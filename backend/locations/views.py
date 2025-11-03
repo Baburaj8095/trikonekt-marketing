@@ -99,10 +99,24 @@ class StateViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = StateSerializer
 
     def get_queryset(self):
-        queryset = State.objects.all().order_by('name')
-        country_id = self.request.query_params.get('country')
-        if country_id:
-            queryset = queryset.filter(country_id=country_id)
+        # Optimize nested serializer (State -> Country) to avoid N+1
+        queryset = State.objects.select_related('country').all().order_by('name')
+        country_param = (
+            self.request.query_params.get('country')
+            or self.request.query_params.get('country_id')
+            or self.request.query_params.get('countryId')
+        )
+        if country_param:
+            try:
+                queryset = queryset.filter(country_id=int(str(country_param).strip()))
+            except Exception:
+                # Invalid id -> empty set to avoid full table scan / DB errors
+                queryset = queryset.none()
+
+        # Optional lightweight limiting for large states lists
+        limit = self.request.query_params.get('limit')
+        if limit and str(limit).isdigit():
+            queryset = queryset[:int(limit)]
         return queryset
 
 
@@ -110,10 +124,45 @@ class CityViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = CitySerializer
 
     def get_queryset(self):
-        queryset = City.objects.all().order_by('name')
-        state_id = self.request.query_params.get('state')
-        if state_id:
-            queryset = queryset.filter(state_id=state_id)
+        # Optimize nested serializer (City -> State -> Country) to avoid N+1s
+        queryset = City.objects.select_related('state', 'state__country').all().order_by('name')
+
+        # Optional name filter for client-side typeahead
+        q = (self.request.query_params.get('q') or '').strip()
+
+        # Accept multiple param shapes: state, state_id, stateId, or state_name
+        state_param = (
+            self.request.query_params.get('state')
+            or self.request.query_params.get('state_id')
+            or self.request.query_params.get('stateId')
+            or self.request.query_params.get('state_name')
+        )
+        s = str(state_param).strip() if state_param is not None else ''
+
+        # Require either a state filter or a search query to avoid full-table scans
+        if s:
+            if s.isdigit():
+                try:
+                    queryset = queryset.filter(state_id=int(s))
+                except Exception:
+                    queryset = queryset.none()
+            else:
+                # Fallback by state name (case-insensitive)
+                queryset = queryset.filter(state__name__iexact=s)
+        elif not q:
+            return City.objects.none()
+
+        if q:
+            queryset = queryset.filter(name__icontains=q)
+
+        # Limit results by default to keep responses fast; override with ?all=1 or set ?limit=...
+        limit = (self.request.query_params.get('limit') or '').strip()
+        all_flag = (self.request.query_params.get('all') or '').strip().lower() in ('1', 'true', 'yes')
+        if limit.isdigit():
+            queryset = queryset[:int(limit)]
+        elif not all_flag:
+            queryset = queryset[:500]
+
         return queryset
 
 
@@ -243,6 +292,20 @@ def reverse_geocode(request):
 
     # Include raw sources only in DEBUG-like scenarios? Keep minimal to reduce payload
     return Response(result, status=status.HTTP_200_OK)
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def debug_counts(request):
+    """
+    Local-only: show counts of Country/State/City to verify data loaded.
+    """
+    if not getattr(settings, "DEBUG", False):
+        return Response({"detail": "Not available in production."}, status=status.HTTP_403_FORBIDDEN)
+    return Response({
+        "countries": Country.objects.count(),
+        "states": State.objects.count(),
+        "cities": City.objects.count(),
+    }, status=status.HTTP_200_OK)
 
 # District -> pincodes lookup using offline cache with in-memory index
 DISTRICT_INDEX = None

@@ -3,6 +3,8 @@ from pathlib import Path
 from django.core.management.base import BaseCommand
 from locations.models import Country, State, City
 from django.db import transaction
+from django.db import connection
+from django.core.management.color import no_style
 
 class Command(BaseCommand):
     help = "Load countries, states, and cities from JSON files"
@@ -32,12 +34,15 @@ class Command(BaseCommand):
 
             state_count = 0
             city_count = 0
+            total_states = len(states_data) if isinstance(states_data, list) else 0
+            missing_country = 0
 
             with transaction.atomic():
                 for s in states_data:
                     country_id = s.get("country_id")
                     country = Country.objects.filter(id=country_id).first()
                     if not country:
+                        missing_country += 1
                         continue
 
                     # Create state
@@ -58,6 +63,17 @@ class Command(BaseCommand):
                         city_count += 1
 
             self.stdout.write(self.style.SUCCESS(f"Loaded {state_count} states and {city_count} cities"))
+            self.stdout.write(self.style.WARNING(f"States in JSON: {total_states}; skipped (missing country): {missing_country}"))
+
+            # Reset Postgres sequences after explicit ID inserts to avoid duplicate key errors
+            try:
+                seq_sql = connection.ops.sequence_reset_sql(no_style(), [Country, State, City])
+                with connection.cursor() as cursor:
+                    for sql in seq_sql:
+                        cursor.execute(sql)
+                self.stdout.write(self.style.SUCCESS("Reset DB sequences for Country, State, City"))
+            except Exception as seq_err:
+                self.stdout.write(self.style.WARNING(f"Sequence reset skipped: {seq_err}"))
 
         except Exception as e:
             self.stdout.write(self.style.ERROR(f"Error: {str(e)}"))

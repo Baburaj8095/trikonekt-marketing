@@ -1,5 +1,10 @@
 from rest_framework import serializers
 from .models import FileUpload, DashboardCard, LuckyDrawSubmission, JobApplication, HomeCard, LuckyCouponAssignment
+from django.conf import settings
+try:
+    from cloudinary_storage.storage import MediaCloudinaryStorage
+except Exception:
+    MediaCloudinaryStorage = None
 
 
 class FileUploadSerializer(serializers.ModelSerializer):
@@ -30,15 +35,47 @@ class FileUploadSerializer(serializers.ModelSerializer):
 
 
 class HomeCardSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
     class Meta:
         model = HomeCard
-        fields = ["id", "title", "image", "order", "is_active", "created_at"]
+        fields = ["id", "title", "image", "image_url", "order", "is_active", "created_at"]
+
+    def get_image_url(self, obj):
+        f = getattr(obj, "image", None)
+        if not f:
+            return None
+        # Prefer the field's own URL first (Cloudinary will yield https://res.cloudinary.com/..., local FS yields /media/...)
+        try:
+            url = f.url
+        except Exception:
+            url = None
+        if not url:
+            return None
+        request = self.context.get("request") if hasattr(self, "context") else None
+        return request.build_absolute_uri(url) if (request and not str(url).startswith("http")) else url
 
 
 class DashboardCardSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
     class Meta:
         model = DashboardCard
-        fields = ["id", "key", "title", "description", "route", "role", "image", "is_active"]
+        fields = ["id", "key", "title", "description", "route", "role", "image", "image_url", "is_active"]
+
+    def get_image_url(self, obj):
+        f = getattr(obj, "image", None)
+        if not f:
+            return None
+        # Prefer the field's own URL first (Cloudinary will yield https://res.cloudinary.com/..., local FS yields /media/...)
+        try:
+            url = f.url
+        except Exception:
+            url = None
+        if not url:
+            return None
+        request = self.context.get("request") if hasattr(self, "context") else None
+        return request.build_absolute_uri(url) if (request and not str(url).startswith("http")) else url
 
 
 class LuckyDrawSubmissionSerializer(serializers.ModelSerializer):

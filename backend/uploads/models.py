@@ -1,10 +1,21 @@
 from django.db import models
 from accounts.models import CustomUser
 
+# Optional Cloudinary raw storage for non-image files (e.g., PDFs)
+# Safe in dev: if cloudinary_storage isn't installed/active, RAW_STORAGE stays None and
+# Django will use DEFAULT_FILE_STORAGE (filesystem or MediaCloudinaryStorage).
+try:
+    from cloudinary_storage.storage import RawMediaCloudinaryStorage, MediaCloudinaryStorage
+    RAW_STORAGE = RawMediaCloudinaryStorage()
+    MEDIA_STORAGE = MediaCloudinaryStorage()
+except Exception:
+    RAW_STORAGE = None
+    MEDIA_STORAGE = None
+
 class FileUpload(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, null=True, blank=True)
     title = models.CharField(max_length=100)
-    file = models.FileField(upload_to='uploads/')
+    file = models.FileField(upload_to='uploads/', storage=RAW_STORAGE)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -17,7 +28,7 @@ class DashboardCard(models.Model):
     description = models.TextField(blank=True)
     route = models.CharField(max_length=200)
     role = models.CharField(max_length=20, blank=True, help_text="Optional: restrict this card to a specific role (user/employee/agency)")
-    image = models.ImageField(upload_to='uploads/cards/', blank=True, null=True)
+    image = models.ImageField(upload_to='uploads/cards/', blank=True, null=True, storage=MEDIA_STORAGE)
     is_active = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -36,7 +47,7 @@ class LuckyDrawSubmission(models.Model):
     sl_number = models.CharField(max_length=100)
     ledger_number = models.CharField(max_length=100)
     pincode = models.CharField(max_length=10)
-    image = models.ImageField(upload_to='uploads/lucky_draw/')
+    image = models.ImageField(upload_to='uploads/lucky_draw/', storage=MEDIA_STORAGE)
 
     # New requested fields
     coupon_purchaser_name = models.CharField(max_length=150, blank=True)
@@ -105,7 +116,7 @@ class JobApplication(models.Model):
     email = models.EmailField()
     phone = models.CharField(max_length=20, blank=True)
     employment_type = models.CharField(max_length=20, choices=EMPLOYMENT_CHOICES)
-    resume = models.FileField(upload_to="uploads/resumes/")
+    resume = models.FileField(upload_to="uploads/resumes/", storage=RAW_STORAGE)
     address = models.TextField(blank=True)
     city = models.CharField(max_length=100, blank=True)
     state = models.CharField(max_length=100, blank=True)
@@ -123,7 +134,7 @@ class JobApplication(models.Model):
 
 class HomeCard(models.Model):
     title = models.CharField(max_length=150, blank=True)
-    image = models.ImageField(upload_to="uploads/homecard/")
+    image = models.ImageField(upload_to="uploads/homecard/", storage=MEDIA_STORAGE)
     order = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

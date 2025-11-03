@@ -1,6 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Auth/Login";
-import Register from "./pages/OldRegister";
 import LuckyDraw from "./pages/LuckyDraw";
 import UserDashboard from "./pages/UserDashboard";
 import AgencyDashboard from "./pages/AgencyDashboard";
@@ -22,16 +21,18 @@ import ConsumerShell from "./components/layouts/ConsumerShell";
 import AgencyShell from "./components/layouts/AgencyShell";
 import EnhancedLogin from "./pages/Auth/EnhancedLogin";
 import Wallet from "./pages/Wallet";
+import LoadingOverlay from "./components/LoadingOverlay";
 
 function App() {
   return (
     <BrowserRouter>
+      <LoadingOverlay />
       <Routes>
         {/* Public Routes */}
         
         <Route path="/" element={<HomeScreen/>} />
         <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+        <Route path="/register" element={<EnhancedLogin />} />
         <Route path="/enhanced-login" element={<EnhancedLogin />} />
         {/* User Routes */}
         <Route

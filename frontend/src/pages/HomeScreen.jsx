@@ -168,7 +168,7 @@ const HomeScreen = () => {
           <>
             {slides.map((s, i) => {
               const visible = i === idx;
-              const src = toImageUrl(s?.image);
+              const src = s?.image_url || toImageUrl(s?.image);
               return (
                 <Box
                   key={s?.id ?? i}

@@ -1,8 +1,9 @@
 import axios from "axios";
+import { incrementLoading, decrementLoading } from "../hooks/loadingStore";
 
 const baseURL =
   process.env.REACT_APP_API_URL ||
-  (process.env.NODE_ENV === "development" ? "/api" : "http://localhost:8000/api");
+  "/api";
 
 const API = axios.create({ baseURL });
 
@@ -95,12 +96,24 @@ function redact(value) {
   return value;
 }
 
-// Attach JWT Authorization header from storage when available.
+/* Track loading + attach JWT Authorization header from storage when available. */
 API.interceptors.request.use(async (config) => {
   // Skip refresh endpoint to prevent recursion/deadlock
   const url = config?.url || "";
   if (url.includes("/accounts/token/refresh/")) {
     return config;
+  }
+
+  // Track loading unless explicitly skipped (e.g., retried request)
+  if (config._skipLoadingTrack) {
+    try {
+      delete config._skipLoadingTrack;
+    } catch (_) {}
+  } else {
+    config._trackLoading = true;
+    try {
+      incrementLoading();
+    } catch (_) {}
   }
 
   // Ensure we have a fresh access token before each request
@@ -129,8 +142,24 @@ API.interceptors.request.use((config) => {
   return config;
 });
 
+/* Ensure we decrement loader even if a request fails before reaching the response interceptors (e.g., network error, CORS, cancellation). */
+API.interceptors.request.use(
+  undefined,
+  (error) => {
+    try {
+      if (error?.config?._trackLoading) decrementLoading();
+    } catch (_) {}
+    return Promise.reject(error);
+  }
+);
+
 API.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    try {
+      if (res?.config?._trackLoading) decrementLoading();
+    } catch (_) {}
+    return res;
+  },
   async (error) => {
     // Dev logging (redacted)
     if (process.env.NODE_ENV !== "production") {
@@ -158,6 +187,8 @@ API.interceptors.response.use(
     // Avoid infinite loops
     if (tokenInvalid && !originalRequest._retry) {
       originalRequest._retry = true;
+      // Do not increment loading again for the retried request
+      originalRequest._skipLoadingTrack = true;
 
       const refreshed = await refreshAccessToken();
       if (refreshed) {
@@ -176,7 +207,17 @@ API.interceptors.response.use(
         sessionStorage.removeItem("token");
         sessionStorage.removeItem("refresh");
       } catch (_) {}
+
+      try {
+        if (originalRequest?._trackLoading) decrementLoading();
+      } catch (_) {}
+      return Promise.reject(error);
     }
+
+    // Non-refreshable error: ensure we decrement loading if we tracked it
+    try {
+      if (originalRequest?._trackLoading) decrementLoading();
+    } catch (_) {}
 
     return Promise.reject(error);
   }

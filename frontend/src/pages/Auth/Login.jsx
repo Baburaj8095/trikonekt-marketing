@@ -164,6 +164,9 @@ const Login = () => {
   const [fpLoading, setFpLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  // Success popup for registration
+  const [regSuccessOpen, setRegSuccessOpen] = useState(false);
+  const [regSuccessText, setRegSuccessText] = useState({ username: "", password: "" });
 
   // Load countries
   useEffect(() => {
@@ -1153,10 +1156,14 @@ const Login = () => {
           address: "",
         });
       } else {
+        const submittedPassword = formData.password;
         const resp = await API.post("/accounts/register/", payload);
         const data = resp?.data || {};
         const uname = data.username || "(generated)";
-        setSuccessMsg(`Registration successful. Please login with username: ${uname}`);
+        // Success alert + popup with username and password as requested
+        setSuccessMsg(`Welcome to Trikonekt!\nUsername: ${uname}\nPassword: ${submittedPassword}`);
+        setRegSuccessText({ username: uname, password: submittedPassword });
+        setRegSuccessOpen(true);
         setMode("login");
         setFormData({
           username: uname,
@@ -2022,6 +2029,19 @@ const Login = () => {
               </Link>
             </Typography>
           </Box>
+
+          {/* Registration success popup */}
+          <Dialog open={regSuccessOpen} onClose={() => setRegSuccessOpen(false)} fullWidth maxWidth="xs">
+            <DialogTitle>Registration Successful</DialogTitle>
+            <DialogContent>
+              <Typography variant="body1" sx={{ whiteSpace: "pre-line" }}>
+                {`Welcome to Trikonekt!\n\nUsername: ${regSuccessText.username}\nPassword: ${regSuccessText.password}`}
+              </Typography>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setRegSuccessOpen(false)}>Close</Button>
+            </DialogActions>
+          </Dialog>
 
           <Dialog open={forgotOpen} onClose={() => setForgotOpen(false)} fullWidth maxWidth="xs">
             <DialogTitle>Reset Password</DialogTitle>

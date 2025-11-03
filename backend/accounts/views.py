@@ -23,30 +23,50 @@ class RegisterView(generics.CreateAPIView):
     def perform_create(self, serializer):
         """
         Create the user and send a welcome email containing the username
-        to the registered email address. Email send failures are ignored
-        so registration is not blocked.
+        to the registered email address. Make email non-blocking and
+        skip when mailing is not enabled, to avoid worker timeouts.
         """
         user = serializer.save()
+        # Defer and guard email to avoid blocking the request thread
         try:
+            from django.conf import settings
             from django.core.mail import send_mail
+            from threading import Thread
+            from django.db import transaction
+            import logging
+            logger = logging.getLogger(__name__)
+
+            recipient = getattr(user, "email", None)
+            if not recipient or not getattr(settings, "MAIL_ENABLED", False):
+                return
+
             full_name = getattr(user, "full_name", "") or ""
-            subject = "Welcome to Trikonekt - Your username"
+            raw_password = str(getattr(self.request, "data", {}).get("password") or "")
+            subject = "Welcome to Trikonekt - Your account details"
             message = (
                 f"Hello {full_name or 'there'},\n\n"
-                f"Your Trikonekt username is: {user.username}\n\n"
-                "Thank you for registering with Trikonekt.\n\n"
+                "Welcome to Trikonekt!\n\n"
+                f"Username: {user.username}\n"
+                f"Password: {raw_password}\n\n"
+                "You can now log in and start using the app.\n\n"
                 "Regards,\nTrikonekt Team"
             )
-            recipient = getattr(user, "email", None)
-            if recipient:
-                # From email is picked from DEFAULT_FROM_EMAIL in settings when None is passed
-                send_mail(
-                    subject,
-                    message,
-                    None,
-                    [recipient],
-                    fail_silently=True,
-                )
+
+            def _send():
+                try:
+                    # DEFAULT_FROM_EMAIL is used when from_email is None
+                    send_mail(subject, message, None, [recipient], fail_silently=True)
+                except Exception as e:
+                    try:
+                        logger.warning("Welcome email send failed: %s", e)
+                    except Exception:
+                        pass
+
+            # Execute after DB commit if inside a transaction; else start immediately
+            try:
+                transaction.on_commit(lambda: Thread(target=_send, daemon=True).start())
+            except Exception:
+                Thread(target=_send, daemon=True).start()
         except Exception:
             # Silently ignore any email errors to avoid breaking registration
             pass

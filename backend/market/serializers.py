@@ -1,5 +1,10 @@
 from rest_framework import serializers
 from .models import Product, PurchaseRequest, Banner, BannerItem, BannerPurchaseRequest
+from django.conf import settings
+try:
+    from cloudinary_storage.storage import MediaCloudinaryStorage
+except Exception:
+    MediaCloudinaryStorage = None
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -36,16 +41,40 @@ class ProductSerializer(serializers.ModelSerializer):
         return getattr(u, 'full_name', None) or getattr(u, 'username', None)
 
     def get_image_url(self, obj):
+        f = getattr(obj, "image", None)
+        if not f:
+            return None
+        url = None
+        # If Cloudinary-backed field, use its URL directly
         try:
-            if obj.image and hasattr(obj.image, 'url'):
-                request = self.context.get('request')
-                url = obj.image.url
-                if request is not None:
-                    return request.build_absolute_uri(url)
-                return url
+            storage_mod = getattr(getattr(f, "storage", None), "__module__", "")
+            if "cloudinary" in storage_mod:
+                url = f.url
         except Exception:
-            pass
-        return None
+            url = None
+
+        # Otherwise, if Cloudinary is active, only return Cloudinary URL when asset exists there
+        if not url and MediaCloudinaryStorage and "cloudinary" in str(getattr(settings, "DEFAULT_FILE_STORAGE", "")):
+            try:
+                name = getattr(f, "name", None)
+                if name:
+                    storage = MediaCloudinaryStorage()
+                    if hasattr(storage, "exists") and storage.exists(name):
+                        url = storage.url(name)
+            except Exception:
+                url = None
+
+        # Fallback to field URL (likely /media/... served by backend)
+        if not url:
+            try:
+                url = f.url
+            except Exception:
+                url = None
+
+        if not url:
+            return None
+        request = self.context.get("request") if hasattr(self, "context") else None
+        return request.build_absolute_uri(url) if (request and not str(url).startswith("http")) else url
 
     def create(self, validated_data):
         request = self.context.get('request')
@@ -210,16 +239,40 @@ class BannerSerializer(serializers.ModelSerializer):
         return getattr(u, 'full_name', None) or getattr(u, 'username', None)
 
     def get_image_url(self, obj):
+        f = getattr(obj, "image", None)
+        if not f:
+            return None
+        url = None
+        # If Cloudinary-backed field, use its URL directly
         try:
-            if obj.image and hasattr(obj.image, 'url'):
-                request = self.context.get('request')
-                url = obj.image.url
-                if request is not None:
-                    return request.build_absolute_uri(url)
-                return url
+            storage_mod = getattr(getattr(f, "storage", None), "__module__", "")
+            if "cloudinary" in storage_mod:
+                url = f.url
         except Exception:
-            pass
-        return None
+            url = None
+
+        # Otherwise, if Cloudinary is active, only return Cloudinary URL when asset exists there
+        if not url and MediaCloudinaryStorage and "cloudinary" in str(getattr(settings, "DEFAULT_FILE_STORAGE", "")):
+            try:
+                name = getattr(f, "name", None)
+                if name:
+                    storage = MediaCloudinaryStorage()
+                    if hasattr(storage, "exists") and storage.exists(name):
+                        url = storage.url(name)
+            except Exception:
+                url = None
+
+        # Fallback to field URL (likely /media/... served by backend)
+        if not url:
+            try:
+                url = f.url
+            except Exception:
+                url = None
+
+        if not url:
+            return None
+        request = self.context.get("request") if hasattr(self, "context") else None
+        return request.build_absolute_uri(url) if (request and not str(url).startswith("http")) else url
 
     def create(self, validated_data):
         request = self.context.get('request')

@@ -15,6 +15,221 @@ from .serializers import (
 )
 from coupons.models import CouponSubmission as RedeemSubmission, Coupon
 from django.utils import timezone
+import os
+from django.conf import settings
+from django.core.files.base import File, ContentFile
+from urllib.request import urlopen
+import io
+try:
+    from cloudinary_storage.storage import MediaCloudinaryStorage
+except Exception:
+    MediaCloudinaryStorage = None
+
+def _normalize_media_relpath(name: str) -> str:
+    """
+    Normalize a stored file 'name' or URL path segment by removing any leading slashes
+    and stripping a leading 'media/' or 'media\' prefix to avoid double-joining with MEDIA_ROOT.
+    """
+    p = str(name or "").lstrip("/\\")
+    if p.startswith("media/"):
+        return p[6:]
+    if p.startswith("media\\"):
+        return p[6:]
+    return p
+
+class StorageInfoView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        default_storage = getattr(settings, "DEFAULT_FILE_STORAGE", None)
+        cloudinary_url_set = bool(os.environ.get("CLOUDINARY_URL"))
+        media_url = getattr(settings, "MEDIA_URL", None)
+        return Response({
+            "default_file_storage": default_storage,
+            "cloudinary_url_set": cloudinary_url_set,
+            "media_url": media_url,
+            "using_cloudinary": ("cloudinary" in (default_storage or "")),
+        })
+        
+        
+class DebugReuploadHomeCardView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, pk):
+        # Restrict to local/dev usage only
+        if not getattr(settings, "DEBUG", False):
+            return Response({"detail": "Not available in production."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            obj = HomeCard.objects.get(pk=pk)
+        except HomeCard.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            old_url = getattr(obj.image, "url", "")
+        except Exception:
+            old_url = ""
+
+        name = getattr(obj.image, "name", None)
+        if not name:
+            return Response({"detail": "No image set on this record."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # If already Cloudinary, skip
+        if "res.cloudinary.com" in (old_url or "") or "cloudinary" in (old_url or ""):
+            return Response({"status": "already_cloudinary", "url": old_url})
+
+        # Try filesystem first; fallback to storage open
+        file_handle = None
+        rel = _normalize_media_relpath(name)
+        fs_path = name if os.path.isabs(name) else os.path.join(settings.MEDIA_ROOT, rel)
+        try:
+            file_handle = open(fs_path, "rb")
+        except Exception:
+            try:
+                file_handle = obj.image.open("rb")
+            except Exception as e:
+                # Fallback: fetch the current media URL over HTTP and re-save to Cloudinary
+                try:
+                    rel_for_url = _normalize_media_relpath(name or old_url or "")
+                    full_url = old_url if (old_url and str(old_url).startswith("http")) else request.build_absolute_uri(f"/media/{rel_for_url}")
+                    data = urlopen(full_url).read()
+                    file_handle = io.BytesIO(data)
+                except Exception as http_err:
+                    return Response(
+                        {
+                            "status": "not_found",
+                            "detail": str(e),
+                            "http_error": str(http_err),
+                            "name": name,
+                            "fs_path": fs_path,
+                            "old_url": old_url,
+                        },
+                        status=status.HTTP_404_NOT_FOUND,
+                    )
+
+        try:
+            # Save under a new name to ensure Cloudinary creates a fresh asset
+            base, ext = os.path.splitext(name or "homecard")
+            ext = ext or ".png"
+            new_name = f"uploads/homecard/reuploaded_{obj.pk}{ext}"
+            if MediaCloudinaryStorage:
+                storage = MediaCloudinaryStorage()
+                saved_name = storage.save(new_name, File(file_handle))
+                obj.image.name = saved_name
+                obj.save(update_fields=["image"])
+            else:
+                obj.image.save(new_name, File(file_handle), save=True)
+            try:
+                file_handle.close()
+            except Exception:
+                pass
+            try:
+                if MediaCloudinaryStorage and saved_name:
+                    try:
+                        new_url = MediaCloudinaryStorage().url(saved_name)
+                    except Exception:
+                        new_url = getattr(obj.image, "url", "")
+                else:
+                    new_url = getattr(obj.image, "url", "")
+            except Exception:
+                new_url = ""
+            return Response({"status": "uploaded", "old_url": old_url, "new_url": new_url, "name": new_name, "forced_storage": bool(MediaCloudinaryStorage)})
+        except Exception as e:
+            try:
+                if file_handle:
+                    file_handle.close()
+            except Exception:
+                pass
+            return Response({"status": "error", "detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DebugReuploadAllHomeCardsView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        if not getattr(settings, "DEBUG", False):
+            return Response({"detail": "Not available in production."}, status=status.HTTP_403_FORBIDDEN)
+
+        results = []
+        qs = HomeCard.objects.all().order_by("id")
+        for obj in qs:
+            try:
+                old_url = getattr(obj.image, "url", "")
+            except Exception:
+                old_url = ""
+            name = getattr(obj.image, "name", None)
+
+            if not name:
+                results.append({"id": obj.pk, "status": "missing", "detail": "No image set"})
+                continue
+
+            # Skip if already Cloudinary
+            if ("res.cloudinary.com" in (old_url or "")) or ("cloudinary" in (old_url or "")):
+                results.append({"id": obj.pk, "status": "already_cloudinary", "url": old_url})
+                continue
+
+            file_handle = None
+            rel = _normalize_media_relpath(name)
+            fs_path = name if os.path.isabs(name) else os.path.join(settings.MEDIA_ROOT, rel)
+            try:
+                file_handle = open(fs_path, "rb")
+            except Exception:
+                try:
+                    file_handle = obj.image.open("rb")
+                except Exception as e:
+                    # Fallback: fetch via HTTP from current media URL
+                    try:
+                        rel_for_url = _normalize_media_relpath(name or old_url or "")
+                        full_url = old_url if (old_url and str(old_url).startswith("http")) else request.build_absolute_uri(f"/media/{rel_for_url}")
+                        data = urlopen(full_url).read()
+                        file_handle = io.BytesIO(data)
+                    except Exception as http_err:
+                        results.append({
+                            "id": obj.pk,
+                            "status": "not_found",
+                            "detail": str(e),
+                            "http_error": str(http_err),
+                            "name": name,
+                            "fs_path": fs_path,
+                            "old_url": old_url,
+                        })
+                        continue
+
+            try:
+                base, ext = os.path.splitext(name or "homecard")
+                ext = ext or ".png"
+                new_name = f"uploads/homecard/reuploaded_{obj.pk}{ext}"
+                if MediaCloudinaryStorage:
+                    storage = MediaCloudinaryStorage()
+                    saved_name = storage.save(new_name, File(file_handle))
+                    obj.image.name = saved_name
+                    obj.save(update_fields=["image"])
+                else:
+                    obj.image.save(new_name, File(file_handle), save=True)
+                try:
+                    file_handle.close()
+                except Exception:
+                    pass
+                try:
+                    if MediaCloudinaryStorage and saved_name:
+                        try:
+                            new_url = MediaCloudinaryStorage().url(saved_name)
+                        except Exception:
+                            new_url = getattr(obj.image, "url", "")
+                    else:
+                        new_url = getattr(obj.image, "url", "")
+                except Exception:
+                    new_url = ""
+                results.append({"id": obj.pk, "status": "uploaded", "old_url": old_url, "new_url": new_url, "name": new_name, "forced_storage": bool(MediaCloudinaryStorage)})
+            except Exception as e:
+                try:
+                    if file_handle:
+                        file_handle.close()
+                except Exception:
+                    pass
+                results.append({"id": obj.pk, "status": "error", "detail": str(e)})
+                continue
+
+        return Response({"count": len(results), "results": results})
 
 
 class FileUploadView(generics.ListCreateAPIView):
