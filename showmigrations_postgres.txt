@@ -1,0 +1,83 @@
+C:\Users\Baburaj\Desktop\React-Django\v1\.venv\Lib\site-packages\django\db\backends\utils.py:98: RuntimeWarning: Accessing the database during app initialization is discouraged. To fix this warning, avoid executing queries in AppConfig.ready() or when your app modules are imported.
+  warnings.warn(self.APPS_NOT_READY_WARNING_MSG, category=RuntimeWarning)
+accounts
+ [X] 0001_initial
+ [X] 0002_customuser_city_customuser_country_and_more
+ [X] 0003_pincodeuser
+ [X] 0004_customuser_sponsor_id
+ [X] 0005_agencydistrict_agencydistrictcoordinator_and_more
+ [X] 0006_alter_customuser_category_alter_customuser_pincode_and_more
+ [X] 0007_alter_businessaccount_options_and_more
+ [X] 0008_delete_businessaccount_and_more
+ [X] 0009_agencyregionassignment
+ [X] 0010_companyaccount_alter_customuser_category
+ [X] 0011_wallet_wallettransaction
+ [X] 0012_alter_agencydistrict_options_and_more
+admin
+ [X] 0001_initial
+ [X] 0002_logentry_remove_auto_add
+ [X] 0003_logentry_add_action_flag_choices
+auth
+ [X] 0001_initial
+ [X] 0002_alter_permission_name_max_length
+ [X] 0003_alter_user_email_max_length
+ [X] 0004_alter_user_username_opts
+ [X] 0005_alter_user_last_login_null
+ [X] 0006_require_contenttypes_0002
+ [X] 0007_alter_validators_add_error_messages
+ [X] 0008_alter_user_username_max_length
+ [X] 0009_alter_user_last_name_max_length
+ [X] 0010_alter_group_name_max_length
+ [X] 0011_update_proxy_permissions
+ [X] 0012_alter_user_first_name_max_length
+business
+ [X] 0001_initial
+ [X] 0002_commissionconfig_autopoolaccount
+ [X] 0003_extend_commissionconfig_geo_fields
+contenttypes
+ [X] 0001_initial
+ [X] 0002_remove_content_type_name
+coupons
+ [X] 0001_initial
+ [X] 0002_couponcode_couponsubmission_code_ref_and_more
+ [X] 0003_couponcode_assigned_agency_couponcode_serial_and_more
+locations
+ [X] 0001_initial
+ [X] 0002_alter_country_options_alter_state_options_and_more
+ [X] 0003_country_iso3
+ [X] 0004_remove_country_iso3_alter_country_iso2
+market
+ [X] 0001_initial
+ [X] 0002_banner_banneritem
+ [X] 0003_purchaserequest_payment_method
+ [X] 0004_rename_market_ban_banner__b6f3a7_idx_market_bann_banner__16de9b_idx
+ [X] 0005_banneritem_gift
+ [X] 0006_bannerpurchaserequest
+sessions
+ [X] 0001_initial
+token_blacklist
+ [X] 0001_initial
+ [X] 0002_outstandingtoken_jti_hex
+ [X] 0003_auto_20171017_2007
+ [X] 0004_auto_20171017_2013
+ [X] 0005_remove_outstandingtoken_jti
+ [X] 0006_auto_20171017_2113
+ [X] 0007_auto_20171017_2214
+ [X] 0008_migrate_to_bigautofield
+ [X] 0010_fix_migrate_to_bigautofield
+ [X] 0011_linearizes_history
+ [X] 0012_alter_outstandingtoken_user
+ [X] 0013_alter_blacklistedtoken_options_and_more
+uploads
+ [X] 0001_initial
+ [X] 0002_alter_fileupload_user
+ [X] 0003_dashboardcard_luckydrawsubmission
+ [X] 0004_dashboardcard_role
+ [X] 0005_jobapplication
+ [X] 0006_homecard
+ [X] 0007_luckydrawsubmission_address_and_more
+ [X] 0008_luckydrawsubmission_tr_emp_id
+ [X] 0009_luckydrawsubmission_agency_comment_and_more
+ [X] 0010_luckycouponassignment
+ [X] 0011_agencycouponquota
+ [X] 0012_luckycouponassignment_sold_count

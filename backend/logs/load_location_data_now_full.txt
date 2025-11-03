@@ -1,0 +1,6 @@
+C:\Users\Baburaj\Desktop\React-Django\v1\.venv\Lib\site-packages\django\db\backends\utils.py:98: RuntimeWarning: Accessing the database during app initialization is discouraged. To fix this warning, avoid executing queries in AppConfig.ready() or when your app modules are imported.
+  warnings.warn(self.APPS_NOT_READY_WARNING_MSG, category=RuntimeWarning)
+Loading countries...
+Loaded 250 countries
+Loading states and cities...
+Error: could not translate host name "dpg-d42ust24d50c73a55sc0-a.oregon-postgres.render.com" to address: Name or service not known

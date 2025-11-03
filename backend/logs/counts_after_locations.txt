@@ -1,0 +1,23 @@
+C:\Users\Baburaj\Desktop\React-Django\v1\.venv\Lib\site-packages\django\db\backends\utils.py:98: RuntimeWarning: Accessing the database during app initialization is discouraged. To fix this warning, avoid executing queries in AppConfig.ready() or when your app modules are imported.
+  warnings.warn(self.APPS_NOT_READY_WARNING_MSG, category=RuntimeWarning)
+Database connection:
+  ENGINE: django.db.backends.postgresql
+  NAME  : trikonekt
+  HOST  : dpg-d42ust24d50c73a55sc0-a.oregon-postgres.render.com
+  PORT  : 
+
+Users (accounts.CustomUser): 0
+market.Product: 0
+market.Banner: 0
+market.PurchaseRequest: 0
+coupons.CouponCode: 0
+uploads.DashboardCard: 1
+uploads.LuckyDrawSubmission: 0
+uploads.LuckyCouponAssignment: 1
+business.CommissionConfig: 0
+business.AutoPoolAccount: 0
+locations.Country: 250
+locations.State: 0
+locations.City: 0
+
+Done.

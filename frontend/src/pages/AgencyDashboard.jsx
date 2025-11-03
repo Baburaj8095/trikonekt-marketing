@@ -1,0 +1,604 @@
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  Typography,
+  Box,
+  Container,
+  Paper,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  CircularProgress,
+  Alert,
+  TextField,
+  Stack,
+  MenuItem,
+  Button,
+} from "@mui/material";
+import API from "../api/api";
+
+export default function AgencyDashboard() {
+  // Nav identity (for filtering employees by agency pincode)
+  const storedUser = useMemo(() => {
+    try {
+      const ls = localStorage.getItem("user") || sessionStorage.getItem("user");
+      return ls ? JSON.parse(ls) : {};
+    } catch {
+      return {};
+    }
+  }, []);
+  const agencyPincode = (storedUser?.pincode || "").toString();
+
+  // Sidebar tabs (internal page tabs)
+  const TABS = {
+    LUCKY: "lucky",
+    ASSIGN: "assign",
+    EMPLOYEES: "employees",
+  };
+  const [activeTab, setActiveTab] = useState(TABS.LUCKY);
+  const [showAllLucky, setShowAllLucky] = useState(false);
+
+  // Lucky Draw history (agency scope: pincode)
+  const [luckyList, setLuckyList] = useState([]);
+  const [luckyLoading, setLuckyLoading] = useState(false);
+  const [luckyError, setLuckyError] = useState("");
+  const [commissionTotal, setCommissionTotal] = useState(0);
+
+  const loadLuckyHistory = async () => {
+    try {
+      setLuckyLoading(true);
+      setLuckyError("");
+      // Prefer actionable pending list for agency; toggle to view all if needed
+      const url = showAllLucky ? "/uploads/lucky-draw/" : "/uploads/lucky-draw/pending/agency/";
+      const res = await API.get(url);
+      const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
+      setLuckyList(arr || []);
+    } catch (e) {
+      setLuckyError("Failed to load lucky draw submissions");
+      setLuckyList([]);
+    } finally {
+      setLuckyLoading(false);
+    }
+  };
+
+  const loadCommission = async () => {
+    try {
+      const res = await API.get("/coupons/commissions/mine/");
+      const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
+      const total = (arr || [])
+        .filter((c) => ["earned", "paid"].includes(String(c.status || "").toLowerCase()))
+        .reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+      setCommissionTotal(total);
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  // Approve / Reject lucky draw (pending for agency)
+  const [busyId, setBusyId] = useState(null);
+  const agencyApproveLucky = async (id) => {
+    const comment = window.prompt("Agency comment (optional)", "") || "";
+    try {
+      setBusyId(id);
+      await API.post(`/uploads/lucky-draw/${id}/agency-approve/`, { comment });
+      await loadLuckyHistory();
+    } catch (e) {
+    } finally {
+      setBusyId(null);
+    }
+  };
+  const agencyRejectLucky = async (id) => {
+    const comment = window.prompt("Agency comment (optional)", "") || "";
+    try {
+      setBusyId(id);
+      await API.post(`/uploads/lucky-draw/${id}/agency-reject/`, { comment });
+      await loadLuckyHistory();
+    } catch (e) {
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  // Employees (for assignment + details)
+  const [myEmployees, setMyEmployees] = useState([]);
+  const [assignableEmployees, setAssignableEmployees] = useState([]);
+  const [empLoading, setEmpLoading] = useState(false);
+  const [empError, setEmpError] = useState("");
+
+  const loadEmployees = async () => {
+    try {
+      setEmpLoading(true);
+      setEmpError("");
+
+      // Primary: by agency pincode using pincode=me (resolved on backend)
+      let arr1 = [];
+      try {
+        const res1 = await API.get("/accounts/users/", {
+          params: { role: "employee", pincode: "me" },
+        });
+        arr1 = Array.isArray(res1.data) ? res1.data : res1.data?.results || [];
+      } catch (_) {}
+
+      // Also include employees directly registered by this agency (role-based)
+      let arr3 = [];
+      try {
+        const res3 = await API.get("/accounts/users/", {
+          params: { role: "employee", registered_by: "me" },
+        });
+        arr3 = Array.isArray(res3.data) ? res3.data : res3.data?.results || [];
+      } catch (_) {}
+
+      // Include employees created via dedicated my/employees endpoint (category-based)
+      let arr2 = [];
+      try {
+        const res2 = await API.get("/accounts/my/employees/");
+        arr2 = Array.isArray(res2.data) ? res2.data : res2.data?.results || [];
+      } catch (_) {}
+
+      // Fallback: fetch all employees (server-side auth required); then client-filter by agency pincode if available
+      let arr4 = [];
+      try {
+        const res4 = await API.get("/accounts/users/", {
+          params: { role: "employee" },
+        });
+        arr4 = Array.isArray(res4.data) ? res4.data : res4.data?.results || [];
+      } catch (_) {}
+
+      // Supplement: employees in my pincode with explicit category filter (covers role/category mismatches)
+      let arr5 = [];
+      try {
+        const res5 = await API.get("/accounts/users/", {
+          params: { role: "employee", pincode: "me", category: "employee" },
+        });
+        arr5 = Array.isArray(res5.data) ? res5.data : res5.data?.results || [];
+      } catch (_) {}
+
+      // All employees by category regardless of role field mismatch
+      let arr6 = [];
+      try {
+        const res6 = await API.get("/accounts/users/", {
+          params: { category: "employee" },
+        });
+        arr6 = Array.isArray(res6.data) ? res6.data : res6.data?.results || [];
+      } catch (_) {}
+
+      // Backend-provided "assignable" list: role=employee where (registered_by=me OR in my pincode)
+      let arrA = [];
+      try {
+        const resA = await API.get("/accounts/users/", {
+          params: { role: "employee", assignable: 1 },
+        });
+        arrA = Array.isArray(resA.data) ? resA.data : resA.data?.results || [];
+      } catch (_) {}
+
+      // If agency pincode available and nothing found yet, prefer only matching pincode from the fallback list
+      let arr4Filtered = [];
+      const pin = agencyPincode ? String(agencyPincode).toLowerCase() : "";
+      if ((arr1?.length || arr2?.length || arr3?.length || arr5?.length) === 0 && pin) {
+        arr4Filtered = (arr4 || []).filter(
+          (u) => String(u?.pincode || "").toLowerCase() === pin
+        );
+      }
+
+      // Merge unique by id (restrict any unscoped lists to my pincode)
+      const byId = new Map();
+      const arr6Scoped = pin ? (arr6 || []).filter((u) => String(u?.pincode || "").toLowerCase() === pin) : [];
+      [...(arr1 || []), ...(arr2 || []), ...(arr3 || []), ...(arr5 || []), ...arr6Scoped, ...(arr4Filtered || [])].forEach((u) => {
+        if (u && typeof u.id !== "undefined" && !byId.has(u.id)) byId.set(u.id, u);
+      });
+      const merged = Array.from(byId.values());
+
+      // Assignable = employees registered under this agency OR in my pincode (arr2, arr3, arr1, arr5, arr6Scoped) + backend "assignable" shortcut (arrA)
+      const assignableById = new Map();
+      [...(arrA || []), ...(arr2 || []), ...(arr3 || []), ...(arr1 || []), ...(arr5 || []), ...arr6Scoped].forEach((u) => {
+        if (u && typeof u.id !== "undefined" && !assignableById.has(u.id)) assignableById.set(u.id, u);
+      });
+      // Fallback: if still none, use pincode-filtered generic list
+      if (assignableById.size === 0 && (arr4Filtered && arr4Filtered.length)) {
+        (arr4Filtered || []).forEach((u) => {
+          if (u && typeof u.id !== "undefined" && !assignableById.has(u.id)) assignableById.set(u.id, u);
+        });
+      }
+      setAssignableEmployees(Array.from(assignableById.values()));
+
+      // Finalize employee list; avoid unscoped all-employees fallback
+      setMyEmployees(merged.length > 0 ? merged : arr4Filtered);
+    } catch (e) {
+      setEmpError("Failed to load employees");
+      setMyEmployees([]);
+    } finally {
+      setEmpLoading(false);
+    }
+  };
+
+  // Assignments
+  const [assignForm, setAssignForm] = useState({ employee: "", quantity: "", note: "" });
+  const onAssignChange = (e) => setAssignForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+  const [assignList, setAssignList] = useState([]);
+  const [assignLoading, setAssignLoading] = useState(false);
+  const [assignError, setAssignError] = useState("");
+  const [assignSubmitting, setAssignSubmitting] = useState(false);
+  const [assignErrors, setAssignErrors] = useState({});
+  const [quota, setQuota] = useState({ quota: 0, assigned: 0, remaining: 0, updated_at: null });
+
+  const loadAssignments = async () => {
+    try {
+      setAssignLoading(true);
+      setAssignError("");
+      const res = await API.get("/uploads/lucky-assignments/");
+      const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
+      setAssignList(arr || []);
+    } catch (e) {
+      setAssignError("Failed to load assignments");
+      setAssignList([]);
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  const loadQuota = async () => {
+    try {
+      const res = await API.get("/uploads/agency-quota/");
+      const data = res?.data || {};
+      setQuota({
+        quota: Number(data.quota || 0),
+        assigned: Number(data.assigned || 0),
+        remaining: Number(data.remaining || 0),
+        updated_at: data.updated_at || null,
+      });
+    } catch (e) {
+      setQuota((q) => ({ ...q, error: "Failed to load quota" }));
+    }
+  };
+
+  const submitAssignment = async (e) => {
+    e.preventDefault();
+    if (!assignForm.employee || !assignForm.quantity) {
+      alert("Please select employee and enter quantity.");
+      return;
+    }
+    // Ensure selected employee is registered under this agency (assignable)
+    const isAssignable = (assignableEmployees || []).some((u) => String(u.id) === String(assignForm.employee));
+    if (!isAssignable) {
+      setAssignErrors({ employee: ["Selected employee is not assignable. Choose an employee registered under your agency."] });
+      return;
+    }
+    // Client-side quota validation to give immediate feedback (server enforces too)
+    const qtyNum = Number(assignForm.quantity);
+    if (Number.isFinite(qtyNum) && typeof quota?.remaining === "number" && qtyNum > quota.remaining) {
+      setAssignErrors({ quantity: [`Cannot assign more than remaining quota (${quota.remaining}).`] });
+      return;
+    }
+    try {
+      setAssignErrors({});
+      setAssignSubmitting(true);
+      await API.post("/uploads/lucky-assignments/", {
+        employee: assignForm.employee,
+        quantity: Number(assignForm.quantity),
+        note: assignForm.note || "",
+      });
+      await loadAssignments();
+      await loadQuota();
+      setAssignForm({ employee: "", quantity: "", note: "" });
+      alert("Assigned successfully.");
+    } catch (e) {
+      const data = e?.response?.data || {};
+      setAssignErrors(data || {});
+      setAssignError(typeof data?.detail === "string" ? data.detail : "Failed to assign.");
+    } finally {
+      setAssignSubmitting(false);
+    }
+  };
+
+  // Load once
+  useEffect(() => {
+    loadLuckyHistory();
+    loadEmployees();
+    loadAssignments();
+    loadQuota();
+    loadCommission();
+  }, []);
+
+  // Reload lucky list when toggle or tab changes
+  useEffect(() => {
+    if (activeTab === TABS.LUCKY) {
+      loadLuckyHistory();
+    }
+  }, [showAllLucky, activeTab]);
+
+  // Reload employees list when switching to Assign or Employees tabs
+  useEffect(() => {
+    if (activeTab === TABS.ASSIGN || activeTab === TABS.EMPLOYEES) {
+      loadEmployees();
+    }
+    if (activeTab === TABS.ASSIGN) {
+      loadQuota();
+    }
+  }, [activeTab]);
+
+  return (
+    <Container maxWidth="lg" sx={{ px: 0 }}>
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2, flexWrap: "wrap", gap: 1 }}>
+        <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>
+          Agency Dashboard
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          Pincode: {agencyPincode || "-"}
+        </Typography>
+      </Box>
+
+      <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+        <Button variant={activeTab === TABS.LUCKY ? "contained" : "outlined"} onClick={() => setActiveTab(TABS.LUCKY)}>
+          Lucky Draw Submission
+        </Button>
+        
+        <Button variant={activeTab === TABS.EMPLOYEES ? "contained" : "outlined"} onClick={() => setActiveTab(TABS.EMPLOYEES)}>
+          Employee Details
+        </Button>
+      </Stack>
+
+      {activeTab === TABS.LUCKY && (
+        <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>
+              Lucky Draw Submission History
+            </Typography>
+            <Box sx={{ display: "flex", gap: 1 }}>
+              <Button size="small" variant="outlined" onClick={() => setShowAllLucky((v) => !v)}>
+                {showAllLucky ? "Show Pending" : "Show All"}
+              </Button>
+              <Button size="small" onClick={loadLuckyHistory}>Refresh</Button>
+            </Box>
+          </Box>
+          <Box sx={{ mb: 2 }}>
+            <Alert severity="success">
+              My commission earned: ₹{commissionTotal.toFixed(2)}
+            </Alert>
+          </Box>
+          {luckyLoading ? (
+            <Box sx={{ py: 4, display: "flex", alignItems: "center", gap: 1 }}>
+              <CircularProgress size={20} /> <Typography variant="body2">Loading...</Typography>
+            </Box>
+          ) : luckyError ? (
+            <Alert severity="error">{luckyError}</Alert>
+          ) : (
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Date</TableCell>
+                  <TableCell>SL</TableCell>
+                  <TableCell>Ledger</TableCell>
+                  <TableCell>Employee</TableCell>
+                  <TableCell>Pincode</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>TRE Reviewer</TableCell>
+                  <TableCell>Agency Reviewer</TableCell>
+                  <TableCell>Comments</TableCell>
+                  <TableCell align="right">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {(luckyList || []).map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell>{r.created_at ? new Date(r.created_at).toLocaleString() : ""}</TableCell>
+                    <TableCell>{r.sl_number}</TableCell>
+                    <TableCell>{r.ledger_number}</TableCell>
+                    <TableCell>
+                      {(r.username || "")}
+                      {r.user ? ` (#${r.user})` : ""}
+                      {r.tr_emp_id ? ` [TRE:${r.tr_emp_id}]` : ""}
+                    </TableCell>
+                    <TableCell>{r.pincode}</TableCell>
+                    <TableCell>{r.status}</TableCell>
+                    <TableCell>
+                      {r.tre_reviewer ? r.tre_reviewer : ""} {r.tre_reviewed_at ? `(${new Date(r.tre_reviewed_at).toLocaleString()})` : ""}
+                    </TableCell>
+                    <TableCell>
+                      {r.agency_reviewer ? r.agency_reviewer : ""} {r.agency_reviewed_at ? `(${new Date(r.agency_reviewed_at).toLocaleString()})` : ""}
+                    </TableCell>
+                    <TableCell>
+                      {r.tre_comment ? `TRE: ${r.tre_comment} ` : ""}
+                      {r.agency_comment ? `AGENCY: ${r.agency_comment}` : ""}
+                    </TableCell>
+                    <TableCell align="right">
+                      {String(r.status).toUpperCase() === "TRE_APPROVED" ? (
+                        <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
+                          <Button size="small" variant="contained" disabled={busyId === r.id} onClick={() => agencyApproveLucky(r.id)} sx={{ backgroundColor: "#2E7D32", "&:hover": { backgroundColor: "#1B5E20" } }}>
+                            Approve
+                          </Button>
+                          <Button size="small" variant="outlined" color="error" disabled={busyId === r.id} onClick={() => agencyRejectLucky(r.id)}>
+                            Reject
+                          </Button>
+                        </Box>
+                      ) : (
+                        "-"
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {(!luckyList || luckyList.length === 0) && (
+                  <TableRow>
+                    <TableCell colSpan={10}>
+                      <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                        No submissions in your pincode.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </Paper>
+      )}
+
+      {activeTab === TABS.ASSIGN && (
+        <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mt: 2 }}>
+          {empError ? <Alert severity="warning" sx={{ mb: 2 }}>{empError}</Alert> : null}
+          {typeof quota?.remaining === "number" ? (
+            <Alert severity={quota.remaining > 0 ? "info" : "warning"} sx={{ mb: 2 }}>
+              Quota: {quota.quota} | Assigned: {quota.assigned} | Remaining: {quota.remaining}
+            </Alert>
+          ) : null}
+          <Box component="form" onSubmit={submitAssignment}>
+            <Stack spacing={2}>
+              <TextField
+                select
+                fullWidth
+                label="Select Employee"
+                name="employee"
+                value={assignForm.employee}
+                onChange={onAssignChange}
+                error={Boolean(assignErrors?.employee)}
+                helperText={
+                  assignErrors?.employee?.[0] ||
+                  (assignableEmployees?.length ? "" : "No employees found in your pincode or registered under your agency.")
+                }
+              >
+                {(assignableEmployees || []).map((emp) => (
+                  <MenuItem key={emp.id} value={emp.id}>
+                    {emp.username} — {emp.full_name || ""} — {emp.phone || ""} — {emp.email || ""}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                fullWidth
+                label="Quantity"
+                name="quantity"
+                value={assignForm.quantity}
+                onChange={onAssignChange}
+                error={Boolean(assignErrors?.quantity)}
+                helperText={assignErrors?.quantity?.[0] || (typeof quota?.remaining === "number" ? `Remaining: ${quota.remaining}` : "")}
+                inputProps={{ inputMode: "numeric", pattern: "[0-9]*", min: 1 }}
+                required
+              />
+              <TextField
+                fullWidth
+                label="Note (optional)"
+                name="note"
+                value={assignForm.note}
+                onChange={onAssignChange}
+                error={Boolean(assignErrors?.note)}
+                helperText={assignErrors?.note?.[0] || ""}
+                multiline
+                minRows={2}
+              />
+              <Button type="submit" variant="contained" disabled={assignSubmitting || (typeof quota?.remaining === "number" && quota.remaining <= 0) || !(assignableEmployees && assignableEmployees.length)}>
+                {assignSubmitting ? "Assigning..." : "Assign"}
+              </Button>
+            </Stack>
+          </Box>
+
+          <div style={{ height: 16 }} />
+
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
+            Assignment History
+          </Typography>
+          {assignLoading ? (
+            <Box sx={{ py: 2, display: "flex", alignItems: "center", gap: 1 }}>
+              <CircularProgress size={20} /> <Typography variant="body2">Loading...</Typography>
+            </Box>
+          ) : assignError ? (
+            <Alert severity="error">{assignError}</Alert>
+          ) : (
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Date</TableCell>
+                  <TableCell>Employee</TableCell>
+                  <TableCell>Full Name</TableCell>
+                  <TableCell>Email</TableCell>
+                  <TableCell>Phone</TableCell>
+                  <TableCell>Pincode</TableCell>
+                  <TableCell>Quantity</TableCell>
+                  <TableCell>Sold</TableCell>
+                  <TableCell>Remaining</TableCell>
+                  <TableCell>Channel</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {(assignList || []).map((a) => (
+                  <TableRow key={a.id}>
+                    <TableCell>{a.created_at ? new Date(a.created_at).toLocaleString() : ""}</TableCell>
+                    <TableCell>{a.employee_username || ""}</TableCell>
+                    <TableCell>{a.employee_full_name || ""}</TableCell>
+                    <TableCell>{a.employee_email || ""}</TableCell>
+                    <TableCell>{a.employee_phone || ""}</TableCell>
+                    <TableCell>{a.employee_pincode || ""}</TableCell>
+                    <TableCell>{a.quantity}</TableCell>
+                    <TableCell>{a.sold_count}</TableCell>
+                    <TableCell>{a.remaining}</TableCell>
+                    <TableCell>{a.channel}</TableCell>
+                  </TableRow>
+                ))}
+                {(!assignList || assignList.length === 0) && (
+                  <TableRow>
+                    <TableCell colSpan={10}>
+                      <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                        No assignments yet.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </Paper>
+      )}
+
+      {activeTab === TABS.EMPLOYEES && (
+        <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mt: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>
+              Employee Details
+            </Typography>
+            <Box sx={{ display: "flex", gap: 1 }}>
+              <Button size="small" onClick={loadEmployees}>Refresh</Button>
+            </Box>
+          </Box>
+          {empLoading ? (
+            <Box sx={{ py: 2, display: "flex", alignItems: "center", gap: 1 }}>
+              <CircularProgress size={20} /> <Typography variant="body2">Loading...</Typography>
+            </Box>
+          ) : empError ? (
+            <Alert severity="error">{empError}</Alert>
+          ) : (
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Username</TableCell>
+                  <TableCell>Full Name</TableCell>
+                  <TableCell>Email</TableCell>
+                  <TableCell>Phone</TableCell>
+                  <TableCell>Address</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {(myEmployees || []).map((u) => (
+                  <TableRow key={u.id}>
+                    <TableCell>{u.username}</TableCell>
+                    <TableCell>{u.full_name || ""}</TableCell>
+                    <TableCell>{u.email || ""}</TableCell>
+                    <TableCell>{u.phone || ""}</TableCell>
+                    <TableCell>
+                      {u.pincode || ""}{u.city ? `, ${u.city}` : ""}{u.state ? `, ${u.state}` : ""}{u.country ? `, ${u.country}` : ""}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {(!myEmployees || myEmployees.length === 0) && (
+                  <TableRow>
+                    <TableCell colSpan={5}>
+                      <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                        No employees found.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </Paper>
+      )}
+    </Container>
+  );
+}

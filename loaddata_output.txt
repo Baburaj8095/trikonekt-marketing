@@ -1,0 +1,37 @@
+C:\Users\Baburaj\Desktop\React-Django\v1\.venv\Lib\site-packages\django\db\backends\utils.py:98: RuntimeWarning: Accessing the database during app initialization is discouraged. To fix this warning, avoid executing queries in AppConfig.ready() or when your app modules are imported.
+  warnings.warn(self.APPS_NOT_READY_WARNING_MSG, category=RuntimeWarning)
+Traceback (most recent call last):
+  File "C:\Users\Baburaj\Desktop\React-Django\v1\backend\manage.py", line 14, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\Baburaj\Desktop\React-Django\v1\backend\manage.py", line 11, in main
+    execute_from_command_line(sys.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\Baburaj\Desktop\React-Django\v1\.venv\Lib\site-packages\django\core\management\__init__.py", line 442, in execute_from_command_line
+    utility.execute()
+    ~~~~~~~~~~~~~~~^^
+  File "C:\Users\Baburaj\Desktop\React-Django\v1\.venv\Lib\site-packages\django\core\management\__init__.py", line 436, in execute
+    self.fetch_command(subcommand).run_from_argv(self.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "C:\Users\Baburaj\Desktop\React-Django\v1\.venv\Lib\site-packages\django\core\management\base.py", line 416, in run_from_argv
+    self.execute(*args, **cmd_options)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Baburaj\Desktop\React-Django\v1\.venv\Lib\site-packages\django\core\management\base.py", line 460, in execute
+    output = self.handle(*args, **options)
+  File "C:\Users\Baburaj\Desktop\React-Django\v1\.venv\Lib\site-packages\django\core\management\commands\loaddata.py", line 103, in handle
+    self.loaddata(fixture_labels)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "C:\Users\Baburaj\Desktop\React-Django\v1\.venv\Lib\site-packages\django\core\management\commands\loaddata.py", line 164, in loaddata
+    self.load_label(fixture_label)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "C:\Users\Baburaj\Desktop\React-Django\v1\.venv\Lib\site-packages\django\core\management\commands\loaddata.py", line 244, in load_label
+    objects = serializers.deserialize(
+        ser_fmt,
+    ...<3 lines>...
+        handle_forward_references=True,
+    )
+  File "C:\Users\Baburaj\Desktop\React-Django\v1\.venv\Lib\site-packages\django\core\serializers\__init__.py", line 146, in deserialize
+    return d(stream_or_string, **options)
+  File "C:\Users\Baburaj\Desktop\React-Django\v1\.venv\Lib\site-packages\django\core\serializers\json.py", line 69, in __init__
+    stream_or_string = stream_or_string.decode()
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xe7 in position 33907: invalid continuation byte

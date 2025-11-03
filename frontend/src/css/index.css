@@ -1,0 +1,5 @@
+body {
+  margin: 0; /* Remove default 8px body margin */
+  background-color: #f9fafc;
+  font-family: 'Poppins', sans-serif;
+}

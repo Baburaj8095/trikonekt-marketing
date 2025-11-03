@@ -1,0 +1,348 @@
+from django.utils import timezone
+from rest_framework import serializers
+from django.conf import settings
+
+from .models import (
+    Coupon,
+    CouponAssignment,
+    CouponSubmission,
+    CouponCode,
+    CouponBatch,
+    Commission,
+    AuditTrail,
+)
+
+
+UserModel = settings.AUTH_USER_MODEL
+
+
+class CouponSerializer(serializers.ModelSerializer):
+    issuer_username = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = Coupon
+        fields = [
+            "id",
+            "code",
+            "title",
+            "description",
+            "campaign",
+            "valid_from",
+            "valid_to",
+            "issuer",
+            "issuer_username",
+            "is_active",
+            "created_at",
+        ]
+        read_only_fields = ["issuer", "issuer_username", "created_at"]
+
+    def get_issuer_username(self, obj):
+        try:
+            return obj.issuer.username
+        except Exception:
+            return None
+
+
+class CouponAssignmentSerializer(serializers.ModelSerializer):
+    coupon_code = serializers.CharField(source="coupon.code", read_only=True)
+    employee_username = serializers.SerializerMethodField(read_only=True)
+    assigned_by_username = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = CouponAssignment
+        fields = [
+            "id",
+            "coupon",
+            "coupon_code",
+            "employee",
+            "employee_username",
+            "assigned_by",
+            "assigned_by_username",
+            "assigned_at",
+            "status",
+        ]
+        read_only_fields = ["assigned_at"]
+
+    def get_employee_username(self, obj):
+        try:
+            return obj.employee.username
+        except Exception:
+            return None
+
+    def get_assigned_by_username(self, obj):
+        try:
+            return obj.assigned_by.username
+        except Exception:
+            return None
+
+
+class CouponCodeSerializer(serializers.ModelSerializer):
+    coupon_title = serializers.CharField(source="coupon.title", read_only=True)
+    assigned_employee_username = serializers.SerializerMethodField(read_only=True)
+    assigned_agency_username = serializers.SerializerMethodField(read_only=True)
+    issued_by_username = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = CouponCode
+        fields = [
+            "id",
+            "code",
+            "coupon",
+            "coupon_title",
+            "issued_channel",
+            "assigned_agency",
+            "assigned_agency_username",
+            "assigned_employee",
+            "assigned_employee_username",
+            "issued_by",
+            "issued_by_username",
+            "batch",
+            "serial",
+            "value",
+            "status",
+            "created_at",
+        ]
+        read_only_fields = ["status", "created_at"]
+
+    def get_assigned_employee_username(self, obj):
+        try:
+            return obj.assigned_employee.username if obj.assigned_employee_id else None
+        except Exception:
+            return None
+
+    def get_assigned_agency_username(self, obj):
+        try:
+            return obj.assigned_agency.username if obj.assigned_agency_id else None
+        except Exception:
+            return None
+
+    def get_issued_by_username(self, obj):
+        try:
+            return obj.issued_by.username
+        except Exception:
+            return None
+
+
+class CouponSubmissionSerializer(serializers.ModelSerializer):
+    consumer_username = serializers.SerializerMethodField(read_only=True)
+    coupon_id = serializers.IntegerField(source="coupon.id", read_only=True)
+    file = serializers.FileField(write_only=True, required=False)
+
+    class Meta:
+        model = CouponSubmission
+        fields = [
+            "id",
+            "consumer",
+            "consumer_username",
+            "coupon",
+            "coupon_id",
+            "coupon_code",
+            "code_ref",
+            "pincode",
+            "notes",
+            "file",
+            "status",
+            "employee_reviewer",
+            "employee_reviewed_at",
+            "employee_comment",
+            "agency_reviewer",
+            "agency_reviewed_at",
+            "agency_comment",
+            "created_at",
+        ]
+        read_only_fields = [
+            "consumer",
+            "consumer_username",
+            "coupon",
+            "coupon_id",
+            "code_ref",
+            "status",
+            "employee_reviewer",
+            "employee_reviewed_at",
+            "agency_reviewer",
+            "agency_reviewed_at",
+            "created_at",
+        ]
+
+    def get_consumer_username(self, obj):
+        try:
+            return obj.consumer.username
+        except Exception:
+            return None
+
+    def validate(self, attrs):
+        # Expect coupon_code provided on create
+        request = self.context.get("request")
+        if request and request.method in ("POST", "PUT", "PATCH"):
+            coupon_code = attrs.get("coupon_code") or (self.instance.coupon_code if self.instance else None)
+            if not coupon_code:
+                raise serializers.ValidationError({"coupon_code": "This field is required."})
+
+            # First: try to resolve a specific CouponCode instance (supports physical/e-coupons at scale)
+            code_ref = None
+            coupon_obj = None
+            try:
+                code_ref = CouponCode.objects.select_related("coupon").get(code=coupon_code)
+                coupon_obj = code_ref.coupon
+            except CouponCode.DoesNotExist:
+                # Fallback to legacy Coupon by code (v1 single code per campaign)
+                try:
+                    coupon_obj = Coupon.objects.get(code=coupon_code)
+                except Coupon.DoesNotExist:
+                    raise serializers.ValidationError({"coupon_code": "Invalid coupon code."})
+
+            now = timezone.now()
+            if not coupon_obj.is_active:
+                raise serializers.ValidationError({"coupon_code": "This coupon is not active."})
+            if coupon_obj.valid_from and coupon_obj.valid_from > now:
+                raise serializers.ValidationError({"coupon_code": "This coupon is not yet valid."})
+            if coupon_obj.valid_to and coupon_obj.valid_to < now:
+                raise serializers.ValidationError({"coupon_code": "This coupon has expired."})
+
+            # Prevent multiple open submissions:
+            # - If code_ref exists, enforce uniqueness per code instance
+            # - Else enforce at coupon level (legacy)
+            if code_ref:
+                if code_ref.status not in ("AVAILABLE", "ASSIGNED_AGENCY", "ASSIGNED_EMPLOYEE"):
+                    raise serializers.ValidationError({"coupon_code": f"This code is not available (status={code_ref.status})."})
+                open_exists = CouponSubmission.objects.filter(
+                    code_ref=code_ref, status__in=("SUBMITTED", "EMPLOYEE_APPROVED")
+                ).exists()
+                if open_exists:
+                    raise serializers.ValidationError({"coupon_code": "There is already an open submission for this code."})
+            else:
+                open_exists = CouponSubmission.objects.filter(
+                    coupon=coupon_obj, status__in=("SUBMITTED", "EMPLOYEE_APPROVED")
+                ).exists()
+                if open_exists:
+                    raise serializers.ValidationError(
+                        {"coupon_code": "There is already an open submission for this coupon."}
+                    )
+
+            # Basic pincode presence check
+            if not attrs.get("pincode"):
+                raise serializers.ValidationError({"pincode": "This field is required."})
+
+            attrs["_validated_coupon_obj"] = coupon_obj
+            attrs["_validated_code_ref"] = code_ref
+
+        return attrs
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        user = request.user if request else None
+
+        coupon = validated_data.pop("_validated_coupon_obj")
+        code_ref = validated_data.pop("_validated_code_ref", None)
+        entered_code = validated_data.get("coupon_code")
+
+        sub = CouponSubmission.objects.create(
+            consumer=user,
+            coupon=coupon,
+            coupon_code=entered_code,  # store entered code (either code_ref.code or legacy coupon code)
+            code_ref=code_ref,
+            pincode=validated_data.get("pincode"),
+            notes=validated_data.get("notes", ""),
+            file=validated_data.get("file"),
+            status="SUBMITTED",
+        )
+
+        # If a specific code instance was used, mark it SOLD
+        if code_ref:
+            code_ref.mark_sold()
+            code_ref.save(update_fields=["status"])
+
+        return sub
+
+
+class CouponBatchSerializer(serializers.ModelSerializer):
+    coupon_title = serializers.CharField(source="coupon.title", read_only=True)
+    created_by_username = serializers.SerializerMethodField(read_only=True)
+    count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = CouponBatch
+        fields = [
+            "id",
+            "coupon",
+            "coupon_title",
+            "prefix",
+            "serial_start",
+            "serial_end",
+            "serial_width",
+            "count",
+            "created_by",
+            "created_by_username",
+            "created_at",
+        ]
+        read_only_fields = ["count", "created_by", "created_by_username", "created_at"]
+
+    def get_created_by_username(self, obj):
+        try:
+            return obj.created_by.username if obj.created_by_id else None
+        except Exception:
+            return None
+
+
+class CommissionSerializer(serializers.ModelSerializer):
+    recipient_username = serializers.SerializerMethodField()
+    coupon_code_value = serializers.SerializerMethodField()
+    submission_id = serializers.IntegerField(source="submission.id", read_only=True)
+
+    class Meta:
+        model = Commission
+        fields = [
+            "id",
+            "recipient",
+            "recipient_username",
+            "role",
+            "amount",
+            "status",
+            "earned_at",
+            "paid_at",
+            "coupon_code",
+            "coupon_code_value",
+            "submission_id",
+            "metadata",
+        ]
+        read_only_fields = ["earned_at", "paid_at"]
+
+    def get_recipient_username(self, obj):
+        try:
+            return obj.recipient.username
+        except Exception:
+            return None
+
+    def get_coupon_code_value(self, obj):
+        try:
+            return float(obj.coupon_code.value) if obj.coupon_code_id else None
+        except Exception:
+            return None
+
+
+class AuditTrailSerializer(serializers.ModelSerializer):
+    actor_username = serializers.SerializerMethodField()
+    coupon_code_value = serializers.CharField(source="coupon_code.code", read_only=True)
+
+    class Meta:
+        model = AuditTrail
+        fields = [
+            "id",
+            "action",
+            "actor",
+            "actor_username",
+            "coupon_code",
+            "coupon_code_value",
+            "submission",
+            "batch",
+            "notes",
+            "metadata",
+            "created_at",
+        ]
+        read_only_fields = ["created_at"]
+
+    def get_actor_username(self, obj):
+        try:
+            return obj.actor.username if obj.actor_id else None
+        except Exception:
+            return None

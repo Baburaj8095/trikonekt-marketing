@@ -1,0 +1,47 @@
+C:\Users\Baburaj\Desktop\React-Django\v1\.venv\Lib\site-packages\django\db\backends\utils.py:98: RuntimeWarning: Accessing the database during app initialization is discouraged. To fix this warning, avoid executing queries in AppConfig.ready() or when your app modules are imported.
+  warnings.warn(self.APPS_NOT_READY_WARNING_MSG, category=RuntimeWarning)
+No sequences found.
+Collecting sqlsequencereset output for apps:
+accounts, admin, auth, business, contenttypes, corsheaders, coupons, django_filters, locations, market, messages, rest_framework, sessions, staticfiles, token_blacklist, uploads
+Executing 40 SQL statements to reset sequences...
+- BEGIN;
+- SELECT setval(pg_get_serial_sequence('"django_admin_log"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "django_admin_log";
+- SELECT setval(pg_get_serial_sequence('"auth_permission"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "auth_permission";
+- SELECT setval(pg_get_serial_sequence('"auth_group_permissions"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "auth_group_permissions";
+- SELECT setval(pg_get_serial_sequence('"auth_group"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "auth_group";
+- SELECT setval(pg_get_serial_sequence('"django_content_type"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "django_content_type";
+- SELECT setval(pg_get_serial_sequence('"token_blacklist_outstandingtoken"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "token_blacklist_outstandingtoken";
+- SELECT setval(pg_get_serial_sequence('"token_blacklist_blacklistedtoken"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "token_blacklist_blacklistedtoken";
+- SELECT setval(pg_get_serial_sequence('"accounts_customuser_groups"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "accounts_customuser_groups";
+- SELECT setval(pg_get_serial_sequence('"accounts_customuser_user_permissions"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "accounts_customuser_user_permissions";
+- SELECT setval(pg_get_serial_sequence('"accounts_customuser"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "accounts_customuser";
+- SELECT setval(pg_get_serial_sequence('"accounts_agencyregionassignment"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "accounts_agencyregionassignment";
+- SELECT setval(pg_get_serial_sequence('"accounts_wallet"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "accounts_wallet";
+- SELECT setval(pg_get_serial_sequence('"accounts_wallettransaction"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "accounts_wallettransaction";
+- SELECT setval(pg_get_serial_sequence('"uploads_fileupload"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "uploads_fileupload";
+- SELECT setval(pg_get_serial_sequence('"uploads_dashboardcard"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "uploads_dashboardcard";
+- SELECT setval(pg_get_serial_sequence('"uploads_luckydrawsubmission"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "uploads_luckydrawsubmission";
+- SELECT setval(pg_get_serial_sequence('"uploads_jobapplication"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "uploads_jobapplication";
+- SELECT setval(pg_get_serial_sequence('"uploads_homecard"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "uploads_homecard";
+- SELECT setval(pg_get_serial_sequence('"uploads_luckycouponassignment"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "uploads_luckycouponassignment";
+- SELECT setval(pg_get_serial_sequence('"uploads_agencycouponquota"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "uploads_agencycouponquota";
+- SELECT setval(pg_get_serial_sequence('"locations_country"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "locations_country";
+- SELECT setval(pg_get_serial_sequence('"locations_state"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "locations_state";
+- SELECT setval(pg_get_serial_sequence('"locations_city"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "locations_city";
+- SELECT setval(pg_get_serial_sequence('"coupons_coupon"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "coupons_coupon";
+- SELECT setval(pg_get_serial_sequence('"coupons_couponcode"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "coupons_couponcode";
+- SELECT setval(pg_get_serial_sequence('"coupons_couponassignment"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "coupons_couponassignment";
+- SELECT setval(pg_get_serial_sequence('"coupons_couponsubmission"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "coupons_couponsubmission";
+- SELECT setval(pg_get_serial_sequence('"coupons_couponbatch"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "coupons_couponbatch";
+- SELECT setval(pg_get_serial_sequence('"coupons_commission"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "coupons_commission";
+- SELECT setval(pg_get_serial_sequence('"coupons_audittrail"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "coupons_audittrail";
+- SELECT setval(pg_get_serial_sequence('"business_businessregistration"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "business_businessregistration";
+- SELECT setval(pg_get_serial_sequence('"business_commissionconfig"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "business_commissionconfig";
+- SELECT setval(pg_get_serial_sequence('"business_autopoolaccount"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "business_autopoolaccount";
+- SELECT setval(pg_get_serial_sequence('"market_product"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "market_product";
+- SELECT setval(pg_get_serial_sequence('"market_purchaserequest"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "market_purchaserequest";
+- SELECT setval(pg_get_serial_sequence('"market_banner"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "market_banner";
+- SELECT setval(pg_get_serial_sequence('"market_banneritem"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "market_banneritem";
+- SELECT setval(pg_get_serial_sequence('"market_bannerpurchaserequest"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "market_bannerpurchaserequest";
+- COMMIT;
+Sequences reset successfully.

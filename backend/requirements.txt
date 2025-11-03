@@ -1,0 +1,15 @@
+Django>=4.0
+djangorestframework
+djangorestframework-simplejwt
+pillow
+django-cors-headers
+requests
+python-dotenv
+gunicorn
+whitenoise
+psycopg2-binary
+dj-database-url
+django-filter
+cloudinary
+django-cloudinary-storage
+django-admin-thumbnails

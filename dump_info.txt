@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import json,collections; d=json.load(open('sqlite_data.json','rb')); from collections import Counter; cnt=Counter(o['model'] for o in d); print('total_records', len(d)); print('\\n'.join(f'{k} {v}' for k,v in cnt.most_common()))
+                                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'sqlite_data.json'

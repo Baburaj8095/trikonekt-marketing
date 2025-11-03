@@ -1,0 +1,49 @@
+Traceback (most recent call last):
+  File "C:\Users\Baburaj\Desktop\React-Django\v1\backend\manage.py", line 14, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\Baburaj\Desktop\React-Django\v1\backend\manage.py", line 11, in main
+    execute_from_command_line(sys.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\Baburaj\Desktop\React-Django\v1\.venv\Lib\site-packages\django\core\management\__init__.py", line 442, in execute_from_command_line
+    utility.execute()
+    ~~~~~~~~~~~~~~~^^
+  File "C:\Users\Baburaj\Desktop\React-Django\v1\.venv\Lib\site-packages\django\core\management\__init__.py", line 382, in execute
+    settings.INSTALLED_APPS
+  File "C:\Users\Baburaj\Desktop\React-Django\v1\.venv\Lib\site-packages\django\conf\__init__.py", line 81, in __getattr__
+    self._setup(name)
+    ~~~~~~~~~~~^^^^^^
+  File "C:\Users\Baburaj\Desktop\React-Django\v1\.venv\Lib\site-packages\django\conf\__init__.py", line 68, in _setup
+    self._wrapped = Settings(settings_module)
+                    ~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Baburaj\Desktop\React-Django\v1\.venv\Lib\site-packages\django\conf\__init__.py", line 166, in __init__
+    mod = importlib.import_module(self.SETTINGS_MODULE)
+  File "C:\Users\Baburaj\AppData\Local\Programs\Python\Python313\Lib\importlib\__init__.py", line 88, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 1026, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "C:\Users\Baburaj\Desktop\React-Django\v1\backend\core\settings.py", line 67, in <module>
+    'default': dj_database_url.config(
+               ~~~~~~~~~~~~~~~~~~~~~~^
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        conn_max_age=600,
+        ^^^^^^^^^^^^^^^^^
+        ssl_require=False
+        ^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Baburaj\Desktop\React-Django\v1\.venv\Lib\site-packages\dj_database_url\__init__.py", line 145, in config
+    return parse(
+        s,
+    ...<5 lines>...
+        test_options,
+    )
+  File "C:\Users\Baburaj\Desktop\React-Django\v1\.venv\Lib\site-packages\dj_database_url\__init__.py", line 188, in parse
+    raise UnknownSchemeError(split_result.scheme)
+dj_database_url.UnknownSchemeError: Scheme '://' is unknown. Did you forget to register custom backend? Following schemes have registered backends: cockroach, mssql, mssqlms, mysql, mysql-connector, mysql2, mysqlgis, oracle, oraclegis, pgsql, postgis, postgres, postgresql, redshift, spatialite, sqlite, timescale, timescalegis.

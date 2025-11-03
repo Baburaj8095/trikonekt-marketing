@@ -1,0 +1,53 @@
+services:
+  - type: web
+    name: trikonekt-backend
+    env: python
+    plan: free
+    rootDir: backend
+    autoDeploy: true
+    buildCommand: |
+      pip install -r requirements.txt
+      python manage.py collectstatic --noinput
+    preDeployCommand: python manage.py migrate --noinput
+    startCommand: gunicorn core.wsgi:application --bind 0.0.0.0:$PORT
+    healthCheckPath: /admin/login/?next=/admin/
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: ".onrender.com"
+      - key: CSRF_TRUSTED_ORIGINS
+        value: "https://*.vercel.app,https://*.onrender.com"
+      - key: CORS_ALLOWED_ORIGINS
+        value: "https://your-frontend.vercel.app"
+      - key: CORS_ALLOWED_ORIGIN_REGEXES
+        value: '^https://.*\.vercel\.app$'
+      - key: SECURE_SSL_REDIRECT
+        value: "True"
+      - key: SECURE_HSTS_SECONDS
+        value: "31536000"
+      - key: SECURE_HSTS_INCLUDE_SUBDOMAINS
+        value: "True"
+      - key: SECURE_HSTS_PRELOAD
+        value: "True"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: trikonekt-db
+          property: connectionString
+      # Optional email settings - set these in Render Dashboard or infra secrets manager
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
+      - key: CLOUDINARY_URL
+        sync: false
+
+
+databases:
+  - name: trikonekt-db
+    plan: free
+    ipAllowList: []

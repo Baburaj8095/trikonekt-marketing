@@ -1,0 +1,28 @@
+C:\Users\Baburaj\Desktop\React-Django\v1\.venv\Lib\site-packages\django\db\backends\utils.py:98: RuntimeWarning: Accessing the database during app initialization is discouraged. To fix this warning, avoid executing queries in AppConfig.ready() or when your app modules are imported.
+  warnings.warn(self.APPS_NOT_READY_WARNING_MSG, category=RuntimeWarning)
+Operations to perform:
+  Apply all migrations: accounts, admin, auth, business, contenttypes, coupons, locations, market, sessions, token_blacklist, uploads
+Running pre-migrate handlers for application admin
+Running pre-migrate handlers for application auth
+Running pre-migrate handlers for application contenttypes
+Running pre-migrate handlers for application sessions
+Running pre-migrate handlers for application token_blacklist
+Running pre-migrate handlers for application accounts
+Running pre-migrate handlers for application uploads
+Running pre-migrate handlers for application locations
+Running pre-migrate handlers for application coupons
+Running pre-migrate handlers for application business
+Running pre-migrate handlers for application market
+Running migrations:
+  No migrations to apply.
+Running post-migrate handlers for application admin
+Running post-migrate handlers for application auth
+Running post-migrate handlers for application contenttypes
+Running post-migrate handlers for application sessions
+Running post-migrate handlers for application token_blacklist
+Running post-migrate handlers for application accounts
+Running post-migrate handlers for application uploads
+Running post-migrate handlers for application locations
+Running post-migrate handlers for application coupons
+Running post-migrate handlers for application business
+Running post-migrate handlers for application market
