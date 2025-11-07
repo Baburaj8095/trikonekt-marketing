@@ -318,32 +318,26 @@ def handle_submission_post_save(sender, instance: "CouponSubmission", created: b
                         metadata={"coupon_value": float(instance.code_ref.value) if instance.code_ref_id else 150},
                     )
 
-            # Wallet credits and Auto-Pool creation
+            # Wallet credit via MLM redeem path (₹140 default) and fixed commissions
             try:
-                from accounts.models import Wallet
-                from business.models import CommissionConfig, AutoPoolAccount, distribute_auto_pool_commissions
-
-                cfg = CommissionConfig.get_solo()
-                # Determine credit value (prefer code_ref.value if available else base config)
-                base_val = None
-                try:
-                    base_val = Decimal(str(getattr(instance.code_ref, "value", ""))) if instance.code_ref_id else None
-                except Exception:
-                    base_val = None
-                credit_value = base_val if base_val is not None else Decimal(cfg.base_coupon_value or 150)
-
-                # Credit consumer wallet
+                from business.services.activation import redeem_150
+                # Credit consumer using MLM redeem flow (idempotent)
                 if instance.consumer_id:
-                    w = Wallet.get_or_create_for_user(instance.consumer)
-                    w.credit(
-                        credit_value,
-                        tx_type="REDEEM_ECOUPON_CREDIT",
-                        meta={"coupon_code": instance.coupon_code, "submission_id": instance.id},
-                        source_type="COUPON",
-                        source_id=str(instance.id),
-                    )
+                    redeem_150(instance.consumer, {"type": "coupon", "id": instance.id, "code": instance.coupon_code})
+                    # Franchise benefit distribution on purchase (idempotent)
+                    try:
+                        from business.services.franchise import distribute_franchise_benefit
+                        distribute_franchise_benefit(
+                            instance.consumer,
+                            trigger="purchase",
+                            source={"type": "coupon", "id": instance.id, "code": instance.coupon_code},
+                        )
+                    except Exception:
+                        # best-effort
+                        pass
 
                     # Fixed commissions to employee and agency wallets (₹15 each) when available
+                    from accounts.models import Wallet
                     if not emp_user:
                         emp_user = instance.employee_reviewer or (instance.code_ref.assigned_employee if instance.code_ref_id else None)
                     if not ag_user:
@@ -373,16 +367,28 @@ def handle_submission_post_save(sender, instance: "CouponSubmission", created: b
                             )
                         except Exception:
                             pass
-
-                    # Auto-Pool account creation anchored to consumer.username and hierarchical commission
-                    try:
-                        entry_amt = Decimal(cfg.base_coupon_value or 150)
-                        AutoPoolAccount.create_for_user(instance.consumer, entry_amt)
-                        distribute_auto_pool_commissions(instance.consumer, entry_amt)
-                    except Exception:
-                        pass
             except Exception:
                 # Non-blocking of main approval flow
+                pass
+
+            # Rewards progress: increment coupon count idempotently
+            try:
+                from business.models import RewardProgress
+                # Guard against double-increment for the same submission
+                if not AuditTrail.objects.filter(action="reward_coupon_increment", submission=instance).exists():
+                    rp, _ = RewardProgress.objects.get_or_create(user=instance.consumer)
+                    rp.coupon_count = int(getattr(rp, "coupon_count", 0) or 0) + 1
+                    rp.save(update_fields=["coupon_count", "updated_at"])
+                    AuditTrail.objects.create(
+                        action="reward_coupon_increment",
+                        actor=instance.agency_reviewer,
+                        submission=instance,
+                        coupon_code=instance.code_ref,
+                        notes="Incremented coupon-based reward progress by 1",
+                        metadata={"source": "coupon_submission"},
+                    )
+            except Exception:
+                # best-effort
                 pass
 
             AuditTrail.objects.create(

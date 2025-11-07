@@ -45,6 +45,8 @@ export default function LuckyDraw() {
   const isMyOrders = location.pathname === "/marketplace/my-orders";
   const isECoupon = location.pathname === "/user/redeem-coupon";
   const isWallet = location.pathname === "/user/wallet";
+  const isKYC = location.pathname === "/user/kyc";
+  const isMyTeam = location.pathname === "/user/my-team";
 
   // Identity for navbar
   const storedUser = useMemo(() => {
@@ -352,6 +354,26 @@ export default function LuckyDraw() {
               <ListItemText primary="Wallet" />
             </ListItemButton>
             <ListItemButton
+              selected={isKYC}
+              sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+              onClick={() => {
+                navigate("/user/kyc");
+                setMobileOpen(false);
+              }}
+            >
+              <ListItemText primary="KYC" />
+            </ListItemButton>
+            <ListItemButton
+              selected={isMyTeam}
+              sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+              onClick={() => {
+                navigate("/user/my-team");
+                setMobileOpen(false);
+              }}
+            >
+              <ListItemText primary="My Team" />
+            </ListItemButton>
+            <ListItemButton
               selected={isMyOrders}
               sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
               onClick={() => {
@@ -419,6 +441,20 @@ export default function LuckyDraw() {
               onClick={() => navigate("/user/wallet")}
             >
               <ListItemText primary="Wallet" />
+            </ListItemButton>
+            <ListItemButton
+              selected={isKYC}
+              sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+              onClick={() => navigate("/user/kyc")}
+            >
+              <ListItemText primary="KYC" />
+            </ListItemButton>
+            <ListItemButton
+              selected={isMyTeam}
+              sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+              onClick={() => navigate("/user/my-team")}
+            >
+              <ListItemText primary="My Team" />
             </ListItemButton>
             <ListItemButton
               selected={isMyOrders}

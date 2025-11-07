@@ -853,3 +853,67 @@ class AuditTrailViewSet(mixins.ListModelMixin,
             except Exception:
                 pass
         return qs.order_by("-created_at")
+
+
+# ===========================
+# Public v1 Coupon Endpoints
+# ===========================
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from business.services.activation import activate_150_active, activate_50, redeem_150, ensure_first_purchase_activation
+
+
+class CouponActivateView(APIView):
+    """
+    POST /api/v1/coupon/activate/
+    Body:
+      {
+        "type": "150" | "50",
+        "source": { ... optional context ... }
+      }
+    Effects:
+      - type "150": opens FIVE_150 (L6) + THREE_150 (L15), pays direct/self bonuses
+      - type "50": opens THREE_50 (L15)
+      - records all ledger via Wallet.credit inside activation services
+      - stamps first_purchase_activated_at and unlocks flags (idempotent)
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        t = str(request.data.get("type") or "").strip()
+        source = request.data.get("source") or {}
+        if t not in ("150", "50"):
+            return Response({"detail": "type must be '150' or '50'."}, status=status.HTTP_400_BAD_REQUEST)
+        if t == "150":
+            ok = activate_150_active(request.user, {"type": "coupon_150_activate", **source})
+        else:
+            ok = activate_50(request.user, {"type": "coupon_50_activate", **source})
+        # Mark first purchase flags (safe idempotent)
+        try:
+            ensure_first_purchase_activation(request.user, {"type": "coupon_first_purchase", **source})
+        except Exception:
+            pass
+        return Response({"activated": bool(ok), "detail": f"Coupon {t} activation processed."}, status=status.HTTP_200_OK)
+
+
+class CouponRedeemView(APIView):
+    """
+    POST /api/v1/coupon/redeem/
+    Body:
+      {
+        "type": "150",
+        "source": { ... optional context ... }
+      }
+    Effects:
+      - credits ₹140 to wallet (configurable)
+      - ledger recorded within service
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        t = str(request.data.get("type") or "").strip()
+        source = request.data.get("source") or {}
+        if t != "150":
+            return Response({"detail": "Only type '150' is supported for redeem."}, status=status.HTTP_400_BAD_REQUEST)
+        ok = redeem_150(request.user, {"type": "coupon_150_redeem", **source})
+        return Response({"redeemed": bool(ok), "detail": "Coupon 150 redeem processed."}, status=status.HTTP_200_OK)

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import BusinessRegistration
+from .models import BusinessRegistration, DailyReport
 from locations.models import Country, State, City
 
 
@@ -128,3 +128,23 @@ class BusinessRegistrationSerializer(serializers.ModelSerializer):
             registered_by=(request.user if request and getattr(request, 'user', None) and request.user.is_authenticated else None)
         )
         return reg
+
+
+class DailyReportSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DailyReport
+        fields = [
+            "id",
+            "reporter",
+            "role",
+            "date",
+            "tr_registered",
+            "wg_registered",
+            "asia_pay_registered",
+            "dm_account_registered",
+            "e_coupon_issued",
+            "physical_coupon_issued",
+            "product_sold",
+            "total_amount",
+        ]
+        read_only_fields = ("id", "reporter", "role", "date")

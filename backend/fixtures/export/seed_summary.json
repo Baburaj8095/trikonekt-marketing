@@ -1,0 +1,38 @@
+{
+  "accounts_csv_len": 12,
+  "total_users": 76,
+  "by_category": {
+    "agency_district_coordinator": 12,
+    "agency_pincode_coordinator": 3,
+    "consumer": 37,
+    "employee": 8,
+    "agency_state_coordinator": 3,
+    "company": 1,
+    "agency_pincode": 3,
+    "agency_district": 3,
+    "agency_sub_franchise": 3,
+    "agency_state": 3
+  },
+  "sample_usernames": [
+    "company",
+    "6181097328",
+    "6248071774",
+    "8239189360",
+    "6876232531",
+    "6837427360",
+    "6331239264",
+    "6538658843",
+    "7585001155",
+    "8736428970",
+    "6803152777",
+    "9236806564",
+    "7113386180",
+    "7718546636",
+    "9839599164",
+    "7097988816",
+    "7608447211",
+    "7485510759",
+    "6205294341",
+    "7533777207"
+  ]
+}

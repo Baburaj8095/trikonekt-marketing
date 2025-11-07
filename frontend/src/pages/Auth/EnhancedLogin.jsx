@@ -2,7 +2,7 @@
 // NOTE: This file PRESERVES your original logic (API calls, geolocation, registration, dialogs).
 // Styling is done via MUI sx props. Requires @mui/material and @mui/icons-material v7.
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   AppBar,
   Toolbar,
@@ -113,6 +113,8 @@ const Login = () => {
   const [geoCountryCode, setGeoCountryCode] = useState("");
   const [geoStateName, setGeoStateName] = useState("");
   const [geoCityName, setGeoCityName] = useState("");
+  const geoRequestedRef = useRef(false);
+  const skipPinLookupRef = useRef(false);
 
   const [sponsorId, setSponsorId] = useState("");
   const [agencyLevel, setAgencyLevel] = useState("");
@@ -249,11 +251,21 @@ const Login = () => {
   };
 
   useEffect(() => {
+    // Only auto-lookup pincode during Register for non-agency/non-business flows
+    if (mode !== "register" || role === "agency" || role === "business") return;
+
+    // Skip one immediate lookup when pincode was set from reverse geocode
+    if (skipPinLookupRef.current) {
+      skipPinLookupRef.current = false;
+      return;
+    }
+
     const code = (pincode || "").trim();
     if (code.replace(/\D/g, "").length === 6) {
-      fetchFromBackendPin(code);
+      const t = setTimeout(() => fetchFromBackendPin(code), 400);
+      return () => clearTimeout(t);
     }
-  }, [pincode]);
+  }, [pincode, mode, role]);
 
   // Sponsor from URL (priority: agencyid, sponsor, sponsor_id, ref)
   useEffect(() => {
@@ -271,6 +283,20 @@ const Login = () => {
 
   // Auto detect location
   useEffect(() => {
+    // Only run geolocation during Register and when not Agency/Business
+    if (mode !== "register" || role === "agency" || role === "business") {
+      setManualMode(true);
+      setAutoLoading(false);
+      return;
+    }
+
+    // Prevent duplicate calls (e.g., React StrictMode in dev)
+    if (geoRequestedRef.current) {
+      setAutoLoading(false);
+      return;
+    }
+    geoRequestedRef.current = true;
+
     let cancelled = false;
 
     if (!navigator.geolocation) {
@@ -297,6 +323,7 @@ const Login = () => {
           const detectedCountry = rb.country || "";
           const detectedCity = rb.city || rb.district || "";
 
+          skipPinLookupRef.current = true;
           setPincode((detectedPin || "").replace(/\D/g, "").slice(0, 6));
           setStateVal(detectedState);
           setCountryVal(detectedCountry);
@@ -325,7 +352,7 @@ const Login = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [mode, role]);
 
   // Fetch post offices
   const handleFetchBranches = async () => {
@@ -789,7 +816,6 @@ const Login = () => {
         const res = await API.post("/accounts/login/", {
           username,
           password: formData.password,
-          role: submitRole,
         });
 
         const access = res?.data?.access || res?.data?.token || res?.data?.data?.token;
@@ -803,10 +829,6 @@ const Login = () => {
 
         if (!tokenRole) throw new Error("Token missing role claim");
 
-        if (tokenRole !== submitRole) {
-          setErrorMsg("Role mismatch. Please select the correct role for this account.");
-          return;
-        }
 
         const storage = remember ? localStorage : sessionStorage;
         storage.setItem("token", access);
@@ -830,7 +852,11 @@ const Login = () => {
           localStorage.removeItem("remember_username");
         }
 
-        navigate(`/${tokenRole}/dashboard`, { replace: true });
+        if (payload?.is_staff || payload?.is_superuser) {
+          navigate("/admin/dashboard", { replace: true });
+        } else {
+          navigate(`/${tokenRole || "user"}/dashboard`, { replace: true });
+        }
       } catch (err) {
         console.error(err);
         const msg =

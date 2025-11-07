@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Box,
   Paper,
@@ -9,6 +9,7 @@ import {
   Stack,
   LinearProgress,
 } from "@mui/material";
+import { TextField, Button, Alert, MenuItem } from "@mui/material";
 import API from "../api/api";
 
 function fmtAmount(value) {
@@ -42,15 +43,44 @@ export default function Wallet() {
   const [txs, setTxs] = useState([]);
   const [err, setErr] = useState("");
 
+  // Withdrawals
+  const [myWithdrawals, setMyWithdrawals] = useState([]);
+  const [wdrErr, setWdrErr] = useState("");
+  const [wdrSubmitting, setWdrSubmitting] = useState(false);
+  const [wdrForm, setWdrForm] = useState({
+    amount: "",
+    method: "upi",
+    upi_id: "",
+    bank_name: "",
+    bank_account_number: "",
+    ifsc_code: "",
+  });
+  const onWdrChange = (e) => setWdrForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+
+  const cooldownUntil = useMemo(() => {
+    try {
+      // list is ordered by -requested_at (backend)
+      const last = (myWithdrawals || []).find((w) => String(w.status).toLowerCase() !== "rejected");
+      if (!last || !last.requested_at) return null;
+      const dt = new Date(last.requested_at);
+      dt.setDate(dt.getDate() + 7);
+      return dt;
+    } catch {
+      return null;
+    }
+  }, [myWithdrawals]);
+  const onCooldown = Boolean(cooldownUntil && cooldownUntil > new Date());
+
   useEffect(() => {
     let mounted = true;
     async function fetchAll() {
       try {
         setLoading(true);
         setErr("");
-        const [w, t] = await Promise.all([
+        const [w, t, mw] = await Promise.all([
           API.get("/accounts/wallet/me/"),
           API.get("/accounts/wallet/me/transactions/"),
+          API.get("/accounts/withdrawals/me/"),
         ]);
         if (!mounted) return;
         const bal = String(w?.data?.balance ?? "0.00");
@@ -59,6 +89,8 @@ export default function Wallet() {
         setBalance(bal);
         setUpdatedAt(upd);
         setTxs((list || []).slice(0, 100));
+        const wlist = Array.isArray(mw?.data) ? mw.data : mw?.data?.results || [];
+        setMyWithdrawals(wlist || []);
       } catch (e) {
         if (!mounted) return;
         setErr("Failed to load wallet. Please try again.");
@@ -72,6 +104,66 @@ export default function Wallet() {
       mounted = false;
     };
   }, []);
+
+  async function submitWithdrawal(e) {
+    e.preventDefault();
+    setWdrErr("");
+    if (onCooldown) return;
+    const amtNum = Number(wdrForm.amount);
+    if (!Number.isFinite(amtNum) || amtNum <= 0) {
+      setWdrErr("Enter a valid amount.");
+      return;
+    }
+    const payload = {
+      amount: amtNum,
+      method: wdrForm.method,
+    };
+    if (wdrForm.method === "upi") {
+      if (!wdrForm.upi_id.trim()) {
+        setWdrErr("UPI ID is required for UPI withdrawals.");
+        return;
+      }
+      payload.upi_id = wdrForm.upi_id.trim();
+    } else {
+      // Bank details optional here; backend will hydrate from KYC if missing
+      if (wdrForm.bank_name) payload.bank_name = wdrForm.bank_name.trim();
+      if (wdrForm.bank_account_number) payload.bank_account_number = wdrForm.bank_account_number.trim();
+      if (wdrForm.ifsc_code) payload.ifsc_code = wdrForm.ifsc_code.trim().toUpperCase();
+    }
+    try {
+      setWdrSubmitting(true);
+      await API.post("/accounts/withdrawals/", payload);
+      // Refresh wallet, txs, withdrawals
+      const [w, t, mw] = await Promise.all([
+        API.get("/accounts/wallet/me/"),
+        API.get("/accounts/wallet/me/transactions/"),
+        API.get("/accounts/withdrawals/me/"),
+      ]);
+      const bal = String(w?.data?.balance ?? "0.00");
+      const upd = w?.data?.updated_at || null;
+      const list = Array.isArray(t?.data) ? t.data : t?.data?.results || [];
+      const wlist = Array.isArray(mw?.data) ? mw.data : mw?.data?.results || [];
+      setBalance(bal);
+      setUpdatedAt(upd);
+      setTxs((list || []).slice(0, 100));
+      setMyWithdrawals(wlist || []);
+      setWdrForm({
+        amount: "",
+        method: wdrForm.method,
+        upi_id: "",
+        bank_name: "",
+        bank_account_number: "",
+        ifsc_code: "",
+      });
+    } catch (e) {
+      const msg =
+        e?.response?.data?.detail ||
+        (e?.response?.data ? JSON.stringify(e.response.data) : "Failed to submit withdrawal.");
+      setWdrErr(String(msg));
+    } finally {
+      setWdrSubmitting(false);
+    }
+  }
 
   return (
     <Box sx={{ maxWidth: 1000, mx: "auto" }}>
@@ -96,6 +188,95 @@ export default function Wallet() {
 
         <Grid item xs={12} md={8}>
           <Paper elevation={3} sx={{ p: 2, borderRadius: 2, minHeight: 120 }}>
+            <Typography variant="subtitle2" sx={{ color: "text.secondary", mb: 1 }}>
+              Request Withdrawal
+            </Typography>
+            {wdrErr ? <Alert severity="error" sx={{ mb: 1 }}>{wdrErr}</Alert> : null}
+            {onCooldown ? (
+              <Alert severity="warning" sx={{ mb: 1 }}>
+                Only one withdrawal is allowed per week. Next available:{" "}
+                {cooldownUntil ? cooldownUntil.toLocaleString() : "-"}
+              </Alert>
+            ) : null}
+            <Box component="form" onSubmit={submitWithdrawal} sx={{ mb: 2 }}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Amount (₹)"
+                  name="amount"
+                  value={wdrForm.amount}
+                  onChange={onWdrChange}
+                  inputProps={{ inputMode: "decimal" }}
+                  required
+                />
+                <TextField
+                  fullWidth
+                  size="small"
+                  select
+                  label="Method"
+                  name="method"
+                  value={wdrForm.method}
+                  onChange={onWdrChange}
+                >
+                  <MenuItem value="upi">UPI</MenuItem>
+                  <MenuItem value="bank">Bank</MenuItem>
+                </TextField>
+              </Stack>
+              {wdrForm.method === "upi" ? (
+                <Box sx={{ mt: 1 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="UPI ID"
+                    name="upi_id"
+                    value={wdrForm.upi_id}
+                    onChange={onWdrChange}
+                    required
+                  />
+                </Box>
+              ) : (
+                <Stack spacing={1} sx={{ mt: 1 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Bank Name"
+                    name="bank_name"
+                    value={wdrForm.bank_name}
+                    onChange={onWdrChange}
+                  />
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Account Number"
+                    name="bank_account_number"
+                    value={wdrForm.bank_account_number}
+                    onChange={onWdrChange}
+                    inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
+                  />
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="IFSC Code"
+                    name="ifsc_code"
+                    value={wdrForm.ifsc_code}
+                    onChange={onWdrChange}
+                    inputProps={{ maxLength: 11, style: { textTransform: "uppercase" } }}
+                  />
+                </Stack>
+              )}
+              <Button
+                type="submit"
+                variant="contained"
+                disabled={onCooldown || wdrSubmitting}
+                sx={{ mt: 1 }}
+              >
+                {wdrSubmitting ? "Requesting..." : "Request Withdrawal"}
+              </Button>
+            </Box>
+
+            <Divider sx={{ mb: 2 }} />
+
             <Typography variant="subtitle2" sx={{ color: "text.secondary", mb: 1 }}>
               Recent Activity
             </Typography>

@@ -73,7 +73,7 @@ WSGI_APPLICATION = 'core.wsgi.application'
 
 DATABASES = {
     'default': dj_database_url.config(
-        default="postgresql://trikonekt_user:l9W9sI11FAiv0jDISO6cUS9VW2Y6QrPw@dpg-d42ust24d50c73a55sc0-a.oregon-postgres.render.com/trikonekt"
+        default="postgresql://trikonekt:Lmt91m5Lnp1dwEoKBPzOuFFjXF0fk4Xi@dpg-d4734kn5r7bs73ajic80-a.singapore-postgres.render.com/trikonekt_rn21"
        
     )
 }

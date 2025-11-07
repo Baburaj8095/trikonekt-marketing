@@ -1,16 +1,16 @@
 from rest_framework import generics
 from .models import CustomUser, AgencyRegionAssignment, Wallet, WalletTransaction
-from .serializers import RegisterSerializer, PublicUserSerializer
+from .serializers import RegisterSerializer, PublicUserSerializer, UserKYCSerializer, WithdrawalRequestSerializer
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .token_serializers import CustomTokenObtainPairSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status, serializers
+from rest_framework import status, serializers, parsers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-from django.db.models import Q
+from django.db.models import Q, Sum
 from locations.views import _build_district_index, india_place_variants
 from locations.models import State
 
@@ -27,6 +27,26 @@ class RegisterView(generics.CreateAPIView):
         skip when mailing is not enabled, to avoid worker timeouts.
         """
         user = serializer.save()
+
+        # Trigger referral join payouts and optional franchise-on-join (best-effort, idempotent)
+        try:
+            from business.services.referral import on_user_join
+            on_user_join(user, {"type": "registration", "id": getattr(user, "id", "")})
+        except Exception:
+            pass
+        try:
+            from business.models import CommissionConfig
+            cfg = CommissionConfig.get_solo()
+            if getattr(cfg, "enable_franchise_on_join", True):
+                from business.services.franchise import distribute_franchise_benefit
+                distribute_franchise_benefit(
+                    user,
+                    trigger="registration",
+                    source={"type": "registration", "id": getattr(user, "id", "")},
+                )
+        except Exception:
+            pass
+
         # Defer and guard email to avoid blocking the request thread
         try:
             from django.conf import settings
@@ -653,6 +673,165 @@ def hierarchy(request):
 
 
 # ====================
+# Team / Earnings APIs
+# ====================
+class TeamSummaryView(APIView):
+    """
+    Returns a consolidated "My Team" snapshot for the logged-in user:
+    - Downline counts (Direct + L1..L5)
+    - Earnings totals by category: direct referral, generation levels, autopool, franchise
+    - Matrix progress (UserMatrixProgress) for THREE_50 / THREE_150 / FIVE_150
+    - Recent team members and recent reward transactions (limited)
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        # Downline counts up to 5 levels (by registered_by chain)
+        def downline_counts(u, max_depth=5):
+            counts = []
+            current_ids = [u.id]
+            for d in range(max_depth):
+                lvl_ids = list(
+                    CustomUser.objects.filter(registered_by_id__in=current_ids).values_list("id", flat=True)
+                )
+                counts.append(len(lvl_ids))
+                if not lvl_ids:
+                    counts.extend([0] * (max_depth - d - 1))
+                    break
+                current_ids = lvl_ids
+            return counts
+
+        levels_1_5 = downline_counts(user, 5)
+        direct_count = levels_1_5[0] if levels_1_5 else 0
+
+        # Earnings totals (wallet transactions)
+        tx = WalletTransaction.objects.filter(user=user)
+        def _sum(qs):
+            val = qs.aggregate(total=Sum("amount"))["total"] or 0
+            return str(val)
+
+        totals = {
+            "direct_referral": _sum(tx.filter(type="DIRECT_REF_BONUS")),
+            "generation_levels": _sum(tx.filter(type="LEVEL_BONUS")),
+            "autopool_three": _sum(tx.filter(type="AUTOPOOL_BONUS_THREE")),
+            "autopool_five": _sum(tx.filter(type="AUTOPOOL_BONUS_FIVE")),
+            "franchise_income": _sum(tx.filter(type="FRANCHISE_INCOME")),
+            "commissions": _sum(tx.filter(type="COMMISSION_CREDIT")),
+            "rewards": _sum(tx.filter(type="REWARD_CREDIT")),
+        }
+
+        # Generation earnings breakdown by level (L1..L5)
+        gen_breakdown = {"1": "0", "2": "0", "3": "0", "4": "0", "5": "0"}
+        try:
+            from decimal import Decimal as D
+            accum = {1: D("0"), 2: D("0"), 3: D("0"), 4: D("0"), 5: D("0")}
+            for r in tx.filter(type="LEVEL_BONUS").values("amount", "meta"):
+                meta = r.get("meta") or {}
+                try:
+                    lvl = int(meta.get("level") or meta.get("level_index") or 0)
+                except Exception:
+                    lvl = 0
+                if 1 <= lvl <= 5:
+                    try:
+                        amt = D(str(r.get("amount") or "0"))
+                        accum[lvl] = accum[lvl] + amt
+                    except Exception:
+                        pass
+            gen_breakdown = {str(k): str(v) for k, v in accum.items()}
+        except Exception:
+            # best-effort
+            pass
+
+        # Commission split by role for COMMISSION_CREDIT
+        comm_split = {"employee": "0", "agency": "0"}
+        try:
+            from decimal import Decimal as D
+            emp = D("0"); ag = D("0")
+            for r in tx.filter(type="COMMISSION_CREDIT").values("amount", "meta"):
+                meta = r.get("meta") or {}
+                role = (meta.get("role") or "").strip().lower()
+                try:
+                    amt = D(str(r.get("amount") or "0"))
+                except Exception:
+                    amt = D("0")
+                if role == "employee":
+                    emp += amt
+                elif role == "agency":
+                    ag += amt
+            comm_split = {"employee": str(emp), "agency": str(ag)}
+        except Exception:
+            # best-effort
+            pass
+
+        # Matrix progress (per pool_type)
+        try:
+            from business.models import UserMatrixProgress
+            mp_qs = UserMatrixProgress.objects.filter(user=user).order_by("-updated_at")
+            matrix = [
+                {
+                    "pool_type": m.pool_type,
+                    "total_earned": str(m.total_earned),
+                    "level_reached": int(m.level_reached or 0),
+                    "per_level_counts": m.per_level_counts or {},
+                    "per_level_earned": m.per_level_earned or {},
+                    "updated_at": m.updated_at,
+                }
+                for m in mp_qs
+            ]
+        except Exception:
+            matrix = []
+
+        # Recent team members (latest 10)
+        recent_team = list(
+            CustomUser.objects.filter(registered_by=user)
+            .order_by("-date_joined")
+            .values("id", "username", "category", "role", "date_joined")[:10]
+        )
+
+        # Recent reward-related wallet transactions (latest 20 across relevant types)
+        relevant_types = [
+            "DIRECT_REF_BONUS", "LEVEL_BONUS",
+            "AUTOPOOL_BONUS_THREE", "AUTOPOOL_BONUS_FIVE",
+            "COMMISSION_CREDIT", "FRANCHISE_INCOME", "REWARD_CREDIT"
+        ]
+        recent_tx = list(
+            tx.filter(type__in=relevant_types)
+            .order_by("-created_at")
+            .values("id", "amount", "type", "source_type", "source_id", "meta", "created_at")[:20]
+        )
+        # Cast Decimal amounts to strings
+        for r in recent_tx:
+            try:
+                r["amount"] = str(r["amount"])
+            except Exception:
+                pass
+
+        return Response(
+            {
+                "downline": {
+                    "direct": direct_count,
+                    "levels": {
+                        "l1": levels_1_5[0] if len(levels_1_5) > 0 else 0,
+                        "l2": levels_1_5[1] if len(levels_1_5) > 1 else 0,
+                        "l3": levels_1_5[2] if len(levels_1_5) > 2 else 0,
+                        "l4": levels_1_5[3] if len(levels_1_5) > 3 else 0,
+                        "l5": levels_1_5[4] if len(levels_1_5) > 4 else 0,
+                    },
+                },
+                "totals": totals,
+                "generation_levels_breakdown": gen_breakdown,
+                "commissions_split": comm_split,
+                "matrix_progress": matrix,
+                "recent_team": recent_team,
+                "recent_transactions": recent_tx,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+# ====================
 # Wallet API Endpoints
 # ====================
 
@@ -683,3 +862,36 @@ class WalletTransactionsList(generics.ListAPIView):
         if t:
             qs = qs.filter(type=t)
         return qs
+
+
+# ====================
+# KYC + Withdrawals API
+# ====================
+
+class UserKYCMeView(generics.RetrieveUpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserKYCSerializer
+
+    def get_object(self):
+        # Ensure the user's KYC row exists
+        from .models import UserKYC
+        obj, _ = UserKYC.objects.get_or_create(user=self.request.user)
+        return obj
+
+
+class WithdrawalCreateView(generics.CreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = WithdrawalRequestSerializer
+    queryset = WalletTransaction.objects.none()  # unused, but DRF requires queryset on generic views
+
+    def perform_create(self, serializer):
+        serializer.save()
+
+
+class MyWithdrawalsListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = WithdrawalRequestSerializer
+
+    def get_queryset(self):
+        from .models import WithdrawalRequest
+        return WithdrawalRequest.objects.filter(user=self.request.user).order_by("-requested_at")

@@ -43,6 +43,8 @@ export default function UserDashboard() {
   const isMyOrders = location.pathname === "/marketplace/my-orders";
   const isECoupon = location.pathname === "/user/redeem-coupon";
   const isWallet = location.pathname === "/user/wallet";
+  const isKYC = location.pathname === "/user/kyc";
+  const isMyTeam = location.pathname === "/user/my-team";
 
   const storedUser = useMemo(() => {
     try {
@@ -175,6 +177,12 @@ export default function UserDashboard() {
             <ListItemButton selected={isWallet} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => { navigate("/user/wallet"); setMobileOpen(false); }}>
               <ListItemText primary="Wallet" />
             </ListItemButton>
+            <ListItemButton selected={isKYC} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => { navigate("/user/kyc"); setMobileOpen(false); }}>
+              <ListItemText primary="KYC" />
+            </ListItemButton>
+            <ListItemButton selected={isMyTeam} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => { navigate("/user/my-team"); setMobileOpen(false); }}>
+              <ListItemText primary="My Team" />
+            </ListItemButton>
             <ListItemButton selected={isMyOrders} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => { navigate("/marketplace/my-orders"); setMobileOpen(false); }}>
               <ListItemText primary="My Orders" />
             </ListItemButton>
@@ -216,6 +224,12 @@ export default function UserDashboard() {
             </ListItemButton>
             <ListItemButton selected={isWallet} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => navigate("/user/wallet")}>
               <ListItemText primary="Wallet" />
+            </ListItemButton>
+            <ListItemButton selected={isKYC} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => navigate("/user/kyc")}>
+              <ListItemText primary="KYC" />
+            </ListItemButton>
+            <ListItemButton selected={isMyTeam} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => navigate("/user/my-team")}>
+              <ListItemText primary="My Team" />
             </ListItemButton>
             <ListItemButton selected={isMyOrders} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => navigate("/marketplace/my-orders")}>
               <ListItemText primary="My Orders" />

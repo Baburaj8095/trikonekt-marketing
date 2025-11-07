@@ -1,0 +1,12 @@
+username,role,category,state,district,pincode,registered_by,password
+8240271519,agency,agency_pincode_coordinator,Karnataka,KALABURAGI,585301,6603795887,Test@123
+6776251666,agency,agency_pincode,Karnataka,KALABURAGI,585301,8240271519,Test@123
+6388454800,agency,agency_sub_franchise,Karnataka,KALABURAGI,585301,6776251666,Test@123
+8199815490,employee,employee,Karnataka,KALABURAGI,585301,6388454800,Test@123
+8837518093,agency,agency_district_coordinator,Karnataka,KALABURAGI,,6282575447,Test@123
+6127850448,agency,agency_district_coordinator,Karnataka,KALABURAGI,,6282575447,Test@123
+7490847278,agency,agency_district_coordinator,Karnataka,KALABURAGI,,6282575447,Test@123
+7573539211,agency,agency_district_coordinator,Karnataka,KALABURAGI,,6282575447,Test@123
+6603795887,agency,agency_district,Karnataka,KALABURAGI,,8837518093,Test@123
+6338221531,agency,agency_state_coordinator,Karnataka,,,company,Test@123
+6282575447,agency,agency_state,Karnataka,,,6338221531,Test@123

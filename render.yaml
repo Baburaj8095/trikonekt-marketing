@@ -8,7 +8,13 @@ services:
     buildCommand: |
       pip install -r requirements.txt
       python manage.py collectstatic --noinput
-    preDeployCommand: python manage.py migrate --noinput
+    preDeployCommand: |
+      python manage.py migrate --noinput
+      if [ "$SEED_LOCATIONS_FIXTURE" = "True" ]; then
+        python manage.py load_locations_fixture
+      elif [ "$SEED_LOCATIONS_ON_DEPLOY" = "True" ]; then
+        python manage.py load_location_data
+      fi
     startCommand: gunicorn core.wsgi:application --bind 0.0.0.0:$PORT
     healthCheckPath: /admin/login/?next=/admin/
     envVars:
@@ -36,15 +42,35 @@ services:
         fromDatabase:
           name: trikonekt-db
           property: connectionString
-      # Optional email settings - set these in Render Dashboard or infra secrets manager
+      # Optional email settings - Zoho SMTP
+      - key: MAIL_ENABLED
+        value: "True"
+      - key: EMAIL_HOST
+        value: "smtp.zoho.com"
+      # If your Zoho account is in the India/EU DC, use smtp.zoho.in or smtp.zoho.eu instead
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_USE_TLS
+        value: "True"
       - key: EMAIL_HOST_USER
-        sync: false
+        value: "contact@trikonekt.com"
       - key: EMAIL_HOST_PASSWORD
         sync: false
       - key: DEFAULT_FROM_EMAIL
-        sync: false
+        value: "contact@trikonekt.com"
+      - key: EMAIL_TIMEOUT
+        value: "10"
+      - key: SERVER_EMAIL
+        value: "contact@trikonekt.com"
       - key: CLOUDINARY_URL
         sync: false
+      - key: SEED_LOCATIONS_ON_DEPLOY
+        value: "False"
+      - key: SEED_LOCATIONS_FIXTURE
+        value: "False"
+    disk:
+      name: media
+      mountPath: /opt/render/project/src/backend/media
 
 
 databases:

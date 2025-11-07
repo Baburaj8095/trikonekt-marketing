@@ -4,7 +4,7 @@ from django.utils import timezone
 from django.db.models import Q
 import csv
 
-from .models import BusinessRegistration, CommissionConfig, AutoPoolAccount
+from .models import BusinessRegistration, CommissionConfig, AutoPoolAccount, RewardProgress, RewardRedemption, UserMatrixProgress, ReferralJoinPayout, FranchisePayout, DailyReport
 from accounts.models import CustomUser
 
 
@@ -87,7 +87,7 @@ class BusinessRegistrationAdmin(admin.ModelAdmin):
 
 @admin.register(CommissionConfig)
 class CommissionConfigAdmin(admin.ModelAdmin):
-    list_display = ("base_coupon_value", "enable_pool_distribution", "enable_geo_distribution", "updated_at", "created_at")
+    list_display = ("base_coupon_value", "enable_pool_distribution", "enable_geo_distribution", "enable_franchise_on_join", "enable_franchise_on_purchase", "autopool_trigger_on_direct_referral", "updated_at", "created_at")
     readonly_fields = ("updated_at", "created_at")
     fieldsets = (
         ("Base", {"fields": ("base_coupon_value",)}),
@@ -104,14 +104,118 @@ class CommissionConfigAdmin(admin.ModelAdmin):
             "employee_percent",
             "royalty_percent",
         )}),
+        ("Trikonekt Toggles", {"fields": ("enable_franchise_on_join", "enable_franchise_on_purchase", "autopool_trigger_on_direct_referral")}),
+        ("Trikonekt Fixed Amounts", {"fields": ("franchise_fixed_json", "referral_join_fixed_json", "three_matrix_amounts_json", "five_matrix_amounts_json")}),
         ("Audit", {"fields": ("updated_at", "created_at")}),
     )
 
 
 @admin.register(AutoPoolAccount)
 class AutoPoolAccountAdmin(admin.ModelAdmin):
-    list_display = ("id", "owner", "username_key", "entry_amount", "status", "level", "created_at")
-    list_filter = ("status",)
+    list_display = ("id", "owner", "username_key", "pool_type", "entry_amount", "status", "level", "created_at")
+    list_filter = ("pool_type", "status")
     search_fields = ("username_key", "owner__username")
     raw_id_fields = ("owner", "parent_account")
     ordering = ("-created_at",)
+
+
+@admin.register(RewardProgress)
+class RewardProgressAdmin(admin.ModelAdmin):
+    list_display = ("user", "coupon_count", "updated_at", "created_at")
+    search_fields = ("user__username",)
+    raw_id_fields = ("user",)
+    readonly_fields = ("created_at", "updated_at")
+    actions = ["reset_coupons"]
+
+    def reset_coupons(self, request, queryset):
+        updated = 0
+        for rp in queryset:
+            try:
+                rp.coupon_count = 0
+                rp.save(update_fields=["coupon_count", "updated_at"])
+                updated += 1
+            except Exception:
+                continue
+        self.message_user(request, f"Reset coupons for {updated} user(s).")
+    reset_coupons.short_description = "Reset coupon counts to 0"
+
+
+@admin.register(RewardRedemption)
+class RewardRedemptionAdmin(admin.ModelAdmin):
+    list_display = ("user", "reward_key", "coupons_spent", "status", "requested_at", "decided_by", "decided_at")
+    list_filter = ("status", "reward_key", "requested_at")
+    search_fields = ("user__username",)
+    raw_id_fields = ("user", "decided_by")
+    readonly_fields = ("requested_at", "decided_at")
+    actions = ["approve_selected", "reject_selected"]
+
+    def approve_selected(self, request, queryset):
+        from django.utils import timezone
+        updated = 0
+        for rr in queryset:
+            try:
+                if rr.status == "requested":
+                    rr.status = "approved"
+                    rr.decided_by = request.user
+                    rr.decided_at = timezone.now()
+                    rr.save(update_fields=["status", "decided_by", "decided_at"])
+                    updated += 1
+            except Exception:
+                continue
+        self.message_user(request, f"Approved {updated} redemption(s).")
+    approve_selected.short_description = "Approve selected redemptions"
+
+    def reject_selected(self, request, queryset):
+        from django.utils import timezone
+        updated = 0
+        for rr in queryset:
+            try:
+                if rr.status == "requested":
+                    rr.status = "rejected"
+                    rr.decided_by = request.user
+                    rr.decided_at = timezone.now()
+                    rr.save(update_fields=["status", "decided_by", "decided_at"])
+                    updated += 1
+            except Exception:
+                continue
+        self.message_user(request, f"Rejected {updated} redemption(s).")
+    reject_selected.short_description = "Reject selected redemptions"
+
+
+@admin.register(UserMatrixProgress)
+class UserMatrixProgressAdmin(admin.ModelAdmin):
+    list_display = ("user", "pool_type", "total_earned", "level_reached", "updated_at")
+    list_filter = ("pool_type",)
+    search_fields = ("user__username",)
+    raw_id_fields = ("user",)
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(ReferralJoinPayout)
+class ReferralJoinPayoutAdmin(admin.ModelAdmin):
+    list_display = ("user_new", "source_type", "source_id", "created_at")
+    search_fields = ("user_new__username", "source_id")
+    raw_id_fields = ("user_new",)
+    readonly_fields = ("created_at",)
+
+
+@admin.register(FranchisePayout)
+class FranchisePayoutAdmin(admin.ModelAdmin):
+    list_display = ("user_new", "trigger", "source_type", "source_id", "created_at")
+    list_filter = ("trigger",)
+    search_fields = ("user_new__username", "source_id")
+    raw_id_fields = ("user_new",)
+    readonly_fields = ("created_at",)
+
+
+@admin.register(DailyReport)
+class DailyReportAdmin(admin.ModelAdmin):
+    list_display = (
+        "date", "reporter", "role",
+        "tr_registered", "wg_registered", "asia_pay_registered", "dm_account_registered",
+        "e_coupon_issued", "physical_coupon_issued", "product_sold", "total_amount",
+    )
+    list_filter = ("role", "date")
+    search_fields = ("reporter__username",)
+    raw_id_fields = ("reporter",)
+    ordering = ("-date", "-id")

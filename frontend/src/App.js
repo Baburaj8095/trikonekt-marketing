@@ -6,7 +6,8 @@ import AgencyDashboard from "./pages/AgencyDashboard";
 import EmployeeDashboard from "./pages/EmployeeDashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
 import HomeScreen from "./pages/HomeScreen";
-import RedeemCoupon from "./pages/RedeemCoupon";
+import ConsumerCoupon from "./pages/ConsumerCoupon";
+import ConsumerKYC from "./pages/ConsumerKYC";
 import AgencyLuckyCoupons from "./pages/AgencyLuckyCoupons";
 import EmployeeLuckyCoupons from "./pages/EmployeeLuckyCoupons";
 import ProductUpload from "./pages/agency/products/ProductUpload";
@@ -19,9 +20,25 @@ import BannerDetails from "./pages/market/BannerDetails";
 import BannerManage from "./pages/agency/banners/BannerManage";
 import ConsumerShell from "./components/layouts/ConsumerShell";
 import AgencyShell from "./components/layouts/AgencyShell";
+import EmployeeShell from "./components/layouts/EmployeeShell";
 import EnhancedLogin from "./pages/Auth/EnhancedLogin";
 import Wallet from "./pages/Wallet";
 import LoadingOverlay from "./components/LoadingOverlay";
+import MyTeam from "./pages/team/MyTeam";
+import EmployeeDailyReport from "./pages/reports/EmployeeDailyReport";
+import AgencyDailyReport from "./pages/reports/AgencyDailyReport";
+import AdminProtectedRoute from "./components/AdminProtectedRoute";
+import AdminShell from "./components/layouts/AdminShell";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminUserTree from "./pages/admin/AdminUserTree";
+import AdminUsers from "./pages/admin/AdminUsers";
+import AdminLogin from "./pages/admin/AdminLogin";
+import AdminKYC from "./pages/admin/AdminKYC";
+import AdminWithdrawals from "./pages/admin/AdminWithdrawals";
+import AdminMatrixFive from "./pages/admin/AdminMatrixFive";
+import AdminMatrixThree from "./pages/admin/AdminMatrixThree";
+import AdminAutopool from "./pages/admin/AdminAutopool";
+import AdminECoupons from "./pages/admin/AdminECoupons";
 
 function App() {
   return (
@@ -34,6 +51,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<EnhancedLogin />} />
         <Route path="/enhanced-login" element={<EnhancedLogin />} />
+        <Route path="/admin/login" element={<AdminLogin />} />
         {/* User Routes */}
         <Route
           path="/user/dashboard"
@@ -56,7 +74,7 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["user"]}>
               <ConsumerShell>
-                <RedeemCoupon />
+                <ConsumerCoupon />
               </ConsumerShell>
             </ProtectedRoute>
           }
@@ -67,6 +85,26 @@ function App() {
             <ProtectedRoute allowedRoles={["user"]}>
               <ConsumerShell>
                 <Wallet />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/kyc"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <ConsumerKYC />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/my-team"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <MyTeam />
               </ConsumerShell>
             </ProtectedRoute>
           }
@@ -97,6 +135,57 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/agency/my-team"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <MyTeam />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agency/daily-report"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <AgencyDailyReport />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/agency/marketplace"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <Marketplace />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agency/marketplace/products/:id"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <ProductDetails />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agency/marketplace/banners/:id"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <BannerDetails />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
 
         {/* Employee Routes */}
         <Route
@@ -112,6 +201,25 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["employee"]}>
               <EmployeeLuckyCoupons />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee/my-team"
+          element={
+            <ProtectedRoute allowedRoles={["employee"]}>
+              <MyTeam />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/employee/daily-report"
+          element={
+            <ProtectedRoute allowedRoles={["employee"]}>
+              <EmployeeShell>
+                <EmployeeDailyReport />
+              </EmployeeShell>
             </ProtectedRoute>
           }
         />
@@ -170,6 +278,98 @@ function App() {
                 <PurchaseRequests />
               </AgencyShell>
             </ProtectedRoute>
+          }
+        />
+
+        {/* Admin Routes */}
+        <Route
+          path="/admin/dashboard"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminDashboard />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/user-tree"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminUserTree />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminUsers />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/kyc"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminKYC />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/withdrawals"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminWithdrawals />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/matrix/five"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminMatrixFive />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/matrix/three"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminMatrixThree />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/autopool"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminAutopool />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/e-coupons"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminECoupons />
+              </AdminShell>
+            </AdminProtectedRoute>
           }
         />
 

@@ -1,7 +1,9 @@
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.db.models import Q
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenRefreshView
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
@@ -45,4 +47,37 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['role'] = user.role
         token['username'] = user.username
         token['full_name'] = getattr(user, 'full_name', '') or ''
+        # Admin flags for guarding Admin UI routes
+        token['is_staff'] = bool(getattr(user, 'is_staff', False))
+        token['is_superuser'] = bool(getattr(user, 'is_superuser', False))
         return token
+
+
+class CustomTokenRefreshSerializer(TokenRefreshSerializer):
+    """
+    Ensure refreshed access tokens include our custom claims so Admin route guard keeps working.
+    """
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        try:
+            refresh = RefreshToken(attrs.get("refresh"))
+            user_id = refresh.get("user_id", None)
+            if user_id:
+                User = get_user_model()
+                user = User.objects.filter(id=user_id).first()
+                if user:
+                    access = refresh.access_token
+                    access["role"] = user.role
+                    access["username"] = user.username
+                    access["full_name"] = getattr(user, "full_name", "") or ""
+                    access["is_staff"] = bool(getattr(user, "is_staff", False))
+                    access["is_superuser"] = bool(getattr(user, "is_superuser", False))
+                    data["access"] = str(access)
+        except Exception:
+            # If anything fails, return the default data without extra claims
+            pass
+        return data
+
+
+class CustomTokenRefreshView(TokenRefreshView):
+    serializer_class = CustomTokenRefreshSerializer

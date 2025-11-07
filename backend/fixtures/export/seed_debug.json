@@ -1,0 +1,14 @@
+{
+  "total_entries_KA": 9658,
+  "districts_selected": [
+    "KALABURAGI"
+  ],
+  "pins_per_district": {
+    "KALABURAGI": 42
+  },
+  "requested_districts": [
+    "kalaburagi"
+  ],
+  "fallback_used": false,
+  "max_pincodes_per_district": 1
+}

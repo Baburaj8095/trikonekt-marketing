@@ -17,11 +17,13 @@ import {
   CardContent,
   Stack,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import API from "../../api/api";
 
 export default function Marketplace() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const basePath = location.pathname.startsWith("/agency/marketplace") ? "/agency/marketplace" : "/marketplace";
 
   // Filters
   const [filters, setFilters] = useState({
@@ -352,7 +354,7 @@ export default function Marketplace() {
             {(banners || []).map((b) => (
               <Grid key={b.id} item xs={12} sm={6} md={4} lg={3}>
                 <Card variant="outlined" sx={{ borderRadius: 2, overflow: "hidden", width: 300, mx: "auto" }}>
-                  <CardActionArea onClick={() => navigate(`/marketplace/banners/${b.id}`)}>
+                  <CardActionArea onClick={() => navigate(`${basePath}/banners/${b.id}`)}>
                     {b.image_url ? (
                       <CardMedia
                         component="img"
@@ -411,7 +413,7 @@ export default function Marketplace() {
                         setSnack({ open: true, type: "error", msg: "This product is out of stock." });
                         return;
                       }
-                      navigate(`/marketplace/products/${p.id}`);
+                      navigate(`${basePath}/products/${p.id}`);
                     }}
                   >
                     {p.image_url ? (

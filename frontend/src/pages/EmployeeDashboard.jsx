@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   AppBar,
   Toolbar,
@@ -31,11 +31,13 @@ import useMediaQuery from "@mui/material/useMediaQuery";
 import MenuIcon from "@mui/icons-material/Menu";
 import LOGO from "../assets/TRIKONEKT.png";
 import API from "../api/api";
+import RewardsTargetCard from "../components/RewardsTargetCard";
 
 const drawerWidth = 220;
 
 export default function EmployeeDashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Identity
   const storedUser = useMemo(() => {
@@ -75,7 +77,21 @@ export default function EmployeeDashboard() {
     ECOUPONS: "ecoupons",
     WALLET: "wallet",
   };
-  const [activeTab, setActiveTab] = useState(TABS.LUCKY);
+  const [activeTab, setActiveTab] = useState(() => {
+    const q = new URLSearchParams(location.search);
+    const t = (q.get("tab") || "").toLowerCase();
+    if (t === "ecoupons") return TABS.ECOUPONS;
+    if (t === "wallet") return TABS.WALLET;
+    return TABS.LUCKY;
+  });
+
+  // Keep URL and local tab state in sync (so shell highlight matches)
+  useEffect(() => {
+    const q = new URLSearchParams(location.search);
+    const t = (q.get("tab") || "").toLowerCase();
+    const next = t === "ecoupons" ? TABS.ECOUPONS : t === "wallet" ? TABS.WALLET : TABS.LUCKY;
+    setActiveTab(next);
+  }, [location.search]);
 
   // Lucky draw pending (TRE)
   const [luckyPending, setLuckyPending] = useState([]);
@@ -311,6 +327,33 @@ export default function EmployeeDashboard() {
   const [txsLoading, setTxsLoading] = useState(false);
   const [txsError, setTxsError] = useState("");
 
+  // Withdrawals
+  const [myWithdrawals, setMyWithdrawals] = useState([]);
+  const [wdrErr, setWdrErr] = useState("");
+  const [wdrSubmitting, setWdrSubmitting] = useState(false);
+  const [wdrForm, setWdrForm] = useState({
+    amount: "",
+    method: "upi",
+    upi_id: "",
+    bank_name: "",
+    bank_account_number: "",
+    ifsc_code: "",
+  });
+  const onWdrChange = (e) => setWdrForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+
+  const cooldownUntil = useMemo(() => {
+    try {
+      const last = (myWithdrawals || []).find((w) => String(w.status).toLowerCase() !== "rejected");
+      if (!last || !last.requested_at) return null;
+      const dt = new Date(last.requested_at);
+      dt.setDate(dt.getDate() + 7);
+      return dt;
+    } catch {
+      return null;
+    }
+  }, [myWithdrawals]);
+  const onCooldown = Boolean(cooldownUntil && cooldownUntil > new Date());
+
   const loadWallet = async () => {
     try {
       setWalletLoading(true);
@@ -340,6 +383,62 @@ export default function EmployeeDashboard() {
       setTxs([]);
     } finally {
       setTxsLoading(false);
+    }
+  };
+
+  const loadMyWithdrawals = async () => {
+    try {
+      const res = await API.get("/accounts/withdrawals/me/");
+      const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
+      setMyWithdrawals(arr || []);
+    } catch (e) {
+      setMyWithdrawals([]);
+    }
+  };
+
+  const submitWithdrawal = async (e) => {
+    e.preventDefault();
+    setWdrErr("");
+    if (onCooldown) return;
+    const amtNum = Number(wdrForm.amount);
+    if (!Number.isFinite(amtNum) || amtNum <= 0) {
+      setWdrErr("Enter a valid amount.");
+      return;
+    }
+    const payload = {
+      amount: amtNum,
+      method: wdrForm.method,
+    };
+    if (wdrForm.method === "upi") {
+      if (!wdrForm.upi_id.trim()) {
+        setWdrErr("UPI ID is required for UPI withdrawals.");
+        return;
+      }
+      payload.upi_id = wdrForm.upi_id.trim();
+    } else {
+      if (wdrForm.bank_name) payload.bank_name = wdrForm.bank_name.trim();
+      if (wdrForm.bank_account_number) payload.bank_account_number = wdrForm.bank_account_number.trim();
+      if (wdrForm.ifsc_code) payload.ifsc_code = wdrForm.ifsc_code.trim().toUpperCase();
+    }
+    try {
+      setWdrSubmitting(true);
+      await API.post("/accounts/withdrawals/", payload);
+      await Promise.all([loadWallet(), loadTransactions(), loadMyWithdrawals()]);
+      setWdrForm({
+        amount: "",
+        method: wdrForm.method,
+        upi_id: "",
+        bank_name: "",
+        bank_account_number: "",
+        ifsc_code: "",
+      });
+    } catch (e) {
+      const msg =
+        e?.response?.data?.detail ||
+        (e?.response?.data ? JSON.stringify(e.response.data) : "Failed to submit withdrawal.");
+      setWdrErr(String(msg));
+    } finally {
+      setWdrSubmitting(false);
     }
   };
 
@@ -380,6 +479,7 @@ export default function EmployeeDashboard() {
     loadPendingSubs();
     loadWallet();
     loadTransactions();
+    loadMyWithdrawals();
   }, []);
 
   // Sidebar UI
@@ -389,7 +489,7 @@ export default function EmployeeDashboard() {
         <ListItemButton
           selected={activeTab === TABS.LUCKY}
           sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
-          onClick={() => setActiveTab(TABS.LUCKY)}
+          onClick={() => { setActiveTab(TABS.LUCKY); navigate("/employee/dashboard?tab=lucky"); }}
         >
           <ListItemText primary="Lucky Draw Submission" />
         </ListItemButton>
@@ -403,16 +503,22 @@ export default function EmployeeDashboard() {
         <ListItemButton
           selected={activeTab === TABS.ECOUPONS}
           sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
-          onClick={() => setActiveTab(TABS.ECOUPONS)}
+          onClick={() => { setActiveTab(TABS.ECOUPONS); navigate("/employee/dashboard?tab=ecoupons"); }}
         >
           <ListItemText primary="My E‑Coupons" />
         </ListItemButton>
         <ListItemButton
           selected={activeTab === TABS.WALLET}
           sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
-          onClick={() => setActiveTab(TABS.WALLET)}
+          onClick={() => { setActiveTab(TABS.WALLET); navigate("/employee/dashboard?tab=wallet"); }}
         >
           <ListItemText primary="My Wallet" />
+        </ListItemButton>
+        <ListItemButton
+          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+          onClick={() => navigate("/employee/daily-report")}
+        >
+          <ListItemText primary="Daily Report" />
         </ListItemButton>
       </List>
       <Divider />
@@ -481,6 +587,9 @@ export default function EmployeeDashboard() {
         <Container maxWidth="lg" sx={{ px: 0 }}>
           {activeTab === TABS.LUCKY && (
             <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <RewardsTargetCard role="employee" />
+              </Grid>
               {/* Lucky draw submissions awaiting my (TRE) approval */}
               <Grid item xs={12}>
                 <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
@@ -946,6 +1055,88 @@ export default function EmployeeDashboard() {
                       Balance: ₹{wallet.balance} {wallet.updated_at ? `— updated ${new Date(wallet.updated_at).toLocaleString()}` : ""}
                     </Alert>
                   )}
+
+                  <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>
+                    Request Withdrawal
+                  </Typography>
+                  {wdrErr ? <Alert severity="error" sx={{ mb: 1 }}>{wdrErr}</Alert> : null}
+                  {onCooldown ? (
+                    <Alert severity="warning" sx={{ mb: 1 }}>
+                      Only one withdrawal is allowed per week. Next available:{" "}
+                      {cooldownUntil ? cooldownUntil.toLocaleString() : "-"}
+                    </Alert>
+                  ) : null}
+                  <Box component="form" onSubmit={submitWithdrawal} sx={{ mb: 2 }}>
+                    <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        label="Amount (₹)"
+                        name="amount"
+                        value={wdrForm.amount}
+                        onChange={(e) => setWdrForm((f) => ({ ...f, amount: e.target.value }))}
+                        inputProps={{ inputMode: "decimal" }}
+                        required
+                      />
+                      <TextField
+                        fullWidth
+                        size="small"
+                        select
+                        label="Method"
+                        name="method"
+                        value={wdrForm.method}
+                        onChange={onWdrChange}
+                      >
+                        <MenuItem value="upi">UPI</MenuItem>
+                        <MenuItem value="bank">Bank</MenuItem>
+                      </TextField>
+                    </Stack>
+                    {wdrForm.method === "upi" ? (
+                      <Box sx={{ mt: 1 }}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="UPI ID"
+                          name="upi_id"
+                          value={wdrForm.upi_id}
+                          onChange={onWdrChange}
+                          required
+                        />
+                      </Box>
+                    ) : (
+                      <Stack spacing={1} sx={{ mt: 1 }}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="Bank Name"
+                          name="bank_name"
+                          value={wdrForm.bank_name}
+                          onChange={onWdrChange}
+                        />
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="Account Number"
+                          name="bank_account_number"
+                          value={wdrForm.bank_account_number}
+                          onChange={onWdrChange}
+                          inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
+                        />
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="IFSC Code"
+                          name="ifsc_code"
+                          value={wdrForm.ifsc_code}
+                          onChange={onWdrChange}
+                          inputProps={{ maxLength: 11, style: { textTransform: "uppercase" } }}
+                        />
+                      </Stack>
+                    )}
+                    <Button type="submit" variant="contained" disabled={onCooldown || wdrSubmitting} sx={{ mt: 1 }}>
+                      {wdrSubmitting ? "Requesting..." : "Request Withdrawal"}
+                    </Button>
+                  </Box>
 
                   <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>
                     Recent Transactions

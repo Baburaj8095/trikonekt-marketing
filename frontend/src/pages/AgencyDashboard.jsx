@@ -17,6 +17,7 @@ import {
   Button,
 } from "@mui/material";
 import API from "../api/api";
+import RewardsTargetCard from "../components/RewardsTargetCard";
 
 export default function AgencyDashboard() {
   // Nav identity (for filtering employees by agency pincode)
@@ -350,6 +351,9 @@ export default function AgencyDashboard() {
               </Button>
               <Button size="small" onClick={loadLuckyHistory}>Refresh</Button>
             </Box>
+          </Box>
+          <Box sx={{ mb: 2 }}>
+            <RewardsTargetCard role="agency" />
           </Box>
           <Box sx={{ mb: 2 }}>
             <Alert severity="success">

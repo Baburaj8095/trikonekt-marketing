@@ -3,7 +3,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
 from django.db.models import Q
 
-from .models import CustomUser, AgencyRegionAssignment, WalletTransaction, Wallet
+from .models import CustomUser, AgencyRegionAssignment, WalletTransaction, Wallet, UserKYC, WithdrawalRequest
 from locations.models import Country, State, City
 
 
@@ -465,16 +465,162 @@ class PublicUserSerializer(serializers.ModelSerializer):
     state = serializers.StringRelatedField()
     city = serializers.StringRelatedField()
     registered_by_username = serializers.SerializerMethodField()
+    avatar_url = serializers.SerializerMethodField()
 
     class Meta:
         model = CustomUser
         fields = [
             'id', 'username', 'unique_id', 'email', 'full_name', 'phone',
-            'country', 'state', 'city', 'pincode', 'sponsor_id',
+            'country', 'state', 'city', 'pincode', 'address', 'sponsor_id',
             'category', 'role', 'registered_by', 'registered_by_username',
+            'avatar_url',
             'date_joined', 'is_active'
         ]
         read_only_fields = fields
 
     def get_registered_by_username(self, obj):
         return getattr(obj.registered_by, 'username', None)
+
+    def get_avatar_url(self, obj):
+        try:
+            f = getattr(obj, 'avatar', None)
+            if f and getattr(f, 'url', None):
+                return f.url
+        except Exception:
+            pass
+        return None
+
+
+class ProfileMeSerializer(serializers.ModelSerializer):
+    country = serializers.PrimaryKeyRelatedField(queryset=Country.objects.all(), required=False, allow_null=True)
+    state = serializers.PrimaryKeyRelatedField(queryset=State.objects.all(), required=False, allow_null=True)
+    city = serializers.PrimaryKeyRelatedField(queryset=City.objects.all(), required=False, allow_null=True)
+    avatar = serializers.ImageField(required=False, allow_null=True)
+    avatar_url = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = CustomUser
+        fields = [
+            'id', 'username', 'email', 'full_name', 'phone',
+            'country', 'state', 'city', 'pincode', 'address',
+            'avatar', 'avatar_url',
+        ]
+        read_only_fields = ['id', 'username', 'avatar_url']
+
+    def get_avatar_url(self, obj):
+        try:
+            f = getattr(obj, 'avatar', None)
+            if f and getattr(f, 'url', None):
+                return f.url
+        except Exception:
+            pass
+        return None
+
+class UserKYCSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserKYC
+        fields = [
+            "bank_name",
+            "bank_account_number",
+            "ifsc_code",
+            "verified",
+            "verified_at",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["verified", "verified_at", "created_at", "updated_at"]
+
+
+class WithdrawalRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WithdrawalRequest
+        fields = [
+            "id",
+            "amount",
+            "method",
+            "upi_id",
+            "bank_name",
+            "bank_account_number",
+            "ifsc_code",
+            "note",
+            "status",
+            "requested_at",
+            "decided_at",
+            "payout_ref",
+        ]
+        read_only_fields = ["status", "requested_at", "decided_at", "payout_ref"]
+
+    def validate(self, attrs):
+        from decimal import Decimal
+        amt = attrs.get("amount")
+        try:
+            if amt is None or Decimal(amt) <= 0:
+                raise serializers.ValidationError({"amount": "Amount must be greater than 0."})
+        except Exception:
+            raise serializers.ValidationError({"amount": "Invalid amount."})
+
+        method = (attrs.get("method") or "upi").lower()
+        if method == "upi":
+            if not (attrs.get("upi_id") or "").strip():
+                raise serializers.ValidationError({"upi_id": "UPI ID is required for UPI withdrawals."})
+        elif method == "bank":
+            # Bank details may be filled from KYC in create()
+            pass
+        else:
+            raise serializers.ValidationError({"method": "Invalid method. Use 'upi' or 'bank'."})
+        return attrs
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated:
+            raise serializers.ValidationError({"detail": "Authentication required."})
+
+        method = (validated_data.get("method") or "upi").lower()
+        bank_name = (validated_data.get("bank_name") or "").strip()
+        bank_acc = (validated_data.get("bank_account_number") or "").strip()
+        ifsc = (validated_data.get("ifsc_code") or "").strip()
+
+        # If bank method and missing fields, hydrate from KYC
+        if method == "bank" and (not bank_acc or not ifsc):
+            try:
+                kyc = getattr(user, "kyc", None)
+                if kyc:
+                    bank_name = bank_name or (kyc.bank_name or "")
+                    bank_acc = bank_acc or (kyc.bank_account_number or "")
+                    ifsc = ifsc or (kyc.ifsc_code or "")
+            except Exception:
+                pass
+            if not bank_acc or not ifsc:
+                raise serializers.ValidationError({"detail": "Bank account number and IFSC are required for bank withdrawals."})
+
+        # Weekly 1 withdrawal limit (applies to all roles: consumer/employee/agency)
+        try:
+            from django.utils import timezone
+            from datetime import timedelta
+            last = WithdrawalRequest.objects.filter(user=user).exclude(status="rejected").order_by("-requested_at").first()
+            if last and last.requested_at:
+                now = timezone.now()
+                if (now - last.requested_at) < timedelta(days=7):
+                    next_allowed = last.requested_at + timedelta(days=7)
+                    raise serializers.ValidationError({
+                        "detail": "Only one withdrawal is allowed per week.",
+                        "next_allowed_at": next_allowed.isoformat(),
+                    })
+        except serializers.ValidationError:
+            raise
+        except Exception:
+            # best-effort guard; do not block if something goes wrong with the check
+            pass
+
+        wr = WithdrawalRequest.objects.create(
+            user=user,
+            amount=validated_data["amount"],
+            method=method,
+            upi_id=(validated_data.get("upi_id") or "").strip(),
+            bank_name=bank_name,
+            bank_account_number=bank_acc,
+            ifsc_code=ifsc,
+            note=(validated_data.get("note") or ""),
+        )
+        return wr

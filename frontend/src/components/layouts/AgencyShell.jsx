@@ -29,6 +29,9 @@ export default function AgencyShell({ children }) {
   const isProductsList = location.pathname === "/agency/products";
   const isBanners = location.pathname === "/agency/banners";
   const isPurchaseRequests = location.pathname === "/agency/purchase-requests";
+  const isMyTeam = location.pathname === "/agency/my-team";
+  const isDailyReport = location.pathname === "/agency/daily-report";
+  const isMarketplace = location.pathname.startsWith("/agency/marketplace");
   const inProductsContext =
     location.pathname.startsWith("/agency/products") ||
     location.pathname === "/agency/purchase-requests";
@@ -110,8 +113,40 @@ export default function AgencyShell({ children }) {
         >
           <ListItemText primary="Commission Summary" />
         </ListItemButton>
-        
-        
+
+        <ListItemButton
+          selected={isMyTeam}
+          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+          onClick={() => {
+            navigate("/agency/my-team");
+            setMobileOpen(false);
+          }}
+        >
+          <ListItemText primary="My Team" />
+        </ListItemButton>
+
+        <ListItemButton
+          selected={isDailyReport}
+          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+          onClick={() => {
+            navigate("/agency/daily-report");
+            setMobileOpen(false);
+          }}
+        >
+          <ListItemText primary="Daily Report" />
+        </ListItemButton>
+
+        <ListItemButton
+          selected={isMarketplace}
+          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+          onClick={() => {
+            navigate("/agency/marketplace");
+            setMobileOpen(false);
+          }}
+        >
+          <ListItemText primary="Marketplace" />
+        </ListItemButton>
+
         <ListItemButton
           selected={isBanners}
           sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}

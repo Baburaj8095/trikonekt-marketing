@@ -13,6 +13,10 @@
     { "src": "/asset-manifest.json", "dest": "/asset-manifest.json" },
     { "src": "/manifest.json", "dest": "/manifest.json" },
     { "src": "/logo(.*)\\.png", "dest": "/logo$1.png" },
+
+    { "src": "/api/(.*)", "dest": "https://trikonekt-backend.onrender.com/api/$1" },
+    { "src": "/media/(.*)", "dest": "https://trikonekt-backend.onrender.com/media/$1" },
+
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }

@@ -214,17 +214,20 @@ class PurchaseRequestStatusUpdate(generics.UpdateAPIView):
                 product.refresh_from_db(fields=["quantity"])
                 instance = serializer.instance
 
-                # Auto-Pool and hierarchical commission on product purchase approval
+                # MLM activations on product purchase approval
                 try:
-                    from decimal import Decimal
-                    from business.models import CommissionConfig, AutoPoolAccount, distribute_auto_pool_commissions
-                    cfg = CommissionConfig.get_solo()
+                    from business.services.activation import product_purchase_activations
                     if instance.created_by_id:
-                        entry_amt = Decimal(cfg.base_coupon_value or 150)
-                        AutoPoolAccount.create_for_user(instance.created_by, entry_amt)
-                        distribute_auto_pool_commissions(instance.created_by, entry_amt)
+                        product_purchase_activations(instance.created_by, {"type": "product", "id": instance.id})
                 except Exception:
                     # Non-blocking best-effort payout
+                    pass
+                # Franchise benefit distribution on purchase (best-effort)
+                try:
+                    if instance.created_by_id:
+                        from business.services.franchise import distribute_franchise_benefit
+                        distribute_franchise_benefit(instance.created_by, trigger="purchase", source={"type": "product", "id": instance.id})
+                except Exception:
                     pass
         else:
             self.perform_update(serializer)
@@ -526,17 +529,20 @@ class BannerPurchaseRequestStatusUpdate(generics.UpdateAPIView):
                 item.refresh_from_db(fields=["quantity"])
                 instance = serializer.instance
 
-                # Optional: auto-pool commission entry similar to product approval
+                # MLM activations on banner item purchase approval
                 try:
-                    from decimal import Decimal
-                    from business.models import CommissionConfig, AutoPoolAccount, distribute_auto_pool_commissions
-                    cfg = CommissionConfig.get_solo()
+                    from business.services.activation import product_purchase_activations
                     if instance.created_by_id:
-                        entry_amt = Decimal(cfg.base_coupon_value or 150)
-                        AutoPoolAccount.create_for_user(instance.created_by, entry_amt)
-                        distribute_auto_pool_commissions(instance.created_by, entry_amt)
+                        product_purchase_activations(instance.created_by, {"type": "banner_item", "id": instance.id})
                 except Exception:
                     # Non-blocking
+                    pass
+                # Franchise benefit distribution on purchase (best-effort)
+                try:
+                    if instance.created_by_id:
+                        from business.services.franchise import distribute_franchise_benefit
+                        distribute_franchise_benefit(instance.created_by, trigger="purchase", source={"type": "banner_item", "id": instance.id})
+                except Exception:
                     pass
         else:
             self.perform_update(serializer)

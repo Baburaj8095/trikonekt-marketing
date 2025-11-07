@@ -11,7 +11,7 @@ from .models import (
     ConsumerAccount, EmployeeAccount, CompanyAccount,
     AgencyStateCoordinator, AgencyState, AgencyDistrictCoordinator, AgencyDistrict,
     AgencyPincodeCoordinator, AgencyPincode, AgencySubFranchise, AgencyRegionAssignment,
-    Wallet, WalletTransaction
+    Wallet, WalletTransaction, UserKYC, WithdrawalRequest
 )
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from locations.models import State, City
@@ -902,10 +902,127 @@ class WalletAdmin(admin.ModelAdmin):
     readonly_fields = ('created_at', 'updated_at')
 
 
+class TxRoleFilter(admin.SimpleListFilter):
+    title = "Commission Role (meta.role)"
+    parameter_name = "tx_role"
+
+    def lookups(self, request, model_admin):
+        return (("employee", "Employee"), ("agency", "Agency"), ("other", "Other/Unset"))
+
+    def queryset(self, request, queryset):
+        val = self.value()
+        if not val:
+            return queryset
+        try:
+            if val in ("employee", "agency"):
+                return queryset.filter(meta__contains={"role": val})
+            if val == "other":
+                return queryset.exclude(meta__has_key="role")
+        except Exception:
+            # SQLite fallback without has_key
+            if val in ("employee", "agency"):
+                return queryset.filter(meta__contains={"role": val})
+            if val == "other":
+                return queryset.exclude(meta__contains={"role": "employee"}).exclude(meta__contains({"role": "agency"}))
+        return queryset
+
+
 @admin.register(WalletTransaction)
 class WalletTransactionAdmin(admin.ModelAdmin):
     list_display = ('user', 'type', 'amount', 'balance_after', 'source_type', 'source_id', 'created_at')
-    list_filter = ('type',)
+    list_filter = ('type', 'source_type', TxRoleFilter)
     search_fields = ('user__username', 'source_id')
     raw_id_fields = ('user',)
     readonly_fields = ('created_at',)
+    actions = ['export_as_csv']
+
+    def export_as_csv(self, request, queryset):
+        import csv
+        from django.http import HttpResponse
+        resp = HttpResponse(content_type='text/csv')
+        resp['Content-Disposition'] = 'attachment; filename=wallet_transactions.csv'
+        writer = csv.writer(resp)
+        writer.writerow(['user', 'type', 'amount', 'balance_after', 'source_type', 'source_id', 'meta', 'created_at'])
+        for t in queryset:
+            writer.writerow([
+                getattr(t.user, 'username', ''),
+                t.type, t.amount, t.balance_after,
+                t.source_type, t.source_id,
+                t.meta, t.created_at
+            ])
+        return resp
+    export_as_csv.short_description = "Export selected to CSV"
+
+
+@admin.register(UserKYC)
+class UserKYCAdmin(admin.ModelAdmin):
+    list_display = ("user", "bank_name", "bank_account_number", "ifsc_code", "verified", "verified_by", "verified_at", "updated_at")
+    list_filter = ("verified",)
+    search_fields = ("user__username", "bank_account_number", "ifsc_code")
+    raw_id_fields = ("user", "verified_by")
+    readonly_fields = ("created_at", "updated_at")
+    actions = ["mark_verified", "mark_unverified"]
+
+    def mark_verified(self, request, queryset):
+        from django.utils import timezone
+        updated = 0
+        for kyc in queryset:
+            try:
+                if not kyc.verified:
+                    kyc.verified = True
+                    kyc.verified_by = request.user
+                    kyc.verified_at = timezone.now()
+                    kyc.save(update_fields=["verified", "verified_by", "verified_at"])
+                    updated += 1
+            except Exception:
+                continue
+        self.message_user(request, f"Marked {updated} KYC record(s) as verified.")
+    mark_verified.short_description = "Mark selected as verified"
+
+    def mark_unverified(self, request, queryset):
+        updated = 0
+        for kyc in queryset:
+            try:
+                kyc.verified = False
+                kyc.verified_by = None
+                kyc.verified_at = None
+                kyc.save(update_fields=["verified", "verified_by", "verified_at"])
+                updated += 1
+            except Exception:
+                continue
+        self.message_user(request, f"Marked {updated} KYC record(s) as unverified.")
+    mark_unverified.short_description = "Mark selected as unverified"
+
+
+@admin.register(WithdrawalRequest)
+class WithdrawalRequestAdmin(admin.ModelAdmin):
+    list_display = ("user", "amount", "method", "status", "requested_at", "decided_by", "decided_at", "payout_ref")
+    list_filter = ("status", "method", "requested_at")
+    search_fields = ("user__username", "payout_ref")
+    raw_id_fields = ("user", "decided_by")
+    readonly_fields = ("requested_at", "decided_at")
+    actions = ["approve_selected", "reject_selected"]
+
+    def approve_selected(self, request, queryset):
+        updated = 0
+        for wr in queryset:
+            try:
+                if getattr(wr, "status", "") == "pending":
+                    wr.approve(actor=request.user)
+                    updated += 1
+            except Exception:
+                continue
+        self.message_user(request, f"Approved {updated} withdrawal(s).")
+    approve_selected.short_description = "Approve selected withdrawals"
+
+    def reject_selected(self, request, queryset):
+        updated = 0
+        for wr in queryset:
+            try:
+                if getattr(wr, "status", "") == "pending":
+                    wr.reject(actor=request.user, reason="Rejected via admin action")
+                    updated += 1
+            except Exception:
+                continue
+        self.message_user(request, f"Rejected {updated} withdrawal(s).")
+    reject_selected.short_description = "Reject selected withdrawals"

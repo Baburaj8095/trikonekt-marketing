@@ -43,7 +43,16 @@ class CustomUser(AbstractUser):
     state = models.ForeignKey('locations.State', null=True, blank=True, on_delete=models.SET_NULL, related_name='users')
     city = models.ForeignKey('locations.City', null=True, blank=True, on_delete=models.SET_NULL, related_name='users')
     pincode = models.CharField(max_length=10, blank=True, db_index=True)
+    address = models.TextField(blank=True)
+    avatar = models.ImageField(upload_to='uploads/profile/', blank=True, null=True)
     sponsor_id = models.CharField(max_length=64, blank=True)
+
+    # Activation/eligibility flags
+    first_purchase_activated_at = models.DateTimeField(null=True, blank=True)
+    autopool_enabled = models.BooleanField(default=False)
+    rewards_enabled = models.BooleanField(default=False)
+    is_agency_unlocked = models.BooleanField(default=False)
+    can_create_self_accounts = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.username} ({self.role} / {self.category})"
@@ -278,11 +287,27 @@ class WalletTransaction(models.Model):
         ('COUPON_PURCHASE_CREDIT', 'Coupon Purchase Credit'),
         ('REDEEM_ECOUPON_CREDIT', 'E-Coupon Redeem Credit'),
         ('PRODUCT_PURCHASE_DEBIT', 'Product Purchase Debit'),
+        ('BANNER_PURCHASE_DEBIT', 'Banner Purchase Debit'),
         ('COMMISSION_CREDIT', 'Commission Credit'),
         ('AUTO_POOL_DEBIT', 'Auto Pool Debit'),
         ('ADJUSTMENT_CREDIT', 'Adjustment Credit'),
         ('ADJUSTMENT_DEBIT', 'Adjustment Debit'),
         ('REFUND_CREDIT', 'Refund Credit'),
+        # Added for MLM/Packages
+        ('PRIME_ACTIVATION_CREDIT', 'Prime Activation Credit'),
+        ('GLOBAL_ACTIVATION_CREDIT', 'Global Activation Credit'),
+        ('DIRECT_REF_BONUS', 'Direct Referral Bonus'),
+        ('WELCOME_BONUS', 'Welcome Bonus'),
+        ('SELF_BONUS_ACTIVE', 'Self Bonus (Active)'),
+        ('LEVEL_BONUS', 'Level Bonus'),
+        ('AUTOPOOL_BONUS_FIVE', 'Auto-Pool Bonus (5-Matrix)'),
+        ('AUTOPOOL_BONUS_THREE', 'Auto-Pool Bonus (3-Matrix)'),
+        ('WITHDRAWAL_DEBIT', 'Withdrawal Debit'),
+        ('LIFETIME_WITHDRAWAL_BONUS', 'Lifetime Withdrawal Bonus'),
+        ('GLOBAL_ROYALTY', 'Global Royalty'),
+        ('REWARD_CREDIT', 'Reward Credit'),
+        ('REWARD_DEBIT', 'Reward Debit'),
+        ('FRANCHISE_INCOME', 'Franchise Income'),
     ]
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='wallet_transactions', db_index=True)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
@@ -304,6 +329,117 @@ class WalletTransaction(models.Model):
         return f"{self.user.username} {self.type} {self.amount} -> {self.balance_after}"
 
 
+class UserKYC(models.Model):
+    """
+    Consumer KYC details for withdrawals and payouts.
+    """
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name="kyc")
+    bank_name = models.CharField(max_length=150, blank=True)
+    bank_account_number = models.CharField(max_length=50, blank=True)
+    ifsc_code = models.CharField(max_length=20, blank=True)
+    verified = models.BooleanField(default=False, db_index=True)
+    verified_by = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.SET_NULL, related_name="kyc_verified_set")
+    verified_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+        verbose_name = "User KYC"
+        verbose_name_plural = "User KYC"
+
+    def __str__(self) -> str:
+        return f"KYC<{getattr(self.user, 'username', 'user')}>"
+
+
+class WithdrawalRequest(models.Model):
+    METHOD_CHOICES = (
+        ("upi", "UPI"),
+        ("bank", "Bank Transfer"),
+    )
+    STATUS_CHOICES = (
+        ("pending", "Pending"),
+        ("approved", "Approved"),
+        ("rejected", "Rejected"),
+    )
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="withdrawal_requests", db_index=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    method = models.CharField(max_length=16, choices=METHOD_CHOICES, default="upi", db_index=True)
+    upi_id = models.CharField(max_length=100, blank=True)
+    # bank fallback (can be copied from UserKYC on create)
+    bank_name = models.CharField(max_length=150, blank=True)
+    bank_account_number = models.CharField(max_length=50, blank=True)
+    ifsc_code = models.CharField(max_length=20, blank=True)
+
+    note = models.TextField(blank=True)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="pending", db_index=True)
+    requested_at = models.DateTimeField(auto_now_add=True)
+    decided_at = models.DateTimeField(null=True, blank=True)
+    decided_by = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.SET_NULL, related_name="withdrawals_decided")
+    payout_ref = models.CharField(max_length=100, blank=True)  # external txn id if any
+
+    class Meta:
+        ordering = ["-requested_at"]
+        indexes = [
+            models.Index(fields=["user", "status"]),
+            models.Index(fields=["status", "requested_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"WDR<{self.user.username}> ₹{self.amount} [{self.status}]"
+
+    @transaction.atomic
+    def approve(self, actor: CustomUser, payout_ref: str | None = None):
+        if self.status != "pending":
+            raise ValueError("Only pending withdrawals can be approved.")
+        # Debit user wallet
+        w = Wallet.get_or_create_for_user(self.user)
+        w.debit(
+            self.amount,
+            tx_type="WITHDRAWAL_DEBIT",
+            meta={"withdrawal_id": self.id, "method": self.method, "payout_ref": payout_ref or ""},
+            source_type="WITHDRAWAL",
+            source_id=str(self.id),
+        )
+        # Lifetime 3% referral withdrawal bonus to direct sponsor (if exists)
+        sponsor = getattr(self.user, "registered_by", None)
+        try:
+            if sponsor:
+                bonus = (self.amount or Decimal("0")) * Decimal("0.03")
+                if bonus > 0:
+                    sw = Wallet.get_or_create_for_user(sponsor)
+                    sw.credit(
+                        bonus.quantize(Decimal("0.01")),
+                        tx_type="LIFETIME_WITHDRAWAL_BONUS",
+                        meta={"from_user": self.user.username, "withdrawal_id": self.id},
+                        source_type="WITHDRAWAL_BONUS",
+                        source_id=str(self.id),
+                    )
+        except Exception:
+            # best-effort
+            pass
+        # Persist status
+        from django.utils import timezone as _tz
+        self.status = "approved"
+        self.decided_by = actor
+        self.decided_at = _tz.now()
+        if payout_ref:
+            self.payout_ref = payout_ref
+        self.save(update_fields=["status", "decided_by", "decided_at", "payout_ref"])
+
+    @transaction.atomic
+    def reject(self, actor: CustomUser, reason: str | None = None):
+        if self.status != "pending":
+            raise ValueError("Only pending withdrawals can be rejected.")
+        from django.utils import timezone as _tz
+        self.status = "rejected"
+        self.decided_by = actor
+        self.decided_at = _tz.now()
+        if reason:
+            self.note = (self.note or "") + f"\nRejected: {reason}"
+        self.save(update_fields=["status", "decided_by", "decided_at", "note"])
+
+
 @receiver(post_save, sender=CustomUser)
 def create_wallet_for_new_user(sender, instance: CustomUser, created: bool, **kwargs):
     if created:
@@ -312,3 +448,42 @@ def create_wallet_for_new_user(sender, instance: CustomUser, created: bool, **kw
         except Exception:
             # Avoid blocking user creation if wallet init fails
             pass
+
+
+@receiver(post_save, sender=CustomUser)
+def handle_new_user_post_save(sender, instance: CustomUser, created: bool, **kwargs):
+    """
+    On new user creation:
+      - Trigger referral join payouts and optional autopool placement.
+      - Optionally distribute franchise benefit on registration (config-driven).
+    """
+    if not created:
+        return
+    # Best-effort guard against import issues
+    cfg = None
+    try:
+        from business.models import CommissionConfig
+        cfg = CommissionConfig.get_solo()
+    except Exception:
+        pass
+
+    # Referral join payouts (DIRECT_REF_BONUS + LEVEL_BONUS) and optional autopool
+    try:
+        from business.services import referral as referral_service
+        referral_service.on_user_join(instance, source={"type": "user", "id": instance.id})
+    except Exception:
+        # do not block user creation
+        pass
+
+    # Franchise benefit distribution on registration
+    try:
+        if cfg is None or getattr(cfg, "enable_franchise_on_join", True):
+            from business.services import franchise as franchise_service
+            franchise_service.distribute_franchise_benefit(
+                instance,
+                trigger="registration",
+                source={"type": "user", "id": instance.id},
+            )
+    except Exception:
+        # best-effort, non-blocking
+        pass
