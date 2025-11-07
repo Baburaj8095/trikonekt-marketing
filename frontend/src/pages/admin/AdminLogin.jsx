@@ -44,7 +44,8 @@ export default function AdminLogin() {
     clearTokens();
 
     try {
-      const userField = onlyDigits(username.trim()) || username.trim();
+      const raw = username.trim();
+      const userField = /[A-Za-z]/.test(raw) ? raw : onlyDigits(raw);
       const res = await API.post("/accounts/login/", {
         username: userField,
         password: password,
@@ -148,8 +149,13 @@ export default function AdminLogin() {
               <input
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter phone or username"
-                inputMode="numeric"
+                placeholder="Enter username"
+                type="text"
+                inputMode="text"
+                autoComplete="username"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
                 style={{
                   padding: "10px 12px",
                   borderRadius: 8,
