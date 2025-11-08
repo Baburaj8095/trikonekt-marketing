@@ -14,6 +14,7 @@ from .views import (
     AdminWithdrawalRejectView,
     AdminMatrixProgressList,
     AdminMatrixTree,
+    AdminMatrix5Tree,
     AdminAutopoolSummary,
 )
 
@@ -40,5 +41,6 @@ urlpatterns = [
     # Matrix & Autopool
     path("matrix/progress/", AdminMatrixProgressList.as_view()),
     path("matrix/tree/", AdminMatrixTree.as_view()),
+    path("matrix/tree5/", AdminMatrix5Tree.as_view()),
     path("autopool/summary/", AdminAutopoolSummary.as_view()),
 ]

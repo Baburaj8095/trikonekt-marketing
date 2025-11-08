@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import API from "../../api/api";
+import TreeReferralGalaxy from "../../components/TreeReferralGalaxy";
 import {
   Box,
   Grid,
@@ -39,6 +40,9 @@ function StatCard({ title, value, subtitle }) {
 export default function MyTeam() {
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
+  const [myTree, setMyTree] = useState(null);
+  const [myTreeLoading, setMyTreeLoading] = useState(false);
+  const [myTreeErr, setMyTreeErr] = useState("");
 
   const role = useMemo(() => {
     try {
@@ -66,6 +70,29 @@ export default function MyTeam() {
     };
   }, []);
 
+  // Load my 5-matrix genealogy tree (spillover-based)
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setMyTreeLoading(true);
+        const res = await API.get("/accounts/my/matrix/tree/", { params: { max_depth: 6 } });
+        if (!mounted) return;
+        setMyTree(res?.data || null);
+        setMyTreeErr("");
+      } catch (e) {
+        if (!mounted) return;
+        setMyTree(null);
+        setMyTreeErr(e?.response?.data?.detail || "Failed to load hierarchy.");
+      } finally {
+        if (mounted) setMyTreeLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const down = data?.downline || {};
   const levels = down?.levels || {};
   const totals = data?.totals || {};
@@ -74,6 +101,24 @@ export default function MyTeam() {
   const commSplit = data?.commissions_split || {};
   const recentTeam = Array.isArray(data?.recent_team) ? data.recent_team : [];
   const recentTx = Array.isArray(data?.recent_transactions) ? data.recent_transactions : [];
+
+  function MyTreeNode({ node, depth = 0 }) {
+    const pad = depth * 16;
+    return (
+      <div style={{ paddingLeft: pad, paddingTop: 6, paddingBottom: 6, borderBottom: "1px solid #f1f5f9" }}>
+        <div style={{ fontWeight: 700, color: "#0f172a" }}>
+          {node.username} <span style={{ color: "#64748b", fontWeight: 500 }}>#{node.id} • {node.full_name || "—"}</span>
+        </div>
+        {Array.isArray(node.children) && node.children.length > 0 ? (
+          <div>
+            {node.children.map((c) => (
+              <MyTreeNode key={c.id} node={c} depth={depth + 1} />
+            ))}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <Box sx={{ p: { xs: 0, md: 0 } }}>
@@ -265,6 +310,13 @@ export default function MyTeam() {
               )}
             </CardContent>
           </Card>
+        </Grid>
+
+        {/* Geneology */}
+        <Grid item xs={12}>
+          <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, background: "#f8fafc", padding: 12 }}>
+            <TreeReferralGalaxy mode="self" />
+          </div>
         </Grid>
 
         {/* Recent Team & Transactions */}

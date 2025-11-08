@@ -32,6 +32,7 @@ import MenuIcon from "@mui/icons-material/Menu";
 import LOGO from "../assets/TRIKONEKT.png";
 import API from "../api/api";
 import RewardsTargetCard from "../components/RewardsTargetCard";
+import ReferAndEarn from "../components/ReferAndEarn";
 
 const drawerWidth = 220;
 
@@ -585,6 +586,7 @@ export default function EmployeeDashboard() {
       <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, md: 3 } }}>
         <Toolbar />
         <Container maxWidth="lg" sx={{ px: 0 }}>
+          <ReferAndEarn title="Refer & Earn" />
           {activeTab === TABS.LUCKY && (
             <Grid container spacing={2}>
               <Grid item xs={12}>

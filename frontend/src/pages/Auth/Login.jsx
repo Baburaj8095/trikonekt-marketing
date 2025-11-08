@@ -51,7 +51,7 @@ import {
 } from "@mui/icons-material";
 
 import "@fontsource/poppins";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import API from "../../api/api";
 import LOGO from "../../assets/TRIKONEKT.png";
 
@@ -63,10 +63,34 @@ const Login = () => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     document.body.style.fontFamily = "'Poppins', sans-serif";
   }, []);
+
+  // Read role and mode (aka "category") from query string to preselect UI
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(location.search);
+      const qMode = (params.get("mode") || params.get("category") || "").toLowerCase();
+      if (qMode === "register") setMode("register");
+      else if (qMode === "login") setMode("login");
+      const qRole = (params.get("role") || "").toLowerCase();
+      if (["user", "agency", "employee", "business"].includes(qRole)) {
+        setRole(qRole);
+      }
+      // If sponsor exists and user came for registration, prefill sponsor
+      const s =
+        params.get("sponsor") ||
+        params.get("sponsor_id") ||
+        params.get("agencyid") ||
+        params.get("ref");
+      if (s && qMode === "register") {
+        setSponsorId(s);
+      }
+    } catch {}
+  }, [location.search]);
 
   const handleModeChange = () => setMode(mode === "login" ? "register" : "login");
   const handleRoleChange = (_, val) => {
@@ -999,11 +1023,10 @@ const [businessPinLoading, setBusinessPinLoading] = useState(false);
   };
 
   const loginField = {
-    label: "Phone number",
-    type: "tel",
-    inputMode: "numeric",
-    placeholder: "Enter your phone number",
-    pattern: "[0-9]*",
+    label: "Username or Phone",
+    type: "text",
+    inputMode: "text",
+    placeholder: "Enter username (e.g., TREMP9876543210) or phone (10 digits)",
   };
 
   const handleSubmit = async (e) => {
@@ -1016,8 +1039,8 @@ const [businessPinLoading, setBusinessPinLoading] = useState(false);
 
     if (mode === "login") {
       try {
-        // Phone-based login: always use digits-only
-        let username = onlyDigits((formData.username || "").trim());
+        // Accept username or phone; backend resolves and disambiguates if needed
+        let username = (formData.username || "").trim();
         const submitRole = role === "business" ? "user" : role;
 
         const res = await API.post("/accounts/login/", {
@@ -1066,10 +1089,15 @@ const [businessPinLoading, setBusinessPinLoading] = useState(false);
         }
       } catch (err) {
         console.error(err);
-        const msg =
-          err?.response?.data?.detail ||
-          (err?.response?.data ? JSON.stringify(err.response.data) : "Login failed!");
-        setErrorMsg(typeof msg === "string" ? msg : String(msg));
+        const data = err?.response?.data;
+        if (data?.multiple_accounts && Array.isArray(data.multiple_accounts)) {
+          const choices = data.multiple_accounts.map((a) => a.username).join(", ");
+          setErrorMsg(`Multiple accounts found for this phone. Please enter one of these usernames: ${choices}`);
+        } else {
+          const msg =
+            data?.detail || (data ? JSON.stringify(data) : "Login failed!");
+          setErrorMsg(typeof msg === "string" ? msg : String(msg));
+        }
       }
       return;
     }

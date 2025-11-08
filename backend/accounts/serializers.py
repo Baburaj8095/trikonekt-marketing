@@ -69,7 +69,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
         fields = (
-            'id', 'username', 'unique_id', 'email', 'password', 'role', 'category',
+            'id', 'username', 'unique_id', 'prefixed_id', 'prefix_code', 'email', 'password', 'role', 'category',
             'full_name', 'phone',
             'country', 'state', 'city', 'pincode', 'sponsor_id',
             # region assignment inputs
@@ -87,20 +87,13 @@ class RegisterSerializer(serializers.ModelSerializer):
         phone = (attrs.get('phone') or '').strip()
         sponsor = (attrs.get('sponsor_id') or '').strip()
 
-        # Phone required for all non-business registrations; username = phone_digits
+        # Phone required for all non-business registrations; allow same phone for multiple accounts (different prefixes)
         if category != 'business':
             if not phone:
                 raise serializers.ValidationError({'phone': 'Phone number is required.'})
             phone_digits = ''.join(c for c in phone if c.isdigit())
-            if not phone_digits or len(phone_digits) < 8:
-                raise serializers.ValidationError({'phone': 'Enter a valid phone number.'})
-            # Enforce global uniqueness: username==digits OR phone==digits (and also original string as fallback)
-            if (
-                CustomUser.objects.filter(username__iexact=phone_digits).exists()
-                or CustomUser.objects.filter(phone__iexact=phone_digits).exists()
-                or CustomUser.objects.filter(phone__iexact=phone).exists()
-            ):
-                raise serializers.ValidationError({'phone': 'This phone number is already registered.'})
+            if not phone_digits or len(phone_digits) != 10:
+                raise serializers.ValidationError({'phone': 'Enter a valid 10-digit phone number.'})
 
         if category == 'business':
             raise serializers.ValidationError({'category': 'Business registration has moved. Use /api/business/register/.'})
@@ -110,11 +103,10 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({'sponsor_id': 'Sponsor is required.'})
 
         # Resolve sponsor by username, sponsor_id, or phone digits
-        sponsor_digits = ''.join(c for c in sponsor if c.isdigit())
-        q = Q(username__iexact=sponsor) | Q(sponsor_id__iexact=sponsor)
-        if sponsor_digits:
-            q = q | Q(phone__iexact=sponsor_digits)
-        sponsor_user = CustomUser.objects.filter(q).first()
+        # Resolve sponsor strictly by Sponsor ID, fallback to exact username match (no phone fallback)
+        sponsor_user = CustomUser.objects.filter(sponsor_id__iexact=sponsor).first()
+        if not sponsor_user:
+            sponsor_user = CustomUser.objects.filter(username__iexact=sponsor).first()
         if not sponsor_user:
             raise serializers.ValidationError({'sponsor_id': 'Sponsor not found.'})
 
@@ -321,12 +313,47 @@ class RegisterSerializer(serializers.ModelSerializer):
         return 'user'
 
     def _build_username(self, category: str, phone: str, unique_id: str) -> str:
-        # New rule: username is the digits-only phone for all non-business categories.
+        """
+        Generate admin-friendly usernames using prefixes by category.
+        - Consumer: TRC+phone
+        - Employee: TREMP+phone
+        - Sub-Franchise: TRSF+phone
+        - Pincode Agency: TRPN+phone
+        - State Agency: TRST+phone
+        - District Agency: TRDT+phone
+        - Business: TRBS+phone
+        - Coordinators (state/district/pincode): unchanged scheme -> use phone only (no prefix)
+        """
         phone_digits = ''.join(c for c in (phone or '') if c.isdigit())
-        base = phone_digits
+
+        coordinator_cats = {
+            'agency_state_coordinator',
+            'agency_district_coordinator',
+            'agency_pincode_coordinator',
+        }
+
+        prefix_map = {
+            'consumer': 'TRC',
+            'employee': 'TREMP',
+            'agency_sub_franchise': 'TRSF',
+            'agency_pincode': 'TRPN',
+            'agency_state': 'TRST',
+            'agency_district': 'TRDT',
+            'business': 'TRBS',
+        }
+
+        if category in coordinator_cats:
+            base = phone_digits  # do not change coordinator usernames
+        else:
+            pref = prefix_map.get(category)
+            if pref:
+                base = f"{pref}{phone_digits}"
+            else:
+                # default to consumer-like prefix
+                base = f"TRC{phone_digits}"
 
         username = base
-        # Ensure uniqueness in case of duplicates (shouldn't happen if phone is unique, but keep as safety)
+        # Ensure uniqueness across table (append -01, -02, ... if needed)
         i = 1
         while CustomUser.objects.filter(username=username).exists():
             suffix = f"-{i:02d}"
@@ -388,8 +415,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         user.country = country
         user.state = state
         user.city = city
-        # Use the newly created username as the shareable Sponsor ID for downstream registrations
-        user.sponsor_id = username
+        # Sponsor ID will default to hierarchical prefixed_id in model.save()
         user.category = category
         user.unique_id = unique_id
         user.registered_by = registered_by
@@ -470,7 +496,7 @@ class PublicUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
         fields = [
-            'id', 'username', 'unique_id', 'email', 'full_name', 'phone',
+            'id', 'username', 'unique_id', 'prefixed_id', 'prefix_code', 'email', 'full_name', 'phone',
             'country', 'state', 'city', 'pincode', 'address', 'sponsor_id',
             'category', 'role', 'registered_by', 'registered_by_username',
             'avatar_url',
@@ -497,11 +523,12 @@ class ProfileMeSerializer(serializers.ModelSerializer):
     city = serializers.PrimaryKeyRelatedField(queryset=City.objects.all(), required=False, allow_null=True)
     avatar = serializers.ImageField(required=False, allow_null=True)
     avatar_url = serializers.SerializerMethodField(read_only=True)
+    age = serializers.IntegerField(required=False, allow_null=True, min_value=0, max_value=120)
 
     class Meta:
         model = CustomUser
         fields = [
-            'id', 'username', 'email', 'full_name', 'phone',
+            'id', 'username', 'email', 'full_name', 'phone', 'age',
             'country', 'state', 'city', 'pincode', 'address',
             'avatar', 'avatar_url',
         ]

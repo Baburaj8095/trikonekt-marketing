@@ -141,8 +141,8 @@ export default function AdminMatrixFive() {
         setTree(null);
         return;
       }
-      const res = await API.get("/admin/matrix/tree/", {
-        params: { pool: "FIVE_150", root_user_id: rootId },
+      const res = await API.get("/admin/matrix/tree5/", {
+        params: { root_user_id: rootId, max_depth: 6 },
       });
       setTree(res?.data || null);
     } catch (e) {
@@ -319,7 +319,7 @@ export default function AdminMatrixFive() {
           <input
             value={treeIdentifier}
             onChange={(e) => setTreeIdentifier(e.target.value)}
-            placeholder="Enter root user id / username / email / unique_id"
+            placeholder="Enter user id / username / sponsor_id / phone / email / unique_id"
             style={{
               padding: "10px 12px",
               minWidth: 320,

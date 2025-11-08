@@ -1,6 +1,6 @@
 from rest_framework import generics
 from .models import CustomUser, AgencyRegionAssignment, Wallet, WalletTransaction
-from .serializers import RegisterSerializer, PublicUserSerializer, UserKYCSerializer, WithdrawalRequestSerializer
+from .serializers import RegisterSerializer, PublicUserSerializer, UserKYCSerializer, WithdrawalRequestSerializer, ProfileMeSerializer
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .token_serializers import CustomTokenObtainPairSerializer
@@ -140,6 +140,19 @@ class ResetPasswordView(APIView):
 class MeView(generics.RetrieveAPIView):
     serializer_class = PublicUserSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+
+
+class ProfileMeView(generics.RetrieveUpdateAPIView):
+    """
+    Get/Update my profile (email, phone, age, pincode, address, avatar, geo fields).
+    Supports multipart for avatar upload.
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = ProfileMeSerializer
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser]
 
     def get_object(self):
         return self.request.user
@@ -670,6 +683,128 @@ def hierarchy(request):
         'chain_up': chain_up,
         'children': children,
     }, status=status.HTTP_200_OK)
+
+
+class MyMatrixTree(APIView):
+    """
+    Returns the authenticated user's 5-matrix genealogy tree (spillover-based).
+    Query params:
+      - max_depth: optional (default 6, capped at 20)
+    Response:
+      { id, username, full_name, level, matrix_position, depth, children:[...] }
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        try:
+            max_depth = int(request.query_params.get("max_depth") or 6)
+        except Exception:
+            max_depth = 6
+        max_depth = max(1, min(max_depth, 20))
+
+        def build_node(u, level: int):
+            node = {
+                "id": u.id,
+                "username": u.username,
+                "full_name": u.full_name,
+                "level": level,
+                "matrix_position": getattr(u, "matrix_position", None),
+                "depth": getattr(u, "depth", 0),
+                "children": [],
+            }
+            if level >= max_depth:
+                return node
+            children = list(
+                CustomUser.objects.filter(parent_id=u.id)
+                .only("id", "username", "full_name", "matrix_position", "depth")
+                .order_by("matrix_position", "id")
+            )
+            for ch in children:
+                node["children"].append(build_node(ch, level + 1))
+            return node
+
+        tree = build_node(user, 1)
+        return Response(tree, status=status.HTTP_200_OK)
+
+
+class MyMatrixTreeByRoot(APIView):
+    """
+    Returns a user's 5-matrix subtree by an arbitrary root_user_id, but only if that
+    root lies within the authenticated user's downline (spillover tree).
+    Query params:
+      - root_user_id: required
+      - max_depth: optional (default 6, capped at 20)
+    Response is identical to MyMatrixTree.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            root_id = int(request.query_params.get("root_user_id") or "0")
+        except Exception:
+            return Response({"detail": "root_user_id must be integer"}, status=status.HTTP_400_BAD_REQUEST)
+        if root_id <= 0:
+            return Response({"detail": "root_user_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Security: ensure requested root is in caller's downline (walk up parent_id)
+        me_id = getattr(request.user, "id", None)
+        if not me_id:
+            return Response({"detail": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        target = CustomUser.objects.filter(id=root_id).only("id", "parent_id").first()
+        if not target:
+            return Response({"detail": "root user not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        cur = target
+        in_downline = False
+        # allow same user (self)
+        for _ in range(7):  # depth up to 6 + self check
+            if not cur:
+                break
+            if cur.id == me_id:
+                in_downline = True
+                break
+            pid = getattr(cur, "parent_id", None)
+            if not pid:
+                break
+            cur = CustomUser.objects.filter(id=pid).only("id", "parent_id").first()
+
+        if not in_downline:
+            return Response({"detail": "Requested root is not inside your downline"}, status=status.HTTP_403_FORBIDDEN)
+
+        # Depth
+        try:
+            max_depth = int(request.query_params.get("max_depth") or 6)
+        except Exception:
+            max_depth = 6
+        max_depth = max(1, min(max_depth, 20))
+
+        # Build subtree
+        def build_node(u, level: int):
+            node = {
+                "id": u.id,
+                "username": u.username,
+                "full_name": u.full_name,
+                "level": level,
+                "matrix_position": getattr(u, "matrix_position", None),
+                "depth": getattr(u, "depth", 0),
+                "children": [],
+            }
+            if level >= max_depth:
+                return node
+            children = list(
+                CustomUser.objects.filter(parent_id=u.id)
+                .only("id", "username", "full_name", "matrix_position", "depth")
+                .order_by("matrix_position", "id")
+            )
+            for ch in children:
+                node["children"].append(build_node(ch, level + 1))
+            return node
+
+        root = CustomUser.objects.filter(id=root_id).first()
+        tree = build_node(root, 1)
+        return Response(tree, status=status.HTTP_200_OK)
 
 
 # ====================

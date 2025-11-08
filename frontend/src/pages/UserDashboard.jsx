@@ -21,6 +21,7 @@ import LOGO from "../assets/TRIKONEKT.png";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import MenuIcon from "@mui/icons-material/Menu";
+import ReferAndEarn from "../components/ReferAndEarn";
 
 const drawerWidth = 220;
 
@@ -252,6 +253,7 @@ export default function UserDashboard() {
         }}
       >
         <Toolbar />
+        <ReferAndEarn title="Refer & Earn" />
         <Typography variant="h5" sx={{ mb: 2, fontWeight: 700, color: "#0C2D48" }}>
           Welcome
         </Typography>

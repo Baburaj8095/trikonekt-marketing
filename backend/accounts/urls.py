@@ -1,5 +1,24 @@
 from django.urls import path
-from .views import RegisterView, CustomTokenObtainPairView, ResetPasswordView, UsersListView, MyEmployeesListView, MyBusinessesListView, MeView, regions_by_sponsor, hierarchy, WalletMe, WalletTransactionsList, UserKYCMeView, WithdrawalCreateView, MyWithdrawalsListView, TeamSummaryView
+from .views import (
+    RegisterView,
+    CustomTokenObtainPairView,
+    ResetPasswordView,
+    UsersListView,
+    MyEmployeesListView,
+    MyBusinessesListView,
+    MeView,
+    regions_by_sponsor,
+    hierarchy,
+    WalletMe,
+    WalletTransactionsList,
+    UserKYCMeView,
+    WithdrawalCreateView,
+    MyWithdrawalsListView,
+    TeamSummaryView,
+    MyMatrixTree,
+    MyMatrixTreeByRoot,
+    ProfileMeView,
+)
 from .token_serializers import CustomTokenRefreshView
 
 urlpatterns = [
@@ -8,10 +27,13 @@ urlpatterns = [
     path('password/reset/', ResetPasswordView.as_view(), name='password_reset'),
     path('users/', UsersListView.as_view(), name='users_list'),
     path('me/', MeView.as_view(), name='me'),
+    path('profile/', ProfileMeView.as_view(), name='profile_me'),
     path('my/employees/', MyEmployeesListView.as_view(), name='my_employees'),
     path('my/businesses/', MyBusinessesListView.as_view(), name='my_businesses'),
     path('regions/by-sponsor/', regions_by_sponsor, name='regions_by_sponsor'),
     path('hierarchy/', hierarchy, name='hierarchy'),
+    path('my/matrix/tree/', MyMatrixTree.as_view(), name='my_matrix_tree'),
+    path('matrix/tree5/', MyMatrixTreeByRoot.as_view(), name='my_matrix_tree_by_root'),
     path('team/summary/', TeamSummaryView.as_view(), name='team_summary'),
     # Wallet
     path('wallet/me/', WalletMe.as_view(), name='wallet_me'),

@@ -28,6 +28,7 @@ export default function EmployeeShell({ children }) {
   const isECoupons = location.pathname === "/employee/dashboard" && tab === "ecoupons";
   const isWallet = location.pathname === "/employee/dashboard" && tab === "wallet";
   const isDailyReport = location.pathname === "/employee/daily-report";
+  const isProfile = location.pathname === "/employee/profile";
 
   const storedUser = useMemo(() => {
     try {
@@ -59,6 +60,16 @@ export default function EmployeeShell({ children }) {
   const DrawerContent = (
     <Box sx={{ overflow: "auto" }}>
       <List>
+        <ListItemButton
+          selected={isProfile}
+          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+          onClick={() => {
+            navigate("/employee/profile");
+            setMobileOpen(false);
+          }}
+        >
+          <ListItemText primary="Profile" />
+        </ListItemButton>
         <ListItemButton
           selected={isLucky}
           sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}

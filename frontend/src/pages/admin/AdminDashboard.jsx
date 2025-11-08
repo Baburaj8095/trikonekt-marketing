@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../../api/api";
+import TreeReferralGalaxy from "../../components/TreeReferralGalaxy";
 
 function Card({ title, value, subtitle, onClick, color = "#0f172a" }) {
   return (
@@ -35,6 +36,50 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [ap, setAp] = useState(null);
   const nav = useNavigate();
+
+  // 5-Matrix quick viewer (dashboard)
+  const [matrixIdent, setMatrixIdent] = useState("");
+  const [matrixTree, setMatrixTree] = useState(null);
+  const [matrixLoading, setMatrixLoading] = useState(false);
+  const [matrixErr, setMatrixErr] = useState("");
+
+  async function loadMatrixTree() {
+    const ident = (matrixIdent || "").trim();
+    if (!ident) {
+      setMatrixErr("Enter user id / username / sponsor_id / phone / email / unique_id");
+      setMatrixTree(null);
+      return;
+    }
+    try {
+      setMatrixLoading(true);
+      setMatrixErr("");
+      const res = await API.get("/admin/matrix/tree5/", { params: { identifier: ident, max_depth: 6 } });
+      setMatrixTree(res?.data || null);
+    } catch (e) {
+      setMatrixTree(null);
+      setMatrixErr(e?.response?.data?.detail || "Failed to load hierarchy");
+    } finally {
+      setMatrixLoading(false);
+    }
+  }
+
+  function DashTreeNode({ node, depth = 0 }) {
+    const pad = depth * 16;
+    return (
+      <div style={{ paddingLeft: pad, paddingTop: 6, paddingBottom: 6, borderBottom: "1px solid #f1f5f9" }}>
+        <div style={{ fontWeight: 700, color: "#0f172a" }}>
+          {node.username} <span style={{ color: "#64748b", fontWeight: 500 }}>#{node.id} • {node.full_name || "—"}</span>
+        </div>
+        {Array.isArray(node.children) && node.children.length > 0 ? (
+          <div>
+            {node.children.map((c) => (
+              <DashTreeNode key={c.id} node={c} depth={depth + 1} />
+            ))}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -228,6 +273,12 @@ export default function AdminDashboard() {
                 Manage E‑Coupons
               </button>
             </div>
+          </div>
+
+          {/* 5-Matrix Quick Viewer */}
+          <div style={{ marginTop: 20 }}>
+          <h3 style={{ margin: "12px 0 8px 0", color: "#0f172a" }}>5‑Matrix Quick Viewer</h3>
+          <TreeReferralGalaxy mode="admin" />
           </div>
         </>
       )}

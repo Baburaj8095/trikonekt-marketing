@@ -32,6 +32,7 @@ export default function ConsumerShell({ children }) {
   const isWallet = location.pathname === "/user/wallet";
   const isKYC = location.pathname === "/user/kyc";
   const isMyTeam = location.pathname === "/user/my-team";
+  const isProfile = location.pathname === "/user/profile";
 
   const storedUser = useMemo(() => {
     try {
@@ -72,6 +73,16 @@ export default function ConsumerShell({ children }) {
           }}
         >
           <ListItemText primary="Dashboard" />
+        </ListItemButton>
+        <ListItemButton
+          selected={isProfile}
+          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+          onClick={() => {
+            navigate("/user/profile");
+            setMobileOpen(false);
+          }}
+        >
+          <ListItemText primary="Profile" />
         </ListItemButton>
         <ListItemButton
           selected={isLuckyDraw}

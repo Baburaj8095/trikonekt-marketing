@@ -22,9 +22,9 @@ export default function PublicNavbar() {
         <Button
           color="inherit"
           sx={{ fontWeight: 500, textTransform: "none" }}
-          onClick={() => navigate("/login")}
+          onClick={() => navigate("/auth/select")}
         >
-          Login
+          Trikonekt Account
         </Button>
       </Toolbar>
     </AppBar>

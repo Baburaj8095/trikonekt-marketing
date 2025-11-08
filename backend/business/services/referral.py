@@ -127,6 +127,100 @@ def _update_matrix_progress(user: CustomUser, pool_type: str, level: int, amount
         pass
 
 
+def _resolve_upline_matrix(user: CustomUser, depth: int) -> List[CustomUser]:
+    """
+    Traverse genealogy chain via `parent` up to `depth` levels (L1..depth).
+    """
+    chain: List[CustomUser] = []
+    cur = getattr(user, "parent", None)
+    seen = set()
+    for _ in range(max(0, depth)):
+        if not cur or getattr(cur, "id", None) in seen:
+            break
+        chain.append(cur)
+        seen.add(cur.id)
+        cur = getattr(cur, "parent", None)
+    return chain
+
+
+def _first_missing_position(children_qs) -> int | None:
+    taken = set(children_qs.values_list("matrix_position", flat=True))
+    for pos in range(1, 6):
+        if pos not in taken:
+            return pos
+    return None
+
+
+def place_user_in_five_matrix(new_user: CustomUser) -> CustomUser | None:
+    """
+    Spillover BFS placement under the sponsor (registered_by) ensuring max 5 direct children.
+    Idempotent: if new_user.parent already set, returns existing parent.
+    """
+    sponsor = getattr(new_user, "registered_by", None)
+    if not sponsor or getattr(new_user, "parent_id", None):
+        return getattr(new_user, "parent", None)
+
+    # BFS to find first node with available child slot
+    from collections import deque
+
+    q = deque([sponsor])
+    while q:
+        node = q.popleft()
+        children = node.children.order_by("matrix_position", "id")
+        if children.count() < 5:
+            pos = _first_missing_position(children)
+            if pos is None:
+                pos = min(children.count() + 1, 5)
+            new_user.parent = node
+            new_user.matrix_position = pos
+            new_user.depth = (getattr(node, "depth", 0) or 0) + 1
+            new_user.save(update_fields=["parent", "matrix_position", "depth"])
+            return node
+        # push to queue for spillover
+        for ch in children:
+            q.append(ch)
+    return None
+
+
+def _distribute_five_matrix(new_user: CustomUser, source: Dict[str, Any]):
+    """
+    Distribute fixed 5-matrix level amounts to genealogy upline via `parent` chain.
+    Uses CommissionConfig.five_matrix_amounts_json if present, else defaults:
+      [15, 2, 2.5, 0.5, 0.05, 0.1]
+    """
+    if not getattr(new_user, "parent_id", None):
+        return
+    cfg = CommissionConfig.get_solo()
+    try:
+        levels = int(getattr(cfg, "five_matrix_levels", 6) or 6)
+    except Exception:
+        levels = 6
+    fixed: list = getattr(cfg, "five_matrix_amounts_json", []) or []
+    if not fixed:
+        fixed = [15, 2, 2.5, 0.5, 0.05, 0.1]
+
+    src_type = str(source.get("type") or "")
+    src_id = str(source.get("id") or "")
+
+    upline = _resolve_upline_matrix(new_user, depth=levels)
+    for idx, recipient in enumerate(upline):
+        if idx >= len(fixed):
+            break
+        amt = _q2(fixed[idx] or 0)
+        if amt <= 0:
+            continue
+        meta = {
+            "source": "FIVE_MATRIX_FIXED",
+            "source_type": src_type,
+            "source_id": src_id,
+            "level_index": idx + 1,
+            "pool_type": "FIVE_150",
+            "fixed": True,
+        }
+        _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_FIVE", meta=meta, source_type=src_type, source_id=src_id)
+        _update_matrix_progress(recipient, "FIVE_150", level=idx + 1, amount=amt)
+
+
 @transaction.atomic
 def on_user_join(new_user: CustomUser, source: Dict[str, Any] | None = None) -> bool:
     """
@@ -148,6 +242,13 @@ def on_user_join(new_user: CustomUser, source: Dict[str, Any] | None = None) -> 
         created = True
     except IntegrityError:
         return False
+
+    # 5-matrix placement under sponsor with spillover
+    try:
+        place_user_in_five_matrix(new_user)
+    except Exception:
+        # best-effort
+        pass
 
     cfg = CommissionConfig.get_solo()
     fixed = getattr(cfg, "referral_join_fixed_json", {}) or {}
@@ -189,6 +290,12 @@ def on_user_join(new_user: CustomUser, source: Dict[str, Any] | None = None) -> 
             source_type="JOIN_REFERRAL",
             source_id=str(getattr(new_user, "id", "")),
         )
+
+    # 5-matrix genealogy benefit distribution (up to configured 6 levels)
+    try:
+        _distribute_five_matrix(new_user, {"type": "JOIN_REFERRAL", "id": getattr(new_user, "id", "")})
+    except Exception:
+        pass
 
     # Optional autopool trigger on direct referral
     if getattr(cfg, "autopool_trigger_on_direct_referral", True):

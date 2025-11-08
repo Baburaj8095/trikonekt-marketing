@@ -267,6 +267,19 @@ const Login = () => {
     }
   }, [pincode, mode, role]);
 
+  // Parse role and category from URL for prefilled registration links
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const rp = (params.get("role") || "").toLowerCase();
+      const level = (params.get("agency_level") || params.get("category") || "").toLowerCase();
+      if (rp === "user" || rp === "employee" || rp === "agency" || rp === "business") {
+        setMode("register");
+        setRole(rp);
+        if (rp === "agency" && level) setAgencyLevel(level);
+      }
+    } catch (_) {}
+  }, []);
   // Sponsor from URL (priority: agencyid, sponsor, sponsor_id, ref)
   useEffect(() => {
     try {
@@ -792,11 +805,10 @@ const Login = () => {
   };
 
   const loginField = {
-    label: "Phone number",
-    type: "tel",
-    inputMode: "numeric",
-    placeholder: "Enter your phone number",
-    pattern: "[0-9]*",
+    label: "Username or Phone",
+    type: "text",
+    inputMode: "text",
+    placeholder: "Enter username (e.g., TREMP9876543210) or phone (10 digits)",
   };
 
   const handleSubmit = async (e) => {
@@ -809,8 +821,8 @@ const Login = () => {
 
     if (mode === "login") {
       try {
-        // Phone-based login: always use digits-only
-        let username = onlyDigits((formData.username || "").trim());
+        // Accept username or phone; backend resolves and disambiguates if needed
+        let username = (formData.username || "").trim();
         const submitRole = role === "business" ? "user" : role;
 
         const res = await API.post("/accounts/login/", {
@@ -859,10 +871,15 @@ const Login = () => {
         }
       } catch (err) {
         console.error(err);
-        const msg =
-          err?.response?.data?.detail ||
-          (err?.response?.data ? JSON.stringify(err.response.data) : "Login failed!");
-        setErrorMsg(typeof msg === "string" ? msg : String(msg));
+        const data = err?.response?.data;
+        if (data?.multiple_accounts && Array.isArray(data.multiple_accounts)) {
+          const choices = data.multiple_accounts.map((a) => a.username).join(", ");
+          setErrorMsg(`Multiple accounts found for this phone. Please enter one of these usernames: ${choices}`);
+        } else {
+          const msg =
+            data?.detail || (data ? JSON.stringify(data) : "Login failed!");
+          setErrorMsg(typeof msg === "string" ? msg : String(msg));
+        }
       }
       return;
     }

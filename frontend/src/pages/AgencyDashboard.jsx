@@ -18,6 +18,7 @@ import {
 } from "@mui/material";
 import API from "../api/api";
 import RewardsTargetCard from "../components/RewardsTargetCard";
+import ReferAndEarn from "../components/ReferAndEarn";
 
 export default function AgencyDashboard() {
   // Nav identity (for filtering employees by agency pincode)
@@ -112,102 +113,19 @@ export default function AgencyDashboard() {
       setEmpLoading(true);
       setEmpError("");
 
-      // Primary: by agency pincode using pincode=me (resolved on backend)
-      let arr1 = [];
-      try {
-        const res1 = await API.get("/accounts/users/", {
-          params: { role: "employee", pincode: "me" },
-        });
-        arr1 = Array.isArray(res1.data) ? res1.data : res1.data?.results || [];
-      } catch (_) {}
-
-      // Also include employees directly registered by this agency (role-based)
-      let arr3 = [];
-      try {
-        const res3 = await API.get("/accounts/users/", {
-          params: { role: "employee", registered_by: "me" },
-        });
-        arr3 = Array.isArray(res3.data) ? res3.data : res3.data?.results || [];
-      } catch (_) {}
-
-      // Include employees created via dedicated my/employees endpoint (category-based)
-      let arr2 = [];
-      try {
-        const res2 = await API.get("/accounts/my/employees/");
-        arr2 = Array.isArray(res2.data) ? res2.data : res2.data?.results || [];
-      } catch (_) {}
-
-      // Fallback: fetch all employees (server-side auth required); then client-filter by agency pincode if available
-      let arr4 = [];
-      try {
-        const res4 = await API.get("/accounts/users/", {
-          params: { role: "employee" },
-        });
-        arr4 = Array.isArray(res4.data) ? res4.data : res4.data?.results || [];
-      } catch (_) {}
-
-      // Supplement: employees in my pincode with explicit category filter (covers role/category mismatches)
-      let arr5 = [];
-      try {
-        const res5 = await API.get("/accounts/users/", {
-          params: { role: "employee", pincode: "me", category: "employee" },
-        });
-        arr5 = Array.isArray(res5.data) ? res5.data : res5.data?.results || [];
-      } catch (_) {}
-
-      // All employees by category regardless of role field mismatch
-      let arr6 = [];
-      try {
-        const res6 = await API.get("/accounts/users/", {
-          params: { category: "employee" },
-        });
-        arr6 = Array.isArray(res6.data) ? res6.data : res6.data?.results || [];
-      } catch (_) {}
-
-      // Backend-provided "assignable" list: role=employee where (registered_by=me OR in my pincode)
-      let arrA = [];
-      try {
-        const resA = await API.get("/accounts/users/", {
-          params: { role: "employee", assignable: 1 },
-        });
-        arrA = Array.isArray(resA.data) ? resA.data : resA.data?.results || [];
-      } catch (_) {}
-
-      // If agency pincode available and nothing found yet, prefer only matching pincode from the fallback list
-      let arr4Filtered = [];
-      const pin = agencyPincode ? String(agencyPincode).toLowerCase() : "";
-      if ((arr1?.length || arr2?.length || arr3?.length || arr5?.length) === 0 && pin) {
-        arr4Filtered = (arr4 || []).filter(
-          (u) => String(u?.pincode || "").toLowerCase() === pin
-        );
-      }
-
-      // Merge unique by id (restrict any unscoped lists to my pincode)
-      const byId = new Map();
-      const arr6Scoped = pin ? (arr6 || []).filter((u) => String(u?.pincode || "").toLowerCase() === pin) : [];
-      [...(arr1 || []), ...(arr2 || []), ...(arr3 || []), ...(arr5 || []), ...arr6Scoped, ...(arr4Filtered || [])].forEach((u) => {
-        if (u && typeof u.id !== "undefined" && !byId.has(u.id)) byId.set(u.id, u);
+      // Single scoped call: backend enforces "assignable" employees for Agency
+      const res = await API.get("/accounts/users/", {
+        params: { role: "employee", assignable: 1 },
       });
-      const merged = Array.from(byId.values());
+      const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
 
-      // Assignable = employees registered under this agency OR in my pincode (arr2, arr3, arr1, arr5, arr6Scoped) + backend "assignable" shortcut (arrA)
-      const assignableById = new Map();
-      [...(arrA || []), ...(arr2 || []), ...(arr3 || []), ...(arr1 || []), ...(arr5 || []), ...arr6Scoped].forEach((u) => {
-        if (u && typeof u.id !== "undefined" && !assignableById.has(u.id)) assignableById.set(u.id, u);
-      });
-      // Fallback: if still none, use pincode-filtered generic list
-      if (assignableById.size === 0 && (arr4Filtered && arr4Filtered.length)) {
-        (arr4Filtered || []).forEach((u) => {
-          if (u && typeof u.id !== "undefined" && !assignableById.has(u.id)) assignableById.set(u.id, u);
-        });
-      }
-      setAssignableEmployees(Array.from(assignableById.values()));
-
-      // Finalize employee list; avoid unscoped all-employees fallback
-      setMyEmployees(merged.length > 0 ? merged : arr4Filtered);
+      // Use the same list for details and assignment
+      setAssignableEmployees(arr);
+      setMyEmployees(arr);
     } catch (e) {
       setEmpError("Failed to load employees");
       setMyEmployees([]);
+      setAssignableEmployees([]);
     } finally {
       setEmpLoading(false);
     }
@@ -222,6 +140,11 @@ export default function AgencyDashboard() {
   const [assignSubmitting, setAssignSubmitting] = useState(false);
   const [assignErrors, setAssignErrors] = useState({});
   const [quota, setQuota] = useState({ quota: 0, assigned: 0, remaining: 0, updated_at: null });
+
+  // My 5‑Matrix tree (spillover-based)
+  const [myTree, setMyTree] = useState(null);
+  const [myTreeLoading, setMyTreeLoading] = useState(false);
+  const [myTreeErr, setMyTreeErr] = useState("");
 
   const loadAssignments = async () => {
     try {
@@ -292,14 +215,52 @@ export default function AgencyDashboard() {
     }
   };
 
-  // Load once
+  // Load once (lazy-load employees/assignments/quota only when tabs are opened)
   useEffect(() => {
     loadLuckyHistory();
-    loadEmployees();
-    loadAssignments();
-    loadQuota();
     loadCommission();
   }, []);
+
+  // Load my 5‑matrix genealogy tree
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setMyTreeLoading(true);
+        const res = await API.get("/accounts/my/matrix/tree/", { params: { max_depth: 6 } });
+        if (!mounted) return;
+        setMyTree(res?.data || null);
+        setMyTreeErr("");
+      } catch (e) {
+        if (!mounted) return;
+        setMyTree(null);
+        setMyTreeErr(e?.response?.data?.detail || "Failed to load hierarchy.");
+      } finally {
+        if (mounted) setMyTreeLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  function MyTreeNode({ node, depth = 0 }) {
+    const pad = depth * 16;
+    return (
+      <div style={{ paddingLeft: pad, paddingTop: 6, paddingBottom: 6, borderBottom: "1px solid #f1f5f9" }}>
+        <div style={{ fontWeight: 700, color: "#0f172a" }}>
+          {node.username} <span style={{ color: "#64748b", fontWeight: 500 }}>#{node.id} • {node.full_name || "—"}</span>
+        </div>
+        {Array.isArray(node.children) && node.children.length > 0 ? (
+          <div>
+            {node.children.map((c) => (
+              <MyTreeNode key={c.id} node={c} depth={depth + 1} />
+            ))}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   // Reload lucky list when toggle or tab changes
   useEffect(() => {
@@ -329,6 +290,7 @@ export default function AgencyDashboard() {
         </Typography>
       </Box>
 
+      <ReferAndEarn title="Refer & Earn" />
       <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
         <Button variant={activeTab === TABS.LUCKY ? "contained" : "outlined"} onClick={() => setActiveTab(TABS.LUCKY)}>
           Lucky Draw Submission
@@ -603,6 +565,57 @@ export default function AgencyDashboard() {
           )}
         </Paper>
       )}
+      {/* My 5‑Matrix Hierarchy (spillover) */}
+      <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mt: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>
+            My 5‑Matrix Hierarchy
+          </Typography>
+          <Box sx={{ display: "flex", gap: 1 }}>
+            <Button
+              size="small"
+              onClick={async () => {
+                try {
+                  setMyTreeLoading(true);
+                  const res = await API.get("/accounts/my/matrix/tree/", { params: { max_depth: 6 } });
+                  setMyTree(res?.data || null);
+                  setMyTreeErr("");
+                } catch (e) {
+                  setMyTree(null);
+                  setMyTreeErr(e?.response?.data?.detail || "Failed to load hierarchy.");
+                } finally {
+                  setMyTreeLoading(false);
+                }
+              }}
+            >
+              {myTreeLoading ? "Refreshing..." : "Refresh"}
+            </Button>
+          </Box>
+        </Box>
+        {myTreeErr ? <Alert severity="error" sx={{ mb: 1 }}>{myTreeErr}</Alert> : null}
+        <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden", background: "#fff" }}>
+          {!myTree ? (
+            <div style={{ padding: 12, color: "#64748b" }}>
+              {myTreeLoading ? "Loading..." : "No hierarchy to display."}
+            </div>
+          ) : (
+            <div>
+              <div
+                style={{
+                  padding: "10px",
+                  borderBottom: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                  fontWeight: 700,
+                  color: "#0f172a",
+                }}
+              >
+                Root: {myTree.username} #{myTree.id} • {myTree.full_name || "—"}
+              </div>
+              <MyTreeNode node={myTree} />
+            </div>
+          )}
+        </div>
+      </Paper>
     </Container>
   );
 }

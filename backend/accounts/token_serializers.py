@@ -7,38 +7,65 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
-        # Allow login by phone for all user types.
-        # If client sends "phone", or "username" is digits-only, map to actual username via phone/username lookup.
-        initial = getattr(self, 'initial_data', {}) or {}
-        raw_username = (initial.get('username') or '').strip()
-        raw_phone = (initial.get('phone') or '').strip()
+        initial = getattr(self, "initial_data", {}) or {}
+        raw_identifier = (initial.get("username") or "").strip()
+        raw_phone = (initial.get("phone") or "").strip()
+        password = (initial.get("password") or attrs.get("password") or "").strip()
 
         def only_digits(s: str) -> str:
-            return ''.join(c for c in (s or '') if c.isdigit())
+            return "".join(c for c in (s or "") if c.isdigit())
 
-        phone_digits = only_digits(raw_phone or raw_username)
+        digits = only_digits(raw_phone or raw_identifier)
 
-        if phone_digits:
+        # If a phone number was provided, try to disambiguate among multiple accounts sharing the same phone
+        if digits and password:
             try:
                 User = get_user_model()
-                # Try to resolve user by phone/digits or legacy username equal to digits
-                u = User.objects.filter(Q(phone__iexact=phone_digits) | Q(username__iexact=phone_digits)).first()
-                if u:
-                    # Replace attrs username with the resolved actual username
-                    attrs['username'] = u.username
+                candidates = list(User.objects.filter(phone__iexact=digits).distinct())
+                # Legacy fallback: if no candidates by phone, try username==digits
+                if not candidates:
+                    fallback = User.objects.filter(username__iexact=digits).first()
+                    if fallback:
+                        candidates = [fallback]
+
+                matches = [u for u in candidates if u.check_password(password)]
+                if len(matches) == 1:
+                    attrs["username"] = matches[0].username
+                elif len(matches) > 1:
+                    raise serializers.ValidationError({
+                        "detail": "Multiple accounts found for this phone. Please choose a username and try again.",
+                        "multiple_accounts": [
+                            {"username": u.username, "category": getattr(u, "category", None), "role": getattr(u, "role", None)}
+                            for u in matches
+                        ],
+                    })
+                # If zero matches, fall through to default super().validate which will fail as usual.
+            except serializers.ValidationError:
+                raise
             except Exception:
-                # Fallback: let default validation handle errors
+                # Best-effort: fall back to default behavior
                 pass
+        else:
+            # If identifier looks like phone but password missing for pre-check, try simple resolution to first match
+            if digits and not password:
+                try:
+                    User = get_user_model()
+                    u = User.objects.filter(Q(phone__iexact=digits) | Q(username__iexact=digits)).first()
+                    if u:
+                        attrs["username"] = u.username
+                except Exception:
+                    pass
 
         data = super().validate(attrs)
 
-        provided_role = initial.get('role')
-        if provided_role and provided_role != getattr(self.user, 'role', None):
-            raise serializers.ValidationError({'detail': 'Role mismatch: not authorized for this role.'})
+        provided_role = initial.get("role")
+        if provided_role and provided_role != getattr(self.user, "role", None):
+            raise serializers.ValidationError({"detail": "Role mismatch: not authorized for this role."})
 
-        # Disable login for Business registrations
-        if getattr(self.user, 'category', None) == 'business':
-            raise serializers.ValidationError({'detail': 'Business login is disabled. Your registration will be processed by admin.'})
+        # Business login policy (keep disabled)
+        if getattr(self.user, "category", None) == "business":
+            raise serializers.ValidationError({"detail": "Business login is disabled. Your registration will be processed by admin."})
+
         return data
 
     @classmethod

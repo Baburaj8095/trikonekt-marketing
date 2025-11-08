@@ -31,6 +31,7 @@ export default function AgencyShell({ children }) {
   const isPurchaseRequests = location.pathname === "/agency/purchase-requests";
   const isMyTeam = location.pathname === "/agency/my-team";
   const isDailyReport = location.pathname === "/agency/daily-report";
+  const isProfile = location.pathname === "/agency/profile";
   const isMarketplace = location.pathname.startsWith("/agency/marketplace");
   const inProductsContext =
     location.pathname.startsWith("/agency/products") ||
@@ -81,6 +82,16 @@ export default function AgencyShell({ children }) {
           }}
         >
           <ListItemText primary="Dashboard" />
+        </ListItemButton>
+        <ListItemButton
+          selected={isProfile}
+          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+          onClick={() => {
+            navigate("/agency/profile");
+            setMobileOpen(false);
+          }}
+        >
+          <ListItemText primary="Profile" />
         </ListItemButton>
        
         <ListItemButton

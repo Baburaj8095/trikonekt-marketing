@@ -113,37 +113,11 @@ export default function AgencyLuckyCoupons() {
     try {
       setEmpLoading(true);
       setEmpError("");
-      // Try multiple sources similar to AgencyDashboard (simplified here)
-      let arr1 = [];
-      try {
-        const res1 = await API.get("/accounts/users/", { params: { role: "employee", pincode: "me" } });
-        arr1 = Array.isArray(res1.data) ? res1.data : res1.data?.results || [];
-      } catch (_) {}
 
-      let arr3 = [];
-      try {
-        const res3 = await API.get("/accounts/users/", { params: { role: "employee", registered_by: "me" } });
-        arr3 = Array.isArray(res3.data) ? res3.data : res3.data?.results || [];
-      } catch (_) {}
-
-      let arr2 = [];
-      try {
-        const res2 = await API.get("/accounts/my/employees/");
-        arr2 = Array.isArray(res2.data) ? res2.data : res2.data?.results || [];
-      } catch (_) {}
-
-      let arr4 = [];
-      try {
-        const res4 = await API.get("/accounts/users/", { params: { role: "employee" } });
-        arr4 = Array.isArray(res4.data) ? res4.data : res4.data?.results || [];
-      } catch (_) {}
-
-      const byId = new Map();
-      [...arr1, ...arr2, ...arr3, ...arr4].forEach((u) => {
-        if (u && typeof u.id !== "undefined" && !byId.has(u.id)) byId.set(u.id, u);
-      });
-      const merged = Array.from(byId.values());
-      setEmployees(merged);
+      // Single scoped call: backend enforces "assignable" employees for Agency
+      const res = await API.get("/accounts/users/", { params: { role: "employee", assignable: 1 } });
+      const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
+      setEmployees(arr);
     } catch (e) {
       setEmpError("Failed to load employees.");
       setEmployees([]);

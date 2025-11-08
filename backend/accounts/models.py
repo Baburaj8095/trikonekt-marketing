@@ -1,5 +1,5 @@
 from django.contrib.auth.models import AbstractUser
-from django.db import models
+from django.db import models, transaction
 from locations.models import State
 
 
@@ -39,6 +39,7 @@ class CustomUser(AbstractUser):
     # Registration profile fields
     full_name = models.CharField(max_length=150, blank=True)
     phone = models.CharField(max_length=20, blank=True)
+    age = models.PositiveSmallIntegerField(null=True, blank=True)
     country = models.ForeignKey('locations.Country', null=True, blank=True, on_delete=models.SET_NULL, related_name='users')
     state = models.ForeignKey('locations.State', null=True, blank=True, on_delete=models.SET_NULL, related_name='users')
     city = models.ForeignKey('locations.City', null=True, blank=True, on_delete=models.SET_NULL, related_name='users')
@@ -46,6 +47,12 @@ class CustomUser(AbstractUser):
     address = models.TextField(blank=True)
     avatar = models.ImageField(upload_to='uploads/profile/', blank=True, null=True)
     sponsor_id = models.CharField(max_length=64, blank=True)
+    prefix_code = models.CharField(max_length=6, blank=True, db_index=True)
+    prefixed_id = models.CharField(max_length=32, unique=True, null=True, blank=True)
+    # 5-Matrix genealogy fields
+    parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='children')
+    matrix_position = models.PositiveSmallIntegerField(null=True, blank=True, db_index=True)
+    depth = models.PositiveIntegerField(default=0, db_index=True)
 
     # Activation/eligibility flags
     first_purchase_activated_at = models.DateTimeField(null=True, blank=True)
@@ -54,8 +61,51 @@ class CustomUser(AbstractUser):
     is_agency_unlocked = models.BooleanField(default=False)
     can_create_self_accounts = models.BooleanField(default=False)
 
+    class Meta(AbstractUser.Meta):
+        constraints = [
+            models.UniqueConstraint(
+                fields=['parent', 'matrix_position'],
+                name='uniq_parent_matrix_position',
+                condition=models.Q(parent__isnull=False)
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['parent']),
+            models.Index(fields=['depth']),
+        ]
+
     def __str__(self):
         return f"{self.username} ({self.role} / {self.category})"
+
+    # Prefix mapping and allocation for hierarchical sponsor codes
+    PREFIX_MAP = {
+        'consumer': 'TRC',
+        'employee': 'TREMP',
+        'business': 'TRBS',
+        'company': 'TR',
+        'agency_state_coordinator': 'TRSC',
+        'agency_state': 'TRST',
+        'agency_district_coordinator': 'TRDC',
+        'agency_district': 'TRDT',
+        'agency_pincode_coordinator': 'TRPC',
+        'agency_pincode': 'TRPN',
+        'agency_sub_franchise': 'TRSF',
+    }
+
+    @classmethod
+    def category_to_prefix(cls, category: str) -> str:
+        cat = (category or '').strip() or 'consumer'
+        return cls.PREFIX_MAP.get(cat, 'TRC')
+
+    @classmethod
+    @transaction.atomic
+    def allocate_prefixed_id(cls, category: str) -> str:
+        """
+        Allocate and return a new prefixed sponsor/code like PREFIX-0000000001.
+        """
+        prefix = cls.category_to_prefix(category)
+        next_num = PrefixSequence.allocate_next(prefix)
+        return f"{prefix}-{next_num:010d}"
 
     @classmethod
     def generate_unique_id(cls) -> str:
@@ -69,11 +119,27 @@ class CustomUser(AbstractUser):
                 return candidate
 
     def save(self, *args, **kwargs):
+        # Ensure 6-digit registration id
         if not self.unique_id:
             self.unique_id = self.generate_unique_id()
-        if not self.sponsor_id and self.username:
-            # Ensure every account has a shareable Sponsor ID; admin-created "Company" users included
-            self.sponsor_id = self.username
+
+        # Allocate hierarchical prefix code and ID once category is known
+        if not getattr(self, "prefixed_id", None) and (self.category or ""):
+            try:
+                code = CustomUser.allocate_prefixed_id(self.category)
+                self.prefixed_id = code
+                try:
+                    self.prefix_code = code.split("-", 1)[0]
+                except Exception:
+                    self.prefix_code = CustomUser.category_to_prefix(self.category)
+            except Exception:
+                # best-effort; fall back to lazy allocation on next save
+                pass
+
+        # Sponsor ID defaults to hierarchical prefixed_id if available, else username
+        if not self.sponsor_id:
+            self.sponsor_id = self.prefixed_id or self.username or ""
+
         super().save(*args, **kwargs)
 
 
@@ -218,6 +284,25 @@ class AgencyRegionAssignment(models.Model):
             desc = f"Pincode={self.pincode}"
         return f"{self.user.username} [{self.level}] {desc or ''}".strip()
 
+
+# Prefix-based sequential code allocator for hierarchical IDs (e.g., TRC-0000000001)
+class PrefixSequence(models.Model):
+    prefix = models.CharField(max_length=10, unique=True)
+    last_number = models.BigIntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Prefix Sequence"
+        verbose_name_plural = "Prefix Sequences"
+
+    @classmethod
+    @transaction.atomic
+    def allocate_next(cls, prefix: str) -> int:
+        p, _ = cls.objects.select_for_update().get_or_create(prefix=prefix, defaults={"last_number": 0})
+        p.last_number = int(p.last_number or 0) + 1
+        p.save(update_fields=["last_number", "updated_at"])
+        return int(p.last_number)
 
 # ======================
 # Wallet & Ledger Models

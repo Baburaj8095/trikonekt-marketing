@@ -39,6 +39,8 @@ import AdminMatrixFive from "./pages/admin/AdminMatrixFive";
 import AdminMatrixThree from "./pages/admin/AdminMatrixThree";
 import AdminAutopool from "./pages/admin/AdminAutopool";
 import AdminECoupons from "./pages/admin/AdminECoupons";
+import Profile from "./pages/Profile";
+import RoleSelect from "./pages/Auth/RoleSelect";
 
 function App() {
   return (
@@ -48,6 +50,7 @@ function App() {
         {/* Public Routes */}
         
         <Route path="/" element={<HomeScreen/>} />
+        <Route path="/auth/select" element={<RoleSelect />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<EnhancedLogin />} />
         <Route path="/enhanced-login" element={<EnhancedLogin />} />
@@ -95,6 +98,16 @@ function App() {
             <ProtectedRoute allowedRoles={["user"]}>
               <ConsumerShell>
                 <ConsumerKYC />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/profile"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <Profile />
               </ConsumerShell>
             </ProtectedRoute>
           }
@@ -151,6 +164,16 @@ function App() {
             <ProtectedRoute allowedRoles={["agency"]}>
               <AgencyShell>
                 <AgencyDailyReport />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agency/profile"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <Profile />
               </AgencyShell>
             </ProtectedRoute>
           }
@@ -219,6 +242,16 @@ function App() {
             <ProtectedRoute allowedRoles={["employee"]}>
               <EmployeeShell>
                 <EmployeeDailyReport />
+              </EmployeeShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee/profile"
+          element={
+            <ProtectedRoute allowedRoles={["employee"]}>
+              <EmployeeShell>
+                <Profile />
               </EmployeeShell>
             </ProtectedRoute>
           }

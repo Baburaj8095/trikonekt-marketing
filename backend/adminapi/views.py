@@ -757,6 +757,125 @@ class AdminMatrixTree(APIView):
         return Response(tree, status=200)
 
 
+class AdminMatrix5Tree(APIView):
+    """
+    Returns 5-matrix genealogy tree (spillover parent/children) for a root user.
+    Query:
+      - identifier: sponsor_id | username | phone (digits) | email | unique_id | id
+      - root_user_id: integer (alternative to identifier)
+      - max_depth: default 6 (hard cap 20)
+      - source: matrix | sponsor | auto (default: auto). When auto and matrix has no children, falls back to sponsor-based tree.
+    Response:
+      { id, username, full_name, level, matrix_position?, depth?, children:[...] }
+    """
+    permission_classes = [IsAdminOrStaff]
+
+    def get(self, request):
+        # sanitize identifier (strip any bracketed suffixes like " [sub franchise]" and trailing tokens)
+        identifier = (request.query_params.get("identifier") or "").strip()
+        if "[" in identifier:
+            identifier = identifier.split("[", 1)[0].strip()
+        if " " in identifier:
+            identifier = identifier.split()[0].strip()
+
+        try:
+            root_id = int(request.query_params.get("root_user_id") or "0")
+        except Exception:
+            root_id = 0
+
+        source = (request.query_params.get("source") or "auto").strip().lower()
+        try:
+            max_depth = int(request.query_params.get("max_depth") or 6)
+        except Exception:
+            max_depth = 6
+        max_depth = max(1, min(max_depth, 20))
+
+        # Resolve root user
+        user = None
+        if root_id > 0:
+            user = CustomUser.objects.filter(id=root_id).first()
+
+        if not user and identifier:
+            digits = "".join([c for c in identifier if c.isdigit()])
+            # Try exact id if numeric-only
+            if digits and digits == identifier and digits.isdigit():
+                user = CustomUser.objects.filter(id=int(digits)).first()
+            if not user:
+                q = (
+                    Q(username__iexact=identifier)
+                    | Q(email__iexact=identifier)
+                    | Q(unique_id__iexact=identifier)
+                    | Q(sponsor_id__iexact=identifier)
+                )
+                if digits:
+                    q = q | Q(phone__iexact=digits) | Q(username__iexact=digits)
+                user = CustomUser.objects.filter(q).first()
+
+        if not user:
+            return Response({"detail": "Root user not found"}, status=404)
+
+        # Builders
+        def build_matrix(u, level: int):
+            node = {
+                "id": u.id,
+                "username": u.username,
+                "full_name": u.full_name,
+                "level": level,
+                "matrix_position": getattr(u, "matrix_position", None),
+                "depth": getattr(u, "depth", 0),
+                "children": [],
+            }
+            if level >= max_depth:
+                return node
+            children = list(
+                CustomUser.objects.filter(parent_id=u.id)
+                .only("id", "username", "full_name", "matrix_position", "depth")
+                .order_by("matrix_position", "id")
+            )
+            for ch in children:
+                node["children"].append(build_matrix(ch, level + 1))
+            return node
+
+        def build_sponsor(u, level: int):
+            node = {
+                "id": u.id,
+                "username": u.username,
+                "full_name": u.full_name,
+                "level": level,
+                "children": [],
+            }
+            if level >= max_depth:
+                return node
+            children = list(
+                CustomUser.objects.filter(
+                    Q(registered_by_id=u.id)
+                    | Q(sponsor_id__iexact=u.username)
+                    | Q(sponsor_id__iexact=u.sponsor_id)
+                )
+                .only("id", "username", "full_name")
+                .order_by("id")
+                .distinct()
+            )
+            for c in children:
+                node["children"].append(build_sponsor(c, level + 1))
+            return node
+
+        # Decide source
+        if source == "matrix":
+            tree = build_matrix(user, 1)
+            return Response(tree, status=200)
+        if source == "sponsor":
+            tree = build_sponsor(user, 1)
+            return Response(tree, status=200)
+
+        # auto: try matrix; if empty children at root, fall back to sponsor
+        mx_tree = build_matrix(user, 1)
+        if not mx_tree or not isinstance(mx_tree.get("children", []), list) or len(mx_tree["children"]) == 0:
+            sp_tree = build_sponsor(user, 1)
+            return Response(sp_tree, status=200)
+        return Response(mx_tree, status=200)
+
+
 class AdminAutopoolSummary(APIView):
     """
     Summary for Auto Commission Pool and Matrix progress.
