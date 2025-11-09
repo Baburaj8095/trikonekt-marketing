@@ -223,4 +223,20 @@ API.interceptors.response.use(
   }
 );
 
+/**
+ * Keep UI session alive by silently refreshing the access token at intervals
+ * while the app is open. This ensures users remain logged in until they
+ * explicitly logout or clear their browser storage.
+ */
+(function startTokenKeepAlive() {
+  if (typeof window === "undefined") return;
+  try {
+    if (window.__tk_keepalive) return;
+    window.__tk_keepalive = setInterval(() => {
+      // ensureFreshAccess() refreshes 60s before expiry using the refresh token (if present)
+      ensureFreshAccess().catch(() => {});
+    }, 120000); // every 2 minutes
+  } catch (_) {}
+})();
+
 export default API;

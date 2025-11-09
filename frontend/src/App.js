@@ -60,7 +60,9 @@ function App() {
           path="/user/dashboard"
           element={
             <ProtectedRoute allowedRoles={["user"]}>
-              <UserDashboard />
+              <ConsumerShell>
+                <UserDashboard embedded />
+              </ConsumerShell>
             </ProtectedRoute>
           }
         />
@@ -68,7 +70,9 @@ function App() {
           path="/user/lucky-draw"
           element={
             <ProtectedRoute allowedRoles={["user"]}>
-              <LuckyDraw />
+              <ConsumerShell>
+                <LuckyDraw embedded />
+              </ConsumerShell>
             </ProtectedRoute>
           }
         />
@@ -215,7 +219,9 @@ function App() {
           path="/employee/dashboard"
           element={
             <ProtectedRoute allowedRoles={["employee"]}>
-              <EmployeeDashboard />
+              <EmployeeShell>
+                <EmployeeDashboard embedded />
+              </EmployeeShell>
             </ProtectedRoute>
           }
         />

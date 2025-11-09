@@ -22,6 +22,7 @@ class CustomUser(AbstractUser):
         ('agency_pincode_coordinator', 'Agency Pincode Coordinator'),
         ('agency_pincode', 'Agency Pincode'),
         ('agency_sub_franchise', 'Agency Sub-Franchise'),
+        ('company_manager', 'Company Manager'),
     ]
 
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='user', db_index=True)
@@ -90,6 +91,7 @@ class CustomUser(AbstractUser):
         'agency_pincode_coordinator': 'TRPC',
         'agency_pincode': 'TRPN',
         'agency_sub_franchise': 'TRSF',
+        'company_manager': 'TRCM',
     }
 
     @classmethod

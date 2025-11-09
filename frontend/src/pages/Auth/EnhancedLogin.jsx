@@ -842,20 +842,19 @@ const Login = () => {
         if (!tokenRole) throw new Error("Token missing role claim");
 
 
-        const storage = remember ? localStorage : sessionStorage;
-        storage.setItem("token", access);
-        if (refreshTok) storage.setItem("refresh", refreshTok);
-        storage.setItem("role", tokenRole);
+        localStorage.setItem("token", access);
+        if (refreshTok) localStorage.setItem("refresh", refreshTok);
+        localStorage.setItem("role", tokenRole);
 
         try {
           const meResp = await API.get("/accounts/me/");
           if (meResp?.data) {
-            storage.setItem("user", JSON.stringify(meResp.data));
+            localStorage.setItem("user", JSON.stringify(meResp.data));
           } else {
-            storage.setItem("user", JSON.stringify({ role: tokenRole, username: tokenUsername, full_name: tokenFullName }));
+            localStorage.setItem("user", JSON.stringify({ role: tokenRole, username: tokenUsername, full_name: tokenFullName }));
           }
         } catch (_) {
-          storage.setItem("user", JSON.stringify({ role: tokenRole, username: tokenUsername, full_name: tokenFullName }));
+          localStorage.setItem("user", JSON.stringify({ role: tokenRole, username: tokenUsername, full_name: tokenFullName }));
         }
 
         if (remember) {

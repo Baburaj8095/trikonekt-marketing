@@ -25,7 +25,7 @@ import ReferAndEarn from "../components/ReferAndEarn";
 
 const drawerWidth = 220;
 
-export default function UserDashboard() {
+export default function UserDashboard({ embedded = false }) {
   const navigate = useNavigate();
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -106,6 +106,61 @@ export default function UserDashboard() {
 
   const MEDIA_BASE = (API?.defaults?.baseURL || "").replace(/\/api\/?$/, "");
 
+
+  if (embedded) {
+    return (
+      <Box sx={{ p: { xs: 2, md: 3 } }}>
+        <ReferAndEarn title="Refer & Earn" />
+        <Typography variant="h5" sx={{ mb: 2, fontWeight: 700, color: "#0C2D48" }}>
+          Welcome
+        </Typography>
+        {loading ? (
+          <Typography variant="body1" sx={{ color: "text.secondary" }}>
+            Loading cards...
+          </Typography>
+        ) : (
+          <Grid container spacing={2}>
+            {computedCards
+              .filter((c) => c.is_active !== false)
+              .map((card) => (
+                <Grid item xs={12} sm={6} md={4} key={card.id || card.key}>
+                  <Card
+                    sx={{
+                      height: "100%",
+                      display: "flex",
+                      flexDirection: "column",
+                      borderRadius: 2,
+                      boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+                    }}
+                  >
+                    {card.image && (
+                      <Box
+                        component="img"
+                        src={
+                          card.image?.startsWith("http")
+                            ? card.image
+                            : `${MEDIA_BASE}${card.image}`
+                        }
+                        alt={card.title}
+                        sx={{ width: "100%", height: 140, objectFit: "cover" }}
+                      />
+                    )}
+                    <CardContent sx={{ flexGrow: 1 }}>
+                      <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+                        {card.title}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {card.description || ""}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+          </Grid>
+        )}
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ display: "flex", minHeight: "100vh", backgroundColor: "#f7f9fb" }}>

@@ -27,17 +27,17 @@ import LOGO from "../assets/TRIKONEKT.png";
 
 const drawerWidth = 220;
 
-export default function LuckyDraw() {
+export default function LuckyDraw({ embedded = false }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Responsive drawer state
+  // Responsive drawer state (used only in standalone mode)
   const theme = useTheme();
   useMediaQuery(theme.breakpoints.up("sm"));
   const [mobileOpen, setMobileOpen] = useState(false);
   const handleDrawerToggle = () => setMobileOpen((prev) => !prev);
 
-  // Active route highlighting
+  // Active route highlighting (used only in standalone mode)
   const isDashboard = location.pathname === "/user/dashboard";
   const isLuckyDraw = location.pathname === "/user/lucky-draw";
   const isMarketplace =
@@ -249,6 +249,233 @@ export default function LuckyDraw() {
     }
   };
 
+  // Main content (shared for embedded and standalone)
+  const MainContent = (
+    <Container maxWidth="sm" sx={{ px: 0, ml: 0, mr: "auto" }}>
+      {/* Lucky Draw Section */}
+      <Paper
+        elevation={3}
+        sx={{
+          p: { xs: 2, md: 3 },
+          borderRadius: 3,
+          backgroundColor: "#fff",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+        }}
+      >
+        <Typography variant="h5" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>
+          Participate Lucky Draw
+        </Typography>
+        <Typography variant="body2" sx={{ color: "text.secondary", mb: 3 }}>
+          Enter your details and upload the coupon image. Only images are accepted.
+        </Typography>
+
+        {!luckyEnabled && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Lucky draw participation is currently disabled by admin.
+          </Alert>
+        )}
+
+        <Box component="form" onSubmit={handleSubmit}>
+          <Stack spacing={2}>
+            <TextField
+              fullWidth
+              label="SL Number"
+              name="sl_number"
+              value={form.sl_number}
+              onChange={onChange}
+              disabled={!luckyEnabled}
+              required
+            />
+            <TextField
+              fullWidth
+              label="Ledger Number"
+              name="ledger_number"
+              value={form.ledger_number}
+              onChange={onChange}
+              disabled={!luckyEnabled}
+              required
+            />
+            <TextField
+              fullWidth
+              label="Pincode"
+              name="pincode"
+              value={form.pincode}
+              onChange={onChange}
+              inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
+              disabled={!luckyEnabled}
+              required
+            />
+            <TextField
+              fullWidth
+              label="Phone"
+              name="phone"
+              value={form.phone}
+              onChange={onChange}
+              type="tel"
+              inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
+              InputProps={{
+                startAdornment: <InputAdornment position="start">+91</InputAdornment>,
+              }}
+              disabled={!luckyEnabled}
+              required
+            />
+
+            {/* Additional Fields */}
+            <TextField
+              fullWidth
+              label="Coupon Purchaser Name"
+              name="coupon_purchaser_name"
+              value={form.coupon_purchaser_name}
+              onChange={onChange}
+              disabled={!luckyEnabled}
+            />
+            <TextField
+              fullWidth
+              label="Purchase Date"
+              name="purchase_date"
+              type="date"
+              value={form.purchase_date}
+              onChange={onChange}
+              InputLabelProps={{ shrink: true }}
+              disabled={!luckyEnabled}
+            />
+            <TextField
+              fullWidth
+              label="Address"
+              name="address"
+              value={form.address}
+              onChange={onChange}
+              multiline
+              minRows={2}
+              disabled={!luckyEnabled}
+            />
+            <TextField
+              fullWidth
+              label="Referral Name"
+              name="referral_name"
+              value={form.referral_name}
+              onChange={onChange}
+              disabled={!luckyEnabled}
+            />
+            <TextField
+              fullWidth
+              label="Referral ID"
+              name="referral_id"
+              value={form.referral_id}
+              onChange={onChange}
+              disabled={!luckyEnabled}
+            />
+            <TextField
+              fullWidth
+              label="Agency Name"
+              name="agency_name"
+              value={form.agency_name}
+              onChange={onChange}
+              disabled={!luckyEnabled}
+            />
+            <TextField
+              fullWidth
+              label="Agency Pincode"
+              name="agency_pincode"
+              value={form.agency_pincode}
+              onChange={onChange}
+              inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
+              disabled={!luckyEnabled}
+            />
+            <TextField
+              fullWidth
+              label="TR Referral ID"
+              name="tr_referral_id"
+              value={form.tr_referral_id}
+              onChange={onChange}
+              disabled={!luckyEnabled}
+            />
+            <TextField
+              fullWidth
+              label="TR Emp ID"
+              name="tr_emp_id"
+              value={form.tr_emp_id}
+              onChange={onChange}
+              disabled={!luckyEnabled}
+            />
+
+            <Button variant="outlined" component="label" fullWidth disabled={!luckyEnabled}>
+              {file ? `Selected: ${file.name}` : "Choose Coupon Image"}
+              <input type="file" accept="image/*" hidden onChange={onFileChange} />
+            </Button>
+            <Button
+              fullWidth
+              type="submit"
+              variant="contained"
+              disabled={submitting || !luckyEnabled}
+              sx={{
+                backgroundColor: "#145DA0",
+                py: 1.2,
+                fontWeight: 600,
+                borderRadius: 2,
+                "&:hover": { backgroundColor: "#0C4B82" },
+              }}
+            >
+              {submitting ? "Submitting..." : "Submit"}
+            </Button>
+          </Stack>
+        </Box>
+      </Paper>
+
+      {/* My Lucky Draw Submissions */}
+      <Paper
+        elevation={3}
+        sx={{
+          p: { xs: 2, md: 3 },
+          borderRadius: 3,
+          backgroundColor: "#fff",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+          mt: 3,
+        }}
+      >
+        <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
+          My Lucky Draw Submissions
+        </Typography>
+        {luckyLoading ? (
+          <Typography variant="body2">Loading...</Typography>
+        ) : luckyError ? (
+          <Typography variant="body2" color="error">{luckyError}</Typography>
+        ) : lucky.length === 0 ? (
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            No submissions yet.
+          </Typography>
+        ) : (
+          <Box component="ul" sx={{ m: 0, pl: 2 }}>
+            {lucky.map((s) => {
+              const meta = statusMeta(s.status);
+              return (
+                <li key={s.id} style={{ marginBottom: 8 }}>
+                  <Typography variant="body2" sx={{ mb: 0.5 }}>
+                    <strong>SL:</strong> {s.sl_number} — <strong>Ledger:</strong> {s.ledger_number} — {s.pincode} — {meta.label}
+                    {meta.pending_with ? ` (Pending with ${meta.pending_with})` : ""}
+                    {s.assigned_tre_username ? ` — TRE: ${s.assigned_tre_username}` : ""}
+                    {s.created_at ? ` — ${new Date(s.created_at).toLocaleString()}` : ""}
+                  </Typography>
+                  {s.image ? (
+                    <a href={s.image} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
+                      View Image
+                    </a>
+                  ) : null}
+                </li>
+              );
+            })}
+          </Box>
+        )}
+      </Paper>
+    </Container>
+  );
+
+  // Embedded mode: render only the page body so ConsumerShell controls the layout and sidebar
+  if (embedded) {
+    return <Box sx={{}}>{MainContent}</Box>;
+  }
+
+  // Standalone mode: keep the previous self-contained layout (AppBar + Drawer)
   return (
     <Box sx={{ display: "flex", minHeight: "100vh", backgroundColor: "#f7f9fb" }}>
       {/* App Top Bar */}
@@ -478,224 +705,7 @@ export default function LuckyDraw() {
         }}
       >
         <Toolbar />
-
-        <Container maxWidth="sm" sx={{ px: 0, ml: 0, mr: "auto" }}>
-          {/* Lucky Draw Section */}
-          <Paper
-            elevation={3}
-            sx={{
-              p: { xs: 2, md: 3 },
-              borderRadius: 3,
-              backgroundColor: "#fff",
-              boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
-            }}
-          >
-            <Typography variant="h5" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>
-              Participate Lucky Draw
-            </Typography>
-            <Typography variant="body2" sx={{ color: "text.secondary", mb: 3 }}>
-              Enter your details and upload the coupon image. Only images are accepted.
-            </Typography>
-
-            {!luckyEnabled && (
-              <Alert severity="warning" sx={{ mb: 2 }}>
-                Lucky draw participation is currently disabled by admin.
-              </Alert>
-            )}
-
-            <Box component="form" onSubmit={handleSubmit}>
-              <Stack spacing={2}>
-                <TextField
-                  fullWidth
-                  label="SL Number"
-                  name="sl_number"
-                  value={form.sl_number}
-                  onChange={onChange}
-                  disabled={!luckyEnabled}
-                  required
-                />
-                <TextField
-                  fullWidth
-                  label="Ledger Number"
-                  name="ledger_number"
-                  value={form.ledger_number}
-                  onChange={onChange}
-                  disabled={!luckyEnabled}
-                  required
-                />
-                <TextField
-                  fullWidth
-                  label="Pincode"
-                  name="pincode"
-                  value={form.pincode}
-                  onChange={onChange}
-                  inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
-                  disabled={!luckyEnabled}
-                  required
-                />
-                <TextField
-                  fullWidth
-                  label="Phone"
-                  name="phone"
-                  value={form.phone}
-                  onChange={onChange}
-                  type="tel"
-                  inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
-                  InputProps={{
-                    startAdornment: <InputAdornment position="start">+91</InputAdornment>,
-                  }}
-                  disabled={!luckyEnabled}
-                  required
-                />
-
-                {/* Additional Fields */}
-                <TextField
-                  fullWidth
-                  label="Coupon Purchaser Name"
-                  name="coupon_purchaser_name"
-                  value={form.coupon_purchaser_name}
-                  onChange={onChange}
-                  disabled={!luckyEnabled}
-                />
-                <TextField
-                  fullWidth
-                  label="Purchase Date"
-                  name="purchase_date"
-                  type="date"
-                  value={form.purchase_date}
-                  onChange={onChange}
-                  InputLabelProps={{ shrink: true }}
-                  disabled={!luckyEnabled}
-                />
-                <TextField
-                  fullWidth
-                  label="Address"
-                  name="address"
-                  value={form.address}
-                  onChange={onChange}
-                  multiline
-                  minRows={2}
-                  disabled={!luckyEnabled}
-                />
-                <TextField
-                  fullWidth
-                  label="Referral Name"
-                  name="referral_name"
-                  value={form.referral_name}
-                  onChange={onChange}
-                  disabled={!luckyEnabled}
-                />
-                <TextField
-                  fullWidth
-                  label="Referral ID"
-                  name="referral_id"
-                  value={form.referral_id}
-                  onChange={onChange}
-                  disabled={!luckyEnabled}
-                />
-                <TextField
-                  fullWidth
-                  label="Agency Name"
-                  name="agency_name"
-                  value={form.agency_name}
-                  onChange={onChange}
-                  disabled={!luckyEnabled}
-                />
-                <TextField
-                  fullWidth
-                  label="Agency Pincode"
-                  name="agency_pincode"
-                  value={form.agency_pincode}
-                  onChange={onChange}
-                  inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
-                  disabled={!luckyEnabled}
-                />
-                <TextField
-                  fullWidth
-                  label="TR Referral ID"
-                  name="tr_referral_id"
-                  value={form.tr_referral_id}
-                  onChange={onChange}
-                  disabled={!luckyEnabled}
-                />
-                <TextField
-                  fullWidth
-                  label="TR Emp ID"
-                  name="tr_emp_id"
-                  value={form.tr_emp_id}
-                  onChange={onChange}
-                  disabled={!luckyEnabled}
-                />
-
-                <Button variant="outlined" component="label" fullWidth disabled={!luckyEnabled}>
-                  {file ? `Selected: ${file.name}` : "Choose Coupon Image"}
-                  <input type="file" accept="image/*" hidden onChange={onFileChange} />
-                </Button>
-                <Button
-                  fullWidth
-                  type="submit"
-                  variant="contained"
-                  disabled={submitting || !luckyEnabled}
-                  sx={{
-                    backgroundColor: "#145DA0",
-                    py: 1.2,
-                    fontWeight: 600,
-                    borderRadius: 2,
-                    "&:hover": { backgroundColor: "#0C4B82" },
-                  }}
-                >
-                  {submitting ? "Submitting..." : "Submit"}
-                </Button>
-              </Stack>
-            </Box>
-          </Paper>
-
-          {/* My Lucky Draw Submissions */}
-          <Paper
-            elevation={3}
-            sx={{
-              p: { xs: 2, md: 3 },
-              borderRadius: 3,
-              backgroundColor: "#fff",
-              boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
-              mt: 3,
-            }}
-          >
-            <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
-              My Lucky Draw Submissions
-            </Typography>
-            {luckyLoading ? (
-              <Typography variant="body2">Loading...</Typography>
-            ) : luckyError ? (
-              <Typography variant="body2" color="error">{luckyError}</Typography>
-            ) : lucky.length === 0 ? (
-              <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                No submissions yet.
-              </Typography>
-            ) : (
-              <Box component="ul" sx={{ m: 0, pl: 2 }}>
-                {lucky.map((s) => {
-                  const meta = statusMeta(s.status);
-                  return (
-                    <li key={s.id} style={{ marginBottom: 8 }}>
-                      <Typography variant="body2" sx={{ mb: 0.5 }}>
-                        <strong>SL:</strong> {s.sl_number} — <strong>Ledger:</strong> {s.ledger_number} — {s.pincode} — {meta.label}
-                        {meta.pending_with ? ` (Pending with ${meta.pending_with})` : ""}
-                        {s.assigned_tre_username ? ` — TRE: ${s.assigned_tre_username}` : ""}
-                        {s.created_at ? ` — ${new Date(s.created_at).toLocaleString()}` : ""}
-                      </Typography>
-                      {s.image ? (
-                        <a href={s.image} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
-                          View Image
-                        </a>
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </Box>
-            )}
-          </Paper>
-        </Container>
+        {MainContent}
       </Box>
     </Box>
   );
