@@ -103,10 +103,10 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({'sponsor_id': 'Sponsor is required.'})
 
         # Resolve sponsor by username, sponsor_id, or phone digits
-        # Resolve sponsor strictly by Sponsor ID, fallback to exact username match (no phone fallback)
-        sponsor_user = CustomUser.objects.filter(sponsor_id__iexact=sponsor).first()
-        if not sponsor_user:
-            sponsor_user = CustomUser.objects.filter(username__iexact=sponsor).first()
+        # Resolve sponsor by own referral code (prefixed_id) or username; also accept legacy sponsor_id
+        sponsor_user = CustomUser.objects.filter(
+            Q(prefixed_id__iexact=sponsor) | Q(username__iexact=sponsor) | Q(sponsor_id__iexact=sponsor)
+        ).first()
         if not sponsor_user:
             raise serializers.ValidationError({'sponsor_id': 'Sponsor not found.'})
 
@@ -315,7 +315,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     def _build_username(self, category: str, phone: str, unique_id: str) -> str:
         """
         Generate admin-friendly usernames using prefixes by category.
-        - Consumer: TRC+phone
+        - Consumer: TR+phone
         - Employee: TREMP+phone
         - Sub-Franchise: TRSF+phone
         - Pincode Agency: TRPN+phone
@@ -333,7 +333,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         }
 
         prefix_map = {
-            'consumer': 'TRC',
+            'consumer': 'TR',
             'employee': 'TREMP',
             'agency_sub_franchise': 'TRSF',
             'agency_pincode': 'TRPN',
@@ -350,7 +350,7 @@ class RegisterSerializer(serializers.ModelSerializer):
                 base = f"{pref}{phone_digits}"
             else:
                 # default to consumer-like prefix
-                base = f"TRC{phone_digits}"
+                base = f"TR{phone_digits}"
 
         username = base
         # Ensure uniqueness across table (append -01, -02, ... if needed)
@@ -419,6 +419,12 @@ class RegisterSerializer(serializers.ModelSerializer):
         user.category = category
         user.unique_id = unique_id
         user.registered_by = registered_by
+        # Store upline's code in sponsor_id; keep user's own referral code in prefixed_id (allocated on save)
+        try:
+            if registered_by:
+                user.sponsor_id = getattr(registered_by, "prefixed_id", "") or getattr(registered_by, "username", "") or sponsor_id
+        except Exception:
+            user.sponsor_id = sponsor_id
 
         # Post-create agency region handling
         if category in AGENCY_CATEGORIES:

@@ -13,3 +13,4 @@ django-filter
 cloudinary
 django-cloudinary-storage
 django-admin-thumbnails
+openpyxl

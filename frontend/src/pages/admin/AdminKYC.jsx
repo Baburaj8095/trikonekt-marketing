@@ -80,6 +80,18 @@ export default function AdminKYC() {
   const [err, setErr] = useState("");
   const [rows, setRows] = useState([]);
 
+  // Mobile detection for responsive rendering
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth < 768 : false
+  );
+  useEffect(() => {
+    function onResize() {
+      setIsMobile(window.innerWidth < 768);
+    }
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   function setF(key, val) {
     setFilters((f) => ({ ...f, [key]: val }));
   }
@@ -136,6 +148,83 @@ export default function AdminKYC() {
     } catch (e) {
       alert(e?.response?.data?.detail || "Failed to reject KYC");
     }
+  }
+
+  function MobileRow({ r }) {
+    const statusBadge = r.verified ? (
+      <Badge color="#065f46" bg="#d1fae5">Verified</Badge>
+    ) : (
+      <Badge>Pending</Badge>
+    );
+
+    function Item({ label, value }) {
+      return (
+        <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ width: 88, color: "#64748b", fontSize: 12, flexShrink: 0 }}>
+            {label}
+          </div>
+          <div style={{ color: "#0f172a", fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>
+            {value}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        key={r.user_id}
+        style={{
+          borderBottom: "1px solid #e2e8f0",
+          padding: 12,
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+          <div style={{ fontWeight: 900, color: "#0f172a" }}>#{r.user_id}</div>
+          <div>{statusBadge}</div>
+        </div>
+        <Item label="Username" value={r.username} />
+        <Item label="Full Name" value={r.full_name || "—"} />
+        <Item label="Phone" value={r.phone || "—"} />
+        <Item label="Pincode" value={r.pincode || "—"} />
+        <Item
+          label="Bank"
+          value={r.bank_name ? `${r.bank_name} (${r.ifsc_code})` : "—"}
+        />
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+          {!r.verified ? (
+            <button
+              onClick={() => handleVerify(r)}
+              style={{
+                padding: "8px 12px",
+                background: "#059669",
+                color: "#fff",
+                border: 0,
+                borderRadius: 6,
+                cursor: "pointer",
+              }}
+            >
+              Verify
+            </button>
+          ) : null}
+          <button
+            onClick={() => handleReject(r)}
+            style={{
+              padding: "8px 12px",
+              background: "#ef4444",
+              color: "#fff",
+              border: 0,
+              borderRadius: 6,
+              cursor: "pointer",
+            }}
+          >
+            Reject
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -196,7 +285,7 @@ export default function AdminKYC() {
         />
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center", flexWrap: "wrap" }}>
         <button
           onClick={fetchKyc}
           disabled={loading}
@@ -237,7 +326,7 @@ export default function AdminKYC() {
         {err ? <div style={{ color: "#dc2626" }}>{err}</div> : null}
       </div>
 
-      {/* Table */}
+      {/* Table / Card list */}
       <div
         style={{
           border: "1px solid #e2e8f0",
@@ -246,100 +335,115 @@ export default function AdminKYC() {
           background: "#fff",
         }}
       >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "110px 160px 1fr 120px 120px 160px 120px 220px",
-            gap: 8,
-            padding: "10px",
-            background: "#f8fafc",
-            borderBottom: "1px solid #e2e8f0",
-            fontWeight: 700,
-            color: "#0f172a",
-          }}
-        >
-          <div>UserID</div>
-          <div>Username</div>
-          <div>Full Name</div>
-          <div>Phone</div>
-          <div>Pincode</div>
-          <div>Bank</div>
-          <div>Status</div>
-          <div>Actions</div>
-        </div>
-        <div>
-          {rows.map((r) => {
-            const statusBadge = r.verified ? (
-              <Badge color="#065f46" bg="#d1fae5">
-                Verified
-              </Badge>
-            ) : (
-              <Badge>Pending</Badge>
-            );
-            return (
-              <div
-                key={r.user_id}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns:
-                    "110px 160px 1fr 120px 120px 160px 120px 220px",
-                  gap: 8,
-                  padding: "10px",
-                  borderBottom: "1px solid #e2e8f0",
-                  alignItems: "center",
-                }}
-              >
-                <div>{r.user_id}</div>
-                <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {r.username}
-                </div>
-                <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {r.full_name || "—"}
-                </div>
-                <div>{r.phone || "—"}</div>
-                <div>{r.pincode || "—"}</div>
-                <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {r.bank_name ? `${r.bank_name} (${r.ifsc_code})` : "—"}
-                </div>
-                <div>{statusBadge}</div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {!r.verified ? (
-                    <button
-                      onClick={() => handleVerify(r)}
-                      style={{
-                        padding: "6px 10px",
-                        background: "#059669",
-                        color: "#fff",
-                        border: 0,
-                        borderRadius: 6,
-                        cursor: "pointer",
-                      }}
-                    >
-                      Verify
-                    </button>
-                  ) : null}
-                  <button
-                    onClick={() => handleReject(r)}
+        {/* Desktop/tablet: table layout with horizontal scroll if needed */}
+        {!isMobile ? (
+          <div style={{ overflowX: "auto" }}>
+            <div
+              style={{
+                minWidth: 940,
+                display: "grid",
+                gridTemplateColumns:
+                  "110px 160px 1fr 120px 120px 160px 120px 220px",
+                gap: 8,
+                padding: "10px",
+                background: "#f8fafc",
+                borderBottom: "1px solid #e2e8f0",
+                fontWeight: 700,
+                color: "#0f172a",
+              }}
+            >
+              <div>UserID</div>
+              <div>Username</div>
+              <div>Full Name</div>
+              <div>Phone</div>
+              <div>Pincode</div>
+              <div>Bank</div>
+              <div>Status</div>
+              <div>Actions</div>
+            </div>
+            <div>
+              {rows.map((r) => {
+                const statusBadge = r.verified ? (
+                  <Badge color="#065f46" bg="#d1fae5">Verified</Badge>
+                ) : (
+                  <Badge>Pending</Badge>
+                );
+                return (
+                  <div
+                    key={r.user_id}
                     style={{
-                      padding: "6px 10px",
-                      background: "#ef4444",
-                      color: "#fff",
-                      border: 0,
-                      borderRadius: 6,
-                      cursor: "pointer",
+                      minWidth: 940,
+                      display: "grid",
+                      gridTemplateColumns:
+                        "110px 160px 1fr 120px 120px 160px 120px 220px",
+                      gap: 8,
+                      padding: "10px",
+                      borderBottom: "1px solid #e2e8f0",
+                      alignItems: "center",
                     }}
                   >
-                    Reject
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-          {!loading && rows.length === 0 ? (
-            <div style={{ padding: 12, color: "#64748b" }}>No results</div>
-          ) : null}
-        </div>
+                    <div>{r.user_id}</div>
+                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {r.username}
+                    </div>
+                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {r.full_name || "—"}
+                    </div>
+                    <div>{r.phone || "—"}</div>
+                    <div>{r.pincode || "—"}</div>
+                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {r.bank_name ? `${r.bank_name} (${r.ifsc_code})` : "—"}
+                    </div>
+                    <div>{statusBadge}</div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {!r.verified ? (
+                        <button
+                          onClick={() => handleVerify(r)}
+                          style={{
+                            padding: "6px 10px",
+                            background: "#059669",
+                            color: "#fff",
+                            border: 0,
+                            borderRadius: 6,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Verify
+                        </button>
+                      ) : null}
+                      <button
+                        onClick={() => handleReject(r)}
+                        style={{
+                          padding: "6px 10px",
+                          background: "#ef4444",
+                          color: "#fff",
+                          border: 0,
+                          borderRadius: 6,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              {!loading && rows.length === 0 ? (
+                <div style={{ padding: 12, color: "#64748b" }}>No results</div>
+              ) : null}
+            </div>
+          </div>
+        ) : (
+          // Mobile: stacked card layout
+          <div>
+            {rows.map((r) => (
+              <MobileRow key={r.user_id} r={r} />
+            ))}
+            {!loading && rows.length === 0 ? (
+              <div style={{ padding: 12, color: "#64748b" }}>No results</div>
+            ) : null}
+          </div>
+        )}
       </div>
     </div>
   );

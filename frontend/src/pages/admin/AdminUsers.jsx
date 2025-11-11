@@ -61,6 +61,18 @@ export default function AdminUsers() {
   const [err, setErr] = useState("");
   const [rows, setRows] = useState([]);
 
+  // Mobile detection for responsiveness
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth < 768 : false
+  );
+  useEffect(() => {
+    function onResize() {
+      setIsMobile(window.innerWidth < 768);
+    }
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   function setF(key, val) {
     setFilters((f) => ({ ...f, [key]: val }));
   }
@@ -125,6 +137,43 @@ export default function AdminUsers() {
     []
   );
 
+  function MobileRow({ u }) {
+    function Item({ label, value }) {
+      return (
+        <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ width: 88, color: "#64748b", fontSize: 12, flexShrink: 0 }}>
+            {label}
+          </div>
+          <div style={{ color: "#0f172a", fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>
+            {value}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        style={{
+          borderBottom: "1px solid #e2e8f0",
+          padding: 12,
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+          <div style={{ fontWeight: 900, color: "#0f172a" }}>#{u.id}</div>
+        </div>
+        <Item label="Username" value={u.username} />
+        <Item label="Full Name" value={u.full_name || "—"} />
+        <Item label="Role" value={u.role || "—"} />
+        <Item label="Category" value={u.category || "—"} />
+        <Item label="Phone" value={u.phone || "—"} />
+        <Item label="Pincode" value={u.pincode || "—"} />
+      </div>
+    );
+  }
+
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
@@ -186,7 +235,7 @@ export default function AdminUsers() {
         />
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center", flexWrap: "wrap" }}>
         <button
           onClick={fetchUsers}
           disabled={loading}
@@ -236,55 +285,70 @@ export default function AdminUsers() {
           background: "#fff",
         }}
       >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "80px 160px 1fr 120px 120px 120px 120px",
-            gap: 8,
-            padding: "10px",
-            background: "#f8fafc",
-            borderBottom: "1px solid #e2e8f0",
-            fontWeight: 700,
-            color: "#0f172a",
-          }}
-        >
-          <div>ID</div>
-          <div>Username</div>
-          <div>Full Name</div>
-          <div>Role</div>
-          <div>Category</div>
-          <div>Phone</div>
-          <div>Pincode</div>
-        </div>
-        <div>
-          {rows.map((u) => (
+        {!isMobile ? (
+          <div style={{ overflowX: "auto" }}>
             <div
-              key={u.id}
               style={{
+                minWidth: 900,
                 display: "grid",
                 gridTemplateColumns: "80px 160px 1fr 120px 120px 120px 120px",
                 gap: 8,
                 padding: "10px",
+                background: "#f8fafc",
                 borderBottom: "1px solid #e2e8f0",
+                fontWeight: 700,
+                color: "#0f172a",
               }}
             >
-              <div>{u.id}</div>
-              <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                {u.username}
-              </div>
-              <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                {u.full_name || "—"}
-              </div>
-              <div>{u.role || "—"}</div>
-              <div>{u.category || "—"}</div>
-              <div>{u.phone || "—"}</div>
-              <div>{u.pincode || "—"}</div>
+              <div>ID</div>
+              <div>Username</div>
+              <div>Full Name</div>
+              <div>Role</div>
+              <div>Category</div>
+              <div>Phone</div>
+              <div>Pincode</div>
             </div>
-          ))}
-          {!loading && rows.length === 0 ? (
-            <div style={{ padding: 12, color: "#64748b" }}>No results</div>
-          ) : null}
-        </div>
+            <div>
+              {rows.map((u) => (
+                <div
+                  key={u.id}
+                  style={{
+                    minWidth: 900,
+                    display: "grid",
+                    gridTemplateColumns: "80px 160px 1fr 120px 120px 120px 120px",
+                    gap: 8,
+                    padding: "10px",
+                    borderBottom: "1px solid #e2e8f0",
+                  }}
+                >
+                  <div>{u.id}</div>
+                  <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {u.username}
+                  </div>
+                  <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {u.full_name || "—"}
+                  </div>
+                  <div>{u.role || "—"}</div>
+                  <div>{u.category || "—"}</div>
+                  <div>{u.phone || "—"}</div>
+                  <div>{u.pincode || "—"}</div>
+                </div>
+              ))}
+              {!loading && rows.length === 0 ? (
+                <div style={{ padding: 12, color: "#64748b" }}>No results</div>
+              ) : null}
+            </div>
+          </div>
+        ) : (
+          <div>
+            {rows.map((u) => (
+              <MobileRow key={u.id} u={u} />
+            ))}
+            {!loading && rows.length === 0 ? (
+              <div style={{ padding: 12, color: "#64748b" }}>No results</div>
+            ) : null}
+          </div>
+        )}
       </div>
     </div>
   );

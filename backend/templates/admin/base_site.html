@@ -1,0 +1,65 @@
+{% extends "admin/base.html" %}
+{% load static admin_dashboard %}
+
+{% block title %}{{ site_title|default:"Admin" }}{% endblock %}
+{% block bodyclass %}{% if request.user.is_authenticated %}with-sidebar{% endif %} {{ block.super }}{% endblock %}
+
+{% block extrastyle %}
+<link rel="stylesheet" href="{% static 'admin/css/admin_custom.css' %}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --brand-primary: {{ ADMIN_BRAND.primary|default:"#2563eb" }};
+    --brand-secondary: {{ ADMIN_BRAND.secondary|default:"#10b981" }};
+    --brand-accent: {{ ADMIN_BRAND.accent|default:"#f59e0b" }};
+    --brand-danger: {{ ADMIN_BRAND.danger|default:"#ef4444" }};
+    --brand-muted: {{ ADMIN_BRAND.muted|default:"#64748b" }};
+    --font-family: {{ ADMIN_BRAND.font_family|default:"Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif" }};
+  }
+</style>
+{% endblock %}
+
+{% block extrahead %}
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{% if ADMIN_BRAND.favicon_static_path %}
+<link rel="icon" href="{% static ADMIN_BRAND.favicon_static_path %}">
+{% endif %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block branding %}
+<div class="branding-row">
+  <a href="{% url 'admin:index' %}" class="brand-wrap">
+    {% if ADMIN_BRAND.logo_static_path %}
+      <img src="{% static ADMIN_BRAND.logo_static_path %}" alt="{{ site_header|default:'Admin' }}" class="brand-logo">
+    {% else %}
+      <span class="brand-text">{{ site_header|default:ADMIN_BRAND.name|default:"Admin" }}</span>
+    {% endif %}
+  </a>
+  {% if request.user.is_authenticated %}
+  <button type="button" id="sidebarToggle" class="sidebar-toggle" aria-label="Toggle sidebar" title="Toggle sidebar">
+    <i class="fa-solid fa-bars"></i>
+  </button>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block nav-global %}{% if request.user.is_authenticated %}{% admin_sidebar %}{% endif %}{% endblock %}
+{% block nav-sidebar %}{% endblock %}
+{% block breadcrumbs %}{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block footer %}
+<div class="admin-footer">
+  <div>© {{ current_year|default:2025 }} {{ ADMIN_BRAND.name|default:"Admin" }}</div>
+  <div class="footer-links">
+    <a href="{% url 'admin:index' %}">Dashboard</a>
+  </div>
+</div>
+<script src="{% static 'admin/js/admin_custom.js' %}"></script>
+{% endblock %}
+
+{% block footer_extra %}{% endblock %}

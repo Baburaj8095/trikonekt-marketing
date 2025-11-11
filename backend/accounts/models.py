@@ -80,7 +80,7 @@ class CustomUser(AbstractUser):
 
     # Prefix mapping and allocation for hierarchical sponsor codes
     PREFIX_MAP = {
-        'consumer': 'TRC',
+        'consumer': 'TR',
         'employee': 'TREMP',
         'business': 'TRBS',
         'company': 'TR',
@@ -97,7 +97,7 @@ class CustomUser(AbstractUser):
     @classmethod
     def category_to_prefix(cls, category: str) -> str:
         cat = (category or '').strip() or 'consumer'
-        return cls.PREFIX_MAP.get(cat, 'TRC')
+        return cls.PREFIX_MAP.get(cat, 'TR')
 
     @classmethod
     @transaction.atomic
@@ -287,7 +287,7 @@ class AgencyRegionAssignment(models.Model):
         return f"{self.user.username} [{self.level}] {desc or ''}".strip()
 
 
-# Prefix-based sequential code allocator for hierarchical IDs (e.g., TRC-0000000001)
+# Prefix-based sequential code allocator for hierarchical IDs (e.g., TR-0000000001)
 class PrefixSequence(models.Model):
     prefix = models.CharField(max_length=10, unique=True)
     last_number = models.BigIntegerField(default=0)

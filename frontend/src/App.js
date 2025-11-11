@@ -39,6 +39,15 @@ import AdminMatrixFive from "./pages/admin/AdminMatrixFive";
 import AdminMatrixThree from "./pages/admin/AdminMatrixThree";
 import AdminAutopool from "./pages/admin/AdminAutopool";
 import AdminECoupons from "./pages/admin/AdminECoupons";
+import AdminProducts from "./pages/admin/AdminProducts";
+import AdminBanners from "./pages/admin/AdminBanners";
+import AdminOrders from "./pages/admin/AdminOrders";
+import AdminUploads from "./pages/admin/AdminUploads";
+import AdminBusiness from "./pages/admin/AdminBusiness";
+import AdminReports from "./pages/admin/AdminReports";
+import AdminDashboardCards from "./pages/admin/AdminDashboardCards";
+import AdminHomeCards from "./pages/admin/AdminHomeCards";
+import AdminLuckyDraw from "./pages/admin/AdminLuckyDraw";
 import Profile from "./pages/Profile";
 import RoleSelect from "./pages/Auth/RoleSelect";
 
@@ -407,6 +416,96 @@ function App() {
             <AdminProtectedRoute>
               <AdminShell>
                 <AdminECoupons />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/products"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminProducts />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/banners"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminBanners />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/orders"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminOrders />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/uploads"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminUploads />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/business"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminBusiness />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/reports"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminReports />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/dashboard-cards"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminDashboardCards />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/home-cards"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminHomeCards />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/lucky-draw"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminLuckyDraw />
               </AdminShell>
             </AdminProtectedRoute>
           }

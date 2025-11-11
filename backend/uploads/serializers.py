@@ -15,7 +15,17 @@ class FileUploadSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FileUpload
-        fields = "__all__"
+        fields = [
+            "id",
+            "user",
+            "title",
+            "file",
+            "created_at",
+            "user_pincode",
+            "user_city",
+            "user_state",
+            "user_country",
+        ]
         read_only_fields = ["user"]
 
     def get_user_pincode(self, obj):

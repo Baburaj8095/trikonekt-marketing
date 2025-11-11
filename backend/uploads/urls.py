@@ -16,6 +16,7 @@ from .views import (
     StorageInfoView,
     DebugReuploadHomeCardView,
     DebugReuploadAllHomeCardsView,
+    FileUploadView,
 )
 
 urlpatterns = [
@@ -26,6 +27,7 @@ urlpatterns = [
     path('homecard/debug-reupload-all/', DebugReuploadAllHomeCardsView.as_view(), name='homecard-debug-reupload-all'),
     # Diagnostics (prod safe): verify storage backend and CLOUDINARY_URL usage
     path('debug/storage/', StorageInfoView.as_view(), name='storage-info'),
+    path('files/', FileUploadView.as_view(), name='file-uploads'),
 
     # Lucky draw (user submits physical coupon; TRE -> Agency approvals)
     path('lucky-draw/', LuckyDrawSubmissionView.as_view(), name='lucky-draw'),

@@ -64,8 +64,9 @@ export default function AdminUserTree() {
   const [treeMap, setTreeMap] = useState({}); // id -> { ...node, _expanded, _children, _loading }
   const [err, setErr] = useState("");
   const [searching, setSearching] = useState(false);
+  const [defaultDepth, setDefaultDepth] = useState(2);
 
-  const canSearch = identifier.trim().length > 0;
+  const canSearch = String(identifier || "").trim().length > 0;
 
   // Allow deep-link: /admin/user-tree?identifier=...
   const location = useLocation();
@@ -79,14 +80,62 @@ export default function AdminUserTree() {
     // eslint-disable-next-line
   }, [autoId]);
 
+  // If no deep-link identifier is present, load default admin root on mount and expand to defaultDepth
+  useEffect(() => {
+    if (!autoId) {
+      loadDefaultRoot(true);
+    }
+    // eslint-disable-next-line
+  }, []);
+
+  // When root changes (via search or default load), auto-expand to defaultDepth (2 by default)
+  useEffect(() => {
+    if (root && defaultDepth >= 2) {
+      expandToDepth(defaultDepth);
+    }
+    // eslint-disable-next-line
+  }, [root, defaultDepth]);
+
   function resetTree() {
     setRoot(null);
     setTreeMap({});
     setErr("");
   }
 
+  async function loadDefaultRoot(autoExpand = false) {
+    setSearching(true);
+    setErr("");
+    try {
+      const res = await API.get("/admin/users/tree/default-root/");
+      const n = res?.data || null;
+      if (!n) {
+        setErr("No default root user found");
+        setRoot(null);
+        setTreeMap({});
+        return;
+      }
+      setRoot(n);
+      setTreeMap((prev) => ({
+        ...prev,
+        [n.id]: { ...n, _expanded: false, _children: [], _loading: false },
+      }));
+      if (autoExpand) {
+        try {
+          await expandToDepth(defaultDepth);
+        } catch (_) {}
+      }
+    } catch (e) {
+      setErr(e?.response?.data?.detail || "Failed to load default root");
+      setRoot(null);
+      setTreeMap({});
+    } finally {
+      setSearching(false);
+    }
+  }
+
   async function loadRoot(valueOverride) {
-    const ident = (valueOverride ?? identifier).trim();
+    const computed = (valueOverride && typeof valueOverride !== "object") ? String(valueOverride) : identifier;
+    const ident = (computed || "").trim();
     if (!ident) return;
     setSearching(true);
     setErr("");
@@ -171,6 +220,66 @@ export default function AdminUserTree() {
     }
   }
 
+  async function loadChildrenFor(userId) {
+    if (!userId) return [];
+    const current = treeMap[userId] || {};
+
+    // If already expanded and children present, return them
+    if (current._expanded && Array.isArray(current._children) && current._children.length > 0) {
+      return current._children;
+    }
+
+    // Mark loading
+    setTreeMap((prev) => ({
+      ...prev,
+      [userId]: { ...(current || {}), _loading: true },
+    }));
+
+    try {
+      const res = await API.get("/admin/users/tree/children/", {
+        params: { userId, page: 1, page_size: 100 },
+      });
+      const items = res?.data?.results || [];
+
+      setTreeMap((prev) => {
+        const next = { ...prev };
+        items.forEach((c) => {
+          const exist = next[c.id];
+          next[c.id] = {
+            ...(exist || c),
+            _expanded: false,
+            _children: exist?._children || [],
+            _loading: false,
+          };
+        });
+        const base = next[userId] || current || {};
+        next[userId] = { ...base, _expanded: true, _children: items, _loading: false };
+        return next;
+      });
+
+      return items;
+    } catch (_) {
+      setTreeMap((prev) => ({
+        ...prev,
+        [userId]: { ...(current || {}), _loading: false },
+      }));
+      return [];
+    }
+  }
+
+  async function expandToDepth(depth = 2) {
+    const d = Math.max(1, Math.min(depth, 3));
+    if (!root || !root.id) return;
+
+    // Level 1: expand root
+    const level1 = await loadChildrenFor(root.id);
+
+    // Level 2: expand each child of root if target depth is 3
+    if (d >= 3 && Array.isArray(level1)) {
+      await Promise.all(level1.map((c) => loadChildrenFor(c.id)));
+    }
+  }
+
   // Render a flat list with indentation based on expanded state
   const flatList = useMemo(() => {
     if (!root) return [];
@@ -218,7 +327,7 @@ export default function AdminUserTree() {
         />
         <button
           disabled={!canSearch || searching}
-          onClick={loadRoot}
+          onClick={() => loadRoot()}
           style={{
             padding: "10px 12px",
             borderRadius: 8,
@@ -242,6 +351,19 @@ export default function AdminUserTree() {
           }}
         >
           Reset
+        </button>
+        <button
+          onClick={() => expandToDepth(3)}
+          style={{
+            padding: "10px 12px",
+            borderRadius: 8,
+            border: 0,
+            background: "#334155",
+            color: "#fff",
+            cursor: "pointer",
+          }}
+        >
+          Expand to 3 levels
         </button>
         {err ? <span style={{ color: "#dc2626", marginLeft: 8 }}>{err}</span> : null}
       </div>

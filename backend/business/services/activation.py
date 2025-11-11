@@ -197,7 +197,7 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
     except Exception:
         pass
     try:
-        AutoPoolAccount.create_three_150_for_user(user, amount=base150)
+        AutoPoolAccount.place_three_150_for_user(user, amount=base150)
     except Exception:
         pass
 
@@ -216,16 +216,36 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
 
     # Distribute 3-matrix (L15)
     three_levels = int(getattr(cfg, "three_matrix_levels", 15) or 15)
-    three_percents = _as_percents(getattr(cfg, "three_matrix_percents_json", []) or [], three_levels)
     upline15 = _resolve_upline(user, depth=three_levels)
-    _distribute_levels(
-        upline15,
-        base_amount=base150,
-        percents=three_percents,
-        tx_type="AUTOPOOL_BONUS_THREE",
-        meta={"source": "THREE_MATRIX_150", "source_type": src_type, "source_id": src_id},
-        pool_type="THREE_150",
-    )
+
+    # Prefer fixed-amount overrides if configured, else fall back to percent distribution
+    fixed_amounts = list(getattr(cfg, "three_matrix_amounts_json", []) or [])
+    if fixed_amounts:
+        for idx, recipient in enumerate(upline15):
+            if idx >= len(fixed_amounts):
+                break
+            amt = _q2(fixed_amounts[idx] or 0)
+            if amt <= 0:
+                continue
+            meta = {
+                "source": "THREE_MATRIX_150_FIXED",
+                "source_type": src_type,
+                "source_id": src_id,
+                "level_index": idx + 1,
+                "fixed": True,
+            }
+            _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_THREE", meta=meta, source_type=src_type, source_id=src_id)
+            _update_matrix_progress(recipient, pool_type="THREE_150", level=idx + 1, amount=amt)
+    else:
+        three_percents = _as_percents(getattr(cfg, "three_matrix_percents_json", []) or [], three_levels)
+        _distribute_levels(
+            upline15,
+            base_amount=base150,
+            percents=three_percents,
+            tx_type="AUTOPOOL_BONUS_THREE",
+            meta={"source": "THREE_MATRIX_150", "source_type": src_type, "source_id": src_id},
+            pool_type="THREE_150",
+        )
 
     return created
 
@@ -293,7 +313,7 @@ def activate_50(user: CustomUser, source: Dict[str, Any], package_code: str = "G
 
     base50 = _q2(cfg.global_activation_amount or 50)
     try:
-        AutoPoolAccount.create_three_50_for_user(user, amount=base50)
+        AutoPoolAccount.place_three_50_for_user(user, amount=base50)
     except Exception:
         pass
     # Enable autopool and rewards eligibility upon 50 activation (best-effort)

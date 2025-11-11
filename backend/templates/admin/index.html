@@ -1,0 +1,67 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static humanize admin_urls admin_dashboard %}
+
+{% block content %}
+<div class="admin-dashboard">
+
+  <div class="dashboard-cards">
+    {% admin_render_cards %}
+  </div>
+
+  <div class="dashboard-widgets">
+    <div class="widget widget--chart">
+      <div class="widget-header">
+        <div class="widget-title">Overview</div>
+        <div class="widget-subtitle">Last 7 days new users</div>
+      </div>
+      <script id="overviewChartData" type="application/json">{% admin_weekly_new_users %}</script>
+      <canvas id="overviewChart" height="120"></canvas>
+    </div>
+
+    <div id="admin-react-widget" class="widget widget--react" data-widget="react-hook">
+      <div class="widget-header">
+        <div class="widget-title">Interactive Widget</div>
+        <div class="widget-subtitle">Optional React/JS micro-widget</div>
+      </div>
+      <div class="widget-body">
+        <div class="placeholder">This is a placeholder. You can mount a React component here.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dashboard-apps">
+    {% if app_list %}
+    <div class="module">
+      <h2>{% trans 'Applications' %}</h2>
+      <div class="app-grid">
+        {% for app in app_list %}
+          <div class="app-card">
+            <div class="app-title">{{ app.name }}</div>
+            <ul class="app-models">
+              {% for model in app.models %}
+                <li>
+                  {% if model.admin_url %}
+                    <a href="{{ model.admin_url }}">{{ model.name }}</a>
+                  {% else %}
+                    {{ model.name }}
+                  {% endif %}
+                  <span class="app-model-actions">
+                    {% if model.add_url %}
+                      <a class="addlink" href="{{ model.add_url }}">{% trans 'Add' %}</a>
+                    {% endif %}
+                    {% if model.view_only %}
+                      <span class="viewonly">{% trans 'view' %}</span>
+                    {% endif %}
+                  </span>
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

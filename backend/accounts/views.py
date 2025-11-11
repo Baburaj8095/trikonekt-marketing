@@ -74,8 +74,14 @@ class RegisterView(generics.CreateAPIView):
 
             def _send():
                 try:
-                    # DEFAULT_FROM_EMAIL is used when from_email is None
-                    send_mail(subject, message, None, [recipient], fail_silently=True)
+                    # Explicit from_email and fail_silently=False to surface SMTP issues
+                    send_mail(
+                        subject,
+                        message,
+                        getattr(settings, "DEFAULT_FROM_EMAIL", None) or getattr(settings, "EMAIL_HOST_USER", None),
+                        [recipient],
+                        fail_silently=False,
+                    )
                 except Exception as e:
                     try:
                         logger.warning("Welcome email send failed: %s", e)

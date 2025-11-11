@@ -261,6 +261,86 @@ class AutoPoolAccount(models.Model):
             level=1,
         )
 
+    # ---------- 3-Matrix placement helpers ----------
+    @classmethod
+    def _first_upline_account(cls, user, pool_type: str):
+        """
+        Return the first ACTIVE AutoPoolAccount in the registered_by upline for the given pool_type.
+        """
+        cur = user
+        seen = set()
+        while cur and getattr(cur, "id", None) and cur.id not in seen:
+            seen.add(cur.id)
+            acc = cls.objects.filter(owner=cur, pool_type=pool_type, status="ACTIVE").order_by("id").first()
+            if acc:
+                return acc
+            cur = getattr(cur, "registered_by", None)
+        return None
+
+    @classmethod
+    def place_in_three_pool(cls, user, pool_type: str, amount: Decimal):
+        """
+        Place the user's pool account under the upline's first account for the same pool using 3-wide BFS spillover.
+        If no upline has an active account for this pool, create a root-level account (no parent).
+        """
+        from collections import deque
+        from decimal import Decimal as D
+        amt = D(amount or 0)
+        root_acc = cls._first_upline_account(user, pool_type)
+
+        # If no upline account exists, create a root account
+        if not root_acc:
+            return cls.objects.create(
+                owner=user,
+                username_key=getattr(user, "username", "") or "",
+                entry_amount=amt,
+                pool_type=pool_type,
+                status="ACTIVE",
+                parent_account=None,
+                level=1,
+            )
+
+        # BFS to find first account with <3 children in same pool
+        q = deque([root_acc])
+        while q:
+            node = q.popleft()
+            child_qs = cls.objects.filter(parent_account=node, pool_type=pool_type, status="ACTIVE").order_by("id")
+            if child_qs.count() < 3:
+                return cls.objects.create(
+                    owner=user,
+                    username_key=getattr(user, "username", "") or "",
+                    entry_amount=amt,
+                    pool_type=pool_type,
+                    status="ACTIVE",
+                    parent_account=node,
+                    level=(getattr(node, "level", 0) or 0) + 1,
+                )
+            for ch in child_qs:
+                q.append(ch)
+
+        # Fallback: attach under root_acc
+        return cls.objects.create(
+            owner=user,
+            username_key=getattr(user, "username", "") or "",
+            entry_amount=amt,
+            pool_type=pool_type,
+            status="ACTIVE",
+            parent_account=root_acc,
+            level=(getattr(root_acc, "level", 0) or 0) + 1,
+        )
+
+    @classmethod
+    def place_three_150_for_user(cls, user, amount: Decimal | None = None):
+        from decimal import Decimal as D
+        amt = D(amount) if amount is not None else D("150.00")
+        return cls.place_in_three_pool(user, "THREE_150", amt)
+
+    @classmethod
+    def place_three_50_for_user(cls, user, amount: Decimal | None = None):
+        from decimal import Decimal as D
+        amt = D(amount) if amount is not None else D("50.00")
+        return cls.place_in_three_pool(user, "THREE_50", amt)
+
 
 class SubscriptionActivation(models.Model):
     """

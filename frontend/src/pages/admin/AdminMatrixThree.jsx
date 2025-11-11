@@ -123,7 +123,7 @@ export default function AdminMatrixThree() {
     if (/^\d+$/.test(idStr)) {
       return parseInt(idStr, 10);
     }
-    // resolve via admin user root endpoint (supports username/email/unique_id)
+    // resolve via admin user root endpoint (supports username/email/unique_id/sponsor_id/phone)
     const res = await API.get("/admin/users/tree/root/", { params: { identifier: idStr } });
     return res?.data?.id || null;
   }
@@ -133,7 +133,7 @@ export default function AdminMatrixThree() {
     setTree(null);
     const ident = treeIdentifier.trim();
     if (!ident) {
-      setTreeErr("Enter user id / username / email / unique_id");
+      setTreeErr("Enter user id / username / sponsor_id / phone / email / unique_id");
       return;
     }
     setTreeLoading(true);
@@ -340,7 +340,7 @@ export default function AdminMatrixThree() {
           <input
             value={treeIdentifier}
             onChange={(e) => setTreeIdentifier(e.target.value)}
-            placeholder="Enter root user id / username / email / unique_id"
+            placeholder="Enter root user id / username / sponsor_id / phone / email / unique_id"
             style={{
               padding: "10px 12px",
               minWidth: 320,

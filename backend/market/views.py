@@ -549,3 +549,49 @@ class BannerPurchaseRequestStatusUpdate(generics.UpdateAPIView):
             instance = serializer.instance
 
         return Response(BannerPurchaseRequestSerializer(instance, context={"request": request}).data, status=status.HTTP_200_OK)
+
+
+class BannerPurchaseRequestAllList(generics.ListAPIView):
+    """
+    GET /api/banners/purchase-requests — admin-only list of all banner purchase requests.
+    Filters:
+      - status=Pending|Approved|Rejected
+      - banner_id, item_id (ints)
+      - payment_method=wallet|cash
+      - created_by (id or username contains; also matches consumer_phone)
+    """
+    serializer_class = BannerPurchaseRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if not getattr(user, "is_staff", False):
+            return BannerPurchaseRequest.objects.none()
+        qs = BannerPurchaseRequest.objects.select_related(
+            "banner", "banner_item", "banner__created_by", "created_by"
+        ).all().order_by("-created_at")
+
+        params = self.request.query_params
+        status_in = (params.get("status") or "").strip()
+        banner_id = (params.get("banner_id") or "").strip()
+        item_id = (params.get("item_id") or "").strip()
+        payment_method = (params.get("payment_method") or "").strip().lower()
+        created_by = (params.get("created_by") or "").strip()
+
+        if status_in in {c for c, _ in BannerPurchaseRequest.STATUS_CHOICES}:
+            qs = qs.filter(status=status_in)
+        if banner_id.isdigit():
+            qs = qs.filter(banner_id=int(banner_id))
+        if item_id.isdigit():
+            qs = qs.filter(banner_item_id=int(item_id))
+        if payment_method in ("wallet", "cash"):
+            qs = qs.filter(payment_method=payment_method)
+        if created_by:
+            if created_by.isdigit():
+                qs = qs.filter(Q(created_by_id=int(created_by)) | Q(created_by__username__icontains=created_by))
+            else:
+                qs = qs.filter(
+                    Q(created_by__username__icontains=created_by)
+                    | Q(consumer_phone__icontains=created_by)
+                )
+        return qs

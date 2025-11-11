@@ -33,6 +33,7 @@ import LOGO from "../assets/TRIKONEKT.png";
 import API from "../api/api";
 import RewardsTargetCard from "../components/RewardsTargetCard";
 import ReferAndEarn from "../components/ReferAndEarn";
+import TreeReferralGalaxy from "../components/TreeReferralGalaxy";
 
 const drawerWidth = 220;
 
@@ -538,8 +539,16 @@ export default function EmployeeDashboard({ embedded = false }) {
 
   if (embedded) {
     return (
-      <Container maxWidth="lg" sx={{ px: 0 }}>
-        <ReferAndEarn title="Refer & Earn" />
+        <Container maxWidth="lg" sx={{ px: 0 }}>
+          <ReferAndEarn title="Refer & Earn" />
+          <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mt: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
+              My Team (5‑Matrix)
+            </Typography>
+            <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden", background: "#fff", padding: 12 }}>
+              <TreeReferralGalaxy mode="self" />
+            </div>
+          </Paper>
         {activeTab === TABS.LUCKY && (
           <Grid container spacing={2}>
             <Grid item xs={12}>

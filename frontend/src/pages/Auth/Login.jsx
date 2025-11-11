@@ -1026,7 +1026,7 @@ const [businessPinLoading, setBusinessPinLoading] = useState(false);
     label: "Username or Phone",
     type: "text",
     inputMode: "text",
-    placeholder: "Enter username (e.g., TREMP9876543210) or phone (10 digits)",
+    placeholder: "Enter username",
   };
 
   const handleSubmit = async (e) => {

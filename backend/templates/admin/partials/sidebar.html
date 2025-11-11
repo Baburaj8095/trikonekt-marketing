@@ -1,0 +1,49 @@
+{% comment %}
+Fixed, collapsible sidebar for Django Admin. Receives:
+- menu: normalized list of items { title, icon, url, children? }
+- current_path: request.path for active link highlight
+- ADMIN_BRAND: branding tokens
+{% endcomment %}
+<div class="admin-sidebar" role="navigation" aria-label="Admin sidebar">
+  <div class="sidebar-inner">
+    <div class="sidebar-section sidebar-section--primary">
+      <div class="sidebar-head">
+        <span class="sidebar-brand">{{ ADMIN_BRAND.name|default:"Admin" }}</span>
+        <button type="button" class="sidebar-close" id="sidebarClose" aria-label="Close sidebar">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </div>
+      <ul class="sidebar-nav">
+        {% for item in menu %}
+          {% with is_active=item.active %}
+          <li class="sidebar-item {% if is_active %}active{% endif %}">
+            <a class="sidebar-link" href="{{ item.url|default:'#' }}" {% if item.children %}aria-expanded="{{ is_active|yesno:'true,false' }}"{% endif %}>
+              {% if item.icon %}
+                <i class="{{ item.icon }} sidebar-icon" aria-hidden="true"></i>
+              {% else %}
+                <span class="sidebar-icon">•</span>
+              {% endif %}
+              <span class="sidebar-text">{{ item.title }}</span>
+              {% if item.children %}
+                <span class="sidebar-caret" aria-hidden="true">▾</span>
+              {% endif %}
+            </a>
+            {% if item.children %}
+              <ul class="sidebar-subnav">
+                {% for child in item.children %}
+                  <li class="sidebar-subitem {% if child.active %}active{% endif %}">
+                    <a class="sidebar-sublink" href="{{ child.url|default:'#' }}">
+                      <span class="bullet">•</span>
+                      <span class="sidebar-text">{{ child.title }}</span>
+                    </a>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          </li>
+          {% endwith %}
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>

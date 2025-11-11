@@ -19,6 +19,7 @@ import {
 import API from "../api/api";
 import RewardsTargetCard from "../components/RewardsTargetCard";
 import ReferAndEarn from "../components/ReferAndEarn";
+import TreeReferralGalaxy from "../components/TreeReferralGalaxy";
 
 export default function AgencyDashboard() {
   // Nav identity (for filtering employees by agency pincode)
@@ -565,55 +566,13 @@ export default function AgencyDashboard() {
           )}
         </Paper>
       )}
-      {/* My 5‑Matrix Hierarchy (spillover) */}
+      {/* My 5‑Matrix Team (click child card to drill down) */}
       <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mt: 2 }}>
-        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>
-            My 5‑Matrix Hierarchy
-          </Typography>
-          <Box sx={{ display: "flex", gap: 1 }}>
-            <Button
-              size="small"
-              onClick={async () => {
-                try {
-                  setMyTreeLoading(true);
-                  const res = await API.get("/accounts/my/matrix/tree/", { params: { max_depth: 6 } });
-                  setMyTree(res?.data || null);
-                  setMyTreeErr("");
-                } catch (e) {
-                  setMyTree(null);
-                  setMyTreeErr(e?.response?.data?.detail || "Failed to load hierarchy.");
-                } finally {
-                  setMyTreeLoading(false);
-                }
-              }}
-            >
-              {myTreeLoading ? "Refreshing..." : "Refresh"}
-            </Button>
-          </Box>
-        </Box>
-        {myTreeErr ? <Alert severity="error" sx={{ mb: 1 }}>{myTreeErr}</Alert> : null}
-        <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden", background: "#fff" }}>
-          {!myTree ? (
-            <div style={{ padding: 12, color: "#64748b" }}>
-              {myTreeLoading ? "Loading..." : "No hierarchy to display."}
-            </div>
-          ) : (
-            <div>
-              <div
-                style={{
-                  padding: "10px",
-                  borderBottom: "1px solid #e2e8f0",
-                  background: "#f8fafc",
-                  fontWeight: 700,
-                  color: "#0f172a",
-                }}
-              >
-                Root: {myTree.username} #{myTree.id} • {myTree.full_name || "—"}
-              </div>
-              <MyTreeNode node={myTree} />
-            </div>
-          )}
+        <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
+          My Team (5‑Matrix)
+        </Typography>
+        <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden", background: "#fff", padding: 12 }}>
+          <TreeReferralGalaxy mode="self" />
         </div>
       </Paper>
     </Container>

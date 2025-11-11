@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from accounts.models import CustomUser, WithdrawalRequest, UserKYC, WalletTransaction
+from market.models import PurchaseRequest, BannerPurchaseRequest
 from business.models import UserMatrixProgress
+from locations.models import Country, State, City
 
 
 class AdminUserNodeSerializer(serializers.ModelSerializer):
@@ -134,5 +136,83 @@ class AdminWalletTransactionSerializer(serializers.ModelSerializer):
             "amount",
             "balance_after",
             "meta",
+            "created_at",
+        ]
+
+
+class AdminUserEditSerializer(serializers.ModelSerializer):
+    """
+    Admin-side editable fields for a user. Primary keys for geo fields.
+    """
+    country = serializers.PrimaryKeyRelatedField(queryset=Country.objects.all(), required=False, allow_null=True)
+    state = serializers.PrimaryKeyRelatedField(queryset=State.objects.all(), required=False, allow_null=True)
+    city = serializers.PrimaryKeyRelatedField(queryset=City.objects.all(), required=False, allow_null=True)
+
+    class Meta:
+        model = CustomUser
+        fields = [
+            "email",
+            "full_name",
+            "phone",
+            "age",
+            "address",
+            "pincode",
+            "role",
+            "category",
+            "country",
+            "state",
+            "city",
+            "is_active",
+        ]
+
+
+class AdminPurchaseRequestSerializer(serializers.ModelSerializer):
+    product_id = serializers.IntegerField(source="product.id", read_only=True)
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    owner_username = serializers.CharField(source="product.created_by.username", read_only=True)
+    created_by_username = serializers.CharField(source="created_by.username", read_only=True)
+
+    class Meta:
+        model = PurchaseRequest
+        fields = [
+            "id",
+            "product_id",
+            "product_name",
+            "consumer_name",
+            "consumer_email",
+            "consumer_phone",
+            "consumer_address",
+            "quantity",
+            "payment_method",
+            "status",
+            "owner_username",
+            "created_by_username",
+            "created_at",
+        ]
+
+
+class AdminBannerPurchaseRequestSerializer(serializers.ModelSerializer):
+    banner_id = serializers.IntegerField(source="banner.id", read_only=True)
+    banner_title = serializers.CharField(source="banner.title", read_only=True)
+    banner_item_id = serializers.IntegerField(source="banner_item.id", read_only=True)
+    item_name = serializers.CharField(source="banner_item.name", read_only=True)
+    created_by_username = serializers.CharField(source="created_by.username", read_only=True)
+
+    class Meta:
+        model = BannerPurchaseRequest
+        fields = [
+            "id",
+            "banner_id",
+            "banner_title",
+            "banner_item_id",
+            "item_name",
+            "consumer_name",
+            "consumer_email",
+            "consumer_phone",
+            "consumer_address",
+            "quantity",
+            "payment_method",
+            "status",
+            "created_by_username",
             "created_at",
         ]

@@ -2,6 +2,7 @@ from django.urls import path
 from .views import (
     AdminMetricsView,
     AdminUserTreeRoot,
+    AdminUserTreeDefaultRoot,
     AdminUserTreeChildren,
     AdminUsersList,
     AdminECouponBulkCreateView,
@@ -21,6 +22,7 @@ from .views import (
 urlpatterns = [
     path("metrics/", AdminMetricsView.as_view()),
     path("users/tree/root/", AdminUserTreeRoot.as_view()),
+    path("users/tree/default-root/", AdminUserTreeDefaultRoot.as_view()),
     path("users/tree/children/", AdminUserTreeChildren.as_view()),
     path("users/", AdminUsersList.as_view()),
 

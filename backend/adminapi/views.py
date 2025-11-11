@@ -10,7 +10,8 @@ from rest_framework import status
 
 from accounts.models import CustomUser, Wallet, WalletTransaction, UserKYC, WithdrawalRequest
 from coupons.models import Coupon, CouponCode, CouponSubmission, CouponBatch
-from uploads.models import FileUpload
+from uploads.models import FileUpload, DashboardCard, HomeCard, LuckyDrawSubmission
+from market.models import Product, PurchaseRequest, Banner, BannerItem, BannerPurchaseRequest
 from business.models import UserMatrixProgress, AutoPoolAccount
 from .permissions import IsAdminOrStaff
 from .serializers import AdminUserNodeSerializer, AdminKYCSerializer, AdminWithdrawalSerializer, AdminMatrixProgressSerializer
@@ -89,6 +90,26 @@ class AdminMetricsView(APIView):
             "failed": 0,
         }
 
+        # Uploads models
+        uploads_models_block = {
+            "dashboardCards": DashboardCard.objects.count(),
+            "homeCards": HomeCard.objects.count(),
+            "luckyDrawSubmissions": LuckyDrawSubmission.objects.count(),
+            "luckyDrawPendingTRE": LuckyDrawSubmission.objects.filter(status="SUBMITTED").count(),
+            "luckyDrawPendingAgency": LuckyDrawSubmission.objects.filter(status="TRE_APPROVED").count(),
+        }
+
+        # Market
+        market_block = {
+            "products": Product.objects.count(),
+            "purchaseRequests": PurchaseRequest.objects.count(),
+            "purchaseRequestsPending": PurchaseRequest.objects.filter(status=PurchaseRequest.STATUS_PENDING).count(),
+            "banners": Banner.objects.count(),
+            "bannerItems": BannerItem.objects.count(),
+            "bannerPurchaseRequests": BannerPurchaseRequest.objects.count(),
+            "bannerPurchaseRequestsPending": BannerPurchaseRequest.objects.filter(status=BannerPurchaseRequest.STATUS_PENDING).count(),
+        }
+
         return Response(
             {
                 "users": users_block,
@@ -96,6 +117,8 @@ class AdminMetricsView(APIView):
                 "withdrawals": withdrawals_block,
                 "coupons": coupons_block,
                 "uploads": uploads_block,
+                "uploadsModels": uploads_models_block,
+                "market": market_block,
             },
             status=status.HTTP_200_OK,
         )
@@ -127,6 +150,7 @@ class AdminUserTreeRoot(APIView):
                 Q(username__iexact=identifier)
                 | Q(email__iexact=identifier)
                 | Q(unique_id__iexact=identifier)
+                | Q(prefixed_id__iexact=identifier)
                 | Q(sponsor_id__iexact=identifier)
             )
             if digits:
@@ -142,6 +166,43 @@ class AdminUserTreeRoot(APIView):
             .annotate(
                 direct_count=Count("registrations", distinct=True),
             )
+            .first()
+        )
+        has_children = (getattr(node, "direct_count", 0) or 0) > 0
+
+        data = AdminUserNodeSerializer({
+            "id": user.id,
+            "username": user.username,
+            "full_name": user.full_name,
+            "role": user.role,
+            "category": user.category,
+            "phone": user.phone,
+            "state": user.state,
+            "pincode": user.pincode,
+            "direct_count": getattr(node, "direct_count", 0) or 0,
+            "has_children": has_children,
+        }).data
+        return Response(data, status=200)
+
+
+class AdminUserTreeDefaultRoot(APIView):
+    """
+    Return default root user for hierarchy tree (first superuser by id; fallback to first staff; else earliest user).
+    """
+    permission_classes = [IsAdminOrStaff]
+
+    def get(self, request):
+        user = (
+            CustomUser.objects.filter(is_superuser=True).order_by("id").first()
+            or CustomUser.objects.filter(is_staff=True).order_by("id").first()
+            or CustomUser.objects.order_by("id").first()
+        )
+        if not user:
+            return Response({"detail": "No users found"}, status=404)
+
+        node = (
+            CustomUser.objects.filter(id=user.id)
+            .annotate(direct_count=Count("registrations", distinct=True))
             .first()
         )
         has_children = (getattr(node, "direct_count", 0) or 0) > 0

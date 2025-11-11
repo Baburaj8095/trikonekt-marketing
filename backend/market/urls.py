@@ -10,6 +10,7 @@ from .views import (
     BannerItemDetail,
     BannerPurchaseRequestListCreate,
     BannerPurchaseRequestStatusUpdate,
+    BannerPurchaseRequestAllList,
 )
 
 # Support both with and without trailing slash
@@ -31,4 +32,6 @@ urlpatterns = [
     # Banner Item Purchase Requests
     re_path(r"^banners/(?P<banner_id>\d+)/items/(?P<item_id>\d+)/purchase-requests/?$", BannerPurchaseRequestListCreate.as_view(), name="banner-item-purchase-request-list-create"),
     re_path(r"^banners/purchase-requests/(?P<pk>\d+)/?$", BannerPurchaseRequestStatusUpdate.as_view(), name="banner-item-purchase-request-status"),
+    # Admin-only: list all banner purchase requests
+    re_path(r"^banners/purchase-requests/?$", BannerPurchaseRequestAllList.as_view(), name="banner-item-purchase-requests-all"),
 ]

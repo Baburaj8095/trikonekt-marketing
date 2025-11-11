@@ -1,0 +1,14 @@
+{% load humanize %}
+<div class="card-grid">
+  {% for c in cards %}
+  <a class="card" href="{{ c.url|default:'#' }}" style="--card-color: var(--color-{{ c.color|default:'primary' }});">
+    <div class="card-icon">
+      <i class="{{ c.icon_class }}" aria-hidden="true"></i>
+    </div>
+    <div class="card-content">
+      <div class="card-title">{{ c.title }}</div>
+      <div class="card-value">{{ c.value|intcomma }}</div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
