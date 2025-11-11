@@ -23,8 +23,8 @@
   /* Sidebar palette */
   --sidebar-bg: #0f172a;
   --sidebar-border: #0b1220;
-  --sidebar-text: #cbd5e1;
-  --sidebar-muted: #94a3b8;
+  --sidebar-text: #ffffff;
+  --sidebar-muted: #e2e8f0;
   --sidebar-active: #0ea5e9;
   --sidebar-active-bg: rgba(14,165,233,0.12);
   --sidebar-active-border: rgba(14,165,233,0.35);
@@ -155,9 +155,10 @@ body {
 #content {
   background: var(--bg);
   color: var(--text);
-  padding: 16px;
-  max-width: 1400px;
-  margin: 0 auto;
+  /* Content aligned to screen start with comfortable breathing space */
+  padding: 16px 20px 24px 20px;
+  max-width: 100%;
+  margin: 0;
   overflow-x: auto;
   overflow-wrap: anywhere;
 }
@@ -221,6 +222,7 @@ tbody tr:hover {
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   color: #0f172a;
+  display: none !important;
 }
 #changelist-search input[type="text"] {
   background: #ffffff;
@@ -465,7 +467,12 @@ body.with-sidebar #container {
   height: 100%;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.5) transparent;
 }
 
 .sidebar-section {
@@ -498,6 +505,25 @@ body.with-sidebar #container {
 .sidebar-link:hover,
 .sidebar-sublink:hover {
   background: rgba(255,255,255,0.04);
+}
+
+/* Ensure high-contrast text color in sidebar */
+.admin-sidebar a,
+.admin-sidebar a:link,
+.admin-sidebar a:visited {
+  color: #ffffff;
+}
+.admin-sidebar .sidebar-link,
+.admin-sidebar .sidebar-sublink,
+.admin-sidebar .sidebar-text,
+.admin-sidebar .sidebar-icon {
+  color: #ffffff;
+}
+
+/* Preserve active state color for emphasis */
+.sidebar-item.active > .sidebar-link,
+.sidebar-subitem.active > .sidebar-sublink {
+  color: var(--sidebar-active);
 }
 
 .sidebar-item.active > .sidebar-link {
@@ -693,4 +719,222 @@ body.login #content { margin-left: 0 !important; }
   body.sidebar-collapsed .admin-sidebar {
     transform: translateX(-100%);
   }
+}
+
+/* ================================
+   Responsive fixes and visibility
+   ================================ */
+
+/* JS will set this according to header height, fallback 56px */
+:root { --admin-header-h: 56px; }
+
+/* Keep the object-tools (Add button) visible and accessible on all viewports */
+#content .object-tools {
+  /* Keep the Add button area inside the flow, above the table, right-aligned */
+  position: static;
+  top: auto;
+  z-index: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  background: transparent;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  margin: 0 0 10px 0;
+  float: right; /* align to right on wide screens */
+}
+#content .object-tools li { margin: 0; }
+#content .object-tools a.addlink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+@media (max-width: 640px) {
+  #content .object-tools {
+    float: none;            /* stack naturally on mobile */
+    justify-content: flex-start;
+  }
+}
+
+/* Ensure changelist and inline tables scroll horizontally on smaller screens */
+#changelist-form .results,
+.inline-group .tabular {
+  overflow-x: auto;
+  display: block;
+  clear: both;     /* ensure lists/tables do not overlap object-tools */
+  margin-top: 8px; /* breathing space below the Add button row */
+}
+#changelist-form .results table,
+.inline-group .tabular table,
+.results table {
+  min-width: 900px;
+  width: 100%;
+}
+
+/* Responsive form rows: stack labels and fields on narrow screens */
+@media (max-width: 900px) {
+  .aligned .form-row {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .aligned .form-row > div,
+  .aligned .form-row > label {
+    width: 100% !important;
+    float: none !important;
+  }
+}
+
+/* Keep submit row visible when forms are long */
+.submit-row {
+  position: sticky;
+  bottom: 0;
+  z-index: 1301;
+  background: #fff;
+}
+
+/* Ensure headings don't overlap under sticky header */
+#content h1 { margin-top: 8px; }
+
+/* Align object-tools to the right within centered content */
+#content .object-tools { margin-left: auto; }
+
+/* Changelist container styling and spacing */
+.change-list #changelist {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 12px 12px 12px; /* more top padding for Add button overlap */
+  position: relative;
+  margin-top: 6px;
+}
+
+/* Place Add button beside search inside the toolbar */
+@media (min-width: 0) {
+  /* Regular padding on card; no extra space reserved for absolute button */
+  .change-list #changelist { padding-top: 16px; }
+
+  /* When the Add button is moved into the toolbar, keep it aligned to the right */
+  .change-list #toolbar .object-tools {
+    position: static !important;
+    top: auto;
+    right: auto;
+    margin: 0 0 0 auto; /* push to right within toolbar row */
+    float: none;
+    background: transparent;
+    padding: 0;
+    border: 0;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    list-style: none; /* ensure no bullets when inside toolbar */
+  }
+}
+
+/* On small screens, keep it above the card naturally */
+@media (max-width: 640px) {
+  .change-list #content .object-tools {
+    margin: 0 0 8px 0;
+  }
+}
+
+/* Search/action toolbar spacing */
+.change-list #toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.change-list #toolbar form #searchbar {
+  min-width: 220px;
+}
+
+/* Paginator spacing */
+#changelist .paginator {
+  margin-top: 12px;
+}
+
+/* Ensure two-column layouts collapse to a single column and align content to screen start */
+#content-main, #content-related {
+  float: none;
+  width: auto;
+  margin: 0;
+  padding: 0;
+}
+
+/* Tables take full available width without hugging the edges */
+#content table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* Comfortable header spacing within content */
+#content h1 {
+  margin: 8px 0 12px;
+}
+
+/* Header responsiveness tweaks */
+#branding .brand-wrap { min-width: 0; }
+.brand-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: clamp(120px, 30vw, 320px);
+}
+
+/* Breadcrumbs responsive alignment */
+.breadcrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+}
+
+/* Responsive sizing for header elements */
+@media (max-width: 900px) {
+  #header { gap: 8px; padding: 6px 10px; }
+  .brand-logo { height: 24px; }
+  .brand-text { font-size: 16px; }
+}
+
+/* Stack header rows on small screens, keep actions accessible */
+@media (max-width: 640px) {
+  #branding, #user-tools { width: 100%; }
+  #branding { order: 0; }
+  #user-tools { order: 1; justify-content: flex-end; }
+  .brand-text { display: none; } /* keep logo + menu visible */
+  #content h1 { font-size: 18px; }
+}
+
+/* ------------------------------
+   Header user tools and theme
+   ------------------------------ */
+
+/* Force default theme to light at CSS level */
+html, :root { color-scheme: light; }
+@media (prefers-color-scheme: dark) {
+  html, :root { color-scheme: light; }
+}
+
+/* Ensure Logout and header links are visible (black/dark text) */
+#header #user-tools a,
+#header #user-tools a:link,
+#header #user-tools a:visited {
+  color: #0f172a !important; /* dark text */
+  font-weight: 600;
+}
+#header #user-tools a:hover { color: #000000 !important; }
+
+/* Hide any theme toggle control if present */
+#header .theme-toggle,
+#user-tools .theme-toggle,
+button[aria-label="Switch theme"],
+a[aria-label="Switch theme"],
+[data-theme-toggle] {
+  display: none !important;
 }

@@ -50,6 +50,9 @@ import AdminHomeCards from "./pages/admin/AdminHomeCards";
 import AdminLuckyDraw from "./pages/admin/AdminLuckyDraw";
 import Profile from "./pages/Profile";
 import RoleSelect from "./pages/Auth/RoleSelect";
+import ReferAndEarnPage from "./pages/ReferAndEarn";
+import WealthGalaxy from "./pages/WealthGalaxy";
+import AppHub from "./pages/AppHub";
 
 function App() {
   return (
@@ -131,6 +134,26 @@ function App() {
             <ProtectedRoute allowedRoles={["user"]}>
               <ConsumerShell>
                 <MyTeam />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/wealth-galaxy"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <WealthGalaxy />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/app-hub"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <AppHub />
               </ConsumerShell>
             </ProtectedRoute>
           }
@@ -272,6 +295,16 @@ function App() {
           }
         />
 
+        <Route
+          path="/user/refer-earn"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <ReferAndEarnPage />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
         {/* Marketplace (Public + Consumer) */}
         <Route path="/marketplace" element={<ConsumerShell><Marketplace /></ConsumerShell>} />
         <Route path="/marketplace/products/:id" element={<ConsumerShell><ProductDetails /></ConsumerShell>} />

@@ -36,7 +36,7 @@
     {% if ADMIN_BRAND.logo_static_path %}
       <img src="{% static ADMIN_BRAND.logo_static_path %}" alt="{{ site_header|default:'Admin' }}" class="brand-logo">
     {% else %}
-      <span class="brand-text">{{ site_header|default:ADMIN_BRAND.name|default:"Admin" }}</span>
+      <!-- brand text removed -->
     {% endif %}
   </a>
   {% if request.user.is_authenticated %}

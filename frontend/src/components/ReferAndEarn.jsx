@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Box, Paper, Typography, Stack, Button, Alert } from "@mui/material";
 
-export default function ReferAndEarn({ title = "Refer & Earn" }) {
+export default function ReferAndEarn({ title = "Refer & Earn", onlyConsumer = false }) {
   const [msg, setMsg] = useState("");
 
   const user = useMemo(() => {
@@ -94,7 +94,7 @@ export default function ReferAndEarn({ title = "Refer & Earn" }) {
       ) : null}
 
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ flexWrap: "wrap" }}>
-        {(renderMode === "all" || renderMode === "emp") && (
+        {(onlyConsumer || renderMode === "all" || renderMode === "emp") && (
           <Button
             variant="contained"
             onClick={() => copy(links.consumer)}
@@ -104,7 +104,7 @@ export default function ReferAndEarn({ title = "Refer & Earn" }) {
           </Button>
         )}
 
-        {(renderMode === "all" || renderMode === "sf") && (
+        {!onlyConsumer && (renderMode === "all" || renderMode === "sf") && (
           <Button
             variant="contained"
             onClick={() => copy(links.employee)}
@@ -114,7 +114,7 @@ export default function ReferAndEarn({ title = "Refer & Earn" }) {
           </Button>
         )}
 
-        {renderMode === "all" && (
+        {!onlyConsumer && renderMode === "all" && (
           <Button
             variant="contained"
             onClick={() => copy(links.subFranchise)}

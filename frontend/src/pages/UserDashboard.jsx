@@ -18,6 +18,7 @@ import {
 } from "@mui/material";
 import API from "../api/api";
 import LOGO from "../assets/TRIKONEKT.png";
+import banner_wg from "../assets/banner_wg.jpg"
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import MenuIcon from "@mui/icons-material/Menu";
@@ -46,6 +47,19 @@ export default function UserDashboard({ embedded = false }) {
   const isWallet = location.pathname === "/user/wallet";
   const isKYC = location.pathname === "/user/kyc";
   const isMyTeam = location.pathname === "/user/my-team";
+
+  const [selectedMenu, setSelectedMenu] = useState('dashboard');
+
+  useEffect(() => {
+    if (isDashboard) setSelectedMenu('dashboard');
+    else if (isLuckyDraw) setSelectedMenu('lucky-draw');
+    else if (isMarketplace) setSelectedMenu('marketplace');
+    else if (isMyOrders) setSelectedMenu('my-orders');
+    else if (isECoupon) setSelectedMenu('e-coupon');
+    else if (isWallet) setSelectedMenu('wallet');
+    else if (isKYC) setSelectedMenu('kyc');
+    else if (isMyTeam) setSelectedMenu('my-team');
+  }, [isDashboard, isLuckyDraw, isMarketplace, isMyOrders, isECoupon, isWallet, isKYC, isMyTeam]);
 
   const storedUser = useMemo(() => {
     try {
@@ -106,20 +120,102 @@ export default function UserDashboard({ embedded = false }) {
 
   const MEDIA_BASE = (API?.defaults?.baseURL || "").replace(/\/api\/?$/, "");
 
+  const WealthGalaxy = () => (
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h4" sx={{ mb: 2 }}>Download Our My Wealth Galaxy Customer App Now</Typography>
+      <Typography variant="body1" sx={{ mb: 2 }}>Download our app for the fastest, most convenient way to send Recharge.</Typography>
+      <Typography variant="h6" sx={{ mb: 1 }}>Customer App Features:</Typography>
+      <Box component="ul" sx={{ pl: 3, mb: 3 }}>
+        <li>Recharges</li>
+        <li>DTH Bills</li>
+        <li>Utility Bills</li>
+        <li>Nearest Merchants</li>
+        <li>Make payment to the merchants</li>
+        <li>Rewards</li>
+        <li>Knowledge Galaxy</li>
+        <li>Refer & Earn</li>
+      </Box>
+      <Grid container spacing={2}>
+        <Grid item xs={12} sm={6} md={3}>
+          <Box
+            component="img"
+            src="https://via.placeholder.com/300x100?text=Download+on+App+Store"
+            alt="App Store"
+            sx={{ width: '100%', cursor: 'pointer' }}
+            onClick={() => window.open('https://apps.apple.com/in/app/my-wealth-galaxy/id6473733826', '_blank')}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Box
+            component="img"
+            src="https://via.placeholder.com/300x100?text=Download+on+App+Store"
+            alt="App Store"
+            sx={{ width: '100%', cursor: 'pointer' }}
+            onClick={() => window.open('https://apps.apple.com/in/app/my-wealth-galaxy/id6473733826', '_blank')}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Box
+            component="img"
+            src="https://via.placeholder.com/300x100?text=Get+it+on+Google+Play"
+            alt="Google Play"
+            sx={{ width: '100%', cursor: 'pointer' }}
+            onClick={() => window.open('https://play.google.com/store/apps/details?id=com.mywealth.galaxy', '_blank')}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Box
+            component="img"
+            src="https://via.placeholder.com/300x100?text=Get+it+on+Google+Play"
+            alt="Google Play"
+            sx={{ width: '100%', cursor: 'pointer' }}
+            onClick={() => window.open('https://play.google.com/store/apps/details?id=com.mywealth.galaxy', '_blank')}
+          />
+        </Grid>
+      </Grid>
+    </Box>
+  );
 
   if (embedded) {
     return (
       <Box sx={{ p: { xs: 2, md: 3 } }}>
-        <ReferAndEarn title="Refer & Earn" />
+        {/* Banner */}
+        <Box
+          sx={{
+            position: "relative",
+            width: "100%",
+            height: { xs: 260, sm: 280, md: 600 },
+            borderRadius: 3,
+            overflow: "hidden",
+            mb: 2,
+            boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
+           
+            background: `linear-gradient(rgba(12,45,72,0.35), rgba(12,45,72,0.35)), url(${banner_wg})`,
+            backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+          }}
+        >
+          <Box sx={{ position: "absolute", bottom: 16, left: 16, color: "#fff" }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+              Welcome, {displayName}
+            </Typography>
+            <Typography variant="body2" sx={{ opacity: 0.9 }}>
+              Explore offers, redeem coupons and more
+            </Typography>
+          </Box>
+        </Box>
         <Typography variant="h5" sx={{ mb: 2, fontWeight: 700, color: "#0C2D48" }}>
-          Welcome
+          Welcome to Trikonekt Explore Market Place, Trikonekt Products
         </Typography>
         {loading ? (
           <Typography variant="body1" sx={{ color: "text.secondary" }}>
             Loading cards...
           </Typography>
         ) : (
+          
           <Grid container spacing={2}>
+            
             {computedCards
               .filter((c) => c.is_active !== false)
               .map((card) => (
@@ -218,28 +314,31 @@ export default function UserDashboard({ embedded = false }) {
         <Toolbar />
         <Box sx={{ overflow: "auto" }}>
           <List>
-            <ListItemButton selected={isDashboard} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => { navigate("/user/dashboard"); setMobileOpen(false); }}>
+            <ListItemButton selected={selectedMenu === 'dashboard'} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => { navigate("/user/dashboard"); setMobileOpen(false); }}>
               <ListItemText primary="Dashboard" />
             </ListItemButton>
-            <ListItemButton selected={isLuckyDraw} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => { navigate("/user/lucky-draw"); setMobileOpen(false); }}>
+            <ListItemButton selected={selectedMenu === 'wealth-galaxy'} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => { setSelectedMenu('wealth-galaxy'); setMobileOpen(false); }}>
+              <ListItemText primary="Wealth Galaxy" />
+            </ListItemButton>
+            <ListItemButton selected={selectedMenu === 'lucky-draw'} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => { navigate("/user/lucky-draw"); setMobileOpen(false); }}>
               <ListItemText primary="Participate Lucky Draw" />
             </ListItemButton>
-            <ListItemButton selected={isMarketplace} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => { navigate("/marketplace"); setMobileOpen(false); }}>
+            <ListItemButton selected={selectedMenu === 'marketplace'} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => { navigate("/marketplace"); setMobileOpen(false); }}>
               <ListItemText primary="Marketplace" />
             </ListItemButton>
-            <ListItemButton selected={isECoupon} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => { navigate("/user/redeem-coupon"); setMobileOpen(false); }}>
+            <ListItemButton selected={selectedMenu === 'e-coupon'} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => { navigate("/user/redeem-coupon"); setMobileOpen(false); }}>
               <ListItemText primary="E-Coupon" />
             </ListItemButton>
-            <ListItemButton selected={isWallet} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => { navigate("/user/wallet"); setMobileOpen(false); }}>
+            <ListItemButton selected={selectedMenu === 'wallet'} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => { navigate("/user/wallet"); setMobileOpen(false); }}>
               <ListItemText primary="Wallet" />
             </ListItemButton>
-            <ListItemButton selected={isKYC} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => { navigate("/user/kyc"); setMobileOpen(false); }}>
+            <ListItemButton selected={selectedMenu === 'kyc'} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => { navigate("/user/kyc"); setMobileOpen(false); }}>
               <ListItemText primary="KYC" />
             </ListItemButton>
-            <ListItemButton selected={isMyTeam} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => { navigate("/user/my-team"); setMobileOpen(false); }}>
+            <ListItemButton selected={selectedMenu === 'my-team'} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => { navigate("/user/my-team"); setMobileOpen(false); }}>
               <ListItemText primary="My Team" />
             </ListItemButton>
-            <ListItemButton selected={isMyOrders} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => { navigate("/marketplace/my-orders"); setMobileOpen(false); }}>
+            <ListItemButton selected={selectedMenu === 'my-orders'} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => { navigate("/marketplace/my-orders"); setMobileOpen(false); }}>
               <ListItemText primary="My Orders" />
             </ListItemButton>
           </List>
@@ -266,28 +365,31 @@ export default function UserDashboard({ embedded = false }) {
         <Toolbar />
         <Box sx={{ overflow: "auto" }}>
           <List>
-            <ListItemButton selected={isDashboard} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => navigate("/user/dashboard")}>
+            <ListItemButton selected={selectedMenu === 'dashboard'} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => navigate("/user/dashboard")}>
               <ListItemText primary="Dashboard" />
             </ListItemButton>
-            <ListItemButton selected={isLuckyDraw} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => navigate("/user/lucky-draw")}>
+            <ListItemButton selected={selectedMenu === 'wealth-galaxy'} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => setSelectedMenu('wealth-galaxy')}>
+              <ListItemText primary="Wealth Galaxy" />
+            </ListItemButton>
+            <ListItemButton selected={selectedMenu === 'lucky-draw'} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => navigate("/user/lucky-draw")}>
               <ListItemText primary="Participate Lucky Draw" />
             </ListItemButton>
-            <ListItemButton selected={isMarketplace} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => navigate("/marketplace")}>
+            <ListItemButton selected={selectedMenu === 'marketplace'} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => navigate("/marketplace")}>
               <ListItemText primary="Marketplace" />
             </ListItemButton>
-            <ListItemButton selected={isECoupon} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => navigate("/user/redeem-coupon")}>
+            <ListItemButton selected={selectedMenu === 'e-coupon'} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => navigate("/user/redeem-coupon")}>
               <ListItemText primary="E-Coupon" />
             </ListItemButton>
-            <ListItemButton selected={isWallet} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => navigate("/user/wallet")}>
+            <ListItemButton selected={selectedMenu === 'wallet'} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => navigate("/user/wallet")}>
               <ListItemText primary="Wallet" />
             </ListItemButton>
-            <ListItemButton selected={isKYC} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => navigate("/user/kyc")}>
+            <ListItemButton selected={selectedMenu === 'kyc'} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => navigate("/user/kyc")}>
               <ListItemText primary="KYC" />
             </ListItemButton>
-            <ListItemButton selected={isMyTeam} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => navigate("/user/my-team")}>
+            <ListItemButton selected={selectedMenu === 'my-team'} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => navigate("/user/my-team")}>
               <ListItemText primary="My Team" />
             </ListItemButton>
-            <ListItemButton selected={isMyOrders} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => navigate("/marketplace/my-orders")}>
+            <ListItemButton selected={selectedMenu === 'my-orders'} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => navigate("/marketplace/my-orders")}>
               <ListItemText primary="My Orders" />
             </ListItemButton>
           </List>
@@ -308,55 +410,79 @@ export default function UserDashboard({ embedded = false }) {
         }}
       >
         <Toolbar />
-        <ReferAndEarn title="Refer & Earn" />
-        <Typography variant="h5" sx={{ mb: 2, fontWeight: 700, color: "#0C2D48" }}>
-          Welcome
-        </Typography>
+        {selectedMenu === 'wealth-galaxy' ? <WealthGalaxy /> : (
+          <>
+            {/* Banner */}
+            <Box
+              sx={{
+                position: "relative",
+                width: "100%",
+                height: { xs: 140, sm: 180, md: 220 },
+                borderRadius: 3,
+                overflow: "hidden",
+                mb: 2,
+                boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
+                background: `linear-gradient(rgba(12,45,72,0.35), rgba(12,45,72,0.35)), url(${LOGO}) center/cover no-repeat`,
+              }}
+            >
+              <Box sx={{ position: "absolute", bottom: 16, left: 16, color: "#fff" }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+                  Welcome, {displayName}
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                  Explore offers, redeem coupons and more
+                </Typography>
+              </Box>
+            </Box>
+            <Typography variant="h5" sx={{ mb: 2, fontWeight: 700, color: "#0C2D48" }}>
+              Welcome
+            </Typography>
 
-
-        {loading ? (
-          <Typography variant="body1" sx={{ color: "text.secondary" }}>
-            Loading cards...
-          </Typography>
-        ) : (
-          <Grid container spacing={2}>
-            {computedCards
-              .filter((c) => c.is_active !== false) // show if true or missing
-              .map((card) => (
-                <Grid item xs={12} sm={6} md={4} key={card.id || card.key}>
-                  <Card
-                    sx={{
-                      height: "100%",
-                      display: "flex",
-                      flexDirection: "column",
-                      borderRadius: 2,
-                      boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
-                    }}
-                  >
-                    {card.image && (
-                      <Box
-                        component="img"
-                        src={
-                          card.image?.startsWith("http")
-                            ? card.image
-                            : `${MEDIA_BASE}${card.image}`
-                        }
-                        alt={card.title}
-                        sx={{ width: "100%", height: 140, objectFit: "cover" }}
-                      />
-                    )}
-                    <CardContent sx={{ flexGrow: 1 }}>
-                      <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-                        {card.title}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {card.description || ""}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-          </Grid>
+            {loading ? (
+              <Typography variant="body1" sx={{ color: "text.secondary" }}>
+                Loading cards...
+              </Typography>
+            ) : (
+              <Grid container spacing={2}>
+                {computedCards
+                  .filter((c) => c.is_active !== false) // show if true or missing
+                  .map((card) => (
+                    <Grid item xs={12} sm={6} md={4} key={card.id || card.key}>
+                      <Card
+                        sx={{
+                          height: "100%",
+                          display: "flex",
+                          flexDirection: "column",
+                          borderRadius: 2,
+                          boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+                        }}
+                      >
+                        {card.image && (
+                          <Box
+                            component="img"
+                            src={
+                              card.image?.startsWith("http")
+                                ? card.image
+                                : `${MEDIA_BASE}${card.image}`
+                            }
+                            alt={card.title}
+                            sx={{ width: "100%", height: 140, objectFit: "cover" }}
+                          />
+                        )}
+                        <CardContent sx={{ flexGrow: 1 }}>
+                          <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+                            {card.title}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {card.description || ""}
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  ))}
+              </Grid>
+            )}
+          </>
         )}
       </Box>
     </Box>

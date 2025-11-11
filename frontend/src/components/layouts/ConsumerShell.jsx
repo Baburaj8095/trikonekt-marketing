@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   AppBar,
@@ -24,6 +24,9 @@ export default function ConsumerShell({ children }) {
 
   // Which items are selected
   const isDashboard = location.pathname === "/user/dashboard";
+  const isWealthGalaxy = location.pathname === "/user/wealth-galaxy";
+  const isAppHub = location.pathname === "/user/app-hub";
+  const isProfile = location.pathname === "/user/profile";
   const isLuckyDraw = location.pathname === "/user/lucky-draw";
   const isMarketplace =
     location.pathname === "/marketplace" || location.pathname.startsWith("/marketplace/");
@@ -32,7 +35,24 @@ export default function ConsumerShell({ children }) {
   const isWallet = location.pathname === "/user/wallet";
   const isKYC = location.pathname === "/user/kyc";
   const isMyTeam = location.pathname === "/user/my-team";
-  const isProfile = location.pathname === "/user/profile";
+  const isReferEarn = location.pathname === "/user/refer-earn";
+
+  const [selectedMenu, setSelectedMenu] = useState('dashboard');
+
+  useEffect(() => {
+    if (isDashboard) setSelectedMenu('dashboard');
+    else if (isWealthGalaxy) setSelectedMenu('wealth-galaxy');
+    else if (isAppHub) setSelectedMenu('app-hub');
+    else if (isProfile) setSelectedMenu('profile');
+    else if (isLuckyDraw) setSelectedMenu('lucky-draw');
+    else if (isMarketplace) setSelectedMenu('marketplace');
+    else if (isECoupon) setSelectedMenu('e-coupon');
+    else if (isWallet) setSelectedMenu('wallet');
+    else if (isKYC) setSelectedMenu('kyc');
+    else if (isMyTeam) setSelectedMenu('my-team');
+    else if (isMyOrders) setSelectedMenu('my-orders');
+    else if (isReferEarn) setSelectedMenu('refer-earn');
+  }, [isDashboard, isWealthGalaxy, isAppHub, isProfile, isLuckyDraw, isMarketplace, isECoupon, isWallet, isKYC, isMyTeam, isMyOrders, isReferEarn]);
 
   const storedUser = useMemo(() => {
     try {
@@ -65,7 +85,7 @@ export default function ConsumerShell({ children }) {
     <Box sx={{ overflow: "auto" }}>
       <List>
         <ListItemButton
-          selected={isDashboard}
+          selected={selectedMenu === 'dashboard'}
           sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
           onClick={() => {
             navigate("/user/dashboard");
@@ -75,7 +95,27 @@ export default function ConsumerShell({ children }) {
           <ListItemText primary="Dashboard" />
         </ListItemButton>
         <ListItemButton
-          selected={isProfile}
+          selected={selectedMenu === 'wealth-galaxy'}
+          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+          onClick={() => {
+            navigate("/user/wealth-galaxy");
+            setMobileOpen(false);
+          }}
+        >
+          <ListItemText primary="Wealth Galaxy" />
+        </ListItemButton>
+        <ListItemButton
+          selected={selectedMenu === 'app-hub'}
+          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+          onClick={() => {
+            navigate("/user/app-hub");
+            setMobileOpen(false);
+          }}
+        >
+          <ListItemText primary="App Hub" />
+        </ListItemButton>
+        <ListItemButton
+          selected={selectedMenu === 'profile'}
           sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
           onClick={() => {
             navigate("/user/profile");
@@ -85,7 +125,7 @@ export default function ConsumerShell({ children }) {
           <ListItemText primary="Profile" />
         </ListItemButton>
         <ListItemButton
-          selected={isLuckyDraw}
+          selected={selectedMenu === 'lucky-draw'}
           sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
           onClick={() => {
             navigate("/user/lucky-draw");
@@ -95,7 +135,7 @@ export default function ConsumerShell({ children }) {
           <ListItemText primary="Participate Lucky Draw" />
         </ListItemButton>
         <ListItemButton
-          selected={isMarketplace}
+          selected={selectedMenu === 'marketplace'}
           sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
           onClick={() => {
             navigate("/marketplace");
@@ -105,7 +145,7 @@ export default function ConsumerShell({ children }) {
           <ListItemText primary="Marketplace" />
         </ListItemButton>
         <ListItemButton
-          selected={isECoupon}
+          selected={selectedMenu === 'e-coupon'}
           sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
           onClick={() => {
             navigate("/user/redeem-coupon");
@@ -115,7 +155,7 @@ export default function ConsumerShell({ children }) {
           <ListItemText primary="E-Coupon" />
         </ListItemButton>
         <ListItemButton
-          selected={isWallet}
+          selected={selectedMenu === 'wallet'}
           sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
           onClick={() => {
             navigate("/user/wallet");
@@ -125,7 +165,7 @@ export default function ConsumerShell({ children }) {
           <ListItemText primary="Wallet" />
         </ListItemButton>
         <ListItemButton
-          selected={isKYC}
+          selected={selectedMenu === 'kyc'}
           sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
           onClick={() => {
             navigate("/user/kyc");
@@ -135,7 +175,7 @@ export default function ConsumerShell({ children }) {
           <ListItemText primary="KYC" />
         </ListItemButton>
         <ListItemButton
-          selected={isMyTeam}
+          selected={selectedMenu === 'my-team'}
           sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
           onClick={() => {
             navigate("/user/my-team");
@@ -145,7 +185,7 @@ export default function ConsumerShell({ children }) {
           <ListItemText primary="My Team" />
         </ListItemButton>
         <ListItemButton
-          selected={isMyOrders}
+          selected={selectedMenu === 'my-orders'}
           sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
           onClick={() => {
             navigate("/marketplace/my-orders");
@@ -153,6 +193,16 @@ export default function ConsumerShell({ children }) {
           }}
         >
           <ListItemText primary="My Orders" />
+        </ListItemButton>
+        <ListItemButton
+          selected={selectedMenu === 'refer-earn'}
+          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+          onClick={() => {
+            navigate("/user/refer-earn");
+            setMobileOpen(false);
+          }}
+        >
+          <ListItemText primary="Refer & Earn" />
         </ListItemButton>
       </List>
       <Divider />
@@ -188,13 +238,27 @@ export default function ConsumerShell({ children }) {
         variant="temporary"
         open={mobileOpen}
         onClose={handleDrawerToggle}
-        ModalProps={{ keepMounted: true }}
+        ModalProps={{
+          keepMounted: true, // Better open performance on mobile
+        }}
         sx={{
           display: { xs: "block", sm: "none" },
-          "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box", borderRight: "1px solid #e5e7eb" },
+          "& .MuiDrawer-paper": {
+            width: drawerWidth,
+            boxSizing: "border-box",
+            borderRight: "1px solid #e5e7eb",
+            // Add mobile-specific styling
+            backgroundColor: "#ffffff",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+          },
         }}
       >
-        <Toolbar />
+        <Toolbar
+          sx={{
+            minHeight: { xs: 56, sm: 64 }, // Smaller toolbar on mobile
+            px: 2,
+          }}
+        />
         {DrawerContent}
       </Drawer>
 
@@ -205,7 +269,12 @@ export default function ConsumerShell({ children }) {
           width: drawerWidth,
           flexShrink: 0,
           display: { xs: "none", sm: "block" },
-          "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box", borderRight: "1px solid #e5e7eb" },
+          "& .MuiDrawer-paper": {
+            width: drawerWidth,
+            boxSizing: "border-box",
+            borderRight: "1px solid #e5e7eb",
+            backgroundColor: "#ffffff",
+          },
         }}
         open
       >
@@ -214,9 +283,19 @@ export default function ConsumerShell({ children }) {
       </Drawer>
 
       {/* Main content */}
-      <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, md: 3 } }}>
-        <Toolbar />
-        {children}
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          p: { xs: 1.5, sm: 2, md: 3 }, // Better mobile padding
+          minHeight: '100vh',
+          backgroundColor: '#f7f9fb',
+        }}
+      >
+        <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }} />
+        <Box sx={{ maxWidth: '100%', overflow: 'hidden' }}>
+          {children}
+        </Box>
       </Box>
     </Box>
   );

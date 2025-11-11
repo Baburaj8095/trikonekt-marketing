@@ -50,6 +50,26 @@
       console.error("Failed to mount React widget:", e);
     }
   }
+  // Compute sticky header height CSS var for proper sticky positioning
+  function setHeaderHeightVar() {
+    try {
+      var header = document.getElementById("header");
+      if (header && header.offsetHeight) {
+        document.documentElement.style.setProperty("--admin-header-h", header.offsetHeight + "px");
+      }
+    } catch (e) {}
+  }
+  function debounce(fn, wait) {
+    var t;
+    return function () {
+      clearTimeout(t);
+      var args = arguments, self = this;
+      t = setTimeout(function () { fn.apply(self, args); }, wait);
+    };
+  }
+  setHeaderHeightVar();
+  window.addEventListener("resize", debounce(setHeaderHeightVar, 150));
+
   // Sidebar behavior
   const body = document.body;
   const sidebarToggle = document.getElementById("sidebarToggle");
@@ -166,6 +186,36 @@
       });
     });
   }
+
+  // Move "Add" button (object-tools) beside the search inside the changelist toolbar
+  function moveObjectToolsIntoToolbar() {
+    try {
+      var isChangeList = document.body.classList.contains("change-list") || document.querySelector("#changelist");
+      if (!isChangeList) return;
+
+      var toolbar = document.querySelector("#changelist #toolbar, #toolbar");
+      var objTools = document.querySelector("#content .object-tools");
+      if (!toolbar || !objTools) return;
+
+      // Avoid duplicate moves
+      if (toolbar.contains(objTools)) return;
+
+      // Normalize when placed in toolbar (styling handled in CSS)
+      objTools.classList.add("object-tools-in-toolbar");
+
+      // Append to toolbar so it sits to the right of the search bar
+      toolbar.appendChild(objTools);
+    } catch (e) {}
+  }
+
+  // Run once on load and DOM readiness (ensure toolbar is present)
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", moveObjectToolsIntoToolbar);
+  } else {
+    moveObjectToolsIntoToolbar();
+  }
+  window.addEventListener("load", moveObjectToolsIntoToolbar);
+  setTimeout(moveObjectToolsIntoToolbar, 0);
 
   window.addEventListener("resize", initSidebar);
   initSidebar();
