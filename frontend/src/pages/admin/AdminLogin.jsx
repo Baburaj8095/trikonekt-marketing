@@ -66,15 +66,35 @@ export default function AdminLogin() {
         return;
       }
 
-      const storage = remember ? localStorage : sessionStorage;
-      storage.setItem("token", access);
-      if (refreshTok) storage.setItem("refresh", refreshTok);
-      if (payload?.role) storage.setItem("role", payload.role);
+      // Namespaced persistent admin session (separate from other roles)
+      const ns = "admin";
+      try {
+        localStorage.setItem(`token_${ns}`, access);
+        if (refreshTok) localStorage.setItem(`refresh_${ns}`, refreshTok);
+        if (payload?.role) localStorage.setItem(`role_${ns}`, payload.role);
+        // Minimal user fallback to prevent undefined username access before /accounts/me/ resolves
+        localStorage.setItem(`user_${ns}`, JSON.stringify({
+          username: payload?.username || "",
+          full_name: payload?.full_name || "",
+          role: payload?.role || "admin",
+        }));
+        // Remove any old non-namespaced keys to avoid cross-role contamination
+        try {
+          localStorage.removeItem("token");
+          localStorage.removeItem("refresh");
+          localStorage.removeItem("role");
+          localStorage.removeItem("user");
+          sessionStorage.removeItem("token");
+          sessionStorage.removeItem("refresh");
+          sessionStorage.removeItem("role");
+          sessionStorage.removeItem("user");
+        } catch (_) {}
+      } catch (_) {}
 
       try {
         const meResp = await API.get("/accounts/me/");
         if (meResp?.data) {
-          storage.setItem("user", JSON.stringify(meResp.data));
+          localStorage.setItem(`user_${ns}`, JSON.stringify(meResp.data));
         }
       } catch {
         // best-effort

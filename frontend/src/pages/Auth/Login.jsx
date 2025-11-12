@@ -126,6 +126,7 @@ const Login = () => {
   const [branches, setBranches] = useState([]);
   const [branchLoading, setBranchLoading] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState(null);
+  const [branchDisabled, setBranchDisabled] = useState(false);
   const [stateVal, setStateVal] = useState("");
   const [countryVal, setCountryVal] = useState("");
   const [cityOptions, setCityOptions] = useState([]);
@@ -151,8 +152,6 @@ const Login = () => {
   const [consumerSelectedDistrict, setConsumerSelectedDistrict] = useState("");
 const [consumerDistrictPincodes, setConsumerDistrictPincodes] = useState([]);
 const [consumerPinsByState, setConsumerPinsByState] = useState([]);
-const [businessPincodes, setBusinessPincodes] = useState([]);
-const [businessPinLoading, setBusinessPinLoading] = useState(false);
 
   // Normalize sponsor input to avoid passing URLs or malformed strings to the API
   const normalizeSponsor = (val) => {
@@ -295,19 +294,20 @@ const [businessPinLoading, setBusinessPinLoading] = useState(false);
   };
 
   useEffect(() => {
-    // Only auto-lookup pincode during Register for non-agency/non-business flows
-    if (mode !== "register" || role === "agency" || role === "business") {
-      return;
-    }
-    // Do NOT call pincode lookup when consumer/employee registration is sponsor-driven
-    if ((role === "user" || role === "employee") && sponsorId) {
-      return;
-    }
+    if (mode !== "register" || role === "agency") return;
     const code = (pincode || "").trim();
     if (code.replace(/\D/g, "").length === 6) {
       fetchFromBackendPin(code);
     }
-  }, [pincode, mode, role, sponsorId]);
+  }, [pincode, mode, role]);
+
+  // Auto-fetch branches when pincode reaches 6 digits for registration
+  useEffect(() => {
+    if (mode !== "register" || role === "agency") return;
+    if (pincode.length === 6) {
+      handleFetchBranches();
+    }
+  }, [pincode, mode, role]);
 
   // Sponsor from URL (priority: agencyid, sponsor, sponsor_id, ref)
   useEffect(() => {
@@ -398,13 +398,8 @@ const [businessPinLoading, setBusinessPinLoading] = useState(false);
   // Fetch post offices
   const handleFetchBranches = async () => {
     const pin = (pincode || "").replace(/\D/g, "");
-    if (pin.length !== 6) {
-      alert("Enter a valid 6-digit pincode");
-      return;
-    }
     setBranchLoading(true);
     setSelectedBranch(null);
-    setManualMode(true);
     setErrorMsg("");
     setSuccessMsg("");
     try {
@@ -431,9 +426,10 @@ const [businessPinLoading, setBusinessPinLoading] = useState(false);
         if (firstDistrict) setGeoCityName(firstDistrict);
       }
 
-      if (list.length === 1) {
+      if (list.length > 0) {
         const b = list[0];
         setSelectedBranch(b);
+        setBranchDisabled(true);
         const st = b.state || b.State || detectedState || "";
         const ct = b.country || b.Country || detectedCountry || "India";
         setStateVal(st);
@@ -478,6 +474,7 @@ const [businessPinLoading, setBusinessPinLoading] = useState(false);
     setPincode(next);
     setBranches([]);
     setSelectedBranch(null);
+    setBranchDisabled(false);
     setGeoCityName("");
   };
 
@@ -637,42 +634,7 @@ const [businessPinLoading, setBusinessPinLoading] = useState(false);
     })();
   }, [mode, role, consumerSelectedDistrict, consumerSelectedState]);
 
-  // Load business pincodes for selected District (City) during Business registration
-  useEffect(() => {
-    if (mode !== "register" || role !== "business") {
-      setBusinessPincodes([]);
-      return;
-    }
-    if (!selectedCity) {
-      setBusinessPincodes([]);
-      return;
-    }
-    const cityName = (() => {
-      const c = (cities || []).find((x) => String(x?.id) === String(selectedCity));
-      return c?.name || c?.Name || c?.city || c?.City || "";
-    })();
-    if (!cityName) {
-      setBusinessPincodes([]);
-      return;
-    }
-    setBusinessPinLoading(true);
-    (async () => {
-      try {
-        const resp = await API.get("/location/pincodes/by-district/", {
-          params: { district_name: cityName, state_id: selectedState },
-        });
-        const pins = resp?.data?.pincodes || [];
-        setBusinessPincodes(pins);
-        if (pincode && !pins.includes(pincode)) {
-          setPincode("");
-        }
-      } catch {
-        setBusinessPincodes([]);
-      } finally {
-        setBusinessPinLoading(false);
-      }
-    })();
-  }, [mode, role, selectedCity, selectedState, cities, pincode]);
+
 
   // Effective pincode options for consumer/employee (intersect when both available)
   const pincodeOptionsConsumer = useMemo(() => {
@@ -1023,7 +985,7 @@ const [businessPinLoading, setBusinessPinLoading] = useState(false);
   };
 
   const loginField = {
-    label: "Username or Phone",
+    label: "Username",
     type: "text",
     inputMode: "text",
     placeholder: "Enter username",
@@ -1031,21 +993,17 @@ const [businessPinLoading, setBusinessPinLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // Business login disabled in UI; admin will process registrations
-    if (mode === "login" && role === "business") {
-      setErrorMsg("Business login is disabled. Please register. Your request will be processed by admin.");
-      return;
-    }
 
     if (mode === "login") {
       try {
         // Accept username or phone; backend resolves and disambiguates if needed
         let username = (formData.username || "").trim();
-        const submitRole = role === "business" ? "user" : role;
+        const submitRole = role;
 
         const res = await API.post("/accounts/login/", {
           username,
           password: formData.password,
+          role: submitRole,
         });
 
         const access = res?.data?.access || res?.data?.token || res?.data?.data?.token;
@@ -1060,19 +1018,34 @@ const [businessPinLoading, setBusinessPinLoading] = useState(false);
         if (!tokenRole) throw new Error("Token missing role claim");
 
 
-        localStorage.setItem("token", access);
-        if (refreshTok) localStorage.setItem("refresh", refreshTok);
-        localStorage.setItem("role", tokenRole);
+        const ns = (payload?.is_staff || payload?.is_superuser) ? "admin" : (tokenRole || "user");
+        const store = remember ? localStorage : sessionStorage;
+
+        // Clean legacy non-namespaced keys to avoid cross-role collisions
+        try {
+          localStorage.removeItem("token");
+          localStorage.removeItem("refresh");
+          localStorage.removeItem("role");
+          localStorage.removeItem("user");
+          sessionStorage.removeItem("token");
+          sessionStorage.removeItem("refresh");
+          sessionStorage.removeItem("role");
+          sessionStorage.removeItem("user");
+        } catch (_) {}
+
+        store.setItem(`token_${ns}`, access);
+        if (refreshTok) store.setItem(`refresh_${ns}`, refreshTok);
+        if (tokenRole) store.setItem(`role_${ns}`, tokenRole);
 
         try {
           const meResp = await API.get("/accounts/me/");
           if (meResp?.data) {
-            localStorage.setItem("user", JSON.stringify(meResp.data));
+            store.setItem(`user_${ns}`, JSON.stringify(meResp.data));
           } else {
-            localStorage.setItem("user", JSON.stringify({ role: tokenRole, username: tokenUsername, full_name: tokenFullName }));
+            store.setItem(`user_${ns}`, JSON.stringify({ role: tokenRole, username: tokenUsername, full_name: tokenFullName }));
           }
         } catch (_) {
-          localStorage.setItem("user", JSON.stringify({ role: tokenRole, username: tokenUsername, full_name: tokenFullName }));
+          store.setItem(`user_${ns}`, JSON.stringify({ role: tokenRole, username: tokenUsername, full_name: tokenFullName }));
         }
 
         if (remember) {
@@ -1091,7 +1064,7 @@ const [businessPinLoading, setBusinessPinLoading] = useState(false);
         const data = err?.response?.data;
         if (data?.multiple_accounts && Array.isArray(data.multiple_accounts)) {
           const choices = data.multiple_accounts.map((a) => a.username).join(", ");
-          setErrorMsg(`Multiple accounts found for this phone. Please enter one of these usernames: ${choices}`);
+          setErrorMsg(`Multiple accounts ambiguity. Please enter one of these usernames: ${choices}`);
         } else {
           const msg =
             data?.detail || (data ? JSON.stringify(data) : "Login failed!");
@@ -1154,14 +1127,11 @@ const [businessPinLoading, setBusinessPinLoading] = useState(false);
       return;
     }
 
-    // Location validation for non-agency registrations (Consumer/Employee) driven by Sponsor
+    // Location validation for non-agency registrations
     if (!AGENCY_CATEGORIES.has(category)) {
-      if (Array.isArray(sponsorConsumerPincodes) && sponsorConsumerPincodes.length > 0) {
-        const pin = (selectedConsumerPincode || "").replace(/\D/g, "");
-        if (!pin || !sponsorConsumerPincodes.includes(pin)) {
-          setErrorMsg("Please select a valid pincode under the Sponsor.");
-          return;
-        }
+      if (!pincode) {
+        setErrorMsg("Pincode is required");
+        return;
       }
     }
 
@@ -1178,10 +1148,10 @@ const [businessPinLoading, setBusinessPinLoading] = useState(false);
     // Non-agency: include location data
     if (!AGENCY_CATEGORIES.has(category)) {
       Object.assign(payload, {
-        country: selectedCountry || null,
-        state: consumerSelectedState || selectedState || null,
-        city: consumerSelectedDistrict || selectedCity || null,
-        pincode: selectedConsumerPincode || pincode,
+        country: null,
+        state: null,
+        city: null,
+        pincode,
         country_name: geoCountryName || "",
         country_code: geoCountryCode || "",
         state_name: geoStateName || "",
@@ -1338,6 +1308,29 @@ const [businessPinLoading, setBusinessPinLoading] = useState(false);
                 ),
               }}
             />
+            <TextField
+              fullWidth
+              label="Pincode"
+              value={pincode}
+              onChange={(e) => handlePincodeChange(e.target.value)}
+              sx={{ mb: 2 }}
+              required
+            />
+            {branches.length > 0 && (
+              <Autocomplete
+                fullWidth
+                options={branches}
+                value={selectedBranch}
+                onChange={handleBranchSelect}
+                disabled={branchDisabled}
+                getOptionLabel={(option) => option?.name || ""}
+                renderInput={(params) => <TextField {...params} label="Branch" />}
+                sx={{ mb: 2 }}
+              />
+            )}
+            <TextField fullWidth label="City" value={geoCityName} disabled sx={{ mb: 2 }} />
+            <TextField fullWidth label="State" value={geoStateName} disabled sx={{ mb: 2 }} />
+            <TextField fullWidth label="Country" value={geoCountryName} disabled sx={{ mb: 2 }} />
           </>
         );
       case "agency":
@@ -1445,20 +1438,27 @@ const [businessPinLoading, setBusinessPinLoading] = useState(false);
             {/* Agency-specific region UI */}
             {(sponsorId && isSC) && (
               <>
-                <FormControl fullWidth sx={{ mb: 2 }}>
-                  <InputLabel>Country</InputLabel>
-                  <Select
-                    label="Country"
-                    value={selectedCountry}
-                    onChange={handleCountryChange}
-                  >
-                    {(countries || []).map((c) => (
-                      <MenuItem key={c.id} value={String(c.id)}>
-                        {c.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>Pincode</InputLabel>
+              <Select
+                label="Pincode"
+                value={pincode}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setPincode(v);
+                  fetchFromBackendPin(v);
+                }}
+                disabled={!selectedCity}
+              >
+                <MenuItem value="">-- Select --</MenuItem>
+                {(businessPincodes || []).map((pin) => (
+                  <MenuItem key={pin} value={pin}>{pin}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField fullWidth label="City" value={geoCityName} disabled sx={{ mb: 2 }} />
+            <TextField fullWidth label="State" value={geoStateName} disabled sx={{ mb: 2 }} />
+            <TextField fullWidth label="Country" value={geoCountryName} disabled sx={{ mb: 2 }} />
 
                 <FormControl fullWidth sx={{ mb: 2 }}>
                   <InputLabel>States (Max 2)</InputLabel>
@@ -1701,6 +1701,29 @@ const [businessPinLoading, setBusinessPinLoading] = useState(false);
                 ),
               }}
             />
+            <TextField
+              fullWidth
+              label="Pincode"
+              value={pincode}
+              onChange={(e) => handlePincodeChange(e.target.value)}
+              sx={{ mb: 2 }}
+              required
+            />
+            {branches.length > 0 && (
+              <Autocomplete
+                fullWidth
+                options={branches}
+                value={selectedBranch}
+                onChange={handleBranchSelect}
+                disabled={branchDisabled}
+                getOptionLabel={(option) => option?.name || ""}
+                renderInput={(params) => <TextField {...params} label="Branch" />}
+                sx={{ mb: 2 }}
+              />
+            )}
+            <TextField fullWidth label="City" value={geoCityName} disabled sx={{ mb: 2 }} />
+            <TextField fullWidth label="State" value={geoStateName} disabled sx={{ mb: 2 }} />
+            <TextField fullWidth label="Country" value={geoCountryName} disabled sx={{ mb: 2 }} />
           </>
         );
       case "business":
@@ -1792,6 +1815,29 @@ const [businessPinLoading, setBusinessPinLoading] = useState(false);
               minRows={2}
               required
             />
+            <TextField
+              fullWidth
+              label="Pincode"
+              value={pincode}
+              onChange={(e) => handlePincodeChange(e.target.value)}
+              sx={{ mb: 2 }}
+              required
+            />
+            {branches.length > 0 && (
+              <Autocomplete
+                fullWidth
+                options={branches}
+                value={selectedBranch}
+                onChange={handleBranchSelect}
+                disabled={branchDisabled}
+                getOptionLabel={(option) => option?.name || ""}
+                renderInput={(params) => <TextField {...params} label="Branch" />}
+                sx={{ mb: 2 }}
+              />
+            )}
+            <TextField fullWidth label="City" value={geoCityName} disabled sx={{ mb: 2 }} />
+            <TextField fullWidth label="State" value={geoStateName} disabled sx={{ mb: 2 }} />
+            <TextField fullWidth label="Country" value={geoCountryName} disabled sx={{ mb: 2 }} />
           </>
         );
       default:
@@ -1887,7 +1933,7 @@ const [businessPinLoading, setBusinessPinLoading] = useState(false);
               <ToggleButton value="employee" aria-label="employee">
                 <WorkIcon sx={{ mr: 1 }} /> Employee
               </ToggleButton>
-              <ToggleButton value="business" aria-label="business" disabled={isLogin}>
+              <ToggleButton value="business" aria-label="business">
                 <BusinessIcon sx={{ mr: 1 }} /> Business
               </ToggleButton>
             </ToggleButtonGroup>
@@ -1919,151 +1965,8 @@ const [businessPinLoading, setBusinessPinLoading] = useState(false);
                   />
                 )}
 
-                {/* Hide location/pincode/branch UI for Agency registrations; exclude Business (custom flow below) */}
-                {!isAgency && role !== "business" && (
-                  <>
-                    {(role === "user" || role === "employee") ? (
-                      <FormControl fullWidth sx={{ mb: 2 }}>
-                        <InputLabel>Pincode (under Sponsor)</InputLabel>
-                        <Select
-                          label="Pincode (under Sponsor)"
-                          value={selectedConsumerPincode}
-                          onChange={(e) => {
-                            const v = e.target.value || "";
-                            setSelectedConsumerPincode(v);
-                            handlePincodeChange(v);
-                            if (v) {
-                              const grp = (consumerPinsByState || []).find(
-                                (g) => Array.isArray(g?.pincodes) && g.pincodes.includes(v)
-                              );
-                              if (grp && grp.state_id) {
-                                setConsumerSelectedState(String(grp.state_id));
-                              }
-                            }
-                          }}
-                          disabled={!sponsorId || (sponsorConsumerPincodes || []).length === 0}
-                        >
-                          <MenuItem value="">-- Select --</MenuItem>
-                          {(pincodeOptionsConsumer || []).map((pin) => (
-                            <MenuItem key={pin} value={pin}>{pin}</MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    ) : (
-                      <>
-                        <TextField
-                          fullWidth
-                          label="Pincode"
-                          value={pincode}
-                          onChange={(e) => handlePincodeChange(e.target.value)}
-                          type="tel"
-                          inputProps={{ inputMode: "numeric", pattern: "[0-9]*", maxLength: 6 }}
-                          sx={{ mb: 2 }}
-                        />
-                        <Button
-                          fullWidth
-                          variant="contained"
-                          onClick={handleFetchBranches}
-                          disabled={(pincode || "").length !== 6 || branchLoading}
-                          sx={{ mb: 2, borderRadius: 1, py: 1.05 }}
-                        >
-                          {branchLoading ? <CircularProgress size={18} color="inherit" /> : "Detect Location"}
-                        </Button>
-                        {(manualMode || branches.length > 0) && (
-                          <Box sx={{ mt: 1, display: "flex", flexDirection: "column" }}>
-                            <Autocomplete
-                              fullWidth
-                              options={branches}
-                              value={selectedBranch}
-                              onChange={handleBranchSelect}
-                              getOptionLabel={(opt) =>
-                                opt ? `${(opt.name || opt.Name) || ""} (${(opt.district || opt.District) || ""}, ${(opt.state || opt.State) || ""})` : ""
-                              }
-                              renderInput={(params) => <TextField {...params} label="Select Branch" />}
-                              sx={{ mb: 2 }}
-                            />
-                            <TextField fullWidth label="City / District" value={geoCityName} disabled sx={{ mb: 2 }} />
-                            <TextField fullWidth label="State" value={stateVal} disabled sx={{ mb: 2 }} />
-                            <TextField fullWidth label="Country" value={countryVal} disabled sx={{ mb: 2 }} />
-                          </Box>
-                        )}
-                        {!manualMode && !autoLoading && (
-                          <Box sx={{ mt: 1, display: "flex", flexDirection: "column" }}>
-                            <TextField fullWidth label="City / District" value={geoCityName} disabled sx={{ mb: 2 }} />
-                            <TextField fullWidth label="State" value={stateVal} disabled sx={{ mb: 2 }} />
-                            <TextField fullWidth label="Country" value={countryVal} disabled sx={{ mb: 2 }} />
-                          </Box>
-                        )}
-                      </>
-                    )}
-                  </>
-                )}
-                {/* Business registration location selectors */}
-                {!isAgency && role === "business" && (
-                  <>
-                    <FormControl fullWidth sx={{ mb: 2 }}>
-                      <InputLabel>Country</InputLabel>
-                      <Select
-                        label="Country"
-                        value={selectedCountry}
-                        onChange={handleCountryChange}
-                      >
-                        {(countries || []).map((c) => (
-                          <MenuItem key={c.id} value={String(c.id)}>
-                            {c.name}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
 
-                    <FormControl fullWidth sx={{ mb: 2 }}>
-                      <InputLabel>State</InputLabel>
-                      <Select
-                        label="State"
-                        value={selectedState}
-                        onChange={handleStateChange}
-                        disabled={!selectedCountry}
-                      >
-                        <MenuItem value="">-- Select --</MenuItem>
-                        {(states || []).map((s) => (
-                          <MenuItem key={s.id} value={String(s.id)}>{s.name}</MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
 
-                    <FormControl fullWidth sx={{ mb: 2 }}>
-                      <InputLabel>District</InputLabel>
-                      <Select
-                        label="District"
-                        value={selectedCity}
-                        onChange={handleCityChange}
-                        disabled={!selectedState}
-                      >
-                        <MenuItem value="">-- Select --</MenuItem>
-                        {(cities || []).map((c) => (
-                          <MenuItem key={c.id} value={String(c.id)}>
-                            {c.name || c.Name || c.city || c.City}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-
-                    <FormControl fullWidth sx={{ mb: 2 }}>
-                      <InputLabel>Pincode</InputLabel>
-                      <Select
-                        label="Pincode"
-                        value={pincode}
-                        onChange={(e) => setPincode(e.target.value)}
-                        disabled={!selectedCity}
-                      >
-                        <MenuItem value="">-- Select --</MenuItem>
-                        {(businessPincodes || []).map((pin) => (
-                          <MenuItem key={pin} value={pin}>{pin}</MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </>
-                )}
               </Box>
             )}
 

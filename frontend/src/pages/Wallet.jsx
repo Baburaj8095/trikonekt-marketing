@@ -171,7 +171,7 @@ export default function Wallet() {
         Wallet
       </Typography>
 
-      <Grid container spacing={2}>
+      <Grid container spacing={{ xs: 2, sm: 2 }} sx={{ mx: { xs: -2, sm: 0 } }}>
         <Grid item xs={12} md={4}>
           <Paper elevation={3} sx={{ p: 2, borderRadius: 2 }}>
             <Typography variant="subtitle2" sx={{ color: "text.secondary" }}>
@@ -294,7 +294,7 @@ export default function Wallet() {
               <Box>
                 {(txs || []).map((tx) => (
                   <Box key={tx.id} sx={{ py: 1.2 }}>
-                    <Grid container spacing={1} alignItems="center">
+                    <Grid container spacing={{ xs: 1, sm: 1 }} sx={{ mx: { xs: -1, sm: 0 } }} alignItems="center">
                       <Grid item xs={12} sm={5} md={4}>
                         <Stack direction="row" spacing={1} alignItems="center">
                           <TxTypeChip type={tx.type} />

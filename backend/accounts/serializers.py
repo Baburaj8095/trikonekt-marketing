@@ -102,11 +102,26 @@ class RegisterSerializer(serializers.ModelSerializer):
         if not sponsor:
             raise serializers.ValidationError({'sponsor_id': 'Sponsor is required.'})
 
-        # Resolve sponsor by username, sponsor_id, or phone digits
-        # Resolve sponsor by own referral code (prefixed_id) or username; also accept legacy sponsor_id
+        # Resolve sponsor by prefixed_id/username/sponsor_id.
+        # Also accept hyphen-less codes like TREMP0000000001 -> TREMP-0000000001 and tolerate phone digits.
+        raw = sponsor
         sponsor_user = CustomUser.objects.filter(
-            Q(prefixed_id__iexact=sponsor) | Q(username__iexact=sponsor) | Q(sponsor_id__iexact=sponsor)
+            Q(prefixed_id__iexact=raw) | Q(username__iexact=raw) | Q(sponsor_id__iexact=raw)
         ).first()
+        if not sponsor_user:
+            # Try normalized variant inserting hyphen before the last 10 digits (prefix-XXXXXXXXXX)
+            import re
+            m = re.match(r'^([A-Za-z_]+)-?(\d{10})$', raw)
+            if m:
+                hyphenated = f"{m.group(1).upper()}-{m.group(2)}"
+                sponsor_user = CustomUser.objects.filter(
+                    Q(prefixed_id__iexact=hyphenated) | Q(username__iexact=hyphenated) | Q(sponsor_id__iexact=hyphenated)
+                ).first()
+        if not sponsor_user:
+            # Best-effort: accept phone digits as sponsor key
+            phone_digits = ''.join(c for c in raw if c.isdigit())
+            if phone_digits:
+                sponsor_user = CustomUser.objects.filter(Q(phone__iexact=phone_digits) | Q(username__iexact=phone_digits)).first()
         if not sponsor_user:
             raise serializers.ValidationError({'sponsor_id': 'Sponsor not found.'})
 
@@ -401,30 +416,31 @@ class RegisterSerializer(serializers.ModelSerializer):
         if not registered_by and request and request.user and request.user.is_authenticated:
             registered_by = request.user
 
-        # Create user
-        user = CustomUser.objects.create_user(
+        # Create user with registered_by set BEFORE first save so post_save can credit sponsor
+        user = CustomUser(
             username=username,
             email=validated_data.get('email', ''),
-            password=validated_data['password'],
-            role=role
+            role=role,
+            category=category,
+            unique_id=unique_id,
+            full_name=full_name,
+            phone=phone_digits,
+            pincode=pincode,
+            country=country,
+            state=state,
+            city=city,
+            registered_by=registered_by,
         )
-        # Assign profile
-        user.full_name = full_name
-        user.phone = phone_digits
-        user.pincode = pincode
-        user.country = country
-        user.state = state
-        user.city = city
-        # Sponsor ID will default to hierarchical prefixed_id in model.save()
-        user.category = category
-        user.unique_id = unique_id
-        user.registered_by = registered_by
         # Store upline's code in sponsor_id; keep user's own referral code in prefixed_id (allocated on save)
         try:
             if registered_by:
                 user.sponsor_id = getattr(registered_by, "prefixed_id", "") or getattr(registered_by, "username", "") or sponsor_id
+            else:
+                user.sponsor_id = sponsor_id
         except Exception:
             user.sponsor_id = sponsor_id
+        user.set_password(validated_data['password'])
+        user.save()  # triggers post_save(created=True) with registered_by present
 
         # Post-create agency region handling
         if category in AGENCY_CATEGORIES:

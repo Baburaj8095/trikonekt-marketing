@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from .views import (
     AdminMetricsView,
     AdminUserTreeRoot,
@@ -18,6 +18,7 @@ from .views import (
     AdminMatrix5Tree,
     AdminAutopoolSummary,
 )
+from .dynamic import router as dynamic_router, admin_meta as dynamic_admin_meta
 
 urlpatterns = [
     path("metrics/", AdminMetricsView.as_view()),
@@ -45,4 +46,7 @@ urlpatterns = [
     path("matrix/tree/", AdminMatrixTree.as_view()),
     path("matrix/tree5/", AdminMatrix5Tree.as_view()),
     path("autopool/summary/", AdminAutopoolSummary.as_view()),
+    # Dynamic admin models (auto-discovered)
+    path("", include(dynamic_router.urls)),
+    path("admin-meta/", dynamic_admin_meta),
 ]

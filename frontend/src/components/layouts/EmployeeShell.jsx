@@ -23,16 +23,18 @@ export default function EmployeeShell({ children }) {
   const location = useLocation();
 
   // Selected states (sync with EmployeeDashboard tabs via ?tab=)
-  const tab = new URLSearchParams(location.search).get("tab") || "lucky";
-  const isLucky = location.pathname === "/employee/dashboard" && tab === "lucky";
-  const isECoupons = location.pathname === "/employee/dashboard" && tab === "ecoupons";
+  const tab = (new URLSearchParams(location.search).get("tab") || "").toLowerCase();
+  const normTab = tab === "lucky" ? "lucky_draw_history" : (tab === "ecoupons" || tab === "ecoupon") ? "e_coupons" : tab;
+  const isLucky = location.pathname === "/employee/dashboard" && normTab === "lucky_draw_history";
+  const isECoupons = location.pathname === "/employee/dashboard" && normTab === "e_coupons";
   const isWallet = location.pathname === "/employee/dashboard" && tab === "wallet";
+  const isRefer = location.pathname === "/employee/dashboard" && tab === "refer_earn";
   const isDailyReport = location.pathname === "/employee/daily-report";
   const isProfile = location.pathname === "/employee/profile";
 
   const storedUser = useMemo(() => {
     try {
-      const ls = localStorage.getItem("user") || sessionStorage.getItem("user");
+      const ls = localStorage.getItem("user_employee") || sessionStorage.getItem("user_employee");
       return ls ? JSON.parse(ls) : {};
     } catch {
       return {};
@@ -45,14 +47,14 @@ export default function EmployeeShell({ children }) {
 
   const handleLogout = () => {
     try {
-      localStorage.removeItem("token");
-      localStorage.removeItem("refresh");
-      localStorage.removeItem("role");
-      localStorage.removeItem("user");
-      sessionStorage.removeItem("token");
-      sessionStorage.removeItem("refresh");
-      sessionStorage.removeItem("role");
-      sessionStorage.removeItem("user");
+      localStorage.removeItem("token_employee");
+      localStorage.removeItem("refresh_employee");
+      localStorage.removeItem("role_employee");
+      localStorage.removeItem("user_employee");
+      sessionStorage.removeItem("token_employee");
+      sessionStorage.removeItem("refresh_employee");
+      sessionStorage.removeItem("role_employee");
+      sessionStorage.removeItem("user_employee");
     } catch (_) {}
     navigate("/", { replace: true });
   };
@@ -60,6 +62,16 @@ export default function EmployeeShell({ children }) {
   const DrawerContent = (
     <Box sx={{ overflow: "auto" }}>
       <List>
+        <ListItemButton
+          selected={location.pathname === "/employee/dashboard" && !new URLSearchParams(location.search).get("tab")}
+          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+          onClick={() => {
+            navigate("/employee/dashboard");
+            setMobileOpen(false);
+          }}
+        >
+          <ListItemText primary="Dashboard" />
+        </ListItemButton>
         <ListItemButton
           selected={isProfile}
           sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
@@ -74,18 +86,47 @@ export default function EmployeeShell({ children }) {
           selected={isLucky}
           sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
           onClick={() => {
-            navigate("/employee/dashboard?tab=lucky");
+            navigate("/employee/dashboard?tab=lucky_draw_history");
             setMobileOpen(false);
           }}
         >
           <ListItemText primary="Lucky Draw Submission" />
         </ListItemButton>
-
+        <ListItemButton
+          selected={location.pathname === "/employee/dashboard" && new URLSearchParams(location.search).get("tab") === "my_team"}
+          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+          onClick={() => {
+            navigate("/employee/dashboard?tab=my_team");
+            setMobileOpen(false);
+          }}
+        >
+          <ListItemText primary="My Team" />
+        </ListItemButton>
+        <ListItemButton
+          selected={isRefer}
+          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+          onClick={() => {
+            navigate("/employee/dashboard?tab=refer_earn");
+            setMobileOpen(false);
+          }}
+        >
+          <ListItemText primary="Refer & Earn" />
+        </ListItemButton>
+        <ListItemButton
+          selected={location.pathname === "/employee/dashboard" && new URLSearchParams(location.search).get("tab") === "rewards"}
+          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+          onClick={() => {
+            navigate("/employee/dashboard?tab=rewards");
+            setMobileOpen(false);
+          }}
+        >
+          <ListItemText primary="Rewards" />
+        </ListItemButton>
         <ListItemButton
           selected={isECoupons}
           sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
           onClick={() => {
-            navigate("/employee/dashboard?tab=ecoupons");
+            navigate("/employee/dashboard?tab=e_coupons");
             setMobileOpen(false);
           }}
         >
@@ -137,7 +178,7 @@ export default function EmployeeShell({ children }) {
 
           <Box sx={{ flexGrow: 1 }} />
 
-          <Typography variant="body2" sx={{ mr: 2 }}>{displayName}</Typography>
+          {/* <Typography variant="body2" sx={{ mr: 2 }}>{displayName}</Typography> */}
           <Button color="inherit" size="small" sx={{ fontWeight: 500, textTransform: "none" }} onClick={handleLogout}>
             Logout
           </Button>

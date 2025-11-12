@@ -15,6 +15,7 @@ import {
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import LOGO from "../../assets/TRIKONEKT.png";
+import { useTheme } from "@mui/material/styles";
 
 const drawerWidth = 220;
 
@@ -56,7 +57,7 @@ export default function ConsumerShell({ children }) {
 
   const storedUser = useMemo(() => {
     try {
-      const ls = localStorage.getItem("user") || sessionStorage.getItem("user");
+      const ls = localStorage.getItem("user_user") || sessionStorage.getItem("user_user");
       return ls ? JSON.parse(ls) : {};
     } catch {
       return {};
@@ -69,20 +70,46 @@ export default function ConsumerShell({ children }) {
 
   const handleLogout = () => {
     try {
-      localStorage.removeItem("token");
-      localStorage.removeItem("refresh");
-      localStorage.removeItem("role");
-      localStorage.removeItem("user");
-      sessionStorage.removeItem("token");
-      sessionStorage.removeItem("refresh");
-      sessionStorage.removeItem("role");
-      sessionStorage.removeItem("user");
+      localStorage.removeItem("token_user");
+      localStorage.removeItem("refresh_user");
+      localStorage.removeItem("role_user");
+      localStorage.removeItem("user_user");
+      sessionStorage.removeItem("token_user");
+      sessionStorage.removeItem("refresh_user");
+      sessionStorage.removeItem("role_user");
+      sessionStorage.removeItem("user_user");
     } catch (_) {}
     navigate("/", { replace: true });
   };
 
+  const theme = useTheme();
+  const primary = theme.palette?.primary?.main || "#2563eb";
+  const primaryLight = theme.palette?.primary?.light || "#60a5fa";
+  const contrast = theme.palette?.primary?.contrastText || "#ffffff";
+  const gradientBg = `linear-gradient(180deg, ${primary} 0%, ${primaryLight} 100%)`;
+
   const DrawerContent = (
-    <Box sx={{ overflow: "auto" }}>
+    <Box
+      sx={{
+        overflow: "auto",
+        "& .MuiListItemButton-root": {
+          color: "#0f172a",
+          borderRadius: 1.5,
+          mx: 1,
+          my: 0.5
+        },
+        "& .MuiListItemButton-root:hover": {
+          backgroundColor: "#f8fafc"
+        },
+        "& .MuiListItemButton-root.Mui-selected": {
+          backgroundColor: "#E3F2FD",
+          color: "#0C2D48"
+        },
+        "& .MuiDivider-root": {
+          borderColor: "#e5e7eb"
+        }
+      }}
+    >
       <List>
         <ListItemButton
           selected={selectedMenu === 'dashboard'}
@@ -213,7 +240,7 @@ export default function ConsumerShell({ children }) {
   return (
     <Box sx={{ display: "flex", minHeight: "100vh", backgroundColor: "#f7f9fb" }}>
       {/* App Bar */}
-      <AppBar position="fixed" sx={{ zIndex: (t) => t.zIndex.drawer + 1, backgroundColor: "#0C2D48" }}>
+      <AppBar position="fixed" sx={{ zIndex: (t) => t.zIndex.drawer + 1, backgroundColor: primary }}>
         <Toolbar>
           <IconButton color="inherit" edge="start" onClick={handleDrawerToggle} sx={{ mr: 2, display: { sm: "none" } }}>
             <MenuIcon />
@@ -226,7 +253,7 @@ export default function ConsumerShell({ children }) {
 
           <Box sx={{ flexGrow: 1 }} />
 
-          <Typography variant="body2" sx={{ mr: 2 }}>{displayName}</Typography>
+          {/* <Typography variant="body2" sx={{ mr: 2 }}>{displayName}</Typography> */}
           <Button color="inherit" size="small" sx={{ fontWeight: 500, textTransform: "none" }} onClick={handleLogout}>
             Logout
           </Button>
@@ -247,10 +274,10 @@ export default function ConsumerShell({ children }) {
             width: drawerWidth,
             boxSizing: "border-box",
             borderRight: "1px solid #e5e7eb",
-            // Add mobile-specific styling
             backgroundColor: "#ffffff",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
-          },
+            color: "inherit",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.06)"
+          }
         }}
       >
         <Toolbar
@@ -274,7 +301,8 @@ export default function ConsumerShell({ children }) {
             boxSizing: "border-box",
             borderRight: "1px solid #e5e7eb",
             backgroundColor: "#ffffff",
-          },
+            color: "inherit"
+          }
         }}
         open
       >

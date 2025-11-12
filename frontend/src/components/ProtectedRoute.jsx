@@ -11,34 +11,59 @@ function parseJwt(token) {
   }
 }
 
+function currentNamespaceFromPath() {
+  try {
+    const p = typeof window !== "undefined" ? window.location.pathname : "";
+    if (p.startsWith("/agency")) return "agency";
+    if (p.startsWith("/employee")) return "employee";
+    if (p.startsWith("/business")) return "business";
+    return "user";
+  } catch {
+    return "user";
+  }
+}
+
 function getStoredAccess() {
-  return localStorage.getItem("token") || sessionStorage.getItem("token");
+  const ns = currentNamespaceFromPath();
+  return (
+    (typeof localStorage !== "undefined" && localStorage.getItem(`token_${ns}`)) ||
+    (typeof sessionStorage !== "undefined" && sessionStorage.getItem(`token_${ns}`)) ||
+    null
+  );
 }
 
 function getStoredRefresh() {
-  return localStorage.getItem("refresh") || sessionStorage.getItem("refresh");
+  const ns = currentNamespaceFromPath();
+  return (
+    (typeof localStorage !== "undefined" && localStorage.getItem(`refresh_${ns}`)) ||
+    (typeof sessionStorage !== "undefined" && sessionStorage.getItem(`refresh_${ns}`)) ||
+    null
+  );
 }
 
 function setAccessToken(newAccess) {
-  if (localStorage.getItem("refresh")) {
-    localStorage.setItem("token", newAccess);
-  } else if (sessionStorage.getItem("refresh")) {
-    sessionStorage.setItem("token", newAccess);
-  } else if (localStorage.getItem("token")) {
-    localStorage.setItem("token", newAccess);
-  } else {
-    sessionStorage.setItem("token", newAccess);
+  const ns = currentNamespaceFromPath();
+  // Write to the same storage type where the namespaced refresh token is stored
+  if (typeof localStorage !== "undefined" && localStorage.getItem(`refresh_${ns}`)) {
+    localStorage.setItem(`token_${ns}`, newAccess);
+  } else if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(`refresh_${ns}`)) {
+    sessionStorage.setItem(`token_${ns}`, newAccess);
+  } else if (typeof localStorage !== "undefined") {
+    localStorage.setItem(`token_${ns}`, newAccess);
+  } else if (typeof sessionStorage !== "undefined") {
+    sessionStorage.setItem(`token_${ns}`, newAccess);
   }
 }
 
 function clearTokens() {
+  const ns = currentNamespaceFromPath();
   try {
-    localStorage.removeItem("token");
-    localStorage.removeItem("refresh");
+    localStorage.removeItem(`token_${ns}`);
+    localStorage.removeItem(`refresh_${ns}`);
   } catch {}
   try {
-    sessionStorage.removeItem("token");
-    sessionStorage.removeItem("refresh");
+    sessionStorage.removeItem(`token_${ns}`);
+    sessionStorage.removeItem(`refresh_${ns}`);
   } catch {}
 }
 
@@ -78,7 +103,11 @@ export default function ProtectedRoute({ children, allowedRoles }) {
 
         if (!access || !claim || !exp || exp <= Math.floor(Date.now() / 1000)) {
           if (!cancelled) {
-            clearTokens();
+            try {
+              if (typeof window !== "undefined") {
+                window.__tk_auth_blocked = true;
+              }
+            } catch {}
             setGranted(false);
             setPayload(null);
           }

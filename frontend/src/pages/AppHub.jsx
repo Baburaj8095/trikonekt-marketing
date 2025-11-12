@@ -3,194 +3,186 @@ import {
   Box,
   Typography,
   Grid,
-  Card,
-  CardContent,
-  CardMedia,
+  IconButton,
+  Tooltip,
 } from "@mui/material";
 
-// ✅ Brand Logos (transparent)
 const apps = [
+  // 🛍️ Shopping
   {
     name: "Amazon",
     appUrl: "amazon://",
-    storeUrl:
-      "https://play.google.com/store/apps/details?id=in.amazon.mShop.android.shopping",
-    iosStoreUrl:
-      "https://apps.apple.com/in/app/amazon-shopping/id297606951",
-    icon: "https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg",
-    description: "Shop millions of products online",
+    storeUrl: "https://play.google.com/store/apps/details?id=in.amazon.mShop.android.shopping",
+    iosStoreUrl: "https://apps.apple.com/in/app/amazon-shopping/id297606951",
+    icon: "https://cdn.brandfetch.io/amazon.com/logo/icon.svg",
   },
   {
     name: "Flipkart",
     appUrl: "flipkart://",
-    storeUrl:
-      "https://play.google.com/store/apps/details?id=com.flipkart.android",
-    iosStoreUrl:
-      "https://apps.apple.com/in/app/flipkart-online-shopping-app/id742044947",
-    icon: "https://upload.wikimedia.org/wikipedia/commons/0/0e/Flipkart_logo.png",
-    description: "Big Billion Days & more offers",
+    storeUrl: "https://play.google.com/store/apps/details?id=com.flipkart.android",
+    iosStoreUrl: "https://apps.apple.com/in/app/flipkart-online-shopping-app/id742044947",
+    icon: "https://cdn.brandfetch.io/flipkart.com/logo/icon.svg",
   },
   {
-    name: "Uber",
-    appUrl: "uber://",
-    storeUrl: "https://play.google.com/store/apps/details?id=com.ubercab",
-    iosStoreUrl: "https://apps.apple.com/in/app/uber/id368677368",
-    icon: "https://upload.wikimedia.org/wikipedia/commons/c/cc/Uber_logo_2018.png",
-    description: "Book rides & delivery services",
+    name: "Myntra",
+    appUrl: "myntra://",
+    storeUrl: "https://play.google.com/store/apps/details?id=com.myntra.android",
+    iosStoreUrl: "https://apps.apple.com/in/app/myntra-fashion-shopping-app/id907394059",
+    icon: "https://cdn.brandfetch.io/myntra.com/logo/icon.svg",
   },
+  {
+    name: "Meesho",
+    appUrl: "meesho://",
+    storeUrl: "https://play.google.com/store/apps/details?id=com.meesho.supply",
+    iosStoreUrl: "https://apps.apple.com/in/app/meesho/id1457958492",
+    icon: "https://cdn.brandfetch.io/meesho.com/logo/icon.svg",
+  },
+  {
+    name: "OLX",
+    appUrl: "olx://",
+    storeUrl: "https://play.google.com/store/apps/details?id=com.olx.southasia",
+    iosStoreUrl: "https://apps.apple.com/in/app/olx-buy-sell-near-you/id913492792",
+    icon: "https://cdn.brandfetch.io/olx.in/logo/icon.svg",
+  },
+
+  // 🚗 Travel & Mobility
   {
     name: "Ola",
     appUrl: "ola://",
-    storeUrl:
-      "https://play.google.com/store/apps/details?id=com.olacabs.customer",
+    storeUrl: "https://play.google.com/store/apps/details?id=com.olacabs.customer",
     iosStoreUrl: "https://apps.apple.com/in/app/ola/id539179365",
-    icon: "https://upload.wikimedia.org/wikipedia/commons/2/21/Ola_Cabs_logo.png",
-    description: "Ride booking & mobility solutions",
+    icon: "https://cdn.brandfetch.io/olacabs.com/logo/icon.svg",
   },
   {
     name: "OYO",
     appUrl: "oyo://",
-    storeUrl:
-      "https://play.google.com/store/apps/details?id=com.oyo.consumer",
-    iosStoreUrl:
-      "https://apps.apple.com/in/app/oyo-hotels-travel/id1331456899",
-    icon: "https://upload.wikimedia.org/wikipedia/commons/5/55/OYO_Rooms_logo.png",
-    description: "Book hotels & stays worldwide",
+    storeUrl: "https://play.google.com/store/apps/details?id=com.oyo.consumer",
+    iosStoreUrl: "https://apps.apple.com/in/app/oyo-hotels-travel/id1331456899",
+    icon: "https://cdn.brandfetch.io/oyorooms.com/logo/icon.svg",
+  },
+  {
+    name: "MakeMyTrip",
+    appUrl: "makemytrip://",
+    storeUrl: "https://play.google.com/store/apps/details?id=com.makemytrip",
+    iosStoreUrl: "https://apps.apple.com/in/app/makemytrip/id530488389",
+    icon: "https://cdn.brandfetch.io/makemytrip.com/logo/icon.svg",
+  },
+
+  // 💰 Finance
+  {
+    name: "PhonePe",
+    appUrl: "phonepe://",
+    storeUrl: "https://play.google.com/store/apps/details?id=com.phonepe.app",
+    iosStoreUrl: "https://apps.apple.com/in/app/phonepe/id1170055821",
+    icon: "https://cdn.brandfetch.io/phonepe.com/logo/icon.svg",
+  },
+  {
+    name: "Paytm",
+    appUrl: "paytm://",
+    storeUrl: "https://play.google.com/store/apps/details?id=net.one97.paytm",
+    iosStoreUrl: "https://apps.apple.com/in/app/paytm-payments-bank-payments/id473941634",
+    icon: "https://cdn.brandfetch.io/paytm.com/logo/icon.svg",
+  },
+  {
+    name: "Google Pay",
+    appUrl: "tez://",
+    storeUrl: "https://play.google.com/store/apps/details?id=com.google.android.apps.nbu.paisa.user",
+    iosStoreUrl: "https://apps.apple.com/in/app/google-pay-for-india-tez/id1193357041",
+    icon: "https://cdn.brandfetch.io/google.com/pay/logo/icon.svg",
   },
 ];
 
 export default function AppHub() {
   const handleAppClick = (app) => {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    const appUrl = app.appUrl;
     const storeUrl = isIOS ? app.iosStoreUrl : app.storeUrl;
 
-    const appWindow = window.open(appUrl, "_blank");
+    const appWindow = window.open(app.appUrl, "_blank");
     setTimeout(() => {
       if (appWindow) appWindow.location.href = storeUrl;
     }, 1000);
   };
 
   return (
-    <Box
-      sx={{
-        px: { xs: 2, sm: 4 },
-        py: { xs: 2, sm: 5 },
-        maxWidth: 1200,
-        mx: "auto",
-      }}
-    >
+    <Box sx={{ px: 2, py: 3, maxWidth: 700, mx: "auto" }}>
       <Typography
-        variant="h4"
+        variant="h5"
         sx={{
-          mb: { xs: 2, sm: 3 },
+          mb: 2,
           textAlign: "center",
           fontWeight: 600,
-          fontSize: { xs: "1.8rem", sm: "2rem" },
+          fontSize: { xs: "1.4rem", sm: "1.6rem" },
         }}
       >
         App Hub
       </Typography>
 
       <Typography
-        variant="body1"
+        variant="body2"
         sx={{
-          mb: { xs: 3, sm: 5 },
+          mb: 3,
           textAlign: "center",
           color: "text.secondary",
-          maxWidth: 600,
-          mx: "auto",
           fontSize: { xs: "0.9rem", sm: "1rem" },
         }}
       >
-        Access your favorite apps for shopping, travel, and rides — all in one
-        place.
+        Access your favorite apps for shopping, travel, and payments.
       </Typography>
 
-      <Grid container spacing={{ xs: 2, sm: 3 }} justifyContent="center">
+      <Grid container spacing={2} justifyContent="center">
         {apps.map((app, index) => (
           <Grid
             item
-            xs={12}
-            sm={6}
-            md={4}
-            lg={3}
+            xs={3.5}
+            sm={2.4}
             key={index}
-            sx={{ display: "flex" }}
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              textAlign: "center",
+            }}
           >
-            <Card
-              onClick={() => handleAppClick(app)}
-              sx={{
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                textAlign: "center",
-                p: { xs: 2, sm: 3 },
-                borderRadius: 4,
-                boxShadow: 3,
-                backgroundColor: "background.paper",
-                transition: "transform 0.2s, box-shadow 0.2s",
-                "&:hover": {
-                  transform: { xs: "none", sm: "translateY(-6px)" },
-                  boxShadow: 6,
-                },
-                "&:active": {
-                  transform: "scale(0.98)",
-                },
-              }}
-            >
-              {/* ✅ Wrapper for perfectly centered round logo */}
-              <Box
+            <Tooltip title={app.name} arrow>
+              <IconButton
+                onClick={() => handleAppClick(app)}
                 sx={{
-                  width: { xs: 90, sm: 110 },
-                  height: { xs: 90, sm: 110 },
+                  width: 65,
+                  height: 65,
                   borderRadius: "50%",
                   backgroundColor: "#fff",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  mb: 2,
                   boxShadow: 3,
-                  overflow: "hidden",
                   p: 1.5,
+                  transition: "transform 0.2s",
+                  "&:hover": { transform: "scale(1.05)" },
                 }}
               >
-                <CardMedia
+                <Box
                   component="img"
-                  image={app.icon}
+                  src={app.icon}
                   alt={app.name}
                   sx={{
-                    width: "80%",
-                    height: "80%",
+                    width: "100%",
+                    height: "100%",
                     objectFit: "contain",
                   }}
+                  onError={(e) => {
+                    e.target.src = "https://cdn-icons-png.flaticon.com/512/5968/5968705.png"; // fallback icon
+                  }}
                 />
-              </Box>
-
-              <CardContent sx={{ p: 0 }}>
-                <Typography
-                  variant="h6"
-                  sx={{
-                    fontWeight: 600,
-                    mb: 0.5,
-                    fontSize: { xs: "1rem", sm: "1.1rem" },
-                  }}
-                >
-                  {app.name}
-                </Typography>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{
-                    fontSize: { xs: "0.8rem", sm: "0.9rem" },
-                    lineHeight: 1.4,
-                  }}
-                >
-                  {app.description}
-                </Typography>
-              </CardContent>
-            </Card>
+              </IconButton>
+            </Tooltip>
+            <Typography
+              variant="caption"
+              sx={{
+                mt: 1,
+                color: "text.primary",
+                fontWeight: 500,
+                fontSize: { xs: "0.75rem", sm: "0.8rem" },
+              }}
+            >
+              {app.name}
+            </Typography>
           </Grid>
         ))}
       </Grid>

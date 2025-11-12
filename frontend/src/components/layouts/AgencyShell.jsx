@@ -45,7 +45,7 @@ export default function AgencyShell({ children }) {
 
   const storedUser = useMemo(() => {
     try {
-      const ls = localStorage.getItem("user") || sessionStorage.getItem("user");
+      const ls = localStorage.getItem("user_agency") || sessionStorage.getItem("user_agency");
       return ls ? JSON.parse(ls) : {};
     } catch {
       return {};
@@ -58,14 +58,14 @@ export default function AgencyShell({ children }) {
 
   const handleLogout = () => {
     try {
-      localStorage.removeItem("token");
-      localStorage.removeItem("refresh");
-      localStorage.removeItem("role");
-      localStorage.removeItem("user");
-      sessionStorage.removeItem("token");
-      sessionStorage.removeItem("refresh");
-      sessionStorage.removeItem("role");
-      sessionStorage.removeItem("user");
+      localStorage.removeItem("token_agency");
+      localStorage.removeItem("refresh_agency");
+      localStorage.removeItem("role_agency");
+      localStorage.removeItem("user_agency");
+      sessionStorage.removeItem("token_agency");
+      sessionStorage.removeItem("refresh_agency");
+      sessionStorage.removeItem("role_agency");
+      sessionStorage.removeItem("user_agency");
     } catch (_) {}
     navigate("/", { replace: true });
   };

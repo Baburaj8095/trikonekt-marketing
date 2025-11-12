@@ -37,6 +37,124 @@ import TreeReferralGalaxy from "../components/TreeReferralGalaxy";
 
 const drawerWidth = 220;
 
+/**
+ * Colored KPI card palette (aligned to Admin dashboard cards)
+ */
+function kpiPaletteStyles(key) {
+  switch (key) {
+    case "indigo":
+      return {
+        bg: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+        border: "rgba(99,102,241,0.35)",
+        text: "#ffffff",
+        sub: "rgba(255,255,255,0.9)",
+        shadow: "0 8px 18px rgba(99,102,241,0.35)",
+      };
+    case "blue":
+      return {
+        bg: "linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%)",
+        border: "rgba(59,130,246,0.35)",
+        text: "#ffffff",
+        sub: "rgba(255,255,255,0.9)",
+        shadow: "0 8px 18px rgba(59,130,246,0.35)",
+      };
+    case "green":
+      return {
+        bg: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+        border: "rgba(16,185,129,0.35)",
+        text: "#ffffff",
+        sub: "rgba(255,255,255,0.9)",
+        shadow: "0 8px 18px rgba(16,185,129,0.35)",
+      };
+    case "red":
+      return {
+        bg: "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
+        border: "rgba(244,63,94,0.35)",
+        text: "#ffffff",
+        sub: "rgba(255,255,255,0.9)",
+        shadow: "0 8px 18px rgba(244,63,94,0.35)",
+      };
+    case "purple":
+      return {
+        bg: "linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)",
+        border: "rgba(124,58,237,0.35)",
+        text: "#ffffff",
+        sub: "rgba(255,255,255,0.9)",
+        shadow: "0 8px 18px rgba(124,58,237,0.35)",
+      };
+    case "cyan":
+      return {
+        bg: "linear-gradient(135deg, #06b6d4 0%, #0ea5e9 100%)",
+        border: "rgba(14,165,233,0.35)",
+        text: "#ffffff",
+        sub: "rgba(255,255,255,0.9)",
+        shadow: "0 8px 18px rgba(14,165,233,0.35)",
+      };
+    case "amber":
+      return {
+        bg: "linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)",
+        border: "rgba(245,158,11,0.35)",
+        text: "#0f172a",
+        sub: "rgba(15,23,42,0.75)",
+        shadow: "0 8px 18px rgba(245,158,11,0.35)",
+      };
+    case "teal":
+      return {
+        bg: "linear-gradient(135deg, #14b8a6 0%, #2dd4bf 100%)",
+        border: "rgba(20,184,166,0.35)",
+        text: "#0f172a",
+        sub: "rgba(15,23,42,0.75)",
+        shadow: "0 8px 18px rgba(20,184,166,0.35)",
+      };
+    default:
+      return {
+        bg: "#ffffff",
+        border: "#e2e8f0",
+        text: "#0f172a",
+        sub: "#64748b",
+        shadow: "0 1px 2px rgba(0,0,0,0.06)",
+      };
+  }
+}
+
+function KpiCard({ title, value, subtitle, palette = "blue" }) {
+  const pal = kpiPaletteStyles(palette);
+  return (
+    <div
+      style={{
+        background: pal.bg,
+        border: `1px solid ${pal.border}`,
+        borderRadius: 14,
+        padding: 16,
+        boxShadow: pal.shadow,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        gap: 8,
+        color: pal.text,
+        height: 132,
+        width: "100%",
+        boxSizing: "border-box",
+        minWidth: 0,
+        position: "relative",
+        overflow: "hidden",
+        marginBottom: 12,
+        transition: "box-shadow 120ms ease",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.boxShadow = "0 10px 22px rgba(0,0,0,0.12)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.boxShadow = pal.shadow;
+      }}
+    >
+      <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 0.3, opacity: 0.95, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</div>
+      <div style={{ fontSize: 28, fontWeight: 900, lineHeight: 1.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</div>
+      {subtitle ? <div style={{ fontSize: 12, color: pal.sub, lineHeight: 1.4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{subtitle}</div> : null}
+    </div>
+  );
+}
+
 export default function EmployeeDashboard({ embedded = false }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -44,13 +162,24 @@ export default function EmployeeDashboard({ embedded = false }) {
   // Identity
   const storedUser = useMemo(() => {
     try {
-      const ls = localStorage.getItem("user") || sessionStorage.getItem("user");
-      return ls ? JSON.parse(ls) : {};
+      const ls =
+        localStorage.getItem("user_employee") ||
+        sessionStorage.getItem("user_employee") ||
+        localStorage.getItem("user") ||
+        sessionStorage.getItem("user");
+      const parsed = ls ? JSON.parse(ls) : {};
+      // Support nested shapes like { user: { ... } }
+      return parsed && typeof parsed === "object" && parsed.user && typeof parsed.user === "object" ? parsed.user : parsed;
     } catch {
       return {};
     }
   }, []);
-  const displayName = storedUser?.full_name || storedUser?.username || "Employee";
+  const displayName =
+    storedUser?.full_name ||
+    storedUser?.user?.full_name ||
+    storedUser?.username ||
+    storedUser?.user?.username ||
+    "Employee";
 
   // Layout
   const theme = useTheme();
@@ -60,6 +189,7 @@ export default function EmployeeDashboard({ embedded = false }) {
 
   const handleLogout = () => {
     try {
+      // Legacy keys
       localStorage.removeItem("token");
       sessionStorage.removeItem("token");
       localStorage.removeItem("refresh");
@@ -68,30 +198,59 @@ export default function EmployeeDashboard({ embedded = false }) {
       sessionStorage.removeItem("role");
       localStorage.removeItem("user");
       sessionStorage.removeItem("user");
+      // Namespaced employee keys
+      localStorage.removeItem("token_employee");
+      sessionStorage.removeItem("token_employee");
+      localStorage.removeItem("refresh_employee");
+      sessionStorage.removeItem("refresh_employee");
+      localStorage.removeItem("role_employee");
+      sessionStorage.removeItem("role_employee");
+      localStorage.removeItem("user_employee");
+      sessionStorage.removeItem("user_employee");
     } catch (e) {}
     navigate("/", { replace: true });
   };
 
-  // Sidebar tabs (Lucky Draw only)
+  // Sidebar tabs
   const TABS = {
-    LUCKY: "lucky",
-    ASSIGN: "assignments",
-    ECOUPONS: "ecoupons",
+    DASHBOARD: "dashboard",
+    LUCKY_DRAW_HISTORY: "lucky_draw_history",
+    E_COUPONS: "e_coupons",
+    MY_TEAM: "my_team",
+    REFER_EARN: "refer_earn",
     WALLET: "wallet",
+    REWARDS: "rewards",
   };
   const [activeTab, setActiveTab] = useState(() => {
     const q = new URLSearchParams(location.search);
     const t = (q.get("tab") || "").toLowerCase();
-    if (t === "ecoupons") return TABS.ECOUPONS;
+    if (t === "lucky_draw_history") return TABS.LUCKY_DRAW_HISTORY;
+    if (t === "e_coupons") return TABS.E_COUPONS;
+    if (t === "my_team") return TABS.MY_TEAM;
+    if (t === "refer_earn") return TABS.REFER_EARN;
     if (t === "wallet") return TABS.WALLET;
-    return TABS.LUCKY;
+    if (t === "rewards") return TABS.REWARDS;
+    return TABS.DASHBOARD;
   });
 
   // Keep URL and local tab state in sync (so shell highlight matches)
   useEffect(() => {
     const q = new URLSearchParams(location.search);
     const t = (q.get("tab") || "").toLowerCase();
-    const next = t === "ecoupons" ? TABS.ECOUPONS : t === "wallet" ? TABS.WALLET : TABS.LUCKY;
+    const next =
+      t === "lucky_draw_history"
+        ? TABS.LUCKY_DRAW_HISTORY
+        : t === "e_coupons"
+        ? TABS.E_COUPONS
+        : t === "my_team"
+        ? TABS.MY_TEAM
+        : t === "refer_earn"
+        ? TABS.REFER_EARN
+        : t === "wallet"
+        ? TABS.WALLET
+        : t === "rewards"
+        ? TABS.REWARDS
+        : TABS.DASHBOARD;
     setActiveTab(next);
   }, [location.search]);
 
@@ -110,7 +269,28 @@ export default function EmployeeDashboard({ embedded = false }) {
 
   // Commission earned
   const [commissionTotal, setCommissionTotal] = useState(0);
+  const [referralCommissionTotal, setReferralCommissionTotal] = useState(0);
+  const [luckyCommissionTotal, setLuckyCommissionTotal] = useState(0);
   const [commissions, setCommissions] = useState([]);
+  const [walletDirectReferralTotal, setWalletDirectReferralTotal] = useState(0);
+
+  // Referral count
+  const [referralCount, setReferralCount] = useState(0);
+  const [referralLoading, setReferralLoading] = useState(false);
+
+  const loadReferralCount = async () => {
+    try {
+      setReferralLoading(true);
+      // Use the same summary endpoint as MyTeam to count direct referrals
+      const res = await API.get("/accounts/team/summary/");
+      const direct = res?.data?.downline?.direct ?? 0;
+      setReferralCount(Number(direct) || 0);
+    } catch (e) {
+      setReferralCount(0);
+    } finally {
+      setReferralLoading(false);
+    }
+  };
 
   // My assignments (employee)
   const [assignList, setAssignList] = useState([]);
@@ -139,7 +319,7 @@ export default function EmployeeDashboard({ embedded = false }) {
 
   const saveSold = async (row) => {
     const id = row.id;
-    let val = (soldEdits[id]?.value ?? row.sold_count ?? 0);
+    let val = soldEdits[id]?.value ?? row.sold_count ?? 0;
     const qty = Number(row.quantity || 0);
     const parsed = Number(val);
     if (!Number.isFinite(parsed) || parsed < 0) {
@@ -177,7 +357,6 @@ export default function EmployeeDashboard({ embedded = false }) {
     }
   };
 
-
   const loadLuckyStats = async () => {
     try {
       const res = await API.get("/uploads/lucky-draw/tre/history/");
@@ -214,12 +393,29 @@ export default function EmployeeDashboard({ embedded = false }) {
       const res = await API.get("/coupons/commissions/mine/");
       const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
       setCommissions(arr || []);
-      const total = (arr || [])
-        .filter((c) => ["earned", "paid"].includes(String(c.status || "").toLowerCase()))
-        .reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+      const validCommissions = (arr || []).filter((c) => ["earned", "paid"].includes(String(c.status || "").toLowerCase()));
+      const total = validCommissions.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
       setCommissionTotal(total);
+      // Separate referral and lucky commissions based on presence of coupon_code
+      const luckyCommissions = validCommissions.filter((c) => c.coupon_code && c.coupon_code.trim());
+      const referralCommissions = validCommissions.filter((c) => !c.coupon_code || !c.coupon_code.trim());
+      const referralTotal = referralCommissions.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+      const luckyTotal = luckyCommissions.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+      setReferralCommissionTotal(referralTotal);
+      setLuckyCommissionTotal(luckyTotal);
     } catch (e) {
       // ignore
+    }
+  };
+
+  const loadWalletDirectCommission = async () => {
+    try {
+      const res = await API.get("/accounts/team/summary/");
+      const valStr = res?.data?.totals?.direct_referral ?? "0";
+      const total = Number(valStr) || 0;
+      setWalletDirectReferralTotal(total);
+    } catch (e) {
+      setWalletDirectReferralTotal(0);
     }
   };
 
@@ -265,7 +461,7 @@ export default function EmployeeDashboard({ embedded = false }) {
       await loadPendingSubs();
     } catch (e) {
       const err = e?.response?.data;
-      const msg = (typeof err === "string" ? err : (err?.detail || JSON.stringify(err || {}))) || "Failed to assign code.";
+      const msg = (typeof err === "string" ? err : err?.detail || JSON.stringify(err || {})) || "Failed to assign code.";
       alert(msg);
     } finally {
       setAssignBusy(false);
@@ -476,7 +672,9 @@ export default function EmployeeDashboard({ embedded = false }) {
     loadLuckyStats();
     loadApprovedHistory();
     loadMyCommissions();
+    loadWalletDirectCommission();
     loadMyAssignments();
+    loadReferralCount();
     loadCodes();
     loadPendingSubs();
     loadWallet();
@@ -491,37 +689,81 @@ export default function EmployeeDashboard({ embedded = false }) {
         <ListItemButton
           selected={location.pathname === "/employee/profile"}
           sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
-          onClick={() => { navigate("/employee/profile"); }}
+          onClick={() => {
+            navigate("/employee/profile");
+          }}
         >
           <ListItemText primary="Profile" />
         </ListItemButton>
         <ListItemButton
-          selected={activeTab === TABS.LUCKY}
+          selected={activeTab === TABS.DASHBOARD}
           sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
-          onClick={() => { setActiveTab(TABS.LUCKY); navigate("/employee/dashboard?tab=lucky"); }}
+          onClick={() => {
+            setActiveTab(TABS.DASHBOARD);
+            navigate("/employee/dashboard");
+          }}
+        >
+          <ListItemText primary="Dashboard" />
+        </ListItemButton>
+        <ListItemButton
+          selected={activeTab === TABS.LUCKY_DRAW_HISTORY}
+          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+          onClick={() => {
+            setActiveTab(TABS.LUCKY_DRAW_HISTORY);
+            navigate("/employee/dashboard?tab=lucky_draw_history");
+          }}
         >
           <ListItemText primary="Lucky Draw Submission" />
         </ListItemButton>
-        {/* <ListItemButton
-          selected={activeTab === TABS.ASSIGN}
-          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
-          onClick={() => setActiveTab(TABS.ASSIGN)}
-        >
-          <ListItemText primary="My Assignments" />
-        </ListItemButton> */}
         <ListItemButton
-          selected={activeTab === TABS.ECOUPONS}
+          selected={activeTab === TABS.E_COUPONS}
           sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
-          onClick={() => { setActiveTab(TABS.ECOUPONS); navigate("/employee/dashboard?tab=ecoupons"); }}
+          onClick={() => {
+            setActiveTab(TABS.E_COUPONS);
+            navigate("/employee/dashboard?tab=e_coupons");
+          }}
         >
-          <ListItemText primary="My E‑Coupons" />
+          <ListItemText primary="E-Coupons" />
+        </ListItemButton>
+        <ListItemButton
+          selected={activeTab === TABS.MY_TEAM}
+          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+          onClick={() => {
+            setActiveTab(TABS.MY_TEAM);
+            navigate("/employee/dashboard?tab=my_team");
+          }}
+        >
+          <ListItemText primary="My Team" />
+        </ListItemButton>
+        <ListItemButton
+          selected={activeTab === TABS.REFER_EARN}
+          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+          onClick={() => {
+            setActiveTab(TABS.REFER_EARN);
+            navigate("/employee/dashboard?tab=refer_earn");
+          }}
+        >
+          <ListItemText primary="Refer & Earn" />
+        </ListItemButton>
+        <ListItemButton
+          selected={activeTab === TABS.REWARDS}
+          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+          onClick={() => {
+            setActiveTab(TABS.REWARDS);
+            navigate("/employee/dashboard?tab=rewards");
+          }}
+        >
+          <ListItemText primary="Rewards" />
         </ListItemButton>
         <ListItemButton
           selected={activeTab === TABS.WALLET}
           sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
-          onClick={() => { setActiveTab(TABS.WALLET); navigate("/employee/dashboard?tab=wallet"); }}
+          onClick={() => {
+            setActiveTab(TABS.WALLET);
+            navigate("/employee/dashboard?tab=wallet");
+          }}
         >
-          <ListItemText primary="My Wallet" />
+          <ListItemText primary="Wallet" />
         </ListItemButton>
         <ListItemButton
           sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
@@ -531,44 +773,179 @@ export default function EmployeeDashboard({ embedded = false }) {
         </ListItemButton>
       </List>
       <Divider />
-      <Box sx={{ p: 2, color: "text.secondary", fontSize: 13 }}>
-        Logged in as: {displayName}
-      </Box>
+      <Box sx={{ p: 2, color: "text.secondary", fontSize: 13 }}>Logged in as: {displayName}</Box>
     </Box>
   );
 
   if (embedded) {
     return (
-        <Container maxWidth="lg" sx={{ px: 0 }}>
-          <ReferAndEarn title="Refer & Earn" />
-          <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mt: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
-              My Team (5‑Matrix)
-            </Typography>
-            <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden", background: "#fff", padding: 12 }}>
-              <TreeReferralGalaxy mode="self" />
-            </div>
-          </Paper>
-        {activeTab === TABS.LUCKY && (
-          <Grid container spacing={2}>
-            <Grid item xs={12}>
-              <RewardsTargetCard role="employee" />
-            </Grid>
+      <Container maxWidth="lg" sx={{ px: 0 }} disableGutters>
+  {activeTab === TABS.DASHBOARD && (
+    <>
+      <Grid
+        container
+        rowSpacing={2}
+        columnSpacing={{ xs: 0, sm: 2 }}
+        sx={{
+          width: '100%',
+          minWidth: { xs: 0 }, // applies only for mobile (xs)
+          boxSizing: { xs: 'border-box' }, // applies only for mobile
+        }}
+      >
+        <Grid
+          item
+          xs={12}
+          sm={6}
+          md={3}
+          sx={{
+           
+            '@media (max-width:600px)': {
+              minWidth: 0,
+              boxSizing: 'border-box',
+              width: '100%',
+            },
+          }}
+        >
+          <KpiCard
+            title="Consumers Registered (Direct Referral)"
+            value={referralLoading ? "..." : referralCount}
+            subtitle="Direct Referrals"
+            palette="blue"
+          />
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3} sx={{
+           
+            '@media (max-width:600px)': {
+              minWidth: 0,
+              boxSizing: 'border-box',
+              width: '100%',
+            },
+          }}>
+          <KpiCard
+            title="Wallet Commission (Coupon Sales)"
+            value={`₹${luckyCommissionTotal.toFixed(2)}`}
+            subtitle="Commission from Coupon Sales"
+            palette="amber"
+          />
+        </Grid>
+
+          <Grid item xs={12} sm={6} md={3} sx={{
+           
+            '@media (max-width:600px)': {
+              minWidth: 0,
+              boxSizing: 'border-box',
+              width: '100%',
+            },
+          }}>
+          <KpiCard
+            title="Coupon Commission"
+            value={`₹${referralCommissionTotal.toFixed(2)}`}
+            subtitle="Coupon commissions"
+            palette="green"
+          />
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3} sx={{
+           
+            '@media (max-width:600px)': {
+              minWidth: 0,
+              boxSizing: 'border-box',
+              width: '100%',
+            },
+          }}>
+          <KpiCard
+            title="Direct Referral Commission"
+            value={`₹${walletDirectReferralTotal.toFixed(2)}`}
+            subtitle="Wallet earnings from direct referrals"
+            palette="green"
+          />
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3} sx={{
+            
+            '@media (max-width:600px)': {
+              minWidth: 0,
+              boxSizing: 'border-box',
+              width: '100%',
+            },
+          }}>
+          <KpiCard
+            title="E-Coupon Sold"
+            value={(codes || []).filter(
+              (c) => c.status === "REDEEMED" || c.status === "ASSIGNED_CONSUMER"
+            ).length}
+            subtitle="Total Sold"
+            palette="red"
+          />
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3} sx={{
+            
+            '@media (max-width:600px)': {
+              minWidth: 0,
+              boxSizing: 'border-box',
+              width: '100%',
+            },
+          }}>
+          <KpiCard
+            title="E-Coupon Available"
+            value={(codes || []).filter((c) => c.status === "AVAILABLE").length}
+            subtitle="Available Codes"
+            palette="purple"
+          />
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3} sx={{
+            
+            '@media (max-width:600px)': {
+              minWidth: 0,
+              boxSizing: 'border-box',
+              width: '100%',
+            },
+          }}>
+          <KpiCard
+            title="E-Coupon Assigned"
+            value={(codes || []).filter((c) => c.status === "ASSIGNED_CONSUMER").length}
+            subtitle="Assigned to Consumers"
+            palette="teal"
+          />
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3} sx={{
+           
+            '@media (max-width:600px)': {
+              minWidth: 0,
+              boxSizing: 'border-box',
+              width: '100%',
+            },
+          }}>
+          <KpiCard
+            title="Wallet Balance"
+            value={`₹${wallet.balance}`}
+            subtitle="Current Balance"
+            palette="cyan"
+          />
+        </Grid>
+      </Grid>
+
+      {/* Assign E-Coupon Section */}
+      
+    </>
+  )}
+        {activeTab === TABS.LUCKY_DRAW_HISTORY && (
+              <Grid container rowSpacing={2} columnSpacing={{ xs: 0, sm: 2 }}>
             {/* Lucky draw submissions awaiting my (TRE) approval */}
             <Grid item xs={12}>
-              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#e3f2fd" }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>
                   Lucky Draw Submissions Awaiting My Approval
                 </Typography>
                 <Box sx={{ mb: 2 }}>
-                  <Alert severity="info">
-                    My reviews — Approved: {luckyStats.approved} | Rejected: {luckyStats.rejected}
-                  </Alert>
+                  <Alert severity="info">My reviews — Approved: {luckyStats.approved} | Rejected: {luckyStats.rejected}</Alert>
                 </Box>
                 <Box sx={{ mb: 2 }}>
-                  <Alert severity="success">
-                    My commission earned: ₹{commissionTotal.toFixed(2)}
-                  </Alert>
+                  <Alert severity="success">My commission earned: ₹{commissionTotal.toFixed(2)}</Alert>
                 </Box>
                 {luckyLoading ? (
                   <Box sx={{ py: 3, display: "flex", alignItems: "center", gap: 1 }}>
@@ -598,22 +975,10 @@ export default function EmployeeDashboard({ embedded = false }) {
                           <TableCell>{r.status}</TableCell>
                           <TableCell align="right">
                             <Stack direction="row" spacing={1} justifyContent="flex-end">
-                              <Button
-                                size="small"
-                                variant="contained"
-                                disabled={luckyActionBusy}
-                                onClick={() => treApproveLucky(r.id)}
-                                sx={{ backgroundColor: "#2E7D32", "&:hover": { backgroundColor: "#1B5E20" } }}
-                              >
+                              <Button size="small" variant="contained" disabled={luckyActionBusy} onClick={() => treApproveLucky(r.id)} sx={{ backgroundColor: "#2E7D32", "&:hover": { backgroundColor: "#1B5E20" } }}>
                                 Approve
                               </Button>
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                color="error"
-                                disabled={luckyActionBusy}
-                                onClick={() => treRejectLucky(r.id)}
-                              >
+                              <Button size="small" variant="outlined" color="error" disabled={luckyActionBusy} onClick={() => treRejectLucky(r.id)}>
                                 Reject
                               </Button>
                             </Stack>
@@ -637,10 +1002,8 @@ export default function EmployeeDashboard({ embedded = false }) {
 
             {/* My Approved Submissions */}
             <Grid item xs={12}>
-              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>
-                  My Approved Submissions
-                </Typography>
+              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#e3f2fd" }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My Approved Submissions</Typography>
                 {approvedLoading ? (
                   <Box sx={{ py: 3, display: "flex", alignItems: "center", gap: 1 }}>
                     <CircularProgress size={20} /> <Typography variant="body2">Loading...</Typography>
@@ -673,7 +1036,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                           </TableCell>
                           <TableCell>
                             {r.tre_comment ? `TRE: ${r.tre_comment} ` : ""}
-                              {r.agency_comment ? `AGENCY: ${r.agency_comment}` : ""}
+                            {r.agency_comment ? `AGENCY: ${r.agency_comment}` : ""}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -693,100 +1056,16 @@ export default function EmployeeDashboard({ embedded = false }) {
             </Grid>
           </Grid>
         )}
-        {activeTab === TABS.ASSIGN && (
-          <Grid container spacing={2}>
+
+        {activeTab === TABS.E_COUPONS && (
+              <Grid container spacing={2} sx={{ width: "100%", minWidth: 0, boxSizing: "border-box" }}>
             <Grid item xs={12}>
-              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
-                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>
-                    My Lucky Draw Coupon Assignments
-                  </Typography>
-                  <Box sx={{ display: "flex", gap: 1 }}>
-                    <Button size="small" onClick={loadMyAssignments}>Refresh</Button>
-                  </Box>
-                </Box>
-                {assignError ? <Alert severity="error" sx={{ mb: 2 }}>{assignError}</Alert> : null}
-                {assignLoading ? (
-                  <Box sx={{ py: 2, display: "flex", alignItems: "center", gap: 1 }}>
-                    <CircularProgress size={20} /> <Typography variant="body2">Loading...</Typography>
-                  </Box>
-                ) : (
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Date</TableCell>
-                        <TableCell>Agency</TableCell>
-                        <TableCell>Assigned</TableCell>
-                        <TableCell>Sold</TableCell>
-                        <TableCell>Remaining</TableCell>
-                        <TableCell>Note</TableCell>
-                        <TableCell align="right">Update</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {(assignList || []).map((row) => {
-                        const edit = soldEdits[row.id] || {};
-                        const value = edit.value !== undefined ? edit.value : row.sold_count || 0;
-                        return (
-                          <TableRow key={row.id}>
-                            <TableCell>{row.created_at ? new Date(row.created_at).toLocaleString() : ""}</TableCell>
-                            <TableCell>{row.created_by_username || ""}</TableCell>
-                            <TableCell>{row.quantity}</TableCell>
-                            <TableCell>
-                              <TextField
-                                size="small"
-                                value={value}
-                                onChange={(e) => handleSoldChange(row.id, e.target.value)}
-                                error={Boolean(edit.error)}
-                                helperText={edit.error || ""}
-                                inputProps={{ inputMode: "numeric", pattern: "[0-9]*", min: 0 }}
-                                sx={{ width: 120 }}
-                              />
-                            </TableCell>
-                            <TableCell>{row.remaining}</TableCell>
-                            <TableCell>{row.note || ""}</TableCell>
-                            <TableCell align="right">
-                              <Button
-                                size="small"
-                                variant="contained"
-                                onClick={() => saveSold(row)}
-                                disabled={Boolean(edit.saving)}
-                              >
-                                {edit.saving ? "Saving..." : "Save"}
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                      {(!assignList || assignList.length === 0) && (
-                        <TableRow>
-                          <TableCell colSpan={7}>
-                            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                              No assignments yet.
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                )}
-              </Paper>
-            </Grid>
-          </Grid>
-        )}
-        {activeTab === TABS.ECOUPONS && (
-          <Grid container spacing={2}>
-            <Grid item xs={12}>
-              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>
-                  My E‑Coupon Codes
-                </Typography>
+              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#e3f2fd" }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My E‑Coupon Codes</Typography>
 
                 {/* Pending E‑Coupon submissions awaiting my approval */}
                 <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2, bgcolor: "#fff" }}>
-                  <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>
-                    Pending E‑Coupon Submissions Awaiting My Approval
-                  </Typography>
+                  <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Pending E‑Coupon Submissions Awaiting My Approval</Typography>
                   {pendingLoading ? (
                     <Box sx={{ py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
                       <CircularProgress size={18} /> <Typography variant="body2">Loading…</Typography>
@@ -815,22 +1094,10 @@ export default function EmployeeDashboard({ embedded = false }) {
                             <TableCell>{s.status}</TableCell>
                             <TableCell align="right">
                               <Stack direction="row" spacing={1} justifyContent="flex-end">
-                                <Button
-                                  size="small"
-                                  variant="contained"
-                                  disabled={pendingBusy}
-                                  onClick={() => empApprove(s.id)}
-                                  sx={{ backgroundColor: "#2E7D32", "&:hover": { backgroundColor: "#1B5E20" } }}
-                                >
+                                <Button size="small" variant="contained" disabled={pendingBusy} onClick={() => empApprove(s.id)} sx={{ backgroundColor: "#2E7D32", "&:hover": { backgroundColor: "#1B5E20" } }}>
                                   Approve
                                 </Button>
-                                <Button
-                                  size="small"
-                                  variant="outlined"
-                                  color="error"
-                                  disabled={pendingBusy}
-                                  onClick={() => empReject(s.id)}
-                                >
+                                <Button size="small" variant="outlined" color="error" disabled={pendingBusy} onClick={() => empReject(s.id)}>
                                   Reject
                                 </Button>
                               </Stack>
@@ -853,9 +1120,7 @@ export default function EmployeeDashboard({ embedded = false }) {
 
                 {/* Assign to Consumer */}
                 <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2, bgcolor: "#fbfdff" }}>
-                  <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>
-                    Assign E‑Coupon to Consumer
-                  </Typography>
+                  <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Assign E‑Coupon to Consumer</Typography>
                   <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                     <TextField
                       select
@@ -864,13 +1129,13 @@ export default function EmployeeDashboard({ embedded = false }) {
                       value={assign.codeId}
                       onChange={(e) => setAssign((a) => ({ ...a, codeId: e.target.value }))}
                       sx={{ minWidth: 220 }}
-                      helperText={codesLoading ? "Loading..." : (codesError || "")}
+                      helperText={codesLoading ? "Loading..." : codesError || ""}
                     >
                       {(codes || [])
                         .filter((c) => c.status === "ASSIGNED_EMPLOYEE" || c.status === "AVAILABLE")
                         .map((c) => (
                           <MenuItem key={c.id} value={c.id}>
-                            {c.code} {typeof c.value !== "undefined" ? `(₹${c.value})` : ""}
+                            {c.code} {c.value !== undefined ? ` (₹${c.value}) ` : ""}
                           </MenuItem>
                         ))}
                       {(!codes || codes.length === 0) && (
@@ -879,33 +1144,10 @@ export default function EmployeeDashboard({ embedded = false }) {
                         </MenuItem>
                       )}
                     </TextField>
-                    <TextField
-                      size="small"
-                      label="Consumer Username"
-                      value={assign.consumerUsername}
-                      onChange={(e) => setAssign((a) => ({ ...a, consumerUsername: e.target.value }))}
-                      sx={{ minWidth: 200 }}
-                    />
-                    <TextField
-                      size="small"
-                      label="Pincode"
-                      value={assign.pincode}
-                      onChange={(e) => setAssign((a) => ({ ...a, pincode: e.target.value }))}
-                      inputProps={{ inputMode: "numeric", pattern: "[0-9]*", maxLength: 10 }}
-                      sx={{ minWidth: 140 }}
-                    />
-                    <TextField
-                      size="small"
-                      label="Notes"
-                      value={assign.notes}
-                      onChange={(e) => setAssign((a) => ({ ...a, notes: e.target.value }))}
-                      sx={{ minWidth: 200 }}
-                    />
-                    <Button
-                      variant="contained"
-                      onClick={doAssign}
-                      disabled={assignBusy || !assign.codeId || !assign.consumerUsername || !assign.pincode}
-                    >
+                    <TextField size="small" label="Consumer Username" value={assign.consumerUsername} onChange={(e) => setAssign((a) => ({ ...a, consumerUsername: e.target.value }))} sx={{ minWidth: 200 }} />
+                    <TextField size="small" label="Pincode" value={assign.pincode} onChange={(e) => setAssign((a) => ({ ...a, pincode: e.target.value }))} inputProps={{ inputMode: "numeric", pattern: "[0-9]*", maxLength: 10 }} sx={{ minWidth: 140 }} />
+                    <TextField size="small" label="Notes" value={assign.notes} onChange={(e) => setAssign((a) => ({ ...a, notes: e.target.value }))} sx={{ minWidth: 200 }} />
+                    <Button variant="contained" onClick={doAssign} disabled={assignBusy || !assign.codeId || !assign.consumerUsername || !assign.pincode}>
                       {assignBusy ? "Assigning..." : "Assign"}
                     </Button>
                   </Stack>
@@ -937,7 +1179,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                           <TableCell>{c.status}</TableCell>
                           <TableCell>{c.batch || ""}</TableCell>
                           <TableCell>{c.serial || ""}</TableCell>
-                          <TableCell>{typeof c.value !== "undefined" ? `₹${c.value}` : ""}</TableCell>
+                          <TableCell>{c.value !== undefined ? `₹${c.value}` : ""}</TableCell>
                           <TableCell>{c.assigned_agency_username || ""}</TableCell>
                           <TableCell>{c.created_at ? new Date(c.created_at).toLocaleString() : ""}</TableCell>
                         </TableRow>
@@ -959,13 +1201,9 @@ export default function EmployeeDashboard({ embedded = false }) {
 
             {/* Commissions list */}
             <Grid item xs={12}>
-              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>
-                  My Commissions
-                </Typography>
-                <Alert severity="success" sx={{ mb: 2 }}>
-                  Commission earned (lifetime): ₹{commissionTotal.toFixed(2)}
-                </Alert>
+              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#e3f2fd" }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My Commissions</Typography>
+                <Alert severity="success" sx={{ mb: 2 }}>Commission earned (lifetime): ₹{commissionTotal.toFixed(2)}</Alert>
                 <Table size="small">
                   <TableHead>
                     <TableRow>
@@ -989,9 +1227,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                     {(!commissions || commissions.length === 0) && (
                       <TableRow>
                         <TableCell colSpan={5}>
-                          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                            No commissions yet.
-                          </Typography>
+                          <Typography variant="body2" sx={{ color: "text.secondary" }}>No commissions yet.</Typography>
                         </TableCell>
                       </TableRow>
                     )}
@@ -1001,13 +1237,31 @@ export default function EmployeeDashboard({ embedded = false }) {
             </Grid>
           </Grid>
         )}
-        {activeTab === TABS.WALLET && (
-          <Grid container spacing={2}>
+
+        {activeTab === TABS.MY_TEAM && (
+              <Grid container spacing={2} sx={{ width: "100%", minWidth: 0, boxSizing: "border-box" }}>
             <Grid item xs={12}>
-              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>
-                  My Wallet
-                </Typography>
+              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#e3f2fd" }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>My Team (5‑Matrix)</Typography>
+                <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden", background: "#fff", padding: 12 }}>
+                  <TreeReferralGalaxy mode="self" />
+                </div>
+              </Paper>
+            </Grid>
+          </Grid>
+        )}
+
+        {activeTab === TABS.REFER_EARN && (
+          <ReferAndEarn title="Refer Consumer" onlyConsumer sponsorUsername={(storedUser?.sponsor_id || (storedUser && storedUser.user && storedUser.user.sponsor_id) || "")} />
+        )}
+
+        {activeTab === TABS.REWARDS && <RewardsTargetCard role="employee" />}
+
+        {activeTab === TABS.WALLET && (
+              <Grid container spacing={2} sx={{ width: "100%", minWidth: 0, boxSizing: "border-box" }}>
+            <Grid item xs={12}>
+              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#e3f2fd" }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My Wallet</Typography>
                 {walletLoading ? (
                   <Typography variant="body2">Loading...</Typography>
                 ) : walletError ? (
@@ -1018,81 +1272,30 @@ export default function EmployeeDashboard({ embedded = false }) {
                   </Alert>
                 )}
 
-                <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>
-                  Request Withdrawal
-                </Typography>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Request Withdrawal</Typography>
                 {wdrErr ? <Alert severity="error" sx={{ mb: 1 }}>{wdrErr}</Alert> : null}
                 {onCooldown ? (
                   <Alert severity="warning" sx={{ mb: 1 }}>
-                    Only one withdrawal is allowed per week. Next available:{" "}
-                    {cooldownUntil ? cooldownUntil.toLocaleString() : "-"}
+                    Only one withdrawal is allowed per week. Next available: {cooldownUntil ? cooldownUntil.toLocaleString() : "-"}
                   </Alert>
                 ) : null}
                 <Box component="form" onSubmit={submitWithdrawal} sx={{ mb: 2 }}>
                   <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      label="Amount (₹)"
-                      name="amount"
-                      value={wdrForm.amount}
-                      onChange={(e) => setWdrForm((f) => ({ ...f, amount: e.target.value }))}
-                      inputProps={{ inputMode: "decimal" }}
-                      required
-                    />
-                    <TextField
-                      fullWidth
-                      size="small"
-                      select
-                      label="Method"
-                      name="method"
-                      value={wdrForm.method}
-                      onChange={onWdrChange}
-                    >
+                    <TextField fullWidth size="small" label="Amount (₹)" name="amount" value={wdrForm.amount} onChange={(e) => setWdrForm((f) => ({ ...f, amount: e.target.value }))} inputProps={{ inputMode: "decimal" }} required />
+                    <TextField fullWidth size="small" select label="Method" name="method" value={wdrForm.method} onChange={onWdrChange}>
                       <MenuItem value="upi">UPI</MenuItem>
                       <MenuItem value="bank">Bank</MenuItem>
                     </TextField>
                   </Stack>
                   {wdrForm.method === "upi" ? (
                     <Box sx={{ mt: 1 }}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="UPI ID"
-                        name="upi_id"
-                        value={wdrForm.upi_id}
-                        onChange={onWdrChange}
-                        required
-                      />
+                      <TextField fullWidth size="small" label="UPI ID" name="upi_id" value={wdrForm.upi_id} onChange={onWdrChange} required />
                     </Box>
                   ) : (
                     <Stack spacing={1} sx={{ mt: 1 }}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Bank Name"
-                        name="bank_name"
-                        value={wdrForm.bank_name}
-                        onChange={onWdrChange}
-                      />
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Account Number"
-                        name="bank_account_number"
-                        value={wdrForm.bank_account_number}
-                        onChange={onWdrChange}
-                        inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
-                      />
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="IFSC Code"
-                        name="ifsc_code"
-                        value={wdrForm.ifsc_code}
-                        onChange={onWdrChange}
-                        inputProps={{ maxLength: 11, style: { textTransform: "uppercase" } }}
-                      />
+                      <TextField fullWidth size="small" label="Bank Name" name="bank_name" value={wdrForm.bank_name} onChange={onWdrChange} />
+                      <TextField fullWidth size="small" label="Account Number" name="bank_account_number" value={wdrForm.bank_account_number} onChange={onWdrChange} inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }} />
+                      <TextField fullWidth size="small" label="IFSC Code" name="ifsc_code" value={wdrForm.ifsc_code} onChange={onWdrChange} inputProps={{ maxLength: 11, style: { textTransform: "uppercase" } }} />
                     </Stack>
                   )}
                   <Button type="submit" variant="contained" disabled={onCooldown || wdrSubmitting} sx={{ mt: 1 }}>
@@ -1100,9 +1303,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                   </Button>
                 </Box>
 
-                <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>
-                  Recent Transactions
-                </Typography>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Recent Transactions</Typography>
                 {txsLoading ? (
                   <Typography variant="body2">Loading...</Typography>
                 ) : txsError ? (
@@ -1126,18 +1327,16 @@ export default function EmployeeDashboard({ embedded = false }) {
                           <TableCell>{t.type}</TableCell>
                           <TableCell>₹{t.amount}</TableCell>
                           <TableCell>₹{t.balance_after}</TableCell>
-                          <TableCell>{t.source_type || ""} {t.source_id ? `(${t.source_id})` : ""}</TableCell>
-                          <TableCell style={{ maxWidth: 300, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                            {t.meta ? JSON.stringify(t.meta) : ""}
+                          <TableCell>
+                            {t.source_type || ""} {t.source_id ? `(${t.source_id})` : ""}
                           </TableCell>
+                          <TableCell style={{ maxWidth: 300, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.meta ? JSON.stringify(t.meta) : ""}</TableCell>
                         </TableRow>
                       ))}
                       {(!txs || txs.length === 0) && (
                         <TableRow>
                           <TableCell colSpan={6}>
-                            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                              No transactions yet.
-                            </Typography>
+                            <Typography variant="body2" sx={{ color: "text.secondary" }}>No transactions yet.</Typography>
                           </TableCell>
                         </TableRow>
                       )}
@@ -1168,7 +1367,7 @@ export default function EmployeeDashboard({ embedded = false }) {
 
           <Box sx={{ flexGrow: 1 }} />
 
-          <Typography variant="body2" sx={{ mr: 2 }}>{displayName}</Typography>
+          {/* <Typography variant="body2" sx={{ mr: 2 }}>{displayName}</Typography> */}
           <Button color="inherit" size="small" sx={{ fontWeight: 500, textTransform: "none" }} onClick={handleLogout}>
             Logout
           </Button>
@@ -1183,7 +1382,7 @@ export default function EmployeeDashboard({ embedded = false }) {
         ModalProps={{ keepMounted: true }}
         sx={{
           display: { xs: "block", sm: "none" },
-          "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box", borderRight: "1px solid #e5e7eb" },
+          "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box", borderRight: "1px solid #e5e7eb", backgroundColor: "#e3f2fd" },
         }}
       >
         <Toolbar />
@@ -1197,7 +1396,7 @@ export default function EmployeeDashboard({ embedded = false }) {
           width: drawerWidth,
           flexShrink: 0,
           display: { xs: "none", sm: "block" },
-          "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box", borderRight: "1px solid #e5e7eb" },
+          "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box", borderRight: "1px solid #e5e7eb", backgroundColor: "#e3f2fd" },
         }}
         open
       >
@@ -1206,30 +1405,126 @@ export default function EmployeeDashboard({ embedded = false }) {
       </Drawer>
 
       {/* Main Content */}
-      <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, md: 3 } }}>
+      <Box component="main" sx={{ flexGrow: 1, p: { xs: 0, md: 3 }, overflowX: "hidden" }}>
         <Toolbar />
-        <Container maxWidth="lg" sx={{ px: 0 }}>
-          <ReferAndEarn title="Refer & Earn" />
-          {activeTab === TABS.LUCKY && (
-            <Grid container spacing={2}>
-              <Grid item xs={12}>
-                <RewardsTargetCard role="employee" />
+        <Container maxWidth="lg" sx={{ px: 0 }} disableGutters>
+          {activeTab === TABS.DASHBOARD && (
+            <>
+              <Grid container spacing={2} sx={{ width: "100%", minWidth: 0, boxSizing: "border-box" }}>
+                <Grid item xs={12} sm={6} md={3}>
+                  <KpiCard
+                    title="Consumers Registered (Direct Referral)"
+                    value={referralLoading ? "..." : referralCount}
+                    subtitle="Direct Referrals"
+                    palette="blue"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <KpiCard
+                    title="Wallet Commission (Coupon Sales)"
+                    value={`₹${luckyCommissionTotal.toFixed(2)}`}
+                    subtitle="Commission from Coupon Sales"
+                    palette="amber"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <KpiCard
+                    title="Coupon Commission"
+                    value={`₹${referralCommissionTotal.toFixed(2)}`}
+                    subtitle="Coupon commissions"
+                    palette="green"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <KpiCard
+                    title="Direct Referral Commission"
+                    value={`₹${walletDirectReferralTotal.toFixed(2)}`}
+                    subtitle="Wallet earnings from direct referrals"
+                    palette="green"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <KpiCard
+                    title="E-Coupon Sold"
+                    value={(codes || []).filter((c) => c.status === "REDEEMED" || c.status === "ASSIGNED_CONSUMER").length}
+                    subtitle="Total Sold"
+                    palette="red"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <KpiCard
+                    title="E-Coupon Available"
+                    value={(codes || []).filter((c) => c.status === "AVAILABLE").length}
+                    subtitle="Available Codes"
+                    palette="purple"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <KpiCard
+                    title="E-Coupon Assigned"
+                    value={(codes || []).filter((c) => c.status === "ASSIGNED_CONSUMER").length}
+                    subtitle="Assigned to Consumers"
+                    palette="teal"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <KpiCard
+                    title="Wallet Balance"
+                    value={`₹${wallet.balance}`}
+                    subtitle="Current Balance"
+                    palette="cyan"
+                  />
+                </Grid>
               </Grid>
+
+              <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mt: 2, bgcolor: "#fbfdff" }}>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Assign E‑Coupon to Consumer</Typography>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                  <TextField
+                    select
+                    size="small"
+                    label="Select Code"
+                    value={assign.codeId}
+                    onChange={(e) => setAssign((a) => ({ ...a, codeId: e.target.value }))}
+                    sx={{ minWidth: 220 }}
+                    helperText={codesLoading ? "Loading..." : codesError || ""}
+                  >
+                    {(codes || [])
+                      .filter((c) => c.status === "ASSIGNED_EMPLOYEE" || c.status === "AVAILABLE")
+                      .map((c) => (
+                        <MenuItem key={c.id} value={c.id}>
+                          {c.code} {c.value !== undefined ? ` (₹${c.value}) ` : ""}
+                        </MenuItem>
+                      ))}
+                    {(!codes || codes.length === 0) && (
+                      <MenuItem disabled value="">
+                        {codesLoading ? "Loading..." : "No codes assigned to you"}
+                      </MenuItem>
+                    )}
+                  </TextField>
+                  <TextField size="small" label="Consumer Username" value={assign.consumerUsername} onChange={(e) => setAssign((a) => ({ ...a, consumerUsername: e.target.value }))} sx={{ minWidth: 200 }} />
+                  <TextField size="small" label="Pincode" value={assign.pincode} onChange={(e) => setAssign((a) => ({ ...a, pincode: e.target.value }))} inputProps={{ inputMode: "numeric", pattern: "[0-9]*", maxLength: 10 }} sx={{ minWidth: 140 }} />
+                  <TextField size="small" label="Notes" value={assign.notes} onChange={(e) => setAssign((a) => ({ ...a, notes: e.target.value }))} sx={{ minWidth: 200 }} />
+                  <Button variant="contained" onClick={doAssign} disabled={assignBusy || !assign.codeId || !assign.consumerUsername || !assign.pincode}>
+                    {assignBusy ? "Assigning..." : "Assign"}
+                  </Button>
+                </Stack>
+              </Paper>
+            </>
+          )}
+          {activeTab === TABS.LUCKY_DRAW_HISTORY && (
+            <Grid container spacing={2}>
               {/* Lucky draw submissions awaiting my (TRE) approval */}
               <Grid item xs={12}>
-                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#e3f2fd" }}>
                   <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>
                     Lucky Draw Submissions Awaiting My Approval
                   </Typography>
                   <Box sx={{ mb: 2 }}>
-                    <Alert severity="info">
-                      My reviews — Approved: {luckyStats.approved} | Rejected: {luckyStats.rejected}
-                    </Alert>
+                    <Alert severity="info">My reviews — Approved: {luckyStats.approved} | Rejected: {luckyStats.rejected}</Alert>
                   </Box>
                   <Box sx={{ mb: 2 }}>
-                    <Alert severity="success">
-                      My commission earned: ₹{commissionTotal.toFixed(2)}
-                    </Alert>
+                    <Alert severity="success">My commission earned: ₹{commissionTotal.toFixed(2)}</Alert>
                   </Box>
                   {luckyLoading ? (
                     <Box sx={{ py: 3, display: "flex", alignItems: "center", gap: 1 }}>
@@ -1259,22 +1554,10 @@ export default function EmployeeDashboard({ embedded = false }) {
                             <TableCell>{r.status}</TableCell>
                             <TableCell align="right">
                               <Stack direction="row" spacing={1} justifyContent="flex-end">
-                                <Button
-                                  size="small"
-                                  variant="contained"
-                                  disabled={luckyActionBusy}
-                                  onClick={() => treApproveLucky(r.id)}
-                                  sx={{ backgroundColor: "#2E7D32", "&:hover": { backgroundColor: "#1B5E20" } }}
-                                >
+                                <Button size="small" variant="contained" disabled={luckyActionBusy} onClick={() => treApproveLucky(r.id)} sx={{ backgroundColor: "#2E7D32", "&:hover": { backgroundColor: "#1B5E20" } }}>
                                   Approve
                                 </Button>
-                                <Button
-                                  size="small"
-                                  variant="outlined"
-                                  color="error"
-                                  disabled={luckyActionBusy}
-                                  onClick={() => treRejectLucky(r.id)}
-                                >
+                                <Button size="small" variant="outlined" color="error" disabled={luckyActionBusy} onClick={() => treRejectLucky(r.id)}>
                                   Reject
                                 </Button>
                               </Stack>
@@ -1284,9 +1567,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                         {(!luckyPending || luckyPending.length === 0) && (
                           <TableRow>
                             <TableCell colSpan={6}>
-                              <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                                No pending lucky draw submissions.
-                              </Typography>
+                              <Typography variant="body2" sx={{ color: "text.secondary" }}>No pending lucky draw submissions.</Typography>
                             </TableCell>
                           </TableRow>
                         )}
@@ -1298,10 +1579,8 @@ export default function EmployeeDashboard({ embedded = false }) {
 
               {/* My Approved Submissions */}
               <Grid item xs={12}>
-                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>
-                    My Approved Submissions
-                  </Typography>
+                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#e3f2fd" }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My Approved Submissions</Typography>
                   {approvedLoading ? (
                     <Box sx={{ py: 3, display: "flex", alignItems: "center", gap: 1 }}>
                       <CircularProgress size={20} /> <Typography variant="body2">Loading...</Typography>
@@ -1341,9 +1620,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                         {(!approvedList || approvedList.length === 0) && (
                           <TableRow>
                             <TableCell colSpan={7}>
-                              <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                                No approved submissions yet.
-                              </Typography>
+                              <Typography variant="body2" sx={{ color: "text.secondary" }}>No approved submissions yet.</Typography>
                             </TableCell>
                           </TableRow>
                         )}
@@ -1357,11 +1634,9 @@ export default function EmployeeDashboard({ embedded = false }) {
           {activeTab === TABS.ASSIGN && (
             <Grid container spacing={2}>
               <Grid item xs={12}>
-                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#e3f2fd" }}>
                   <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>
-                      My Lucky Draw Coupon Assignments
-                    </Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>My Lucky Draw Coupon Assignments</Typography>
                     <Box sx={{ display: "flex", gap: 1 }}>
                       <Button size="small" onClick={loadMyAssignments}>Refresh</Button>
                     </Box>
@@ -1407,12 +1682,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                               <TableCell>{row.remaining}</TableCell>
                               <TableCell>{row.note || ""}</TableCell>
                               <TableCell align="right">
-                                <Button
-                                  size="small"
-                                  variant="contained"
-                                  onClick={() => saveSold(row)}
-                                  disabled={Boolean(edit.saving)}
-                                >
+                                <Button size="small" variant="contained" onClick={() => saveSold(row)} disabled={Boolean(edit.saving)}>
                                   {edit.saving ? "Saving..." : "Save"}
                                 </Button>
                               </TableCell>
@@ -1422,9 +1692,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                         {(!assignList || assignList.length === 0) && (
                           <TableRow>
                             <TableCell colSpan={7}>
-                              <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                                No assignments yet.
-                              </Typography>
+                              <Typography variant="body2" sx={{ color: "text.secondary" }}>No assignments yet.</Typography>
                             </TableCell>
                           </TableRow>
                         )}
@@ -1436,19 +1704,15 @@ export default function EmployeeDashboard({ embedded = false }) {
             </Grid>
           )}
 
-          {activeTab === TABS.ECOUPONS && (
+          {activeTab === TABS.E_COUPONS && (
             <Grid container spacing={2}>
               <Grid item xs={12}>
-                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>
-                    My E‑Coupon Codes
-                  </Typography>
+                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#e3f2fd" }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My E‑Coupon Codes</Typography>
 
                   {/* Pending E‑Coupon submissions awaiting my approval */}
                   <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2, bgcolor: "#fff" }}>
-                    <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>
-                      Pending E‑Coupon Submissions Awaiting My Approval
-                    </Typography>
+                    <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Pending E‑Coupon Submissions Awaiting My Approval</Typography>
                     {pendingLoading ? (
                       <Box sx={{ py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
                         <CircularProgress size={18} /> <Typography variant="body2">Loading…</Typography>
@@ -1477,22 +1741,10 @@ export default function EmployeeDashboard({ embedded = false }) {
                               <TableCell>{s.status}</TableCell>
                               <TableCell align="right">
                                 <Stack direction="row" spacing={1} justifyContent="flex-end">
-                                  <Button
-                                    size="small"
-                                    variant="contained"
-                                    disabled={pendingBusy}
-                                    onClick={() => empApprove(s.id)}
-                                    sx={{ backgroundColor: "#2E7D32", "&:hover": { backgroundColor: "#1B5E20" } }}
-                                  >
+                                  <Button size="small" variant="contained" disabled={pendingBusy} onClick={() => empApprove(s.id)} sx={{ backgroundColor: "#2E7D32", "&:hover": { backgroundColor: "#1B5E20" } }}>
                                     Approve
                                   </Button>
-                                  <Button
-                                    size="small"
-                                    variant="outlined"
-                                    color="error"
-                                    disabled={pendingBusy}
-                                    onClick={() => empReject(s.id)}
-                                  >
+                                  <Button size="small" variant="outlined" color="error" disabled={pendingBusy} onClick={() => empReject(s.id)}>
                                     Reject
                                   </Button>
                                 </Stack>
@@ -1502,9 +1754,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                           {(!pendingSubs || pendingSubs.length === 0) && (
                             <TableRow>
                               <TableCell colSpan={6}>
-                                <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                                  No pending e‑coupon submissions.
-                                </Typography>
+                                <Typography variant="body2" sx={{ color: "text.secondary" }}>No pending e‑coupon submissions.</Typography>
                               </TableCell>
                             </TableRow>
                           )}
@@ -1515,9 +1765,7 @@ export default function EmployeeDashboard({ embedded = false }) {
 
                   {/* Assign to Consumer */}
                   <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2, bgcolor: "#fbfdff" }}>
-                    <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>
-                      Assign E‑Coupon to Consumer
-                    </Typography>
+                    <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Assign E‑Coupon to Consumer</Typography>
                     <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                       <TextField
                         select
@@ -1526,13 +1774,13 @@ export default function EmployeeDashboard({ embedded = false }) {
                         value={assign.codeId}
                         onChange={(e) => setAssign((a) => ({ ...a, codeId: e.target.value }))}
                         sx={{ minWidth: 220 }}
-                        helperText={codesLoading ? "Loading..." : (codesError || "")}
+                        helperText={codesLoading ? "Loading..." : codesError || ""}
                       >
                         {(codes || [])
                           .filter((c) => c.status === "ASSIGNED_EMPLOYEE" || c.status === "AVAILABLE")
                           .map((c) => (
                             <MenuItem key={c.id} value={c.id}>
-                              {c.code} {typeof c.value !== "undefined" ? `(₹${c.value})` : ""}
+                              {c.code} {typeof c.value !== "undefined" ? ` (₹${c.value}) ` : ""}
                             </MenuItem>
                           ))}
                         {(!codes || codes.length === 0) && (
@@ -1541,33 +1789,10 @@ export default function EmployeeDashboard({ embedded = false }) {
                           </MenuItem>
                         )}
                       </TextField>
-                      <TextField
-                        size="small"
-                        label="Consumer Username"
-                        value={assign.consumerUsername}
-                        onChange={(e) => setAssign((a) => ({ ...a, consumerUsername: e.target.value }))}
-                        sx={{ minWidth: 200 }}
-                      />
-                      <TextField
-                        size="small"
-                        label="Pincode"
-                        value={assign.pincode}
-                        onChange={(e) => setAssign((a) => ({ ...a, pincode: e.target.value }))}
-                        inputProps={{ inputMode: "numeric", pattern: "[0-9]*", maxLength: 10 }}
-                        sx={{ minWidth: 140 }}
-                      />
-                      <TextField
-                        size="small"
-                        label="Notes"
-                        value={assign.notes}
-                        onChange={(e) => setAssign((a) => ({ ...a, notes: e.target.value }))}
-                        sx={{ minWidth: 200 }}
-                      />
-                      <Button
-                        variant="contained"
-                        onClick={doAssign}
-                        disabled={assignBusy || !assign.codeId || !assign.consumerUsername || !assign.pincode}
-                      >
+                      <TextField size="small" label="Consumer Username" value={assign.consumerUsername} onChange={(e) => setAssign((a) => ({ ...a, consumerUsername: e.target.value }))} sx={{ minWidth: 200 }} />
+                      <TextField size="small" label="Pincode" value={assign.pincode} onChange={(e) => setAssign((a) => ({ ...a, pincode: e.target.value }))} inputProps={{ inputMode: "numeric", pattern: "[0-9]*", maxLength: 10 }} sx={{ minWidth: 140 }} />
+                      <TextField size="small" label="Notes" value={assign.notes} onChange={(e) => setAssign((a) => ({ ...a, notes: e.target.value }))} sx={{ minWidth: 200 }} />
+                      <Button variant="contained" onClick={doAssign} disabled={assignBusy || !assign.codeId || !assign.consumerUsername || !assign.pincode}>
                         {assignBusy ? "Assigning..." : "Assign"}
                       </Button>
                     </Stack>
@@ -1607,9 +1832,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                         {(!codes || codes.length === 0) && (
                           <TableRow>
                             <TableCell colSpan={7}>
-                              <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                                No codes assigned to you.
-                              </Typography>
+                              <Typography variant="body2" sx={{ color: "text.secondary" }}>No codes assigned to you.</Typography>
                             </TableCell>
                           </TableRow>
                         )}
@@ -1621,13 +1844,9 @@ export default function EmployeeDashboard({ embedded = false }) {
 
               {/* Commissions list */}
               <Grid item xs={12}>
-                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>
-                    My Commissions
-                  </Typography>
-                  <Alert severity="success" sx={{ mb: 2 }}>
-                    Commission earned (lifetime): ₹{commissionTotal.toFixed(2)}
-                  </Alert>
+                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#e3f2fd" }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My Commissions</Typography>
+                  <Alert severity="success" sx={{ mb: 2 }}>Commission earned (lifetime): ₹{commissionTotal.toFixed(2)}</Alert>
                   <Table size="small">
                     <TableHead>
                       <TableRow>
@@ -1651,9 +1870,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                       {(!commissions || commissions.length === 0) && (
                         <TableRow>
                           <TableCell colSpan={5}>
-                            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                              No commissions yet.
-                            </Typography>
+                            <Typography variant="body2" sx={{ color: "text.secondary" }}>No commissions yet.</Typography>
                           </TableCell>
                         </TableRow>
                       )}
@@ -1663,14 +1880,29 @@ export default function EmployeeDashboard({ embedded = false }) {
               </Grid>
             </Grid>
           )}
+          {activeTab === TABS.MY_TEAM && (
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#e3f2fd" }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>My Team (5‑Matrix)</Typography>
+                  <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden", background: "#fff", padding: 12 }}>
+                    <TreeReferralGalaxy mode="self" />
+                  </div>
+                </Paper>
+              </Grid>
+            </Grid>
+          )}
+          {activeTab === TABS.REFER_EARN && (
+            <ReferAndEarn title="Refer Consumer" onlyConsumer sponsorUsername={(storedUser?.sponsor_id || (storedUser && storedUser.user && storedUser.user.sponsor_id) || "")} />
+          )}
+
+          {activeTab === TABS.REWARDS && <RewardsTargetCard role="employee" />}
 
           {activeTab === TABS.WALLET && (
             <Grid container spacing={2}>
               <Grid item xs={12}>
-                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>
-                    My Wallet
-                  </Typography>
+                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#e3f2fd" }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My Wallet</Typography>
                   {walletLoading ? (
                     <Typography variant="body2">Loading...</Typography>
                   ) : walletError ? (
@@ -1681,81 +1913,30 @@ export default function EmployeeDashboard({ embedded = false }) {
                     </Alert>
                   )}
 
-                  <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>
-                    Request Withdrawal
-                  </Typography>
+                  <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Request Withdrawal</Typography>
                   {wdrErr ? <Alert severity="error" sx={{ mb: 1 }}>{wdrErr}</Alert> : null}
                   {onCooldown ? (
                     <Alert severity="warning" sx={{ mb: 1 }}>
-                      Only one withdrawal is allowed per week. Next available:{" "}
-                      {cooldownUntil ? cooldownUntil.toLocaleString() : "-"}
+                      Only one withdrawal is allowed per week. Next available: {cooldownUntil ? cooldownUntil.toLocaleString() : "-"}
                     </Alert>
                   ) : null}
                   <Box component="form" onSubmit={submitWithdrawal} sx={{ mb: 2 }}>
                     <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Amount (₹)"
-                        name="amount"
-                        value={wdrForm.amount}
-                        onChange={(e) => setWdrForm((f) => ({ ...f, amount: e.target.value }))}
-                        inputProps={{ inputMode: "decimal" }}
-                        required
-                      />
-                      <TextField
-                        fullWidth
-                        size="small"
-                        select
-                        label="Method"
-                        name="method"
-                        value={wdrForm.method}
-                        onChange={onWdrChange}
-                      >
+                      <TextField fullWidth size="small" label="Amount (₹)" name="amount" value={wdrForm.amount} onChange={(e) => setWdrForm((f) => ({ ...f, amount: e.target.value }))} inputProps={{ inputMode: "decimal" }} required />
+                      <TextField fullWidth size="small" select label="Method" name="method" value={wdrForm.method} onChange={onWdrChange}>
                         <MenuItem value="upi">UPI</MenuItem>
                         <MenuItem value="bank">Bank</MenuItem>
                       </TextField>
                     </Stack>
                     {wdrForm.method === "upi" ? (
                       <Box sx={{ mt: 1 }}>
-                        <TextField
-                          fullWidth
-                          size="small"
-                          label="UPI ID"
-                          name="upi_id"
-                          value={wdrForm.upi_id}
-                          onChange={onWdrChange}
-                          required
-                        />
+                        <TextField fullWidth size="small" label="UPI ID" name="upi_id" value={wdrForm.upi_id} onChange={onWdrChange} required />
                       </Box>
                     ) : (
                       <Stack spacing={1} sx={{ mt: 1 }}>
-                        <TextField
-                          fullWidth
-                          size="small"
-                          label="Bank Name"
-                          name="bank_name"
-                          value={wdrForm.bank_name}
-                          onChange={onWdrChange}
-                        />
-                        <TextField
-                          fullWidth
-                          size="small"
-                          label="Account Number"
-                          name="bank_account_number"
-                          value={wdrForm.bank_account_number}
-                          onChange={onWdrChange}
-                          inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
-                        />
-                        <TextField
-                          fullWidth
-                          size="small"
-                          label="IFSC Code"
-                          name="ifsc_code"
-                          value={wdrForm.ifsc_code}
-                          onChange={onWdrChange}
-                          inputProps={{ maxLength: 11, style: { textTransform: "uppercase" } }}
-                        />
+                        <TextField fullWidth size="small" label="Bank Name" name="bank_name" value={wdrForm.bank_name} onChange={onWdrChange} />
+                        <TextField fullWidth size="small" label="Account Number" name="bank_account_number" value={wdrForm.bank_account_number} onChange={onWdrChange} inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }} />
+                        <TextField fullWidth size="small" label="IFSC Code" name="ifsc_code" value={wdrForm.ifsc_code} onChange={onWdrChange} inputProps={{ maxLength: 11, style: { textTransform: "uppercase" } }} />
                       </Stack>
                     )}
                     <Button type="submit" variant="contained" disabled={onCooldown || wdrSubmitting} sx={{ mt: 1 }}>
@@ -1763,9 +1944,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                     </Button>
                   </Box>
 
-                  <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>
-                    Recent Transactions
-                  </Typography>
+                  <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Recent Transactions</Typography>
                   {txsLoading ? (
                     <Typography variant="body2">Loading...</Typography>
                   ) : txsError ? (
@@ -1789,18 +1968,16 @@ export default function EmployeeDashboard({ embedded = false }) {
                             <TableCell>{t.type}</TableCell>
                             <TableCell>₹{t.amount}</TableCell>
                             <TableCell>₹{t.balance_after}</TableCell>
-                            <TableCell>{t.source_type || ""} {t.source_id ? `(${t.source_id})` : ""}</TableCell>
-                            <TableCell style={{ maxWidth: 300, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                              {t.meta ? JSON.stringify(t.meta) : ""}
+                            <TableCell>
+                              {t.source_type || ""} {t.source_id ? `(${t.source_id})` : ""}
                             </TableCell>
+                            <TableCell style={{ maxWidth: 300, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.meta ? JSON.stringify(t.meta) : ""}</TableCell>
                           </TableRow>
                         ))}
                         {(!txs || txs.length === 0) && (
                           <TableRow>
                             <TableCell colSpan={6}>
-                              <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                                No transactions yet.
-                              </Typography>
+                              <Typography variant="body2" sx={{ color: "text.secondary" }}>No transactions yet.</Typography>
                             </TableCell>
                           </TableRow>
                         )}

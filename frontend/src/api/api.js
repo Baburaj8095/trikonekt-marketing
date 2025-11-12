@@ -10,6 +10,69 @@ const API = axios.create({ baseURL });
 // Separate client without interceptors for token refresh to avoid recursion/deadlocks
 const refreshClient = axios.create({ baseURL });
 
+// Session namespace helpers: isolate tokens per role (admin, user, agency, employee, business)
+function currentNamespace() {
+  try {
+    const p =
+      typeof window !== "undefined" &&
+      window.location &&
+      typeof window.location.pathname === "string"
+        ? window.location.pathname
+        : "";
+    if (p.startsWith("/admin")) return "admin";
+    if (p.startsWith("/agency")) return "agency";
+    if (p.startsWith("/employee")) return "employee";
+    if (p.startsWith("/business")) return "business";
+    return "user";
+  } catch {
+    return "user";
+  }
+}
+
+function nsKey(base, ns) {
+  return `${base}_${ns}`;
+}
+
+function readNamespaced(base) {
+  const ns = currentNamespace();
+  const k = nsKey(base, ns);
+  return (
+    (typeof localStorage !== "undefined" && localStorage.getItem(k)) ||
+    (typeof sessionStorage !== "undefined" && sessionStorage.getItem(k)) ||
+    (typeof localStorage !== "undefined" && localStorage.getItem(base)) ||
+    (typeof sessionStorage !== "undefined" && sessionStorage.getItem(base)) ||
+    null
+  );
+}
+
+function writeNamespaced(base, value) {
+  const ns = currentNamespace();
+  const k = nsKey(base, ns);
+  // Persist in the same bucket where a refresh exists; fallback to localStorage for "never expire"
+  const refreshKey = nsKey("refresh", ns);
+  const hasLocal =
+    typeof localStorage !== "undefined" &&
+    localStorage.getItem(refreshKey) !== null;
+  const hasSession =
+    typeof sessionStorage !== "undefined" &&
+    sessionStorage.getItem(refreshKey) !== null;
+  try {
+    if (hasLocal) {
+      localStorage.setItem(k, value);
+      return;
+    }
+    if (hasSession) {
+      sessionStorage.setItem(k, value);
+      return;
+    }
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(k, value);
+    } else if (typeof sessionStorage !== "undefined") {
+      sessionStorage.setItem(k, value);
+    }
+  } catch (_) {}
+}
+
 /**
  * JWT helpers to keep session active until logout or storage is cleared.
  */
@@ -25,11 +88,11 @@ function parseJwt(token) {
 }
 
 function getAccessToken() {
-  return localStorage.getItem("token") || sessionStorage.getItem("token");
+  return readNamespaced("token");
 }
 
 function getRefreshToken() {
-  return localStorage.getItem("refresh") || sessionStorage.getItem("refresh");
+  return readNamespaced("refresh");
 }
 
 async function refreshAccessToken() {
@@ -39,11 +102,7 @@ async function refreshAccessToken() {
     const resp = await refreshClient.post("/accounts/token/refresh/", { refresh });
     const newAccess = resp?.data?.access;
     if (newAccess) {
-      if (localStorage.getItem("refresh")) {
-        localStorage.setItem("token", newAccess);
-      } else {
-        sessionStorage.setItem("token", newAccess);
-      }
+      writeNamespaced("token", newAccess);
       return newAccess;
     }
   } catch (_) {
@@ -198,14 +257,12 @@ API.interceptors.response.use(
         return API(originalRequest);
       }
 
-      // No refresh available or refresh failed: clear tokens
+      // No refresh available or refresh failed: do NOT clear tokens automatically.
+      // Persist session until explicit logout or manual cache clear.
       try {
-        localStorage.removeItem("token");
-        localStorage.removeItem("refresh");
-      } catch (_) {}
-      try {
-        sessionStorage.removeItem("token");
-        sessionStorage.removeItem("refresh");
+        if (typeof window !== "undefined") {
+          window.__tk_auth_blocked = true; // can be used by UI to route to login without wiping storage
+        }
       } catch (_) {}
 
       try {

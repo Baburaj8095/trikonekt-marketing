@@ -938,3 +938,307 @@ a[aria-label="Switch theme"],
 [data-theme-toggle] {
   display: none !important;
 }
+
+/* ===============================
+   Fieldset padding + responsiveness
+   =============================== */
+
+/* Base fieldset styling for forms */
+fieldset.module {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+/* Fieldset header */
+fieldset.module > h2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* keep collapse toggle aligned */
+  margin: -8px -8px 12px -8px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  border-radius: 10px 10px 0 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+/* Collapsed state still keeps some padding so it doesn't look cramped */
+fieldset.module.collapsed {
+  padding: 12px;
+}
+
+/* Inline stacked items (non-tabular) */
+.inline-related {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.inline-related h3 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -8px -8px 10px -8px;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  border-radius: 10px 10px 0 0;
+  font-size: 15px;
+  color: #0f172a;
+}
+
+/* Responsive form-row grid inside aligned fieldsets */
+@media (min-width: 901px) {
+  .aligned fieldset .form-row,
+  .aligned .form-row {
+    display: grid;
+    grid-template-columns: minmax(140px, 220px) 1fr;
+    gap: 10px 16px;
+    align-items: start;
+  }
+  .aligned .form-row > label {
+    margin: 6px 0 0;
+  }
+  .aligned .form-row > div {
+    width: 100% !important;
+  }
+}
+
+/* Ensure inputs fill available width inside fieldsets */
+.aligned .form-row input,
+.aligned .form-row select,
+.aligned .form-row textarea {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* ===============================
+   Colorful accents and UX polish
+   =============================== */
+
+/* Inputs and controls: colorful focus, subtle borders */
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+input[type="url"],
+input[type="tel"],
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+select,
+textarea {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 8px 10px;
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="search"]:focus,
+input[type="url"]:focus,
+input[type="tel"]:focus,
+input[type="date"]:focus,
+input[type="time"]:focus,
+input[type="datetime-local"]:focus,
+select:focus,
+textarea:focus {
+  outline: 0;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 22%, transparent);
+}
+
+/* Checkbox/radio use brand color */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--color-primary);
+}
+
+/* File input full-width on narrow screens */
+@media (max-width: 900px) {
+  input[type="file"] {
+    width: 100%;
+  }
+}
+
+/* Buttons: vibrant primary and subtle hover */
+.button,
+input[type="submit"],
+.submit-row input.default {
+  border-radius: 10px !important;
+  border: 0;
+  font-weight: 600;
+}
+
+.submit-row input.default,
+.button.default {
+  background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
+  color: #fff;
+}
+.submit-row input.default:hover,
+.button.default:hover {
+  filter: brightness(1.05);
+}
+
+/* Secondary action buttons */
+.button,
+.object-tools a {
+  background: #0ea5e9;
+  color: #06281d !important;
+}
+.object-tools a:hover { filter: brightness(1.05); }
+
+/* Danger button remains clear */
+.deletelink {
+  background: var(--color-danger);
+  color: #fff !important;
+}
+
+/* Fieldset and inline headers with colorful accent */
+fieldset.module {
+  border-left: 4px solid color-mix(in srgb, var(--color-primary) 60%, #0000);
+}
+.inline-related {
+  border-left: 3px solid color-mix(in srgb, var(--color-secondary) 60%, #0000);
+}
+
+/* Tables: colorful headers, sticky head, clean hover */
+.results table thead th,
+#content table thead th,
+table thead th {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--color-primary) 10%, #f8fafc) 0%,
+    #f8fafc 100%);
+  color: #0f172a;
+  position: sticky;
+  top: calc(var(--admin-header-h, 56px) + 8px);
+  z-index: 1;
+}
+
+.results table tbody tr:hover,
+#content table tbody tr:hover {
+  background: color-mix(in srgb, var(--color-secondary) 10%, #ffffff);
+}
+
+/* Compact small utility cols keep text centered */
+th.action-checkbox,
+td.action-checkbox,
+th.column-action,
+td.column-action {
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* Boolean/status chips when text present */
+td .yes,
+td .boolean-yes,
+td .status-yes {
+  display: inline-block;
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 1;
+}
+td .no,
+td .boolean-no,
+td .status-no {
+  display: inline-block;
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* Align long content and preserve readability */
+.results table td,
+#content table td {
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+/* Sticky submit actions at bottom with subtle shadow */
+.submit-row {
+  position: sticky;
+  bottom: 0;
+  z-index: 1301;
+  background: #fff;
+  box-shadow: 0 -6px 12px rgba(15,23,42,0.04);
+}
+
+/* Breadcrumbs get soft colorful underline */
+.breadcrumbs {
+  border-bottom: 2px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
+}
+
+/* Login page: give brand gradient header bar */
+.login-card {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 12%, #ffffff) 0%, #ffffff 40%) padding-box;
+  border: 1px solid #e2e8f0;
+}
+
+/* Make change forms breathe */
+.change-form form .aligned .form-row {
+  margin-bottom: 12px;
+}
+
+/* Inline tabular: keep header sticky and rows scrollable */
+.inline-group .tabular {
+  overflow-x: auto;
+}
+.inline-group .tabular thead th {
+  position: sticky;
+  top: calc(var(--admin-header-h, 56px) + 8px);
+  z-index: 1;
+}
+
+/* Search toolbar inputs get rounded look */
+#changelist #toolbar input[type="text"],
+#changelist #toolbar select {
+  border-radius: 999px;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+/* Tags/badges helpers for custom columns if used downstream */
+.badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 1;
+  border: 1px solid transparent;
+}
+.badge-primary {
+  background: color-mix(in srgb, var(--color-primary) 15%, #ffffff);
+  color: #0b3aa1;
+  border-color: color-mix(in srgb, var(--color-primary) 35%, #ffffff);
+}
+.badge-secondary {
+  background: color-mix(in srgb, var(--color-secondary) 15%, #ffffff);
+  color: #064e3b;
+  border-color: color-mix(in srgb, var(--color-secondary) 35%, #ffffff);
+}
+.badge-accent {
+  background: color-mix(in srgb, var(--color-accent) 15%, #ffffff);
+  color: #7c4a00;
+  border-color: color-mix(in srgb, var(--color-accent) 35%, #ffffff);
+}

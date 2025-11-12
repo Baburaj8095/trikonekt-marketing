@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'coupons',
     'business',
     'market',
+    'adminapi',
     'core',
 ]
 

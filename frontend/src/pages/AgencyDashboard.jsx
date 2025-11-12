@@ -48,6 +48,11 @@ export default function AgencyDashboard() {
   const [luckyError, setLuckyError] = useState("");
   const [commissionTotal, setCommissionTotal] = useState(0);
 
+  // Wallet (for agency dashboard display)
+  const [wallet, setWallet] = useState({ balance: "0", updated_at: null });
+  const [walletLoading, setWalletLoading] = useState(false);
+  const [walletError, setWalletError] = useState("");
+
   const loadLuckyHistory = async () => {
     try {
       setLuckyLoading(true);
@@ -75,6 +80,24 @@ export default function AgencyDashboard() {
       setCommissionTotal(total);
     } catch (e) {
       // ignore
+    }
+  };
+
+  // Load my wallet balance for dashboard
+  const loadWallet = async () => {
+    try {
+      setWalletLoading(true);
+      setWalletError("");
+      const res = await API.get("/accounts/wallet/me/");
+      setWallet({
+        balance: res?.data?.balance ?? "0",
+        updated_at: res?.data?.updated_at ?? null,
+      });
+    } catch (e) {
+      setWalletError("Failed to load wallet.");
+      setWallet({ balance: "0", updated_at: null });
+    } finally {
+      setWalletLoading(false);
     }
   };
 
@@ -220,6 +243,7 @@ export default function AgencyDashboard() {
   useEffect(() => {
     loadLuckyHistory();
     loadCommission();
+    loadWallet();
   }, []);
 
   // Load my 5‑matrix genealogy tree
@@ -303,7 +327,7 @@ export default function AgencyDashboard() {
       </Stack>
 
       {activeTab === TABS.LUCKY && (
-        <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+        <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: '#e3f2fd' }}>
           <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>
               Lucky Draw Submission History
@@ -317,6 +341,17 @@ export default function AgencyDashboard() {
           </Box>
           <Box sx={{ mb: 2 }}>
             <RewardsTargetCard role="agency" />
+          </Box>
+          <Box sx={{ mb: 2 }}>
+            {walletLoading ? (
+              <Typography variant="body2">Loading wallet...</Typography>
+            ) : walletError ? (
+              <Alert severity="error">{walletError}</Alert>
+            ) : (
+              <Alert severity="info">
+                Wallet Balance: ₹{wallet.balance} {wallet.updated_at ? `— updated ${new Date(wallet.updated_at).toLocaleString()}` : ""}
+              </Alert>
+            )}
           </Box>
           <Box sx={{ mb: 2 }}>
             <Alert severity="success">
@@ -400,7 +435,7 @@ export default function AgencyDashboard() {
       )}
 
       {activeTab === TABS.ASSIGN && (
-        <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mt: 2 }}>
+        <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mt: 2, backgroundColor: '#e8f5e8' }}>
           {empError ? <Alert severity="warning" sx={{ mb: 2 }}>{empError}</Alert> : null}
           {typeof quota?.remaining === "number" ? (
             <Alert severity={quota.remaining > 0 ? "info" : "warning"} sx={{ mb: 2 }}>
@@ -514,7 +549,7 @@ export default function AgencyDashboard() {
       )}
 
       {activeTab === TABS.EMPLOYEES && (
-        <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mt: 2 }}>
+        <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mt: 2, backgroundColor: '#fff3e0' }}>
           <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>
               Employee Details
@@ -567,7 +602,7 @@ export default function AgencyDashboard() {
         </Paper>
       )}
       {/* My 5‑Matrix Team (click child card to drill down) */}
-      <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mt: 2 }}>
+      <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mt: 2, backgroundColor: '#fce4ec' }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
           My Team (5‑Matrix)
         </Typography>

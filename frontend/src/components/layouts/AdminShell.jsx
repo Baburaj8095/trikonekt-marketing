@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import API from "../../api/api";
 
 export default function AdminShell({ children }) {
   const loc = useLocation();
@@ -48,7 +49,32 @@ export default function AdminShell({ children }) {
     { to: "/admin/matrix/five", label: "5‑Matrix", icon: "matrix5" },
     { to: "/admin/matrix/three", label: "3‑Matrix", icon: "matrix3" },
     { to: "/admin/autopool", label: "Auto Commission", icon: "pool" },
+    { to: "/admin/dashboard/models", label: "Models", icon: "box" },
   ];
+
+  // Dynamic admin models metadata
+  const [models, setModels] = useState([]);
+  const [modelsErr, setModelsErr] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+    API.get("/admin/admin-meta/")
+      .then(({ data }) => {
+        if (!mounted) return;
+        setModels(data?.models || []);
+        setModelsErr("");
+      })
+      .catch(() => setModelsErr("Failed to load admin models"));
+    return () => { mounted = false; };
+  }, []);
+
+  const modelsByApp = React.useMemo(() => {
+    const g = {};
+    (models || []).forEach((m) => {
+      (g[m.app_label] = g[m.app_label] || []).push(m);
+    });
+    return g;
+  }, [models]);
 
   function isActive(to) {
     if (to === "/admin/matrix/five" || to === "/admin/matrix/three") {
@@ -205,7 +231,7 @@ export default function AdminShell({ children }) {
   const topOffset = isMobile ? headerHeightMobile : 0;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f1f5f9" }}>
+    <div className="admin-scope" style={{ minHeight: "100vh", background: "#f1f5f9" }}>
       {/* Top bar: shown only on mobile */}
       {isMobile ? (
         <div
@@ -292,6 +318,33 @@ export default function AdminShell({ children }) {
               {items.map((it) => (
                 <NavLink key={it.to} to={it.to} label={it.label} icon={it.icon} />
               ))}
+
+              {/* Dynamic Admin Models in sidebar */}
+              {Object.keys(modelsByApp).length ? (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ color: "#cbd5e1", fontWeight: 900, fontSize: 12, padding: "8px 4px 4px" }}>
+                    Models
+                  </div>
+                  {Object.keys(modelsByApp).sort().map((app) => (
+                    <div key={app} style={{ marginBottom: 6 }}>
+                      <div style={{ color: "#64748b", fontSize: 11, padding: "0 4px 4px" }}>{app}</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {modelsByApp[app]
+                          .sort((a, b) => (a.verbose_name || a.model).localeCompare(b.verbose_name || b.model))
+                          .map((m) => (
+                            <NavLink
+                              key={`${m.app_label}.${m.model}`}
+                              to={`/admin/dashboard/models/${m.app_label}/${m.model}`}
+                              label={m.verbose_name || m.model}
+                              icon="box"
+                            />
+                          ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
               <div style={{ marginTop: 8, borderTop: "1px solid #0b1220" }} />
               <div style={{ color: "#64748b", fontSize: 11, padding: "8px 4px" }}>
                 © {new Date().getFullYear()} Admin Console

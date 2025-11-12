@@ -813,21 +813,17 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // Business login disabled in UI; admin will process registrations
-    if (mode === "login" && role === "business") {
-      setErrorMsg("Business login is disabled. Please register. Your request will be processed by admin.");
-      return;
-    }
 
     if (mode === "login") {
       try {
         // Accept username or phone; backend resolves and disambiguates if needed
         let username = (formData.username || "").trim();
-        const submitRole = role === "business" ? "user" : role;
+        const submitRole = role;
 
         const res = await API.post("/accounts/login/", {
           username,
           password: formData.password,
+          role: submitRole,
         });
 
         const access = res?.data?.access || res?.data?.token || res?.data?.data?.token;
@@ -842,19 +838,32 @@ const Login = () => {
         if (!tokenRole) throw new Error("Token missing role claim");
 
 
-        localStorage.setItem("token", access);
-        if (refreshTok) localStorage.setItem("refresh", refreshTok);
-        localStorage.setItem("role", tokenRole);
+        // Namespaced session per role; staff -> admin namespace
+        const ns = (payload?.is_staff || payload?.is_superuser) ? "admin" : (tokenRole || "user");
+        localStorage.setItem(`token_${ns}`, access);
+        if (refreshTok) localStorage.setItem(`refresh_${ns}`, refreshTok);
+        if (tokenRole) localStorage.setItem(`role_${ns}`, tokenRole);
+        // Clean legacy non-namespaced keys to avoid cross-role collisions
+        try {
+          localStorage.removeItem("token");
+          localStorage.removeItem("refresh");
+          localStorage.removeItem("role");
+          localStorage.removeItem("user");
+          sessionStorage.removeItem("token");
+          sessionStorage.removeItem("refresh");
+          sessionStorage.removeItem("role");
+          sessionStorage.removeItem("user");
+        } catch (_) {}
 
         try {
           const meResp = await API.get("/accounts/me/");
           if (meResp?.data) {
-            localStorage.setItem("user", JSON.stringify(meResp.data));
+            localStorage.setItem(`user_${ns}`, JSON.stringify(meResp.data));
           } else {
-            localStorage.setItem("user", JSON.stringify({ role: tokenRole, username: tokenUsername, full_name: tokenFullName }));
+            localStorage.setItem(`user_${ns}`, JSON.stringify({ role: tokenRole, username: tokenUsername, full_name: tokenFullName }));
           }
         } catch (_) {
-          localStorage.setItem("user", JSON.stringify({ role: tokenRole, username: tokenUsername, full_name: tokenFullName }));
+          localStorage.setItem(`user_${ns}`, JSON.stringify({ role: tokenRole, username: tokenUsername, full_name: tokenFullName }));
         }
 
         if (remember) {
@@ -1630,7 +1639,7 @@ const Login = () => {
               <ToggleButton value="employee" aria-label="employee">
                 <WorkIcon sx={{ mr: 1 }} /> Employee
               </ToggleButton>
-              <ToggleButton value="business" aria-label="business" disabled={isLogin}>
+              <ToggleButton value="business" aria-label="business">
                 <BusinessIcon sx={{ mr: 1 }} /> Business
               </ToggleButton>
             </ToggleButtonGroup>

@@ -14,7 +14,7 @@ export default function WealthGalaxy() {
       <Typography variant="h4" sx={{ mb: { xs: 2, sm: 3 }, textAlign: 'center', fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
         Download Our My Wealth Galaxy Customer App Now
       </Typography>
-      <Grid container spacing={{ xs: 3, md: 4 }}>
+      <Grid container spacing={{ xs: 3, md: 4 }} sx={{ mx: { xs: -2, sm: 0 } }}>
         <Grid item xs={12} md={6}>
           <Box sx={{
             display: 'flex',
@@ -54,7 +54,7 @@ export default function WealthGalaxy() {
             <li>Knowledge Galaxy</li>
             <li>Refer & Earn</li>
           </Box>
-          <Grid container spacing={{ xs: 2, sm: 2 }}>
+          <Grid container spacing={{ xs: 2, sm: 2 }} sx={{ mx: { xs: -2, sm: 0 } }}>
             <Grid item xs={12} sm={6}>
               <Box
                 component="img"

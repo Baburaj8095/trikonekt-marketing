@@ -225,7 +225,7 @@ def _distribute_five_matrix(new_user: CustomUser, source: Dict[str, Any]):
 def on_user_join(new_user: CustomUser, source: Dict[str, Any] | None = None) -> bool:
     """
     Trigger referral join benefits:
-      - Direct ₹5 to registered_by (DIRECT_REF_BONUS)
+  - Direct ₹15 to registered_by (DIRECT_REF_BONUS)
       - Levels 1..5 fixed: 2,1,1,0.5,0.5 (LEVEL_BONUS)
       - Optional autopool trigger for THREE_50 with 15-level distribution
     Idempotent via ReferralJoinPayout (unique per new user).
@@ -252,8 +252,8 @@ def on_user_join(new_user: CustomUser, source: Dict[str, Any] | None = None) -> 
 
     cfg = CommissionConfig.get_solo()
     fixed = getattr(cfg, "referral_join_fixed_json", {}) or {}
-    # Defaults if not configured
-    direct_amt = _q2(fixed.get("direct", 5))
+    # Defaults if not configured (universal ₹15 unless admin overrides in config)
+    direct_amt = _q2(fixed.get("direct", 15))
     arr = [
         _q2(fixed.get("l1", 2)),
         _q2(fixed.get("l2", 1)),
@@ -269,7 +269,12 @@ def on_user_join(new_user: CustomUser, source: Dict[str, Any] | None = None) -> 
             sponsor,
             direct_amt,
             tx_type="DIRECT_REF_BONUS",
-            meta={"source": "JOIN_REFERRAL", "new_user": getattr(new_user, "username", None), "level": 0},
+            meta={
+                "source": "JOIN_REFERRAL",
+                "from_user_id": getattr(new_user, "id", None),
+                "from_user": getattr(new_user, "username", None),
+                "level": 0,
+            },
             source_type="JOIN_REFERRAL",
             source_id=str(getattr(new_user, "id", "")),
         )

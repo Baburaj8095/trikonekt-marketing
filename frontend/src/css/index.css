@@ -1,5 +1,48 @@
-body {
+/* Light baseline to avoid OS/browser forced dark inversion making text invisible */
+:root {
+  /* Tell the browser our UI is light so it doesn&#39;t auto-invert colors on dark OS */
+  color-scheme: light;
+}
+
+html, body {
   margin: 0; /* Remove default 8px body margin */
   background-color: #f9fafc;
-  font-family: 'Poppins', sans-serif;
 }
+
+body {
+  font-family: 'Poppins', sans-serif;
+  color: #0f172a; /* Ensure readable default text color on light backgrounds */
+}
+
+/* Ensure common surfaces remain light with readable text, without breaking AppBar contrast */
+.MuiCard-root {
+  background-color: #ffffff;
+  color: #0f172a;
+}
+.MuiDrawer-paper {
+  background-color: #ffffff;
+  color: #0f172a;
+}
+/* AppBar should keep light text over dark backgrounds */
+.MuiAppBar-root {
+  color: #ffffff;
+}
+.MuiAppBar-root .MuiIconButton-root,
+.MuiAppBar-root .MuiSvgIcon-root,
+.MuiAppBar-root .MuiButton-root,
+.MuiAppBar-root .MuiTypography-root,
+.MuiAppBar-root a {
+  color: #000000;
+}
+
+/* Keep root container neutral */
+#root {
+  background-color: transparent;
+  color: inherit;
+}
+
+/* Optional: links inherit readable color unless explicitly styled */
+a {
+  color: inherit;
+}
+

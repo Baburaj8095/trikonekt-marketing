@@ -61,7 +61,8 @@ export default function RewardsTargetCard({ role = "employee" }) {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [role]);
+
 
   return (
     <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>

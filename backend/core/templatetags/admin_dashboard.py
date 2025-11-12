@@ -255,7 +255,8 @@ def admin_weekly_new_users():
         next_day = day + timedelta(days=1)
         labels.append(day.strftime("%b %d"))
         try:
-            count = CustomUser.objects.filter(date_joined__gte=day, date_joined__lt=next_day).count()
+            # Use __date lookup to avoid naive datetime with USE_TZ enabled
+            count = CustomUser.objects.filter(date_joined__date=day).count()
         except Exception:
             count = 0
         data.append(int(count))

@@ -53,6 +53,10 @@ import RoleSelect from "./pages/Auth/RoleSelect";
 import ReferAndEarnPage from "./pages/ReferAndEarn";
 import WealthGalaxy from "./pages/WealthGalaxy";
 import AppHub from "./pages/AppHub";
+import ModelsIndex from "./admin-panel/dynamic/ModelsIndex";
+import ModelList from "./admin-panel/dynamic/ModelList";
+import UsersPage from "./admin-panel/examples/UsersPage";
+import ProductPage from "./admin-panel/examples/ProductPage";
 
 function App() {
   return (
@@ -544,6 +548,46 @@ function App() {
           }
         />
 
+        <Route
+          path="/admin/dashboard/models"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <ModelsIndex />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/dashboard/models/:app/:model"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <ModelList />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/dashboard/examples/users"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <UsersPage />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/dashboard/examples/products"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <ProductPage />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
         {/* Catch-all route for unknown paths */}
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

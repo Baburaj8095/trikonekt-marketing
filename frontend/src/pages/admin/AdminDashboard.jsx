@@ -139,6 +139,10 @@ export default function AdminDashboard() {
   const [ap, setAp] = useState(null);
   const nav = useNavigate();
 
+  // Dynamic models (from Django Admin)
+  const [modelsMeta, setModelsMeta] = useState([]);
+  const [modelsErr, setModelsErr] = useState("");
+
   useEffect(() => {
     let mounted = true;
     setLoading(true);
@@ -154,6 +158,24 @@ export default function AdminDashboard() {
         setErr("Failed to load metrics");
       })
       .finally(() => setLoading(false));
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Load admin model metadata for dashboard cards
+  useEffect(() => {
+    let mounted = true;
+    API.get("/admin/admin-meta/")
+      .then(({ data }) => {
+        if (!mounted) return;
+        setModelsMeta(data?.models || []);
+        setModelsErr("");
+      })
+      .catch(() => {
+        setModelsMeta([]);
+        setModelsErr("Failed to load admin models");
+      });
     return () => {
       mounted = false;
     };
@@ -179,6 +201,14 @@ export default function AdminDashboard() {
     (sum, k) => sum + (acc[k]?.ACTIVE || 0),
     0
   );
+
+  const modelsByApp = React.useMemo(() => {
+    const g = {};
+    (modelsMeta || []).forEach((m) => {
+      (g[m.app_label] = g[m.app_label] || []).push(m);
+    });
+    return g;
+  }, [modelsMeta]);
 
   return (
     <div>
@@ -377,6 +407,48 @@ export default function AdminDashboard() {
               onClick={() => nav("/admin/orders")}
               palette="green"
             />
+          </div>
+
+          {/* All Admin Models - auto-discovered */}
+          <div style={{ marginTop: 16 }}>
+            <h3 style={{ margin: "8px 0", color: "#0f172a", fontSize: 16, fontWeight: 800 }}>
+              All Admin Models
+            </h3>
+            {modelsErr ? (
+              <div style={{ color: "#dc2626" }}>{modelsErr}</div>
+            ) : null}
+            {Object.keys(modelsByApp).length ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {Object.keys(modelsByApp).sort().map((app) => (
+                  <div key={app} style={{ border: "1px solid #e2e8f0", borderRadius: 10, background: "#fff", padding: 12 }}>
+                    <div style={{ fontWeight: 800, color: "#0f172a", marginBottom: 8 }}>{app}</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8 }}>
+                      {modelsByApp[app]
+                        .sort((a, b) => (a.verbose_name || a.model).localeCompare(b.verbose_name || b.model))
+                        .map((m) => (
+                          <button
+                            key={`${m.app_label}.${m.model}`}
+                            onClick={() => nav(`/admin/dashboard/models/${m.app_label}/${m.model}`)}
+                            style={{
+                              textAlign: "left",
+                              padding: "10px 12px",
+                              borderRadius: 10,
+                              border: "1px solid #e2e8f0",
+                              background: "#f8fafc",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <div style={{ fontWeight: 700, color: "#0f172a" }}>{m.verbose_name || m.model}</div>
+                            <div style={{ fontSize: 12, color: "#64748b" }}>{m.app_label}.{m.model}</div>
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : !modelsErr ? (
+              <div style={{ color: "#64748b" }}>No admin models available.</div>
+            ) : null}
           </div>
 
           {/* Quick actions - fully responsive */}
