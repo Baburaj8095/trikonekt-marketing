@@ -1,36 +1,10 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import {
-  AppBar,
-  Toolbar,
-  Typography,
-  Box,
-  Drawer,
-  List,
-  ListItemButton,
-  ListItemText,
-  Divider,
-  IconButton,
-  Button,
-} from "@mui/material";
-import MenuIcon from "@mui/icons-material/Menu";
-import LOGO from "../../assets/TRIKONEKT.png";
-
-const drawerWidth = 220;
+import ShellBase from "./ShellBase";
 
 export default function EmployeeShell({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
-
-  // Selected states (sync with EmployeeDashboard tabs via ?tab=)
-  const tab = (new URLSearchParams(location.search).get("tab") || "").toLowerCase();
-  const normTab = tab === "lucky" ? "lucky_draw_history" : (tab === "ecoupons" || tab === "ecoupon") ? "e_coupons" : tab;
-  const isLucky = location.pathname === "/employee/dashboard" && normTab === "lucky_draw_history";
-  const isECoupons = location.pathname === "/employee/dashboard" && normTab === "e_coupons";
-  const isWallet = location.pathname === "/employee/dashboard" && tab === "wallet";
-  const isRefer = location.pathname === "/employee/dashboard" && tab === "refer_earn";
-  const isDailyReport = location.pathname === "/employee/daily-report";
-  const isProfile = location.pathname === "/employee/profile";
 
   const storedUser = useMemo(() => {
     try {
@@ -42,10 +16,7 @@ export default function EmployeeShell({ children }) {
   }, []);
   const displayName = storedUser?.full_name || storedUser?.username || "Employee";
 
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const handleDrawerToggle = () => setMobileOpen((v) => !v);
-
-  const handleLogout = () => {
+  const onLogout = () => {
     try {
       localStorage.removeItem("token_employee");
       localStorage.removeItem("refresh_employee");
@@ -59,167 +30,47 @@ export default function EmployeeShell({ children }) {
     navigate("/", { replace: true });
   };
 
-  const DrawerContent = (
-    <Box sx={{ overflow: "auto" }}>
-      <List>
-        <ListItemButton
-          selected={location.pathname === "/employee/dashboard" && !new URLSearchParams(location.search).get("tab")}
-          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
-          onClick={() => {
-            navigate("/employee/dashboard");
-            setMobileOpen(false);
-          }}
-        >
-          <ListItemText primary="Dashboard" />
-        </ListItemButton>
-        <ListItemButton
-          selected={isProfile}
-          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
-          onClick={() => {
-            navigate("/employee/profile");
-            setMobileOpen(false);
-          }}
-        >
-          <ListItemText primary="Profile" />
-        </ListItemButton>
-        <ListItemButton
-          selected={isLucky}
-          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
-          onClick={() => {
-            navigate("/employee/dashboard?tab=lucky_draw_history");
-            setMobileOpen(false);
-          }}
-        >
-          <ListItemText primary="Lucky Draw Submission" />
-        </ListItemButton>
-        <ListItemButton
-          selected={location.pathname === "/employee/dashboard" && new URLSearchParams(location.search).get("tab") === "my_team"}
-          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
-          onClick={() => {
-            navigate("/employee/dashboard?tab=my_team");
-            setMobileOpen(false);
-          }}
-        >
-          <ListItemText primary="My Team" />
-        </ListItemButton>
-        <ListItemButton
-          selected={isRefer}
-          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
-          onClick={() => {
-            navigate("/employee/dashboard?tab=refer_earn");
-            setMobileOpen(false);
-          }}
-        >
-          <ListItemText primary="Refer & Earn" />
-        </ListItemButton>
-        <ListItemButton
-          selected={location.pathname === "/employee/dashboard" && new URLSearchParams(location.search).get("tab") === "rewards"}
-          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
-          onClick={() => {
-            navigate("/employee/dashboard?tab=rewards");
-            setMobileOpen(false);
-          }}
-        >
-          <ListItemText primary="Rewards" />
-        </ListItemButton>
-        <ListItemButton
-          selected={isECoupons}
-          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
-          onClick={() => {
-            navigate("/employee/dashboard?tab=e_coupons");
-            setMobileOpen(false);
-          }}
-        >
-          <ListItemText primary="My E‑Coupons" />
-        </ListItemButton>
+  const menu = [
+    { to: "/employee/dashboard", label: "Dashboard", icon: "dashboard" },
+    { to: "/employee/profile", label: "Profile", icon: "users" },
 
-        <ListItemButton
-          selected={isWallet}
-          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
-          onClick={() => {
-            navigate("/employee/dashboard?tab=wallet");
-            setMobileOpen(false);
-          }}
-        >
-          <ListItemText primary="My Wallet" />
-        </ListItemButton>
+    // Dashboard tabs via query param
+    { to: "/employee/dashboard?tab=lucky_draw_history", label: "Lucky Draw Submission", icon: "ticket" },
+    { to: "/employee/dashboard?tab=my_team", label: "My Team", icon: "tree" },
+    { to: "/employee/dashboard?tab=refer_earn", label: "Refer & Earn", icon: "upload" },
+    { to: "/employee/dashboard?tab=rewards", label: "Rewards", icon: "chart" },
+    { to: "/employee/dashboard?tab=e_coupons", label: "My E‑Coupons", icon: "ticket" },
+    { to: "/employee/dashboard?tab=wallet", label: "My Wallet", icon: "wallet" },
 
-        <ListItemButton
-          selected={isDailyReport}
-          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
-          onClick={() => {
-            navigate("/employee/daily-report");
-            setMobileOpen(false);
-          }}
-        >
-          <ListItemText primary="Daily Report" />
-        </ListItemButton>
-      </List>
-      <Divider />
-      <Box sx={{ p: 2, color: "text.secondary", fontSize: 13 }}>
-        Logged in as: {displayName}
-      </Box>
-    </Box>
-  );
+    { to: "/employee/daily-report", label: "Daily Report", icon: "box" },
+  ];
+
+  const isActive = (to, loc) => {
+    // Normalize and compare
+    const [toPath, toQuery] = to.split("?");
+    if (toPath === "/employee/dashboard") {
+      const q = new URLSearchParams(loc.search);
+      const tab = (q.get("tab") || "").toLowerCase();
+      const targetTab = new URLSearchParams(toQuery || "").get("tab");
+      if (!targetTab) {
+        // base dashboard active when no 'tab' present
+        return loc.pathname === "/employee/dashboard" && !q.get("tab");
+      }
+      return loc.pathname === "/employee/dashboard" && tab === String(targetTab).toLowerCase();
+    }
+    // Exact path match for other pages
+    return `${loc.pathname}${loc.search}` === to;
+  };
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", backgroundColor: "#f7f9fb" }}>
-      {/* App Bar */}
-      <AppBar position="fixed" sx={{ zIndex: (t) => t.zIndex.drawer + 1, backgroundColor: "#0C2D48" }}>
-        <Toolbar>
-          <IconButton color="inherit" edge="start" onClick={handleDrawerToggle} sx={{ mr: 2, display: { sm: "none" } }}>
-            <MenuIcon />
-          </IconButton>
-
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Box component="img" src={LOGO} alt="Trikonekt" sx={{ height: 36 }} />
-            <Typography variant="h6" sx={{ fontWeight: 700 }} />
-          </Box>
-
-          <Box sx={{ flexGrow: 1 }} />
-
-          {/* <Typography variant="body2" sx={{ mr: 2 }}>{displayName}</Typography> */}
-          <Button color="inherit" size="small" sx={{ fontWeight: 500, textTransform: "none" }} onClick={handleLogout}>
-            Logout
-          </Button>
-        </Toolbar>
-      </AppBar>
-
-      {/* Sidebar - mobile */}
-      <Drawer
-        variant="temporary"
-        open={mobileOpen}
-        onClose={handleDrawerToggle}
-        ModalProps={{ keepMounted: true }}
-        sx={{
-          display: { xs: "block", sm: "none" },
-          "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box", borderRight: "1px solid #e5e7eb" },
-        }}
-      >
-        <Toolbar />
-        {DrawerContent}
-      </Drawer>
-
-      {/* Sidebar - desktop */}
-      <Drawer
-        variant="permanent"
-        sx={{
-          width: drawerWidth,
-          flexShrink: 0,
-          display: { xs: "none", sm: "block" },
-          "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box", borderRight: "1px solid #e5e7eb" },
-        }}
-        open
-      >
-        <Toolbar />
-        {DrawerContent}
-      </Drawer>
-
-      {/* Main content */}
-      <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, md: 3 } }}>
-        <Toolbar />
-        {children}
-      </Box>
-    </Box>
+    <ShellBase
+      title="Employee"
+      menu={menu}
+      isActive={isActive}
+      onLogout={onLogout}
+      footerText={`Logged in as: ${displayName}`}
+    >
+      {children}
+    </ShellBase>
   );
 }

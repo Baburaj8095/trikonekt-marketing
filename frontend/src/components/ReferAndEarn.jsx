@@ -54,11 +54,15 @@ export default function ReferAndEarn({ title = "Refer & Earn", onlyConsumer = fa
     const r =
       (localStorage.getItem("role_employee") ||
         sessionStorage.getItem("role_employee") ||
+        localStorage.getItem("role_agency") ||
+        sessionStorage.getItem("role_agency") ||
         localStorage.getItem("role_user") ||
         sessionStorage.getItem("role_user") ||
         localStorage.getItem("role") ||
         sessionStorage.getItem("role") ||
         user?.role ||
+        user?.role_name ||
+        (user && user.user && (user.user.role || user.user.role_name)) ||
         "")
         .toString()
         .toLowerCase();

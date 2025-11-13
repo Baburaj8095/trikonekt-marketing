@@ -1,123 +1,152 @@
-import React, { useEffect, useMemo, useState } from "react";
-import API from "../../api/api";
+import React from "react";
+import { getAdminMeta } from "../../admin-panel/api/adminMeta";
+import ModelListSimple from "../../admin-panel/dynamic/ModelListSimple";
 
-function TextInput({ label, value, onChange, placeholder, style }) {
+function Section({ title, children, extraRight }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <label style={{ fontSize: 12, color: "#64748b" }}>{label}</label>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
+    <div
+      style={{
+        border: "1px solid #e2e8f0",
+        borderRadius: 10,
+        overflow: "hidden",
+        background: "#fff",
+        marginBottom: 16,
+      }}
+    >
+      <div
         style={{
-          padding: "10px 12px",
-          borderRadius: 8,
-          border: "1px solid #e2e8f0",
-          outline: "none",
-          background: "#fff",
-          ...style,
+          padding: "10px",
+          background: "#f8fafc",
+          borderBottom: "1px solid #e2e8f0",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
         }}
-      />
+      >
+        <div style={{ fontWeight: 800, color: "#0f172a" }}>{title}</div>
+        {extraRight || null}
+      </div>
+      <div style={{ padding: 12 }}>{children}</div>
     </div>
   );
 }
 
+/**
+ * AdminHomeCards
+ * - Fully manages the "Home Cards/Banners" upload model using the dynamic admin engine.
+ * - Auto-discovers the likely model under app_label "uploads".
+ * - Create/Edit supports image/file fields via ModelFormDialog (FormData).
+ *
+ * If more than one candidate exists, a dropdown is provided to pick one.
+ */
 export default function AdminHomeCards() {
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
-  const [rows, setRows] = useState([]);
-  const [q, setQ] = useState("");
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState("");
+  const [uploadsModels, setUploadsModels] = React.useState([]);
+  const [selectedKey, setSelectedKey] = React.useState("");
 
-  async function fetchCards() {
+  React.useEffect(() => {
+    let mounted = true;
     setLoading(true);
-    setErr("");
-    try {
-      // Backend endpoint: /api/uploads/homecard/ (active-only)
-      const res = await API.get("/uploads/homecard/");
-      const items = res?.data?.results || res?.data || [];
-      setRows(Array.isArray(items) ? items : []);
-    } catch (e) {
-      setErr(e?.response?.data?.detail || "Failed to load home cards");
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
-  }
+    setError("");
+    getAdminMeta()
+      .then((data) => {
+        if (!mounted) return;
+        const all = Array.isArray(data?.models) ? data.models : [];
+        const uploads = all.filter((m) => m.app_label === "uploads");
 
-  useEffect(() => {
-    fetchCards();
-    // eslint-disable-next-line
+        // Prefer models that look like "home cards/banners"
+        const tokensAll = ["home"];
+        const tokensAny = ["card", "banner"];
+        const matches = uploads.filter((m) => {
+          const hay = [
+            m.app_label || "",
+            m.model || "",
+            m.verbose_name || "",
+            m.verbose_name_plural || "",
+          ]
+            .join(" ")
+            .toLowerCase()
+            .replace(/[_-]+/g, " ");
+          const hasAll = tokensAll.every((t) => hay.includes(t));
+          const hasAny = tokensAny.some((t) => hay.includes(t));
+          return hasAll && hasAny;
+        });
+
+        const list = uploads;
+        setUploadsModels(list);
+
+        const pick = (matches[0] || list[0]) || null;
+        if (pick) {
+          setSelectedKey(`${pick.app_label}.${pick.model}`);
+        } else {
+          setSelectedKey("");
+        }
+      })
+      .catch(() => setError("Failed to load admin metadata"))
+      .finally(() => setLoading(false));
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  const filtered = useMemo(() => {
-    const term = (q || "").toLowerCase().trim();
-    if (!term) return rows;
-    return rows.filter((c) => {
-      const t = (c.title || "").toLowerCase();
-      const id = String(c.id || "");
-      return t.includes(term) || id.includes(term);
-    });
-  }, [rows, q]);
+  const selected = React.useMemo(() => {
+    if (!selectedKey) return null;
+    return uploadsModels.find((m) => `${m.app_label}.${m.model}` === selectedKey) || null;
+  }, [uploadsModels, selectedKey]);
 
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: 0, color: "#0f172a" }}>Home Cards</h2>
+        <h2 style={{ margin: 0, color: "#0f172a" }}>Home Cards / Banners (Uploads)</h2>
         <div style={{ color: "#64748b", fontSize: 13 }}>
-          Active banners on the public home screen (read-only list).
+          Manage home screen cards/banners via the dynamic admin engine. Image/file fields are supported.
         </div>
       </div>
 
-      {/* Filters */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-          gap: 12,
-          marginBottom: 12,
-        }}
+      <Section
+        title="Select Upload Model"
+        extraRight={
+          loading ? (
+            <div style={{ color: "#64748b", fontSize: 12 }}>Loading…</div>
+          ) : error ? (
+            <div style={{ color: "#dc2626", fontSize: 12 }}>{error}</div>
+          ) : null
+        }
       >
-        <TextInput
-          label="Search"
-          value={q}
-          onChange={setQ}
-          placeholder="id / title"
-        />
-      </div>
+        {uploadsModels.length ? (
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <label style={{ fontSize: 12, color: "#64748b" }}>Model:</label>
+            <select
+              value={selectedKey}
+              onChange={(e) => setSelectedKey(e.target.value)}
+              style={{
+                padding: "8px 10px",
+                borderRadius: 8,
+                border: "1px solid #e2e8f0",
+                background: "#fff",
+              }}
+            >
+              {uploadsModels.map((m) => {
+                const key = `${m.app_label}.${m.model}`;
+                const label = m.verbose_name || m.model;
+                return (
+                  <option key={key} value={key}>
+                    {label} ({key})
+                  </option>
+                );
+              })}
+            </select>
+            <div style={{ color: "#64748b", fontSize: 12 }}>
+              Tip: We auto-select models containing “home” and one of “card”/“banner”.
+            </div>
+          </div>
+        ) : loading ? null : (
+          <div style={{ color: "#64748b" }}>No uploads models discovered via admin-meta.</div>
+        )}
+      </Section>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        <button
-          onClick={fetchCards}
-          disabled={loading}
-          style={{
-            padding: "10px 12px",
-            background: "#0f172a",
-            color: "#fff",
-            border: 0,
-            borderRadius: 8,
-            cursor: loading ? "not-allowed" : "pointer",
-          }}
-        >
-          {loading ? "Loading..." : "Refresh"}
-        </button>
-        <button
-          onClick={() => setQ("")}
-          disabled={loading}
-          style={{
-            padding: "10px 12px",
-            background: "#fff",
-            color: "#0f172a",
-            border: "1px solid #e2e8f0",
-            borderRadius: 8,
-            cursor: loading ? "not-allowed" : "pointer",
-          }}
-        >
-          Reset
-        </button>
-        {err ? <div style={{ color: "#dc2626" }}>{err}</div> : null}
-      </div>
-
-      {/* Table */}
       <div
         style={{
           border: "1px solid #e2e8f0",
@@ -126,71 +155,18 @@ export default function AdminHomeCards() {
           background: "#fff",
         }}
       >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "80px 120px 1fr 120px 140px",
-            gap: 8,
-            padding: "10px",
-            background: "#f8fafc",
-            borderBottom: "1px solid #e2e8f0",
-            fontWeight: 700,
-            color: "#0f172a",
-          }}
-        >
-          <div>ID</div>
-          <div>Image</div>
-          <div>Title</div>
-          <div>Order</div>
-          <div>Active</div>
-        </div>
-        <div>
-          {filtered.map((c) => (
-            <div
-              key={c.id}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "80px 120px 1fr 120px 140px",
-                gap: 8,
-                padding: "10px",
-                borderBottom: "1px solid #e2e8f0",
-                alignItems: "center",
-              }}
-            >
-              <div>{c.id}</div>
-              <div>
-                {c.image_url || c.image ? (
-                  <img
-                    src={c.image_url || c.image}
-                    alt={c.title || "Home Card"}
-                    style={{ width: 100, height: 56, objectFit: "cover", borderRadius: 6, border: "1px solid #e2e8f0" }}
-                  />
-                ) : (
-                  <div style={{ width: 100, height: 56, background: "#f1f5f9", borderRadius: 6, border: "1px solid #e2e8f0" }} />
-                )}
-              </div>
-              <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{c.title || "—"}</div>
-              <div>{c.order ?? "—"}</div>
-              <div>
-                <span
-                  style={{
-                    padding: "2px 8px",
-                    borderRadius: 999,
-                    fontSize: 12,
-                    color: c.is_active ? "#065f46" : "#991b1b",
-                    background: c.is_active ? "#d1fae5" : "#fee2e2",
-                    border: `1px solid ${c.is_active ? "#10b981" : "#ef4444"}30`,
-                  }}
-                >
-                  {c.is_active ? "Active" : "Inactive"}
-                </span>
-              </div>
+        {!selected ? (
+          <div style={{ padding: 12, color: "#64748b" }}>
+            {loading ? "Loading…" : error || "Select a model to manage home cards/banners."}
+          </div>
+        ) : (
+          <div style={{ padding: 12 }}>
+            <div style={{ marginBottom: 8, color: "#64748b", fontSize: 12 }}>
+              Managing: {selected.verbose_name || selected.model} ({selected.app_label}.{selected.model})
             </div>
-          ))}
-          {!loading && filtered.length === 0 ? (
-            <div style={{ padding: 12, color: "#64748b" }}>No results</div>
-          ) : null}
-        </div>
+            <ModelListSimple app={selected.app_label} model={selected.model} />
+          </div>
+        )}
       </div>
     </div>
   );

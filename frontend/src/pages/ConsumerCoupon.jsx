@@ -1,7 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  AppBar,
-  Toolbar,
   Typography,
   Box,
   Container,
@@ -14,7 +12,6 @@ import {
   Grid,
 } from "@mui/material";
 import API from "../api/api";
-import LOGO from "../assets/TRIKONEKT.png";
 
 const CHANNELS = [
   { value: "e_coupon", label: "E-Coupon" },
@@ -34,8 +31,9 @@ const COUPON_TYPES = [
 export default function ConsumerCoupon() {
   const storedUser = useMemo(() => {
     try {
-      const ls = localStorage.getItem("user") || sessionStorage.getItem("user");
-      return ls ? JSON.parse(ls) : {};
+      const ls = localStorage.getItem("user_user") || sessionStorage.getItem("user_user") || localStorage.getItem("user") || sessionStorage.getItem("user");
+      const parsed = ls ? JSON.parse(ls) : {};
+      return parsed && typeof parsed === "object" && parsed.user && typeof parsed.user === "object" ? parsed.user : parsed;
     } catch {
       return {};
     }
@@ -62,7 +60,6 @@ export default function ConsumerCoupon() {
   const [errorSubs, setErrorSubs] = useState("");
 
   const onChange = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
-
 
   const statusLabel = (s) => {
     const x = String(s || "").toUpperCase();
@@ -118,9 +115,6 @@ export default function ConsumerCoupon() {
       alert("TR Referral ID is required.");
       return false;
     }
-    if (form.channel === "physical") {
-      // No upload required for Physical Coupon. Pincode optional.
-    }
     if (form.action === "REDEEM" && form.coupon_type === "50") {
       alert("₹50 coupon cannot be redeemed. Choose Activate.");
       return false;
@@ -136,7 +130,6 @@ export default function ConsumerCoupon() {
       setSubmitting(true);
       setWalletMsg("");
 
-      // E-Coupon → immediate API
       if (form.channel === "e_coupon") {
         if (form.action === "ACTIVATE") {
           const t = form.coupon_type === "50" ? "50" : "150";
@@ -150,7 +143,6 @@ export default function ConsumerCoupon() {
           });
           alert(t === "150" ? "Activated: 5-matrix + 3-matrix opened." : "Activated: 3-matrix opened.");
         } else {
-          // REDEEM (only 150)
           await API.post("/v1/coupon/redeem/", {
             type: "150",
             source: {
@@ -164,7 +156,6 @@ export default function ConsumerCoupon() {
           alert("Redeem successful. Wallet credited.");
         }
       } else {
-        // Physical → direct activation/redeem without upload
         if (form.action === "ACTIVATE") {
           const t = form.coupon_type === "50" ? "50" : "150";
           await API.post("/v1/coupon/activate/", {
@@ -178,7 +169,6 @@ export default function ConsumerCoupon() {
           });
           alert(t === "150" ? "Activated: 5-matrix + 3-matrix opened." : "Activated: 3-matrix opened.");
         } else {
-          // REDEEM (only 150)
           await API.post("/v1/coupon/redeem/", {
             type: "150",
             source: {
@@ -194,7 +184,6 @@ export default function ConsumerCoupon() {
         }
       }
 
-      // Reset some fields
       setForm((f) => ({ ...f, coupon_code: "", notes: "" }));
     } catch (err) {
       const msg =
@@ -207,169 +196,157 @@ export default function ConsumerCoupon() {
   };
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", backgroundColor: "#f7f9fb" }}>
-      <AppBar position="fixed" sx={{ backgroundColor: "#0C2D48" }}>
-        <Toolbar>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Box component="img" src={LOGO} alt="Trikonekt" sx={{ height: 36 }} />
-            <Typography variant="h6" sx={{ fontWeight: 700 }}></Typography>
-          </Box>
-          <Box sx={{ flexGrow: 1 }} />
-          <Typography variant="body2">{displayName}</Typography>
-        </Toolbar>
-      </AppBar>
-
-      <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, md: 3 } }}>
-        <Toolbar />
-
-        <Container maxWidth="md" sx={{ px: 0, ml: 0, mr: "auto" }}>
-          <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mb: 3 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>
-              Coupon Actions
-            </Typography>
-
-            {walletMsg ? <Alert severity="success" sx={{ mb: 2 }}>{walletMsg}</Alert> : null}
-
-            <Box component="form" onSubmit={onSubmit}>
-              <Grid container spacing={2}>
-                <Grid item xs={12} md={4}>
-                  <TextField
-                    select
-                    fullWidth
-                    size="small"
-                    label="Channel"
-                    name="channel"
-                    value={form.channel}
-                    onChange={onChange}
-                  >
-                    {CHANNELS.map((c) => <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>)}
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <TextField
-                    select
-                    fullWidth
-                    size="small"
-                    label="Coupon Type"
-                    name="coupon_type"
-                    value={form.coupon_type}
-                    onChange={onChange}
-                  >
-                    {COUPON_TYPES.map((c) => <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>)}
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <TextField
-                    select
-                    fullWidth
-                    size="small"
-                    label="Action"
-                    name="action"
-                    value={form.action}
-                    onChange={onChange}
-                    helperText={form.coupon_type === "50" && form.action === "REDEEM" ? "₹50 cannot be redeemed" : ""}
-                    error={form.coupon_type === "50" && form.action === "REDEEM"}
-                  >
-                    {ACTIONS.map((a) => (
-                      <MenuItem key={a.value} value={a.value} disabled={form.coupon_type === "50" && a.value === "REDEEM"}>
-                        {a.label}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    name="coupon_code"
-                    label="Coupon Code"
-                    value={form.coupon_code}
-                    onChange={onChange}
-                    required
-                  />
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    name="referral_id"
-                    label="TR Referral ID"
-                    value={form.referral_id}
-                    onChange={onChange}
-                    required
-                  />
-                </Grid>
-
-                {form.channel === "physical" ? (
-                  <Grid item xs={12} md={6}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      name="pincode"
-                      label="Pincode (optional)"
-                      value={form.pincode}
-                      onChange={onChange}
-                      inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
-                    />
-                  </Grid>
-                ) : null}
-
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    name="notes"
-                    label="Notes (optional)"
-                    value={form.notes}
-                    onChange={onChange}
-                    multiline
-                    minRows={2}
-                  />
-                </Grid>
-
-                <Grid item xs={12}>
-                  <Stack direction="row" spacing={1} justifyContent="flex-end">
-                    <Button
-                      type="submit"
-                      variant="contained"
-                      disabled={submitting}
-                      sx={{ backgroundColor: "#145DA0", "&:hover": { backgroundColor: "#0C4B82" } }}
-                    >
-                      {submitting ? "Processing..." : "Submit"}
-                    </Button>
-                  </Stack>
-                </Grid>
-              </Grid>
-            </Box>
-          </Paper>
-
-          <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
-              My Coupon Requests (Physical Channel)
-            </Typography>
-            {loadingSubs ? (
-              <Typography variant="body2">Loading...</Typography>
-            ) : errorSubs ? (
-              <Alert severity="error">{errorSubs}</Alert>
-            ) : (mySubs || []).length === 0 ? (
-              <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                No submissions yet.
-              </Typography>
-            ) : (
-              <Box component="ul" sx={{ m: 0, pl: 2 }}>
-                {(mySubs || []).map((s) => (
-                  <li key={s.id} style={{ marginBottom: 8 }}>
-                    <Typography variant="body2">
-                      <strong>Code:</strong> {s.coupon_code} — <strong>Status:</strong> {statusLabel(s.status)}{" "}
-                      {s.created_at ? `— ${new Date(s.created_at).toLocaleString()}` : ""}
-                    </Typography>
-                  </li>
-                ))}
-              </Box>
-            )}
-          </Paper>
-        </Container>
+    <Container maxWidth="md" sx={{ px: { xs: 0, md: 2 }, py: { xs: 1, md: 2 } }}>
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2, flexWrap: "wrap", gap: 1 }}>
+        <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>
+          Coupon Actions
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          {displayName}
+        </Typography>
       </Box>
-    </Box>
+
+      {walletMsg ? <Alert severity="success" sx={{ mb: 2 }}>{walletMsg}</Alert> : null}
+
+      <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mb: 3 }}>
+        <Box component="form" onSubmit={onSubmit}>
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={4}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                label="Channel"
+                name="channel"
+                value={form.channel}
+                onChange={onChange}
+              >
+                {CHANNELS.map((c) => <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>)}
+              </TextField>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                label="Coupon Type"
+                name="coupon_type"
+                value={form.coupon_type}
+                onChange={onChange}
+              >
+                {COUPON_TYPES.map((c) => <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>)}
+              </TextField>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                label="Action"
+                name="action"
+                value={form.action}
+                onChange={onChange}
+                helperText={form.coupon_type === "50" && form.action === "REDEEM" ? "₹50 cannot be redeemed" : ""}
+                error={form.coupon_type === "50" && form.action === "REDEEM"}
+              >
+                {ACTIONS.map((a) => (
+                  <MenuItem key={a.value} value={a.value} disabled={form.coupon_type === "50" && a.value === "REDEEM"}>
+                    {a.label}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                size="small"
+                name="coupon_code"
+                label="Coupon Code"
+                value={form.coupon_code}
+                onChange={onChange}
+                required
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                size="small"
+                name="referral_id"
+                label="TR Referral ID"
+                value={form.referral_id}
+                onChange={onChange}
+                required
+              />
+            </Grid>
+
+            {form.channel === "physical" ? (
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  name="pincode"
+                  label="Pincode (optional)"
+                  value={form.pincode}
+                  onChange={onChange}
+                  inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
+                />
+              </Grid>
+            ) : null}
+
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                size="small"
+                name="notes"
+                label="Notes (optional)"
+                value={form.notes}
+                onChange={onChange}
+                multiline
+                minRows={2}
+              />
+            </Grid>
+
+            <Grid item xs={12}>
+              <Stack direction="row" spacing={1} justifyContent="flex-end">
+                <Button
+                  type="submit"
+                  variant="contained"
+                  disabled={submitting}
+                  sx={{ backgroundColor: "#145DA0", "&:hover": { backgroundColor: "#0C4B82" } }}
+                >
+                  {submitting ? "Processing..." : "Submit"}
+                </Button>
+              </Stack>
+            </Grid>
+          </Grid>
+        </Box>
+      </Paper>
+
+      <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+        <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
+          My Coupon Requests (Physical Channel)
+        </Typography>
+        {loadingSubs ? (
+          <Typography variant="body2">Loading...</Typography>
+        ) : errorSubs ? (
+          <Alert severity="error">{errorSubs}</Alert>
+        ) : (mySubs || []).length === 0 ? (
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            No submissions yet.
+          </Typography>
+        ) : (
+          <Box component="ul" sx={{ m: 0, pl: 2 }}>
+            {(mySubs || []).map((s) => (
+              <li key={s.id} style={{ marginBottom: 8 }}>
+                <Typography variant="body2">
+                  <strong>Code:</strong> {s.coupon_code} — <strong>Status:</strong> {statusLabel(s.status)}{" "}
+                  {s.created_at ? `— ${new Date(s.created_at).toLocaleString()}` : ""}
+                </Typography>
+              </li>
+            ))}
+          </Box>
+        )}
+      </Paper>
+    </Container>
   );
 }

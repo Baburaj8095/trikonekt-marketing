@@ -84,12 +84,13 @@ export default function AdminECoupons() {
   const [coupons, setCoupons] = useState([]);
   const [batches, setBatches] = useState([]);
   const [agencies, setAgencies] = useState([]);
+  const [employees, setEmployees] = useState([]);
 
   // Create Coupon form
   const [couponForm, setCouponForm] = useState({
     title: "Lucky E-Coupon",
     description: "",
-    campaign: "E-LDGR",
+    campaign: "LDGR",
     valid_from: "",
     valid_to: "",
   });
@@ -98,21 +99,27 @@ export default function AdminECoupons() {
   // Create Batch form (E-Coupon)
   const [batchForm, setBatchForm] = useState({
     coupon_id: "",
-    prefix: "E-LDGR",
+    prefix: "LDGR",
     serial_start: "1",
     serial_end: "1000",
     serial_width: "6",
+    denomination: "150",
   });
   const [createBatchLoading, setCreateBatchLoading] = useState(false);
 
   // Assign-to-Agency form
   const [assignForm, setAssignForm] = useState({
     batch_id: "",
+    assignee_type: "agency",
     agency_id: "",
+    employee_id: "",
     serial_start: "",
     serial_end: "",
+    count: "",
   });
   const [assignLoading, setAssignLoading] = useState(false);
+  const [nextStart, setNextStart] = useState("");
+  const [nextStartLoading, setNextStartLoading] = useState(false);
 
   // Metrics selection and values
   const [selectedBatch, setSelectedBatch] = useState("");
@@ -123,12 +130,22 @@ export default function AdminECoupons() {
     sold: 0,
     redeemed: 0,
     revoked: 0,
-    matrix_five_users: 0,
-    matrix_three_150_users: 0,
-    matrix_three_50_users: 0,
   });
   const [metricsLoading, setMetricsLoading] = useState(false);
   const [err, setErr] = useState("");
+  // Assignment history (list)
+  const [assignments, setAssignments] = useState([]);
+  const [assignTotal, setAssignTotal] = useState(0);
+  const [assignPage, setAssignPage] = useState(1);
+  const [assignPageSize, setAssignPageSize] = useState(25);
+  const [assignListLoading, setAssignListLoading] = useState(false);
+  const [assignFilters, setAssignFilters] = useState({
+    role: "",
+    assignee_id: "",
+    search: "",
+    from: "",
+    to: "",
+  });
 
   function setCouponField(k, v) {
     setCouponForm((f) => ({ ...f, [k]: v }));
@@ -166,6 +183,14 @@ export default function AdminECoupons() {
     } catch (_) {}
   }
 
+  async function loadEmployees() {
+    try {
+      const res = await API.get("/admin/users/", { params: { role: "employee", page_size: 200 } });
+      const items = res?.data?.results || res?.data || [];
+      setEmployees(Array.isArray(items) ? items : []);
+    } catch (_) {}
+  }
+
   async function loadAgencies() {
     try {
       const res = await API.get("/admin/users/", { params: { role: "agency", page_size: 200 } });
@@ -179,7 +204,7 @@ export default function AdminECoupons() {
     setErr("");
     try {
       const payload = {
-        code: (couponForm.campaign || couponForm.title || "E-LDGR").trim(),
+        code: (couponForm.campaign || couponForm.title || "LDGR").trim(),
         title: couponForm.title,
         description: couponForm.description,
         campaign: couponForm.campaign,
@@ -207,11 +232,12 @@ export default function AdminECoupons() {
       }
       const payload = {
         coupon: parseInt(batchForm.coupon_id, 10),
-        prefix: batchForm.prefix.trim() || "E-LDGR",
+        prefix: batchForm.prefix.trim() || "LDGR",
         serial_start: parseInt(batchForm.serial_start, 10),
         serial_end: parseInt(batchForm.serial_end, 10),
         serial_width: parseInt(batchForm.serial_width, 10),
         issued_channel: "e_coupon",
+        value: parseInt(batchForm.denomination, 10),
       };
       if (!payload.serial_start || !payload.serial_end || payload.serial_start > payload.serial_end) {
         alert("Enter valid serial range");
@@ -228,28 +254,192 @@ export default function AdminECoupons() {
     }
   }
 
-  async function assignToAgency() {
+  async function assignECoupons() {
     setAssignLoading(true);
     setErr("");
     try {
-      if (!assignForm.batch_id || !assignForm.agency_id) {
-        alert("Select batch and agency");
+      if (!assignForm.batch_id) {
+        alert("Select batch");
         setAssignLoading(false);
         return;
       }
-      const id = parseInt(assignForm.batch_id, 10);
-      const payload = { agency_id: parseInt(assignForm.agency_id, 10) };
-      if (assignForm.serial_start && assignForm.serial_end) {
-        payload.serial_start = parseInt(assignForm.serial_start, 10);
-        payload.serial_end = parseInt(assignForm.serial_end, 10);
+      const batchId = parseInt(assignForm.batch_id, 10);
+      const isAgency = assignForm.assignee_type === "agency";
+      const assigneeId = isAgency
+        ? parseInt(assignForm.agency_id || "0", 10)
+        : parseInt(assignForm.employee_id || "0", 10);
+      if (!assigneeId) {
+        alert(isAgency ? "Select agency" : "Select employee");
+        setAssignLoading(false);
+        return;
       }
-      await API.post(`/coupons/batches/${id}/assign-agency/`, payload);
-      await loadBatches();
-      alert("Assigned to agency");
+      let serialStart = assignForm.serial_start ? parseInt(assignForm.serial_start, 10) : (nextStart ? parseInt(nextStart, 10) : NaN);
+      let serialEnd = assignForm.serial_end ? parseInt(assignForm.serial_end, 10) : NaN;
+      const count = assignForm.count ? parseInt(assignForm.count, 10) : NaN;
+      if (!assignForm.serial_start && !assignForm.serial_end && !Number.isNaN(count) && !Number.isNaN(serialStart)) {
+        serialEnd = serialStart + count - 1;
+      }
+      // Monotonic guardrails (avoid overlaps and invalid ranges)
+      const ns = nextStart ? parseInt(nextStart, 10) : NaN;
+      if (!Number.isNaN(count) && count <= 0) {
+        alert("Count must be > 0");
+        setAssignLoading(false);
+        return;
+      }
+      if (!Number.isNaN(serialStart) && !Number.isNaN(serialEnd) && serialStart > serialEnd) {
+        alert("Serial Start must be <= Serial End");
+        setAssignLoading(false);
+        return;
+      }
+      if (!Number.isNaN(ns)) {
+        // If overrides are provided, ensure they don't start before the nextStart (sequential policy)
+        if (assignForm.serial_start && serialStart < ns) {
+          alert(`Serial Start must be \u2265 ${ns} to avoid overlapping previous assignments`);
+          setAssignLoading(false);
+          return;
+        }
+      }
+      if (!isAgency) {
+        if (Number.isNaN(count) || count <= 0) {
+          alert("For employee assignment, enter a valid Count (>0).");
+          setAssignLoading(false);
+          return;
+        }
+      }
+      let url, payload;
+      if (isAgency) {
+        payload = { agency_id: assigneeId };
+        if (!Number.isNaN(serialStart) && !Number.isNaN(serialEnd)) {
+          payload.serial_start = serialStart;
+          payload.serial_end = serialEnd;
+        }
+        url = `/coupons/batches/${batchId}/assign-agency/`;
+      } else {
+        payload = { employee_id: assigneeId, count: count };
+        url = `/coupons/batches/${batchId}/admin-assign-employee-count/`;
+      }
+      await API.post(url, payload);
+      setSelectedBatch(String(batchId));
+      setAssignPage(1);
+      await Promise.all([loadBatches(), loadAssignments(), loadMetrics()]);
+      loadNextStart();
+      alert("Assigned successfully");
     } catch (e) {
-      setErr(e?.response?.data?.detail || "Failed to assign to agency");
+      setErr(e?.response?.data?.detail || "Failed to assign");
     } finally {
       setAssignLoading(false);
+    }
+  }
+
+  async function loadAssignments() {
+    setAssignListLoading(true);
+    try {
+      const bid = selectedBatch || assignForm.batch_id || "";
+      const params = {
+        page: assignPage,
+        page_size: assignPageSize,
+        batch: bid || undefined,
+      };
+      const res = await API.get("/coupons/audits/", { params });
+      const items = res?.data?.results || res?.data || [];
+      const rows = (Array.isArray(items) ? items : [])
+        .filter((r) => {
+          const a = r.action || "";
+          return (
+            a === "assigned_to_agency" ||
+            a === "assigned_to_agency_by_count" ||
+            a === "assigned_to_employee" ||
+            a === "bulk_assigned_to_employees" ||
+            a === "bulk_assigned_to_agencies" ||
+            a === "agency_assigned_to_employee_by_count" ||
+            a === "admin_assigned_to_employee_by_count"
+          );
+        })
+        .flatMap((r) => {
+          const action = r.action || "";
+          const meta = r.metadata || {};
+          const batch_id = r.batch || r.batch_id || null;
+          const by = r.actor_username || "";
+          const at = r.created_at || "";
+          if (action === "bulk_assigned_to_employees" && Array.isArray(meta.assignments)) {
+            return meta.assignments.map((it) => ({
+              id: `${action}-${batch_id}-${it.employee_id}-${at}`,
+              role: "employee",
+              assignee_id: it.employee_id,
+              assignee_name: `Employee #${it.employee_id}`,
+              serial_start: null,
+              serial_end: null,
+              count: it.count,
+              batch_display: batch_id ? `#${batch_id}` : "",
+              assigned_by: by,
+              assigned_at: at,
+            }));
+          }
+          let role = action.includes("employee") ? "employee" : "agency";
+          let assignee_id = role === "employee" ? (meta.employee_id || null) : (meta.agency_id || null);
+          let assignee_name =
+            assignee_id
+              ? `${role === "employee" ? "Employee" : "Agency"} #${assignee_id}`
+              : (r.notes || "").replace(/^.* to /, "").trim();
+          let start = null,
+            end = null,
+            count = null;
+          if (Array.isArray(meta.serial_range) && meta.serial_range.length === 2) {
+            start = meta.serial_range[0];
+            end = meta.serial_range[1];
+            if (Number.isFinite(start) && Number.isFinite(end)) {
+              count = end - start + 1;
+            }
+          }
+          if (meta.count && !count) count = meta.count;
+          if (meta.total_assigned && !count) count = meta.total_assigned;
+          return [
+            {
+              id: `${action}-${batch_id}-${assignee_id || ""}-${at}`,
+              role,
+              assignee_id,
+              assignee_name,
+              serial_start: start,
+              serial_end: end,
+              count,
+              batch_display: batch_id ? `#${batch_id}` : "",
+              assigned_by: by,
+              assigned_at: at,
+            },
+          ];
+        });
+
+      // Client-side filters
+      let filtered = rows;
+      if (assignFilters.role) {
+        filtered = filtered.filter((x) => x.role === assignFilters.role);
+      }
+      if (assignFilters.assignee_id) {
+        filtered = filtered.filter((x) => String(x.assignee_id || "") === String(assignFilters.assignee_id));
+      }
+      if (assignFilters.search) {
+        const q = String(assignFilters.search).toLowerCase();
+        filtered = filtered.filter(
+          (x) =>
+            String(x.assignee_name || "").toLowerCase().includes(q) ||
+            String(x.batch_display || "").toLowerCase().includes(q) ||
+            String(x.assigned_by || "").toLowerCase().includes(q)
+        );
+      }
+
+      setAssignments(filtered);
+      const total =
+        typeof res?.data?.count === "number"
+          ? res.data.count
+          : Array.isArray(items)
+          ? items.length
+          : filtered.length;
+      setAssignTotal(total);
+    } catch (_) {
+      setAssignments([]);
+      setAssignTotal(0);
+    } finally {
+      setAssignListLoading(false);
     }
   }
 
@@ -261,6 +451,27 @@ export default function AdminECoupons() {
       return c || 0;
     } catch {
       return 0;
+    }
+  }
+
+  async function loadNextStart() {
+    const bid = assignForm.batch_id ? parseInt(assignForm.batch_id, 10) : null;
+    if (!bid) {
+      setNextStart("");
+      return;
+    }
+    setNextStartLoading(true);
+    try {
+      const role = assignForm.assignee_type === "employee" ? "employee" : "agency";
+      const res = await API.get(`/coupons/batches/${bid}/next-start/`, {
+        params: { scope: "global", role },
+      });
+      const n = res?.data?.next_start;
+      setNextStart(typeof n === "number" ? String(n) : "");
+    } catch (_) {
+      setNextStart("");
+    } finally {
+      setNextStartLoading(false);
     }
   }
 
@@ -276,10 +487,6 @@ export default function AdminECoupons() {
         sold,
         redeemed,
         revoked,
-        // matrix users per pool
-        five_users,
-        three150_users,
-        three50_users,
       ] = await Promise.all([
         bid ? fetchCount("/coupons/codes/", { batch: bid, status: "AVAILABLE" }) : 0,
         bid ? fetchCount("/coupons/codes/", { batch: bid, status: "ASSIGNED_AGENCY" }) : 0,
@@ -287,9 +494,6 @@ export default function AdminECoupons() {
         bid ? fetchCount("/coupons/codes/", { batch: bid, status: "SOLD" }) : 0,
         bid ? fetchCount("/coupons/codes/", { batch: bid, status: "REDEEMED" }) : 0,
         bid ? fetchCount("/coupons/codes/", { batch: bid, status: "REVOKED" }) : 0,
-        fetchCount("/admin/matrix/progress/", { pool: "FIVE_150" }),
-        fetchCount("/admin/matrix/progress/", { pool: "THREE_150" }),
-        fetchCount("/admin/matrix/progress/", { pool: "THREE_50" }),
       ]);
 
       setMetrics({
@@ -299,9 +503,6 @@ export default function AdminECoupons() {
         sold,
         redeemed,
         revoked,
-        matrix_five_users: five_users,
-        matrix_three_150_users: three150_users,
-        matrix_three_50_users: three50_users,
       });
     } catch (_) {
       // ignore
@@ -314,10 +515,23 @@ export default function AdminECoupons() {
     loadCoupons();
     loadBatches();
     loadAgencies();
+    loadEmployees();
   }, []);
 
   useEffect(() => {
     loadMetrics();
+  }, [selectedBatch]);
+
+  useEffect(() => {
+    loadNextStart();
+  }, [assignForm.batch_id, assignForm.assignee_type]);
+
+  useEffect(() => {
+    loadAssignments();
+  }, [assignPage, assignPageSize, assignFilters]);
+
+  useEffect(() => {
+    loadAssignments();
   }, [selectedBatch]);
 
   const couponOptions = useMemo(
@@ -336,13 +550,17 @@ export default function AdminECoupons() {
     () => agencies.map((u) => ({ value: String(u.id), label: `${u.username} #${u.id}` })),
     [agencies]
   );
+  const employeeOptions = useMemo(
+    () => employees.map((u) => ({ value: String(u.id), label: `${u.username} #${u.id}` })),
+    [employees]
+  );
 
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ margin: 0, color: "#0f172a" }}>E-Coupons</h2>
         <div style={{ color: "#64748b", fontSize: 13 }}>
-          Create e-coupon batches with codes like E-LDGR + SEQ number, assign to agencies, and view redemption/activation metrics.
+          Create e-coupon batches with codes like LDGR + SEQ number, assign to agencies, and view redemption metrics.
         </div>
       </div>
 
@@ -386,7 +604,7 @@ export default function AdminECoupons() {
             label="Campaign"
             value={couponForm.campaign}
             onChange={(v) => setCouponField("campaign", v)}
-            placeholder="e.g., E-LDGR"
+            placeholder="e.g., LDGR"
           />
           <TextInput
             label="Valid From"
@@ -413,7 +631,7 @@ export default function AdminECoupons() {
 
       {/* Create E-Coupon Batch */}
       <Section
-        title="Create E-Coupon Batch (E-LDGR + SEQ)"
+        title="Create E-Coupon Batch (LDGR + SEQ)"
         extraRight={
           <button
             onClick={createBatch}
@@ -449,7 +667,7 @@ export default function AdminECoupons() {
             label="Prefix"
             value={batchForm.prefix}
             onChange={(v) => setBatchField("prefix", v)}
-            placeholder="E-LDGR"
+            placeholder="LDGR"
           />
           <TextInput
             label="Serial Start"
@@ -469,19 +687,29 @@ export default function AdminECoupons() {
             onChange={(v) => setBatchField("serial_width", v)}
             placeholder="6"
           />
+          <Select
+            label="Denomination"
+            value={batchForm.denomination}
+            onChange={(v) => setBatchField("denomination", v)}
+            options={[
+              { value: "50", label: "₹50" },
+              { value: "150", label: "₹150" },
+              { value: "750", label: "₹750" },
+            ]}
+          />
         </div>
         <div style={{ color: "#64748b", fontSize: 12, marginTop: 8 }}>
-          Example with prefix={batchForm.prefix || "E-LDGR"} and width={batchForm.serial_width || 6}:{" "}
-          {(batchForm.prefix || "E-LDGR") + String(batchForm.serial_start || 1).padStart(parseInt(batchForm.serial_width || "6", 10), "0")}
+          Example with prefix={batchForm.prefix || "LDGR"} and width={batchForm.serial_width || 6}:{" "}
+          {(batchForm.prefix || "LDGR") + String(batchForm.serial_start || 1).padStart(parseInt(batchForm.serial_width || "6", 10), "0")}
         </div>
       </Section>
 
       {/* Assign to Agency */}
       <Section
-        title="Assign E-Coupons to Agency"
+        title="Assign E-Coupons"
         extraRight={
           <button
-            onClick={assignToAgency}
+            onClick={assignECoupons}
             disabled={assignLoading}
             style={{
               padding: "8px 12px",
@@ -511,32 +739,313 @@ export default function AdminECoupons() {
             options={[{ value: "", label: "Select..." }, ...batchOptions]}
           />
           <Select
-            label="Agency"
-            value={assignForm.agency_id}
-            onChange={(v) => setAssignField("agency_id", v)}
-            options={[{ value: "", label: "Select..." }, ...agencyOptions]}
+            label="Assign To"
+            value={assignForm.assignee_type}
+            onChange={(v) => setAssignField("assignee_type", v)}
+            options={[
+              { value: "agency", label: "Agency" },
+              { value: "employee", label: "Employee (Admin direct)" },
+            ]}
+          />
+          {assignForm.assignee_type === "agency" ? (
+            <Select
+              label="Agency"
+              value={assignForm.agency_id}
+              onChange={(v) => setAssignField("agency_id", v)}
+              options={[{ value: "", label: "Select..." }, ...agencyOptions]}
+            />
+          ) : (
+            <Select
+              label="Employee"
+              value={assignForm.employee_id}
+              onChange={(v) => setAssignField("employee_id", v)}
+              options={[{ value: "", label: "Select..." }, ...employeeOptions]}
+            />
+          )}
+          <TextInput
+            label={`Next Start (auto)${nextStartLoading ? " • loading…" : ""}`}
+            value={nextStart}
+            onChange={() => {}}
+            placeholder="—"
+            style={{ background: "#f8fafc" }}
           />
           <TextInput
-            label="Serial Start (optional)"
+            label="Count (optional)"
+            value={assignForm.count}
+            onChange={(v) => setAssignField("count", v)}
+            placeholder="e.g., 100"
+            type="number"
+          />
+          <TextInput
+            label="Serial Start (optional override)"
             value={assignForm.serial_start}
             onChange={(v) => setAssignField("serial_start", v)}
-            placeholder="Range start"
+            placeholder="Override start"
           />
           <TextInput
-            label="Serial End (optional)"
+            label="Serial End (optional override)"
             value={assignForm.serial_end}
             onChange={(v) => setAssignField("serial_end", v)}
-            placeholder="Range end"
+            placeholder="Override end"
           />
         </div>
         <div style={{ color: "#64748b", fontSize: 12, marginTop: 8 }}>
-          Leave Serial Start/End empty to assign all currently AVAILABLE codes in the batch to the selected agency.
+          Leave Count empty to assign a custom range (Serial Start/End). Leave all fields empty to assign all AVAILABLE codes in the batch.
+          If Count is set and overrides are empty, the assigned range will start from “Next Start” and continue sequentially.
+        </div>
+      </Section>
+
+      {/* Assignment History */}
+      <Section
+        title="Assignment History"
+        extraRight={
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button
+              onClick={() => loadAssignments()}
+              disabled={assignListLoading}
+              style={{
+                padding: "8px 12px",
+                background: "#0f172a",
+                color: "#fff",
+                border: 0,
+                borderRadius: 8,
+                cursor: assignListLoading ? "not-allowed" : "pointer",
+                fontWeight: 700,
+                height: 40,
+              }}
+            >
+              {assignListLoading ? "Refreshing..." : "Refresh"}
+            </button>
+          </div>
+        }
+      >
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+            gap: 12,
+          }}
+        >
+          <Select
+            label="Role"
+            value={assignFilters.role}
+            onChange={(v) => {
+              setAssignFilters((f) => ({ ...f, role: v, assignee_id: "" }));
+              setAssignPage(1);
+            }}
+            options={[
+              { value: "", label: "Any role" },
+              { value: "agency", label: "Agency" },
+              { value: "employee", label: "Employee" },
+            ]}
+          />
+          {assignFilters.role === "employee" ? (
+            <Select
+              label="Employee"
+              value={assignFilters.assignee_id}
+              onChange={(v) => {
+                setAssignFilters((f) => ({ ...f, assignee_id: v }));
+                setAssignPage(1);
+              }}
+              options={[{ value: "", label: "Any" }, ...employeeOptions]}
+            />
+          ) : (
+            <Select
+              label="Agency"
+              value={assignFilters.assignee_id}
+              onChange={(v) => {
+                setAssignFilters((f) => ({ ...f, assignee_id: v }));
+                setAssignPage(1);
+              }}
+              options={[{ value: "", label: "Any" }, ...agencyOptions]}
+            />
+          )}
+          <TextInput
+            label="Search"
+            value={assignFilters.search}
+            onChange={(v) => setAssignFilters((f) => ({ ...f, search: v }))}
+            placeholder="assignee/code/batch"
+          />
+          <TextInput
+            label="From"
+            type="datetime-local"
+            value={assignFilters.from}
+            onChange={(v) => setAssignFilters((f) => ({ ...f, from: v }))}
+            placeholder="from"
+          />
+          <TextInput
+            label="To"
+            type="datetime-local"
+            value={assignFilters.to}
+            onChange={(v) => setAssignFilters((f) => ({ ...f, to: v }))}
+            placeholder="to"
+          />
+        </div>
+
+        <div style={{ display: "flex", gap: 8, marginTop: 10, marginBottom: 10, flexWrap: "wrap" }}>
+          <button
+            onClick={() => {
+              setAssignPage(1);
+              loadAssignments();
+            }}
+            disabled={assignListLoading}
+            style={{
+              padding: "8px 12px",
+              background: "#0f172a",
+              color: "#fff",
+              border: 0,
+              borderRadius: 8,
+              cursor: assignListLoading ? "not-allowed" : "pointer",
+              fontWeight: 700,
+            }}
+          >
+            Apply Filters
+          </button>
+          <button
+            onClick={() => {
+              setAssignFilters({ role: "", assignee_id: "", search: "", from: "", to: "" });
+              setAssignPage(1);
+            }}
+            disabled={assignListLoading}
+            style={{
+              padding: "8px 12px",
+              background: "#fff",
+              color: "#0f172a",
+              border: "1px solid #e2e8f0",
+              borderRadius: 8,
+              cursor: assignListLoading ? "not-allowed" : "pointer",
+            }}
+          >
+            Reset
+          </button>
+          <div style={{ color: "#64748b", marginLeft: "auto" }}>
+            {assignTotal} records
+          </div>
+        </div>
+
+        <div
+          style={{
+            border: "1px solid #e2e8f0",
+            borderRadius: 10,
+            overflow: "hidden",
+            background: "#fff",
+          }}
+        >
+          <div style={{ overflowX: "auto" }}>
+            <div
+              style={{
+                minWidth: 1000,
+                display: "grid",
+                gridTemplateColumns: "120px 1fr 180px 120px 120px 1fr 200px",
+                gap: 8,
+                padding: "10px",
+                background: "#f8fafc",
+                borderBottom: "1px solid #e2e8f0",
+                fontWeight: 700,
+                color: "#0f172a",
+              }}
+            >
+              <div>Role</div>
+              <div>Assignee</div>
+              <div>Range</div>
+              <div>Count</div>
+              <div>Batch</div>
+              <div>Assigned By</div>
+              <div>Assigned At</div>
+            </div>
+            <div>
+              {(assignments || []).map((a) => {
+                const role = a.role || (a.agency_id ? "agency" : a.employee_id ? "employee" : "");
+                const assignee =
+                  a.assignee_name ||
+                  (a.assignee && (a.assignee.username || a.assignee.name)) ||
+                  a.agency_name ||
+                  a.employee_name ||
+                  (a.agency && (a.agency.username || a.agency.name)) ||
+                  (a.employee && (a.employee.username || a.employee.name)) ||
+                  `#${a.assignee_id || a.agency_id || a.employee_id || ""}`;
+                const start = a.serial_start ?? a.start ?? a.range_start;
+                const end = a.serial_end ?? a.end ?? a.range_end;
+                const count = a.count ?? (typeof start === "number" && typeof end === "number" ? end - start + 1 : "");
+                const batch = a.batch_display || (a.batch && `#${a.batch.id}`) || (a.batch_id ? `#${a.batch_id}` : "");
+                const by =
+                  a.assigned_by_name ||
+                  (a.assigned_by && (a.assigned_by.username || a.assigned_by.name)) ||
+                  (typeof a.assigned_by === "string" ? a.assigned_by : "");
+                const at = a.assigned_at || a.created_at || a.created || "";
+                return (
+                  <div
+                    key={a.id || `${role}-${assignee}-${start}-${end}-${Math.random()}`}
+                    style={{
+                      minWidth: 1000,
+                      display: "grid",
+                      gridTemplateColumns: "120px 1fr 180px 120px 120px 1fr 200px",
+                      gap: 8,
+                      padding: "10px",
+                      borderBottom: "1px solid #e2e8f0",
+                    }}
+                  >
+                    <div style={{ textTransform: "capitalize" }}>{role || "—"}</div>
+                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{assignee || "—"}</div>
+                    <div>{(start ?? "—")} - {(end ?? "—")}</div>
+                    <div>{count ?? "—"}</div>
+                    <div>{batch || "—"}</div>
+                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{by || "—"}</div>
+                    <div>{at ? new Date(at).toLocaleString() : "—"}</div>
+                  </div>
+                );
+              })}
+              {!assignListLoading && (!assignments || assignments.length === 0) ? (
+                <div style={{ padding: 12, color: "#64748b" }}>No assignments found</div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 10, flexWrap: "wrap" }}>
+          <button
+            onClick={() => setAssignPage((p) => Math.max(1, p - 1))}
+            disabled={assignPage <= 1 || assignListLoading}
+            style={{
+              padding: "6px 10px",
+              background: "#fff",
+              color: "#0f172a",
+              border: "1px solid #e2e8f0",
+              borderRadius: 8,
+              cursor: assignPage <= 1 || assignListLoading ? "not-allowed" : "pointer",
+            }}
+          >
+            Prev
+          </button>
+          <div style={{ color: "#64748b" }}>
+            Page {assignPage} / {Math.max(1, Math.ceil(assignTotal / assignPageSize) || 1)}
+          </div>
+          <button
+            onClick={() => {
+              const maxPage = Math.max(1, Math.ceil(assignTotal / assignPageSize) || 1);
+              setAssignPage((p) => Math.min(maxPage, p + 1));
+            }}
+            disabled={assignPage >= Math.max(1, Math.ceil(assignTotal / assignPageSize) || 1) || assignListLoading}
+            style={{
+              padding: "6px 10px",
+              background: "#fff",
+              color: "#0f172a",
+              border: "1px solid #e2e8f0",
+              borderRadius: 8,
+              cursor:
+                assignPage >= Math.max(1, Math.ceil(assignTotal / assignPageSize) || 1) || assignListLoading
+                  ? "not-allowed"
+                  : "pointer",
+            }}
+          >
+            Next
+          </button>
         </div>
       </Section>
 
       {/* Metrics */}
       <Section
-        title="Redemption & Activation Summary"
+        title="Redemption Summary"
         extraRight={
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <Select
@@ -579,22 +1088,8 @@ export default function AdminECoupons() {
           <MetricCard label="Redeemed (Approved)" value={metrics.redeemed} />
           <MetricCard label="Revoked" value={metrics.revoked} />
         </div>
-        <div style={{ height: 12 }} />
-        <div style={{ fontWeight: 800, color: "#0f172a", marginBottom: 8 }}>Activation (Users with pool progress)</div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-            gap: 12,
-          }}
-        >
-          <MetricCard label="5-Matrix (FIVE_150) Users" value={metrics.matrix_five_users} />
-          <MetricCard label="3-Matrix (THREE_150) Users" value={metrics.matrix_three_150_users} />
-          <MetricCard label="3-Matrix (THREE_50) Users" value={metrics.matrix_three_50_users} />
-        </div>
         <div style={{ color: "#64748b", fontSize: 12, marginTop: 8 }}>
-          Notes: Redemption counts are computed per selected batch using CouponCode status. Activation counts are overall users with matrix
-          progress in the respective pools.
+          Notes: Redemption counts are computed per selected batch using CouponCode status.
         </div>
       </Section>
     </div>

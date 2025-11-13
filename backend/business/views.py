@@ -6,7 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.http import HttpResponse
 from django.db.models import Q
-from .models import BusinessRegistration, RewardProgress, RewardRedemption, DailyReport
+from .models import BusinessRegistration, RewardProgress, RewardRedemption, DailyReport, AutoPoolAccount, SubscriptionActivation
 from .serializers import BusinessRegistrationSerializer, DailyReportSerializer
 
 
@@ -51,6 +51,53 @@ class SelfActivation50View(APIView):
             )
         except Exception:
             return Response({"detail": "Failed to process self activation."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ActivationStatusView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        # Active pool account counts
+        five_qs = AutoPoolAccount.objects.filter(owner=user, pool_type="FIVE_150", status="ACTIVE")
+        three_qs = AutoPoolAccount.objects.filter(owner=user, status="ACTIVE", pool_type__in=["THREE_150", "THREE_50"])
+
+        five_count = five_qs.count()
+        three_count = three_qs.count()
+
+        five_active = five_count > 0
+        three_active = three_count > 0
+        active = five_active and three_active
+
+        # Activation counts by denomination via SubscriptionActivation
+        count_150 = SubscriptionActivation.objects.filter(user=user, package="PRIME_150_ACTIVE").count()
+        count_50 = SubscriptionActivation.objects.filter(
+            user=user, package__in=["GLOBAL_50", "SELF_50", "PRODUCT_GLOBAL_50"]
+        ).count()
+
+        # Activation timestamps (best-effort)
+        from django.db.models import Min, Max
+        agg_all = AutoPoolAccount.objects.filter(owner=user, status="ACTIVE").aggregate(
+            first=Min("created_at"), last=Max("created_at")
+        )
+        activated_at = agg_all.get("first")
+        last_activated_at = agg_all.get("last")
+
+        return Response(
+            {
+                "active": bool(active),
+                "five_matrix_active": bool(five_active),
+                "three_matrix_active": bool(three_active),
+                "five_matrix_count": int(five_count),
+                "three_matrix_count": int(three_count),
+                "count_150": int(count_150),
+                "count_50": int(count_50),
+                "activated_at": activated_at,
+                "last_activated_at": last_activated_at,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 # =======================

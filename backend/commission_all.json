@@ -1,0 +1,14 @@
+{
+  "count": 1,
+  "rows": [
+    {
+      "id": 1,
+      "five_matrix_levels": 6,
+      "five_matrix_percents_json": [],
+      "three_matrix_levels": 15,
+      "three_matrix_percents_json": [],
+      "three_matrix_amounts_json": [],
+      "product_opens_prime": false
+    }
+  ]
+}

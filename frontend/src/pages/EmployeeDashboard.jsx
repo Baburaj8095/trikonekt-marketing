@@ -1252,7 +1252,7 @@ export default function EmployeeDashboard({ embedded = false }) {
         )}
 
         {activeTab === TABS.REFER_EARN && (
-          <ReferAndEarn title="Refer Consumer" onlyConsumer sponsorUsername={(storedUser?.sponsor_id || (storedUser && storedUser.user && storedUser.user.sponsor_id) || "")} />
+            <ReferAndEarn title="Refer Consumer" onlyConsumer sponsorUsername={(storedUser?.sponsor_id || (storedUser && storedUser.user && storedUser.user.sponsor_id) || "")} />
         )}
 
         {activeTab === TABS.REWARDS && <RewardsTargetCard role="employee" />}

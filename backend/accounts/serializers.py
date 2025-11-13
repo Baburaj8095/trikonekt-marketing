@@ -98,32 +98,15 @@ class RegisterSerializer(serializers.ModelSerializer):
         if category == 'business':
             raise serializers.ValidationError({'category': 'Business registration has moved. Use /api/business/register/.'})
 
-        # Sponsor required (can be phone number, username, or sponsor_id)
+        # Sponsor required: must be a valid username
         if not sponsor:
-            raise serializers.ValidationError({'sponsor_id': 'Sponsor is required.'})
+            raise serializers.ValidationError({'sponsor_id': 'Sponsor username is required.'})
 
-        # Resolve sponsor by prefixed_id/username/sponsor_id.
-        # Also accept hyphen-less codes like TREMP0000000001 -> TREMP-0000000001 and tolerate phone digits.
+        # Resolve sponsor strictly by username.
         raw = sponsor
-        sponsor_user = CustomUser.objects.filter(
-            Q(prefixed_id__iexact=raw) | Q(username__iexact=raw) | Q(sponsor_id__iexact=raw)
-        ).first()
+        sponsor_user = CustomUser.objects.filter(username__iexact=raw).first()
         if not sponsor_user:
-            # Try normalized variant inserting hyphen before the last 10 digits (prefix-XXXXXXXXXX)
-            import re
-            m = re.match(r'^([A-Za-z_]+)-?(\d{10})$', raw)
-            if m:
-                hyphenated = f"{m.group(1).upper()}-{m.group(2)}"
-                sponsor_user = CustomUser.objects.filter(
-                    Q(prefixed_id__iexact=hyphenated) | Q(username__iexact=hyphenated) | Q(sponsor_id__iexact=hyphenated)
-                ).first()
-        if not sponsor_user:
-            # Best-effort: accept phone digits as sponsor key
-            phone_digits = ''.join(c for c in raw if c.isdigit())
-            if phone_digits:
-                sponsor_user = CustomUser.objects.filter(Q(phone__iexact=phone_digits) | Q(username__iexact=phone_digits)).first()
-        if not sponsor_user:
-            raise serializers.ValidationError({'sponsor_id': 'Sponsor not found.'})
+            raise serializers.ValidationError({'sponsor_id': 'Sponsor username not found.'})
 
         # Enforce agency hierarchy transitions only for agency categories
         if category in AGENCY_CATEGORIES:
@@ -331,7 +314,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         """
         Generate admin-friendly usernames using prefixes by category.
         - Consumer: TR+phone
-        - Employee: TREMP+phone
+        - Employee: TREP+phone
         - Sub-Franchise: TRSF+phone
         - Pincode Agency: TRPN+phone
         - State Agency: TRST+phone
@@ -349,7 +332,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
         prefix_map = {
             'consumer': 'TR',
-            'employee': 'TREMP',
+            'employee': 'TREP',
             'agency_sub_franchise': 'TRSF',
             'agency_pincode': 'TRPN',
             'agency_state': 'TRST',
@@ -434,7 +417,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         # Store upline's code in sponsor_id; keep user's own referral code in prefixed_id (allocated on save)
         try:
             if registered_by:
-                user.sponsor_id = getattr(registered_by, "prefixed_id", "") or getattr(registered_by, "username", "") or sponsor_id
+                user.sponsor_id = getattr(registered_by, "username", "") or sponsor_id
             else:
                 user.sponsor_id = sponsor_id
         except Exception:

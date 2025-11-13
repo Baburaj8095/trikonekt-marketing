@@ -183,7 +183,7 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
       return "";
     }
   };
-  const [remember, setRemember] = useState(false);
+  const [remember, setRemember] = useState(true);
   const [forgotOpen, setForgotOpen] = useState(false);
   const [fpUsername, setFpUsername] = useState("");
   const [fpNewPassword, setFpNewPassword] = useState("");
@@ -882,7 +882,7 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
 
   const validateAgencyInputs = () => {
     if (!sponsorId.trim()) {
-      setErrorMsg("Sponsor ID is required for agency registrations.");
+      setErrorMsg("Sponsor Username is required for agency registrations.");
       return false;
     }
     if (isSC) {
@@ -1118,7 +1118,7 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
 
     // Sponsor ID mandatory (from URL param or manual entry)
     if (!sponsorId) {
-      setErrorMsg("Sponsor ID is required");
+      setErrorMsg("Sponsor Username is required");
       return;
     }
 
@@ -1415,7 +1415,7 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
 
             <TextField
               fullWidth
-              label="Sponsor ID"
+              label="Sponsor Username"
               value={sponsorId}
               onChange={(e) => setSponsorId(e.target.value)}
               required
@@ -1431,7 +1431,7 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
 
             {!sponsorId.trim() && (
               <Alert severity="info" sx={{ mb: 2 }}>
-                Enter Sponsor ID to continue selecting regions.
+                Enter Sponsor Username to continue selecting regions.
               </Alert>
             )}
 
@@ -1950,7 +1950,7 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
                 {!isAgency && (
                   <TextField
                     fullWidth
-                    label="Sponsor ID"
+                    label="Sponsor Username"
                     value={sponsorId}
                     onChange={(e) => setSponsorId(e.target.value)}
                     required

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../../api/api";
 import TreeReferralGalaxy from "../../components/TreeReferralGalaxy";
+import { getAdminMeta } from "../../admin-panel/api/adminMeta";
 
 function paletteStyles(key) {
   // Solid, high-contrast gradients for colored cards
@@ -143,6 +144,10 @@ export default function AdminDashboard() {
   const [modelsMeta, setModelsMeta] = useState([]);
   const [modelsErr, setModelsErr] = useState("");
 
+  // Recent E‑Coupon assignments (compact dashboard widget)
+  const [recentAssign, setRecentAssign] = useState([]);
+  const [recentAssignLoading, setRecentAssignLoading] = useState(false);
+
   useEffect(() => {
     let mounted = true;
     setLoading(true);
@@ -166,8 +171,8 @@ export default function AdminDashboard() {
   // Load admin model metadata for dashboard cards
   useEffect(() => {
     let mounted = true;
-    API.get("/admin/admin-meta/")
-      .then(({ data }) => {
+    getAdminMeta()
+      .then((data) => {
         if (!mounted) return;
         setModelsMeta(data?.models || []);
         setModelsErr("");
@@ -202,13 +207,51 @@ export default function AdminDashboard() {
     0
   );
 
+  // Group models by app with de-duplication and build a filtered set for "All Admin Models"
   const modelsByApp = React.useMemo(() => {
-    const g = {};
-    (modelsMeta || []).forEach((m) => {
-      (g[m.app_label] = g[m.app_label] || []).push(m);
-    });
-    return g;
+    const norm = (s) => String(s || "").toLowerCase();
+    const seen = new Set();
+    const grouped = {};
+    for (const m of (modelsMeta || [])) {
+      if (!m) continue;
+      const app = norm(m.app_label);
+      const model = norm(m.model);
+      const key = `${app}.${model}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      (grouped[m.app_label] = grouped[m.app_label] || []).push(m);
+    }
+    return grouped;
   }, [modelsMeta]);
+
+  // Exclude apps that already have dedicated sections to avoid duplicates on the dashboard
+  const modelsByAppAllFiltered = React.useMemo(() => {
+    const excludedApps = new Set(["uploads", "market", "auth", "token_blacklist", "locations"]);
+    const out = {};
+    Object.keys(modelsByApp).forEach((appLabel) => {
+      const appLower = String(appLabel).toLowerCase();
+      if (excludedApps.has(appLower)) return;
+      out[appLabel] = modelsByApp[appLabel];
+    });
+    return out;
+  }, [modelsByApp]);
+
+  async function loadRecentAssignments() {
+    setRecentAssignLoading(true);
+    try {
+      const res = await API.get("/coupons/assignments/", { params: { page_size: 5 } });
+      const items = res?.data?.results || res?.data || [];
+      setRecentAssign(Array.isArray(items) ? items : []);
+    } catch (_) {
+      setRecentAssign([]);
+    } finally {
+      setRecentAssignLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadRecentAssignments();
+  }, []);
 
   return (
     <div>
@@ -249,10 +292,10 @@ export default function AdminDashboard() {
             }}
           >
             <Card
-              title="Accounts / Users"
+              title="User Accounts"
               value={users.total ?? 0}
               subtitle={`Active: ${users.active ?? 0} • Today: ${users.todayNew ?? 0} • KYC pending: ${users.kycPending ?? 0}`}
-              onClick={() => nav("/admin/user-tree")}
+              onClick={() => nav("/admin/users")}
               palette="indigo"
             />
             <Card
@@ -289,6 +332,20 @@ export default function AdminDashboard() {
               subtitle={`Today: ${uploads.todayNew || 0}`}
               onClick={() => nav("/admin/uploads")}
               palette="cyan"
+            />
+            <Card
+              title="Lucky Draw (Create)"
+              value={coupons.total || 0}
+              subtitle="Create and manage lucky draw coupons"
+              onClick={() => nav("/admin/lucky-draw")}
+              palette="indigo"
+            />
+            <Card
+              title="Business Registration"
+              value={0}
+              subtitle="Review and approve businesses"
+              onClick={() => nav("/admin/business")}
+              palette="amber"
             />
           </div>
 
@@ -331,125 +388,8 @@ export default function AdminDashboard() {
             />
           </div>
 
-          {/* Uploads Models */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-              gap: 12,
-              marginTop: 12,
-            }}
-          >
-            <Card
-              title="Dashboard Cards"
-              value={uploadsModels.dashboardCards || 0}
-              subtitle="Active dashboard tiles"
-              onClick={() => nav("/admin/dashboard-cards")}
-              palette="teal"
-            />
-            <Card
-              title="Home Cards"
-              value={uploadsModels.homeCards || 0}
-              subtitle="Active home screen banners"
-              onClick={() => nav("/admin/home-cards")}
-              palette="amber"
-            />
-            <Card
-              title="Lucky Draw Submissions"
-              value={uploadsModels.luckyDrawSubmissions || 0}
-              subtitle={`Pending TRE: ${uploadsModels.luckyDrawPendingTRE || 0} • Pending Agency: ${uploadsModels.luckyDrawPendingAgency || 0}`}
-              onClick={() => nav("/admin/lucky-draw")}
-              palette="red"
-            />
-          </div>
 
-          {/* Market Models */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-              gap: 12,
-              marginTop: 12,
-            }}
-          >
-            <Card
-              title="Products"
-              value={market.products || 0}
-              subtitle="Marketplace catalog"
-              onClick={() => nav("/admin/products")}
-              palette="blue"
-            />
-            <Card
-              title="Purchase Requests"
-              value={market.purchaseRequests || 0}
-              subtitle={`Pending: ${market.purchaseRequestsPending || 0}`}
-              onClick={() => nav("/admin/orders")}
-              palette="purple"
-            />
-            <Card
-              title="Banners"
-              value={market.banners || 0}
-              subtitle="Agency configured"
-              onClick={() => nav("/admin/banners")}
-              palette="indigo"
-            />
-            <Card
-              title="Banner Items"
-              value={market.bannerItems || 0}
-              subtitle="Items within banners"
-              onClick={() => nav("/admin/banners")}
-              palette="cyan"
-            />
-            <Card
-              title="Banner Purchase Requests"
-              value={market.bannerPurchaseRequests || 0}
-              subtitle={`Pending: ${market.bannerPurchaseRequestsPending || 0}`}
-              onClick={() => nav("/admin/orders")}
-              palette="green"
-            />
-          </div>
 
-          {/* All Admin Models - auto-discovered */}
-          <div style={{ marginTop: 16 }}>
-            <h3 style={{ margin: "8px 0", color: "#0f172a", fontSize: 16, fontWeight: 800 }}>
-              All Admin Models
-            </h3>
-            {modelsErr ? (
-              <div style={{ color: "#dc2626" }}>{modelsErr}</div>
-            ) : null}
-            {Object.keys(modelsByApp).length ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {Object.keys(modelsByApp).sort().map((app) => (
-                  <div key={app} style={{ border: "1px solid #e2e8f0", borderRadius: 10, background: "#fff", padding: 12 }}>
-                    <div style={{ fontWeight: 800, color: "#0f172a", marginBottom: 8 }}>{app}</div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8 }}>
-                      {modelsByApp[app]
-                        .sort((a, b) => (a.verbose_name || a.model).localeCompare(b.verbose_name || b.model))
-                        .map((m) => (
-                          <button
-                            key={`${m.app_label}.${m.model}`}
-                            onClick={() => nav(`/admin/dashboard/models/${m.app_label}/${m.model}`)}
-                            style={{
-                              textAlign: "left",
-                              padding: "10px 12px",
-                              borderRadius: 10,
-                              border: "1px solid #e2e8f0",
-                              background: "#f8fafc",
-                              cursor: "pointer",
-                            }}
-                          >
-                            <div style={{ fontWeight: 700, color: "#0f172a" }}>{m.verbose_name || m.model}</div>
-                            <div style={{ fontSize: 12, color: "#64748b" }}>{m.app_label}.{m.model}</div>
-                          </button>
-                        ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : !modelsErr ? (
-              <div style={{ color: "#64748b" }}>No admin models available.</div>
-            ) : null}
-          </div>
 
           {/* Quick actions - fully responsive */}
           <div style={{ marginTop: 16 }}>
@@ -497,9 +437,97 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* 5-Matrix Quick Viewer - overflow safe for mobile */}
-          <div style={{ marginTop: 16 }}>
-            <h3 style={{ margin: "8px 0", color: "#0f172a", fontSize: 16, fontWeight: 800 }}>5‑Matrix Quick Viewer</h3>
+      {/* Recent E‑Coupon Assignments (compact) */}
+      <div style={{ marginTop: 16 }}>
+        <h3 style={{ margin: "8px 0", color: "#0f172a", fontSize: 16, fontWeight: 800 }}>Recent E‑Coupon Assignments</h3>
+        <div
+          style={{
+            border: "1px solid #e2e8f0",
+            borderRadius: 10,
+            background: "#fff",
+            overflow: "hidden",
+          }}
+        >
+          <div style={{ overflowX: "auto" }}>
+            <div
+              style={{
+                minWidth: 900,
+                display: "grid",
+                gridTemplateColumns: "120px 1fr 200px 120px 220px",
+                gap: 8,
+                padding: "10px",
+                background: "#f8fafc",
+                borderBottom: "1px solid #e2e8f0",
+                fontWeight: 700,
+                color: "#0f172a",
+              }}
+            >
+              <div>Role</div>
+              <div>Assignee</div>
+              <div>Range</div>
+              <div>Count</div>
+              <div>Assigned At</div>
+            </div>
+            <div>
+              {(recentAssign || []).map((a) => {
+                const role = a.role || (a.agency_id ? "agency" : a.employee_id ? "employee" : "");
+                const assignee =
+                  a.assignee_name ||
+                  (a.assignee && (a.assignee.username || a.assignee.name)) ||
+                  a.agency_name ||
+                  a.employee_name ||
+                  (a.agency && (a.agency.username || a.agency.name)) ||
+                  (a.employee && (a.employee.username || a.employee.name)) ||
+                  `#${a.assignee_id || a.agency_id || a.employee_id || ""}`;
+                const start = a.serial_start ?? a.start ?? a.range_start;
+                const end = a.serial_end ?? a.end ?? a.range_end;
+                const count =
+                  a.count ?? (typeof start === "number" && typeof end === "number" ? end - start + 1 : "");
+                const at = a.assigned_at || a.created_at || a.created || "";
+                return (
+                  <div
+                    key={a.id || `${role}-${assignee}-${start}-${end}-${Math.random()}`}
+                    style={{
+                      minWidth: 900,
+                      display: "grid",
+                      gridTemplateColumns: "120px 1fr 200px 120px 220px",
+                      gap: 8,
+                      padding: "10px",
+                      borderBottom: "1px solid #e2e8f0",
+                    }}
+                  >
+                    <div style={{ textTransform: "capitalize" }}>{role || "—"}</div>
+                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{assignee || "—"}</div>
+                    <div>{(start ?? "—")} - {(end ?? "—")}</div>
+                    <div>{count ?? "—"}</div>
+                    <div>{at ? new Date(at).toLocaleString() : "—"}</div>
+                  </div>
+                );
+              })}
+              {!recentAssignLoading && (!recentAssign || recentAssign.length === 0) ? (
+                <div style={{ padding: 12, color: "#64748b" }}>No recent assignments</div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+          <button
+            onClick={() => nav("/admin/e-coupons")}
+            style={{
+              padding: "8px 12px",
+              background: "#0f172a",
+              color: "#fff",
+              border: 0,
+              borderRadius: 8,
+              cursor: "pointer",
+              fontWeight: 700,
+            }}
+          >
+            View all
+          </button>
+        </div>
+
+        <h3 style={{ margin: "8px 0", color: "#0f172a", fontSize: 16, fontWeight: 800 }}>5‑Matrix Quick Viewer</h3>
             <div
               style={{
                 border: "1px solid #e2e8f0",

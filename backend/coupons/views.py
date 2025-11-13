@@ -171,6 +171,87 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         ser = self.get_serializer(page if page is not None else qs, many=True)
         return self.get_paginated_response(ser.data) if page is not None else Response(ser.data)
 
+    @action(detail=False, methods=["get"], url_path="my-ranges", permission_classes=[IsAuthenticated])
+    def my_ranges(self, request):
+        """
+        Returns compacted contiguous serial ranges of codes owned by the current user.
+        - Agency: codes where assigned_agency = me
+        - Employee: codes where assigned_employee = me
+        Response:
+        {
+          "role": "agency" | "employee",
+          "total": <int>,
+          "groups": [
+            {
+              "batch_id": <id or null>,
+              "prefix": "LDGR",
+              "ranges": [
+                {"start_serial": 1, "end_serial": 100, "start_code": "LDGR000001", "end_code": "LDGR000100", "count": 100},
+                ...
+              ]
+            },
+            ...
+          ]
+        }
+        """
+        user = request.user
+        if is_employee_user(user):
+            qs = CouponCode.objects.filter(assigned_employee=user).order_by("batch_id", "serial")
+            role = "employee"
+        elif is_agency_user(user):
+            qs = CouponCode.objects.filter(assigned_agency=user).order_by("batch_id", "serial")
+            role = "agency"
+        else:
+            return Response({"detail": "Only agency or employees can view ranges."}, status=status.HTTP_403_FORBIDDEN)
+
+        groups = {}
+        total = 0
+        # Minimize columns for performance; rely on code/serial/batch
+        for code in qs.only("code", "serial", "batch_id").select_related("batch"):
+            # Prefer batch.prefix; fallback to stripping trailing digits from code
+            prefix = getattr(code.batch, "prefix", None) if code.batch_id else None
+            if not prefix:
+                # crude fallback: strip trailing digits
+                prefix = str(code.code).rstrip("0123456789") or ""
+            key = (code.batch_id or 0, prefix)
+            if key not in groups:
+                groups[key] = {"batch_id": code.batch_id, "prefix": prefix, "ranges": []}
+            grp = groups[key]
+
+            serial = int(code.serial or 0)
+            if not grp["ranges"]:
+                grp["ranges"].append({
+                    "start_serial": serial,
+                    "end_serial": serial,
+                    "start_code": code.code,
+                    "end_code": code.code,
+                    "count": 1,
+                })
+            else:
+                last = grp["ranges"][-1]
+                if serial == int(last["end_serial"]) + 1:
+                    last["end_serial"] = serial
+                    last["end_code"] = code.code
+                    last["count"] = int(last["count"]) + 1
+                else:
+                    grp["ranges"].append({
+                        "start_serial": serial,
+                        "end_serial": serial,
+                        "start_code": code.code,
+                        "end_code": code.code,
+                        "count": 1,
+                    })
+            total += 1
+
+        out = {
+            "role": role,
+            "total": total,
+            "groups": [
+                {"batch_id": v["batch_id"], "prefix": v["prefix"], "ranges": v["ranges"]}
+                for (_, _), v in groups.items()
+            ],
+        }
+        return Response(out)
 
     @action(detail=True, methods=["post"], url_path="assign-consumer", permission_classes=[IsAuthenticated])
     def assign_consumer(self, request, pk=None):
@@ -325,6 +406,15 @@ class CouponBatchViewSet(mixins.CreateModelMixin,
             if issued_channel not in ("physical", "e_coupon"):
                 issued_channel = "physical"
 
+            # Denomination support: accept 50, 150, 750 (fallback to 150)
+            value_param = request.data.get("value") or request.data.get("denomination") or request.data.get("amount")
+            try:
+                code_value = int(float(value_param))
+            except Exception:
+                code_value = 150
+            if code_value not in (50, 150, 750):
+                code_value = 150
+
             # Validate no duplicate codes
             to_create = []
             for s in range(start, end + 1):
@@ -337,7 +427,7 @@ class CouponBatchViewSet(mixins.CreateModelMixin,
                     assigned_agency=None,
                     batch=batch,
                     serial=s,
-                    value=150,
+                    value=code_value,
                     issued_by=request.user,
                     status="AVAILABLE",
                 ))
@@ -353,7 +443,7 @@ class CouponBatchViewSet(mixins.CreateModelMixin,
                 actor=request.user,
                 batch=batch,
                 notes=f"Generated {len(final_list)} codes",
-                metadata={"prefix": prefix, "range": [start, end], "width": width},
+                metadata={"prefix": prefix, "range": [start, end], "width": width, "issued_channel": issued_channel, "value": code_value},
             )
 
         return Response(self.get_serializer(batch).data, status=status.HTTP_201_CREATED)
@@ -563,6 +653,187 @@ class CouponBatchViewSet(mixins.CreateModelMixin,
             )
 
         return Response({"assigned_per_employee": result, "remaining_unassigned_for_agency": max(0, len(pool_ids) - idx)}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="assign-agency-count", permission_classes=[IsAuthenticated])
+    def assign_agency_count(self, request, pk=None):
+        """
+        Admin assigns the next N AVAILABLE codes from this batch to a specific agency.
+        Body: { "agency_id": <id>, "count": <int> }
+        """
+        if not is_admin_user(request.user):
+            return Response({"detail": "Only admin can assign by count."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            batch = self.get_object()
+        except Exception:
+            return Response({"detail": "Batch not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            agency_id = int(request.data.get("agency_id"))
+            count = int(request.data.get("count"))
+        except Exception:
+            return Response({"detail": "agency_id and count are required integers."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            agency = CustomUser.objects.get(id=agency_id)
+        except CustomUser.DoesNotExist:
+            return Response({"agency_id": ["Invalid agency id."]}, status=status.HTTP_400_BAD_REQUEST)
+        if not is_agency_user(agency):
+            return Response({"agency_id": ["Provided user is not an agency."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        code_ids = list(
+            CouponCode.objects
+            .filter(batch=batch, status="AVAILABLE")
+            .order_by("serial")
+            .values_list("id", flat=True)[:count]
+        )
+        if not code_ids:
+            return Response({"assigned": 0, "detail": "No available codes."}, status=status.HTTP_200_OK)
+
+        with transaction.atomic():
+            updated = CouponCode.objects.filter(id__in=code_ids).update(
+                assigned_agency=agency, status="ASSIGNED_AGENCY"
+            )
+            AuditTrail.objects.create(
+                action="assigned_to_agency_by_count",
+                actor=request.user,
+                batch=batch,
+                notes=f"Assigned {updated} by count to {agency.username}",
+                metadata={"agency_id": agency.id, "count": updated},
+            )
+        return Response({"assigned": updated}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="admin-assign-employee-count", permission_classes=[IsAuthenticated])
+    def admin_assign_employee_count(self, request, pk=None):
+        """
+        Admin assigns the next N AVAILABLE codes (not yet owned by any agency/employee) from this batch directly to an employee.
+        Body: { "employee_id": <id>, "count": <int> }
+        """
+        if not is_admin_user(request.user):
+            return Response({"detail": "Only admin can assign by count."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            batch = self.get_object()
+        except Exception:
+            return Response({"detail": "Batch not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            employee_id = int(request.data.get("employee_id"))
+            count = int(request.data.get("count"))
+        except Exception:
+            return Response({"detail": "employee_id and count are required integers."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            employee = CustomUser.objects.get(id=employee_id)
+        except CustomUser.DoesNotExist:
+            return Response({"employee_id": ["Invalid employee id."]}, status=status.HTTP_400_BAD_REQUEST)
+        if not is_employee_user(employee):
+            return Response({"employee_id": ["Provided user is not an employee."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        code_ids = list(
+            CouponCode.objects
+            .filter(batch=batch, status="AVAILABLE", assigned_agency__isnull=True, assigned_employee__isnull=True)
+            .order_by("serial")
+            .values_list("id", flat=True)[:count]
+        )
+        if not code_ids:
+            return Response({"assigned": 0, "detail": "No available codes."}, status=status.HTTP_200_OK)
+
+        with transaction.atomic():
+            updated = CouponCode.objects.filter(id__in=code_ids).update(
+                assigned_employee=employee, status="ASSIGNED_EMPLOYEE"
+            )
+            AuditTrail.objects.create(
+                action="admin_assigned_to_employee_by_count",
+                actor=request.user,
+                batch=batch,
+                notes=f"Assigned {updated} by count to {employee.username}",
+                metadata={"employee_id": employee.id, "count": updated},
+            )
+        return Response({"assigned": updated}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="agency-assign-employee-count", permission_classes=[IsAuthenticated])
+    def agency_assign_employee_count(self, request, pk=None):
+        """
+        Agency assigns the next N codes from its own pool in this batch to an employee.
+        Body: { "employee_id": <id>, "count": <int> }
+        """
+        if not is_agency_user(request.user):
+            return Response({"detail": "Only agency can assign to employees."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            batch = self.get_object()
+        except Exception:
+            return Response({"detail": "Batch not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            employee_id = int(request.data.get("employee_id"))
+            count = int(request.data.get("count"))
+        except Exception:
+            return Response({"detail": "employee_id and count are required integers."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            employee = CustomUser.objects.get(id=employee_id)
+        except CustomUser.DoesNotExist:
+            return Response({"employee_id": ["Invalid employee id."]}, status=status.HTTP_400_BAD_REQUEST)
+        if not is_employee_user(employee):
+            return Response({"employee_id": ["Provided user is not an employee."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        pool_ids = list(
+            CouponCode.objects
+            .filter(batch=batch, assigned_agency=request.user, assigned_employee__isnull=True, status="ASSIGNED_AGENCY")
+            .order_by("serial")
+            .values_list("id", flat=True)[:count]
+        )
+        if not pool_ids:
+            return Response({"assigned": 0, "detail": "No agency-owned codes available."}, status=status.HTTP_200_OK)
+
+        with transaction.atomic():
+            updated = CouponCode.objects.filter(id__in=pool_ids).update(
+                assigned_employee=employee, status="ASSIGNED_EMPLOYEE"
+            )
+            AuditTrail.objects.create(
+                action="agency_assigned_to_employee_by_count",
+                actor=request.user,
+                batch=batch,
+                notes=f"Assigned {updated} to {employee.username}",
+                metadata={"employee_id": employee.id, "count": updated},
+            )
+        return Response({"assigned": updated}, status=status.HTTP_200_OK)
+
+
+    @action(detail=True, methods=["get"], url_path="next-start", permission_classes=[IsAuthenticated])
+    def next_start(self, request, pk=None):
+        """
+        Utility: compute the next starting serial for sequential assignments.
+        Query params:
+          - role: 'agency' or 'employee' (required)
+          - scope: optional, currently supports 'global' (default)
+        Returns: { "next_start": <int or null> }
+        """
+        try:
+            batch = self.get_object()
+        except Exception:
+            return Response({"detail": "Batch not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        role = str(request.query_params.get("role") or "").lower()
+        scope = str(request.query_params.get("scope") or "global").lower()
+
+        if role not in ("agency", "employee"):
+            return Response({"detail": "role must be 'agency' or 'employee'."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # For scope 'global' (default):
+        # - agency next start = first AVAILABLE serial in this batch
+        # - employee next start (admin direct) = first AVAILABLE serial with no agency/employee yet
+        if role == "agency":
+            qs = CouponCode.objects.filter(batch=batch, status="AVAILABLE")
+        else:
+            qs = CouponCode.objects.filter(
+                batch=batch,
+                status="AVAILABLE",
+                assigned_agency__isnull=True,
+                assigned_employee__isnull=True,
+            )
+
+        nxt = qs.order_by("serial").values_list("serial", flat=True).first()
+        return Response({"next_start": int(nxt) if nxt is not None else None}, status=status.HTTP_200_OK)
 
 
 class CouponSubmissionViewSet(

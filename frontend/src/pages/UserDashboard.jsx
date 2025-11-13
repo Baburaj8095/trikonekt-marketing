@@ -231,8 +231,13 @@ export default function UserDashboard({ embedded = false }) {
   const displayName = storedUser?.full_name || storedUser?.username || "Consumer";
   const myReferralId = useMemo(() => {
     try {
-      const sponsor = storedUser?.sponsor_id || (storedUser && storedUser.user && storedUser.user.sponsor_id) || "";
-      return String(sponsor).trim();
+      // Show the consumer's own referral identifier (prefer prefixed_id, fallback to username)
+      const own =
+        storedUser?.prefixed_id ||
+        storedUser?.username ||
+        (storedUser && storedUser.user && (storedUser.user.prefixed_id || storedUser.user.username)) ||
+        "";
+      return String(own).trim();
     } catch {
       return "";
     }
@@ -278,6 +283,11 @@ export default function UserDashboard({ embedded = false }) {
   const [codesLoading, setCodesLoading] = useState(false);
   const [referralCommissionTotal, setReferralCommissionTotal] = useState(0);
   const [walletDirectReferralTotal, setWalletDirectReferralTotal] = useState(0);
+
+  // Account activation status
+  const [activation, setActivation] = useState(null);
+  const [activationLoading, setActivationLoading] = useState(false);
+  const [activating50, setActivating50] = useState(false);
 
   const loadWallet = async () => {
     try {
@@ -331,11 +341,42 @@ export default function UserDashboard({ embedded = false }) {
     }
   };
 
+  const loadActivationStatus = async () => {
+    try {
+      setActivationLoading(true);
+      const res = await API.get("/business/activation/status/");
+      setActivation(res?.data || {});
+    } catch (e) {
+      setActivation(null);
+    } finally {
+      setActivationLoading(false);
+    }
+  };
+
+  const handleSelf50Activation = async () => {
+    try {
+      setActivating50(true);
+      await API.post("/business/activations/self-50/", {});
+      await Promise.all([loadWallet(), loadActivationStatus()]);
+      try {
+        window.alert("50 activation triggered successfully.");
+      } catch (_e) {}
+    } catch (e) {
+      const msg = e?.response?.data?.detail || e?.message || "Failed to activate.";
+      try {
+        window.alert(String(msg));
+      } catch (_e) {}
+    } finally {
+      setActivating50(false);
+    }
+  };
+
   useEffect(() => {
     loadWallet();
     loadCodes();
     loadMyCommissions();
     loadWalletDirectCommission();
+    loadActivationStatus();
   }, []);
 
   const availableCodes = (codes || []).filter((c) => c.status === "AVAILABLE").length;
@@ -353,6 +394,10 @@ export default function UserDashboard({ embedded = false }) {
   // Direct referral count (consumer)
   const [referralCount, setReferralCount] = useState(0);
   const [referralLoading, setReferralLoading] = useState(false);
+
+  const accountActive = Boolean(activation?.active);
+  const accountStatusStr = activationLoading ? "..." : accountActive ? "Active" : "Inactive";
+  const accountPalette = accountActive ? "green" : "red";
 
   const loadReferralCount = async () => {
     try {
@@ -401,7 +446,7 @@ export default function UserDashboard({ embedded = false }) {
             borderBottom: "1px solid #e2e8f0",
           }}
         >
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, fontSize:"12px" }} >
             {title}
           </Typography>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -411,7 +456,7 @@ export default function UserDashboard({ embedded = false }) {
               onClick={() => onViewMarketplace && onViewMarketplace()}
               sx={{ textTransform: "none" }}
             >
-              View Marketplace
+              Marketplace
             </Button>
             <IconButton
               size="small"
@@ -445,7 +490,14 @@ export default function UserDashboard({ embedded = false }) {
         {computedCards
           .filter((c) => c.is_active !== false)
           .map((card) => (
-            <Grid item xs={12} sm={6} md={4} key={card.id || card.key}>
+            <Grid item xs={12} sm={6} md={4} key={card.id || card.key}  sx={{
+           
+            '@media (max-width:600px)': {
+              minWidth: 0,
+              boxSizing: 'border-box',
+              width: '100%',
+            },
+          }}>
               <Card
                 sx={{
                   height: "100%",
@@ -566,9 +618,7 @@ export default function UserDashboard({ embedded = false }) {
         <Box
           sx={{
             position: "relative",
-            width: { xs: "calc(100% + 32px)", md: "100%" },
-            ml: { xs: -2, md: 0 },
-            mr: { xs: -2, md: 0 },
+            
             height: { xs: 220, sm: 220, md: 400 },
             borderRadius: 3,
             overflow: "hidden",
@@ -589,6 +639,21 @@ export default function UserDashboard({ embedded = false }) {
 
         {/* KPI Cards */}
         <Grid container spacing={2} sx={{ width: "100%", minWidth: 0, boxSizing: "border-box", mb: 2 }}>
+          <Grid item xs={12} sm={6} md={4}  sx={{
+           
+            '@media (max-width:600px)': {
+              minWidth: 0,
+              boxSizing: 'border-box',
+              width: '100%',
+            },
+          }}>
+            <KpiCard
+              title="Account Status"
+              value={accountStatusStr}
+              subtitle={accountActive ? "Autopool enabled" : "Activate to unlock benefits"}
+              palette={accountPalette}
+            />
+          </Grid>
           <Grid item xs={12} sm={6} md={4}  sx={{
            
             '@media (max-width:600px)': {
@@ -715,7 +780,14 @@ export default function UserDashboard({ embedded = false }) {
               onClick={() => navigate("/user/my-team")}
             />
           </Grid>
-          <Grid item xs={12} sm={6} md={4}>
+          <Grid item xs={12} sm={6} md={4} sx={{
+           
+            '@media (max-width:600px)': {
+              minWidth: 0,
+              boxSizing: 'border-box',
+              width: '100%',
+            },
+          }}>
             <KpiCard
               title="My Direct Referrals"
               value={referralLoading ? "..." : referralCount}
@@ -723,17 +795,39 @@ export default function UserDashboard({ embedded = false }) {
               palette="indigo"
             />
           </Grid>
-          <Grid item xs={12} sm={6} md={4}>
+          
+          <Grid item xs={12} sm={6} md={4}  sx={{
+           
+            '@media (max-width:600px)': {
+              minWidth: 0,
+              boxSizing: 'border-box',
+              width: '100%',
+            },
+          }}>
+            <KpiCard
+              title="Test: Self 50 Activation"
+              value={activating50 ? "..." : "Run"}
+              subtitle="Trigger 50 activation now"
+              palette="red"
+              onClick={handleSelf50Activation}
+            />
+          </Grid>
+          {/* <Grid item xs={12} sm={6} md={4}>
             <KpiCard
               title="My Referral ID"
               value={myReferralId || "-"}
               subtitle="Share this ID to refer"
               palette="teal"
             />
-          </Grid>
+          </Grid> */}
         </Grid>
 
-        {/* Wealth Galaxy Section (in Dashboard) */}
+            {/* Refer & Earn (consumer) */}
+            {/* <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", mb: 2, border: "1px solid #e2e8f0" }}>
+              <ReferAndEarn title="Refer & Earn" onlyConsumer />
+            </Box> */}
+
+            {/* Wealth Galaxy Section (in Dashboard) */}
         <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", mb: 2, border: "1px solid #e2e8f0" }}>
           <WealthGalaxy />
         </Box>
@@ -745,7 +839,7 @@ export default function UserDashboard({ embedded = false }) {
 
         {/* Marketplace section - wrapped inside AppHub-like cards (two variants) */}
         <MarketplaceCard
-          title="Explore Market Place, Trikonekt Products"
+          title="Trikonekt Products"
           variant="plain"
           defaultExpanded
           onViewMarketplace={() => navigate("/marketplace")}
@@ -1015,6 +1109,14 @@ export default function UserDashboard({ embedded = false }) {
             <Grid container spacing={2} sx={{ width: "100%", minWidth: 0, boxSizing: "border-box", mb: 2 }}>
               <Grid item xs={12} sm={6} md={4}>
                 <KpiCard
+                  title="Account Status"
+                  value={accountStatusStr}
+                  subtitle={accountActive ? "Autopool enabled" : "Activate to unlock benefits"}
+                  palette={accountPalette}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <KpiCard
                   title="Wallet Balance"
                   value={`₹${wallet.balance}`}
                   subtitle="Go to Wallet"
@@ -1097,6 +1199,15 @@ export default function UserDashboard({ embedded = false }) {
                   value={myReferralId || "-"}
                   subtitle="Share this ID to refer"
                   palette="teal"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <KpiCard
+                  title="Test: Self 50 Activation"
+                  value={activating50 ? "..." : "Run"}
+                  subtitle="Trigger 50 activation now"
+                  palette="red"
+                  onClick={handleSelf50Activation}
                 />
               </Grid>
             </Grid>

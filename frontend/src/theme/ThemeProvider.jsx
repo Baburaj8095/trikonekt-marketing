@@ -3,19 +3,49 @@ import { ThemeProvider as MuiThemeProvider, createTheme } from "@mui/material/st
 import CssBaseline from "@mui/material/CssBaseline";
 
 /**
- * MUI ThemeProvider with strong style overrides to guarantee white surfaces
- * for DataGrid rows/cells and dialog form fields across the admin.
+ * Global MUI theme
+ * - Unifies font
+ * - Professional, colorful primary buttons (gradient)
+ * - Keeps admin grids/dialogs on clean white surfaces
+ * - Light UI background consistent with admin shell
  */
 const theme = createTheme({
   palette: {
     mode: "light",
+    primary: {
+      main: "#0ea5e9",       // Admin accent (sky blue)
+      dark: "#0284c7",
+      contrastText: "#ffffff",
+    },
+    secondary: {
+      main: "#a855f7",       // Purple accent for variety
+      contrastText: "#ffffff",
+    },
+    success: {
+      main: "#22c55e",       // Green for gradient blend
+    },
     background: {
-      default: "#f1f5f9",
-      paper: "#ffffff",
+      default: "#f1f5f9",    // Page background (admin-like)
+      paper: "#ffffff",      // Cards/dialogs on white
     },
     text: {
       primary: "#0f172a",
     },
+    divider: "#e5e7eb",
+  },
+  typography: {
+    // Professional, readable stack; falls back safely if Inter isn't present
+    fontFamily:
+      'Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"',
+    fontSize: 14,
+    button: {
+      textTransform: "none",
+      fontWeight: 700,
+    },
+    h5: { fontWeight: 800 },
+    h6: { fontWeight: 800 },
+    subtitle1: { fontWeight: 600 },
+    subtitle2: { fontWeight: 600 },
   },
   components: {
     MuiCssBaseline: {
@@ -24,6 +54,47 @@ const theme = createTheme({
         body: { color: "#0f172a" },
       },
     },
+
+    // Buttons: colorful & professional primary by default
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          borderRadius: 10,
+          fontWeight: 700,
+        },
+        containedPrimary: {
+          // Subtle blue->green gradient for primary actions across the app
+          backgroundImage: "linear-gradient(135deg, #0ea5e9 0%, #22c55e 100%)",
+          color: "#ffffff",
+          boxShadow: "0 6px 14px rgba(14,165,233,0.25)",
+          "&:hover": {
+            backgroundImage: "linear-gradient(135deg, #0284c7 0%, #16a34a 100%)",
+            boxShadow: "0 10px 20px rgba(2,132,199,0.28)",
+          },
+          "&:active": {
+            boxShadow: "0 6px 10px rgba(2,132,199,0.22)",
+          },
+          "&.Mui-disabled": {
+            color: "rgba(255,255,255,0.7)",
+          },
+        },
+        outlinedPrimary: {
+          borderColor: "rgba(14,165,233,0.35)",
+          color: "#0284c7",
+          "&:hover": {
+            borderColor: "rgba(14,165,233,0.6)",
+            backgroundColor: "rgba(14,165,233,0.08)",
+          },
+        },
+        textPrimary: {
+          color: "#0284c7",
+          "&:hover": {
+            backgroundColor: "rgba(14,165,233,0.08)",
+          },
+        },
+      },
+    },
+
     // Ensure Dialog paper (Create/Edit) is white
     MuiDialog: {
       styleOverrides: {
@@ -32,6 +103,7 @@ const theme = createTheme({
         },
       },
     },
+
     // Ensure text inputs render on white, including disabled/readonly
     MuiOutlinedInput: {
       styleOverrides: {
@@ -55,6 +127,7 @@ const theme = createTheme({
         },
       },
     },
+
     // Ensure Select uses white input surface as well
     MuiSelect: {
       styleOverrides: {
@@ -66,7 +139,9 @@ const theme = createTheme({
         },
       },
     },
-    // Strong DataGrid-wide overrides (requires @mui/x-data-grid)
+
+    // DataGrid: force clean white tables in admin
+    // (requires @mui/x-data-grid)
     MuiDataGrid: {
       styleOverrides: {
         root: {

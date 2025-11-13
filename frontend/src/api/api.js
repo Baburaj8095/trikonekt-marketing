@@ -100,19 +100,27 @@ async function refreshAccessToken() {
   if (!refresh) return null;
   try {
     const resp = await refreshClient.post("/accounts/token/refresh/", { refresh });
-    const newAccess = resp?.data?.access;
-    if (newAccess) {
-      writeNamespaced("token", newAccess);
-      return newAccess;
+    const { access, refresh: newRefresh } = resp?.data || {};
+    if (access) {
+      writeNamespaced("token", access);
     }
+    if (newRefresh) {
+      writeNamespaced("refresh", newRefresh);
+    }
+    return access || null;
   } catch (_) {
-    // fall through
+    return null;
   }
-  return null;
 }
 
 async function ensureFreshAccess() {
-  const token = getAccessToken();
+  let token = getAccessToken();
+  const hasRefresh = !!getRefreshToken();
+
+  // If no access but we have a refresh, try to mint a new access
+  if (!token && hasRefresh) {
+    return await refreshAccessToken();
+  }
   if (!token) return null;
 
   const payload = parseJwt(token);
@@ -296,4 +304,5 @@ API.interceptors.response.use(
   } catch (_) {}
 })();
 
+export { ensureFreshAccess, getAccessToken, getRefreshToken };
 export default API;

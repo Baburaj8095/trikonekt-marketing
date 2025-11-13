@@ -1,7 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  AppBar,
-  Toolbar,
   Typography,
   Box,
   Container,
@@ -13,13 +11,17 @@ import {
   Grid,
 } from "@mui/material";
 import API from "../api/api";
-import LOGO from "../assets/TRIKONEKT.png";
 
 export default function ConsumerKYC() {
   const storedUser = useMemo(() => {
     try {
-      const ls = localStorage.getItem("user") || sessionStorage.getItem("user");
-      return ls ? JSON.parse(ls) : {};
+      const ls =
+        localStorage.getItem("user_user") ||
+        sessionStorage.getItem("user_user") ||
+        localStorage.getItem("user") ||
+        sessionStorage.getItem("user");
+      const parsed = ls ? JSON.parse(ls) : {};
+      return parsed && typeof parsed === "object" && parsed.user && typeof parsed.user === "object" ? parsed.user : parsed;
     } catch {
       return {};
     }
@@ -41,17 +43,16 @@ export default function ConsumerKYC() {
 
   const validate = () => {
     const { bank_name, bank_account_number, ifsc_code } = form;
-    if (!bank_name.trim()) {
+    if (!String(bank_name || "").trim()) {
       setError("Bank name is required.");
       return false;
     }
-    const acc = bank_account_number.trim();
+    const acc = String(bank_account_number || "").trim();
     if (!acc || acc.length < 6) {
       setError("Enter a valid bank account number.");
       return false;
     }
-    const ifsc = ifsc_code.trim().toUpperCase();
-    // Standard IFSC: 4 letters + 0 + 6 alphanumerics
+    const ifsc = String(ifsc_code || "").trim().toUpperCase();
     const ifscRe = /^[A-Z]{4}0[A-Z0-9]{6}$/i;
     if (!ifscRe.test(ifsc)) {
       setError("Enter a valid IFSC code (e.g., HDFC0001234).");
@@ -66,7 +67,6 @@ export default function ConsumerKYC() {
       setLoading(true);
       setError("");
       setMessage("");
-      // GET /accounts/kyc/me/
       const res = await API.get("/accounts/kyc/me/");
       const data = res?.data || {};
       setForm({
@@ -96,11 +96,10 @@ export default function ConsumerKYC() {
     try {
       setSaving(true);
       setMessage("");
-      // PUT /accounts/kyc/me/
       const payload = {
-        bank_name: form.bank_name.trim(),
-        bank_account_number: form.bank_account_number.trim(),
-        ifsc_code: form.ifsc_code.trim().toUpperCase(),
+        bank_name: String(form.bank_name || "").trim(),
+        bank_account_number: String(form.bank_account_number || "").trim(),
+        ifsc_code: String(form.ifsc_code || "").trim().toUpperCase(),
       };
       const res = await API.put("/accounts/kyc/me/", payload);
       const data = res?.data || {};
@@ -114,107 +113,95 @@ export default function ConsumerKYC() {
       const msg =
         err?.response?.data?.detail ||
         (err?.response?.data ? JSON.stringify(err.response.data) : "Failed to save KYC.");
-      setError(msg);
+      setError(String(msg));
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", backgroundColor: "#f7f9fb" }}>
-      <AppBar position="fixed" sx={{ backgroundColor: "#0C2D48" }}>
-        <Toolbar>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Box component="img" src={LOGO} alt="Trikonekt" sx={{ height: 36 }} />
-            <Typography variant="h6" sx={{ fontWeight: 700 }}></Typography>
-          </Box>
-          <Box sx={{ flexGrow: 1 }} />
-          <Typography variant="body2">{displayName}</Typography>
-        </Toolbar>
-      </AppBar>
-
-      <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, md: 3 } }}>
-        <Toolbar />
-
-        <Container maxWidth="sm" sx={{ px: 0, ml: 0, mr: "auto" }}>
-          <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>
-              Bank KYC
-            </Typography>
-
-            {meta.verified ? (
-              <Alert severity="success" sx={{ mb: 2 }}>
-                KYC verified{meta.verified_at ? ` on ${new Date(meta.verified_at).toLocaleString()}` : ""}.
-              </Alert>
-            ) : (
-              <Alert severity="info" sx={{ mb: 2 }}>
-                KYC pending verification. Please ensure your details are correct.
-              </Alert>
-            )}
-            {message ? <Alert severity="success" sx={{ mb: 2 }}>{message}</Alert> : null}
-            {error ? <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert> : null}
-
-            <Box component="form" onSubmit={onSubmit}>
-              <Grid container spacing={2}>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    name="bank_name"
-                    label="Bank Name"
-                    value={form.bank_name}
-                    onChange={onChange}
-                    required
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    name="bank_account_number"
-                    label="Bank Account Number"
-                    value={form.bank_account_number}
-                    onChange={onChange}
-                    inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
-                    required
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    name="ifsc_code"
-                    label="IFSC Code"
-                    value={form.ifsc_code}
-                    onChange={onChange}
-                    inputProps={{ style: { textTransform: "uppercase" }, maxLength: 11 }}
-                    helperText="Example: HDFC0001234"
-                    required
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <Stack direction="row" spacing={1} justifyContent="flex-end">
-                    <Button
-                      type="submit"
-                      variant="contained"
-                      disabled={saving || loading}
-                      sx={{ backgroundColor: "#145DA0", "&:hover": { backgroundColor: "#0C4B82" } }}
-                    >
-                      {saving ? "Saving..." : "Save KYC"}
-                    </Button>
-                  </Stack>
-                </Grid>
-              </Grid>
-            </Box>
-
-            {meta.updated_at ? (
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: "block" }}>
-                Last updated: {new Date(meta.updated_at).toLocaleString()}
-              </Typography>
-            ) : null}
-          </Paper>
-        </Container>
+    <Container maxWidth="sm" sx={{ px: { xs: 0, md: 2 }, py: { xs: 1, md: 2 } }}>
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2, flexWrap: "wrap", gap: 1 }}>
+        <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>
+          Bank KYC
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          {displayName}
+        </Typography>
       </Box>
-    </Box>
+
+      <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+        {meta.verified ? (
+          <Alert severity="success" sx={{ mb: 2 }}>
+            KYC verified{meta.verified_at ? ` on ${new Date(meta.verified_at).toLocaleString()}` : ""}.
+          </Alert>
+        ) : (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            KYC pending verification. Please ensure your details are correct.
+          </Alert>
+        )}
+        {message ? <Alert severity="success" sx={{ mb: 2 }}>{message}</Alert> : null}
+        {error ? <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert> : null}
+
+        <Box component="form" onSubmit={onSubmit}>
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                size="small"
+                name="bank_name"
+                label="Bank Name"
+                value={form.bank_name}
+                onChange={onChange}
+                required
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                size="small"
+                name="bank_account_number"
+                label="Bank Account Number"
+                value={form.bank_account_number}
+                onChange={onChange}
+                inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
+                required
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                size="small"
+                name="ifsc_code"
+                label="IFSC Code"
+                value={form.ifsc_code}
+                onChange={onChange}
+                inputProps={{ style: { textTransform: "uppercase" }, maxLength: 11 }}
+                helperText="Example: HDFC0001234"
+                required
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <Stack direction="row" spacing={1} justifyContent="flex-end">
+                <Button
+                  type="submit"
+                  variant="contained"
+                  disabled={saving || loading}
+                  sx={{ backgroundColor: "#145DA0", "&:hover": { backgroundColor: "#0C4B82" } }}
+                >
+                  {saving ? "Saving..." : "Save KYC"}
+                </Button>
+              </Stack>
+            </Grid>
+          </Grid>
+        </Box>
+
+        {meta.updated_at ? (
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: "block" }}>
+            Last updated: {new Date(meta.updated_at).toLocaleString()}
+          </Typography>
+        ) : null}
+      </Paper>
+    </Container>
   );
 }

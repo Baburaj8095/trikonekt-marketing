@@ -714,7 +714,7 @@ const Login = () => {
 
   const validateAgencyInputs = () => {
     if (!sponsorId.trim()) {
-      setErrorMsg("Sponsor ID is required for agency registrations.");
+      setErrorMsg("Sponsor Username is required for agency registrations.");
       return false;
     }
     if (isSC) {
@@ -808,7 +808,7 @@ const Login = () => {
     label: "Username or Phone",
     type: "text",
     inputMode: "text",
-    placeholder: "Enter username (e.g., TREMP9876543210) or phone (10 digits)",
+    placeholder: "Enter username (e.g., TREP9876543210) or phone (10 digits)",
   };
 
   const handleSubmit = async (e) => {
@@ -936,7 +936,7 @@ const Login = () => {
 
     // Sponsor ID mandatory (from URL param or manual entry)
     if (!sponsorId) {
-      setErrorMsg("Sponsor ID is required");
+      setErrorMsg("Sponsor Username is required");
       return;
     }
 
@@ -1221,7 +1221,7 @@ const Login = () => {
 
             <TextField
               fullWidth
-              label="Sponsor ID"
+              label="Sponsor Username"
               value={sponsorId}
               onChange={(e) => setSponsorId(e.target.value)}
               required
@@ -1237,7 +1237,7 @@ const Login = () => {
 
             {!sponsorId.trim() && (
               <Alert severity="info" sx={{ mb: 2 }}>
-                Enter Sponsor ID to continue selecting regions.
+                Enter Sponsor Username to continue selecting regions.
               </Alert>
             )}
 
@@ -1656,7 +1656,7 @@ const Login = () => {
                 {!isAgency && (
                   <TextField
                     fullWidth
-                    label="Sponsor ID"
+                    label="Sponsor Username"
                     value={sponsorId}
                     onChange={(e) => setSponsorId(e.target.value)}
                     required

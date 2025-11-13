@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import API from "../api/api";
+import API, { ensureFreshAccess } from "../api/api";
 
 function parseJwt(token) {
   try {
@@ -82,22 +82,17 @@ export default function ProtectedRoute({ children, allowedRoles }) {
         const now = Math.floor(Date.now() / 1000);
         let exp = claim?.exp || 0;
 
-        // If no access or expired, try refresh once
+        // If no access or expired, try refresh once via keep-alive helper
         if (!access || !claim || !exp || exp <= now) {
-          const refresh = getStoredRefresh();
-          if (refresh) {
-            try {
-              const resp = await API.post("/accounts/token/refresh/", { refresh });
-              const newAccess = resp?.data?.access;
-              if (newAccess) {
-                setAccessToken(newAccess);
-                access = newAccess;
-                claim = parseJwt(newAccess);
-                exp = claim?.exp || 0;
-              }
-            } catch (_) {
-              // fall through to clear below
+          try {
+            const newAccess = await ensureFreshAccess();
+            if (newAccess) {
+              access = newAccess;
+              claim = parseJwt(newAccess);
+              exp = claim?.exp || 0;
             }
+          } catch (_) {
+            // ignore
           }
         }
 

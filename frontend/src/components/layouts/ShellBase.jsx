@@ -1,9 +1,28 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import API from "../../api/api";
-import { getAdminMeta } from "../../admin-panel/api/adminMeta";
 
-export default function AdminShell({ children }) {
+/**
+ * ShellBase
+ * - Dark, professional sidebar (matches AdminShell)
+ * - Mobile top bar with burger menu
+ * - Content area with light background
+ *
+ * Props:
+ * - title: string (used in mobile header and sidebar title)
+ * - menu: Array<{ to: string; label: string; icon?: string }>
+ * - isActive?: (to: string, location: ReturnType<useLocation>) => boolean
+ * - onLogout?: () => void (if provided, Logout button is shown in sidebar footer)
+ * - footerText?: string
+ * - children: ReactNode
+ */
+export default function ShellBase({
+  title = "Console",
+  menu = [],
+  isActive,
+  onLogout,
+  footerText,
+  children,
+}) {
   const loc = useLocation();
 
   // Responsive flags
@@ -28,85 +47,17 @@ export default function AdminShell({ children }) {
   // Close drawer on route change (mobile only)
   useEffect(() => {
     if (isMobile) setSidebarOpen(false);
-  }, [loc.pathname, isMobile]);
+  }, [loc.pathname, loc.search, isMobile]);
 
-  // Nav definition
-  const items = [
-    { to: "/admin/dashboard", label: "Dashboard", icon: "dashboard" },
-    { to: "/admin/user-tree", label: "Genealogy", icon: "tree" },
-    { to: "/admin/users", label: "Users", icon: "users" },
-    { to: "/admin/banners", label: "Banners", icon: "image" },
-    { to: "/admin/orders", label: "Orders", icon: "orders" },
-    { to: "/admin/lucky-draw", label: "Lucky Draw", icon: "ticket" },
-    { to: "/admin/kyc", label: "KYC", icon: "shield" },
-    { to: "/admin/withdrawals", label: "Withdrawals", icon: "wallet" },
-    { to: "/admin/dashboard/models/business/dailyreport", label: "Reports", icon: "chart" },
-    { to: "/admin/dashboard/models", label: "Developer Service", icon: "box" },
-    { to: "/admin/matrix/five", label: "5‑Matrix", icon: "matrix5" },
-    { to: "/admin/matrix/three", label: "3‑Matrix", icon: "matrix3" },
-    { to: "/admin/autopool", label: "Auto Commission", icon: "pool" },
-  ];
-
-  // Dynamic admin models metadata
-  const [models, setModels] = useState([]);
-  const [modelsErr, setModelsErr] = useState("");
-
-  useEffect(() => {
-    let mounted = true;
-    getAdminMeta()
-      .then((data) => {
-        if (!mounted) return;
-        setModels(data?.models || []);
-        setModelsErr("");
-      })
-      .catch(() => setModelsErr("Failed to load admin models"));
-    return () => { mounted = false; };
-  }, []);
-
-  // Deduplicate dynamic models against static sidebar items to avoid duplicates.
-  const normalize = (s) =>
-    String(s || "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, "")
-      .replace(/s\b/, "");
-  const reservedSet = new Set(items.map((i) => normalize(i.label)));
-  const shouldHideModel = (m) => {
-    const app = String(m?.app_label || "").toLowerCase();
-    const model = String(m?.model || "").toLowerCase();
-    const label = String(m?.verbose_name || m?.model || "");
-    const n = normalize(label);
-    if (reservedSet.has(n)) return true;
-    const has = (t) => n.includes(t) || model.includes(t);
-    // Hide models that have dedicated static pages in the sidebar
-    if (app === "accounts" && has("user")) return true;
-    if (app === "market" && (has("product") || has("banner") || has("order"))) return true;
-    if (app === "uploads" && ((has("dashboard") && has("card")) || (has("home") && has("card")))) return true;
-    return false;
-  };
-  const modelsByApp = React.useMemo(() => {
-    const g = {};
-    const seen = new Set();
-    (models || []).forEach((m) => {
-      if (shouldHideModel(m)) return;
-      const key = `${String(m.app_label || "").toLowerCase()}.${String(m.model || "").toLowerCase()}`;
-      if (seen.has(key)) return;
-      seen.add(key);
-      (g[m.app_label] = g[m.app_label] || []).push(m);
-    });
-    return g;
-  }, [models]);
-
-  function isActive(to) {
-    if (to === "/admin/matrix/five" || to === "/admin/matrix/three") {
-      return loc.pathname.startsWith("/admin/matrix");
-    }
-    return loc.pathname === to;
+  function defaultIsActive(to, location) {
+    // Default behavior: exact path match including query
+    return `${location.pathname}${location.search}` === to;
   }
+  const activeCheck = useMemo(() => isActive || defaultIsActive, [isActive]);
 
   function Icon({ name, active }) {
     const stroke = active ? "#0ea5e9" : "#94a3b8";
     const size = 18;
-    // Minimal, generic icons to avoid external deps
     switch (name) {
       case "dashboard":
         return (
@@ -223,7 +174,7 @@ export default function AdminShell({ children }) {
   }
 
   function NavLink({ to, label, icon }) {
-    const active = isActive(to);
+    const active = activeCheck(to, loc);
     return (
       <Link
         to={to}
@@ -238,8 +189,11 @@ export default function AdminShell({ children }) {
           background: active ? "rgba(14,165,233,0.12)" : "transparent",
           border: active ? "1px solid rgba(14,165,233,0.35)" : "1px solid transparent",
         }}
+        onClick={() => {
+          if (isMobile) setSidebarOpen(false);
+        }}
       >
-        <Icon name={icon} active={active} />
+        {icon ? <Icon name={icon} active={active} /> : null}
         <span style={{ fontWeight: active ? 700 : 600, fontSize: 14 }}>{label}</span>
       </Link>
     );
@@ -251,7 +205,7 @@ export default function AdminShell({ children }) {
   const topOffset = isMobile ? headerHeightMobile : 0;
 
   return (
-    <div className="admin-scope" style={{ minHeight: "100vh", background: "#f1f5f9" }}>
+    <div className="role-shell-scope" style={{ minHeight: "100vh", background: "#f1f5f9" }}>
       {/* Top bar: shown only on mobile */}
       {isMobile ? (
         <div
@@ -291,8 +245,8 @@ export default function AdminShell({ children }) {
               </svg>
             </button>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              <span style={{ fontWeight: 900, color: "#0f172a", fontSize: 18 }}>Admin</span>
-              <span style={{ color: "#64748b", fontSize: 12 }}>Control Panel</span>
+              <span style={{ fontWeight: 900, color: "#0f172a", fontSize: 18 }}>{title}</span>
+              <span style={{ color: "#64748b", fontSize: 12 }}>Dashboard</span>
             </div>
           </div>
         </div>
@@ -313,7 +267,7 @@ export default function AdminShell({ children }) {
 
       {/* Layout */}
       <div style={{ display: "flex", alignItems: "stretch" }}>
-        {/* Sidebar: permanent on desktop, drawer on mobile */}
+        {/* Sidebar */}
         <aside
           style={{
             position: "fixed",
@@ -333,41 +287,34 @@ export default function AdminShell({ children }) {
           {(isMobile && !sidebarOpen) ? null : (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <div style={{ color: "#cbd5e1", fontWeight: 900, fontSize: 14, padding: "2px 4px 10px" }}>
-                Admin Menu
+                {title} Menu
               </div>
-              {items.map((it) => (
+
+              {menu.map((it) => (
                 <NavLink key={it.to} to={it.to} label={it.label} icon={it.icon} />
               ))}
 
-              {/* Dynamic Admin Models in sidebar */}
-              {false ? (
-                <div style={{ marginTop: 8 }}>
-                  <div style={{ color: "#cbd5e1", fontWeight: 900, fontSize: 12, padding: "8px 4px 4px" }}>
-                    Models
-                  </div>
-                  {Object.keys(modelsByApp).sort().map((app) => (
-                    <div key={app} style={{ marginBottom: 6 }}>
-                      <div style={{ color: "#64748b", fontSize: 11, padding: "0 4px 4px" }}>{app}</div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        {modelsByApp[app]
-                          .sort((a, b) => (a.verbose_name || a.model).localeCompare(b.verbose_name || b.model))
-                          .map((m) => (
-                            <NavLink
-                              key={`${m.app_label}.${m.model}`}
-                              to={`/admin/dashboard/models/${m.app_label}/${m.model}`}
-                              label={m.verbose_name || m.model}
-                              icon="box"
-                            />
-                          ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-
               <div style={{ marginTop: 8, borderTop: "1px solid #0b1220" }} />
-              <div style={{ color: "#64748b", fontSize: 11, padding: "8px 4px" }}>
-                © {new Date().getFullYear()} Admin Console
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "8px 4px" }}>
+                <div style={{ color: "#64748b", fontSize: 11 }}>
+                  {footerText || `© ${new Date().getFullYear()}`}
+                </div>
+                {onLogout ? (
+                  <button
+                    onClick={onLogout}
+                    style={{
+                      border: "1px solid rgba(14,165,233,0.35)",
+                      background: "linear-gradient(135deg, #0ea5e9 0%, #22c55e 100%)",
+                      color: "#fff",
+                      fontWeight: 700,
+                      borderRadius: 8,
+                      padding: "6px 10px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Logout
+                  </button>
+                ) : null}
               </div>
             </div>
           )}

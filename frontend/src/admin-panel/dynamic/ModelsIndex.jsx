@@ -1,6 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../api/client";
+import { getAdminMeta } from "../api/adminMeta";
 
 export default function ModelsIndex() {
   const [models, setModels] = React.useState([]);
@@ -11,8 +12,8 @@ export default function ModelsIndex() {
   React.useEffect(() => {
     let mounted = true;
     setLoading(true);
-    API.get("/admin/admin-meta/")
-      .then(({ data }) => {
+    getAdminMeta()
+      .then((data) => {
         if (!mounted) return;
         setModels(data?.models || []);
         setErr("");
@@ -38,8 +39,8 @@ export default function ModelsIndex() {
   return (
     <div>
       <div style={{ marginBottom: 12, display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 20, fontWeight: 900 }}>Manage Models</h2>
-        <span style={{ color: "#64748b", fontSize: 12 }}>Auto-discovered from Django Admin</span>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 20, fontWeight: 900 }}>Developer Service</h2>
+        <span style={{ color: "#64748b", fontSize: 12 }}>Admin models and utilities</span>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -53,15 +54,17 @@ export default function ModelsIndex() {
                   onClick={() => nav(`/admin/dashboard/models/${m.app_label}/${m.model}`)}
                   style={{
                     textAlign: "left",
-                    padding: "10px 12px",
-                    borderRadius: 10,
-                    border: "1px solid #e2e8f0",
-                    background: "#f8fafc",
+                    padding: "12px 14px",
+                    borderRadius: 12,
+                    border: "1px solid rgba(99,102,241,0.35)",
+                    background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+                    color: "#ffffff",
+                    boxShadow: "0 8px 18px rgba(99,102,241,0.25)",
                     cursor: "pointer",
                   }}
                 >
-                  <div style={{ fontWeight: 700, color: "#0f172a" }}>{m.verbose_name || m.model}</div>
-                  <div style={{ fontSize: 12, color: "#64748b" }}>{m.app_label}.{m.model}</div>
+                  <div style={{ fontWeight: 800, color: "#ffffff" }}>{m.verbose_name || m.model}</div>
+                  <div style={{ fontSize: 12, color: "rgba(255,255,255,0.85)" }}>{m.app_label}.{m.model}</div>
                 </button>
               ))}
             </div>

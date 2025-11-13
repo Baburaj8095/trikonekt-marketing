@@ -5,6 +5,7 @@ from .views import (
     SelfActivation50View,
     RewardProgressMeView,
     RewardRedeemView,
+    ActivationStatusView,
 )
 
 urlpatterns = [
@@ -13,6 +14,7 @@ urlpatterns = [
 
     # MLM packages
     path('activations/self-50/', SelfActivation50View.as_view(), name='self_activation_50'),
+    path('activation/status/', ActivationStatusView.as_view(), name='activation_status'),
 
     # Rewards
     path('rewards/me/', RewardProgressMeView.as_view(), name='reward_progress_me'),

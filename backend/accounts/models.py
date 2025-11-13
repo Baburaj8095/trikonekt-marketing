@@ -81,7 +81,7 @@ class CustomUser(AbstractUser):
     # Prefix mapping and allocation for hierarchical sponsor codes
     PREFIX_MAP = {
         'consumer': 'TR',
-        'employee': 'TREMP',
+        'employee': 'TREP',
         'business': 'TRBS',
         'company': 'TR',
         'agency_state_coordinator': 'TRSC',

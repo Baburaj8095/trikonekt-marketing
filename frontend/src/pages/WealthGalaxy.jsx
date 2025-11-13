@@ -63,6 +63,7 @@ export default function WealthGalaxy() {
                 sx={{
                   width: '100%',
                   cursor: 'pointer',
+                  
                   borderRadius: 1,
                   transition: 'transform 0.2s',
                   '&:hover': {
