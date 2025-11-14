@@ -34,13 +34,12 @@ function nsKey(base, ns) {
 }
 
 function readNamespaced(base) {
+  // Strictly read namespaced keys only to prevent cross-role token leakage
   const ns = currentNamespace();
   const k = nsKey(base, ns);
   return (
     (typeof localStorage !== "undefined" && localStorage.getItem(k)) ||
     (typeof sessionStorage !== "undefined" && sessionStorage.getItem(k)) ||
-    (typeof localStorage !== "undefined" && localStorage.getItem(base)) ||
-    (typeof sessionStorage !== "undefined" && sessionStorage.getItem(base)) ||
     null
   );
 }
@@ -189,7 +188,10 @@ API.interceptors.request.use(async (config) => {
 
   if (token) {
     config.headers = config.headers || {};
-    config.headers.Authorization = `Bearer ${token}`;
+    // Respect manually provided Authorization header (e.g., post-login profile fetch)
+    if (!config.headers.Authorization) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
   }
   return config;
 });
@@ -287,6 +289,22 @@ API.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+/* One-time cleanup of legacy non-namespaced auth keys to avoid cross-role collisions */
+(function cleanupLegacyAuthKeys() {
+  try {
+    if (typeof localStorage !== "undefined") {
+      ["token", "refresh", "role", "user"].forEach((k) => {
+        try { localStorage.removeItem(k); } catch (_) {}
+      });
+    }
+    if (typeof sessionStorage !== "undefined") {
+      ["token", "refresh", "role", "user"].forEach((k) => {
+        try { sessionStorage.removeItem(k); } catch (_) {}
+      });
+    }
+  } catch (_) {}
+})();
 
 /**
  * Keep UI session alive by silently refreshing the access token at intervals

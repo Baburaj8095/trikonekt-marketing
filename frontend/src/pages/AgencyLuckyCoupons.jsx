@@ -9,6 +9,7 @@ import {
   TableRow,
   TableCell,
   TableBody,
+  TableContainer,
   CircularProgress,
   Alert,
   TextField,
@@ -130,12 +131,14 @@ export default function AgencyLuckyCoupons() {
   const [codes, setCodes] = useState([]);
   const [codesLoading, setCodesLoading] = useState(false);
   const [codesError, setCodesError] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
   
   const loadCodes = async () => {
     try {
       setCodesLoading(true);
       setCodesError("");
-      const res = await API.get("/coupons/codes/", { params: { status: "ASSIGNED_AGENCY" } });
+      // Load ALL my agency codes across statuses (ASSIGNED_AGENCY, ASSIGNED_EMPLOYEE, SOLD, REDEEMED, REVOKED, ...)
+      const res = await API.get("/coupons/codes/");
       const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
       setCodes(arr || []);
     } catch (e) {
@@ -145,10 +148,59 @@ export default function AgencyLuckyCoupons() {
       setCodesLoading(false);
     }
   };
+
+  // Agency summary (counts by status)
+  const [summary, setSummary] = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState("");
+
+  const loadSummary = async () => {
+    try {
+      setSummaryLoading(true);
+      setSummaryError("");
+      const res = await API.get("/coupons/codes/agency-summary/");
+      setSummary(res.data || null);
+    } catch (e) {
+      setSummary(null);
+      setSummaryError("Failed to load summary.");
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
   
   const [sellForm, setSellForm] = useState({ codeId: "", consumerUsername: "", pincode: "", notes: "" });
   const [sellBusy, setSellBusy] = useState(false);
   const onSellChange = (e) => setSellForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+  const [resolveLoading, setResolveLoading] = useState(false);
+  const [resolvedUser, setResolvedUser] = useState(null);
+  const [resolveError, setResolveError] = useState("");
+  useEffect(() => {
+    const u = String(sellForm.consumerUsername || "").trim();
+    if (!u) {
+      setResolvedUser(null);
+      setResolveError("");
+      return;
+    }
+    let cancelled = false;
+    setResolveLoading(true);
+    API.get("/coupons/codes/resolve-user/", { params: { username: u } })
+      .then((res) => {
+        if (cancelled) return;
+        setResolvedUser(res.data || null);
+        setResolveError("");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setResolvedUser(null);
+        setResolveError("User not found or invalid.");
+      })
+      .finally(() => {
+        if (!cancelled) setResolveLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sellForm.consumerUsername]);
   const submitSell = async (e) => {
     e.preventDefault();
     if (!sellForm.codeId || !sellForm.consumerUsername || !sellForm.pincode) {
@@ -166,6 +218,7 @@ export default function AgencyLuckyCoupons() {
       setSellForm({ codeId: "", consumerUsername: "", pincode: "", notes: "" });
       await loadCodes();
       await loadCommissions();
+      await loadSummary();
     } catch (e) {
       const err = e?.response?.data;
       const msg = (typeof err === "string" ? err : (err?.detail || JSON.stringify(err || {}))) || "Failed to assign.";
@@ -178,8 +231,7 @@ export default function AgencyLuckyCoupons() {
   const [assignForm, setAssignForm] = useState({
     batch_id: "",
     employee_id: "",
-    serial_start: "",
-    serial_end: "",
+    count: "",
   });
   const onAssignChange = (e) =>
     setAssignForm((f) => ({
@@ -190,19 +242,19 @@ export default function AgencyLuckyCoupons() {
 
   const submitAssign = async (e) => {
     e.preventDefault();
-    if (!assignForm.batch_id || !assignForm.employee_id || !assignForm.serial_start || !assignForm.serial_end) {
-      alert("Please select batch, employee and serial range.");
+    if (!assignForm.batch_id || !assignForm.employee_id || !assignForm.count) {
+      alert("Please select batch, employee and count.");
       return;
     }
     try {
       setAssignBusy(true);
-      await API.post(`/coupons/batches/${assignForm.batch_id}/assign-employee/`, {
+      await API.post(`/coupons/batches/${assignForm.batch_id}/agency-assign-employee-count/`, {
         employee_id: Number(assignForm.employee_id),
-        serial_start: Number(assignForm.serial_start),
-        serial_end: Number(assignForm.serial_end),
+        count: Number(assignForm.count),
       });
       alert("Assigned successfully.");
-      setAssignForm({ batch_id: "", employee_id: "", serial_start: "", serial_end: "" });
+      setAssignForm({ batch_id: "", employee_id: "", count: "" });
+      await loadSummary();
     } catch (e) {
       alert("Failed to assign. Check serial range and permissions.");
     } finally {
@@ -236,6 +288,7 @@ export default function AgencyLuckyCoupons() {
     loadEmployees();
     loadCodes();
     loadCommissions();
+    loadSummary();
   }, []);
 
   return (
@@ -260,25 +313,26 @@ export default function AgencyLuckyCoupons() {
           ) : pendingError ? (
             <Alert severity="error">{pendingError}</Alert>
           ) : (
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Date</TableCell>
-                  <TableCell>Coupon Code</TableCell>
-                  <TableCell>Pincode</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Consumer</TableCell>
-                  <TableCell align="right">Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
+            <TableContainer sx={{ maxWidth: "100%", overflowX: "auto" }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Date</TableCell>
+                    <TableCell>Coupon Code</TableCell>
+                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Pincode</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Consumer</TableCell>
+                    <TableCell align="right">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
                 {(pending || []).map((r) => (
                   <TableRow key={r.id}>
                     <TableCell>{r.created_at ? new Date(r.created_at).toLocaleString() : ""}</TableCell>
                     <TableCell>{r.coupon_code}</TableCell>
-                    <TableCell>{r.pincode}</TableCell>
+                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{r.pincode}</TableCell>
                     <TableCell>{r.status}</TableCell>
-                    <TableCell>{r.consumer_username || ""}</TableCell>
+                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{r.consumer_username || ""}</TableCell>
                     <TableCell align="right">
                       <Stack direction="row" spacing={1} justifyContent="flex-end">
                         <Button size="small" variant="contained" disabled={pendingBusy} onClick={() => agencyApprove(r.id)} sx={{ backgroundColor: "#2E7D32", "&:hover": { backgroundColor: "#1B5E20" } }}>
@@ -301,13 +355,138 @@ export default function AgencyLuckyCoupons() {
                   </TableRow>
                 )}
               </TableBody>
-            </Table>
+              </Table>
+            </TableContainer>
           )}
         </Paper>
       )}
 
       {activeTab === TABS.ASSIGN && (
         <Grid container spacing={2}>
+          {/* Agency Summary */}
+          <Grid item xs={12}>
+            <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>
+                My E-Coupon Summary
+              </Typography>
+              {summaryLoading ? (
+                <Box sx={{ py: 1 }}><Typography variant="body2">Loading...</Typography></Box>
+              ) : summaryError ? (
+                <Alert severity="error">{summaryError}</Alert>
+              ) : summary ? (
+                <Grid container spacing={2}>
+                  <Grid item xs={6} md={2}>
+                    <Typography variant="body2">Available</Typography>
+                    <Typography variant="h6">{summary.available ?? 0}</Typography>
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <Typography variant="body2">Assigned to Employee</Typography>
+                    <Typography variant="h6">{summary.assigned_employee ?? 0}</Typography>
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <Typography variant="body2">Sold</Typography>
+                    <Typography variant="h6">{summary.sold ?? 0}</Typography>
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <Typography variant="body2">Redeemed</Typography>
+                    <Typography variant="h6">{summary.redeemed ?? 0}</Typography>
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <Typography variant="body2">Revoked</Typography>
+                    <Typography variant="h6">{summary.revoked ?? 0}</Typography>
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <Typography variant="body2">Total</Typography>
+                    <Typography variant="h6">{summary.total ?? 0}</Typography>
+                  </Grid>
+                </Grid>
+              ) : (
+                <Typography variant="body2" color="text.secondary">No data.</Typography>
+              )}
+            </Paper>
+          </Grid>
+          {/* All My E‑Coupon Codes (full list with status) */}
+          <Grid item xs={12}>
+            <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mb: 2 }}>
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2, gap: 1, flexWrap: "wrap" }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>
+                  All My E‑Coupon Codes
+                </Typography>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <TextField
+                    select
+                    size="small"
+                    label="Status"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    sx={{ minWidth: 180 }}
+                  >
+                    <MenuItem value="ALL">All</MenuItem>
+                    <MenuItem value="AVAILABLE">AVAILABLE</MenuItem>
+                    <MenuItem value="ASSIGNED_AGENCY">ASSIGNED_AGENCY</MenuItem>
+                    <MenuItem value="ASSIGNED_EMPLOYEE">ASSIGNED_EMPLOYEE</MenuItem>
+                    <MenuItem value="SOLD">SOLD</MenuItem>
+                    <MenuItem value="REDEEMED">REDEEMED</MenuItem>
+                    <MenuItem value="REVOKED">REVOKED</MenuItem>
+                  </TextField>
+                  <Button size="small" onClick={loadCodes}>Refresh</Button>
+                </Stack>
+              </Box>
+
+              {codesLoading ? (
+                <Box sx={{ py: 2, display: "flex", alignItems: "center", gap: 1 }}>
+                  <CircularProgress size={20} /> <Typography variant="body2">Loading...</Typography>
+                </Box>
+              ) : codesError ? (
+                <Alert severity="error">{codesError}</Alert>
+              ) : (
+                <TableContainer sx={{ maxWidth: "100%", overflowX: "auto" }}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Code</TableCell>
+                        <TableCell>Status</TableCell>
+                        <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Batch</TableCell>
+                        <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Serial</TableCell>
+                        <TableCell>Value</TableCell>
+                        <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Assigned Employee</TableCell>
+                        <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Assigned Consumer</TableCell>
+                        <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Assigned Agency</TableCell>
+                        <TableCell>Created</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                    {(codes || [])
+                      .filter((c) => statusFilter === "ALL" ? true : String(c.status).toUpperCase() === statusFilter)
+                      .map((c) => (
+                        <TableRow key={c.id}>
+                          <TableCell>{c.code}</TableCell>
+                          <TableCell>{c.status}</TableCell>
+                          <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.batch ? `#${c.batch}` : ""}</TableCell>
+                          <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.serial || ""}</TableCell>
+                          <TableCell>{typeof c.value !== "undefined" ? `₹${c.value}` : ""}</TableCell>
+                          <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.assigned_employee_username || ""}</TableCell>
+                          <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.assigned_consumer_username || ""}</TableCell>
+                          <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.assigned_agency_username || ""}</TableCell>
+                          <TableCell>{c.created_at ? new Date(c.created_at).toLocaleString() : ""}</TableCell>
+                        </TableRow>
+                      ))}
+                    {(!codes || codes.length === 0) && (
+                      <TableRow>
+                        <TableCell colSpan={9}>
+                          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                            No e‑coupon codes found.
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </Paper>
+          </Grid>
+
           {/* Sell E-Coupon to Consumer */}
           <Grid item xs={12} md={6}>
             <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
@@ -325,11 +504,13 @@ export default function AgencyLuckyCoupons() {
                     onChange={onSellChange}
                     helperText={codesLoading ? "Loading..." : (codesError || "")}
                   >
-                    {(codes || []).map((c) => (
-                      <MenuItem key={c.id} value={c.id}>
-                        {c.code} {typeof c.value !== "undefined" ? `(₹${c.value})` : ""}
-                      </MenuItem>
-                    ))}
+                    {(codes || [])
+                      .filter((c) => String(c.status).toUpperCase() === "ASSIGNED_AGENCY" && !c.assigned_employee)
+                      .map((c) => (
+                        <MenuItem key={c.id} value={c.id}>
+                          {c.code} {typeof c.value !== "undefined" ? `(₹${c.value})` : ""}
+                        </MenuItem>
+                      ))}
                     {(!codes || codes.length === 0) && (
                       <MenuItem disabled value="">
                         {codesLoading ? "Loading..." : "No e-coupons in your pool"}
@@ -343,6 +524,16 @@ export default function AgencyLuckyCoupons() {
                     value={sellForm.consumerUsername}
                     onChange={onSellChange}
                   />
+                  {resolveLoading ? (
+                    <Typography variant="caption" color="text.secondary">Resolving username…</Typography>
+                  ) : resolvedUser ? (
+                    <Typography variant="caption" color="text.secondary">
+                      This TR username belongs to {resolvedUser.full_name || resolvedUser.username} · PIN {resolvedUser.pincode || "-"}
+                      {resolvedUser.city ? ` · ${resolvedUser.city}` : ""}{resolvedUser.state ? `, ${resolvedUser.state}` : ""}
+                    </Typography>
+                  ) : resolveError ? (
+                    <Alert severity="warning">{resolveError}</Alert>
+                  ) : null}
                   <TextField
                     fullWidth
                     label="Pincode"
@@ -368,7 +559,7 @@ export default function AgencyLuckyCoupons() {
           <Grid item xs={12} md={6}>
             <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
               <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>
-                Assign Coupons to Employee (by Serial Range)
+                Assign Coupons to Employee (by Count)
               </Typography>
               <Box component="form" onSubmit={submitAssign}>
                 <Stack spacing={2}>
@@ -404,18 +595,9 @@ export default function AgencyLuckyCoupons() {
                   </TextField>
                   <TextField
                     fullWidth
-                    label="Serial Start"
-                    name="serial_start"
-                    value={assignForm.serial_start}
-                    onChange={onAssignChange}
-                    inputProps={{ inputMode: "numeric", pattern: "[0-9]*", min: 1 }}
-                    required
-                  />
-                  <TextField
-                    fullWidth
-                    label="Serial End"
-                    name="serial_end"
-                    value={assignForm.serial_end}
+                    label="Count"
+                    name="count"
+                    value={assignForm.count}
                     onChange={onAssignChange}
                     inputProps={{ inputMode: "numeric", pattern: "[0-9]*", min: 1 }}
                     required
@@ -427,7 +609,7 @@ export default function AgencyLuckyCoupons() {
               </Box>
             </Paper>
           </Grid>
-          <Grid item xs={12} md={6}>
+          {/* <Grid item xs={12} md={6}>
             <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
               <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>
                 Batches
@@ -472,7 +654,7 @@ export default function AgencyLuckyCoupons() {
                 </Table>
               )}
             </Paper>
-          </Grid>
+          </Grid> */}
         </Grid>
       )}
 
@@ -488,24 +670,25 @@ export default function AgencyLuckyCoupons() {
           ) : comError ? (
             <Alert severity="error">{comError}</Alert>
           ) : (
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Date</TableCell>
-                  <TableCell>Role</TableCell>
-                  <TableCell>Amount</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Coupon Code</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
+            <TableContainer sx={{ maxWidth: "100%", overflowX: "auto" }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Date</TableCell>
+                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Role</TableCell>
+                    <TableCell>Amount</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Coupon Code</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
                 {(commissions || []).map((c) => (
                   <TableRow key={c.id}>
                     <TableCell>{c.earned_at ? new Date(c.earned_at).toLocaleString() : ""}</TableCell>
-                    <TableCell>{c.role}</TableCell>
+                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.role}</TableCell>
                     <TableCell>₹{c.amount}</TableCell>
                     <TableCell>{c.status}</TableCell>
-                    <TableCell>{c.coupon_code || ""}</TableCell>
+                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.coupon_code || ""}</TableCell>
                   </TableRow>
                 ))}
                 {(!commissions || commissions.length === 0) && (
@@ -518,7 +701,8 @@ export default function AgencyLuckyCoupons() {
                   </TableRow>
                 )}
               </TableBody>
-            </Table>
+              </Table>
+            </TableContainer>
           )}
         </Paper>
       )}

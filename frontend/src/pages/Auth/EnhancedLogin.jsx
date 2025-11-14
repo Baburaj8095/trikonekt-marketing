@@ -856,7 +856,8 @@ const Login = () => {
         } catch (_) {}
 
         try {
-          const meResp = await API.get("/accounts/me/");
+          const authHeaders = { headers: { Authorization: `Bearer ${access}` } };
+          const meResp = await API.get("/accounts/me/", authHeaders);
           if (meResp?.data) {
             localStorage.setItem(`user_${ns}`, JSON.stringify(meResp.data));
           } else {

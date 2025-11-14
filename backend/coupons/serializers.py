@@ -80,7 +80,12 @@ class CouponCodeSerializer(serializers.ModelSerializer):
     coupon_title = serializers.CharField(source="coupon.title", read_only=True)
     assigned_employee_username = serializers.SerializerMethodField(read_only=True)
     assigned_agency_username = serializers.SerializerMethodField(read_only=True)
+    assigned_consumer_username = serializers.SerializerMethodField(read_only=True)
     issued_by_username = serializers.SerializerMethodField(read_only=True)
+    state_label = serializers.SerializerMethodField(read_only=True)
+    display_status = serializers.SerializerMethodField(read_only=True)
+    can_activate = serializers.SerializerMethodField(read_only=True)
+    can_transfer = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = CouponCode
@@ -94,12 +99,18 @@ class CouponCodeSerializer(serializers.ModelSerializer):
             "assigned_agency_username",
             "assigned_employee",
             "assigned_employee_username",
+            "assigned_consumer",
+            "assigned_consumer_username",
             "issued_by",
             "issued_by_username",
             "batch",
             "serial",
             "value",
             "status",
+            "state_label",
+            "display_status",
+            "can_activate",
+            "can_transfer",
             "created_at",
         ]
         read_only_fields = ["status", "created_at"]
@@ -121,6 +132,85 @@ class CouponCodeSerializer(serializers.ModelSerializer):
             return obj.issued_by.username
         except Exception:
             return None
+
+    def get_assigned_consumer_username(self, obj):
+        try:
+            return obj.assigned_consumer.username if obj.assigned_consumer_id else None
+        except Exception:
+            return None
+
+    def get_state_label(self, obj):
+        try:
+            st = (obj.status or "").upper()
+            if st == "ASSIGNED_EMPLOYEE":
+                name = obj.assigned_employee.username if obj.assigned_employee_id else None
+                return f"Assigned to {name}" if name else "Assigned to employee"
+            return st
+        except Exception:
+            return obj.status
+
+    def get_display_status(self, obj):
+        # User-friendly status for consumer dashboard:
+        # - When consumer owns the code (SOLD), show "PENDING" until activated
+        # - If activation audit exists by the same consumer, show "ACTIVATED"
+        # - If redeemed, show "REDEEMED"
+        # - If this user has transferred this code away, show "TRANSFERRED"
+        try:
+            request = self.context.get("request")
+            user = getattr(request, "user", None) if request else None
+            st = (obj.status or "").upper()
+            if user and getattr(user, "id", None):
+                from .models import AuditTrail  # local import to avoid circular in some tools
+                # If current user initiated a transfer of this code, show TRANSFERRED regardless of current ownership
+                did_transfer = AuditTrail.objects.filter(action="consumer_transfer", actor=user, coupon_code=obj).exists()
+                if did_transfer:
+                    return "TRANSFERRED"
+                # For owned codes, show pending/activated/redeemed
+                if obj.assigned_consumer_id == user.id:
+                    activated = AuditTrail.objects.filter(action="coupon_activated", actor=user, coupon_code=obj).exists()
+                    if activated:
+                        return "ACTIVATED"
+                    if st == "SOLD":
+                        return "PENDING"
+                    if st == "REDEEMED":
+                        return "REDEEMED"
+            return st
+        except Exception:
+            return obj.status
+
+    def get_can_activate(self, obj):
+        # Consumer can activate only if they own it, it's not redeemed, not already activated, and not transferred by them
+        try:
+            request = self.context.get("request")
+            user = getattr(request, "user", None) if request else None
+            if not (user and getattr(user, "id", None) and obj.assigned_consumer_id == user.id):
+                return False
+            st = (obj.status or "").upper()
+            if st == "REDEEMED":
+                return False
+            from .models import AuditTrail
+            activated = AuditTrail.objects.filter(action="coupon_activated", actor=user, coupon_code=obj).exists()
+            did_transfer = AuditTrail.objects.filter(action="consumer_transfer", actor=user, coupon_code=obj).exists()
+            return (not activated) and (not did_transfer)
+        except Exception:
+            return False
+
+    def get_can_transfer(self, obj):
+        # Consumer can transfer only if they own it, it's not redeemed, and not activated or previously transferred by them
+        try:
+            request = self.context.get("request")
+            user = getattr(request, "user", None) if request else None
+            if not (user and getattr(user, "id", None) and obj.assigned_consumer_id == user.id):
+                return False
+            st = (obj.status or "").upper()
+            if st == "REDEEMED":
+                return False
+            from .models import AuditTrail
+            activated = AuditTrail.objects.filter(action="coupon_activated", actor=user, coupon_code=obj).exists()
+            did_transfer = AuditTrail.objects.filter(action="consumer_transfer", actor=user, coupon_code=obj).exists()
+            return (not activated) and (not did_transfer)
+        except Exception:
+            return False
 
 
 class CouponSubmissionSerializer(serializers.ModelSerializer):

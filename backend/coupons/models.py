@@ -43,6 +43,8 @@ class CouponCode(models.Model):
     issued_channel = models.CharField(max_length=20, choices=CHANNEL_CHOICES, default="physical")
     assigned_employee = models.ForeignKey(UserModel, null=True, blank=True, on_delete=models.SET_NULL, related_name="assigned_codes")
     assigned_agency = models.ForeignKey(UserModel, null=True, blank=True, on_delete=models.SET_NULL, related_name="assigned_codes_agency")
+    # New: direct ownership for e-coupons (no approval workflow)
+    assigned_consumer = models.ForeignKey(UserModel, null=True, blank=True, on_delete=models.SET_NULL, related_name="owned_codes")
     batch = models.ForeignKey("CouponBatch", null=True, blank=True, on_delete=models.SET_NULL, related_name="codes")
     serial = models.PositiveIntegerField(null=True, blank=True, db_index=True)
     value = models.DecimalField(max_digits=8, decimal_places=2, default=150)
@@ -57,6 +59,7 @@ class CouponCode(models.Model):
             models.Index(fields=["coupon"]),
             models.Index(fields=["batch"]),
             models.Index(fields=["serial"]),
+            models.Index(fields=["assigned_consumer"]),
         ]
 
     def __str__(self):

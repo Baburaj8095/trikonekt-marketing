@@ -1038,14 +1038,23 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
         if (tokenRole) store.setItem(`role_${ns}`, tokenRole);
 
         try {
-          const meResp = await API.get("/accounts/me/");
+          // Use the freshly issued access token explicitly here to avoid namespace mixups
+          // while we are still on the /login route (which would default to "user" namespace).
+          const authHeaders = { headers: { Authorization: `Bearer ${access}` } };
+          const meResp = await API.get("/accounts/me/", authHeaders);
           if (meResp?.data) {
             store.setItem(`user_${ns}`, JSON.stringify(meResp.data));
           } else {
-            store.setItem(`user_${ns}`, JSON.stringify({ role: tokenRole, username: tokenUsername, full_name: tokenFullName }));
+            store.setItem(
+              `user_${ns}`,
+              JSON.stringify({ role: tokenRole, username: tokenUsername, full_name: tokenFullName })
+            );
           }
         } catch (_) {
-          store.setItem(`user_${ns}`, JSON.stringify({ role: tokenRole, username: tokenUsername, full_name: tokenFullName }));
+          store.setItem(
+            `user_${ns}`,
+            JSON.stringify({ role: tokenRole, username: tokenUsername, full_name: tokenFullName })
+          );
         }
 
         if (remember) {

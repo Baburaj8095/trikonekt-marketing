@@ -21,6 +21,7 @@ import {
   TableRow,
   TableCell,
   TableBody,
+  TableContainer,
   CircularProgress,
   Alert,
   TextField,
@@ -162,14 +163,27 @@ export default function EmployeeDashboard({ embedded = false }) {
   // Identity
   const storedUser = useMemo(() => {
     try {
-      const ls =
+      // Strictly prefer namespaced employee cache to avoid cross-role pollution
+      const primary =
         localStorage.getItem("user_employee") ||
-        sessionStorage.getItem("user_employee") ||
-        localStorage.getItem("user") ||
-        sessionStorage.getItem("user");
-      const parsed = ls ? JSON.parse(ls) : {};
-      // Support nested shapes like { user: { ... } }
-      return parsed && typeof parsed === "object" && parsed.user && typeof parsed.user === "object" ? parsed.user : parsed;
+        sessionStorage.getItem("user_employee");
+      if (primary) {
+        const parsed = JSON.parse(primary);
+        return parsed && typeof parsed === "object" && parsed.user && typeof parsed.user === "object" ? parsed.user : parsed;
+      }
+      // Fallback to JWT claims if cache missing
+      const tok =
+        (typeof localStorage !== "undefined" && localStorage.getItem("token_employee")) ||
+        (typeof sessionStorage !== "undefined" && sessionStorage.getItem("token_employee")) ||
+        null;
+      if (tok && tok.includes(".")) {
+        try {
+          const [, payload] = tok.split(".");
+          const claim = JSON.parse(atob(payload));
+          return { username: claim?.username, full_name: claim?.full_name, role: claim?.role };
+        } catch (_) {}
+      }
+      return {};
     } catch {
       return {};
     }
@@ -688,7 +702,7 @@ export default function EmployeeDashboard({ embedded = false }) {
       <List>
         <ListItemButton
           selected={location.pathname === "/employee/profile"}
-          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+          sx={{ "&.Mui-selected": { backgroundColor: "#ffffff", color: "#0C2D48" } }}
           onClick={() => {
             navigate("/employee/profile");
           }}
@@ -697,7 +711,7 @@ export default function EmployeeDashboard({ embedded = false }) {
         </ListItemButton>
         <ListItemButton
           selected={activeTab === TABS.DASHBOARD}
-          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+          sx={{ "&.Mui-selected": { backgroundColor: "#ffffff", color: "#0C2D48" } }}
           onClick={() => {
             setActiveTab(TABS.DASHBOARD);
             navigate("/employee/dashboard");
@@ -707,7 +721,7 @@ export default function EmployeeDashboard({ embedded = false }) {
         </ListItemButton>
         <ListItemButton
           selected={activeTab === TABS.LUCKY_DRAW_HISTORY}
-          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+          sx={{ "&.Mui-selected": { backgroundColor: "#ffffff", color: "#0C2D48" } }}
           onClick={() => {
             setActiveTab(TABS.LUCKY_DRAW_HISTORY);
             navigate("/employee/dashboard?tab=lucky_draw_history");
@@ -717,7 +731,7 @@ export default function EmployeeDashboard({ embedded = false }) {
         </ListItemButton>
         <ListItemButton
           selected={activeTab === TABS.E_COUPONS}
-          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+          sx={{ "&.Mui-selected": { backgroundColor: "#ffffff", color: "#0C2D48" } }}
           onClick={() => {
             setActiveTab(TABS.E_COUPONS);
             navigate("/employee/dashboard?tab=e_coupons");
@@ -727,7 +741,7 @@ export default function EmployeeDashboard({ embedded = false }) {
         </ListItemButton>
         <ListItemButton
           selected={activeTab === TABS.MY_TEAM}
-          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+          sx={{ "&.Mui-selected": { backgroundColor: "#ffffff", color: "#0C2D48" } }}
           onClick={() => {
             setActiveTab(TABS.MY_TEAM);
             navigate("/employee/dashboard?tab=my_team");
@@ -737,7 +751,7 @@ export default function EmployeeDashboard({ embedded = false }) {
         </ListItemButton>
         <ListItemButton
           selected={activeTab === TABS.REFER_EARN}
-          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+          sx={{ "&.Mui-selected": { backgroundColor: "#ffffff", color: "#0C2D48" } }}
           onClick={() => {
             setActiveTab(TABS.REFER_EARN);
             navigate("/employee/dashboard?tab=refer_earn");
@@ -747,7 +761,7 @@ export default function EmployeeDashboard({ embedded = false }) {
         </ListItemButton>
         <ListItemButton
           selected={activeTab === TABS.REWARDS}
-          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+          sx={{ "&.Mui-selected": { backgroundColor: "#ffffff", color: "#0C2D48" } }}
           onClick={() => {
             setActiveTab(TABS.REWARDS);
             navigate("/employee/dashboard?tab=rewards");
@@ -757,7 +771,7 @@ export default function EmployeeDashboard({ embedded = false }) {
         </ListItemButton>
         <ListItemButton
           selected={activeTab === TABS.WALLET}
-          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+          sx={{ "&.Mui-selected": { backgroundColor: "#ffffff", color: "#0C2D48" } }}
           onClick={() => {
             setActiveTab(TABS.WALLET);
             navigate("/employee/dashboard?tab=wallet");
@@ -766,7 +780,7 @@ export default function EmployeeDashboard({ embedded = false }) {
           <ListItemText primary="Wallet" />
         </ListItemButton>
         <ListItemButton
-          sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
+          sx={{ "&.Mui-selected": { backgroundColor: "#ffffff", color: "#0C2D48" } }}
           onClick={() => navigate("/employee/daily-report")}
         >
           <ListItemText primary="Daily Report" />
@@ -873,7 +887,7 @@ export default function EmployeeDashboard({ embedded = false }) {
           <KpiCard
             title="E-Coupon Sold"
             value={(codes || []).filter(
-              (c) => c.status === "REDEEMED" || c.status === "ASSIGNED_CONSUMER"
+              (c) => c.status === "REDEEMED" || c.status === "SOLD"
             ).length}
             subtitle="Total Sold"
             palette="red"
@@ -890,7 +904,7 @@ export default function EmployeeDashboard({ embedded = false }) {
           }}>
           <KpiCard
             title="E-Coupon Available"
-            value={(codes || []).filter((c) => c.status === "AVAILABLE").length}
+            value={(codes || []).filter((c) => c.status === "ASSIGNED_EMPLOYEE").length}
             subtitle="Available Codes"
             palette="purple"
           />
@@ -906,7 +920,7 @@ export default function EmployeeDashboard({ embedded = false }) {
           }}>
           <KpiCard
             title="E-Coupon Assigned"
-            value={(codes || []).filter((c) => c.status === "ASSIGNED_CONSUMER").length}
+            value={(codes || []).filter((c) => c.status === "SOLD").length}
             subtitle="Assigned to Consumers"
             palette="teal"
           />
@@ -937,7 +951,7 @@ export default function EmployeeDashboard({ embedded = false }) {
               <Grid container rowSpacing={2} columnSpacing={{ xs: 0, sm: 2 }}>
             {/* Lucky draw submissions awaiting my (TRE) approval */}
             <Grid item xs={12}>
-              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#e3f2fd" }}>
+              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>
                   Lucky Draw Submissions Awaiting My Approval
                 </Typography>
@@ -954,55 +968,57 @@ export default function EmployeeDashboard({ embedded = false }) {
                 ) : luckyError ? (
                   <Alert severity="error">{luckyError}</Alert>
                 ) : (
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Date</TableCell>
-                        <TableCell>SL</TableCell>
-                        <TableCell>Ledger</TableCell>
-                        <TableCell>Pincode</TableCell>
-                        <TableCell>Status</TableCell>
-                        <TableCell align="right">Actions</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {(luckyPending || []).map((r) => (
-                        <TableRow key={r.id}>
-                          <TableCell>{r.created_at ? new Date(r.created_at).toLocaleString() : ""}</TableCell>
-                          <TableCell>{r.sl_number}</TableCell>
-                          <TableCell>{r.ledger_number}</TableCell>
-                          <TableCell>{r.pincode}</TableCell>
-                          <TableCell>{r.status}</TableCell>
-                          <TableCell align="right">
-                            <Stack direction="row" spacing={1} justifyContent="flex-end">
-                              <Button size="small" variant="contained" disabled={luckyActionBusy} onClick={() => treApproveLucky(r.id)} sx={{ backgroundColor: "#2E7D32", "&:hover": { backgroundColor: "#1B5E20" } }}>
-                                Approve
-                              </Button>
-                              <Button size="small" variant="outlined" color="error" disabled={luckyActionBusy} onClick={() => treRejectLucky(r.id)}>
-                                Reject
-                              </Button>
-                            </Stack>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      {(!luckyPending || luckyPending.length === 0) && (
+                  <TableContainer sx={{ maxWidth: "100%", overflowX: "auto" }}>
+                    <Table size="small">
+                      <TableHead>
                         <TableRow>
-                          <TableCell colSpan={6}>
-                            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                              No pending lucky draw submissions.
-                            </Typography>
-                          </TableCell>
+                          <TableCell>Date</TableCell>
+                          <TableCell>SL</TableCell>
+                          <TableCell>Ledger</TableCell>
+                          <TableCell>Pincode</TableCell>
+                          <TableCell>Status</TableCell>
+                          <TableCell align="right">Actions</TableCell>
                         </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
+                      </TableHead>
+                      <TableBody>
+                        {(luckyPending || []).map((r) => (
+                          <TableRow key={r.id}>
+                            <TableCell>{r.created_at ? new Date(r.created_at).toLocaleString() : ""}</TableCell>
+                            <TableCell>{r.sl_number}</TableCell>
+                            <TableCell>{r.ledger_number}</TableCell>
+                            <TableCell>{r.pincode}</TableCell>
+                            <TableCell>{r.status}</TableCell>
+                            <TableCell align="right">
+                              <Stack direction="row" spacing={1} justifyContent="flex-end">
+                                <Button size="small" variant="contained" disabled={luckyActionBusy} onClick={() => treApproveLucky(r.id)} sx={{ backgroundColor: "#2E7D32", "&:hover": { backgroundColor: "#1B5E20" } }}>
+                                  Approve
+                                </Button>
+                                <Button size="small" variant="outlined" color="error" disabled={luckyActionBusy} onClick={() => treRejectLucky(r.id)}>
+                                  Reject
+                                </Button>
+                              </Stack>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {(!luckyPending || luckyPending.length === 0) && (
+                          <TableRow>
+                            <TableCell colSpan={6}>
+                              <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                                No pending lucky draw submissions.
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
                 )}
               </Paper>
-            </Grid>
+              </Grid>
 
             {/* My Approved Submissions */}
             <Grid item xs={12}>
-              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#e3f2fd" }}>
+              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My Approved Submissions</Typography>
                 {approvedLoading ? (
                   <Box sx={{ py: 3, display: "flex", alignItems: "center", gap: 1 }}>
@@ -1010,17 +1026,18 @@ export default function EmployeeDashboard({ embedded = false }) {
                   </Box>
                 ) : approvedError ? (
                   <Alert severity="error">{approvedError}</Alert>
-                ) : (
-                  <Table size="small">
+                  ) : (
+                    <TableContainer sx={{ maxWidth: "100%", overflowX: "auto" }}>
+                    <Table size="small">
                     <TableHead>
                       <TableRow>
-                        <TableCell>Date</TableCell>
-                        <TableCell>SL</TableCell>
-                        <TableCell>Ledger</TableCell>
-                        <TableCell>Pincode</TableCell>
+                        <TableCell>Code</TableCell>
                         <TableCell>Status</TableCell>
-                        <TableCell>Agency Reviewer</TableCell>
-                        <TableCell>Comments</TableCell>
+                        <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Batch</TableCell>
+                        <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Serial</TableCell>
+                        <TableCell>Value</TableCell>
+                        <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Assigned Agency</TableCell>
+                        <TableCell>Created</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -1051,6 +1068,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                       )}
                     </TableBody>
                   </Table>
+                  </TableContainer>
                 )}
               </Paper>
             </Grid>
@@ -1060,11 +1078,11 @@ export default function EmployeeDashboard({ embedded = false }) {
         {activeTab === TABS.E_COUPONS && (
               <Grid container spacing={2} sx={{ width: "100%", minWidth: 0, boxSizing: "border-box" }}>
             <Grid item xs={12}>
-              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#e3f2fd" }}>
+              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My E‑Coupon Codes</Typography>
 
                 {/* Pending E‑Coupon submissions awaiting my approval */}
-                <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2, bgcolor: "#fff" }}>
+                {/* <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2, bgcolor: "#fff" }}>
                   <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Pending E‑Coupon Submissions Awaiting My Approval</Typography>
                   {pendingLoading ? (
                     <Box sx={{ py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
@@ -1074,25 +1092,25 @@ export default function EmployeeDashboard({ embedded = false }) {
                     <Alert severity="error">{pendingError}</Alert>
                   ) : (
                     <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Date</TableCell>
-                          <TableCell>Consumer</TableCell>
-                          <TableCell>Coupon Code</TableCell>
-                          <TableCell>Pincode</TableCell>
-                          <TableCell>Status</TableCell>
-                          <TableCell align="right">Actions</TableCell>
-                        </TableRow>
-                      </TableHead>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Date</TableCell>
+                            <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Consumer</TableCell>
+                            <TableCell>Coupon Code</TableCell>
+                            <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Pincode</TableCell>
+                            <TableCell>Status</TableCell>
+                            <TableCell align="right">Actions</TableCell>
+                          </TableRow>
+                        </TableHead>
                       <TableBody>
-                        {(pendingSubs || []).map((s) => (
-                          <TableRow key={s.id}>
-                            <TableCell>{s.created_at ? new Date(s.created_at).toLocaleString() : ""}</TableCell>
-                            <TableCell>{s.consumer_username || s.consumer || ""}</TableCell>
-                            <TableCell>{s.coupon_code || (s.code_ref && s.code_ref.code) || ""}</TableCell>
-                            <TableCell>{s.pincode || ""}</TableCell>
-                            <TableCell>{s.status}</TableCell>
-                            <TableCell align="right">
+                          {(pendingSubs || []).map((s) => (
+                            <TableRow key={s.id}>
+                              <TableCell>{s.created_at ? new Date(s.created_at).toLocaleString() : ""}</TableCell>
+                              <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{s.consumer_username || s.consumer || ""}</TableCell>
+                              <TableCell>{s.coupon_code || (s.code_ref && s.code_ref.code) || ""}</TableCell>
+                              <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{s.pincode || ""}</TableCell>
+                              <TableCell>{s.status}</TableCell>
+                              <TableCell align="right">
                               <Stack direction="row" spacing={1} justifyContent="flex-end">
                                 <Button size="small" variant="contained" disabled={pendingBusy} onClick={() => empApprove(s.id)} sx={{ backgroundColor: "#2E7D32", "&:hover": { backgroundColor: "#1B5E20" } }}>
                                   Approve
@@ -1116,7 +1134,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                       </TableBody>
                     </Table>
                   )}
-                </Paper>
+                </Paper> */}
 
                 {/* Assign to Consumer */}
                 <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2, bgcolor: "#fbfdff" }}>
@@ -1131,13 +1149,13 @@ export default function EmployeeDashboard({ embedded = false }) {
                       sx={{ minWidth: 220 }}
                       helperText={codesLoading ? "Loading..." : codesError || ""}
                     >
-                      {(codes || [])
-                        .filter((c) => c.status === "ASSIGNED_EMPLOYEE" || c.status === "AVAILABLE")
-                        .map((c) => (
-                          <MenuItem key={c.id} value={c.id}>
-                            {c.code} {c.value !== undefined ? ` (₹${c.value}) ` : ""}
-                          </MenuItem>
-                        ))}
+                    {(codes || [])
+                      .filter((c) => c.status === "ASSIGNED_EMPLOYEE")
+                      .map((c) => (
+                        <MenuItem key={c.id} value={c.id}>
+                          {c.code} {c.value !== undefined ? ` (₹${c.value}) ` : ""}
+                        </MenuItem>
+                      ))}
                       {(!codes || codes.length === 0) && (
                         <MenuItem disabled value="">
                           {codesLoading ? "Loading..." : "No codes assigned to you"}
@@ -1159,49 +1177,76 @@ export default function EmployeeDashboard({ embedded = false }) {
                   </Box>
                 ) : codesError ? (
                   <Alert severity="error">{codesError}</Alert>
-                ) : (
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Code</TableCell>
-                        <TableCell>Status</TableCell>
-                        <TableCell>Batch</TableCell>
-                        <TableCell>Serial</TableCell>
-                        <TableCell>Value</TableCell>
-                        <TableCell>Assigned Agency</TableCell>
-                        <TableCell>Created</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {(codes || []).map((c) => (
-                        <TableRow key={c.id}>
-                          <TableCell>{c.code}</TableCell>
-                          <TableCell>{c.status}</TableCell>
-                          <TableCell>{c.batch || ""}</TableCell>
-                          <TableCell>{c.serial || ""}</TableCell>
-                          <TableCell>{c.value !== undefined ? `₹${c.value}` : ""}</TableCell>
-                          <TableCell>{c.assigned_agency_username || ""}</TableCell>
-                          <TableCell>{c.created_at ? new Date(c.created_at).toLocaleString() : ""}</TableCell>
-                        </TableRow>
-                      ))}
-                      {(!codes || codes.length === 0) && (
-                        <TableRow>
-                          <TableCell colSpan={7}>
-                            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                              No codes assigned to you.
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                )}
+                  ) : (
+                    <React.Fragment>
+                      <Box sx={{ display: { xs: "block", sm: "none" } }}>
+                        {(codes || []).map((c) => (
+                          <Box key={c.id} sx={{ p: 1.5, mb: 1, border: "1px solid #e5e7eb", borderRadius: 1, backgroundColor: "#fff" }}>
+                            <Stack direction="row" justifyContent="space-between" alignItems="center">
+                              <Typography variant="body2" sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>{c.code}</Typography>
+                              <Typography variant="caption" sx={{ color: "text.secondary" }}>{c.status}</Typography>
+                            </Stack>
+                            <Stack direction="row" spacing={1} sx={{ mt: 0.5, color: "text.secondary" }}>
+                              <Typography variant="caption">{c.value !== undefined ? `₹${c.value}` : ""}</Typography>
+                              <Typography variant="caption">• {c.created_at ? new Date(c.created_at).toLocaleString() : ""}</Typography>
+                            </Stack>
+                            {(c.batch || c.serial || c.assigned_agency_username) ? (
+                              <Typography variant="caption" sx={{ display: "block", mt: 0.5, color: "text.secondary" }}>
+                                {c.batch ? `Batch: ${c.batch} ` : ""}{c.serial ? ` Serial: ${c.serial} ` : ""}{c.assigned_agency_username ? ` Agency: ${c.assigned_agency_username}` : ""}
+                              </Typography>
+                            ) : null}
+                          </Box>
+                        ))}
+                        {(!codes || codes.length === 0) && (
+                          <Typography variant="body2" sx={{ color: "text.secondary" }}>No codes assigned to you.</Typography>
+                        )}
+                      </Box>
+
+                      <Box sx={{ display: { xs: "none", sm: "block" } }}>
+                        <TableContainer sx={{ maxWidth: "100%", overflowX: "auto" }}>
+                          <Table size="small">
+                            <TableHead>
+                              <TableRow>
+                                <TableCell>Code</TableCell>
+                                <TableCell>Status</TableCell>
+                          
+                                <TableCell>Value</TableCell>
+                                <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Assigned Agency</TableCell>
+                                <TableCell>Created</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {(codes || []).map((c) => (
+                                <TableRow key={c.id}>
+                                  <TableCell sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>{c.code}</TableCell>
+                                  <TableCell>{c.status}</TableCell>
+                                  
+                                  <TableCell>{c.value !== undefined ? `₹${c.value}` : ""}</TableCell>
+                                  <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.assigned_agency_username || ""}</TableCell>
+                                  <TableCell>{c.created_at ? new Date(c.created_at).toLocaleString() : ""}</TableCell>
+                                </TableRow>
+                              ))}
+                              {(!codes || codes.length === 0) && (
+                                <TableRow>
+                                  <TableCell colSpan={7}>
+                                    <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                                      No codes assigned to you.
+                                    </Typography>
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      </Box>
+                    </React.Fragment>
+                  )}
               </Paper>
             </Grid>
 
             {/* Commissions list */}
             <Grid item xs={12}>
-              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#e3f2fd" }}>
+              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My Commissions</Typography>
                 <Alert severity="success" sx={{ mb: 2 }}>Commission earned (lifetime): ₹{commissionTotal.toFixed(2)}</Alert>
                 <Table size="small">
@@ -1241,7 +1286,7 @@ export default function EmployeeDashboard({ embedded = false }) {
         {activeTab === TABS.MY_TEAM && (
               <Grid container spacing={2} sx={{ width: "100%", minWidth: 0, boxSizing: "border-box" }}>
             <Grid item xs={12}>
-              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#e3f2fd" }}>
+              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>My Team (5‑Matrix)</Typography>
                 <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden", background: "#fff", padding: 12 }}>
                   <TreeReferralGalaxy mode="self" />
@@ -1252,7 +1297,7 @@ export default function EmployeeDashboard({ embedded = false }) {
         )}
 
         {activeTab === TABS.REFER_EARN && (
-            <ReferAndEarn title="Refer Consumer" onlyConsumer sponsorUsername={(storedUser?.sponsor_id || (storedUser && storedUser.user && storedUser.user.sponsor_id) || "")} />
+            <ReferAndEarn title="Refer Consumer" onlyConsumer sponsorUsername={(storedUser?.username || (storedUser && storedUser.user && storedUser.user.username) || "")} />
         )}
 
         {activeTab === TABS.REWARDS && <RewardsTargetCard role="employee" />}
@@ -1260,7 +1305,7 @@ export default function EmployeeDashboard({ embedded = false }) {
         {activeTab === TABS.WALLET && (
               <Grid container spacing={2} sx={{ width: "100%", minWidth: 0, boxSizing: "border-box" }}>
             <Grid item xs={12}>
-              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#e3f2fd" }}>
+              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My Wallet</Typography>
                 {walletLoading ? (
                   <Typography variant="body2">Loading...</Typography>
@@ -1382,7 +1427,7 @@ export default function EmployeeDashboard({ embedded = false }) {
         ModalProps={{ keepMounted: true }}
         sx={{
           display: { xs: "block", sm: "none" },
-          "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box", borderRight: "1px solid #e5e7eb", backgroundColor: "#e3f2fd" },
+          "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box", borderRight: "1px solid #e5e7eb", backgroundColor: "#ffffff" },
         }}
       >
         <Toolbar />
@@ -1396,7 +1441,7 @@ export default function EmployeeDashboard({ embedded = false }) {
           width: drawerWidth,
           flexShrink: 0,
           display: { xs: "none", sm: "block" },
-          "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box", borderRight: "1px solid #e5e7eb", backgroundColor: "#e3f2fd" },
+          "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box", borderRight: "1px solid #e5e7eb", backgroundColor: "#ffffff" },
         }}
         open
       >
@@ -1405,7 +1450,7 @@ export default function EmployeeDashboard({ embedded = false }) {
       </Drawer>
 
       {/* Main Content */}
-      <Box component="main" sx={{ flexGrow: 1, p: { xs: 0, md: 3 }, overflowX: "hidden" }}>
+      <Box component="main" sx={{ flexGrow: 1, p: { xs: 0, md: 3 }, overflowX: { xs: "auto", md: "visible" } }}>
         <Toolbar />
         <Container maxWidth="lg" sx={{ px: 0 }} disableGutters>
           {activeTab === TABS.DASHBOARD && (
@@ -1446,7 +1491,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                 <Grid item xs={12} sm={6} md={3}>
                   <KpiCard
                     title="E-Coupon Sold"
-                    value={(codes || []).filter((c) => c.status === "REDEEMED" || c.status === "ASSIGNED_CONSUMER").length}
+                    value={(codes || []).filter((c) => c.status === "REDEEMED" || c.status === "SOLD").length}
                     subtitle="Total Sold"
                     palette="red"
                   />
@@ -1454,7 +1499,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                 <Grid item xs={12} sm={6} md={3}>
                   <KpiCard
                     title="E-Coupon Available"
-                    value={(codes || []).filter((c) => c.status === "AVAILABLE").length}
+                    value={(codes || []).filter((c) => c.status === "ASSIGNED_EMPLOYEE").length}
                     subtitle="Available Codes"
                     palette="purple"
                   />
@@ -1462,7 +1507,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                 <Grid item xs={12} sm={6} md={3}>
                   <KpiCard
                     title="E-Coupon Assigned"
-                    value={(codes || []).filter((c) => c.status === "ASSIGNED_CONSUMER").length}
+                    value={(codes || []).filter((c) => c.status === "SOLD").length}
                     subtitle="Assigned to Consumers"
                     palette="teal"
                   />
@@ -1490,7 +1535,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                     helperText={codesLoading ? "Loading..." : codesError || ""}
                   >
                     {(codes || [])
-                      .filter((c) => c.status === "ASSIGNED_EMPLOYEE" || c.status === "AVAILABLE")
+                      .filter((c) => c.status === "ASSIGNED_EMPLOYEE")
                       .map((c) => (
                         <MenuItem key={c.id} value={c.id}>
                           {c.code} {c.value !== undefined ? ` (₹${c.value}) ` : ""}
@@ -1516,7 +1561,7 @@ export default function EmployeeDashboard({ embedded = false }) {
             <Grid container spacing={2}>
               {/* Lucky draw submissions awaiting my (TRE) approval */}
               <Grid item xs={12}>
-                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#e3f2fd" }}>
+                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
                   <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>
                     Lucky Draw Submissions Awaiting My Approval
                   </Typography>
@@ -1579,7 +1624,7 @@ export default function EmployeeDashboard({ embedded = false }) {
 
               {/* My Approved Submissions */}
               <Grid item xs={12}>
-                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#e3f2fd" }}>
+                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
                   <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My Approved Submissions</Typography>
                   {approvedLoading ? (
                     <Box sx={{ py: 3, display: "flex", alignItems: "center", gap: 1 }}>
@@ -1634,7 +1679,7 @@ export default function EmployeeDashboard({ embedded = false }) {
           {activeTab === TABS.ASSIGN && (
             <Grid container spacing={2}>
               <Grid item xs={12}>
-                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#e3f2fd" }}>
+                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
                   <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
                     <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>My Lucky Draw Coupon Assignments</Typography>
                     <Box sx={{ display: "flex", gap: 1 }}>
@@ -1707,7 +1752,7 @@ export default function EmployeeDashboard({ embedded = false }) {
           {activeTab === TABS.E_COUPONS && (
             <Grid container spacing={2}>
               <Grid item xs={12}>
-                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#e3f2fd" }}>
+                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
                   <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My E‑Coupon Codes</Typography>
 
                   {/* Pending E‑Coupon submissions awaiting my approval */}
@@ -1777,10 +1822,10 @@ export default function EmployeeDashboard({ embedded = false }) {
                         helperText={codesLoading ? "Loading..." : codesError || ""}
                       >
                         {(codes || [])
-                          .filter((c) => c.status === "ASSIGNED_EMPLOYEE" || c.status === "AVAILABLE")
+                          .filter((c) => c.status === "ASSIGNED_EMPLOYEE")
                           .map((c) => (
                             <MenuItem key={c.id} value={c.id}>
-                              {c.code} {typeof c.value !== "undefined" ? ` (₹${c.value}) ` : ""}
+                              {c.code} {c.value !== undefined ? ` (₹${c.value}) ` : ""}
                             </MenuItem>
                           ))}
                         {(!codes || codes.length === 0) && (
@@ -1805,46 +1850,71 @@ export default function EmployeeDashboard({ embedded = false }) {
                   ) : codesError ? (
                     <Alert severity="error">{codesError}</Alert>
                   ) : (
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Code</TableCell>
-                          <TableCell>Status</TableCell>
-                          <TableCell>Batch</TableCell>
-                          <TableCell>Serial</TableCell>
-                          <TableCell>Value</TableCell>
-                          <TableCell>Assigned Agency</TableCell>
-                          <TableCell>Created</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
+                    <React.Fragment>
+                      <Box sx={{ display: { xs: "block", sm: "none" } }}>
                         {(codes || []).map((c) => (
-                          <TableRow key={c.id}>
-                            <TableCell>{c.code}</TableCell>
-                            <TableCell>{c.status}</TableCell>
-                            <TableCell>{c.batch || ""}</TableCell>
-                            <TableCell>{c.serial || ""}</TableCell>
-                            <TableCell>{typeof c.value !== "undefined" ? `₹${c.value}` : ""}</TableCell>
-                            <TableCell>{c.assigned_agency_username || ""}</TableCell>
-                            <TableCell>{c.created_at ? new Date(c.created_at).toLocaleString() : ""}</TableCell>
-                          </TableRow>
+                          <Box key={c.id} sx={{ p: 1.5, mb: 1, border: "1px solid #e5e7eb", borderRadius: 1, backgroundColor: "#fff" }}>
+                            <Stack direction="row" justifyContent="space-between" alignItems="center">
+                              <Typography variant="body2" sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>{c.code}</Typography>
+                              <Typography variant="caption" sx={{ color: "text.secondary" }}>{c.status}</Typography>
+                            </Stack>
+                            <Stack direction="row" spacing={1} sx={{ mt: 0.5, color: "text.secondary" }}>
+                              <Typography variant="caption">{c.value !== undefined ? `₹${c.value}` : ""}</Typography>
+                              <Typography variant="caption">• {c.created_at ? new Date(c.created_at).toLocaleString() : ""}</Typography>
+                            </Stack>
+                            {(c.batch || c.serial || c.assigned_agency_username) ? (
+                              <Typography variant="caption" sx={{ display: "block", mt: 0.5, color: "text.secondary" }}>
+                                {c.batch ? `Batch: ${c.batch} ` : ""}{c.serial ? ` Serial: ${c.serial} ` : ""}{c.assigned_agency_username ? ` Agency: ${c.assigned_agency_username}` : ""}
+                              </Typography>
+                            ) : null}
+                          </Box>
                         ))}
                         {(!codes || codes.length === 0) && (
-                          <TableRow>
-                            <TableCell colSpan={7}>
-                              <Typography variant="body2" sx={{ color: "text.secondary" }}>No codes assigned to you.</Typography>
-                            </TableCell>
-                          </TableRow>
+                          <Typography variant="body2" sx={{ color: "text.secondary" }}>No codes assigned to you.</Typography>
                         )}
-                      </TableBody>
-                    </Table>
+                      </Box>
+
+                      <Box sx={{ display: { xs: "none", sm: "block" } }}>
+                        <TableContainer sx={{ maxWidth: "100%", overflowX: "auto" }}>
+                          <Table size="small">
+                            <TableHead>
+                              <TableRow>
+                                <TableCell>Code</TableCell>
+                                <TableCell>Status</TableCell>
+                                <TableCell>Value</TableCell>
+                                <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Assigned Agency</TableCell>
+                                <TableCell>Created</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {(codes || []).map((c) => (
+                                <TableRow key={c.id}>
+                                  <TableCell sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>{c.code}</TableCell>
+                                  <TableCell>{c.status}</TableCell>
+                                  <TableCell>{c.value !== undefined ? `₹${c.value}` : ""}</TableCell>
+                                  <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.assigned_agency_username || ""}</TableCell>
+                                  <TableCell>{c.created_at ? new Date(c.created_at).toLocaleString() : ""}</TableCell>
+                                </TableRow>
+                              ))}
+                              {(!codes || codes.length === 0) && (
+                                <TableRow>
+                                  <TableCell colSpan={7}>
+                                    <Typography variant="body2" sx={{ color: "text.secondary" }}>No codes assigned to you.</Typography>
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      </Box>
+                    </React.Fragment>
                   )}
-                </Paper>
+              </Paper>
               </Grid>
 
               {/* Commissions list */}
               <Grid item xs={12}>
-                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#e3f2fd" }}>
+                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
                   <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My Commissions</Typography>
                   <Alert severity="success" sx={{ mb: 2 }}>Commission earned (lifetime): ₹{commissionTotal.toFixed(2)}</Alert>
                   <Table size="small">
@@ -1883,7 +1953,7 @@ export default function EmployeeDashboard({ embedded = false }) {
           {activeTab === TABS.MY_TEAM && (
             <Grid container spacing={2}>
               <Grid item xs={12}>
-                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#e3f2fd" }}>
+                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
                   <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>My Team (5‑Matrix)</Typography>
                   <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden", background: "#fff", padding: 12 }}>
                     <TreeReferralGalaxy mode="self" />
@@ -1893,7 +1963,7 @@ export default function EmployeeDashboard({ embedded = false }) {
             </Grid>
           )}
           {activeTab === TABS.REFER_EARN && (
-            <ReferAndEarn title="Refer Consumer" onlyConsumer sponsorUsername={(storedUser?.sponsor_id || (storedUser && storedUser.user && storedUser.user.sponsor_id) || "")} />
+            <ReferAndEarn title="Refer Consumer" onlyConsumer sponsorUsername={(storedUser?.username || (storedUser && storedUser.user && storedUser.user.username) || "")} />
           )}
 
           {activeTab === TABS.REWARDS && <RewardsTargetCard role="employee" />}
@@ -1901,7 +1971,7 @@ export default function EmployeeDashboard({ embedded = false }) {
           {activeTab === TABS.WALLET && (
             <Grid container spacing={2}>
               <Grid item xs={12}>
-                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#e3f2fd" }}>
+                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
                   <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My Wallet</Typography>
                   {walletLoading ? (
                     <Typography variant="body2">Loading...</Typography>

@@ -6,14 +6,20 @@ export default function ReferAndEarn({ title = "Refer & Earn", onlyConsumer = fa
 
   const user = useMemo(() => {
     try {
-      // Prefer consumer storage first to avoid picking up stale employee data
-      const ls =
-        localStorage.getItem("user_user") ||
-        sessionStorage.getItem("user_user") ||
+      // Prefer namespaced storage for the current section (user/agency/employee/business)
+      const p = (typeof window !== "undefined" && window.location && window.location.pathname) || "";
+      const ns = p.startsWith("/agency") ? "agency" : p.startsWith("/employee") ? "employee" : p.startsWith("/business") ? "business" : "user";
+      const primary =
+        localStorage.getItem(`user_${ns}`) ||
+        sessionStorage.getItem(`user_${ns}`);
+      // Fallbacks: legacy caches
+      const fallback =
+        (ns !== "user" ? (localStorage.getItem("user_user") || sessionStorage.getItem("user_user")) : null) ||
         localStorage.getItem("user") ||
         sessionStorage.getItem("user") ||
         localStorage.getItem("user_employee") ||
         sessionStorage.getItem("user_employee");
+      const ls = primary || fallback;
       const parsed = ls ? JSON.parse(ls) : {};
       // Support nested shapes like { user: { ... } }
       return parsed && typeof parsed === "object" && parsed.user && typeof parsed.user === "object" ? parsed.user : parsed;

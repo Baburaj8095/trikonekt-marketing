@@ -14,7 +14,13 @@ import API from "../api/api";
 export default function Profile() {
   const storedUser = useMemo(() => {
     try {
-      const ls = localStorage.getItem("user") || sessionStorage.getItem("user");
+      const p = (typeof window !== "undefined" && window.location && window.location.pathname) || "";
+      const ns = p.startsWith("/agency") ? "agency" : p.startsWith("/employee") ? "employee" : p.startsWith("/business") ? "business" : "user";
+      const ls =
+        localStorage.getItem(`user_${ns}`) ||
+        sessionStorage.getItem(`user_${ns}`) ||
+        localStorage.getItem("user") ||
+        sessionStorage.getItem("user");
       return ls ? JSON.parse(ls) : {};
     } catch {
       return {};
@@ -103,12 +109,21 @@ export default function Profile() {
       });
 
       setOk("Profile updated successfully.");
-      // Refresh cached user (best-effort)
+      // Refresh cached user (best-effort) with correct namespace
       try {
         const me = await API.get("/accounts/me/");
         const data = me?.data || {};
-        const currentStorage = localStorage.getItem("user") ? localStorage : sessionStorage;
-        currentStorage.setItem("user", JSON.stringify(data));
+        const p = (typeof window !== "undefined" && window.location && window.location.pathname) || "";
+        const ns = p.startsWith("/agency") ? "agency" : p.startsWith("/employee") ? "employee" : p.startsWith("/business") ? "business" : "user";
+        const preferLocal = typeof localStorage !== "undefined" && localStorage.getItem(`refresh_${ns}`) !== null;
+        const preferSession = typeof sessionStorage !== "undefined" && sessionStorage.getItem(`refresh_${ns}`) !== null;
+        const store = preferLocal ? localStorage : (preferSession ? sessionStorage : localStorage);
+        store.setItem(`user_${ns}`, JSON.stringify(data));
+        // Maintain legacy 'user' cache only for consumer routes
+        if (ns === "user") {
+          try { localStorage.setItem("user", JSON.stringify(data)); } catch {}
+          try { sessionStorage.setItem("user", JSON.stringify(data)); } catch {}
+        }
       } catch (_) {}
     } catch (e) {
       const msg =

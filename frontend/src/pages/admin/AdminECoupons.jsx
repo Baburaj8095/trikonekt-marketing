@@ -79,6 +79,22 @@ function Section({ title, children, extraRight }) {
   );
 }
 
+function MetricCard({ label, value }) {
+  return (
+    <div
+      style={{
+        background: "#fff",
+        border: "1px solid #e2e8f0",
+        borderRadius: 10,
+        padding: 12,
+      }}
+    >
+      <div style={{ fontSize: 12, color: "#64748b" }}>{label}</div>
+      <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>{value}</div>
+    </div>
+  );
+}
+
 export default function AdminECoupons() {
   // Master lists
   const [coupons, setCoupons] = useState([]);
@@ -100,26 +116,20 @@ export default function AdminECoupons() {
   const [batchForm, setBatchForm] = useState({
     coupon_id: "",
     prefix: "LDGR",
-    serial_start: "1",
-    serial_end: "1000",
-    serial_width: "6",
+    count: "500",
     denomination: "150",
   });
   const [createBatchLoading, setCreateBatchLoading] = useState(false);
 
-  // Assign-to-Agency form
+  // Assign-to-Agency/Employee form (count based only)
   const [assignForm, setAssignForm] = useState({
     batch_id: "",
     assignee_type: "agency",
     agency_id: "",
     employee_id: "",
-    serial_start: "",
-    serial_end: "",
     count: "",
   });
   const [assignLoading, setAssignLoading] = useState(false);
-  const [nextStart, setNextStart] = useState("");
-  const [nextStartLoading, setNextStartLoading] = useState(false);
 
   // Metrics selection and values
   const [selectedBatch, setSelectedBatch] = useState("");
@@ -132,7 +142,29 @@ export default function AdminECoupons() {
     revoked: 0,
   });
   const [metricsLoading, setMetricsLoading] = useState(false);
+
   const [err, setErr] = useState("");
+  const [bootstrapLoading, setBootstrapLoading] = useState(false);
+
+  // Admin Agency Assignment Summary
+  const [summary, setSummary] = useState([]);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState("");
+  const [summaryFrom, setSummaryFrom] = useState("");
+  const [summaryTo, setSummaryTo] = useState("");
+
+  async function loadAgencySummary() {
+    setSummaryLoading(true);
+    setSummaryError("");
+    try {
+      await loadDashboard(true);
+    } catch (e) {
+      setSummaryError("Failed to load agency summary");
+    } finally {
+      setSummaryLoading(false);
+    }
+  }
+
   // Assignment history (list)
   const [assignments, setAssignments] = useState([]);
   const [assignTotal, setAssignTotal] = useState(0);
@@ -232,20 +264,17 @@ export default function AdminECoupons() {
       }
       const payload = {
         coupon: parseInt(batchForm.coupon_id, 10),
-        prefix: batchForm.prefix.trim() || "LDGR",
-        serial_start: parseInt(batchForm.serial_start, 10),
-        serial_end: parseInt(batchForm.serial_end, 10),
-        serial_width: parseInt(batchForm.serial_width, 10),
-        issued_channel: "e_coupon",
-        value: parseInt(batchForm.denomination, 10),
+        prefix: (batchForm.prefix || "LDGR").trim() || "LDGR",
+        count: parseInt(batchForm.count || "0", 10),
+        value: parseInt(batchForm.denomination || "150", 10),
       };
-      if (!payload.serial_start || !payload.serial_end || payload.serial_start > payload.serial_end) {
-        alert("Enter valid serial range");
+      if (!payload.count || payload.count <= 0) {
+        alert("Enter a valid Count (>0)");
         setCreateBatchLoading(false);
         return;
       }
-      await API.post("/coupons/batches/", payload);
-      await loadBatches();
+      await API.post("/coupons/batches/create-ecoupons/", payload);
+      await loadBootstrap();
       alert("E-Coupon batch created");
     } catch (e) {
       setErr(e?.response?.data?.detail || "Failed to create batch");
@@ -273,56 +302,25 @@ export default function AdminECoupons() {
         setAssignLoading(false);
         return;
       }
-      let serialStart = assignForm.serial_start ? parseInt(assignForm.serial_start, 10) : (nextStart ? parseInt(nextStart, 10) : NaN);
-      let serialEnd = assignForm.serial_end ? parseInt(assignForm.serial_end, 10) : NaN;
-      const count = assignForm.count ? parseInt(assignForm.count, 10) : NaN;
-      if (!assignForm.serial_start && !assignForm.serial_end && !Number.isNaN(count) && !Number.isNaN(serialStart)) {
-        serialEnd = serialStart + count - 1;
-      }
-      // Monotonic guardrails (avoid overlaps and invalid ranges)
-      const ns = nextStart ? parseInt(nextStart, 10) : NaN;
-      if (!Number.isNaN(count) && count <= 0) {
-        alert("Count must be > 0");
+      const count = parseInt(assignForm.count || "0", 10);
+      if (!count || count <= 0) {
+        alert("Enter a valid Count (>0).");
         setAssignLoading(false);
         return;
-      }
-      if (!Number.isNaN(serialStart) && !Number.isNaN(serialEnd) && serialStart > serialEnd) {
-        alert("Serial Start must be <= Serial End");
-        setAssignLoading(false);
-        return;
-      }
-      if (!Number.isNaN(ns)) {
-        // If overrides are provided, ensure they don't start before the nextStart (sequential policy)
-        if (assignForm.serial_start && serialStart < ns) {
-          alert(`Serial Start must be \u2265 ${ns} to avoid overlapping previous assignments`);
-          setAssignLoading(false);
-          return;
-        }
-      }
-      if (!isAgency) {
-        if (Number.isNaN(count) || count <= 0) {
-          alert("For employee assignment, enter a valid Count (>0).");
-          setAssignLoading(false);
-          return;
-        }
       }
       let url, payload;
       if (isAgency) {
-        payload = { agency_id: assigneeId };
-        if (!Number.isNaN(serialStart) && !Number.isNaN(serialEnd)) {
-          payload.serial_start = serialStart;
-          payload.serial_end = serialEnd;
-        }
-        url = `/coupons/batches/${batchId}/assign-agency/`;
+        url = `/coupons/batches/${batchId}/assign-agency-count/`;
+        payload = { agency_id: assigneeId, count };
       } else {
-        payload = { employee_id: assigneeId, count: count };
         url = `/coupons/batches/${batchId}/admin-assign-employee-count/`;
+        payload = { employee_id: assigneeId, count };
       }
       await API.post(url, payload);
       setSelectedBatch(String(batchId));
       setAssignPage(1);
-      await Promise.all([loadBatches(), loadAssignments(), loadMetrics()]);
-      loadNextStart();
+      await loadBootstrap();
+      await loadDashboard(false);
       alert("Assigned successfully");
     } catch (e) {
       setErr(e?.response?.data?.detail || "Failed to assign");
@@ -381,9 +379,9 @@ export default function AdminECoupons() {
             assignee_id
               ? `${role === "employee" ? "Employee" : "Agency"} #${assignee_id}`
               : (r.notes || "").replace(/^.* to /, "").trim();
-          let start = null,
-            end = null,
-            count = null;
+
+          let start = null, end = null, count = null;
+          // Keep backward compatibility if server still emits serial_range
           if (Array.isArray(meta.serial_range) && meta.serial_range.length === 2) {
             start = meta.serial_range[0];
             end = meta.serial_range[1];
@@ -393,6 +391,7 @@ export default function AdminECoupons() {
           }
           if (meta.count && !count) count = meta.count;
           if (meta.total_assigned && !count) count = meta.total_assigned;
+
           return [
             {
               id: `${action}-${batch_id}-${assignee_id || ""}-${at}`,
@@ -447,31 +446,15 @@ export default function AdminECoupons() {
     try {
       // Request small page_size so DRF returns {"count": <N>, "results": [...]}
       const res = await API.get(url, { params: { page_size: 1, ...params } });
-      const c = typeof res?.data?.count === "number" ? res.data.count : (Array.isArray(res?.data) ? res.data.length : 0);
+      const c =
+        typeof res?.data?.count === "number"
+          ? res.data.count
+          : Array.isArray(res?.data)
+          ? res.data.length
+          : 0;
       return c || 0;
     } catch {
       return 0;
-    }
-  }
-
-  async function loadNextStart() {
-    const bid = assignForm.batch_id ? parseInt(assignForm.batch_id, 10) : null;
-    if (!bid) {
-      setNextStart("");
-      return;
-    }
-    setNextStartLoading(true);
-    try {
-      const role = assignForm.assignee_type === "employee" ? "employee" : "agency";
-      const res = await API.get(`/coupons/batches/${bid}/next-start/`, {
-        params: { scope: "global", role },
-      });
-      const n = res?.data?.next_start;
-      setNextStart(typeof n === "number" ? String(n) : "");
-    } catch (_) {
-      setNextStart("");
-    } finally {
-      setNextStartLoading(false);
     }
   }
 
@@ -480,21 +463,15 @@ export default function AdminECoupons() {
     try {
       const bid = selectedBatch ? parseInt(selectedBatch, 10) : null;
 
-      const [
-        available,
-        assigned_agency,
-        assigned_employee,
-        sold,
-        redeemed,
-        revoked,
-      ] = await Promise.all([
-        bid ? fetchCount("/coupons/codes/", { batch: bid, status: "AVAILABLE" }) : 0,
-        bid ? fetchCount("/coupons/codes/", { batch: bid, status: "ASSIGNED_AGENCY" }) : 0,
-        bid ? fetchCount("/coupons/codes/", { batch: bid, status: "ASSIGNED_EMPLOYEE" }) : 0,
-        bid ? fetchCount("/coupons/codes/", { batch: bid, status: "SOLD" }) : 0,
-        bid ? fetchCount("/coupons/codes/", { batch: bid, status: "REDEEMED" }) : 0,
-        bid ? fetchCount("/coupons/codes/", { batch: bid, status: "REVOKED" }) : 0,
-      ]);
+      const [available, assigned_agency, assigned_employee, sold, redeemed, revoked] =
+        await Promise.all([
+          bid ? fetchCount("/coupons/codes/", { batch: bid, status: "AVAILABLE" }) : 0,
+          bid ? fetchCount("/coupons/codes/", { batch: bid, status: "ASSIGNED_AGENCY" }) : 0,
+          bid ? fetchCount("/coupons/codes/", { batch: bid, status: "ASSIGNED_EMPLOYEE" }) : 0,
+          bid ? fetchCount("/coupons/codes/", { batch: bid, status: "SOLD" }) : 0,
+          bid ? fetchCount("/coupons/codes/", { batch: bid, status: "REDEEMED" }) : 0,
+          bid ? fetchCount("/coupons/codes/", { batch: bid, status: "REVOKED" }) : 0,
+        ]);
 
       setMetrics({
         available,
@@ -511,41 +488,138 @@ export default function AdminECoupons() {
     }
   }
 
+  // Consolidated loaders: bootstrap (static + initial dynamic) and dashboard (dynamic on filter/batch changes)
+  async function loadBootstrap() {
+    setBootstrapLoading(true);
+    setErr("");
+    try {
+      const res = await API.get("/coupons/codes/admin-ecoupons-bootstrap/", {
+        params: { page: assignPage, page_size: assignPageSize },
+      });
+      const d = res?.data || {};
+      setCoupons(Array.isArray(d.coupons) ? d.coupons : []);
+      setBatches(Array.isArray(d.batches) ? d.batches : []);
+      setAgencies(Array.isArray(d.agencies) ? d.agencies : []);
+      setEmployees(Array.isArray(d.employees) ? d.employees : []);
+
+      const defId = d.default_batch_id ? String(d.default_batch_id) : "";
+      setSelectedBatch((prev) => prev || defId);
+      if (!assignForm.batch_id && defId) {
+        setAssignForm((f) => ({ ...f, batch_id: defId }));
+      }
+
+      if (d.metrics) setMetrics(d.metrics);
+      if (d.assignments) {
+        const rows = Array.isArray(d.assignments.results) ? d.assignments.results : [];
+        setAssignments(rows);
+        const total =
+          typeof d.assignments.count === "number"
+            ? d.assignments.count
+            : rows.length;
+        setAssignTotal(total);
+      }
+    } catch (e) {
+      setErr("Failed to load bootstrap data");
+    } finally {
+      setBootstrapLoading(false);
+    }
+  }
+
+  async function loadDashboard(includeSummary = false) {
+    setMetricsLoading(true);
+    setAssignListLoading(true);
+    if (includeSummary) setSummaryLoading(true);
+    try {
+      const payload = {
+        batch: selectedBatch ? parseInt(selectedBatch, 10) : null,
+        assign: {
+          role: assignFilters.role || "",
+          assignee_id: assignFilters.assignee_id ? parseInt(assignFilters.assignee_id, 10) : null,
+          page: assignPage,
+          page_size: assignPageSize,
+        },
+        include_summary: !!includeSummary,
+        summary: { date_from: summaryFrom || "", date_to: summaryTo || "" },
+      };
+      const res = await API.post("/coupons/codes/admin-ecoupons-dashboard/", payload);
+      const d = res?.data || {};
+
+      if (d.metrics) setMetrics(d.metrics);
+
+      if (d.assignments) {
+        const rows = Array.isArray(d.assignments.results) ? d.assignments.results : [];
+        const q = String(assignFilters.search || "").toLowerCase();
+        const filtered = q
+          ? rows.filter((x) =>
+              String(x.assignee_name || "").toLowerCase().includes(q) ||
+              String(x.batch_display || "").toLowerCase().includes(q) ||
+              String(x.assigned_by || "").toLowerCase().includes(q)
+            )
+          : rows;
+        setAssignments(filtered);
+        const total =
+          typeof d.assignments.count === "number"
+            ? d.assignments.count
+            : filtered.length;
+        setAssignTotal(total);
+      }
+
+      if (includeSummary) {
+        const items = d?.summary?.results || [];
+        setSummary(Array.isArray(items) ? items : []);
+        setSummaryError("");
+      }
+    } catch (e) {
+      setErr("Failed to load dashboard");
+      if (includeSummary) setSummaryError("Failed to load agency summary");
+    } finally {
+      setMetricsLoading(false);
+      setAssignListLoading(false);
+      if (includeSummary) setSummaryLoading(false);
+    }
+  }
+
   useEffect(() => {
-    loadCoupons();
-    loadBatches();
-    loadAgencies();
-    loadEmployees();
+    loadBootstrap();
   }, []);
 
   useEffect(() => {
-    loadMetrics();
+    if (!selectedBatch) return;
+    loadDashboard(false);
   }, [selectedBatch]);
 
   useEffect(() => {
-    loadNextStart();
-  }, [assignForm.batch_id, assignForm.assignee_type]);
+    if (!selectedBatch) return;
+    loadDashboard(false);
+  }, [selectedBatch, assignPage, assignPageSize, assignFilters]);
 
   useEffect(() => {
-    loadAssignments();
-  }, [assignPage, assignPageSize, assignFilters]);
-
-  useEffect(() => {
-    loadAssignments();
+    // handled by the combined effect above
   }, [selectedBatch]);
 
   const couponOptions = useMemo(
     () => coupons.map((c) => ({ value: String(c.id), label: `${c.title} (id:${c.id})` })),
     [coupons]
   );
+
+  // Show label with total count when available, fallback to prefix
   const batchOptions = useMemo(
     () =>
-      batches.map((b) => ({
-        value: String(b.id),
-        label: `#${b.id} ${b.prefix}${String(b.serial_start).padStart(b.serial_width, "0")} - ${b.prefix}${String(b.serial_end).padStart(b.serial_width, "0")}`,
-      })),
+      batches.map((b) => {
+        const count =
+          b.total ||
+          b.count ||
+          (typeof b.serial_start === "number" && typeof b.serial_end === "number"
+            ? b.serial_end - b.serial_start + 1
+            : null);
+        return {
+          value: String(b.id),
+          label: `#${b.id} ${b.prefix}${count ? ` (${count} codes)` : ""}`,
+        };
+      }),
     [batches]
   );
+
   const agencyOptions = useMemo(
     () => agencies.map((u) => ({ value: String(u.id), label: `${u.username} #${u.id}` })),
     [agencies]
@@ -560,7 +634,7 @@ export default function AdminECoupons() {
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ margin: 0, color: "#0f172a" }}>E-Coupons</h2>
         <div style={{ color: "#64748b", fontSize: 13 }}>
-          Create e-coupon batches with codes like LDGR + SEQ number, assign to agencies, and view redemption metrics.
+          Create random e-coupon batches (Prefix + 7-char alphanumeric), assign by count to agencies or employees, and view redemption metrics.
         </div>
       </div>
 
@@ -631,7 +705,7 @@ export default function AdminECoupons() {
 
       {/* Create E-Coupon Batch */}
       <Section
-        title="Create E-Coupon Batch (LDGR + SEQ)"
+        title="Create Random E-Coupon Batch (Prefix + 7 chars)"
         extraRight={
           <button
             onClick={createBatch}
@@ -670,22 +744,11 @@ export default function AdminECoupons() {
             placeholder="LDGR"
           />
           <TextInput
-            label="Serial Start"
-            value={batchForm.serial_start}
-            onChange={(v) => setBatchField("serial_start", v)}
-            placeholder="1"
-          />
-          <TextInput
-            label="Serial End"
-            value={batchForm.serial_end}
-            onChange={(v) => setBatchField("serial_end", v)}
-            placeholder="1000"
-          />
-          <TextInput
-            label="Serial Width"
-            value={batchForm.serial_width}
-            onChange={(v) => setBatchField("serial_width", v)}
-            placeholder="6"
+            label="Count"
+            type="number"
+            value={batchForm.count}
+            onChange={(v) => setBatchField("count", v)}
+            placeholder="500"
           />
           <Select
             label="Denomination"
@@ -699,14 +762,13 @@ export default function AdminECoupons() {
           />
         </div>
         <div style={{ color: "#64748b", fontSize: 12, marginTop: 8 }}>
-          Example with prefix={batchForm.prefix || "LDGR"} and width={batchForm.serial_width || 6}:{" "}
-          {(batchForm.prefix || "LDGR") + String(batchForm.serial_start || 1).padStart(parseInt(batchForm.serial_width || "6", 10), "0")}
+          Codes will be generated as {(batchForm.prefix || "LDGR")} + 7 random uppercase alphanumerics (e.g., {`${(batchForm.prefix || "LDGR")}X7K9A2B`}).
         </div>
       </Section>
 
-      {/* Assign to Agency */}
+      {/* Assign to Agency/Employee */}
       <Section
-        title="Assign E-Coupons"
+        title="Assign E-Coupons (Count-based)"
         extraRight={
           <button
             onClick={assignECoupons}
@@ -763,35 +825,15 @@ export default function AdminECoupons() {
             />
           )}
           <TextInput
-            label={`Next Start (auto)${nextStartLoading ? " • loading…" : ""}`}
-            value={nextStart}
-            onChange={() => {}}
-            placeholder="—"
-            style={{ background: "#f8fafc" }}
-          />
-          <TextInput
-            label="Count (optional)"
+            label="Count"
             value={assignForm.count}
             onChange={(v) => setAssignField("count", v)}
             placeholder="e.g., 100"
             type="number"
           />
-          <TextInput
-            label="Serial Start (optional override)"
-            value={assignForm.serial_start}
-            onChange={(v) => setAssignField("serial_start", v)}
-            placeholder="Override start"
-          />
-          <TextInput
-            label="Serial End (optional override)"
-            value={assignForm.serial_end}
-            onChange={(v) => setAssignField("serial_end", v)}
-            placeholder="Override end"
-          />
         </div>
         <div style={{ color: "#64748b", fontSize: 12, marginTop: 8 }}>
-          Leave Count empty to assign a custom range (Serial Start/End). Leave all fields empty to assign all AVAILABLE codes in the batch.
-          If Count is set and overrides are empty, the assigned range will start from “Next Start” and continue sequentially.
+          Assigns the given number of unassigned random codes from the selected batch. Assigned codes will be unique and cannot be re-assigned by other agencies.
         </div>
       </Section>
 
@@ -801,7 +843,7 @@ export default function AdminECoupons() {
         extraRight={
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <button
-              onClick={() => loadAssignments()}
+              onClick={() => loadDashboard(false)}
               disabled={assignListLoading}
               style={{
                 padding: "8px 12px",
@@ -886,7 +928,7 @@ export default function AdminECoupons() {
           <button
             onClick={() => {
               setAssignPage(1);
-              loadAssignments();
+              loadDashboard(false);
             }}
             disabled={assignListLoading}
             style={{
@@ -918,9 +960,7 @@ export default function AdminECoupons() {
           >
             Reset
           </button>
-          <div style={{ color: "#64748b", marginLeft: "auto" }}>
-            {assignTotal} records
-          </div>
+          <div style={{ color: "#64748b", marginLeft: "auto" }}>{assignTotal} records</div>
         </div>
 
         <div
@@ -947,7 +987,7 @@ export default function AdminECoupons() {
             >
               <div>Role</div>
               <div>Assignee</div>
-              <div>Range</div>
+              <div>Range/Info</div>
               <div>Count</div>
               <div>Batch</div>
               <div>Assigned By</div>
@@ -966,8 +1006,15 @@ export default function AdminECoupons() {
                   `#${a.assignee_id || a.agency_id || a.employee_id || ""}`;
                 const start = a.serial_start ?? a.start ?? a.range_start;
                 const end = a.serial_end ?? a.end ?? a.range_end;
-                const count = a.count ?? (typeof start === "number" && typeof end === "number" ? end - start + 1 : "");
-                const batch = a.batch_display || (a.batch && `#${a.batch.id}`) || (a.batch_id ? `#${a.batch_id}` : "");
+                const count =
+                  a.count ??
+                  (typeof start === "number" && typeof end === "number" ? end - start + 1 : "");
+                const info =
+                  typeof start === "number" && typeof end === "number"
+                    ? `${start} - ${end}`
+                    : "Random codes";
+                const batch =
+                  a.batch_display || (a.batch && `#${a.batch.id}`) || (a.batch_id ? `#${a.batch_id}` : "");
                 const by =
                   a.assigned_by_name ||
                   (a.assigned_by && (a.assigned_by.username || a.assigned_by.name)) ||
@@ -987,7 +1034,7 @@ export default function AdminECoupons() {
                   >
                     <div style={{ textTransform: "capitalize" }}>{role || "—"}</div>
                     <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{assignee || "—"}</div>
-                    <div>{(start ?? "—")} - {(end ?? "—")}</div>
+                    <div>{info}</div>
                     <div>{count ?? "—"}</div>
                     <div>{batch || "—"}</div>
                     <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{by || "—"}</div>
@@ -1025,7 +1072,9 @@ export default function AdminECoupons() {
               const maxPage = Math.max(1, Math.ceil(assignTotal / assignPageSize) || 1);
               setAssignPage((p) => Math.min(maxPage, p + 1));
             }}
-            disabled={assignPage >= Math.max(1, Math.ceil(assignTotal / assignPageSize) || 1) || assignListLoading}
+            disabled={
+              assignPage >= Math.max(1, Math.ceil(assignTotal / assignPageSize) || 1) || assignListLoading
+            }
             style={{
               padding: "6px 10px",
               background: "#fff",
@@ -1055,7 +1104,7 @@ export default function AdminECoupons() {
               options={[{ value: "", label: "Select..." }, ...batchOptions]}
             />
             <button
-              onClick={loadMetrics}
+              onClick={() => loadDashboard(false)}
               disabled={metricsLoading}
               style={{
                 padding: "8px 12px",
@@ -1092,22 +1141,120 @@ export default function AdminECoupons() {
           Notes: Redemption counts are computed per selected batch using CouponCode status.
         </div>
       </Section>
-    </div>
-  );
-}
 
-function MetricCard({ label, value }) {
-  return (
-    <div
-      style={{
-        background: "#fff",
-        border: "1px solid #e2e8f0",
-        borderRadius: 10,
-        padding: 12,
-      }}
-    >
-      <div style={{ fontSize: 12, color: "#64748b" }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>{value}</div>
+      {/* Admin: Agency Assignment Summary */}
+      <Section
+        title="Agency Assignment Summary"
+        extraRight={
+          <div style={{ display: "flex", alignItems: "end", gap: 8 }}>
+            <TextInput
+              label="From"
+              type="datetime-local"
+              value={summaryFrom}
+              onChange={setSummaryFrom}
+              placeholder="from"
+              style={{ minWidth: 220 }}
+            />
+            <TextInput
+              label="To"
+              type="datetime-local"
+              value={summaryTo}
+              onChange={setSummaryTo}
+              placeholder="to"
+              style={{ minWidth: 220 }}
+            />
+            <button
+              onClick={loadAgencySummary}
+              disabled={summaryLoading}
+              style={{
+                padding: "8px 12px",
+                background: "#0f172a",
+                color: "#fff",
+                border: 0,
+                borderRadius: 8,
+                cursor: summaryLoading ? "not-allowed" : "pointer",
+                fontWeight: 700,
+                height: 40,
+                alignSelf: "end",
+              }}
+            >
+              {summaryLoading ? "Refreshing..." : "Refresh"}
+            </button>
+          </div>
+        }
+      >
+        {summaryError ? <div style={{ color: "#dc2626", marginBottom: 10 }}>{summaryError}</div> : null}
+        <div
+          style={{
+            border: "1px solid #e2e8f0",
+            borderRadius: 10,
+            overflow: "hidden",
+            background: "#fff",
+          }}
+        >
+          <div style={{ overflowX: "auto" }}>
+            <div
+              style={{
+                minWidth: 1200,
+                display: "grid",
+                gridTemplateColumns: "180px 220px 120px 140px 140px 120px 120px 140px 120px 120px 120px",
+                gap: 8,
+                padding: "10px",
+                background: "#f8fafc",
+                borderBottom: "1px solid #e2e8f0",
+                fontWeight: 700,
+                color: "#0f172a",
+              }}
+            >
+              <div>Username</div>
+              <div>Full Name</div>
+              <div>Pincode</div>
+              <div>City</div>
+              <div>State</div>
+              <div>Available</div>
+              <div>Assigned</div>
+              <div>Assigned Emp</div>
+              <div>Sold</div>
+              <div>Redeemed</div>
+              <div>Total</div>
+            </div>
+            <div>
+              {(summary || []).map((row, idx) => {
+                const counts = row.counts || {};
+                return (
+                  <div
+                    key={row.agency_id || idx}
+                    style={{
+                      minWidth: 1200,
+                      display: "grid",
+                      gridTemplateColumns: "180px 220px 120px 140px 140px 120px 120px 140px 120px 120px 120px",
+                      gap: 8,
+                      padding: "10px",
+                      borderBottom: "1px solid #e2e8f0",
+                    }}
+                  >
+                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{row.username || "—"}</div>
+                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{row.full_name || "—"}</div>
+                    <div>{row.pincode || "—"}</div>
+                    <div>{row.city || "—"}</div>
+                    <div>{row.state || "—"}</div>
+                    <div>{counts.AVAILABLE ?? 0}</div>
+                    <div>{counts.ASSIGNED_AGENCY ?? 0}</div>
+                    <div>{counts.ASSIGNED_EMPLOYEE ?? 0}</div>
+                    <div>{counts.SOLD ?? 0}</div>
+                    <div>{counts.REDEEMED ?? 0}</div>
+                    <div>{row.total ?? 0}</div>
+                  </div>
+                );
+              })}
+              {!summaryLoading && (!summary || summary.length === 0) ? (
+                <div style={{ padding: 12, color: "#64748b" }}>No data</div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </Section>
+
     </div>
   );
 }

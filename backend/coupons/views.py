@@ -1,6 +1,6 @@
 from django.utils import timezone
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Count
 from rest_framework import status, viewsets, mixins
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -171,6 +171,64 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         ser = self.get_serializer(page if page is not None else qs, many=True)
         return self.get_paginated_response(ser.data) if page is not None else Response(ser.data)
 
+    @action(detail=False, methods=["get"], url_path="mine-consumer", permission_classes=[IsAuthenticated])
+    def mine_consumer(self, request):
+        """
+        Consumer: list my e-coupon codes (ownership via assigned_consumer)
+        """
+        if not is_consumer_user(request.user):
+            return Response({"detail": "Only consumers can view their codes."}, status=status.HTTP_403_FORBIDDEN)
+        qs = CouponCode.objects.filter(assigned_consumer=request.user).order_by("-created_at")
+        page = self.paginate_queryset(qs)
+        ser = self.get_serializer(page if page is not None else qs, many=True)
+        return self.get_paginated_response(ser.data) if page is not None else Response(ser.data)
+
+    @action(detail=False, methods=["get"], url_path="consumer-summary", permission_classes=[IsAuthenticated])
+    def consumer_summary(self, request):
+        """
+        Consumer summary tailored for My E‑Coupons:
+          - available: codes assigned to me and not yet activated (status SOLD minus my activation count)
+          - redeemed: codes assigned to me with status REDEEMED
+          - activated: number of activation audits by me
+          - transferred: number of transfers initiated by me
+        """
+        if not is_consumer_user(request.user):
+            return Response({"detail": "Only consumers can access."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Base counts by assignment to this consumer
+        assigned_qs = CouponCode.objects.filter(assigned_consumer=request.user)
+        try:
+            available_assigned = assigned_qs.filter(status="SOLD").count()
+        except Exception:
+            available_assigned = 0
+        try:
+            redeemed_assigned = assigned_qs.filter(status="REDEEMED").count()
+        except Exception:
+            redeemed_assigned = 0
+
+        # Audits for actions taken by this consumer
+        try:
+            activated_count = AuditTrail.objects.filter(action="coupon_activated", actor=request.user).count()
+        except Exception:
+            activated_count = 0
+        try:
+            transferred_count = AuditTrail.objects.filter(action="consumer_transfer", actor=request.user).count()
+        except Exception:
+            transferred_count = 0
+
+        # Available excludes those already activated
+        available_final = available_assigned - activated_count
+        if available_final < 0:
+            available_final = 0
+
+        summary = {
+            "available": available_final,
+            "redeemed": redeemed_assigned,
+            "activated": activated_count,
+            "transferred": transferred_count,
+        }
+        return Response(summary, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=["get"], url_path="my-ranges", permission_classes=[IsAuthenticated])
     def my_ranges(self, request):
         """
@@ -257,8 +315,8 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     def assign_consumer(self, request, pk=None):
         """
         Employee or Agency assigns an e-coupon code to a Consumer.
-        This creates a CouponSubmission on behalf of the consumer in SUBMITTED state
-        so the normal review/commission/wallet signal flow proceeds.
+        This directly assigns ownership to the consumer and marks the code SOLD.
+        No submissions or approvals are created for e-coupons.
         Body: { "consumer_username": "U123456", "pincode": "585101", "notes": "optional" }
         """
         # Employees and Agencies can assign to consumers
@@ -299,35 +357,22 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         if not consumer or not is_consumer_user(consumer):
             return Response({"consumer_username": ["Consumer not found or invalid."]}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Prevent multiple open submissions for this code
-        open_exists = CouponSubmission.objects.filter(code_ref=code, status__in=("SUBMITTED", "EMPLOYEE_APPROVED")).exists()
-        if open_exists:
-            return Response({"detail": "There is already an open submission for this code."}, status=status.HTTP_400_BAD_REQUEST)
-
         with transaction.atomic():
-            sub = CouponSubmission.objects.create(
-                consumer=consumer,
-                coupon=code.coupon,
-                coupon_code=code.code,
-                code_ref=code,
-                pincode=pincode,
-                notes=notes,
-                status="SUBMITTED",
-            )
-            # Mark code as SOLD (distributed to consumer)
+            # Directly assign to consumer and mark SOLD
+            code.assigned_consumer = consumer
             code.mark_sold()
-            code.save(update_fields=["status"])
+            code.save(update_fields=["assigned_consumer", "status"])
 
             AuditTrail.objects.create(
                 action="assigned_to_consumer",
                 actor=request.user,
                 coupon_code=code,
-                submission=sub,
-                metadata={"consumer_username": consumer.username},
+                notes=notes,
+                metadata={"consumer_username": consumer.username, "pincode": pincode},
             )
 
-        ser = CouponSubmissionSerializer(sub)
-        return Response(ser.data, status=status.HTTP_201_CREATED)
+        data = CouponCodeSerializer(code).data
+        return Response(data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"], url_path="revoke", permission_classes=[IsAuthenticated])
     def revoke(self, request, pk=None):
@@ -364,6 +409,452 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         return Response({"detail": "Code revoked."}, status=status.HTTP_200_OK)
 
 
+    @action(detail=False, methods=["get"], url_path="resolve-user", permission_classes=[IsAuthenticated])
+    def resolve_user(self, request):
+        username = str(request.query_params.get("username") or "").strip()
+        if not username:
+            return Response({"username": ["This field is required."]}, status=status.HTTP_400_BAD_REQUEST)
+        u = CustomUser.objects.filter(username__iexact=username).first()
+        if not u:
+            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+        out = {
+            "id": u.id,
+            "username": u.username,
+            "full_name": getattr(u, "full_name", "") or "",
+            "pincode": getattr(u, "pincode", "") or "",
+            "city": getattr(getattr(u, "city", None), "name", None),
+            "state": getattr(getattr(u, "state", None), "name", None),
+            "role": getattr(u, "role", None),
+            "category": getattr(u, "category", None),
+        }
+        return Response(out, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="transfer", permission_classes=[IsAuthenticated])
+    def transfer(self, request, pk=None):
+        # Consumers can transfer their owned (SOLD) e-coupon to another consumer (no approvals)
+        if not is_consumer_user(request.user):
+            return Response({"detail": "Only consumers can transfer codes."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            code = self.get_object()
+        except Exception:
+            return Response({"detail": "Code not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Must be owner and not redeemed
+        if code.assigned_consumer_id != request.user.id:
+            return Response({"detail": "You do not own this code."}, status=status.HTTP_403_FORBIDDEN)
+        if code.status == "REDEEMED":
+            return Response({"detail": "Redeemed codes cannot be transferred."}, status=status.HTTP_400_BAD_REQUEST)
+
+        to_username = str(request.data.get("to_username") or "").strip()
+        if not to_username:
+            return Response({"to_username": ["This field is required."]}, status=status.HTTP_400_BAD_REQUEST)
+        new_consumer = CustomUser.objects.filter(username__iexact=to_username).first()
+        if not new_consumer or not is_consumer_user(new_consumer):
+            return Response({"to_username": ["Target consumer not found or invalid."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        pincode = (request.data.get("pincode") or "").strip()
+        notes = (request.data.get("notes") or "").strip()
+
+        with transaction.atomic():
+            prev_user = request.user
+            code.assigned_consumer = new_consumer
+            # Remain SOLD while transferring ownership
+            code.save(update_fields=["assigned_consumer"])
+
+            AuditTrail.objects.create(
+                action="consumer_transfer",
+                actor=prev_user,
+                coupon_code=code,
+                notes=notes,
+                metadata={"from": prev_user.username, "to": new_consumer.username, "pincode": pincode},
+            )
+
+        return Response(CouponCodeSerializer(code).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["get"], url_path="agency-summary", permission_classes=[IsAuthenticated])
+    def agency_summary(self, request):
+        if not is_agency_user(request.user):
+            return Response({"detail": "Only agency users can access."}, status=status.HTTP_403_FORBIDDEN)
+
+        agg = (CouponCode.objects
+               .filter(assigned_agency=request.user)
+               .values("status")
+               .annotate(c=Count("id")))
+
+        metrics = {"available": 0, "assigned_employee": 0, "sold": 0, "redeemed": 0, "revoked": 0}
+        total = 0
+        for row in agg:
+            st = (row.get("status") or "").upper()
+            if st == "ASSIGNED_AGENCY":
+                metrics["available"] = row["c"]
+            elif st == "ASSIGNED_EMPLOYEE":
+                metrics["assigned_employee"] = row["c"]
+            elif st == "SOLD":
+                metrics["sold"] = row["c"]
+            elif st == "REDEEMED":
+                metrics["redeemed"] = row["c"]
+            elif st == "REVOKED":
+                metrics["revoked"] = row["c"]
+            total += int(row["c"] or 0)
+        metrics["total"] = total
+        return Response(metrics, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="admin-agency-assignment-summary", permission_classes=[IsAuthenticated])
+    def admin_agency_assignment_summary(self, request):
+        if not is_admin_user(request.user):
+            return Response({"detail": "Only admin can view this summary."}, status=status.HTTP_403_FORBIDDEN)
+
+        batch_id = request.query_params.get("batch")
+        date_from = request.query_params.get("date_from")
+        date_to = request.query_params.get("date_to")
+
+        qs = CouponCode.objects.filter(assigned_agency__isnull=False)
+        if batch_id:
+            qs = qs.filter(batch_id=batch_id)
+        if date_from:
+            try:
+                qs = qs.filter(created_at__gte=date_from)
+            except Exception:
+                pass
+        if date_to:
+            try:
+                qs = qs.filter(created_at__lte=date_to)
+            except Exception:
+                pass
+
+        by_agency = {}
+        for c in qs.only("id", "assigned_agency_id", "status").select_related("assigned_agency__city", "assigned_agency__state"):
+            aid = c.assigned_agency_id
+            if aid not in by_agency:
+                u = c.assigned_agency
+                by_agency[aid] = {
+                    "agency_id": aid,
+                    "username": getattr(u, "username", None),
+                    "full_name": getattr(u, "full_name", "") or "",
+                    "pincode": getattr(u, "pincode", "") or "",
+                    "city": getattr(getattr(u, "city", None), "name", None),
+                    "state": getattr(getattr(u, "state", None), "name", None),
+                    "counts": {"AVAILABLE": 0, "ASSIGNED_AGENCY": 0, "ASSIGNED_EMPLOYEE": 0, "SOLD": 0, "REDEEMED": 0, "REVOKED": 0},
+                    "total": 0,
+                }
+            entry = by_agency[aid]
+            st = c.status or "AVAILABLE"
+            if st not in entry["counts"]:
+                entry["counts"][st] = 0
+            entry["counts"][st] += 1
+            entry["total"] += 1
+
+        return Response({"results": list(by_agency.values())}, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="admin-ecoupons-bootstrap", permission_classes=[IsAuthenticated])
+    def admin_ecoupons_bootstrap(self, request):
+        if not is_admin_user(request.user):
+            return Response({"detail": "Only admin can access."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Reference lists (lean payloads)
+        coupons = list(Coupon.objects.only("id", "title", "campaign").order_by("-created_at").values("id", "title", "campaign"))
+        batches_qs = CouponBatch.objects.only("id", "prefix", "serial_start", "serial_end", "created_at").order_by("-created_at")
+        batches = []
+        for b in batches_qs:
+            total = None
+            try:
+                if b.serial_start is not None and b.serial_end is not None:
+                    total = int(b.serial_end) - int(b.serial_start) + 1
+            except Exception:
+                total = None
+            batches.append({
+                "id": b.id,
+                "prefix": b.prefix,
+                "serial_start": b.serial_start,
+                "serial_end": b.serial_end,
+                "created_at": b.created_at,
+                "total": total,
+            })
+
+        agencies = list(
+            CustomUser.objects.filter(Q(role="agency") | Q(category__startswith="agency"))
+            .only("id", "username").order_by("id").values("id", "username")
+        )
+        employees = list(
+            CustomUser.objects.filter(Q(role="employee") | Q(category="employee"))
+            .only("id", "username").order_by("id").values("id", "username")
+        )
+
+        default_batch_id = batches[0]["id"] if batches else None
+
+        # Metrics for default batch
+        metrics = {"available": 0, "assigned_agency": 0, "assigned_employee": 0, "sold": 0, "redeemed": 0, "revoked": 0}
+        if default_batch_id:
+            agg = CouponCode.objects.filter(batch_id=default_batch_id).values("status").annotate(c=Count("id"))
+            for row in agg:
+                st = (row["status"] or "").upper()
+                if st == "AVAILABLE": metrics["available"] = row["c"]
+                elif st == "ASSIGNED_AGENCY": metrics["assigned_agency"] = row["c"]
+                elif st == "ASSIGNED_EMPLOYEE": metrics["assigned_employee"] = row["c"]
+                elif st == "SOLD": metrics["sold"] = row["c"]
+                elif st == "REDEEMED": metrics["redeemed"] = row["c"]
+                elif st == "REVOKED": metrics["revoked"] = row["c"]
+
+        # Assignment history (flattened)
+        def flatten_assignments(qs):
+            out = []
+            for r in qs:
+                action = r.action or ""
+                meta = r.metadata or {}
+                by = getattr(r.actor, "username", None)
+                at = r.created_at
+                batch_id = r.batch_id
+
+                if action == "bulk_assigned_to_employees" and isinstance(meta.get("assignments"), list):
+                    for it in meta["assignments"]:
+                        out.append({
+                            "id": f"{action}-{batch_id}-{it.get('employee_id')}-{at.isoformat() if at else ''}",
+                            "role": "employee",
+                            "assignee_id": it.get("employee_id"),
+                            "assignee_name": f"Employee #{it.get('employee_id')}",
+                            "serial_start": None,
+                            "serial_end": None,
+                            "count": it.get("count"),
+                            "batch_display": f"#{batch_id}" if batch_id else "",
+                            "assigned_by": by,
+                            "assigned_at": at,
+                            "info": "Random codes",
+                        })
+                    continue
+
+                role = "employee" if "employee" in action else "agency"
+                assignee_id = meta.get("employee_id") if role == "employee" else meta.get("agency_id")
+                count = meta.get("count") or meta.get("total_assigned")
+                s_range = meta.get("serial_range")
+                if isinstance(s_range, list) and len(s_range) == 2 and all(isinstance(x, int) for x in s_range):
+                    start, end = s_range
+                    info = f"{start} - {end}"
+                    if count is None:
+                        count = (end - start + 1)
+                    serial_start, serial_end = start, end
+                else:
+                    info = "Random codes"
+                    serial_start = serial_end = None
+
+                out.append({
+                    "id": f"{action}-{batch_id}-{assignee_id or ''}-{at.isoformat() if at else ''}",
+                    "role": role,
+                    "assignee_id": assignee_id,
+                    "assignee_name": (f"{'Employee' if role=='employee' else 'Agency'} #{assignee_id}") if assignee_id else None,
+                    "serial_start": serial_start,
+                    "serial_end": serial_end,
+                    "count": count,
+                    "batch_display": f"#{batch_id}" if batch_id else "",
+                    "assigned_by": by,
+                    "assigned_at": at,
+                    "info": info,
+                })
+            return out
+
+        page = int(request.query_params.get("page") or 1)
+        page_size = int(request.query_params.get("page_size") or 25)
+        start = (page - 1) * page_size
+        end = start + page_size
+        actions = [
+            "assigned_to_agency", "assigned_to_agency_by_count",
+            "assigned_to_employee", "bulk_assigned_to_employees",
+            "bulk_assigned_to_agencies", "agency_assigned_to_employee_by_count",
+            "admin_assigned_to_employee_by_count",
+        ]
+        assign_qs = AuditTrail.objects.filter(action__in=actions)
+        if default_batch_id:
+            assign_qs = assign_qs.filter(batch_id=default_batch_id)
+        assign_qs = assign_qs.select_related("actor", "batch").order_by("-created_at")
+        total_assign = assign_qs.count()
+        page_items = list(assign_qs[start:end])
+        flat = flatten_assignments(page_items)
+
+        out = {
+            "coupons": coupons,
+            "batches": batches,
+            "agencies": agencies,
+            "employees": employees,
+            "default_batch_id": default_batch_id,
+            "metrics": metrics,
+            "assignments": {
+                "results": flat,
+                "count": total_assign,
+                "page": page,
+                "page_size": page_size,
+            },
+        }
+        return Response(out, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["post"], url_path="admin-ecoupons-dashboard", permission_classes=[IsAuthenticated])
+    def admin_ecoupons_dashboard(self, request):
+        if not is_admin_user(request.user):
+            return Response({"detail": "Only admin can access."}, status=status.HTTP_403_FORBIDDEN)
+
+        batch_id = request.data.get("batch")
+        try:
+            batch_id = int(batch_id) if batch_id else None
+        except Exception:
+            batch_id = None
+
+        assign_payload = request.data.get("assign") or {}
+        page = int(assign_payload.get("page") or 1)
+        page_size = int(assign_payload.get("page_size") or 25)
+        role_filter = (assign_payload.get("role") or "").strip().lower()
+        assignee_id = assign_payload.get("assignee_id")
+        try:
+            assignee_id = int(assignee_id) if assignee_id else None
+        except Exception:
+            assignee_id = None
+
+        include_summary = bool(request.data.get("include_summary"))
+        summary_filters = request.data.get("summary") or {}
+        date_from = summary_filters.get("date_from") or None
+        date_to = summary_filters.get("date_to") or None
+
+        # Metrics
+        metrics = {"available": 0, "assigned_agency": 0, "assigned_employee": 0, "sold": 0, "redeemed": 0, "revoked": 0}
+        if batch_id:
+            agg = CouponCode.objects.filter(batch_id=batch_id).values("status").annotate(c=Count("id"))
+            for row in agg:
+                st = (row["status"] or "").upper()
+                if st == "AVAILABLE": metrics["available"] = row["c"]
+                elif st == "ASSIGNED_AGENCY": metrics["assigned_agency"] = row["c"]
+                elif st == "ASSIGNED_EMPLOYEE": metrics["assigned_employee"] = row["c"]
+                elif st == "SOLD": metrics["sold"] = row["c"]
+                elif st == "REDEEMED": metrics["redeemed"] = row["c"]
+                elif st == "REVOKED": metrics["revoked"] = row["c"]
+
+        # Assignments (flattened)
+        def flatten_assignments(qs):
+            out = []
+            for r in qs:
+                action = r.action or ""
+                meta = r.metadata or {}
+                by = getattr(r.actor, "username", None)
+                at = r.created_at
+                b_id = r.batch_id
+
+                if action == "bulk_assigned_to_employees" and isinstance(meta.get("assignments"), list):
+                    for it in meta["assignments"]:
+                        out.append({
+                            "id": f"{action}-{b_id}-{it.get('employee_id')}-{at.isoformat() if at else ''}",
+                            "role": "employee",
+                            "assignee_id": it.get("employee_id"),
+                            "assignee_name": f"Employee #{it.get('employee_id')}",
+                            "serial_start": None,
+                            "serial_end": None,
+                            "count": it.get("count"),
+                            "batch_display": f"#{b_id}" if b_id else "",
+                            "assigned_by": by,
+                            "assigned_at": at,
+                            "info": "Random codes",
+                        })
+                    continue
+
+                role = "employee" if "employee" in action else "agency"
+                assignee = meta.get("employee_id") if role == "employee" else meta.get("agency_id")
+                cnt = meta.get("count") or meta.get("total_assigned")
+                s_range = meta.get("serial_range")
+                if isinstance(s_range, list) and len(s_range) == 2 and all(isinstance(x, int) for x in s_range):
+                    start, end = s_range
+                    info = f"{start} - {end}"
+                    if cnt is None:
+                        cnt = (end - start + 1)
+                    s_start, s_end = start, end
+                else:
+                    info = "Random codes"
+                    s_start = s_end = None
+
+                out.append({
+                    "id": f"{action}-{b_id}-{assignee or ''}-{at.isoformat() if at else ''}",
+                    "role": role,
+                    "assignee_id": assignee,
+                    "assignee_name": (f"{'Employee' if role=='employee' else 'Agency'} #{assignee}") if assignee else None,
+                    "serial_start": s_start,
+                    "serial_end": s_end,
+                    "count": cnt,
+                    "batch_display": f"#{b_id}" if b_id else "",
+                    "assigned_by": by,
+                    "assigned_at": at,
+                    "info": info,
+                })
+            return out
+
+        actions = [
+            "assigned_to_agency", "assigned_to_agency_by_count",
+            "assigned_to_employee", "bulk_assigned_to_employees",
+            "bulk_assigned_to_agencies", "agency_assigned_to_employee_by_count",
+            "admin_assigned_to_employee_by_count",
+        ]
+        aq = AuditTrail.objects.filter(action__in=actions).select_related("actor", "batch")
+        if batch_id:
+            aq = aq.filter(batch_id=batch_id)
+        if role_filter in ("agency", "employee"):
+            if role_filter == "employee":
+                aq = aq.filter(Q(action__icontains="employee") | Q(metadata__has_key="employee_id"))
+            else:
+                aq = aq.exclude(Q(action__icontains="employee") | Q(metadata__has_key="employee_id"))
+        if assignee_id:
+            # Try both agency and employee keys in metadata
+            aq = aq.filter(Q(metadata__employee_id=assignee_id) | Q(metadata__agency_id=assignee_id))
+
+        aq = aq.order_by("-created_at")
+        total = aq.count()
+        start = (page - 1) * page_size
+        items = list(aq[start:start + page_size])
+        flat = flatten_assignments(items)
+
+        out = {
+            "metrics": metrics,
+            "assignments": {
+                "results": flat,
+                "count": total,
+                "page": page,
+                "page_size": page_size,
+            },
+        }
+
+        if include_summary:
+            qs = CouponCode.objects.filter(assigned_agency__isnull=False)
+            if batch_id:
+                qs = qs.filter(batch_id=batch_id)
+            if date_from:
+                try:
+                    qs = qs.filter(created_at__gte=date_from)
+                except Exception:
+                    pass
+            if date_to:
+                try:
+                    qs = qs.filter(created_at__lte=date_to)
+                except Exception:
+                    pass
+
+            by_agency = {}
+            for c in qs.only("id", "assigned_agency_id", "status").select_related("assigned_agency__city", "assigned_agency__state"):
+                aid = c.assigned_agency_id
+                if aid not in by_agency:
+                    u = c.assigned_agency
+                    by_agency[aid] = {
+                        "agency_id": aid,
+                        "username": getattr(u, "username", None),
+                        "full_name": getattr(u, "full_name", "") or "",
+                        "pincode": getattr(u, "pincode", "") or "",
+                        "city": getattr(getattr(u, "city", None), "name", None),
+                        "state": getattr(getattr(u, "state", None), "name", None),
+                        "counts": {"AVAILABLE": 0, "ASSIGNED_AGENCY": 0, "ASSIGNED_EMPLOYEE": 0, "SOLD": 0, "REDEEMED": 0, "REVOKED": 0},
+                        "total": 0,
+                    }
+                entry = by_agency[aid]
+                st = c.status or "AVAILABLE"
+                if st not in entry["counts"]:
+                    entry["counts"][st] = 0
+                entry["counts"][st] += 1
+                entry["total"] += 1
+
+            out["summary"] = {"results": list(by_agency.values())}
+
+        return Response(out, status=status.HTTP_200_OK)
+
 class CouponBatchViewSet(mixins.CreateModelMixin,
                          mixins.ListModelMixin,
                          mixins.RetrieveModelMixin,
@@ -371,6 +862,103 @@ class CouponBatchViewSet(mixins.CreateModelMixin,
     queryset = CouponBatch.objects.select_related("coupon", "created_by").all()
     serializer_class = CouponBatchSerializer
     permission_classes = [IsAuthenticated]
+
+    @action(detail=False, methods=["post"], url_path="create-ecoupons", permission_classes=[IsAuthenticated])
+    def create_ecoupons(self, request):
+        """
+        Admin creates a random e-coupon batch by count.
+        Body:
+        {
+          "coupon": <coupon_id>,
+          "count": 500,
+          "value": 150,              # optional; defaults to 150; allowed: 50, 150, 750
+          "prefix": "LDGR"           # optional, defaults to 'LDGR'
+        }
+        Generates codes like: LDGR + 7-char uppercase alphanumeric (e.g., LDGRX7K9A2B).
+        """
+        if not is_admin_user(request.user):
+            return Response({"detail": "Only admin can create e-coupon batches."}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            coupon_id = int(request.data.get("coupon"))
+        except Exception:
+            return Response({"coupon": ["This field is required (integer)."]}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            count = int(request.data.get("count"))
+        except Exception:
+            return Response({"count": ["This field is required (integer)."]}, status=status.HTTP_400_BAD_REQUEST)
+        if count <= 0:
+            return Response({"count": ["Must be > 0."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Denomination support: accept 50, 150, 750 (fallback to 150)
+        value_param = request.data.get("value") or request.data.get("denomination") or request.data.get("amount")
+        try:
+            code_value = int(float(value_param)) if value_param is not None else 150
+        except Exception:
+            code_value = 150
+        if code_value not in (50, 150, 750):
+            code_value = 150
+
+        prefix = (str(request.data.get("prefix") or "LDGR")).strip().upper() or "LDGR"
+
+        # Resolve coupon
+        try:
+            coupon = Coupon.objects.get(id=coupon_id)
+        except Coupon.DoesNotExist:
+            return Response({"coupon": ["Invalid coupon id."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            # Create a grouping batch record (serials are placeholders; codes will not use serial)
+            batch = CouponBatch.objects.create(
+                coupon=coupon,
+                prefix=prefix,
+                serial_start=1,
+                serial_end=count,
+                serial_width=0,
+                created_by=request.user,
+            )
+
+            # Generate unique random codes: PREFIX + 7-char A-Z0-9
+            import random, string
+            alphabet = string.ascii_uppercase + string.digits
+
+            def gen_one():
+                return prefix + "".join(random.choices(alphabet, k=7))
+
+            to_create = []
+            # Prefetch existing codes with this prefix to reduce collisions
+            existing = set(CouponCode.objects.filter(code__startswith=prefix).values_list("code", flat=True))
+            seen = set()
+            while len(to_create) < count:
+                candidate = gen_one()
+                if candidate in existing or candidate in seen:
+                    continue
+                seen.add(candidate)
+                to_create.append(CouponCode(
+                    code=candidate,
+                    coupon=coupon,
+                    issued_channel="e_coupon",
+                    assigned_employee=None,
+                    assigned_agency=None,
+                    batch=batch,
+                    serial=None,
+                    value=code_value,
+                    issued_by=request.user,
+                    status="AVAILABLE",
+                ))
+
+            if to_create:
+                CouponCode.objects.bulk_create(to_create, batch_size=1000)
+
+            AuditTrail.objects.create(
+                action="batch_created_random_ecoupons",
+                actor=request.user,
+                batch=batch,
+                notes=f"Generated {len(to_create)} random e-codes",
+                metadata={"prefix": prefix, "count": len(to_create), "value": code_value},
+            )
+
+        return Response(self.get_serializer(batch).data, status=status.HTTP_201_CREATED)
 
     def get_queryset(self):
         # Admin sees all; agency/employee can see for visibility (reporting)
@@ -521,7 +1109,7 @@ class CouponBatchViewSet(mixins.CreateModelMixin,
         if not agency_list:
             return Response({"detail": "No agencies found to assign."}, status=status.HTTP_400_BAD_REQUEST)
 
-        code_ids = list(CouponCode.objects.filter(batch=batch, status="AVAILABLE").order_by("serial").values_list("id", flat=True))
+        code_ids = list(CouponCode.objects.filter(batch=batch, status="AVAILABLE").order_by("serial", "id").values_list("id", flat=True))
 
         result = {}
         idx = 0
@@ -631,7 +1219,7 @@ class CouponBatchViewSet(mixins.CreateModelMixin,
             batch=batch,
             assigned_agency=request.user,
             status="ASSIGNED_AGENCY",
-        ).order_by("serial").values_list("id", flat=True))
+        ).order_by("serial", "id").values_list("id", flat=True))
 
         result = {}
         idx = 0
@@ -683,7 +1271,7 @@ class CouponBatchViewSet(mixins.CreateModelMixin,
         code_ids = list(
             CouponCode.objects
             .filter(batch=batch, status="AVAILABLE")
-            .order_by("serial")
+            .order_by("serial", "id")
             .values_list("id", flat=True)[:count]
         )
         if not code_ids:
@@ -731,7 +1319,7 @@ class CouponBatchViewSet(mixins.CreateModelMixin,
         code_ids = list(
             CouponCode.objects
             .filter(batch=batch, status="AVAILABLE", assigned_agency__isnull=True, assigned_employee__isnull=True)
-            .order_by("serial")
+            .order_by("serial", "id")
             .values_list("id", flat=True)[:count]
         )
         if not code_ids:
@@ -779,7 +1367,7 @@ class CouponBatchViewSet(mixins.CreateModelMixin,
         pool_ids = list(
             CouponCode.objects
             .filter(batch=batch, assigned_agency=request.user, assigned_employee__isnull=True, status="ASSIGNED_AGENCY")
-            .order_by("serial")
+            .order_by("serial", "id")
             .values_list("id", flat=True)[:count]
         )
         if not pool_ids:
@@ -873,6 +1461,31 @@ class CouponSubmissionViewSet(
         instance = serializer.save()
         return Response(self.get_serializer(instance).data, status=status.HTTP_201_CREATED)
 
+    @action(detail=False, methods=["get"], url_path="my-summary", permission_classes=[IsAuthenticated])
+    def my_summary(self, request):
+        if not is_consumer_user(request.user):
+            return Response({"detail": "Only consumers can access."}, status=status.HTTP_403_FORBIDDEN)
+
+        agg = (CouponSubmission.objects
+               .filter(consumer=request.user)
+               .values("status")
+               .annotate(c=Count("id")))
+        summary = {"submitted": 0, "employee_approved": 0, "agency_approved": 0, "rejected": 0}
+        for row in agg:
+            st = (row.get("status") or "").upper()
+            if st == "SUBMITTED":
+                summary["submitted"] = row["c"]
+            elif st == "EMPLOYEE_APPROVED":
+                summary["employee_approved"] = row["c"]
+            elif st == "AGENCY_APPROVED":
+                summary["agency_approved"] = row["c"]
+            elif st == "REJECTED":
+                summary["rejected"] = row["c"]
+
+        transferred = AuditTrail.objects.filter(action="consumer_transfer", actor=request.user).count()
+        summary["transferred"] = transferred
+        return Response(summary, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=["get"], url_path="my", permission_classes=[IsAuthenticated])
     def my_submissions(self, request):
         qs = CouponSubmission.objects.filter(consumer=request.user).order_by("-created_at")
@@ -888,7 +1501,7 @@ class CouponSubmissionViewSet(
             Q(code_ref__assigned_employee=request.user) |
             Q(coupon__assignment__employee=request.user),
             status="SUBMITTED"
-        ).order_by("-created_at")
+        ).exclude(code_ref__issued_channel="e_coupon").order_by("-created_at")
         page = self.paginate_queryset(qs)
         ser = self.get_serializer(page if page is not None else qs, many=True)
         return self.get_paginated_response(ser.data) if page is not None else Response(ser.data)
@@ -905,7 +1518,7 @@ class CouponSubmissionViewSet(
                 code_ref__assigned_agency=request.user,
             ),
             pincode=request.user.pincode,
-        ).order_by("-created_at")
+        ).exclude(code_ref__issued_channel="e_coupon").order_by("-created_at")
         page = self.paginate_queryset(qs)
         ser = self.get_serializer(page if page is not None else qs, many=True)
         return self.get_paginated_response(ser.data) if page is not None else Response(ser.data)
@@ -1164,6 +1777,22 @@ class CouponActivateView(APIView):
             ensure_first_purchase_activation(request.user, {"type": "coupon_first_purchase", **source})
         except Exception:
             pass
+        # Record activation audit for e-coupons (no approval flow)
+        try:
+            code_str = str(source.get("code") or "").strip()
+            ch = str(source.get("channel") or "")
+            if code_str and ch == "e_coupon":
+                code_obj = CouponCode.objects.filter(code=code_str).first()
+                if code_obj and code_obj.assigned_consumer_id == request.user.id:
+                    AuditTrail.objects.create(
+                        action="coupon_activated",
+                        actor=request.user,
+                        coupon_code=code_obj,
+                        notes="",
+                        metadata={"type": t},
+                    )
+        except Exception:
+            pass
         return Response({"activated": bool(ok), "detail": f"Coupon {t} activation processed."}, status=status.HTTP_200_OK)
 
 
@@ -1187,4 +1816,22 @@ class CouponRedeemView(APIView):
         if t != "150":
             return Response({"detail": "Only type '150' is supported for redeem."}, status=status.HTTP_400_BAD_REQUEST)
         ok = redeem_150(request.user, {"type": "coupon_150_redeem", **source})
+        # Mark code redeemed and audit for e-coupons (no approval flow)
+        try:
+            code_str = str(source.get("code") or "").strip()
+            ch = str(source.get("channel") or "")
+            if code_str and ch == "e_coupon":
+                code_obj = CouponCode.objects.filter(code=code_str).first()
+                if code_obj and code_obj.assigned_consumer_id == request.user.id and code_obj.status != "REDEEMED":
+                    code_obj.mark_redeemed()
+                    code_obj.save(update_fields=["status"])
+                    AuditTrail.objects.create(
+                        action="coupon_redeemed",
+                        actor=request.user,
+                        coupon_code=code_obj,
+                        notes="",
+                        metadata={"type": t},
+                    )
+        except Exception:
+            pass
         return Response({"redeemed": bool(ok), "detail": "Coupon 150 redeem processed."}, status=status.HTTP_200_OK)

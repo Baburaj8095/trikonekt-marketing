@@ -10,6 +10,17 @@ import {
   Alert,
   MenuItem,
   Grid,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  TableContainer,
+  CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 import API from "../api/api";
 
@@ -58,6 +69,121 @@ export default function ConsumerCoupon() {
   const [mySubs, setMySubs] = useState([]);
   const [loadingSubs, setLoadingSubs] = useState(false);
   const [errorSubs, setErrorSubs] = useState("");
+  // Summary of my submissions
+  const [mySummary, setMySummary] = useState(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [errorSummary, setErrorSummary] = useState("");
+
+  // My owned E‑Coupons (direct assignments)
+  const [myCodes, setMyCodes] = useState([]);
+  const [codesLoading, setCodesLoading] = useState(false);
+  const [codesError, setCodesError] = useState("");
+  // Inline transfer per owned code id
+  const [transferCodeForms, setTransferCodeForms] = useState({});
+  const [transferCodeBusy, setTransferCodeBusy] = useState({});
+  const [activateCodeBusy, setActivateCodeBusy] = useState({});
+
+  // Transfer dialog (consumer -> consumer)
+  const [transferDialog, setTransferDialog] = useState({
+    open: false,
+    code: null,
+    username: "",
+    userInfo: null,
+    resolving: false,
+    submitting: false,
+    error: "",
+  });
+
+  const openTransferDialog = (code) => {
+    setTransferDialog({
+      open: true,
+      code,
+      username: "",
+      userInfo: null,
+      resolving: false,
+      submitting: false,
+      error: "",
+    });
+  };
+
+  const closeTransferDialog = () => setTransferDialog((d) => ({ ...d, open: false }));
+
+  const resolveUsername = async () => {
+    const u = String(transferDialog.username || "").trim();
+    if (!u) return;
+    try {
+      setTransferDialog((d) => ({ ...d, resolving: true, error: "" }));
+      const res = await API.get("/coupons/codes/resolve-user", { params: { username: u } });
+      setTransferDialog((d) => ({ ...d, resolving: false, userInfo: res.data || null }));
+    } catch (e) {
+      const msg = e?.response?.data?.detail || "User not found.";
+      setTransferDialog((d) => ({ ...d, resolving: false, userInfo: null, error: msg }));
+    }
+  };
+
+  const submitTransfer = async () => {
+    const codeId = transferDialog?.code?.id;
+    const u = String(transferDialog.username || "").trim();
+    if (!codeId || !u) {
+      try { alert("Enter TR Username."); } catch {}
+      return;
+    }
+    try {
+      setTransferDialog((d) => ({ ...d, submitting: true, error: "" }));
+      await API.post(`/coupons/codes/${codeId}/transfer/`, { to_username: u });
+      try { alert("Transfer successful."); } catch {}
+      setTransferDialog((d) => ({ ...d, submitting: false, open: false }));
+      await loadMyCodes();
+      await loadMySummary();
+    } catch (e) {
+      const err = e?.response?.data;
+      const msg = (typeof err === "string" ? err : (err?.detail || JSON.stringify(err || {}))) || "Transfer failed.";
+      setTransferDialog((d) => ({ ...d, submitting: false, error: msg }));
+    }
+  };
+
+  // Inline transfer forms per submission id
+  const [transferForms, setTransferForms] = useState({});
+  const [transferBusy, setTransferBusy] = useState({});
+
+  const useSubmissionCode = (s) => {
+    if (!s?.coupon_code) return;
+    setForm((f) => ({ ...f, channel: "e_coupon", coupon_code: s.coupon_code }));
+    try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch {}
+  };
+
+  const onTransferChange = (id, field, value) => {
+    setTransferForms((m) => ({ ...m, [id]: { ...(m[id] || {}), [field]: value } }));
+  };
+
+  const doTransfer = async (s) => {
+    const id = s?.id;
+    if (!id || !s?.code_ref) return;
+    const data = transferForms[id] || {};
+    const to = String(data.to_username || "").trim();
+    if (!to) {
+      alert("Enter target TR username.");
+      return;
+    }
+    try {
+      setTransferBusy((m) => ({ ...m, [id]: true }));
+      await API.post(`/coupons/codes/${s.code_ref}/transfer/`, {
+        to_username: to,
+        pincode: String(data.pincode || "").trim(),
+        notes: String(data.notes || "").trim(),
+      });
+      alert("Transfer submitted.");
+      setTransferForms((m) => ({ ...m, [id]: { to_username: "", pincode: "", notes: "" } }));
+      await loadMySubmissions();
+      await loadMySummary();
+    } catch (e) {
+      const err = e?.response?.data;
+      const msg = (typeof err === "string" ? err : (err?.detail || JSON.stringify(err || {}))) || "Transfer failed.";
+      alert(msg);
+    } finally {
+      setTransferBusy((m) => ({ ...m, [id]: false }));
+    }
+  };
 
   const onChange = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
@@ -92,6 +218,98 @@ export default function ConsumerCoupon() {
     }
   };
 
+  const loadMySummary = async () => {
+    try {
+      setLoadingSummary(true);
+      setErrorSummary("");
+      const res = await API.get("/coupons/codes/consumer-summary/");
+      setMySummary(res.data || null);
+    } catch (e) {
+      setMySummary(null);
+      setErrorSummary("Failed to load summary.");
+    } finally {
+      setLoadingSummary(false);
+    }
+  };
+
+  const loadMyCodes = async () => {
+    try {
+      setCodesLoading(true);
+      setCodesError("");
+      const res = await API.get("/coupons/codes/mine-consumer/");
+      const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
+      setMyCodes(arr || []);
+    } catch (e) {
+      setMyCodes([]);
+      setCodesError("Failed to load my e‑coupons.");
+    } finally {
+      setCodesLoading(false);
+    }
+  };
+
+  const onCodeTransferChange = (codeId, field, value) => {
+    setTransferCodeForms((m) => ({ ...m, [codeId]: { ...(m[codeId] || {}), [field]: value } }));
+  };
+
+  const doTransferCode = async (code) => {
+    const codeId = code?.id;
+    if (!codeId) return;
+    const data = transferCodeForms[codeId] || {};
+    const to = String(data.to_username || "").trim();
+    if (!to) {
+      alert("Enter target TR username.");
+      return;
+    }
+    try {
+      setTransferCodeBusy((m) => ({ ...m, [codeId]: true }));
+      await API.post(`/coupons/codes/${codeId}/transfer/`, {
+        to_username: to,
+        pincode: String(data.pincode || "").trim(),
+        notes: String(data.notes || "").trim(),
+      });
+      alert("Transfer successful.");
+      setTransferCodeForms((m) => ({ ...m, [codeId]: { to_username: "", pincode: "", notes: "" } }));
+      await loadMyCodes();
+      await loadMySummary();
+    } catch (e) {
+      const err = e?.response?.data;
+      const msg = (typeof err === "string" ? err : (err?.detail || JSON.stringify(err || {}))) || "Transfer failed.";
+      alert(msg);
+    } finally {
+      setTransferCodeBusy((m) => ({ ...m, [codeId]: false }));
+    }
+  };
+
+  // Quick Activate button per owned e‑coupon
+  const handleActivateCode = async (code) => {
+    if (!code?.id) return;
+    const codeId = code.id;
+    const denom = Number(code?.value) || 150;
+    const t = denom <= 50 ? "50" : "150";
+    try {
+      setActivateCodeBusy((m) => ({ ...m, [codeId]: true }));
+      await API.post("/v1/coupon/activate/", {
+        type: t,
+        source: {
+          channel: "e_coupon",
+          code: String(code.code).trim(),
+          referral_id: String(form.referral_id || "").trim(),
+        },
+      });
+      try { alert(`Activated (${t}).`); } catch {}
+      // Immediately disable actions locally for this code
+      setMyCodes((prev) => prev.map((x) => x.id === codeId ? { ...x, display_status: "ACTIVATED", can_activate: false, can_transfer: false } : x));
+      await loadMySummary();
+      await loadMyCodes();
+    } catch (e) {
+      const err = e?.response?.data;
+      const msg = (typeof err === "string" ? err : (err?.detail || JSON.stringify(err || {}))) || "Activation failed.";
+      alert(msg);
+    } finally {
+      setActivateCodeBusy((m) => ({ ...m, [codeId]: false }));
+    }
+  };
+
   const loadWallet = async () => {
     try {
       const res = await API.get("/accounts/wallet/me/");
@@ -104,6 +322,8 @@ export default function ConsumerCoupon() {
   useEffect(() => {
     loadMySubmissions();
     loadWallet();
+    loadMySummary();
+    loadMyCodes();
   }, []);
 
   const validate = () => {
@@ -208,7 +428,7 @@ export default function ConsumerCoupon() {
 
       {walletMsg ? <Alert severity="success" sx={{ mb: 2 }}>{walletMsg}</Alert> : null}
 
-      <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mb: 3 }}>
+      {/* <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mb: 3 }}>
         <Box component="form" onSubmit={onSubmit}>
           <Grid container spacing={2}>
             <Grid item xs={12} md={4}>
@@ -320,11 +540,132 @@ export default function ConsumerCoupon() {
             </Grid>
           </Grid>
         </Box>
+      </Paper> */}
+
+      {/* My E-Coupon Summary */}
+      <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mb: 2 }}>
+        <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
+          My E-Coupon Summary
+        </Typography>
+        {loadingSummary ? (
+          <Typography variant="body2">Loading...</Typography>
+        ) : errorSummary ? (
+          <Alert severity="error">{errorSummary}</Alert>
+        ) : mySummary ? (
+          <Grid container spacing={2}>
+            <Grid item xs={6} md={3}>
+              <Typography variant="body2">Available</Typography>
+              <Typography variant="h6">{mySummary.available ?? 0}</Typography>
+            </Grid>
+            <Grid item xs={6} md={3}>
+              <Typography variant="body2">Redeemed</Typography>
+              <Typography variant="h6">{mySummary.redeemed ?? 0}</Typography>
+            </Grid>
+            <Grid item xs={6} md={3}>
+              <Typography variant="body2">Activated</Typography>
+              <Typography variant="h6">{mySummary.activated ?? 0}</Typography>
+            </Grid>
+            <Grid item xs={6} md={3}>
+              <Typography variant="body2">Transferred</Typography>
+              <Typography variant="h6">{mySummary.transferred ?? 0}</Typography>
+            </Grid>
+          </Grid>
+        ) : (
+          <Typography variant="body2" color="text.secondary">No data.</Typography>
+        )}
       </Paper>
 
-      <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+      <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mb: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
-          My Coupon Requests (Physical Channel)
+          E-Coupon History
+        </Typography>
+        {codesLoading ? (
+          <Box sx={{ py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+            <CircularProgress size={18} /> <Typography variant="body2">Loading...</Typography>
+          </Box>
+        ) : codesError ? (
+          <Alert severity="error">{codesError}</Alert>
+        ) : (myCodes || []).length === 0 ? (
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            No e‑coupon entries.
+          </Typography>
+        ) : (
+          <TableContainer sx={{ maxWidth: "100%", overflowX: "auto" }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Code</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Batch</TableCell>
+                  <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Batch</TableCell>
+                  <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Serial</TableCell>
+                  <TableCell>Value</TableCell>
+                  <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Assigned Agency</TableCell>
+                  <TableCell>Created</TableCell>
+                  <TableCell>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+              {(myCodes || []).map((c) => {
+                const status = String(c.display_status || c.status || "").toUpperCase();
+                const isActivated = status === "ACTIVATED";
+                const isPending = status === "PENDING";
+                const isRedeemed = status === "REDEEMED";
+                const canAct = !!c.can_activate;
+                const canTrans = !!c.can_transfer;
+                const tf = transferCodeForms[c.id] || {};
+                const busy = !!transferCodeBusy[c.id];
+                const forceEnable = isPending;
+                const disableActivate = forceEnable ? Boolean(activateCodeBusy[c.id]) : (Boolean(activateCodeBusy[c.id]) || !form.referral_id || !canAct);
+                const disableTransfer = forceEnable ? !!busy : (busy || !canTrans);
+                return (
+                  <TableRow key={c.id}>
+                    <TableCell>{c.code}</TableCell>
+                    <TableCell>{c.display_status || c.status}</TableCell>
+                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.batch ? `#${c.batch}` : ""}</TableCell>
+                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.serial || ""}</TableCell>
+                    <TableCell>{typeof c.value !== "undefined" ? `₹${c.value}` : ""}</TableCell>
+                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.assigned_agency_username || ""}</TableCell>
+                    <TableCell>{c.created_at ? new Date(c.created_at).toLocaleString() : ""}</TableCell>
+                    <TableCell>
+                      {!isRedeemed ? (
+                        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            color="primary"
+                            disabled={disableActivate}
+                            sx={{ "&.Mui-disabled": { backgroundColor: "#9e9e9e", color: "#fff" } }}
+                            onClick={() => handleActivateCode(c)}
+                          >
+                            {activateCodeBusy[c.id] ? "Activating..." : "Activate"}
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            disabled={disableTransfer}
+                            sx={{ "&.Mui-disabled": { backgroundColor: "#9e9e9e", color: "#fff" } }}
+                            onClick={() => openTransferDialog(c)}
+                          >
+                            {busy ? "Processing..." : "Transfer"}
+                          </Button>
+                        </Stack>
+                      ) : (
+                        <Typography variant="caption" color="text.secondary">Redeemed</Typography>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </Paper>
+
+      {/* <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+        <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
+          My E-Coupon Requests
         </Typography>
         {loadingSubs ? (
           <Typography variant="body2">Loading...</Typography>
@@ -336,17 +677,88 @@ export default function ConsumerCoupon() {
           </Typography>
         ) : (
           <Box component="ul" sx={{ m: 0, pl: 2 }}>
-            {(mySubs || []).map((s) => (
-              <li key={s.id} style={{ marginBottom: 8 }}>
-                <Typography variant="body2">
-                  <strong>Code:</strong> {s.coupon_code} — <strong>Status:</strong> {statusLabel(s.status)}{" "}
-                  {s.created_at ? `— ${new Date(s.created_at).toLocaleString()}` : ""}
-                </Typography>
-              </li>
-            ))}
+            {(mySubs || []).map((s) => {
+              const canTransfer = Boolean(s.code_ref) && String(s.status).toUpperCase() === "SUBMITTED";
+              const tf = transferForms[s.id] || {};
+              const busy = !!transferBusy[s.id];
+              return (
+                <li key={s.id} style={{ marginBottom: 12, listStyle: "none" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <Typography variant="body2" sx={{ mr: 1 }}>
+                      <strong>Code:</strong> {s.coupon_code} — <strong>Status:</strong> {statusLabel(s.status)}{" "}
+                      {s.created_at ? `— ${new Date(s.created_at).toLocaleString()}` : ""}
+                    </Typography>
+                    <Button size="small" variant="outlined" onClick={() => useSubmissionCode(s)}>
+                      Use
+                    </Button>
+                  </div>
+                  {canTransfer ? (
+                    <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1 }}>
+                      <TextField
+                        size="small"
+                        label="Transfer To (TR Username)"
+                        value={tf.to_username || ""}
+                        onChange={(e) => onTransferChange(s.id, "to_username", e.target.value)}
+                      />
+                      <TextField
+                        size="small"
+                        label="Pincode"
+                        value={tf.pincode || ""}
+                        onChange={(e) => onTransferChange(s.id, "pincode", e.target.value)}
+                        inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
+                      />
+                      <TextField
+                        size="small"
+                        label="Notes"
+                        value={tf.notes || ""}
+                        onChange={(e) => onTransferChange(s.id, "notes", e.target.value)}
+                      />
+                      <Button size="small" variant="contained" disabled={busy} onClick={() => doTransfer(s)}>
+                        {busy ? "Transferring..." : "Transfer"}
+                      </Button>
+                    </Stack>
+                  ) : null}
+                </li>
+              );
+            })}
           </Box>
         )}
-      </Paper>
+      </Paper> */}
+      <Dialog open={transferDialog.open} onClose={closeTransferDialog} fullWidth maxWidth="sm">
+        <DialogTitle>Transfer E-Coupon</DialogTitle>
+        <DialogContent>
+          <Stack spacing={1} sx={{ mt: 1 }}>
+            <TextField
+              size="small"
+              label="TR Username"
+              value={transferDialog.username}
+              onChange={(e) => setTransferDialog((d) => ({ ...d, username: e.target.value, userInfo: null }))}
+              onBlur={resolveUsername}
+            />
+            <Button variant="outlined" size="small" onClick={resolveUsername} disabled={transferDialog.resolving}>
+              {transferDialog.resolving ? "Checking..." : "Check"}
+            </Button>
+            {transferDialog.error ? <Alert severity="error">{transferDialog.error}</Alert> : null}
+            {transferDialog.userInfo ? (
+              <Box sx={{ p: 1, border: "1px solid #eee", borderRadius: 1 }}>
+                <Typography variant="body2"><strong>Username:</strong> {transferDialog.userInfo.username}</Typography>
+                <Typography variant="body2"><strong>Name:</strong> {transferDialog.userInfo.full_name || "-"}</Typography>
+                <Typography variant="body2"><strong>Pincode:</strong> {transferDialog.userInfo.pincode || "-"}</Typography>
+                <Typography variant="body2"><strong>City/State:</strong> {transferDialog.userInfo.city || "-"}{transferDialog.userInfo.state ? `, ${transferDialog.userInfo.state}` : ""}</Typography>
+              </Box>
+            ) : (
+              <Typography variant="caption" color="text.secondary">Enter TR Username to view details.</Typography>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeTransferDialog}>Close</Button>
+          <Button variant="contained" onClick={submitTransfer} disabled={transferDialog.submitting || !transferDialog.username}>
+            {transferDialog.submitting ? "Transferring..." : "Submit"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
     </Container>
   );
 }

@@ -25,7 +25,7 @@ export default function AgencyDashboard() {
   // Nav identity (for filtering employees by agency pincode)
   const storedUser = useMemo(() => {
     try {
-      const ls = localStorage.getItem("user") || sessionStorage.getItem("user");
+      const ls = localStorage.getItem("user_agency") || sessionStorage.getItem("user_agency");
       return ls ? JSON.parse(ls) : {};
     } catch {
       return {};
@@ -47,6 +47,15 @@ export default function AgencyDashboard() {
   const [luckyLoading, setLuckyLoading] = useState(false);
   const [luckyError, setLuckyError] = useState("");
   const [commissionTotal, setCommissionTotal] = useState(0);
+  // E‑Coupon summary for Agency
+  const [ecSummary, setEcSummary] = useState(null);
+  const [ecSummaryLoading, setEcSummaryLoading] = useState(false);
+  const [ecSummaryError, setEcSummaryError] = useState("");
+
+  // Agency E‑Coupon codes (history)
+  const [agencyCodes, setAgencyCodes] = useState([]);
+  const [agencyCodesLoading, setAgencyCodesLoading] = useState(false);
+  const [agencyCodesError, setAgencyCodesError] = useState("");
 
   // Wallet (for agency dashboard display)
   const [wallet, setWallet] = useState({ balance: "0", updated_at: null });
@@ -98,6 +107,37 @@ export default function AgencyDashboard() {
       setWallet({ balance: "0", updated_at: null });
     } finally {
       setWalletLoading(false);
+    }
+  };
+
+  // Load agency E‑Coupon summary (available, assigned to employee, sold, redeemed, total)
+  const loadEcSummary = async () => {
+    try {
+      setEcSummaryLoading(true);
+      setEcSummaryError("");
+      const res = await API.get("/coupons/codes/agency-summary/");
+      setEcSummary(res?.data || null);
+    } catch (e) {
+      setEcSummary(null);
+      setEcSummaryError("Failed to load E‑Coupon summary.");
+    } finally {
+      setEcSummaryLoading(false);
+    }
+  };
+
+  // Load agency's own E‑Coupon codes (assigned_agency = me)
+  const loadAgencyCodes = async () => {
+    try {
+      setAgencyCodesLoading(true);
+      setAgencyCodesError("");
+      const res = await API.get("/coupons/codes/");
+      const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
+      setAgencyCodes(arr || []);
+    } catch (e) {
+      setAgencyCodes([]);
+      setAgencyCodesError("Failed to load E‑Coupon codes.");
+    } finally {
+      setAgencyCodesLoading(false);
     }
   };
 
@@ -244,6 +284,8 @@ export default function AgencyDashboard() {
     loadLuckyHistory();
     loadCommission();
     loadWallet();
+    loadEcSummary();
+    loadAgencyCodes();
   }, []);
 
   // Load my 5‑matrix genealogy tree
@@ -315,7 +357,7 @@ export default function AgencyDashboard() {
         </Typography>
       </Box>
 
-      <ReferAndEarn title="Refer & Earn" />
+      <ReferAndEarn title="Refer & Earn"  sponsorUsername={(storedUser?.username || (storedUser && storedUser.user && storedUser.user.username) || "")}  />
       <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
         <Button variant={activeTab === TABS.LUCKY ? "contained" : "outlined"} onClick={() => setActiveTab(TABS.LUCKY)}>
           Lucky Draw Submission
@@ -358,6 +400,66 @@ export default function AgencyDashboard() {
               My commission earned: ₹{commissionTotal.toFixed(2)}
             </Alert>
           </Box>
+          <Box sx={{ mb: 2 }}>
+            {ecSummaryLoading ? (
+              <Typography variant="body2">Loading E‑Coupon summary...</Typography>
+            ) : ecSummaryError ? (
+              <Alert severity="error">{ecSummaryError}</Alert>
+            ) : ecSummary ? (
+              <Alert severity="info">
+                E‑Coupons — Available: {ecSummary.available ?? 0} • Assigned to Employee: {ecSummary.assigned_employee ?? 0} • Sold: {ecSummary.sold ?? 0} • Redeemed: {ecSummary.redeemed ?? 0} • Total: {ecSummary.total ?? 0}
+              </Alert>
+            ) : null}
+          </Box>
+
+          {/* Agency E‑Coupon Codes (history) */}
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>My E‑Coupon Codes</Typography>
+            {agencyCodesLoading ? (
+              <Box sx={{ py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+                <CircularProgress size={18} /> <Typography variant="body2">Loading…</Typography>
+              </Box>
+            ) : agencyCodesError ? (
+              <Alert severity="error">{agencyCodesError}</Alert>
+            ) : (
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Code</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Batch</TableCell>
+                    <TableCell>Serial</TableCell>
+                    <TableCell>Value</TableCell>
+                    <TableCell>Assigned Agency</TableCell>
+                    <TableCell>Created</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {(agencyCodes || []).map((c) => (
+                    <TableRow key={c.id}>
+                      <TableCell>{c.code}</TableCell>
+                      <TableCell>{c.status}</TableCell>
+                      <TableCell>{c.batch || ""}</TableCell>
+                      <TableCell>{c.serial || ""}</TableCell>
+                      <TableCell>{typeof c.value !== "undefined" ? `₹${c.value}` : ""}</TableCell>
+                      <TableCell>{c.assigned_agency_username || ""}</TableCell>
+                      <TableCell>{c.created_at ? new Date(c.created_at).toLocaleString() : ""}</TableCell>
+                    </TableRow>
+                  ))}
+                  {(!agencyCodes || agencyCodes.length === 0) && (
+                    <TableRow>
+                      <TableCell colSpan={7}>
+                        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                          No e‑coupons assigned to your agency.
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            )}
+          </Box>
+
           {luckyLoading ? (
             <Box sx={{ py: 4, display: "flex", alignItems: "center", gap: 1 }}>
               <CircularProgress size={20} /> <Typography variant="body2">Loading...</Typography>
