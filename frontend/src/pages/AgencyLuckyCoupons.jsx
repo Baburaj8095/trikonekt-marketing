@@ -17,6 +17,7 @@ import {
   MenuItem,
   Grid,
   Button,
+  Pagination,
 } from "@mui/material";
 import API from "../api/api";
 import { useLocation } from "react-router-dom";
@@ -132,15 +133,26 @@ export default function AgencyLuckyCoupons() {
   const [codesLoading, setCodesLoading] = useState(false);
   const [codesError, setCodesError] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [totalCount, setTotalCount] = useState(0);
   
   const loadCodes = async () => {
     try {
       setCodesLoading(true);
       setCodesError("");
-      // Load ALL my agency codes across statuses (ASSIGNED_AGENCY, ASSIGNED_EMPLOYEE, SOLD, REDEEMED, REVOKED, ...)
-      const res = await API.get("/coupons/codes/");
-      const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
+      // Load my agency codes (paginated)
+      const res = await API.get("/coupons/codes/", {
+        params: {
+          page,
+          page_size: pageSize,
+          status: statusFilter === "ALL" ? undefined : statusFilter,
+        },
+      });
+      const data = res.data;
+      const arr = Array.isArray(data) ? data : data?.results || [];
       setCodes(arr || []);
+      setTotalCount(Array.isArray(data) ? (arr || []).length : (data?.count || (arr || []).length));
     } catch (e) {
       setCodesError("Failed to load e-coupon codes.");
       setCodes([]);
@@ -168,7 +180,7 @@ export default function AgencyLuckyCoupons() {
     }
   };
   
-  const [sellForm, setSellForm] = useState({ codeId: "", consumerUsername: "", pincode: "", notes: "" });
+  const [sellForm, setSellForm] = useState({ codeId: "", consumerUsername: "" });
   const [sellBusy, setSellBusy] = useState(false);
   const onSellChange = (e) => setSellForm((f) => ({ ...f, [e.target.name]: e.target.value }));
   const [resolveLoading, setResolveLoading] = useState(false);
@@ -203,19 +215,17 @@ export default function AgencyLuckyCoupons() {
   }, [sellForm.consumerUsername]);
   const submitSell = async (e) => {
     e.preventDefault();
-    if (!sellForm.codeId || !sellForm.consumerUsername || !sellForm.pincode) {
-      alert("Select code, consumer username and pincode.");
+    if (!sellForm.codeId || !sellForm.consumerUsername) {
+      alert("Select code and consumer username.");
       return;
     }
     try {
       setSellBusy(true);
       await API.post(`/coupons/codes/${sellForm.codeId}/assign-consumer/`, {
         consumer_username: String(sellForm.consumerUsername).trim(),
-        pincode: String(sellForm.pincode).trim(),
-        notes: String(sellForm.notes || "").trim(),
       });
       alert("E-Coupon assigned to consumer.");
-      setSellForm({ codeId: "", consumerUsername: "", pincode: "", notes: "" });
+      setSellForm({ codeId: "", consumerUsername: "" });
       await loadCodes();
       await loadCommissions();
       await loadSummary();
@@ -291,6 +301,11 @@ export default function AgencyLuckyCoupons() {
     loadSummary();
   }, []);
 
+  // Reload codes when pagination or status changes
+  useEffect(() => {
+    loadCodes();
+  }, [page, pageSize, statusFilter]);
+
   return (
     <Container maxWidth="lg" sx={{ px: 0 }}>
       {/* Section Header aligned to Shell navigation */}
@@ -362,7 +377,7 @@ export default function AgencyLuckyCoupons() {
       )}
 
       {activeTab === TABS.ASSIGN && (
-        <Grid container spacing={2}>
+        <Grid container spacing={2} alignItems="stretch" columns={{ xs: 12, sm: 12, md: 12 }}>
           {/* Agency Summary */}
           <Grid item xs={12}>
             <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
@@ -375,29 +390,83 @@ export default function AgencyLuckyCoupons() {
                 <Alert severity="error">{summaryError}</Alert>
               ) : summary ? (
                 <Grid container spacing={2}>
-                  <Grid item xs={6} md={2}>
-                    <Typography variant="body2">Available</Typography>
-                    <Typography variant="h6">{summary.available ?? 0}</Typography>
+                  <Grid item xs={6} md={2} sx={{
+           
+            '@media (max-width:600px)': {
+              minWidth: 0,
+              boxSizing: 'border-box',
+              width: '100%',
+            },
+          }}>
+                    <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)", color: "#fff", border: "1px solid rgba(124,58,237,0.35)", boxShadow: "0 8px 18px rgba(124,58,237,0.35)" }}>
+                      <Typography variant="caption" sx={{ opacity: 0.9 }}>Available</Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 900 }}>{summary.available ?? 0}</Typography>
+                    </Box>
                   </Grid>
-                  <Grid item xs={6} md={2}>
-                    <Typography variant="body2">Assigned to Employee</Typography>
-                    <Typography variant="h6">{summary.assigned_employee ?? 0}</Typography>
+                  <Grid item xs={6} md={2} sx={{
+           
+            '@media (max-width:600px)': {
+              minWidth: 0,
+              boxSizing: 'border-box',
+              width: '100%',
+            },
+          }}>
+                    <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #14b8a6 0%, #2dd4bf 100%)", color: "#0f172a", border: "1px solid rgba(20,184,166,0.35)", boxShadow: "0 8px 18px rgba(20,184,166,0.35)" }}>
+                      <Typography variant="caption" sx={{ opacity: 0.9 }}>Assigned to Employee</Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 900 }}>{summary.assigned_employee ?? 0}</Typography>
+                    </Box>
                   </Grid>
-                  <Grid item xs={6} md={2}>
-                    <Typography variant="body2">Sold</Typography>
-                    <Typography variant="h6">{summary.sold ?? 0}</Typography>
+                  <Grid item xs={6} md={2} sx={{
+           
+            '@media (max-width:600px)': {
+              minWidth: 0,
+              boxSizing: 'border-box',
+              width: '100%',
+            },
+          }}>
+                    <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)", color: "#0f172a", border: "1px solid rgba(245,158,11,0.35)", boxShadow: "0 8px 18px rgba(245,158,11,0.35)" }}>
+                      <Typography variant="caption" sx={{ opacity: 0.9 }}>Sold</Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 900 }}>{summary.sold ?? 0}</Typography>
+                    </Box>
                   </Grid>
-                  <Grid item xs={6} md={2}>
-                    <Typography variant="body2">Redeemed</Typography>
-                    <Typography variant="h6">{summary.redeemed ?? 0}</Typography>
+                  <Grid item xs={6} md={2} sx={{
+           
+            '@media (max-width:600px)': {
+              minWidth: 0,
+              boxSizing: 'border-box',
+              width: '100%',
+            },
+          }}>
+                    <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", color: "#fff", border: "1px solid rgba(16,185,129,0.35)", boxShadow: "0 8px 18px rgba(16,185,129,0.35)" }}>
+                      <Typography variant="caption" sx={{ opacity: 0.9 }}>Redeemed</Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 900 }}>{summary.redeemed ?? 0}</Typography>
+                    </Box>
                   </Grid>
-                  <Grid item xs={6} md={2}>
-                    <Typography variant="body2">Revoked</Typography>
-                    <Typography variant="h6">{summary.revoked ?? 0}</Typography>
+                  <Grid item xs={6} md={2} sx={{
+           
+            '@media (max-width:600px)': {
+              minWidth: 0,
+              boxSizing: 'border-box',
+              width: '100%',
+            },
+          }}>
+                    <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%)", color: "#fff", border: "1px solid rgba(59,130,246,0.35)", boxShadow: "0 8px 18px rgba(59,130,246,0.35)" }}>
+                      <Typography variant="caption" sx={{ opacity: 0.9 }}>Revoked</Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 900 }}>{summary.revoked ?? 0}</Typography>
+                    </Box>
                   </Grid>
-                  <Grid item xs={6} md={2}>
-                    <Typography variant="body2">Total</Typography>
-                    <Typography variant="h6">{summary.total ?? 0}</Typography>
+                  <Grid item xs={6} md={2} sx={{
+           
+            '@media (max-width:600px)': {
+              minWidth: 0,
+              boxSizing: 'border-box',
+              width: '100%',
+            },
+          }}>
+                    <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #06b6d4 0%, #0ea5e9 100%)", color: "#fff", border: "1px solid rgba(14,165,233,0.35)", boxShadow: "0 8px 18px rgba(14,165,233,0.35)" }}>
+                      <Typography variant="caption" sx={{ opacity: 0.9 }}>Total</Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 900 }}>{summary.total ?? 0}</Typography>
+                    </Box>
                   </Grid>
                 </Grid>
               ) : (
@@ -412,14 +481,20 @@ export default function AgencyLuckyCoupons() {
                 <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>
                   All My E‑Coupon Codes
                 </Typography>
-                <Stack direction="row" spacing={1} alignItems="center">
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={1}
+                  alignItems={{ xs: "stretch", sm: "center" }}
+                  sx={{ width: { xs: "100%", sm: "auto" } }}
+                >
                   <TextField
                     select
                     size="small"
+                    fullWidth
                     label="Status"
                     value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    sx={{ minWidth: 180 }}
+                    onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+                    sx={{ minWidth: { sm: 180 } }}
                   >
                     <MenuItem value="ALL">All</MenuItem>
                     <MenuItem value="AVAILABLE">AVAILABLE</MenuItem>
@@ -429,7 +504,27 @@ export default function AgencyLuckyCoupons() {
                     <MenuItem value="REDEEMED">REDEEMED</MenuItem>
                     <MenuItem value="REVOKED">REVOKED</MenuItem>
                   </TextField>
-                  <Button size="small" onClick={loadCodes}>Refresh</Button>
+                  <TextField
+                    select
+                    size="small"
+                    fullWidth
+                    label="Rows"
+                    value={pageSize}
+                    onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+                    sx={{ minWidth: { sm: 120 } }}
+                  >
+                    <MenuItem value={10}>10</MenuItem>
+                    <MenuItem value={25}>25</MenuItem>
+                    <MenuItem value={50}>50</MenuItem>
+                    <MenuItem value={100}>100</MenuItem>
+                  </TextField>
+                  <Button
+                    size="small"
+                    onClick={loadCodes}
+                    sx={{ width: { xs: "100%", sm: "auto" }, alignSelf: { xs: "stretch", sm: "auto" } }}
+                  >
+                    Refresh
+                  </Button>
                 </Stack>
               </Box>
 
@@ -484,12 +579,25 @@ export default function AgencyLuckyCoupons() {
                   </Table>
                 </TableContainer>
               )}
+              {!codesLoading && !codesError ? (
+                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 1 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    {totalCount} items
+                  </Typography>
+                  <Pagination
+                    count={Math.max(1, Math.ceil(totalCount / pageSize))}
+                    page={page}
+                    onChange={(e, p) => setPage(p)}
+                    size="small"
+                  />
+                </Box>
+              ) : null}
             </Paper>
           </Grid>
 
           {/* Sell E-Coupon to Consumer */}
-          <Grid item xs={12} md={6}>
-            <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+          <Grid item xs={12} sm={12} md={6} sx={{ display: "flex", width: "100%" }}>
+            <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, height: "100%", width: "100%" }}>
               <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>
                 Sell E-Coupon to Consumer
               </Typography>
@@ -534,30 +642,15 @@ export default function AgencyLuckyCoupons() {
                   ) : resolveError ? (
                     <Alert severity="warning">{resolveError}</Alert>
                   ) : null}
-                  <TextField
-                    fullWidth
-                    label="Pincode"
-                    name="pincode"
-                    value={sellForm.pincode}
-                    onChange={onSellChange}
-                    inputProps={{ inputMode: "numeric", pattern: "[0-9]*", maxLength: 10 }}
-                  />
-                  <TextField
-                    fullWidth
-                    label="Notes"
-                    name="notes"
-                    value={sellForm.notes}
-                    onChange={onSellChange}
-                  />
-                  <Button type="submit" variant="contained" disabled={sellBusy || !sellForm.codeId || !sellForm.consumerUsername || !sellForm.pincode}>
+                  <Button type="submit" variant="contained" disabled={sellBusy || !sellForm.codeId || !sellForm.consumerUsername}>
                     {sellBusy ? "Assigning..." : "Assign"}
                   </Button>
                 </Stack>
               </Box>
             </Paper>
           </Grid>
-          <Grid item xs={12} md={6}>
-            <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+          <Grid item xs={12} sm={12} md={6} sx={{ display: "flex", width: "100%" }}>
+            <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, height: "100%", width: "100%" }}>
               <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>
                 Assign Coupons to Employee (by Count)
               </Typography>

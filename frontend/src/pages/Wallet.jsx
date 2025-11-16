@@ -9,7 +9,7 @@ import {
   Stack,
   LinearProgress,
 } from "@mui/material";
-import { TextField, Button, Alert, MenuItem } from "@mui/material";
+import { TextField, Button, Alert } from "@mui/material";
 import API from "../api/api";
 
 function fmtAmount(value) {
@@ -49,8 +49,7 @@ export default function Wallet() {
   const [wdrSubmitting, setWdrSubmitting] = useState(false);
   const [wdrForm, setWdrForm] = useState({
     amount: "",
-    method: "upi",
-    upi_id: "",
+    method: "bank",
     bank_name: "",
     bank_account_number: "",
     ifsc_code: "",
@@ -116,20 +115,12 @@ export default function Wallet() {
     }
     const payload = {
       amount: amtNum,
-      method: wdrForm.method,
+      method: "bank",
     };
-    if (wdrForm.method === "upi") {
-      if (!wdrForm.upi_id.trim()) {
-        setWdrErr("UPI ID is required for UPI withdrawals.");
-        return;
-      }
-      payload.upi_id = wdrForm.upi_id.trim();
-    } else {
-      // Bank details optional here; backend will hydrate from KYC if missing
-      if (wdrForm.bank_name) payload.bank_name = wdrForm.bank_name.trim();
-      if (wdrForm.bank_account_number) payload.bank_account_number = wdrForm.bank_account_number.trim();
-      if (wdrForm.ifsc_code) payload.ifsc_code = wdrForm.ifsc_code.trim().toUpperCase();
-    }
+    // Bank details optional here; backend will hydrate from KYC if missing
+    if (wdrForm.bank_name) payload.bank_name = wdrForm.bank_name.trim();
+    if (wdrForm.bank_account_number) payload.bank_account_number = wdrForm.bank_account_number.trim();
+    if (wdrForm.ifsc_code) payload.ifsc_code = wdrForm.ifsc_code.trim().toUpperCase();
     try {
       setWdrSubmitting(true);
       await API.post("/accounts/withdrawals/", payload);
@@ -150,7 +141,6 @@ export default function Wallet() {
       setWdrForm({
         amount: "",
         method: wdrForm.method,
-        upi_id: "",
         bank_name: "",
         bank_account_number: "",
         ifsc_code: "",
@@ -210,61 +200,44 @@ export default function Wallet() {
                   inputProps={{ inputMode: "decimal" }}
                   required
                 />
+                {/* Method fixed to Bank; UPI removed */}
                 <TextField
                   fullWidth
                   size="small"
-                  select
                   label="Method"
                   name="method"
-                  value={wdrForm.method}
-                  onChange={onWdrChange}
-                >
-                  <MenuItem value="upi">UPI</MenuItem>
-                  <MenuItem value="bank">Bank</MenuItem>
-                </TextField>
+                  value="bank"
+                  disabled
+                />
               </Stack>
-              {wdrForm.method === "upi" ? (
-                <Box sx={{ mt: 1 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="UPI ID"
-                    name="upi_id"
-                    value={wdrForm.upi_id}
-                    onChange={onWdrChange}
-                    required
-                  />
-                </Box>
-              ) : (
-                <Stack spacing={1} sx={{ mt: 1 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Bank Name"
-                    name="bank_name"
-                    value={wdrForm.bank_name}
-                    onChange={onWdrChange}
-                  />
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Account Number"
-                    name="bank_account_number"
-                    value={wdrForm.bank_account_number}
-                    onChange={onWdrChange}
-                    inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
-                  />
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="IFSC Code"
-                    name="ifsc_code"
-                    value={wdrForm.ifsc_code}
-                    onChange={onWdrChange}
-                    inputProps={{ maxLength: 11, style: { textTransform: "uppercase" } }}
-                  />
-                </Stack>
-              )}
+              <Stack spacing={1} sx={{ mt: 1 }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Bank Name"
+                  name="bank_name"
+                  value={wdrForm.bank_name}
+                  onChange={onWdrChange}
+                />
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Account Number"
+                  name="bank_account_number"
+                  value={wdrForm.bank_account_number}
+                  onChange={onWdrChange}
+                  inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
+                />
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="IFSC Code"
+                  name="ifsc_code"
+                  value={wdrForm.ifsc_code}
+                  onChange={onWdrChange}
+                  inputProps={{ maxLength: 11, style: { textTransform: "uppercase" } }}
+                />
+              </Stack>
               <Button
                 type="submit"
                 variant="contained"

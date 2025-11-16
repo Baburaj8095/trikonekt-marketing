@@ -236,6 +236,9 @@ def on_user_join(new_user: CustomUser, source: Dict[str, Any] | None = None) -> 
     src = source or {"type": "user", "id": getattr(new_user, "id", "")}
     src_type = str(src.get("type") or "user")
     src_id = str(src.get("id") or "")
+    # Gate payouts until first activation is stamped
+    if not getattr(new_user, "first_purchase_activated_at", None):
+        return False
 
     try:
         ReferralJoinPayout.objects.create(user_new=new_user, source_type=src_type, source_id=src_id)
@@ -305,16 +308,19 @@ def on_user_join(new_user: CustomUser, source: Dict[str, Any] | None = None) -> 
     # Optional autopool trigger on direct referral
     if getattr(cfg, "autopool_trigger_on_direct_referral", True):
         try:
-            # Use 50 as base for THREE_50
-            base50 = _q2(getattr(cfg, "global_activation_amount", 50) or 50)
-            _distribute_three_matrix(new_user, base50, {"type": "JOIN_REFERRAL", "id": getattr(new_user, "id", "")})
-            # Enable flags on new user
-            try:
-                new_user.autopool_enabled = True
-                new_user.rewards_enabled = True
-                new_user.save(update_fields=["autopool_enabled", "rewards_enabled"])
-            except Exception:
-                pass
+            st = (src_type or "").lower()
+            # Skip autopool here when join is executed as part of an activation flow to avoid double payouts
+            if not (st.startswith("coupon_") or st.startswith("product_")):
+                # Use 50 as base for THREE_50
+                base50 = _q2(getattr(cfg, "global_activation_amount", 50) or 50)
+                _distribute_three_matrix(new_user, base50, {"type": "JOIN_REFERRAL", "id": getattr(new_user, "id", "")})
+                # Enable flags on new user
+                try:
+                    new_user.autopool_enabled = True
+                    new_user.rewards_enabled = True
+                    new_user.save(update_fields=["autopool_enabled", "rewards_enabled"])
+                except Exception:
+                    pass
         except Exception:
             pass
 

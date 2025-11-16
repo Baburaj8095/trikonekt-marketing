@@ -132,6 +132,25 @@ def ensure_first_purchase_activation(user: CustomUser, source: Dict[str, Any]) -
             rp.save(update_fields=["coupon_count", "updated_at"])
         except Exception:
             pass
+
+        # Trigger deferred referral + franchise payouts only after first activation is stamped
+        try:
+            from business.services.referral import on_user_join
+            on_user_join(user, source or {"type": "coupon_first_purchase", "id": getattr(user, "id", "")})
+        except Exception:
+            pass
+        try:
+            from business.models import CommissionConfig
+            cfg = CommissionConfig.get_solo()
+            if getattr(cfg, "enable_franchise_on_join", True):
+                from business.services.franchise import distribute_franchise_benefit
+                distribute_franchise_benefit(
+                    user,
+                    trigger="registration",
+                    source=source or {"type": "coupon_first_purchase", "id": getattr(user, "id", "")},
+                )
+        except Exception:
+            pass
     except Exception:
         # best-effort; do not block
         pass

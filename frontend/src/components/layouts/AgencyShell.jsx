@@ -53,6 +53,9 @@ export default function AgencyShell({ children }) {
     // Marketplace
     { to: "/agency/marketplace", label: "Marketplace", icon: "box" },
 
+    // Refer & Earn
+    { to: "/agency/refer-earn", label: "Refer & Earn", icon: "users" },
+
     // Resources
     { to: "/agency/banners", label: "Banners", icon: "image" },
     { to: "/agency/purchase-requests", label: "Purchase Requests", icon: "orders" },

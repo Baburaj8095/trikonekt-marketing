@@ -13,12 +13,13 @@ import {
   Alert,
   TextField,
   Stack,
+  Grid,
   MenuItem,
   Button,
+  Pagination,
 } from "@mui/material";
 import API from "../api/api";
 import RewardsTargetCard from "../components/RewardsTargetCard";
-import ReferAndEarn from "../components/ReferAndEarn";
 import TreeReferralGalaxy from "../components/TreeReferralGalaxy";
 
 export default function AgencyDashboard() {
@@ -56,6 +57,10 @@ export default function AgencyDashboard() {
   const [agencyCodes, setAgencyCodes] = useState([]);
   const [agencyCodesLoading, setAgencyCodesLoading] = useState(false);
   const [agencyCodesError, setAgencyCodesError] = useState("");
+  const [agencyCodesPage, setAgencyCodesPage] = useState(1);
+  const [agencyCodesPageSize, setAgencyCodesPageSize] = useState(25);
+  const [agencyCodesTotal, setAgencyCodesTotal] = useState(0);
+  const [agencyStatusFilter, setAgencyStatusFilter] = useState("ALL");
 
   // Wallet (for agency dashboard display)
   const [wallet, setWallet] = useState({ balance: "0", updated_at: null });
@@ -130,9 +135,17 @@ export default function AgencyDashboard() {
     try {
       setAgencyCodesLoading(true);
       setAgencyCodesError("");
-      const res = await API.get("/coupons/codes/");
-      const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
+      const res = await API.get("/coupons/codes/", {
+        params: {
+          page: agencyCodesPage,
+          page_size: agencyCodesPageSize,
+          status: agencyStatusFilter === "ALL" ? undefined : agencyStatusFilter,
+        },
+      });
+      const data = res.data;
+      const arr = Array.isArray(data) ? data : data?.results || [];
       setAgencyCodes(arr || []);
+      setAgencyCodesTotal(Array.isArray(data) ? (arr || []).length : (data?.count || (arr || []).length));
     } catch (e) {
       setAgencyCodes([]);
       setAgencyCodesError("Failed to load E‑Coupon codes.");
@@ -346,6 +359,11 @@ export default function AgencyDashboard() {
     }
   }, [activeTab]);
 
+  // Reload agency codes when pagination or status filter changes
+  useEffect(() => {
+    loadAgencyCodes();
+  }, [agencyCodesPage, agencyCodesPageSize, agencyStatusFilter]);
+
   return (
     <Container maxWidth="lg" sx={{ px: 0 }}>
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2, flexWrap: "wrap", gap: 1 }}>
@@ -357,12 +375,11 @@ export default function AgencyDashboard() {
         </Typography>
       </Box>
 
-      <ReferAndEarn title="Refer & Earn"  sponsorUsername={(storedUser?.username || (storedUser && storedUser.user && storedUser.user.username) || "")}  />
       <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-        <Button variant={activeTab === TABS.LUCKY ? "contained" : "outlined"} onClick={() => setActiveTab(TABS.LUCKY)}>
+        {/* <Button variant={activeTab === TABS.LUCKY ? "contained" : "outlined"} onClick={() => setActiveTab(TABS.LUCKY)}>
           Lucky Draw Submission
         </Button>
-        
+         */}
         <Button variant={activeTab === TABS.EMPLOYEES ? "contained" : "outlined"} onClick={() => setActiveTab(TABS.EMPLOYEES)}>
           Employee Details
         </Button>
@@ -406,15 +423,96 @@ export default function AgencyDashboard() {
             ) : ecSummaryError ? (
               <Alert severity="error">{ecSummaryError}</Alert>
             ) : ecSummary ? (
-              <Alert severity="info">
-                E‑Coupons — Available: {ecSummary.available ?? 0} • Assigned to Employee: {ecSummary.assigned_employee ?? 0} • Sold: {ecSummary.sold ?? 0} • Redeemed: {ecSummary.redeemed ?? 0} • Total: {ecSummary.total ?? 0}
-              </Alert>
+              <Grid container spacing={2}>
+                <Grid item xs={6} md={2}>
+                  <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)", color: "#fff", border: "1px solid rgba(124,58,237,0.35)", boxShadow: "0 8px 18px rgba(124,58,237,0.35)" }}>
+                    <Typography variant="caption" sx={{ opacity: 0.9 }}>Available</Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.available ?? 0}</Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={6} md={2}>
+                  <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #14b8a6 0%, #2dd4bf 100%)", color: "#0f172a", border: "1px solid rgba(20,184,166,0.35)", boxShadow: "0 8px 18px rgba(20,184,166,0.35)" }}>
+                    <Typography variant="caption" sx={{ opacity: 0.9 }}>Assigned to Employee</Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.assigned_employee ?? 0}</Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={6} md={2}>
+                  <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)", color: "#0f172a", border: "1px solid rgba(245,158,11,0.35)", boxShadow: "0 8px 18px rgba(245,158,11,0.35)" }}>
+                    <Typography variant="caption" sx={{ opacity: 0.9 }}>Sold</Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.sold ?? 0}</Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={6} md={2}>
+                  <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", color: "#fff", border: "1px solid rgba(16,185,129,0.35)", boxShadow: "0 8px 18px rgba(16,185,129,0.35)" }}>
+                    <Typography variant="caption" sx={{ opacity: 0.9 }}>Redeemed</Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.redeemed ?? 0}</Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={6} md={2}>
+                  <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%)", color: "#fff", border: "1px solid rgba(59,130,246,0.35)", boxShadow: "0 8px 18px rgba(59,130,246,0.35)" }}>
+                    <Typography variant="caption" sx={{ opacity: 0.9 }}>Revoked</Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.revoked ?? 0}</Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={6} md={2}>
+                  <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #06b6d4 0%, #0ea5e9 100%)", color: "#fff", border: "1px solid rgba(14,165,233,0.35)", boxShadow: "0 8px 18px rgba(14,165,233,0.35)" }}>
+                    <Typography variant="caption" sx={{ opacity: 0.9 }}>Total</Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.total ?? 0}</Typography>
+                  </Box>
+                </Grid>
+              </Grid>
             ) : null}
           </Box>
 
           {/* Agency E‑Coupon Codes (history) */}
           <Box sx={{ mb: 2 }}>
-            <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>My E‑Coupon Codes</Typography>
+            <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>All My E‑Coupon Codes</Typography>
+            <Grid container spacing={1} sx={{ mb: 1 }}>
+              <Grid item xs={12} sm={6} md={4}>
+                <TextField
+                  select
+                  size="small"
+                  fullWidth
+                  label="Status"
+                  value={agencyStatusFilter}
+                  onChange={(e) => { setAgencyStatusFilter(e.target.value); setAgencyCodesPage(1); }}
+                  sx={{ minWidth: { sm: 180 } }}
+                >
+                  <MenuItem value="ALL">All</MenuItem>
+                  <MenuItem value="AVAILABLE">AVAILABLE</MenuItem>
+                  <MenuItem value="ASSIGNED_AGENCY">ASSIGNED_AGENCY</MenuItem>
+                  <MenuItem value="ASSIGNED_EMPLOYEE">ASSIGNED_EMPLOYEE</MenuItem>
+                  <MenuItem value="SOLD">SOLD</MenuItem>
+                  <MenuItem value="REDEEMED">REDEEMED</MenuItem>
+                  <MenuItem value="REVOKED">REVOKED</MenuItem>
+                </TextField>
+              </Grid>
+              <Grid item xs={12} sm={4} md={3}>
+                <TextField
+                  select
+                  size="small"
+                  fullWidth
+                  label="Rows"
+                  value={agencyCodesPageSize}
+                  onChange={(e) => { setAgencyCodesPageSize(Number(e.target.value)); setAgencyCodesPage(1); }}
+                  sx={{ minWidth: { sm: 120 } }}
+                >
+                  <MenuItem value={10}>10</MenuItem>
+                  <MenuItem value={25}>25</MenuItem>
+                  <MenuItem value={50}>50</MenuItem>
+                  <MenuItem value={100}>100</MenuItem>
+                </TextField>
+              </Grid>
+              <Grid item xs={12} sm={2} md={2}>
+                <Button
+                  size="small"
+                  onClick={loadAgencyCodes}
+                  fullWidth
+                >
+                  Refresh
+                </Button>
+              </Grid>
+            </Grid>
             {agencyCodesLoading ? (
               <Box sx={{ py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
                 <CircularProgress size={18} /> <Typography variant="body2">Loading…</Typography>
@@ -427,8 +525,7 @@ export default function AgencyDashboard() {
                   <TableRow>
                     <TableCell>Code</TableCell>
                     <TableCell>Status</TableCell>
-                    <TableCell>Batch</TableCell>
-                    <TableCell>Serial</TableCell>
+                
                     <TableCell>Value</TableCell>
                     <TableCell>Assigned Agency</TableCell>
                     <TableCell>Created</TableCell>
@@ -439,8 +536,7 @@ export default function AgencyDashboard() {
                     <TableRow key={c.id}>
                       <TableCell>{c.code}</TableCell>
                       <TableCell>{c.status}</TableCell>
-                      <TableCell>{c.batch || ""}</TableCell>
-                      <TableCell>{c.serial || ""}</TableCell>
+                     
                       <TableCell>{typeof c.value !== "undefined" ? `₹${c.value}` : ""}</TableCell>
                       <TableCell>{c.assigned_agency_username || ""}</TableCell>
                       <TableCell>{c.created_at ? new Date(c.created_at).toLocaleString() : ""}</TableCell>
@@ -458,6 +554,19 @@ export default function AgencyDashboard() {
                 </TableBody>
               </Table>
             )}
+            {!agencyCodesLoading && !agencyCodesError ? (
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 1 }}>
+                <Typography variant="caption" color="text.secondary">
+                  {agencyCodesTotal} items
+                </Typography>
+                <Pagination
+                  count={Math.max(1, Math.ceil(agencyCodesTotal / agencyCodesPageSize))}
+                  page={agencyCodesPage}
+                  onChange={(e, p) => setAgencyCodesPage(p)}
+                  size="small"
+                />
+              </Box>
+            ) : null}
           </Box>
 
           {luckyLoading ? (
@@ -704,14 +813,14 @@ export default function AgencyDashboard() {
         </Paper>
       )}
       {/* My 5‑Matrix Team (click child card to drill down) */}
-      <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mt: 2, backgroundColor: '#fce4ec' }}>
+      {/* <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mt: 2, backgroundColor: '#fce4ec' }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
           My Team (5‑Matrix)
         </Typography>
         <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden", background: "#fff", padding: 12 }}>
           <TreeReferralGalaxy mode="self" />
         </div>
-      </Paper>
+      </Paper> */}
     </Container>
   );
 }

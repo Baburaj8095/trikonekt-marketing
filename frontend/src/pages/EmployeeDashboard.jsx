@@ -454,22 +454,20 @@ export default function EmployeeDashboard({ embedded = false }) {
   };
 
   // Assign e‑coupon to consumer (employee flow)
-  const [assign, setAssign] = useState({ codeId: "", consumerUsername: "", pincode: "", notes: "" });
+  const [assign, setAssign] = useState({ codeId: "", consumerUsername: "" });
   const [assignBusy, setAssignBusy] = useState(false);
   const doAssign = async () => {
     try {
-      if (!assign.codeId || !assign.consumerUsername || !assign.pincode) {
-        alert("Select code, enter consumer username and pincode.");
+      if (!assign.codeId || !assign.consumerUsername) {
+        alert("Select code and enter consumer username.");
         return;
       }
       setAssignBusy(true);
       await API.post(`/coupons/codes/${assign.codeId}/assign-consumer/`, {
         consumer_username: String(assign.consumerUsername).trim(),
-        pincode: String(assign.pincode).trim(),
-        notes: String(assign.notes || "").trim(),
       });
       alert("E‑Coupon assigned to consumer.");
-      setAssign({ codeId: "", consumerUsername: "", pincode: "", notes: "" });
+      setAssign({ codeId: "", consumerUsername: "" });
       await loadCodes();
       await loadMyCommissions();
       await loadPendingSubs();
@@ -545,7 +543,7 @@ export default function EmployeeDashboard({ embedded = false }) {
   const [wdrSubmitting, setWdrSubmitting] = useState(false);
   const [wdrForm, setWdrForm] = useState({
     amount: "",
-    method: "upi",
+    method: "bank",
     upi_id: "",
     bank_name: "",
     bank_account_number: "",
@@ -619,26 +617,18 @@ export default function EmployeeDashboard({ embedded = false }) {
     }
     const payload = {
       amount: amtNum,
-      method: wdrForm.method,
+      method: "bank",
     };
-    if (wdrForm.method === "upi") {
-      if (!wdrForm.upi_id.trim()) {
-        setWdrErr("UPI ID is required for UPI withdrawals.");
-        return;
-      }
-      payload.upi_id = wdrForm.upi_id.trim();
-    } else {
-      if (wdrForm.bank_name) payload.bank_name = wdrForm.bank_name.trim();
-      if (wdrForm.bank_account_number) payload.bank_account_number = wdrForm.bank_account_number.trim();
-      if (wdrForm.ifsc_code) payload.ifsc_code = wdrForm.ifsc_code.trim().toUpperCase();
-    }
+    if (wdrForm.bank_name) payload.bank_name = wdrForm.bank_name.trim();
+    if (wdrForm.bank_account_number) payload.bank_account_number = wdrForm.bank_account_number.trim();
+    if (wdrForm.ifsc_code) payload.ifsc_code = wdrForm.ifsc_code.trim().toUpperCase();
     try {
       setWdrSubmitting(true);
       await API.post("/accounts/withdrawals/", payload);
       await Promise.all([loadWallet(), loadTransactions(), loadMyWithdrawals()]);
       setWdrForm({
         amount: "",
-        method: wdrForm.method,
+        method: "bank",
         upi_id: "",
         bank_name: "",
         bank_account_number: "",
@@ -1076,9 +1066,9 @@ export default function EmployeeDashboard({ embedded = false }) {
         )}
 
         {activeTab === TABS.E_COUPONS && (
-              <Grid container spacing={2} sx={{ width: "100%", minWidth: 0, boxSizing: "border-box" }}>
-            <Grid item xs={12}>
-              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
+            <Grid container spacing={2} sx={{ width: "100%", minWidth: 0, boxSizing: "border-box" }}>
+            <Grid item xs={12} sx={{ width: "100%"}}>
+              <Paper elevation={3} sx={{width:"100%", p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff", width: "100%" }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My E‑Coupon Codes</Typography>
 
                 {/* Pending E‑Coupon submissions awaiting my approval */}
@@ -1137,7 +1127,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                 </Paper> */}
 
                 {/* Assign to Consumer */}
-                <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2, bgcolor: "#fbfdff" }}>
+                <Paper variant="outlined" xs={12} sm={12} md={6} sx={{ width:"100%", p: 2, borderRadius: 2, mb: 2, bgcolor: "#fbfdff" }}>
                   <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Assign E‑Coupon to Consumer</Typography>
                   <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                     <TextField
@@ -1146,7 +1136,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                       label="Select Code"
                       value={assign.codeId}
                       onChange={(e) => setAssign((a) => ({ ...a, codeId: e.target.value }))}
-                      sx={{ minWidth: 220 }}
+                    sx={{ minWidth: { sm: 220 }, width: "100%" }}
                       helperText={codesLoading ? "Loading..." : codesError || ""}
                     >
                     {(codes || [])
@@ -1162,10 +1152,8 @@ export default function EmployeeDashboard({ embedded = false }) {
                         </MenuItem>
                       )}
                     </TextField>
-                    <TextField size="small" label="Consumer Username" value={assign.consumerUsername} onChange={(e) => setAssign((a) => ({ ...a, consumerUsername: e.target.value }))} sx={{ minWidth: 200 }} />
-                    <TextField size="small" label="Pincode" value={assign.pincode} onChange={(e) => setAssign((a) => ({ ...a, pincode: e.target.value }))} inputProps={{ inputMode: "numeric", pattern: "[0-9]*", maxLength: 10 }} sx={{ minWidth: 140 }} />
-                    <TextField size="small" label="Notes" value={assign.notes} onChange={(e) => setAssign((a) => ({ ...a, notes: e.target.value }))} sx={{ minWidth: 200 }} />
-                    <Button variant="contained" onClick={doAssign} disabled={assignBusy || !assign.codeId || !assign.consumerUsername || !assign.pincode}>
+                      <TextField size="small" label="Consumer Username" value={assign.consumerUsername} onChange={(e) => setAssign((a) => ({ ...a, consumerUsername: e.target.value }))} sx={{ minWidth: { sm: 200 }, width: "100%" }} />
+                      <Button variant="contained" onClick={doAssign} disabled={assignBusy || !assign.codeId || !assign.consumerUsername} sx={{ width: { xs: "100%", sm: "auto" } }}>
                       {assignBusy ? "Assigning..." : "Assign"}
                     </Button>
                   </Stack>
@@ -1246,7 +1234,7 @@ export default function EmployeeDashboard({ embedded = false }) {
 
             {/* Commissions list */}
             <Grid item xs={12}>
-              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
+              <Paper elevation={3} sx={{width:"100%", p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My Commissions</Typography>
                 <Alert severity="success" sx={{ mb: 2 }}>Commission earned (lifetime): ₹{commissionTotal.toFixed(2)}</Alert>
                 <Table size="small">
@@ -1327,22 +1315,14 @@ export default function EmployeeDashboard({ embedded = false }) {
                 <Box component="form" onSubmit={submitWithdrawal} sx={{ mb: 2 }}>
                   <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                     <TextField fullWidth size="small" label="Amount (₹)" name="amount" value={wdrForm.amount} onChange={(e) => setWdrForm((f) => ({ ...f, amount: e.target.value }))} inputProps={{ inputMode: "decimal" }} required />
-                    <TextField fullWidth size="small" select label="Method" name="method" value={wdrForm.method} onChange={onWdrChange}>
-                      <MenuItem value="upi">UPI</MenuItem>
-                      <MenuItem value="bank">Bank</MenuItem>
-                    </TextField>
+                    {/* Method fixed to Bank; UPI removed */}
+                    <TextField fullWidth size="small" label="Method" name="method" value="bank" disabled />
                   </Stack>
-                  {wdrForm.method === "upi" ? (
-                    <Box sx={{ mt: 1 }}>
-                      <TextField fullWidth size="small" label="UPI ID" name="upi_id" value={wdrForm.upi_id} onChange={onWdrChange} required />
-                    </Box>
-                  ) : (
-                    <Stack spacing={1} sx={{ mt: 1 }}>
-                      <TextField fullWidth size="small" label="Bank Name" name="bank_name" value={wdrForm.bank_name} onChange={onWdrChange} />
-                      <TextField fullWidth size="small" label="Account Number" name="bank_account_number" value={wdrForm.bank_account_number} onChange={onWdrChange} inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }} />
-                      <TextField fullWidth size="small" label="IFSC Code" name="ifsc_code" value={wdrForm.ifsc_code} onChange={onWdrChange} inputProps={{ maxLength: 11, style: { textTransform: "uppercase" } }} />
-                    </Stack>
-                  )}
+                  <Stack spacing={1} sx={{ mt: 1 }}>
+                    <TextField fullWidth size="small" label="Bank Name" name="bank_name" value={wdrForm.bank_name} onChange={onWdrChange} />
+                    <TextField fullWidth size="small" label="Account Number" name="bank_account_number" value={wdrForm.bank_account_number} onChange={onWdrChange} inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }} />
+                    <TextField fullWidth size="small" label="IFSC Code" name="ifsc_code" value={wdrForm.ifsc_code} onChange={onWdrChange} inputProps={{ maxLength: 11, style: { textTransform: "uppercase" } }} />
+                  </Stack>
                   <Button type="submit" variant="contained" disabled={onCooldown || wdrSubmitting} sx={{ mt: 1 }}>
                     {wdrSubmitting ? "Requesting..." : "Request Withdrawal"}
                   </Button>
@@ -1531,7 +1511,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                     label="Select Code"
                     value={assign.codeId}
                     onChange={(e) => setAssign((a) => ({ ...a, codeId: e.target.value }))}
-                    sx={{ minWidth: 220 }}
+                    sx={{ minWidth: { sm: 220 }, width: "100%" }}
                     helperText={codesLoading ? "Loading..." : codesError || ""}
                   >
                     {(codes || [])
@@ -1547,10 +1527,8 @@ export default function EmployeeDashboard({ embedded = false }) {
                       </MenuItem>
                     )}
                   </TextField>
-                  <TextField size="small" label="Consumer Username" value={assign.consumerUsername} onChange={(e) => setAssign((a) => ({ ...a, consumerUsername: e.target.value }))} sx={{ minWidth: 200 }} />
-                  <TextField size="small" label="Pincode" value={assign.pincode} onChange={(e) => setAssign((a) => ({ ...a, pincode: e.target.value }))} inputProps={{ inputMode: "numeric", pattern: "[0-9]*", maxLength: 10 }} sx={{ minWidth: 140 }} />
-                  <TextField size="small" label="Notes" value={assign.notes} onChange={(e) => setAssign((a) => ({ ...a, notes: e.target.value }))} sx={{ minWidth: 200 }} />
-                  <Button variant="contained" onClick={doAssign} disabled={assignBusy || !assign.codeId || !assign.consumerUsername || !assign.pincode}>
+                      <TextField size="small" label="Consumer Username" value={assign.consumerUsername} onChange={(e) => setAssign((a) => ({ ...a, consumerUsername: e.target.value }))} sx={{ minWidth: { sm: 200 }, width: "100%" }} />
+                      <Button variant="contained" onClick={doAssign} disabled={assignBusy || !assign.codeId || !assign.consumerUsername} sx={{ width: { xs: "100%", sm: "auto" } }}>
                     {assignBusy ? "Assigning..." : "Assign"}
                   </Button>
                 </Stack>
@@ -1818,7 +1796,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                         label="Select Code"
                         value={assign.codeId}
                         onChange={(e) => setAssign((a) => ({ ...a, codeId: e.target.value }))}
-                        sx={{ minWidth: 220 }}
+                        sx={{ minWidth: { sm: 220 }, width: "100%" }}
                         helperText={codesLoading ? "Loading..." : codesError || ""}
                       >
                         {(codes || [])
@@ -1834,10 +1812,19 @@ export default function EmployeeDashboard({ embedded = false }) {
                           </MenuItem>
                         )}
                       </TextField>
-                      <TextField size="small" label="Consumer Username" value={assign.consumerUsername} onChange={(e) => setAssign((a) => ({ ...a, consumerUsername: e.target.value }))} sx={{ minWidth: 200 }} />
-                      <TextField size="small" label="Pincode" value={assign.pincode} onChange={(e) => setAssign((a) => ({ ...a, pincode: e.target.value }))} inputProps={{ inputMode: "numeric", pattern: "[0-9]*", maxLength: 10 }} sx={{ minWidth: 140 }} />
-                      <TextField size="small" label="Notes" value={assign.notes} onChange={(e) => setAssign((a) => ({ ...a, notes: e.target.value }))} sx={{ minWidth: 200 }} />
-                      <Button variant="contained" onClick={doAssign} disabled={assignBusy || !assign.codeId || !assign.consumerUsername || !assign.pincode}>
+                      <TextField
+                        size="small"
+                        label="Consumer Username"
+                        value={assign.consumerUsername}
+                        onChange={(e) => setAssign((a) => ({ ...a, consumerUsername: e.target.value }))}
+                        sx={{ minWidth: { sm: 200 }, width: "100%" }}
+                      />
+                      <Button
+                        variant="contained"
+                        onClick={doAssign}
+                        disabled={assignBusy || !assign.codeId || !assign.consumerUsername}
+                        sx={{ width: { xs: "100%", sm: "auto" } }}
+                      >
                         {assignBusy ? "Assigning..." : "Assign"}
                       </Button>
                     </Stack>
@@ -1993,22 +1980,14 @@ export default function EmployeeDashboard({ embedded = false }) {
                   <Box component="form" onSubmit={submitWithdrawal} sx={{ mb: 2 }}>
                     <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                       <TextField fullWidth size="small" label="Amount (₹)" name="amount" value={wdrForm.amount} onChange={(e) => setWdrForm((f) => ({ ...f, amount: e.target.value }))} inputProps={{ inputMode: "decimal" }} required />
-                      <TextField fullWidth size="small" select label="Method" name="method" value={wdrForm.method} onChange={onWdrChange}>
-                        <MenuItem value="upi">UPI</MenuItem>
-                        <MenuItem value="bank">Bank</MenuItem>
-                      </TextField>
+                      {/* Method fixed to Bank; UPI removed */}
+                      <TextField fullWidth size="small" label="Method" name="method" value="bank" disabled />
                     </Stack>
-                    {wdrForm.method === "upi" ? (
-                      <Box sx={{ mt: 1 }}>
-                        <TextField fullWidth size="small" label="UPI ID" name="upi_id" value={wdrForm.upi_id} onChange={onWdrChange} required />
-                      </Box>
-                    ) : (
-                      <Stack spacing={1} sx={{ mt: 1 }}>
-                        <TextField fullWidth size="small" label="Bank Name" name="bank_name" value={wdrForm.bank_name} onChange={onWdrChange} />
-                        <TextField fullWidth size="small" label="Account Number" name="bank_account_number" value={wdrForm.bank_account_number} onChange={onWdrChange} inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }} />
-                        <TextField fullWidth size="small" label="IFSC Code" name="ifsc_code" value={wdrForm.ifsc_code} onChange={onWdrChange} inputProps={{ maxLength: 11, style: { textTransform: "uppercase" } }} />
-                      </Stack>
-                    )}
+                    <Stack spacing={1} sx={{ mt: 1 }}>
+                      <TextField fullWidth size="small" label="Bank Name" name="bank_name" value={wdrForm.bank_name} onChange={onWdrChange} />
+                      <TextField fullWidth size="small" label="Account Number" name="bank_account_number" value={wdrForm.bank_account_number} onChange={onWdrChange} inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }} />
+                      <TextField fullWidth size="small" label="IFSC Code" name="ifsc_code" value={wdrForm.ifsc_code} onChange={onWdrChange} inputProps={{ maxLength: 11, style: { textTransform: "uppercase" } }} />
+                    </Stack>
                     <Button type="submit" variant="contained" disabled={onCooldown || wdrSubmitting} sx={{ mt: 1 }}>
                       {wdrSubmitting ? "Requesting..." : "Request Withdrawal"}
                     </Button>

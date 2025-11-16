@@ -323,10 +323,15 @@ def handle_submission_post_save(sender, instance: "CouponSubmission", created: b
 
             # Wallet credit via MLM redeem path (₹140 default) and fixed commissions
             try:
-                from business.services.activation import redeem_150
+                from business.services.activation import redeem_150, ensure_first_purchase_activation
                 # Credit consumer using MLM redeem flow (idempotent)
                 if instance.consumer_id:
                     redeem_150(instance.consumer, {"type": "coupon", "id": instance.id, "code": instance.coupon_code})
+                    # Stamp first activation and trigger deferred join/franchise-on-join (idempotent)
+                    try:
+                        ensure_first_purchase_activation(instance.consumer, {"type": "coupon_first_purchase", "id": instance.id, "code": instance.coupon_code})
+                    except Exception:
+                        pass
                     # Franchise benefit distribution on purchase (idempotent)
                     try:
                         from business.services.franchise import distribute_franchise_benefit

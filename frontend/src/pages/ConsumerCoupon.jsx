@@ -552,22 +552,65 @@ export default function ConsumerCoupon() {
         ) : errorSummary ? (
           <Alert severity="error">{errorSummary}</Alert>
         ) : mySummary ? (
-          <Grid container spacing={2}>
-            <Grid item xs={6} md={3}>
-              <Typography variant="body2">Available</Typography>
-              <Typography variant="h6">{mySummary.available ?? 0}</Typography>
+          <Grid container spacing={2} sx={{
+           
+            '@media (max-width:600px)': {
+              minWidth: 0,
+              boxSizing: 'border-box',
+              width: '100%',
+            },
+          }}>
+            <Grid item xs={6} md={3} sx={{
+           
+            '@media (max-width:600px)': {
+              minWidth: 0,
+              boxSizing: 'border-box',
+              width: '100%',
+            },
+          }}>
+              <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)", color: "#fff", border: "1px solid rgba(124,58,237,0.35)", boxShadow: "0 8px 18px rgba(124,58,237,0.35)" }}>
+                <Typography variant="caption" sx={{ opacity: 0.9 }}>Available</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 900 }}>{mySummary.available ?? 0}</Typography>
+              </Box>
             </Grid>
-            <Grid item xs={6} md={3}>
-              <Typography variant="body2">Redeemed</Typography>
-              <Typography variant="h6">{mySummary.redeemed ?? 0}</Typography>
+            <Grid item xs={6} md={3} sx={{
+           
+            '@media (max-width:600px)': {
+              minWidth: 0,
+              boxSizing: 'border-box',
+              width: '100%',
+            },
+          }}>
+              <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)", color: "#fff", border: "1px solid rgba(244,63,94,0.35)", boxShadow: "0 8px 18px rgba(244,63,94,0.35)" }}>
+                <Typography variant="caption" sx={{ opacity: 0.9 }}>Redeemed</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 900 }}>{mySummary.redeemed ?? 0}</Typography>
+              </Box>
             </Grid>
-            <Grid item xs={6} md={3}>
-              <Typography variant="body2">Activated</Typography>
-              <Typography variant="h6">{mySummary.activated ?? 0}</Typography>
+            <Grid item xs={6} md={3} sx={{
+           
+            '@media (max-width:600px)': {
+              minWidth: 0,
+              boxSizing: 'border-box',
+              width: '100%',
+            },
+          }}>
+              <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", color: "#fff", border: "1px solid rgba(16,185,129,0.35)", boxShadow: "0 8px 18px rgba(16,185,129,0.35)" }}>
+                <Typography variant="caption" sx={{ opacity: 0.9 }}>Activated</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 900 }}>{mySummary.activated ?? 0}</Typography>
+              </Box>
             </Grid>
-            <Grid item xs={6} md={3}>
-              <Typography variant="body2">Transferred</Typography>
-              <Typography variant="h6">{mySummary.transferred ?? 0}</Typography>
+            <Grid item xs={6} md={3} sx={{
+           
+            '@media (max-width:600px)': {
+              minWidth: 0,
+              boxSizing: 'border-box',
+              width: '100%',
+            },
+          }}>
+              <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%)", color: "#fff", border: "1px solid rgba(59,130,246,0.35)", boxShadow: "0 8px 18px rgba(59,130,246,0.35)" }}>
+                <Typography variant="caption" sx={{ opacity: 0.9 }}>Transferred</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 900 }}>{mySummary.transferred ?? 0}</Typography>
+              </Box>
             </Grid>
           </Grid>
         ) : (
@@ -577,7 +620,7 @@ export default function ConsumerCoupon() {
 
       <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mb: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
-          E-Coupon History
+          All My E‑Coupon Codes
         </Typography>
         {codesLoading ? (
           <Box sx={{ py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>

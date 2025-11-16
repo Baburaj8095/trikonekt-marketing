@@ -283,6 +283,10 @@ export default function UserDashboard({ embedded = false }) {
   const [codesLoading, setCodesLoading] = useState(false);
   const [referralCommissionTotal, setReferralCommissionTotal] = useState(0);
   const [walletDirectReferralTotal, setWalletDirectReferralTotal] = useState(0);
+  // E‑Coupon consumer summary for dashboard cards
+  const [ecSummary, setEcSummary] = useState(null);
+  const [ecSummaryLoading, setEcSummaryLoading] = useState(false);
+  const [ecSummaryError, setEcSummaryError] = useState("");
 
   // Account activation status
   const [activation, setActivation] = useState(null);
@@ -353,6 +357,21 @@ export default function UserDashboard({ embedded = false }) {
     }
   };
 
+  // Load E‑Coupon consumer summary for dashboard
+  const loadEcSummary = async () => {
+    try {
+      setEcSummaryLoading(true);
+      setEcSummaryError("");
+      const res = await API.get("/coupons/codes/consumer-summary/");
+      setEcSummary(res?.data || null);
+    } catch (e) {
+      setEcSummary(null);
+      setEcSummaryError("Failed to load E‑Coupon summary.");
+    } finally {
+      setEcSummaryLoading(false);
+    }
+  };
+
   const handleSelf50Activation = async () => {
     try {
       setActivating50(true);
@@ -377,6 +396,7 @@ export default function UserDashboard({ embedded = false }) {
     loadMyCommissions();
     loadWalletDirectCommission();
     loadActivationStatus();
+    loadEcSummary();
   }, []);
 
   const availableCodes = (codes || []).filter((c) => c.status === "AVAILABLE").length;
@@ -796,7 +816,7 @@ export default function UserDashboard({ embedded = false }) {
             />
           </Grid>
           
-          <Grid item xs={12} sm={6} md={4}  sx={{
+          {/* <Grid item xs={12} sm={6} md={4}  sx={{
            
             '@media (max-width:600px)': {
               minWidth: 0,
@@ -811,7 +831,7 @@ export default function UserDashboard({ embedded = false }) {
               palette="red"
               onClick={handleSelf50Activation}
             />
-          </Grid>
+          </Grid> */}
           {/* <Grid item xs={12} sm={6} md={4}>
             <KpiCard
               title="My Referral ID"
@@ -827,7 +847,50 @@ export default function UserDashboard({ embedded = false }) {
               <ReferAndEarn title="Refer & Earn" onlyConsumer />
             </Box> */}
 
-            {/* Wealth Galaxy Section (in Dashboard) */}
+            {/* My E‑Coupon Summary (cards) */}
+        <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", mb: 2, border: "1px solid #e2e8f0" }}>
+          <Box sx={{ p: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
+              My E‑Coupon Summary
+            </Typography>
+            {ecSummaryLoading ? (
+              <Typography variant="body2">Loading...</Typography>
+            ) : ecSummaryError ? (
+              <Typography variant="body2" color="error">{ecSummaryError}</Typography>
+            ) : ecSummary ? (
+              <Grid container spacing={2}>
+                <Grid item xs={6} md={3}>
+                  <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)", color: "#fff", border: "1px solid rgba(124,58,237,0.35)", boxShadow: "0 8px 18px rgba(124,58,237,0.35)" }}>
+                    <Typography variant="caption" sx={{ opacity: 0.9 }}>Available</Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.available ?? 0}</Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={6} md={3}>
+                  <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)", color: "#fff", border: "1px solid rgba(244,63,94,0.35)", boxShadow: "0 8px 18px rgba(244,63,94,0.35)" }}>
+                    <Typography variant="caption" sx={{ opacity: 0.9 }}>Redeemed</Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.redeemed ?? 0}</Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={6} md={3}>
+                  <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", color: "#fff", border: "1px solid rgba(16,185,129,0.35)", boxShadow: "0 8px 18px rgba(16,185,129,0.35)" }}>
+                    <Typography variant="caption" sx={{ opacity: 0.9 }}>Activated</Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.activated ?? 0}</Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={6} md={3}>
+                  <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%)", color: "#fff", border: "1px solid rgba(59,130,246,0.35)", boxShadow: "0 8px 18px rgba(59,130,246,0.35)" }}>
+                    <Typography variant="caption" sx={{ opacity: 0.9 }}>Transferred</Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.transferred ?? 0}</Typography>
+                  </Box>
+                </Grid>
+              </Grid>
+            ) : (
+              <Typography variant="body2" color="text.secondary">No data.</Typography>
+            )}
+          </Box>
+        </Box>
+
+        {/* Wealth Galaxy Section (in Dashboard) */}
         <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", mb: 2, border: "1px solid #e2e8f0" }}>
           <WealthGalaxy />
         </Box>
@@ -1211,6 +1274,49 @@ export default function UserDashboard({ embedded = false }) {
                 />
               </Grid>
             </Grid>
+
+            {/* My E‑Coupon Summary (cards) */}
+            <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", mb: 2, border: "1px solid #e2e8f0" }}>
+              <Box sx={{ p: 2 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
+                  My E‑Coupon Summary
+                </Typography>
+                {ecSummaryLoading ? (
+                  <Typography variant="body2">Loading...</Typography>
+                ) : ecSummaryError ? (
+                  <Typography variant="body2" color="error">{ecSummaryError}</Typography>
+                ) : ecSummary ? (
+                  <Grid container spacing={2}>
+                    <Grid item xs={6} md={3}>
+                      <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)", color: "#fff", border: "1px solid rgba(124,58,237,0.35)", boxShadow: "0 8px 18px rgba(124,58,237,0.35)" }}>
+                        <Typography variant="caption" sx={{ opacity: 0.9 }}>Available</Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.available ?? 0}</Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={6} md={3}>
+                      <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)", color: "#fff", border: "1px solid rgba(244,63,94,0.35)", boxShadow: "0 8px 18px rgba(244,63,94,0.35)" }}>
+                        <Typography variant="caption" sx={{ opacity: 0.9 }}>Redeemed</Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.redeemed ?? 0}</Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={6} md={3}>
+                      <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", color: "#fff", border: "1px solid rgba(16,185,129,0.35)", boxShadow: "0 8px 18px rgba(16,185,129,0.35)" }}>
+                        <Typography variant="caption" sx={{ opacity: 0.9 }}>Activated</Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.activated ?? 0}</Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={6} md={3}>
+                      <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%)", color: "#fff", border: "1px solid rgba(59,130,246,0.35)", boxShadow: "0 8px 18px rgba(59,130,246,0.35)" }}>
+                        <Typography variant="caption" sx={{ opacity: 0.9 }}>Transferred</Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.transferred ?? 0}</Typography>
+                      </Box>
+                    </Grid>
+                  </Grid>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">No data.</Typography>
+                )}
+              </Box>
+            </Box>
 
             {/* Wealth Galaxy Section (in Dashboard) */}
             <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", mb: 2, border: "1px solid #e2e8f0" }}>

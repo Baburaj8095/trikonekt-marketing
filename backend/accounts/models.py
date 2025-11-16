@@ -4,6 +4,9 @@ from locations.models import State
 
 
 class CustomUser(AbstractUser):
+    # USERNAME_FIELD must be globally unique in Django; keep global uniqueness.
+    username = models.CharField(max_length=150, unique=True, db_index=True)
+
     ROLE_CHOICES = [
         ('user', 'User'),
         ('agency', 'Agency'),
@@ -441,7 +444,6 @@ class UserKYC(models.Model):
 
 class WithdrawalRequest(models.Model):
     METHOD_CHOICES = (
-        ("upi", "UPI"),
         ("bank", "Bank Transfer"),
     )
     STATUS_CHOICES = (
@@ -451,7 +453,7 @@ class WithdrawalRequest(models.Model):
     )
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="withdrawal_requests", db_index=True)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
-    method = models.CharField(max_length=16, choices=METHOD_CHOICES, default="upi", db_index=True)
+    method = models.CharField(max_length=16, choices=METHOD_CHOICES, default="bank", db_index=True)
     upi_id = models.CharField(max_length=100, blank=True)
     # bank fallback (can be copied from UserKYC on create)
     bank_name = models.CharField(max_length=150, blank=True)
@@ -554,23 +556,8 @@ def handle_new_user_post_save(sender, instance: CustomUser, created: bool, **kwa
     except Exception:
         pass
 
-    # Referral join payouts (DIRECT_REF_BONUS + LEVEL_BONUS) and optional autopool
-    try:
-        from business.services import referral as referral_service
-        referral_service.on_user_join(instance, source={"type": "user", "id": instance.id})
-    except Exception:
-        # do not block user creation
-        pass
+    # DEFERRED: No referral/matrix payouts on registration.
+    # Intentionally not calling referral.on_user_join here. Payouts will be triggered on first activation.
 
-    # Franchise benefit distribution on registration
-    try:
-        if cfg is None or getattr(cfg, "enable_franchise_on_join", True):
-            from business.services import franchise as franchise_service
-            franchise_service.distribute_franchise_benefit(
-                instance,
-                trigger="registration",
-                source={"type": "user", "id": instance.id},
-            )
-    except Exception:
-        # best-effort, non-blocking
-        pass
+    # DEFERRED: No franchise payouts on registration.
+    # Franchise payouts will be triggered on first activation inside ensure_first_purchase_activation.

@@ -51,6 +51,7 @@ import AdminLuckyDraw from "./pages/admin/AdminLuckyDraw";
 import Profile from "./pages/Profile";
 import RoleSelect from "./pages/Auth/RoleSelect";
 import ReferAndEarnPage from "./pages/ReferAndEarn";
+import AgencyReferAndEarn from "./pages/AgencyReferAndEarn";
 import WealthGalaxy from "./pages/WealthGalaxy";
 import AppHub from "./pages/AppHub";
 import ModelsIndex from "./admin-panel/dynamic/ModelsIndex";
@@ -214,6 +215,16 @@ function App() {
             <ProtectedRoute allowedRoles={["agency"]}>
               <AgencyShell>
                 <Profile />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agency/refer-earn"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <AgencyReferAndEarn />
               </AgencyShell>
             </ProtectedRoute>
           }

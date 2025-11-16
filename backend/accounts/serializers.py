@@ -260,6 +260,19 @@ class RegisterSerializer(serializers.ModelSerializer):
         # Keep a reference for use in create()
         self._sponsor_user = sponsor_user
 
+        # Enforce per-role username uniqueness (and special consumer rule)
+        try:
+            phone_digits = ''.join(c for c in (phone or '') if c.isdigit())
+        except Exception:
+            phone_digits = (phone or '')
+        username_base = self._build_username(category, phone_digits, '')
+        # USERNAME_FIELD is globally unique; enforce against username only.
+        if CustomUser.objects.filter(username__iexact=username_base).exists():
+            if category == 'consumer':
+                # Deterministic username TR+phone => same phone implies same username for consumer
+                raise serializers.ValidationError({'phone': 'Consumer already exists for this phone number.'})
+            raise serializers.ValidationError({'detail': 'Username already exists.'})
+
         # Basic email validation presence is optional; rely on DRF internal if provided
         return attrs
 
@@ -351,13 +364,6 @@ class RegisterSerializer(serializers.ModelSerializer):
                 base = f"TR{phone_digits}"
 
         username = base
-        # Ensure uniqueness across table (append -01, -02, ... if needed)
-        i = 1
-        while CustomUser.objects.filter(username=username).exists():
-            suffix = f"-{i:02d}"
-            trim_len = 150 - len(suffix)
-            username = f"{base[:trim_len]}{suffix}"
-            i += 1
         return username
 
     @transaction.atomic
@@ -591,15 +597,12 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
         except Exception:
             raise serializers.ValidationError({"amount": "Invalid amount."})
 
-        method = (attrs.get("method") or "upi").lower()
-        if method == "upi":
-            if not (attrs.get("upi_id") or "").strip():
-                raise serializers.ValidationError({"upi_id": "UPI ID is required for UPI withdrawals."})
-        elif method == "bank":
-            # Bank details may be filled from KYC in create()
-            pass
-        else:
-            raise serializers.ValidationError({"method": "Invalid method. Use 'upi' or 'bank'."})
+        # Only bank withdrawals are supported
+        method = (attrs.get("method") or "bank").lower()
+        if method != "bank":
+            raise serializers.ValidationError({"method": "Only bank withdrawals are supported."})
+        attrs["method"] = "bank"
+        # Bank details may be filled from KYC in create()
         return attrs
 
     def create(self, validated_data):
@@ -608,7 +611,7 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
         if not user or not user.is_authenticated:
             raise serializers.ValidationError({"detail": "Authentication required."})
 
-        method = (validated_data.get("method") or "upi").lower()
+        method = (validated_data.get("method") or "bank").lower()
         bank_name = (validated_data.get("bank_name") or "").strip()
         bank_acc = (validated_data.get("bank_account_number") or "").strip()
         ifsc = (validated_data.get("ifsc_code") or "").strip()

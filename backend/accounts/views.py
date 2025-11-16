@@ -28,24 +28,8 @@ class RegisterView(generics.CreateAPIView):
         """
         user = serializer.save()
 
-        # Trigger referral join payouts and optional franchise-on-join (best-effort, idempotent)
-        try:
-            from business.services.referral import on_user_join
-            on_user_join(user, {"type": "registration", "id": getattr(user, "id", "")})
-        except Exception:
-            pass
-        try:
-            from business.models import CommissionConfig
-            cfg = CommissionConfig.get_solo()
-            if getattr(cfg, "enable_franchise_on_join", True):
-                from business.services.franchise import distribute_franchise_benefit
-                distribute_franchise_benefit(
-                    user,
-                    trigger="registration",
-                    source={"type": "registration", "id": getattr(user, "id", "")},
-                )
-        except Exception:
-            pass
+        # Defer referral/franchise payouts until first activation; no payouts on registration
+        # Intentionally removed calls to referral.on_user_join and franchise.distribute_franchise_benefit here.
 
         # Defer and guard email to avoid blocking the request thread
         try:

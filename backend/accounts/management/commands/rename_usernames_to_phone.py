@@ -34,7 +34,7 @@ def _find_sf_for_pin(pin: str) -> Optional[CustomUser]:
 def _safe_rename_username(user: CustomUser, new_username: str, dry_run: bool) -> str:
     if user.username == new_username:
         return "unchanged"
-    # Check for collision
+    # Check for global collision (USERNAME_FIELD must be globally unique)
     exists = CustomUser.objects.filter(username=new_username).exclude(id=user.id).exists()
     if exists:
         raise CommandError(

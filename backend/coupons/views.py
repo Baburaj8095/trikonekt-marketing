@@ -5,6 +5,7 @@ from rest_framework import status, viewsets, mixins
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.pagination import PageNumberPagination
 
 from accounts.models import CustomUser
 from .models import (
@@ -25,6 +26,12 @@ from .serializers import (
     CommissionSerializer,
     AuditTrailSerializer,
 )
+
+# Pagination (per-view) for coupon codes
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 25
+    page_size_query_param = "page_size"
+    max_page_size = 100
 
 
 def is_agency_user(user: CustomUser) -> bool:
@@ -141,6 +148,7 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     queryset = CouponCode.objects.select_related("coupon", "assigned_employee", "assigned_agency", "issued_by", "batch").all()
     serializer_class = CouponCodeSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
         user = self.request.user
