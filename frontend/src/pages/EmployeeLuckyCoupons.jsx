@@ -161,20 +161,19 @@ export default function EmployeeLuckyCoupons() {
   }, []);
 
   // Assign e-coupon to consumer (creates submission and triggers normal flow)
-  const [assign, setAssign] = useState({ codeId: "", consumerUsername: "", pincode: "", notes: "" });
+  const [assign, setAssign] = useState({ codeId: "", consumerUsername: "", notes: "" });
   const [assignBusy, setAssignBusy] = useState(false);
 
   const doAssign = async () => {
     try {
-      if (!assign.codeId || !assign.consumerUsername || !assign.pincode) return;
+      if (!assign.codeId || !assign.consumerUsername) return;
       setAssignBusy(true);
       await API.post(`/coupons/codes/${assign.codeId}/assign-consumer/`, {
         consumer_username: assign.consumerUsername,
-        pincode: assign.pincode,
         notes: assign.notes || "",
       });
       alert("Assigned successfully.");
-      setAssign({ codeId: "", consumerUsername: "", pincode: "", notes: "" });
+      setAssign({ codeId: "", consumerUsername: "", notes: "" });
       await loadCodes();
       await loadCommissions();
     } catch (e) {
@@ -369,14 +368,6 @@ export default function EmployeeLuckyCoupons() {
                   />
                   <TextField
                     size="small"
-                    label="Pincode"
-                    value={assign.pincode}
-                    onChange={(e) => setAssign((a) => ({ ...a, pincode: e.target.value }))}
-                    inputProps={{ inputMode: "numeric", pattern: "[0-9]*", maxLength: 10 }}
-                    sx={{ minWidth: 140 }}
-                  />
-                  <TextField
-                    size="small"
                     label="Notes"
                     value={assign.notes}
                     onChange={(e) => setAssign((a) => ({ ...a, notes: e.target.value }))}
@@ -385,7 +376,7 @@ export default function EmployeeLuckyCoupons() {
                   <Button
                     variant="contained"
                     onClick={doAssign}
-                    disabled={assignBusy || !assign.codeId || !assign.consumerUsername || !assign.pincode}
+                    disabled={assignBusy || !assign.codeId || !assign.consumerUsername}
                   >
                     {assignBusy ? "Assigning..." : "Assign"}
                   </Button>

@@ -325,7 +325,7 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         Employee or Agency assigns an e-coupon code to a Consumer.
         This directly assigns ownership to the consumer and marks the code SOLD.
         No submissions or approvals are created for e-coupons.
-        Body: { "consumer_username": "U123456", "pincode": "585101", "notes": "optional" }
+        Body: { "consumer_username": "U123456", "notes": "optional" }
         """
         # Employees and Agencies can assign to consumers
         if not (is_employee_user(request.user) or is_agency_user(request.user)):
@@ -353,13 +353,10 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
                 return Response({"detail": f"Code not assignable in current status: {code.status}."}, status=status.HTTP_400_BAD_REQUEST)
 
         consumer_username = (request.data.get("consumer_username") or "").strip()
-        pincode = (request.data.get("pincode") or "").strip()
         notes = (request.data.get("notes") or "").strip()
 
         if not consumer_username:
             return Response({"consumer_username": ["This field is required."]}, status=status.HTTP_400_BAD_REQUEST)
-        if not pincode:
-            return Response({"pincode": ["This field is required."]}, status=status.HTTP_400_BAD_REQUEST)
 
         consumer = CustomUser.objects.filter(username__iexact=consumer_username).first()
         if not consumer or not is_consumer_user(consumer):
@@ -376,7 +373,7 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
                 actor=request.user,
                 coupon_code=code,
                 notes=notes,
-                metadata={"consumer_username": consumer.username, "pincode": pincode},
+                metadata={"consumer_username": consumer.username},
             )
 
         data = CouponCodeSerializer(code).data
