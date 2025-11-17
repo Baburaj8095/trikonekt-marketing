@@ -40,7 +40,7 @@ export default function EmployeeShell({ children }) {
     { to: "/employee/dashboard?tab=refer_earn", label: "Refer & Earn", icon: "upload" },
     { to: "/employee/dashboard?tab=rewards", label: "Rewards", icon: "chart" },
     { to: "/employee/dashboard?tab=e_coupons", label: "My E‑Coupons", icon: "ticket" },
-    { to: "/employee/dashboard?tab=wallet", label: "My Wallet", icon: "wallet" },
+    { to: "/employee/wallet", label: "Wallet", icon: "wallet" },
 
     { to: "/employee/daily-report", label: "Daily Report", icon: "box" },
   ];

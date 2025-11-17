@@ -41,6 +41,7 @@ export default function AgencyShell({ children }) {
   const menu = [
     { to: "/agency/dashboard", label: "Dashboard", icon: "dashboard" },
     { to: "/agency/profile", label: "Profile", icon: "users" },
+    { to: "/agency/wallet", label: "Wallet", icon: "wallet" },
 
     // Lucky-coupons tabs
     { to: "/agency/lucky-coupons?tab=pending", label: "Lucky Draw Submissions", icon: "ticket" },

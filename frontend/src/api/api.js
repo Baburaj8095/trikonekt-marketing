@@ -322,5 +322,10 @@ API.interceptors.response.use(
   } catch (_) {}
 })();
 
+export async function assignConsumerByCount(payload) {
+  const res = await API.post("/coupons/codes/assign-consumer-count/", payload);
+  return res?.data || res;
+}
+
 export { ensureFreshAccess, getAccessToken, getRefreshToken };
 export default API;

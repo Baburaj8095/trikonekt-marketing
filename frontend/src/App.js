@@ -220,6 +220,16 @@ function App() {
           }
         />
         <Route
+          path="/agency/wallet"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <Wallet />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/agency/refer-earn"
           element={
             <ProtectedRoute allowedRoles={["agency"]}>
@@ -305,6 +315,16 @@ function App() {
             <ProtectedRoute allowedRoles={["employee"]}>
               <EmployeeShell>
                 <Profile />
+              </EmployeeShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee/wallet"
+          element={
+            <ProtectedRoute allowedRoles={["employee"]}>
+              <EmployeeShell>
+                <Wallet />
               </EmployeeShell>
             </ProtectedRoute>
           }

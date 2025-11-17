@@ -28,7 +28,7 @@ import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import MenuIcon from "@mui/icons-material/Menu";
 import LOGO from "../assets/TRIKONEKT.png";
-import API from "../api/api";
+import API, { assignConsumerByCount } from "../api/api";
 
 const drawerWidth = 220;
 
@@ -182,6 +182,75 @@ export default function EmployeeLuckyCoupons() {
       alert(msg);
     } finally {
       setAssignBusy(false);
+    }
+  };
+
+  // Bulk sell by count to consumer (employee)
+  const [bulkSell, setBulkSell] = useState({ consumerUsername: "", count: "", notes: "" });
+  const onBulkChange = (e) => setBulkSell((f) => ({ ...f, [e.target.name]: e.target.value }));
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  // Resolve consumer for bulk
+  const [bulkResolveLoading, setBulkResolveLoading] = useState(false);
+  const [bulkResolvedUser, setBulkResolvedUser] = useState(null);
+  const [bulkResolveError, setBulkResolveError] = useState("");
+
+  useEffect(() => {
+    const u = String(bulkSell.consumerUsername || "").trim();
+    if (!u) {
+      setBulkResolvedUser(null);
+      setBulkResolveError("");
+      return;
+    }
+    let cancelled = false;
+    setBulkResolveLoading(true);
+    API.get("/coupons/codes/resolve-user/", { params: { username: u } })
+      .then((res) => {
+        if (cancelled) return;
+        setBulkResolvedUser(res.data || null);
+        setBulkResolveError("");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setBulkResolvedUser(null);
+        setBulkResolveError("User not found or invalid.");
+      })
+      .finally(() => {
+        if (!cancelled) setBulkResolveLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [bulkSell.consumerUsername]);
+
+  const availableMine = useMemo(
+    () => (codes || []).filter((c) => String(c.status) === "ASSIGNED_EMPLOYEE" && !c.assigned_consumer).length,
+    [codes]
+  );
+
+  const submitBulkSell = async () => {
+    const consumer = String(bulkSell.consumerUsername || "").trim();
+    const cnt = Number(bulkSell.count || 0);
+    if (!consumer || !cnt || cnt <= 0) {
+      alert("Enter consumer username and a positive count.");
+      return;
+    }
+    try {
+      setBulkBusy(true);
+      const payload = { consumer_username: consumer, count: cnt };
+      if (bulkSell.notes) payload.notes = String(bulkSell.notes);
+      const res = await assignConsumerByCount(payload);
+      const assigned = res?.assigned ?? 0;
+      alert(`Assigned ${assigned} codes to ${res?.consumer?.username || consumer}.`);
+      setBulkSell({ consumerUsername: "", count: "", notes: "" });
+      await loadCodes();
+      await loadCommissions();
+    } catch (e) {
+      const err = e?.response?.data;
+      const msg = (typeof err === "string" ? err : (err?.detail || JSON.stringify(err || {}))) || "Failed to assign by count.";
+      alert(msg);
+    } finally {
+      setBulkBusy(false);
     }
   };
 
@@ -380,6 +449,62 @@ export default function EmployeeLuckyCoupons() {
                   >
                     {assignBusy ? "Assigning..." : "Assign"}
                   </Button>
+                </Stack>
+              </Paper>
+
+              {/* Sell E-Coupons by Count */}
+              <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2, bgcolor: "#fbfdff" }}>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>
+                  Sell E-Coupons by Count
+                </Typography>
+                <Stack direction={{ xs: "column" }} spacing={1}>
+                  <Typography variant="body2" color="text.secondary">
+                    Available in My Pool: {availableMine}
+                  </Typography>
+                  <TextField
+                    size="small"
+                    label="Consumer Username"
+                    name="consumerUsername"
+                    value={bulkSell.consumerUsername}
+                    onChange={onBulkChange}
+                    sx={{ minWidth: 200 }}
+                  />
+                  {bulkResolveLoading ? (
+                    <Typography variant="caption" color="text.secondary">Resolving username…</Typography>
+                  ) : bulkResolvedUser ? (
+                    <Typography variant="caption" color="text.secondary">
+                      This TR username belongs to {bulkResolvedUser.full_name || bulkResolvedUser.username} · PIN {bulkResolvedUser.pincode || "-"}
+                      {bulkResolvedUser.city ? ` · ${bulkResolvedUser.city}` : ""}{bulkResolvedUser.state ? `, ${bulkResolvedUser.state}` : ""}
+                    </Typography>
+                  ) : bulkResolveError ? (
+                    <Alert severity="warning">{bulkResolveError}</Alert>
+                  ) : null}
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                    <TextField
+                      size="small"
+                      label="Count"
+                      name="count"
+                      value={bulkSell.count}
+                      onChange={onBulkChange}
+                      inputProps={{ inputMode: "numeric", pattern: "[0-9]*", min: 1 }}
+                      sx={{ minWidth: 140 }}
+                    />
+                    <TextField
+                      size="small"
+                      label="Notes (optional)"
+                      name="notes"
+                      value={bulkSell.notes}
+                      onChange={onBulkChange}
+                      sx={{ minWidth: 200 }}
+                    />
+                    <Button
+                      variant="contained"
+                      onClick={submitBulkSell}
+                      disabled={bulkBusy || !bulkSell.consumerUsername || !bulkSell.count}
+                    >
+                      {bulkBusy ? "Assigning..." : "Assign by Count"}
+                    </Button>
+                  </Stack>
                 </Stack>
               </Paper>
 

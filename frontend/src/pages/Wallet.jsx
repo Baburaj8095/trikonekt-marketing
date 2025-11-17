@@ -36,12 +36,51 @@ function TxTypeChip({ type }) {
   return <Chip size="small" color={color} label={type || "TX"} />;
 }
 
+function computeWeeklyWindowLocal() {
+  // Compute current week's Wednesday 7:00 PM to 9:00 PM window using local time
+  const now = new Date();
+
+  // JS weekday: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+  const day = now.getDay();
+
+  // Days since this week's Wednesday
+  const daysSinceWed = ((day - 3) + 7) % 7;
+
+  // Get this week's Wednesday date
+  const currentWed = new Date(now);
+  currentWed.setHours(0, 0, 0, 0);
+  currentWed.setDate(currentWed.getDate() - daysSinceWed);
+
+  // Window start/end (local time)
+  const currentStart = new Date(currentWed);
+  currentStart.setHours(19, 0, 0, 0); // 7:00 PM
+  const currentEnd = new Date(currentWed);
+  currentEnd.setHours(21, 0, 0, 0); // 9:00 PM
+
+  // Open state
+  const isOpen = now >= currentStart && now < currentEnd;
+
+  // Next window start
+  let nextStart = new Date(currentStart);
+  if (now >= currentEnd) {
+    // next week's Wednesday
+    nextStart = new Date(currentStart);
+    nextStart.setDate(nextStart.getDate() + 7);
+  } else if (now < currentStart) {
+    nextStart = new Date(currentStart);
+  }
+
+  return { isOpen, nextWindowAt: nextStart, currentStart, currentEnd };
+}
+
 export default function Wallet() {
   const [loading, setLoading] = useState(true);
   const [balance, setBalance] = useState("0.00");
   const [updatedAt, setUpdatedAt] = useState(null);
   const [txs, setTxs] = useState([]);
   const [err, setErr] = useState("");
+  const [kyc, setKyc] = useState({ verified: false });
+  const [windowInfo, setWindowInfo] = useState(computeWeeklyWindowLocal());
 
   // Withdrawals
   const [myWithdrawals, setMyWithdrawals] = useState([]);
@@ -56,19 +95,33 @@ export default function Wallet() {
   });
   const onWdrChange = (e) => setWdrForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
-  const cooldownUntil = useMemo(() => {
+  const inWindowCooldown = useMemo(() => {
+    const wi = windowInfo;
+    if (!wi || !wi.currentStart || !wi.currentEnd) return false;
     try {
-      // list is ordered by -requested_at (backend)
-      const last = (myWithdrawals || []).find((w) => String(w.status).toLowerCase() !== "rejected");
-      if (!last || !last.requested_at) return null;
-      const dt = new Date(last.requested_at);
-      dt.setDate(dt.getDate() + 7);
-      return dt;
+      return (myWithdrawals || []).some((w) => {
+        const status = String(w.status || "").toLowerCase();
+        if (status === "rejected") return false;
+        const dt = w.requested_at ? new Date(w.requested_at) : null;
+        return dt && dt >= wi.currentStart && dt < wi.currentEnd;
+      });
     } catch {
-      return null;
+      return false;
     }
-  }, [myWithdrawals]);
-  const onCooldown = Boolean(cooldownUntil && cooldownUntil > new Date());
+  }, [myWithdrawals, windowInfo]);
+
+  const disableReason = useMemo(() => {
+    if (!kyc?.verified) return "KYC verification required";
+    if (Number(balance) < 500) return "Minimum balance ₹500 required";
+    if (!windowInfo?.isOpen) return "Withdrawals are allowed only on Wednesday 7:00 PM to 9:00 PM (IST)";
+    if (inWindowCooldown) return "You have already requested a withdrawal in this week's window";
+    return "";
+  }, [kyc, balance, windowInfo, inWindowCooldown]);
+
+  useEffect(() => {
+    const id = setInterval(() => setWindowInfo(computeWeeklyWindowLocal()), 30000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -76,10 +129,11 @@ export default function Wallet() {
       try {
         setLoading(true);
         setErr("");
-        const [w, t, mw] = await Promise.all([
+        const [w, t, mw, kycRes] = await Promise.all([
           API.get("/accounts/wallet/me/"),
           API.get("/accounts/wallet/me/transactions/"),
           API.get("/accounts/withdrawals/me/"),
+          API.get("/accounts/kyc/me/"),
         ]);
         if (!mounted) return;
         const bal = String(w?.data?.balance ?? "0.00");
@@ -90,6 +144,8 @@ export default function Wallet() {
         setTxs((list || []).slice(0, 100));
         const wlist = Array.isArray(mw?.data) ? mw.data : mw?.data?.results || [];
         setMyWithdrawals(wlist || []);
+        setKyc(kycRes?.data || { verified: false });
+        setWindowInfo(computeWeeklyWindowLocal());
       } catch (e) {
         if (!mounted) return;
         setErr("Failed to load wallet. Please try again.");
@@ -107,7 +163,10 @@ export default function Wallet() {
   async function submitWithdrawal(e) {
     e.preventDefault();
     setWdrErr("");
-    if (onCooldown) return;
+    if (disableReason) {
+      setWdrErr(disableReason);
+      return;
+    }
     const amtNum = Number(wdrForm.amount);
     if (!Number.isFinite(amtNum) || amtNum <= 0) {
       setWdrErr("Enter a valid amount.");
@@ -182,10 +241,25 @@ export default function Wallet() {
               Request Withdrawal
             </Typography>
             {wdrErr ? <Alert severity="error" sx={{ mb: 1 }}>{wdrErr}</Alert> : null}
-            {onCooldown ? (
+            {!kyc?.verified ? (
+              <Alert severity="error" sx={{ mb: 1 }}>
+                KYC verification required to request withdrawal. Please complete KYC in the KYC section.
+              </Alert>
+            ) : null}
+            {Number(balance) < 500 ? (
               <Alert severity="warning" sx={{ mb: 1 }}>
-                Only one withdrawal is allowed per week. Next available:{" "}
-                {cooldownUntil ? cooldownUntil.toLocaleString() : "-"}
+                Minimum balance ₹500 required to enable withdrawals. Short by ₹{(Math.max(0, 500 - Number(balance))).toFixed(2)}
+              </Alert>
+            ) : null}
+            {!windowInfo?.isOpen ? (
+              <Alert severity="info" sx={{ mb: 1 }}>
+                Withdrawals open on Wednesday between 7:00 PM and 9:00 PM (IST).{" "}
+                Next window: {windowInfo?.nextWindowAt ? windowInfo.nextWindowAt.toLocaleString() : "-"}
+              </Alert>
+            ) : null}
+            {inWindowCooldown ? (
+              <Alert severity="warning" sx={{ mb: 1 }}>
+                You have already requested a withdrawal in this week's window.
               </Alert>
             ) : null}
             <Box component="form" onSubmit={submitWithdrawal} sx={{ mb: 2 }}>
@@ -241,7 +315,7 @@ export default function Wallet() {
               <Button
                 type="submit"
                 variant="contained"
-                disabled={onCooldown || wdrSubmitting}
+                disabled={Boolean(disableReason) || wdrSubmitting}
                 sx={{ mt: 1 }}
               >
                 {wdrSubmitting ? "Requesting..." : "Request Withdrawal"}
@@ -293,7 +367,7 @@ export default function Wallet() {
                       </Grid>
                     </Grid>
                     {tx.meta ? (
-                      <Typography variant="caption" sx={{ color: "text.disabled" }}>
+                      <Typography variant="caption" sx={{ color: "text.disabled", wordBreak: "break-word", whiteSpace: "normal" }}>
                         {(() => {
                           try {
                             return JSON.stringify(tx.meta);

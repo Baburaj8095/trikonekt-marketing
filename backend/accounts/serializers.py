@@ -606,20 +606,116 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        """
+        Create a withdrawal request with the following business rules:
+        - KYC must be verified
+        - Wallet balance must be >= ₹500 (enable threshold) AND >= requested amount
+        - Only one request allowed within each Wednesday 7PM-9PM (IST) window
+        - Requests can only be made on Wednesday between 19:00 and 21:00 IST
+        """
+        from decimal import Decimal
+        from datetime import datetime, time, timedelta, timezone as dt_timezone
+        from zoneinfo import ZoneInfo
+        from django.utils import timezone
+        from .models import WithdrawalRequest, Wallet
+
         request = self.context.get("request")
         user = getattr(request, "user", None)
         if not user or not user.is_authenticated:
             raise serializers.ValidationError({"detail": "Authentication required."})
 
+        # Normalize method + bank fields (will hydrate from KYC later if needed)
         method = (validated_data.get("method") or "bank").lower()
         bank_name = (validated_data.get("bank_name") or "").strip()
         bank_acc = (validated_data.get("bank_account_number") or "").strip()
         ifsc = (validated_data.get("ifsc_code") or "").strip()
 
+        # Amount checks (will also compare against wallet balance below)
+        try:
+            amount = Decimal(validated_data.get("amount"))
+        except Exception:
+            raise serializers.ValidationError({"amount": "Invalid amount."})
+        if amount <= 0:
+            raise serializers.ValidationError({"amount": "Amount must be greater than 0."})
+
+        # KYC must be verified
+        try:
+            kyc = getattr(user, "kyc", None)
+        except Exception:
+            kyc = None
+        if not kyc or not getattr(kyc, "verified", False):
+            raise serializers.ValidationError({"detail": "KYC verification required to request withdrawal.", "code": "KYC_REQUIRED"})
+
+        # Wallet balance must be >= 500 and >= requested amount
+        w = Wallet.get_or_create_for_user(user)
+        try:
+            bal = Decimal(w.balance or 0)
+        except Exception:
+            bal = Decimal("0")
+        if bal < Decimal("500"):
+            short = (Decimal("500") - bal)
+            raise serializers.ValidationError({
+                "detail": "Minimum balance ₹500 required to enable withdrawals.",
+                "code": "INSUFFICIENT_MIN_BALANCE",
+                "short_by": str(short.quantize(Decimal("0.01"))),
+            })
+        if amount > bal:
+            raise serializers.ValidationError({"detail": "Insufficient wallet balance.", "code": "INSUFFICIENT_BALANCE"})
+
+        # Enforce Wednesday 7PM-9PM IST window
+        IST = ZoneInfo("Asia/Kolkata")
+        now_local = timezone.now().astimezone(IST)
+
+        # Compute this week's Wednesday date
+        # weekday: Mon=0 ... Wed=2
+        days_from_wed = now_local.weekday() - 2  # positive if after Wed, negative if before
+        wed_date = now_local.date() - timedelta(days=days_from_wed)
+
+        window_start_local = datetime.combine(wed_date, time(19, 0), IST)
+        window_end_local = datetime.combine(wed_date, time(21, 0), IST)
+
+        # Determine current/next window info
+        if now_local < window_start_local:
+            # Not yet opened this week
+            next_window_start_local = window_start_local
+        elif now_local >= window_end_local:
+            # Window is over; next week's Wednesday
+            next_wed_date = wed_date + timedelta(days=7)
+            next_window_start_local = datetime.combine(next_wed_date, time(19, 0), IST)
+        else:
+            # We are inside the window
+            next_window_start_local = window_start_local
+
+        if not (window_start_local <= now_local < window_end_local):
+            raise serializers.ValidationError({
+                "detail": "Withdrawals can be requested only on Wednesday between 7:00 PM and 9:00 PM (IST).",
+                "code": "WINDOW_CLOSED",
+                "next_window_at": next_window_start_local.astimezone(dt_timezone.utc).isoformat(),
+                "next_window_at_ist": next_window_start_local.isoformat(),
+            })
+
+        # Limit to 1 request per weekly window (this Wednesday 19:00-21:00 IST)
+        window_start_utc = window_start_local.astimezone(dt_timezone.utc)
+        window_end_utc = window_end_local.astimezone(dt_timezone.utc)
+        exists_in_window = WithdrawalRequest.objects.filter(
+            user=user,
+            requested_at__gte=window_start_utc,
+            requested_at__lt=window_end_utc,
+        ).exclude(status="rejected").exists()
+        if exists_in_window:
+            # Next allowed window is next week's Wednesday
+            next_wed_date = wed_date + timedelta(days=7)
+            next_window_start_local = datetime.combine(next_wed_date, time(19, 0), IST)
+            raise serializers.ValidationError({
+                "detail": "Only one withdrawal request is allowed per week.",
+                "code": "WEEKLY_LIMIT_REACHED",
+                "next_window_at": next_window_start_local.astimezone(dt_timezone.utc).isoformat(),
+                "next_window_at_ist": next_window_start_local.isoformat(),
+            })
+
         # If bank method and missing fields, hydrate from KYC
         if method == "bank" and (not bank_acc or not ifsc):
             try:
-                kyc = getattr(user, "kyc", None)
                 if kyc:
                     bank_name = bank_name or (kyc.bank_name or "")
                     bank_acc = bank_acc or (kyc.bank_account_number or "")
@@ -629,29 +725,11 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
             if not bank_acc or not ifsc:
                 raise serializers.ValidationError({"detail": "Bank account number and IFSC are required for bank withdrawals."})
 
-        # Weekly 1 withdrawal limit (applies to all roles: consumer/employee/agency)
-        try:
-            from django.utils import timezone
-            from datetime import timedelta
-            last = WithdrawalRequest.objects.filter(user=user).exclude(status="rejected").order_by("-requested_at").first()
-            if last and last.requested_at:
-                now = timezone.now()
-                if (now - last.requested_at) < timedelta(days=7):
-                    next_allowed = last.requested_at + timedelta(days=7)
-                    raise serializers.ValidationError({
-                        "detail": "Only one withdrawal is allowed per week.",
-                        "next_allowed_at": next_allowed.isoformat(),
-                    })
-        except serializers.ValidationError:
-            raise
-        except Exception:
-            # best-effort guard; do not block if something goes wrong with the check
-            pass
-
+        # Create pending withdrawal request (no immediate debit; debit on admin approval)
         wr = WithdrawalRequest.objects.create(
             user=user,
-            amount=validated_data["amount"],
-            method=method,
+            amount=amount,
+            method="bank",
             upi_id=(validated_data.get("upi_id") or "").strip(),
             bank_name=bank_name,
             bank_account_number=bank_acc,

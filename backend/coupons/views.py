@@ -476,6 +476,165 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
 
         return Response(CouponCodeSerializer(code).data, status=status.HTTP_201_CREATED)
 
+    @action(detail=False, methods=["post"], url_path="assign-consumer-count", permission_classes=[IsAuthenticated])
+    def assign_consumer_count(self, request):
+        """
+        Bulk assign e-coupon codes by count to a consumer.
+        - Employee: from their own ASSIGNED_EMPLOYEE pool.
+        - Agency: from their own ASSIGNED_AGENCY pool (not delegated), optional employee attribution.
+        Body:
+          {
+            "consumer_username": "C123",
+            "count": 10,
+            "batch": 1,                # optional
+            "employee_id": 55,         # optional; allowed only for agency calls (attribution)
+            "notes": "optional"
+          }
+        Returns counts to display remaining inventory without extra calls.
+        """
+        user = request.user
+        if not (is_employee_user(user) or is_agency_user(user)):
+            return Response({"detail": "Only employees or agencies can assign by count."}, status=status.HTTP_403_FORBIDDEN)
+
+        consumer_username = (request.data.get("consumer_username") or "").strip()
+        try:
+            count = int(request.data.get("count"))
+        except Exception:
+            count = 0
+        batch_id = request.data.get("batch")
+        notes = (request.data.get("notes") or "").strip()
+
+        if not consumer_username or count <= 0:
+            return Response({"detail": "consumer_username and positive count are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        consumer = CustomUser.objects.filter(username__iexact=consumer_username).first()
+        if not consumer or not is_consumer_user(consumer):
+            return Response({"consumer_username": ["Consumer not found or invalid."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        employee_to_attribute = None
+        if is_agency_user(user):
+            emp_id = request.data.get("employee_id")
+            if emp_id is not None:
+                try:
+                    emp_obj = CustomUser.objects.get(id=int(emp_id))
+                except Exception:
+                    return Response({"employee_id": ["Invalid employee id."]}, status=status.HTTP_400_BAD_REQUEST)
+                if not is_employee_user(emp_obj):
+                    return Response({"employee_id": ["Provided user is not an employee."]}, status=status.HTTP_400_BAD_REQUEST)
+                employee_to_attribute = emp_obj
+        else:
+            # Employee caller must not attribute to another employee
+            if request.data.get("employee_id") is not None:
+                return Response({"employee_id": "Not allowed for employee."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Build eligibility filter (prevents duplicates/repeats)
+        base_qs = CouponCode.objects.all()
+        if is_employee_user(user):
+            base_qs = base_qs.filter(
+                assigned_employee=user,
+                status="ASSIGNED_EMPLOYEE",
+                assigned_consumer__isnull=True,
+            )
+        else:
+            base_qs = base_qs.filter(
+                assigned_agency=user,
+                assigned_employee__isnull=True,
+                status="ASSIGNED_AGENCY",
+                assigned_consumer__isnull=True,
+            )
+        if batch_id:
+            base_qs = base_qs.filter(batch_id=batch_id)
+
+        available_before = base_qs.count()
+        if available_before <= 0:
+            return Response(
+                {
+                    "available_before": 0,
+                    "assigned": 0,
+                    "available_after": 0,
+                    "detail": "No eligible codes in your pool.",
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        from django.db import transaction
+        with transaction.atomic():
+            # Try to lock rows to avoid double-pick in concurrent calls (Postgres)
+            try:
+                locking_qs = base_qs.select_for_update(skip_locked=True)
+            except Exception:
+                locking_qs = base_qs
+
+            pick_ids = list(
+                locking_qs.order_by("serial", "id").values_list("id", flat=True)[:count]
+            )
+            if not pick_ids:
+                # Could happen under contention
+                available_after = base_qs.count()
+                return Response(
+                    {
+                        "available_before": available_before,
+                        "assigned": 0,
+                        "available_after": available_after,
+                        "detail": "No eligible codes available now.",
+                    },
+                    status=status.HTTP_200_OK,
+                )
+
+            update_kwargs = {"assigned_consumer_id": consumer.id, "status": "SOLD"}
+            if employee_to_attribute:
+                update_kwargs["assigned_employee_id"] = employee_to_attribute.id
+
+            # Guarded update (ensures still-eligible at write time to prevent duplicates)
+            write_qs = CouponCode.objects.filter(id__in=pick_ids)
+            if is_employee_user(user):
+                write_qs = write_qs.filter(
+                    assigned_employee=user,
+                    status="ASSIGNED_EMPLOYEE",
+                    assigned_consumer__isnull=True,
+                )
+            else:
+                write_qs = write_qs.filter(
+                    assigned_agency=user,
+                    assigned_employee__isnull=True,
+                    status="ASSIGNED_AGENCY",
+                    assigned_consumer__isnull=True,
+                )
+
+            affected = write_qs.update(**update_kwargs)
+
+            # Audit trail
+            AuditTrail.objects.create(
+                action="employee_assigned_consumer_by_count" if is_employee_user(user) else "agency_assigned_consumer_by_count",
+                actor=user,
+                batch_id=(int(batch_id) if batch_id else None),
+                notes=notes,
+                metadata={
+                    "consumer_id": consumer.id,
+                    "consumer_username": consumer.username,
+                    "count": int(affected or 0),
+                    "employee_id": getattr(employee_to_attribute, "id", None),
+                },
+            )
+
+        # Compute remaining and sample of actually assigned codes
+        available_after = base_qs.count()
+        sample_codes = list(
+            CouponCode.objects.filter(id__in=pick_ids, assigned_consumer=consumer)
+            .values_list("code", flat=True)[:5]
+        )
+
+        return Response(
+            {
+                "available_before": available_before,
+                "assigned": int(affected or 0),
+                "available_after": available_after,
+                "sample_codes": sample_codes,
+                "consumer": {"id": consumer.id, "username": consumer.username},
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
     @action(detail=False, methods=["get"], url_path="agency-summary", permission_classes=[IsAuthenticated])
     def agency_summary(self, request):
         if not is_agency_user(request.user):
@@ -665,6 +824,7 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
             "assigned_to_employee", "bulk_assigned_to_employees",
             "bulk_assigned_to_agencies", "agency_assigned_to_employee_by_count",
             "admin_assigned_to_employee_by_count",
+            "agency_assigned_consumer_by_count", "employee_assigned_consumer_by_count",
         ]
         assign_qs = AuditTrail.objects.filter(action__in=actions)
         if default_batch_id:
@@ -790,6 +950,7 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
             "assigned_to_employee", "bulk_assigned_to_employees",
             "bulk_assigned_to_agencies", "agency_assigned_to_employee_by_count",
             "admin_assigned_to_employee_by_count",
+            "agency_assigned_consumer_by_count", "employee_assigned_consumer_by_count",
         ]
         aq = AuditTrail.objects.filter(action__in=actions).select_related("actor", "batch")
         if batch_id:

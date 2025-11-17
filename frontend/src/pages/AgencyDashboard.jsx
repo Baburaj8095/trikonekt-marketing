@@ -4,6 +4,7 @@ import {
   Box,
   Container,
   Paper,
+  TableContainer,
   Table,
   TableHead,
   TableRow,
@@ -465,109 +466,7 @@ export default function AgencyDashboard() {
           </Box>
 
           {/* Agency E‑Coupon Codes (history) */}
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>All My E‑Coupon Codes</Typography>
-            <Grid container spacing={1} sx={{ mb: 1 }}>
-              <Grid item xs={12} sm={6} md={4}>
-                <TextField
-                  select
-                  size="small"
-                  fullWidth
-                  label="Status"
-                  value={agencyStatusFilter}
-                  onChange={(e) => { setAgencyStatusFilter(e.target.value); setAgencyCodesPage(1); }}
-                  sx={{ minWidth: { sm: 180 } }}
-                >
-                  <MenuItem value="ALL">All</MenuItem>
-                  <MenuItem value="AVAILABLE">AVAILABLE</MenuItem>
-                  <MenuItem value="ASSIGNED_AGENCY">ASSIGNED_AGENCY</MenuItem>
-                  <MenuItem value="ASSIGNED_EMPLOYEE">ASSIGNED_EMPLOYEE</MenuItem>
-                  <MenuItem value="SOLD">SOLD</MenuItem>
-                  <MenuItem value="REDEEMED">REDEEMED</MenuItem>
-                  <MenuItem value="REVOKED">REVOKED</MenuItem>
-                </TextField>
-              </Grid>
-              <Grid item xs={12} sm={4} md={3}>
-                <TextField
-                  select
-                  size="small"
-                  fullWidth
-                  label="Rows"
-                  value={agencyCodesPageSize}
-                  onChange={(e) => { setAgencyCodesPageSize(Number(e.target.value)); setAgencyCodesPage(1); }}
-                  sx={{ minWidth: { sm: 120 } }}
-                >
-                  <MenuItem value={10}>10</MenuItem>
-                  <MenuItem value={25}>25</MenuItem>
-                  <MenuItem value={50}>50</MenuItem>
-                  <MenuItem value={100}>100</MenuItem>
-                </TextField>
-              </Grid>
-              <Grid item xs={12} sm={2} md={2}>
-                <Button
-                  size="small"
-                  onClick={loadAgencyCodes}
-                  fullWidth
-                >
-                  Refresh
-                </Button>
-              </Grid>
-            </Grid>
-            {agencyCodesLoading ? (
-              <Box sx={{ py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
-                <CircularProgress size={18} /> <Typography variant="body2">Loading…</Typography>
-              </Box>
-            ) : agencyCodesError ? (
-              <Alert severity="error">{agencyCodesError}</Alert>
-            ) : (
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Code</TableCell>
-                    <TableCell>Status</TableCell>
-                
-                    <TableCell>Value</TableCell>
-                    <TableCell>Assigned Agency</TableCell>
-                    <TableCell>Created</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {(agencyCodes || []).map((c) => (
-                    <TableRow key={c.id}>
-                      <TableCell>{c.code}</TableCell>
-                      <TableCell>{c.status}</TableCell>
-                     
-                      <TableCell>{typeof c.value !== "undefined" ? `₹${c.value}` : ""}</TableCell>
-                      <TableCell>{c.assigned_agency_username || ""}</TableCell>
-                      <TableCell>{c.created_at ? new Date(c.created_at).toLocaleString() : ""}</TableCell>
-                    </TableRow>
-                  ))}
-                  {(!agencyCodes || agencyCodes.length === 0) && (
-                    <TableRow>
-                      <TableCell colSpan={7}>
-                        <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                          No e‑coupons assigned to your agency.
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            )}
-            {!agencyCodesLoading && !agencyCodesError ? (
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 1 }}>
-                <Typography variant="caption" color="text.secondary">
-                  {agencyCodesTotal} items
-                </Typography>
-                <Pagination
-                  count={Math.max(1, Math.ceil(agencyCodesTotal / agencyCodesPageSize))}
-                  page={agencyCodesPage}
-                  onChange={(e, p) => setAgencyCodesPage(p)}
-                  size="small"
-                />
-              </Box>
-            ) : null}
-          </Box>
+          
 
           {luckyLoading ? (
             <Box sx={{ py: 4, display: "flex", alignItems: "center", gap: 1 }}>
@@ -576,51 +475,65 @@ export default function AgencyDashboard() {
           ) : luckyError ? (
             <Alert severity="error">{luckyError}</Alert>
           ) : (
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Date</TableCell>
-                  <TableCell>SL</TableCell>
-                  <TableCell>Ledger</TableCell>
-                  <TableCell>Employee</TableCell>
-                  <TableCell>Pincode</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>TRE Reviewer</TableCell>
-                  <TableCell>Agency Reviewer</TableCell>
-                  <TableCell>Comments</TableCell>
-                  <TableCell align="right">Actions</TableCell>
-                </TableRow>
-              </TableHead>
+            <TableContainer sx={{ overflowX: 'auto' }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Date</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>SL</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Ledger</TableCell>
+                    <TableCell>Employee</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Pincode</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>TRE Reviewer</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Agency Reviewer</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Comments</TableCell>
+                    <TableCell align="right">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
               <TableBody>
                 {(luckyList || []).map((r) => (
                   <TableRow key={r.id}>
                     <TableCell>{r.created_at ? new Date(r.created_at).toLocaleString() : ""}</TableCell>
-                    <TableCell>{r.sl_number}</TableCell>
-                    <TableCell>{r.ledger_number}</TableCell>
-                    <TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{r.sl_number}</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{r.ledger_number}</TableCell>
+                    <TableCell sx={{ whiteSpace: 'normal', wordBreak: 'break-word', maxWidth: { xs: 160, sm: 'unset' } }}>
                       {(r.username || "")}
                       {r.user ? ` (#${r.user})` : ""}
                       {r.tr_emp_id ? ` [TRE:${r.tr_emp_id}]` : ""}
                     </TableCell>
-                    <TableCell>{r.pincode}</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{r.pincode}</TableCell>
                     <TableCell>{r.status}</TableCell>
-                    <TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
                       {r.tre_reviewer ? r.tre_reviewer : ""} {r.tre_reviewed_at ? `(${new Date(r.tre_reviewed_at).toLocaleString()})` : ""}
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
                       {r.agency_reviewer ? r.agency_reviewer : ""} {r.agency_reviewed_at ? `(${new Date(r.agency_reviewed_at).toLocaleString()})` : ""}
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
                       {r.tre_comment ? `TRE: ${r.tre_comment} ` : ""}
                       {r.agency_comment ? `AGENCY: ${r.agency_comment}` : ""}
                     </TableCell>
                     <TableCell align="right">
                       {String(r.status).toUpperCase() === "TRE_APPROVED" ? (
-                        <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
-                          <Button size="small" variant="contained" disabled={busyId === r.id} onClick={() => agencyApproveLucky(r.id)} sx={{ backgroundColor: "#2E7D32", "&:hover": { backgroundColor: "#1B5E20" } }}>
+                        <Box sx={{ display: "flex", gap: 1, justifyContent: { xs: "stretch", sm: "flex-end" }, flexDirection: { xs: "column", sm: "row" } }}>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            disabled={busyId === r.id}
+                            onClick={() => agencyApproveLucky(r.id)}
+                            sx={{ backgroundColor: "#2E7D32", "&:hover": { backgroundColor: "#1B5E20" }, width: { xs: "100%", sm: "auto" } }}
+                          >
                             Approve
                           </Button>
-                          <Button size="small" variant="outlined" color="error" disabled={busyId === r.id} onClick={() => agencyRejectLucky(r.id)}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="error"
+                            disabled={busyId === r.id}
+                            onClick={() => agencyRejectLucky(r.id)}
+                            sx={{ width: { xs: "100%", sm: "auto" } }}
+                          >
                             Reject
                           </Button>
                         </Box>
@@ -640,7 +553,8 @@ export default function AgencyDashboard() {
                   </TableRow>
                 )}
               </TableBody>
-            </Table>
+              </Table>
+            </TableContainer>
           )}
         </Paper>
       )}
@@ -719,7 +633,7 @@ export default function AgencyDashboard() {
                 <TableRow>
                   <TableCell>Date</TableCell>
                   <TableCell>Employee</TableCell>
-                  <TableCell>Full Name</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Full Name</TableCell>
                   <TableCell>Email</TableCell>
                   <TableCell>Phone</TableCell>
                   <TableCell>Pincode</TableCell>
@@ -734,7 +648,7 @@ export default function AgencyDashboard() {
                   <TableRow key={a.id}>
                     <TableCell>{a.created_at ? new Date(a.created_at).toLocaleString() : ""}</TableCell>
                     <TableCell>{a.employee_username || ""}</TableCell>
-                    <TableCell>{a.employee_full_name || ""}</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{a.employee_full_name || ""}</TableCell>
                     <TableCell>{a.employee_email || ""}</TableCell>
                     <TableCell>{a.employee_phone || ""}</TableCell>
                     <TableCell>{a.employee_pincode || ""}</TableCell>
@@ -776,39 +690,41 @@ export default function AgencyDashboard() {
           ) : empError ? (
             <Alert severity="error">{empError}</Alert>
           ) : (
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Username</TableCell>
-                  <TableCell>Full Name</TableCell>
-                  <TableCell>Email</TableCell>
-                  <TableCell>Phone</TableCell>
-                  <TableCell>Address</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {(myEmployees || []).map((u) => (
-                  <TableRow key={u.id}>
-                    <TableCell>{u.username}</TableCell>
-                    <TableCell>{u.full_name || ""}</TableCell>
-                    <TableCell>{u.email || ""}</TableCell>
-                    <TableCell>{u.phone || ""}</TableCell>
-                    <TableCell>
-                      {u.pincode || ""}{u.city ? `, ${u.city}` : ""}{u.state ? `, ${u.state}` : ""}{u.country ? `, ${u.country}` : ""}
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {(!myEmployees || myEmployees.length === 0) && (
+            <TableContainer sx={{ overflowX: 'auto' }}>
+              <Table size="small">
+                <TableHead>
                   <TableRow>
-                    <TableCell colSpan={5}>
-                      <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                        No employees found.
-                      </Typography>
-                    </TableCell>
+                    <TableCell>Username</TableCell>
+                    <TableCell>Full Name</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Email</TableCell>
+                    <TableCell>Phone</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Address</TableCell>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableHead>
+                <TableBody>
+                  {(myEmployees || []).map((u) => (
+                    <TableRow key={u.id}>
+                      <TableCell sx={{ whiteSpace: 'normal', wordBreak: 'break-word', maxWidth: { xs: 140, sm: 'unset' } }}>{u.username}</TableCell>
+                      <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' }, whiteSpace: 'normal', wordBreak: 'break-word', maxWidth: { xs: 160, sm: 'unset' } }}>{u.full_name || ""}</TableCell>
+                      <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' }, whiteSpace: 'normal', wordBreak: 'break-word' }}>{u.email || ""}</TableCell>
+                      <TableCell sx={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>{u.phone || ""}</TableCell>
+                      <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' }, whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                        {u.pincode || ""}{u.city ? `, ${u.city}` : ""}{u.state ? `, ${u.state}` : ""}{u.country ? `, ${u.country}` : ""}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {(!myEmployees || myEmployees.length === 0) && (
+                    <TableRow>
+                      <TableCell colSpan={5}>
+                        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                          No employees found.
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
           )}
         </Paper>
       )}
