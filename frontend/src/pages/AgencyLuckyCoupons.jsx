@@ -19,7 +19,7 @@ import {
   Button,
   Pagination,
 } from "@mui/material";
-import API, { assignConsumerByCount } from "../api/api";
+import API, { assignConsumerByCount, assignEmployeeByCount } from "../api/api";
 import { useLocation } from "react-router-dom";
 
 export default function AgencyLuckyCoupons() {
@@ -147,6 +147,7 @@ export default function AgencyLuckyCoupons() {
           page,
           page_size: pageSize,
           status: statusFilter === "ALL" ? undefined : statusFilter,
+          issued_channel: "e_coupon",
         },
       });
       const data = res.data;
@@ -154,6 +155,12 @@ export default function AgencyLuckyCoupons() {
       setCodes(arr || []);
       setTotalCount(Array.isArray(data) ? (arr || []).length : (data?.count || (arr || []).length));
     } catch (e) {
+      const msg = String(e?.message || "");
+      const code = e?.code || "";
+      // Ignore cancellation/abort errors from request de-duplication to prevent false "failed load" UI
+      if (code === "ERR_CANCELED" || msg.toLowerCase().includes("canceled") || msg.toLowerCase().includes("cancelled") || msg.toLowerCase().includes("abort")) {
+        return;
+      }
       setCodesError("Failed to load e-coupon codes.");
       setCodes([]);
     } finally {
@@ -239,7 +246,7 @@ export default function AgencyLuckyCoupons() {
   };
 
   // Bulk sell by count to consumer (with optional employee attribution and batch)
-  const [bulkSell, setBulkSell] = useState({ consumerUsername: "", count: "", employeeId: "", batchId: "", notes: "" });
+  const [bulkSell, setBulkSell] = useState({ targetType: "", username: "", count: "" });
   const onBulkChange = (e) => setBulkSell((f) => ({ ...f, [e.target.name]: e.target.value }));
   const [bulkBusy, setBulkBusy] = useState(false);
 
@@ -248,7 +255,7 @@ export default function AgencyLuckyCoupons() {
   const [bulkResolveError, setBulkResolveError] = useState("");
 
   useEffect(() => {
-    const u = String(bulkSell.consumerUsername || "").trim();
+    const u = String(bulkSell.username || "").trim();
     if (!u) {
       setBulkResolvedUser(null);
       setBulkResolveError("");
@@ -273,27 +280,32 @@ export default function AgencyLuckyCoupons() {
     return () => {
       cancelled = true;
     };
-  }, [bulkSell.consumerUsername]);
+  }, [bulkSell.username]);
 
   const submitBulkSell = async (e) => {
     e.preventDefault();
-    const consumer = String(bulkSell.consumerUsername || "").trim();
+    const role = String(bulkSell.targetType || "").toLowerCase();
+    const uname = String(bulkSell.username || "").trim();
     const cnt = Number(bulkSell.count || 0);
-    if (!consumer || !cnt || cnt <= 0) {
-      alert("Enter consumer username and a positive count.");
+    if (!role || !uname || !cnt || cnt <= 0) {
+      alert("Select target type, enter TR username and a positive count.");
       return;
     }
     try {
       setBulkBusy(true);
-      const payload = { consumer_username: consumer, count: cnt };
-      if (bulkSell.batchId) payload.batch = Number(bulkSell.batchId);
-      if (bulkSell.employeeId) payload.employee_id = Number(bulkSell.employeeId);
-      if (bulkSell.notes) payload.notes = String(bulkSell.notes);
-      const res = await assignConsumerByCount(payload);
+      let res;
+      if (role === "consumer") {
+        res = await assignConsumerByCount({ consumer_username: uname, count: cnt });
+      } else if (role === "employee") {
+        res = await assignEmployeeByCount({ employee_username: uname, count: cnt });
+      } else {
+        alert("Invalid target type.");
+        return;
+      }
       const assigned = res?.assigned ?? 0;
       const after = res?.available_after;
-      alert(`Assigned ${assigned} codes to ${res?.consumer?.username || consumer}.`);
-      setBulkSell({ consumerUsername: "", count: "", employeeId: "", batchId: "", notes: "" });
+      alert(`Assigned ${assigned} codes to ${uname} (${role}).`);
+      setBulkSell({ targetType: "", username: "", count: "" });
       // Update summary counts inline if available
       if (typeof after === "number") {
         setSummary((s) => (s ? { ...s, available: after } : s));
@@ -367,9 +379,8 @@ export default function AgencyLuckyCoupons() {
 
   useEffect(() => {
     loadPending();
-    loadBatches();
-    loadEmployees();
-    loadCodes();
+    //loadBatches();
+    //loadEmployees();
     loadCommissions();
     loadSummary();
   }, []);
@@ -614,8 +625,7 @@ export default function AgencyLuckyCoupons() {
                       <TableRow>
                         <TableCell>Code</TableCell>
                         <TableCell>Status</TableCell>
-                        <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Batch</TableCell>
-                        <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Serial</TableCell>
+                        
                         <TableCell>Value</TableCell>
                         <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Assigned Employee</TableCell>
                         <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Assigned Consumer</TableCell>
@@ -630,8 +640,6 @@ export default function AgencyLuckyCoupons() {
                         <TableRow key={c.id}>
                           <TableCell>{c.code}</TableCell>
                           <TableCell>{c.status}</TableCell>
-                          <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.batch ? `#${c.batch}` : ""}</TableCell>
-                          <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.serial || ""}</TableCell>
                           <TableCell>{typeof c.value !== "undefined" ? `₹${c.value}` : ""}</TableCell>
                           <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.assigned_employee_username || ""}</TableCell>
                           <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.assigned_consumer_username || ""}</TableCell>
@@ -681,19 +689,40 @@ export default function AgencyLuckyCoupons() {
                     Available in Agency Pool: {summary?.available ?? 0}
                   </Typography>
                   <TextField
+                    select
                     fullWidth
-                    label="Consumer Username"
-                    name="consumerUsername"
-                    value={bulkSell.consumerUsername}
+                    label="Target Type"
+                    name="targetType"
+                    value={bulkSell.targetType}
                     onChange={onBulkChange}
+                    required
+                  >
+                    <MenuItem value="consumer">Consumer</MenuItem>
+                    <MenuItem value="employee">Employee</MenuItem>
+                  </TextField>
+                  <TextField
+                    fullWidth
+                    label="TR Username"
+                    name="username"
+                    value={bulkSell.username}
+                    onChange={onBulkChange}
+                    required
                   />
                   {bulkResolveLoading ? (
                     <Typography variant="caption" color="text.secondary">Resolving username…</Typography>
                   ) : bulkResolvedUser ? (
-                    <Typography variant="caption" color="text.secondary">
-                      This TR username belongs to {bulkResolvedUser.full_name || bulkResolvedUser.username} · PIN {bulkResolvedUser.pincode || "-"}
-                      {bulkResolvedUser.city ? ` · ${bulkResolvedUser.city}` : ""}{bulkResolvedUser.state ? `, ${bulkResolvedUser.state}` : ""}
-                    </Typography>
+                    <Stack spacing={0.5}>
+                      <Typography variant="caption" color="text.secondary">
+                        {bulkResolvedUser.full_name || bulkResolvedUser.username} · PIN {bulkResolvedUser.pincode || "-"}
+                        {bulkResolvedUser.city ? ` · ${bulkResolvedUser.city}` : ""}{bulkResolvedUser.state ? `, ${bulkResolvedUser.state}` : ""}
+                      </Typography>
+                      {bulkSell.targetType && (
+                        ((bulkSell.targetType === "employee" && !((bulkResolvedUser?.role === "employee") || (bulkResolvedUser?.category === "employee"))) ||
+                         (bulkSell.targetType === "consumer" && !((bulkResolvedUser?.role === "user") && (bulkResolvedUser?.category === "consumer"))))
+                          ? <Alert severity="warning">Selected type is {bulkSell.targetType}, but this username belongs to role {bulkResolvedUser?.role || bulkResolvedUser?.category}.</Alert>
+                          : null
+                      )}
+                    </Stack>
                   ) : bulkResolveError ? (
                     <Alert severity="warning">{bulkResolveError}</Alert>
                   ) : null}
@@ -709,7 +738,7 @@ export default function AgencyLuckyCoupons() {
                     />
                     
                   </Stack>
-                  <Button type="submit" variant="contained" disabled={bulkBusy || !bulkSell.consumerUsername || !bulkSell.count}>
+                  <Button type="submit" variant="contained" disabled={bulkBusy || !bulkSell.targetType || !bulkSell.username || !bulkSell.count}>
                     {bulkBusy ? "Assigning..." : "Assign by Count"}
                   </Button>
                 </Stack>
@@ -717,59 +746,7 @@ export default function AgencyLuckyCoupons() {
             </Paper>
           </Grid>
 
-          <Grid item xs={12} sm={12} md={6} sx={{ display: "flex", width: "100%" }}>
-            <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, height: "100%", width: "100%" }}>
-              <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>
-                Assign Coupons to Employee (by Count)
-              </Typography>
-              <Box component="form" onSubmit={submitAssign}>
-                <Stack spacing={2}>
-                  <TextField
-                    select
-                    fullWidth
-                    label="Batch"
-                    name="batch_id"
-                    value={assignForm.batch_id}
-                    onChange={onAssignChange}
-                    helperText={batchesError || ""}
-                  >
-                    {(batches || []).map((b) => (
-                      <MenuItem key={b.id} value={b.id}>
-                        {b.prefix}{String(b.serial_start).padStart(b.serial_width, "0")} - {b.prefix}{String(b.serial_end).padStart(b.serial_width, "0")} — {b.coupon_title || ""}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                  <TextField
-                    select
-                    fullWidth
-                    label="Employee"
-                    name="employee_id"
-                    value={assignForm.employee_id}
-                    onChange={onAssignChange}
-                    helperText={empError || ""}
-                  >
-                    {(employees || []).map((emp) => (
-                      <MenuItem key={emp.id} value={emp.id}>
-                        {emp.username} — {emp.full_name || ""} — {emp.phone || ""} — {emp.email || ""}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                  <TextField
-                    fullWidth
-                    label="Count"
-                    name="count"
-                    value={assignForm.count}
-                    onChange={onAssignChange}
-                    inputProps={{ inputMode: "numeric", pattern: "[0-9]*", min: 1 }}
-                    required
-                  />
-                  <Button type="submit" variant="contained" disabled={assignBusy}>
-                    {assignBusy ? "Assigning..." : "Assign"}
-                  </Button>
-                </Stack>
-              </Box>
-            </Paper>
-          </Grid>
+          
           {/* <Grid item xs={12} md={6}>
             <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
               <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>

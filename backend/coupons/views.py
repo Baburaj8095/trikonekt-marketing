@@ -168,6 +168,10 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
             qs = qs.filter(batch_id=batch_id)
         if status_in:
             qs = qs.filter(status=status_in)
+        # Optional channel filter so Agency can request only e-coupons
+        channel = self.request.query_params.get("channel") or self.request.query_params.get("issued_channel")
+        if channel:
+            qs = qs.filter(issued_channel=channel)
         return qs
 
     @action(detail=False, methods=["get"], url_path="mine", permission_classes=[IsAuthenticated])
@@ -631,6 +635,128 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
                 "available_after": available_after,
                 "sample_codes": sample_codes,
                 "consumer": {"id": consumer.id, "username": consumer.username},
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=False, methods=["post"], url_path="assign-employee-count", permission_classes=[IsAuthenticated])
+    def assign_employee_count(self, request):
+        """
+        Agency bulk assign e-coupon codes by count to an employee from agency's pool.
+        Body:
+          {
+            "employee_username": "E123",  // or provide "employee_id"
+            "employee_id": 55,            // optional if username provided
+            "count": 10,
+            "batch": 1,                   // optional
+            "notes": "optional"
+          }
+        Returns counts to display remaining inventory without extra calls.
+        """
+        user = request.user
+        if not is_agency_user(user):
+            return Response({"detail": "Only agency users can assign to employees by count."}, status=status.HTTP_403_FORBIDDEN)
+
+        employee_username = (request.data.get("employee_username") or "").strip()
+        emp_id_raw = request.data.get("employee_id")
+        try:
+            cnt = int(request.data.get("count"))
+        except Exception:
+            cnt = 0
+        batch_id = request.data.get("batch")
+        notes = (request.data.get("notes") or "").strip()
+
+        if cnt <= 0:
+            return Response({"detail": "Positive count is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        employee = None
+        if employee_username:
+            employee = CustomUser.objects.filter(username__iexact=employee_username).first()
+            if not employee:
+                return Response({"employee_username": ["Employee not found."]}, status=status.HTTP_400_BAD_REQUEST)
+        elif emp_id_raw is not None:
+            try:
+                employee = CustomUser.objects.get(id=int(emp_id_raw))
+            except Exception:
+                return Response({"employee_id": ["Invalid employee id."]}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"detail": "Provide employee_username or employee_id."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not is_employee_user(employee):
+            return Response({"employee": ["Provided user is not an employee."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        base_qs = CouponCode.objects.filter(
+            assigned_agency=user,
+            assigned_employee__isnull=True,
+            assigned_consumer__isnull=True,
+            status="ASSIGNED_AGENCY",
+        )
+        if batch_id:
+            base_qs = base_qs.filter(batch_id=batch_id)
+
+        available_before = base_qs.count()
+        if available_before <= 0:
+            return Response(
+                {
+                    "available_before": 0,
+                    "assigned": 0,
+                    "available_after": 0,
+                    "detail": "No eligible codes in your pool.",
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        with transaction.atomic():
+            try:
+                locking_qs = base_qs.select_for_update(skip_locked=True)
+            except Exception:
+                locking_qs = base_qs
+
+            pick_ids = list(locking_qs.order_by("serial", "id").values_list("id", flat=True)[:cnt])
+            if not pick_ids:
+                available_after = base_qs.count()
+                return Response(
+                    {
+                        "available_before": available_before,
+                        "assigned": 0,
+                        "available_after": available_after,
+                        "detail": "No eligible codes available now.",
+                    },
+                    status=status.HTTP_200_OK,
+                )
+
+            write_qs = CouponCode.objects.filter(id__in=pick_ids).filter(
+                assigned_agency=user,
+                assigned_employee__isnull=True,
+                assigned_consumer__isnull=True,
+                status="ASSIGNED_AGENCY",
+            )
+            affected = write_qs.update(assigned_employee_id=employee.id, status="ASSIGNED_EMPLOYEE")
+
+            AuditTrail.objects.create(
+                action="agency_assigned_to_employee_by_count",
+                actor=user,
+                batch_id=(int(batch_id) if batch_id else None),
+                notes=notes,
+                metadata={
+                    "employee_id": employee.id,
+                    "count": int(affected or 0),
+                },
+            )
+
+        available_after = base_qs.count()
+        sample_codes = list(
+            CouponCode.objects.filter(id__in=pick_ids, assigned_employee=employee)
+            .values_list("code", flat=True)[:5]
+        )
+
+        return Response(
+            {
+                "available_before": available_before,
+                "assigned": int(affected or 0),
+                "available_after": available_after,
+                "sample_codes": sample_codes,
+                "employee": {"id": employee.id, "username": employee.username},
             },
             status=status.HTTP_201_CREATED,
         )
@@ -1614,8 +1740,8 @@ class CouponSubmissionViewSet(
                 Q(coupon__assignment__employee=user)
             )
         if is_agency_user(user):
-            # Agency can see submissions in their pincode (v1 simple rule)
-            return qs.filter(pincode=user.pincode)
+            # Agency can see submissions in their pincode or those routed to them via TR
+            return qs.filter(Q(pincode=user.pincode) | Q(tr_user=user))
         # default: restrict
         return qs.none()
 
@@ -1677,13 +1803,14 @@ class CouponSubmissionViewSet(
         if not is_agency_user(request.user):
             return Response({"detail": "Only agency users can view pending agency submissions."}, status=status.HTTP_403_FORBIDDEN)
         qs = CouponSubmission.objects.filter(
-            Q(status="EMPLOYEE_APPROVED") |
+            Q(status="EMPLOYEE_APPROVED", pincode=request.user.pincode) |
             Q(
                 status="SUBMITTED",
                 code_ref__assigned_employee__isnull=True,
                 code_ref__assigned_agency=request.user,
-            ),
-            pincode=request.user.pincode,
+                pincode=request.user.pincode,
+            ) |
+            Q(status="SUBMITTED", tr_user=request.user)
         ).exclude(code_ref__issued_channel="e_coupon").order_by("-created_at")
         page = self.paginate_queryset(qs)
         ser = self.get_serializer(page if page is not None else qs, many=True)
@@ -1772,14 +1899,15 @@ class CouponSubmissionViewSet(
         if sub.status == "EMPLOYEE_APPROVED":
             can_approve = True
         elif sub.status == "SUBMITTED":
-            if sub.code_ref_id and sub.code_ref.assigned_employee_id is None and sub.code_ref.assigned_agency_id == request.user.id:
+            if (sub.code_ref_id and sub.code_ref.assigned_employee_id is None and sub.code_ref.assigned_agency_id == request.user.id) or (sub.tr_user_id == request.user.id):
                 can_approve = True
         if not can_approve:
             return Response({"detail": f"Invalid state transition from {sub.status}."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # v1 coverage: match pincode
-        if not request.user.pincode or request.user.pincode != sub.pincode:
-            return Response({"detail": "Submission not within your pincode coverage."}, status=status.HTTP_403_FORBIDDEN)
+        # Coverage check applies only if not routed by TR to this agency
+        if not (sub.tr_user_id == request.user.id):
+            if not request.user.pincode or request.user.pincode != sub.pincode:
+                return Response({"detail": "Submission not within your pincode coverage."}, status=status.HTTP_403_FORBIDDEN)
 
         comment = request.data.get("comment", "")
         # Persist the agency review on the model (method is defined on the model in latest state)
@@ -1808,12 +1936,18 @@ class CouponSubmissionViewSet(
         except Exception:
             return Response({"detail": "Submission not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        if sub.status != "EMPLOYEE_APPROVED":
+        can_reject = False
+        if sub.status == "EMPLOYEE_APPROVED":
+            can_reject = True
+        elif sub.status == "SUBMITTED" and sub.tr_user_id == request.user.id:
+            can_reject = True
+        if not can_reject:
             return Response({"detail": f"Invalid state transition from {sub.status}."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # v1 coverage: match pincode
-        if not request.user.pincode or request.user.pincode != sub.pincode:
-            return Response({"detail": "Submission not within your pincode coverage."}, status=status.HTTP_403_FORBIDDEN)
+        # Coverage check applies only if not routed by TR to this agency
+        if not (sub.tr_user_id == request.user.id):
+            if not request.user.pincode or request.user.pincode != sub.pincode:
+                return Response({"detail": "Submission not within your pincode coverage."}, status=status.HTTP_403_FORBIDDEN)
 
         comment = request.data.get("comment", "")
         sub.agency_reviewer = request.user
@@ -1825,6 +1959,76 @@ class CouponSubmissionViewSet(
         ])
         return Response(self.get_serializer(sub).data)
 
+
+    @action(detail=True, methods=["post"], url_path="consumer-approve", permission_classes=[IsAuthenticated])
+    def consumer_approve(self, request, pk=None):
+        # Consumer can finalize approval when submission was routed to them via TR
+        if not is_consumer_user(request.user):
+            return Response({"detail": "Only consumers can approve routed submissions."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            sub = self.get_object()
+        except Exception:
+            return Response({"detail": "Submission not found."}, status=status.HTTP_404_NOT_FOUND)
+        if sub.status != "SUBMITTED" or sub.tr_user_id != request.user.id:
+            return Response({"detail": "Not allowed for this submission."}, status=status.HTTP_403_FORBIDDEN)
+
+        comment = (request.data.get("comment") or "").strip()
+        sub.agency_reviewer = None
+        sub.agency_reviewed_at = timezone.now()
+        sub.agency_comment = comment
+        sub.status = "AGENCY_APPROVED"
+        sub.save(update_fields=["agency_reviewer", "agency_reviewed_at", "agency_comment", "status"])
+
+        # Mark code redeemed (signal ensures idempotent side effects)
+        if sub.code_ref_id:
+            sub.code_ref.mark_redeemed()
+            sub.code_ref.save(update_fields=["status"])
+
+        # Audit trail for consumer approval
+        try:
+            AuditTrail.objects.create(
+                action="consumer_approved",
+                actor=request.user,
+                coupon_code=sub.code_ref,
+                submission=sub,
+                notes=comment or "",
+            )
+        except Exception:
+            pass
+
+        return Response(self.get_serializer(sub).data)
+
+    @action(detail=True, methods=["post"], url_path="consumer-reject", permission_classes=[IsAuthenticated])
+    def consumer_reject(self, request, pk=None):
+        # Consumer can reject when submission was routed to them via TR
+        if not is_consumer_user(request.user):
+            return Response({"detail": "Only consumers can reject routed submissions."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            sub = self.get_object()
+        except Exception:
+            return Response({"detail": "Submission not found."}, status=status.HTTP_404_NOT_FOUND)
+        if sub.status != "SUBMITTED" or sub.tr_user_id != request.user.id:
+            return Response({"detail": "Not allowed for this submission."}, status=status.HTTP_403_FORBIDDEN)
+
+        comment = (request.data.get("comment") or "").strip()
+        sub.agency_reviewer = None
+        sub.agency_reviewed_at = timezone.now()
+        sub.agency_comment = comment
+        sub.status = "REJECTED"
+        sub.save(update_fields=["agency_reviewer", "agency_reviewed_at", "agency_comment", "status"])
+
+        try:
+            AuditTrail.objects.create(
+                action="consumer_rejected",
+                actor=request.user,
+                coupon_code=sub.code_ref,
+                submission=sub,
+                notes=comment or "",
+            )
+        except Exception:
+            pass
+
+        return Response(self.get_serializer(sub).data)
 
 class CommissionViewSet(mixins.ListModelMixin,
                         mixins.RetrieveModelMixin,

@@ -14,6 +14,7 @@ import {
   TableRow,
   TableCell,
   TableBody,
+  TableContainer,
   Stack,
 } from "@mui/material";
 import API from "../../api/api";
@@ -224,7 +225,7 @@ export default function EmployeeDailyReport() {
             <Stack
               direction={{ xs: "column", sm: "row" }}
               spacing={2}
-              sx={{ mb: 2 }}
+              sx={{ mb: 2, flexWrap: "wrap" }}
               alignItems={{ xs: "stretch", sm: "center" }}
             >
               <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", flexGrow: 1 }}>
@@ -235,6 +236,7 @@ export default function EmployeeDailyReport() {
                 type="date"
                 label="From"
                 InputLabelProps={{ shrink: true }}
+                sx={{ width: { xs: "100%", sm: "auto" } }}
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
               />
@@ -243,10 +245,11 @@ export default function EmployeeDailyReport() {
                 type="date"
                 label="To"
                 InputLabelProps={{ shrink: true }}
+                sx={{ width: { xs: "100%", sm: "auto" } }}
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
               />
-              <Button variant="outlined" onClick={loadMyReports}>Filter</Button>
+              <Button variant="outlined" onClick={loadMyReports} sx={{ width: { xs: "100%", sm: "auto" } }}>Filter</Button>
             </Stack>
 
             {loading ? (
@@ -256,7 +259,8 @@ export default function EmployeeDailyReport() {
             ) : loadError ? (
               <Alert severity="error">{loadError}</Alert>
             ) : (
-              <Table size="small">
+              <TableContainer sx={{ width: "100%", overflowX: "auto" }}>
+                <Table size="small" sx={{ minWidth: 900 }}>
                 <TableHead>
                   <TableRow>
                     <TableCell>Date</TableCell>
@@ -296,7 +300,8 @@ export default function EmployeeDailyReport() {
                     </TableRow>
                   )}
                 </TableBody>
-              </Table>
+                </Table>
+              </TableContainer>
             )}
           </Paper>
         </Grid>

@@ -74,12 +74,26 @@ export default function AgencyDashboard() {
       setLuckyError("");
       // Prefer actionable pending list for agency; toggle to view all if needed
       const url = showAllLucky ? "/uploads/lucky-draw/" : "/uploads/lucky-draw/pending/agency/";
-      const res = await API.get(url);
+      const res = await API.get(url, { retryAttempts: 1 });
       const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
       setLuckyList(arr || []);
     } catch (e) {
-      setLuckyError("Failed to load lucky draw submissions");
-      setLuckyList([]);
+      // Fallback to "all" endpoint if pending/agency fails (e.g., permission edge-cases)
+      try {
+        const alt = await API.get("/uploads/lucky-draw/", { retryAttempts: 0 });
+        const arr2 = Array.isArray(alt.data) ? alt.data : alt.data?.results || [];
+        setLuckyList(arr2 || []);
+        setLuckyError("");
+      } catch (e2) {
+        const msg =
+          e2?.response?.data?.detail ||
+          e2?.response?.data?.message ||
+          (typeof e2?.response?.data === "string" ? e2.response.data : "") ||
+          e2?.message ||
+          "Failed to load Manual Coupon Submissions";
+        setLuckyError(msg);
+        setLuckyList([]);
+      }
     } finally {
       setLuckyLoading(false);
     }
@@ -295,35 +309,12 @@ export default function AgencyDashboard() {
 
   // Load once (lazy-load employees/assignments/quota only when tabs are opened)
   useEffect(() => {
-    loadLuckyHistory();
-    loadCommission();
-    loadWallet();
+    // loadLuckyHistory() is invoked by the effect watching [showAllLucky, activeTab] when the Lucky tab is active
+    //loadCommission();
+    //loadWallet();
     loadEcSummary();
-    loadAgencyCodes();
   }, []);
 
-  // Load my 5‑matrix genealogy tree
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        setMyTreeLoading(true);
-        const res = await API.get("/accounts/my/matrix/tree/", { params: { max_depth: 6 } });
-        if (!mounted) return;
-        setMyTree(res?.data || null);
-        setMyTreeErr("");
-      } catch (e) {
-        if (!mounted) return;
-        setMyTree(null);
-        setMyTreeErr(e?.response?.data?.detail || "Failed to load hierarchy.");
-      } finally {
-        if (mounted) setMyTreeLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   function MyTreeNode({ node, depth = 0 }) {
     const pad = depth * 16;
@@ -360,10 +351,6 @@ export default function AgencyDashboard() {
     }
   }, [activeTab]);
 
-  // Reload agency codes when pagination or status filter changes
-  useEffect(() => {
-    loadAgencyCodes();
-  }, [agencyCodesPage, agencyCodesPageSize, agencyStatusFilter]);
 
   return (
     <Container maxWidth="lg" sx={{ px: 0 }}>
@@ -402,22 +389,12 @@ export default function AgencyDashboard() {
           <Box sx={{ mb: 2 }}>
             <RewardsTargetCard role="agency" />
           </Box>
-          <Box sx={{ mb: 2 }}>
-            {walletLoading ? (
-              <Typography variant="body2">Loading wallet...</Typography>
-            ) : walletError ? (
-              <Alert severity="error">{walletError}</Alert>
-            ) : (
-              <Alert severity="info">
-                Wallet Balance: ₹{wallet.balance} {wallet.updated_at ? `— updated ${new Date(wallet.updated_at).toLocaleString()}` : ""}
-              </Alert>
-            )}
-          </Box>
-          <Box sx={{ mb: 2 }}>
+          
+          {/* <Box sx={{ mb: 2 }}>
             <Alert severity="success">
               My commission earned: ₹{commissionTotal.toFixed(2)}
             </Alert>
-          </Box>
+          </Box> */}
           <Box sx={{ mb: 2 }}>
             {ecSummaryLoading ? (
               <Typography variant="body2">Loading E‑Coupon summary...</Typography>

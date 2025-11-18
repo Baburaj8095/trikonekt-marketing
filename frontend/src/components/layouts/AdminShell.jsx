@@ -30,6 +30,34 @@ export default function AdminShell({ children }) {
     if (isMobile) setSidebarOpen(false);
   }, [loc.pathname, isMobile]);
 
+  // Admin auth ping to surface clear guidance
+  const [authErr, setAuthErr] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    API.get("/admin/ping/")
+      .then(() => {
+        if (!cancelled) setAuthErr("");
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        const s = e?.response?.status;
+        if (s === 401) {
+          setAuthErr(
+            "Not authenticated for admin. Login from an /admin/* URL so the admin token namespace is used."
+          );
+        } else if (s === 403) {
+          setAuthErr(
+            "This account lacks admin/staff privileges. Use a staff/superuser account or grant is_staff."
+          );
+        } else {
+          setAuthErr("Admin API not reachable or blocked by network/proxy.");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [loc.pathname]);
+
   // Nav definition
   const items = [
     { to: "/admin/dashboard", label: "Dashboard", icon: "dashboard" },
@@ -40,6 +68,7 @@ export default function AdminShell({ children }) {
     { to: "/admin/lucky-draw", label: "Lucky Draw", icon: "ticket" },
     { to: "/admin/kyc", label: "KYC", icon: "shield" },
     { to: "/admin/withdrawals", label: "Withdrawals", icon: "wallet" },
+    { to: "/admin/support", label: "Support", icon: "ticket" },
     { to: "/admin/dashboard/models/business/dailyreport", label: "Reports", icon: "chart" },
     { to: "/admin/dashboard/models", label: "Developer Service", icon: "box" },
     { to: "/admin/matrix/five", label: "5‑Matrix", icon: "matrix5" },
@@ -384,6 +413,20 @@ export default function AdminShell({ children }) {
           }}
         >
           <div style={{ width: "100%", margin: "0 auto", maxWidth: 1400 }}>
+            {authErr ? (
+              <div
+                style={{
+                  marginBottom: 12,
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  background: "#FEF2F2",
+                  color: "#991B1B",
+                  border: "1px solid #FCA5A5",
+                }}
+              >
+                {authErr}
+              </div>
+            ) : null}
             {children}
           </div>
         </main>

@@ -124,7 +124,7 @@ export default function AdminLuckyDraw() {
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: 0, color: "#0f172a" }}>Lucky Draw Submissions</h2>
+        <h2 style={{ margin: 0, color: "#0f172a" }}>Manual Coupon Submissions</h2>
         <div style={{ color: "#64748b", fontSize: 13 }}>
           Staff overview of all submissions (read-only). Approvals are performed by TRE/Agency roles in their respective apps.
         </div>

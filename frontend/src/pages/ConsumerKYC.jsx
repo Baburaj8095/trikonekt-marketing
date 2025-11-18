@@ -11,6 +11,7 @@ import {
   Grid,
 } from "@mui/material";
 import API from "../api/api";
+import { useNavigate } from "react-router-dom";
 
 export default function ConsumerKYC() {
   const storedUser = useMemo(() => {
@@ -28,6 +29,8 @@ export default function ConsumerKYC() {
   }, []);
   const displayName = storedUser?.full_name || storedUser?.username || "Consumer";
 
+  const navigate = useNavigate();
+
   const [form, setForm] = useState({
     bank_name: "",
     bank_account_number: "",
@@ -37,7 +40,8 @@ export default function ConsumerKYC() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [meta, setMeta] = useState({ verified: false, verified_at: null, updated_at: null });
+  const [meta, setMeta] = useState({ verified: false, verified_at: null, updated_at: null, can_submit_kyc: true, kyc_reopen_allowed: false });
+  const locked = meta.verified && !meta.can_submit_kyc;
 
   const onChange = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
@@ -78,6 +82,8 @@ export default function ConsumerKYC() {
         verified: Boolean(data.verified),
         verified_at: data.verified_at || null,
         updated_at: data.updated_at || null,
+        can_submit_kyc: data?.can_submit_kyc !== undefined ? !!data.can_submit_kyc : !data?.verified,
+        kyc_reopen_allowed: !!data?.kyc_reopen_allowed,
       });
     } catch (e) {
       setError("Failed to load KYC details.");
@@ -93,6 +99,10 @@ export default function ConsumerKYC() {
   const onSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
+    if (meta.verified && !meta.can_submit_kyc) {
+      setError("KYC is verified and locked. Please create a Support ticket to request re-verification.");
+      return;
+    }
     try {
       setSaving(true);
       setMessage("");
@@ -142,6 +152,16 @@ export default function ConsumerKYC() {
         )}
         {message ? <Alert severity="success" sx={{ mb: 2 }}>{message}</Alert> : null}
         {error ? <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert> : null}
+        {locked ? (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Your KYC is verified and locked. To modify details, raise a Support request for KYC re-verification.
+            <Box sx={{ mt: 1 }}>
+              <Button variant="outlined" size="small" onClick={() => navigate("/user/support")}>
+                Open Support Portal
+              </Button>
+            </Box>
+          </Alert>
+        ) : null}
 
         <Box component="form" onSubmit={onSubmit}>
           <Grid container spacing={2}>
@@ -186,7 +206,7 @@ export default function ConsumerKYC() {
                 <Button
                   type="submit"
                   variant="contained"
-                  disabled={saving || loading}
+                  disabled={saving || loading || locked}
                   sx={{ backgroundColor: "#145DA0", "&:hover": { backgroundColor: "#0C4B82" } }}
                 >
                   {saving ? "Saving..." : "Save KYC"}

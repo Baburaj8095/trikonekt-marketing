@@ -1,4 +1,4 @@
-import API from "../../api/api";
+import API, { ensureFreshAccess, getAccessToken } from "../../api/api";
 
 /**
  * Shared admin-meta cache to prevent duplicate network requests across the app,
@@ -22,15 +22,33 @@ export async function getAdminMeta() {
   if (g.__ADMIN_META_CACHE__) return g.__ADMIN_META_CACHE__;
   if (g.__ADMIN_META_INFLIGHT__) return g.__ADMIN_META_INFLIGHT__;
 
-  g.__ADMIN_META_INFLIGHT__ = API.get("admin/admin-meta/")
-    .then((res) => {
-      const data = res?.data || {};
-      g.__ADMIN_META_CACHE__ = data;
-      return data;
-    })
-    .finally(() => {
-      g.__ADMIN_META_INFLIGHT__ = null;
-    });
+  const base = API?.defaults?.baseURL || "/api/";
+  const joinUrl = (b, p) => {
+    const b2 = b.endsWith("/") ? b : b + "/";
+    const p2 = p.startsWith("/") ? p.slice(1) : p;
+    return b2 + p2;
+  };
+  const fullUrl = joinUrl(base, "/admin/admin-meta/");
+
+  g.__ADMIN_META_INFLIGHT__ = (async () => {
+    let token = await ensureFreshAccess();
+    if (!token) token = getAccessToken();
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const resp = await fetch(fullUrl, { method: "GET", headers });
+    if (!resp.ok) {
+      let detail = "Failed to load admin metadata";
+      try {
+        const d = await resp.json();
+        detail = d?.detail || detail;
+      } catch (_) {}
+      throw new Error(detail);
+    }
+    const data = await resp.json().catch(() => ({}));
+    g.__ADMIN_META_CACHE__ = data || {};
+    return g.__ADMIN_META_CACHE__;
+  })().finally(() => {
+    g.__ADMIN_META_INFLIGHT__ = null;
+  });
 
   return g.__ADMIN_META_INFLIGHT__;
 }

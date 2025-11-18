@@ -37,25 +37,25 @@ function TxTypeChip({ type }) {
 }
 
 function computeWeeklyWindowLocal() {
-  // Compute current week's Wednesday 7:00 PM to 9:00 PM window using local time
+  // Compute current week's Sunday 6:00 PM to 11:59 PM window using local time
   const now = new Date();
 
   // JS weekday: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
   const day = now.getDay();
 
-  // Days since this week's Wednesday
-  const daysSinceWed = ((day - 3) + 7) % 7;
+  // Days since this week's Sunday
+  const daysSinceSun = ((day - 0) + 7) % 7;
 
-  // Get this week's Wednesday date
-  const currentWed = new Date(now);
-  currentWed.setHours(0, 0, 0, 0);
-  currentWed.setDate(currentWed.getDate() - daysSinceWed);
+  // Get this week's Sunday date
+  const currentSun = new Date(now);
+  currentSun.setHours(0, 0, 0, 0);
+  currentSun.setDate(currentSun.getDate() - daysSinceSun);
 
   // Window start/end (local time)
-  const currentStart = new Date(currentWed);
-  currentStart.setHours(19, 0, 0, 0); // 7:00 PM
-  const currentEnd = new Date(currentWed);
-  currentEnd.setHours(21, 0, 0, 0); // 9:00 PM
+  const currentStart = new Date(currentSun);
+  currentStart.setHours(18, 0, 0, 0); // 6:00 PM
+  const currentEnd = new Date(currentSun);
+  currentEnd.setHours(23, 59, 59, 999); // 11:59 PM
 
   // Open state
   const isOpen = now >= currentStart && now < currentEnd;
@@ -63,7 +63,7 @@ function computeWeeklyWindowLocal() {
   // Next window start
   let nextStart = new Date(currentStart);
   if (now >= currentEnd) {
-    // next week's Wednesday
+    // next week's Sunday
     nextStart = new Date(currentStart);
     nextStart.setDate(nextStart.getDate() + 7);
   } else if (now < currentStart) {
@@ -89,9 +89,6 @@ export default function Wallet() {
   const [wdrForm, setWdrForm] = useState({
     amount: "",
     method: "bank",
-    bank_name: "",
-    bank_account_number: "",
-    ifsc_code: "",
   });
   const onWdrChange = (e) => setWdrForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
@@ -113,7 +110,7 @@ export default function Wallet() {
   const disableReason = useMemo(() => {
     if (!kyc?.verified) return "KYC verification required";
     if (Number(balance) < 500) return "Minimum balance ₹500 required";
-    if (!windowInfo?.isOpen) return "Withdrawals are allowed only on Wednesday 7:00 PM to 9:00 PM (IST)";
+    if (!windowInfo?.isOpen) return "Withdrawals are allowed only on Sunday 6:00 PM to 11:59 PM (IST)";
     if (inWindowCooldown) return "You have already requested a withdrawal in this week's window";
     return "";
   }, [kyc, balance, windowInfo, inWindowCooldown]);
@@ -176,10 +173,7 @@ export default function Wallet() {
       amount: amtNum,
       method: "bank",
     };
-    // Bank details optional here; backend will hydrate from KYC if missing
-    if (wdrForm.bank_name) payload.bank_name = wdrForm.bank_name.trim();
-    if (wdrForm.bank_account_number) payload.bank_account_number = wdrForm.bank_account_number.trim();
-    if (wdrForm.ifsc_code) payload.ifsc_code = wdrForm.ifsc_code.trim().toUpperCase();
+    // Bank details are captured from KYC; not collected on this screen.
     try {
       setWdrSubmitting(true);
       await API.post("/accounts/withdrawals/", payload);
@@ -200,9 +194,6 @@ export default function Wallet() {
       setWdrForm({
         amount: "",
         method: wdrForm.method,
-        bank_name: "",
-        bank_account_number: "",
-        ifsc_code: "",
       });
     } catch (e) {
       const msg =
@@ -215,12 +206,12 @@ export default function Wallet() {
   }
 
   return (
-    <Box sx={{ maxWidth: 1000, mx: "auto" }}>
+    <Box sx={{ maxWidth: 1000, mx: "auto", px: { xs: 2, sm: 3 }, py: { xs: 2, sm: 3 } }}>
       <Typography variant="h5" sx={{ mb: 2, fontWeight: 700, color: "#0C2D48" }}>
         Wallet
       </Typography>
 
-      <Grid container spacing={{ xs: 2, sm: 2 }} sx={{ mx: { xs: -2, sm: 0 } }}>
+      <Grid container spacing={{ xs: 2, sm: 2 }}>
         <Grid item xs={12} md={4}>
           <Paper elevation={3} sx={{ p: 2, borderRadius: 2 }}>
             <Typography variant="subtitle2" sx={{ color: "text.secondary" }}>
@@ -253,7 +244,7 @@ export default function Wallet() {
             ) : null}
             {!windowInfo?.isOpen ? (
               <Alert severity="info" sx={{ mb: 1 }}>
-                Withdrawals open on Wednesday between 7:00 PM and 9:00 PM (IST).{" "}
+                Withdrawals open on Sunday between 6:00 PM and 11:59 PM (IST).{" "}
                 Next window: {windowInfo?.nextWindowAt ? windowInfo.nextWindowAt.toLocaleString() : "-"}
               </Alert>
             ) : null}
@@ -284,34 +275,9 @@ export default function Wallet() {
                   disabled
                 />
               </Stack>
-              <Stack spacing={1} sx={{ mt: 1 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Bank Name"
-                  name="bank_name"
-                  value={wdrForm.bank_name}
-                  onChange={onWdrChange}
-                />
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Account Number"
-                  name="bank_account_number"
-                  value={wdrForm.bank_account_number}
-                  onChange={onWdrChange}
-                  inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
-                />
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="IFSC Code"
-                  name="ifsc_code"
-                  value={wdrForm.ifsc_code}
-                  onChange={onWdrChange}
-                  inputProps={{ maxLength: 11, style: { textTransform: "uppercase" } }}
-                />
-              </Stack>
+              <Alert severity="info" sx={{ mt: 1 }}>
+                Bank details are captured in the KYC screen. Ensure your KYC bank details are correct before requesting a withdrawal.
+              </Alert>
               <Button
                 type="submit"
                 variant="contained"
@@ -341,7 +307,7 @@ export default function Wallet() {
               <Box>
                 {(txs || []).map((tx) => (
                   <Box key={tx.id} sx={{ py: 1.2 }}>
-                    <Grid container spacing={{ xs: 1, sm: 1 }} sx={{ mx: { xs: -1, sm: 0 } }} alignItems="center">
+                    <Grid container spacing={{ xs: 1, sm: 1 }} alignItems="center">
                       <Grid item xs={12} sm={5} md={4}>
                         <Stack direction="row" spacing={1} alignItems="center">
                           <TxTypeChip type={tx.type} />

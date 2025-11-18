@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from accounts.models import CustomUser, WithdrawalRequest, UserKYC, WalletTransaction
+from accounts.models import CustomUser, WithdrawalRequest, UserKYC, WalletTransaction, SupportTicket, SupportTicketMessage
 from market.models import PurchaseRequest, BannerPurchaseRequest
 from business.models import UserMatrixProgress
 from locations.models import Country, State, City
@@ -216,3 +216,65 @@ class AdminBannerPurchaseRequestSerializer(serializers.ModelSerializer):
             "created_by_username",
             "created_at",
         ]
+
+
+class AdminSupportTicketMessageSerializer(serializers.ModelSerializer):
+    author_username = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = SupportTicketMessage
+        fields = ["id", "author", "author_username", "message", "created_at"]
+        read_only_fields = ["id", "author_username", "created_at"]
+
+    def get_author_username(self, obj):
+        try:
+            return getattr(obj.author, "username", None)
+        except Exception:
+            return None
+
+
+class AdminSupportTicketSerializer(serializers.ModelSerializer):
+    user_id = serializers.IntegerField(source="user.id", read_only=True)
+    username = serializers.CharField(source="user.username", read_only=True)
+    full_name = serializers.CharField(source="user.full_name", read_only=True)
+    phone = serializers.CharField(source="user.phone", read_only=True)
+    state_name = serializers.SerializerMethodField()
+    pincode = serializers.CharField(source="user.pincode", read_only=True)
+    admin_assignee_username = serializers.SerializerMethodField(read_only=True)
+    messages = AdminSupportTicketMessageSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = SupportTicket
+        fields = [
+            "id",
+            "type",
+            "status",
+            "subject",
+            "message",
+            "resolution_note",
+            "admin_assignee",
+            "admin_assignee_username",
+            "user_id",
+            "username",
+            "full_name",
+            "phone",
+            "state_name",
+            "pincode",
+            "created_at",
+            "updated_at",
+            "messages",
+        ]
+        read_only_fields = ["user_id", "username", "full_name", "phone", "state_name", "pincode", "created_at", "updated_at", "messages", "admin_assignee_username"]
+
+    def get_state_name(self, obj):
+        try:
+            st = getattr(obj.user, "state", None)
+            return st.name if st else ""
+        except Exception:
+            return ""
+
+    def get_admin_assignee_username(self, obj):
+        try:
+            return getattr(obj.admin_assignee, "username", None)
+        except Exception:
+            return None

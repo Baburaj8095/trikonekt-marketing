@@ -28,6 +28,7 @@ export default function TreeReferralGalaxy({
   initialUserId = null,
   onUserChange,
   fetchTeamCount,
+  preferredSource = "auto",
 }) {
   const isAdmin = mode === "admin";
 
@@ -106,17 +107,23 @@ export default function TreeReferralGalaxy({
           // Sponsor-based registered_by tree for admin
           res = await API.get("/admin/matrix/tree/", {
             params: { root_user_id: userId, max_depth: 6 },
+            cacheTTL: 5000,
+            retryAttempts: 2,
           });
         } else {
           // Matrix-based (parent/children)
           res = await API.get("/admin/matrix/tree5/", {
             params: { root_user_id: userId, max_depth: 6 },
+            cacheTTL: 5000,
+            retryAttempts: 2,
           });
         }
       } else {
-        // Authenticated subtree; server validates root is within my downline (or self)
-        res = await API.get("/accounts/matrix/tree5/", {
+        // Authenticated sponsor subtree; server validates root is within my sponsor downline (or self)
+        res = await API.get("/accounts/sponsor/tree/", {
           params: { root_user_id: userId, max_depth: 6 },
+          cacheTTL: 5000,
+          retryAttempts: 2,
         });
       }
       const total = countNodes(res?.data || null);
@@ -129,7 +136,7 @@ export default function TreeReferralGalaxy({
     }
   }, [countsMap, countNodes, fetchTeamCount, isAdmin, keyFor, putCount]);
 
-  const fetchRoot = useCallback(async ({ identifier, userId, depth = 2 }) => {
+  const fetchRoot = useCallback(async ({ identifier, userId, depth = 6 }) => {
     setLoading(true);
     setErr("");
     try {
@@ -138,7 +145,7 @@ export default function TreeReferralGalaxy({
 
       if (isAdmin) {
         // Try matrix tree first
-        const paramsMx = { max_depth: depth };
+        const paramsMx = { max_depth: depth, source: preferredSource };
         let usedId = userId;
         let ident = identifier;
 
@@ -152,13 +159,18 @@ export default function TreeReferralGalaxy({
           throw new Error("identifier or userId required for admin mode");
         }
 
-        const r1 = await API.get("/admin/matrix/tree5/", { params: paramsMx });
+        const r1 = await API.get("/admin/matrix/tree5/", { params: paramsMx, cacheTTL: 5000, retryAttempts: 2 });
         const node1 = r1?.data || null;
 
-        // If children exist or we are not allowed fallback -> accept matrix
-        if (node1 && Array.isArray(node1.children) && node1.children.length > 0) {
+        // Respect preferredSource: if 'matrix', do not fallback to sponsor even if empty
+        const requestedSrc = (preferredSource || "auto").toLowerCase();
+        if (requestedSrc === "matrix") {
           resNode = node1;
           source = "matrix";
+        } else if (node1 && Array.isArray(node1.children) && node1.children.length > 0) {
+          // node1 came from /admin/matrix/tree5 with source=requestedSrc
+          resNode = node1;
+          source = requestedSrc === "sponsor" ? "sponsor" : "matrix";
         } else {
           // Fallback to sponsor-based tree: requires root id
           let rid = usedId;
@@ -167,7 +179,7 @@ export default function TreeReferralGalaxy({
             // If even that failed (e.g., identifier not resolved), try resolving via admin root
             if (!rid && ident) {
               try {
-                const rr = await API.get("/admin/users/tree/root/", { params: { identifier: ident } });
+                const rr = await API.get("/admin/users/tree/root/", { params: { identifier: ident }, cacheTTL: 10000, retryAttempts: 2 });
                 rid = rr?.data?.id || null;
               } catch {
                 // ignore
@@ -176,7 +188,7 @@ export default function TreeReferralGalaxy({
           }
           if (rid) {
             try {
-              const r2 = await API.get("/admin/matrix/tree/", { params: { root_user_id: rid, max_depth: depth } });
+              const r2 = await API.get("/admin/matrix/tree/", { params: { root_user_id: rid, max_depth: depth }, cacheTTL: 5000, retryAttempts: 2 });
               const node2 = r2?.data || null;
               if (node2 && Array.isArray(node2.children) && node2.children.length >= 0) {
                 resNode = node2;
@@ -198,19 +210,32 @@ export default function TreeReferralGalaxy({
           }
         }
       } else {
-        // Self mode
+        // Self mode (sponsor-based)
         if (userId) {
-          const r = await API.get("/accounts/matrix/tree5/", {
+          const r = await API.get("/accounts/sponsor/tree/", {
             params: { root_user_id: userId, max_depth: depth },
+            cacheTTL: 5000,
+            retryAttempts: 2,
           });
           resNode = r?.data || null;
-          source = "matrix";
+          source = "sponsor";
         } else {
-          const r = await API.get("/accounts/my/matrix/tree/", { params: { max_depth: depth } });
+          const r = await API.get("/accounts/my/sponsor/tree/", { params: { max_depth: depth }, cacheTTL: 5000, retryAttempts: 2 });
           resNode = r?.data || null;
-          source = "matrix";
+          source = "sponsor";
         }
       }
+
+      // Precompute team counts locally from fetched tree (root + first 5 children)
+      try {
+        if (resNode && resNode.id) {
+          const kids = Array.isArray(resNode.children) ? resNode.children.slice(0, 5) : [];
+          putCount(source, resNode.id, Math.max(0, countNodes(resNode) - 1));
+          for (const k of kids) {
+            putCount(source, k.id, Math.max(0, countNodes(k) - 1));
+          }
+        }
+      } catch (_) {}
 
       setRoot(resNode);
       setSourceType(source);
@@ -229,29 +254,26 @@ export default function TreeReferralGalaxy({
   useEffect(() => {
     if (isAdmin) {
       if (initialUserId || initialIdentifier) {
-        fetchRoot({ userId: initialUserId, identifier: initialIdentifier, depth: 2 });
+        fetchRoot({ userId: initialUserId, identifier: initialIdentifier, depth: 6 });
+      } else {
+        (async () => {
+          try {
+            const r = await API.get("/admin/users/tree/default-root/", { cacheTTL: 60000, retryAttempts: 2 });
+            const rid = r?.data?.id;
+            if (rid) {
+              await fetchRoot({ userId: rid, depth: 6 });
+            }
+          } catch (e) {
+            // best-effort: leave root null and show search bar
+          }
+        })();
       }
     } else {
-      fetchRoot({ depth: 2 });
+      fetchRoot({ depth: 6 });
     }
     // eslint-disable-next-line
   }, []);
 
-  // When root changes, prefetch team counts for root and its direct children (best-effort)
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      if (!root || !root.id) return;
-      await getTeamCount(root.id, sourceType);
-      const kids = (root.children || []).slice(0, 5);
-      await Promise.all(
-        kids.map(async (k) => {
-          if (mounted) await getTeamCount(k.id, sourceType);
-        })
-      );
-    })();
-    return () => { mounted = false; };
-  }, [root, getTeamCount, sourceType]);
 
   const onSearch = async () => {
     if (!isAdmin) return;
@@ -264,7 +286,7 @@ export default function TreeReferralGalaxy({
       setSearchBusy(true);
       setCrumbs([]);
       const clean = sanitizeIdentifier(raw);
-      await fetchRoot({ identifier: clean, depth: 2 });
+      await fetchRoot({ identifier: clean, depth: 6 });
     } finally {
       setSearchBusy(false);
     }
@@ -275,7 +297,7 @@ export default function TreeReferralGalaxy({
     if (root) {
       setCrumbs((prev) => [...prev, { id: root.id, username: root.username, full_name: root.full_name }]);
     }
-    await fetchRoot({ userId: child.id, depth: 2 });
+    await fetchRoot({ userId: child.id, depth: 6 });
   };
 
   const crumbClick = async (idx) => {
@@ -284,7 +306,7 @@ export default function TreeReferralGalaxy({
     const target = crumbs[idx];
     const newTrail = crumbs.slice(0, idx); // ancestors up to before the target
     setCrumbs(newTrail);
-    await fetchRoot({ userId: target.id, depth: 2 });
+    await fetchRoot({ userId: target.id, depth: 6 });
   };
 
   const goBackOne = async () => {
@@ -304,29 +326,42 @@ export default function TreeReferralGalaxy({
     </svg>
   );
 
-  // Styles (inline to keep component self-contained)
-  const styles = {
+  // Responsive styles (inline to keep component self-contained)
+  const [vw, setVw] = useState(typeof window !== "undefined" ? window.innerWidth : 1024);
+  useEffect(() => {
+    const onR = () => setVw(window.innerWidth);
+    window.addEventListener("resize", onR);
+    return () => window.removeEventListener("resize", onR);
+  }, []);
+  const isMobile = vw <= 600;
+  const cardW = isMobile ? 140 : 160;
+  const gap = isMobile ? 8 : 12;
+  const rootAvatar = isMobile ? 48 : 56;
+  const childAvatar = isMobile ? 40 : 48;
+
+  const styles = useMemo(() => ({
     container: { background: "transparent" },
-    header: { textAlign: "center", fontSize: 22, fontWeight: 800, color: "#0f172a", marginBottom: 12 },
+    header: { textAlign: "center", fontSize: isMobile ? 18 : 22, fontWeight: 800, color: "#0f172a", marginBottom: 12 },
     bar: { display: "flex", gap: 8, alignItems: "center", justifyContent: "center", marginBottom: 10, flexWrap: "wrap" },
-    breadcrumb: { display: "flex", gap: 6, alignItems: "center", justifyContent: "center", color: "#64748b", fontSize: 12, flexWrap: "wrap" },
+    breadcrumb: { display: "flex", gap: 6, alignItems: "center", justifyContent: "center", color: "#64748b", fontSize: isMobile ? 11 : 12, flexWrap: "wrap" },
     crumbLink: { color: "#0f172a", cursor: "pointer", fontWeight: 700, textTransform: "uppercase" },
     crumbSep: { color: "#94a3b8", fontWeight: 700 },
-    card: { background: "#fff", borderRadius: 16, boxShadow: "0 8px 20px rgba(15, 23, 42, 0.08)", padding: 16, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", minWidth: 220 },
-    cardName: { fontWeight: 800, color: "#0f172a", marginTop: 8 },
-    cardTR: { color: "#334155", fontSize: 13, marginTop: 4 },
-    cardTeam: { color: "#0f172a", fontWeight: 700, fontSize: 14, marginTop: 6 },
+    card: { background: "#fff", borderRadius: 16, boxShadow: "0 8px 20px rgba(15, 23, 42, 0.08)", padding: 16, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", minWidth: cardW, width: cardW },
+    cardName: { fontWeight: 800, color: "#0f172a", marginTop: 8, fontSize: isMobile ? 14 : 16 },
+    cardTR: { color: "#334155", fontSize: isMobile ? 12 : 13, marginTop: 4 },
+    cardTeam: { color: "#0f172a", fontWeight: 700, fontSize: isMobile ? 13 : 14, marginTop: 6 },
     teamLabel: { marginTop: 16, marginBottom: 8, color: "#334155", fontWeight: 700, textAlign: "left" },
-    row5: { display: "grid", gridTemplateColumns: "repeat(5, minmax(160px, 1fr))", gap: 12 },
-    childCard: { background: "#fff", borderRadius: 16, boxShadow: "0 8px 20px rgba(15, 23, 42, 0.06)", padding: 14, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", cursor: "pointer" },
-    placeholder: { background: "#fff", borderRadius: 16, padding: 14, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", border: "2px dashed #e2e8f0", color: "#94a3b8" },
+    scrollX: { overflowX: "auto", WebkitOverflowScrolling: "touch", overscrollBehaviorX: "contain", paddingBottom: 8 },
+    row5: { display: "grid", gridTemplateColumns: `repeat(5, ${cardW}px)`, gap, width: "max-content" },
+    childCard: { background: "#fff", borderRadius: 16, boxShadow: "0 8px 20px rgba(15, 23, 42, 0.06)", padding: isMobile ? 12 : 14, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", cursor: "pointer", width: cardW },
+    placeholder: { background: "#fff", borderRadius: 16, padding: isMobile ? 12 : 14, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", border: "2px dashed #e2e8f0", color: "#94a3b8", width: cardW },
     subtle: { color: "#64748b", fontSize: 12 },
     search: { display: "flex", gap: 8, alignItems: "center", justifyContent: "center", marginBottom: 8, flexWrap: "wrap" },
-    input: { padding: "10px 12px", minWidth: 320, borderRadius: 8, border: "1px solid #e2e8f0", outline: "none", background: "#fff" },
+    input: { padding: "10px 12px", minWidth: isMobile ? 220 : 320, borderRadius: 8, border: "1px solid #e2e8f0", outline: "none", background: "#fff" },
     button: { padding: "10px 12px", background: "#0f172a", color: "#fff", border: 0, borderRadius: 8, cursor: "pointer" },
     backBtn: { padding: "8px 10px", background: "#334155", color: "#fff", border: 0, borderRadius: 8, cursor: "pointer", fontSize: 12 },
     topBar: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 8 },
-  };
+  }), [isMobile, cardW, gap]);
 
   // Compute up to 5 children and placeholders
   const children = useMemo(() => Array.isArray(root?.children) ? root.children.slice(0, 5) : [], [root]);
@@ -334,7 +369,7 @@ export default function TreeReferralGalaxy({
 
   return (
     <div style={styles.container}>
-      <div style={styles.header}>Geneology</div>
+      <div style={styles.header}>Genealogy</div>
 
       {/* Breadcrumbs and optional admin search bar */}
       <div style={styles.bar}>
@@ -392,7 +427,7 @@ export default function TreeReferralGalaxy({
           {/* Parent card */}
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 6 }}>
             <div style={styles.card}>
-              <AvatarIcon />
+              <AvatarIcon size={rootAvatar} />
               <div style={styles.cardName}>{displayName(root) || "—"}</div>
               <div style={styles.cardTR}>TR Username: {displayTR(root) || "—"}</div>
               <div style={styles.cardTeam}>Team: {getCountValue(root.id) ?? "—"}</div>
@@ -401,10 +436,11 @@ export default function TreeReferralGalaxy({
 
           {/* Team row */}
           <div style={styles.teamLabel}>Team</div>
-          <div style={styles.row5}>
+          <div style={styles.scrollX}>
+            <div style={styles.row5}>
             {children.map((c) => (
               <div key={c.id} style={styles.childCard} onClick={() => drillDown(c)}>
-                <AvatarIcon size={48} />
+                <AvatarIcon size={childAvatar} />
                 <div style={{ ...styles.cardName, fontSize: 14, marginTop: 6 }}>{displayName(c) || "—"}</div>
                 <div style={{ ...styles.cardTR, fontSize: 12 }}>TR Username: {displayTR(c) || "—"}</div>
                 <div style={{ ...styles.cardTeam, fontSize: 13 }}>Team: {getCountValue(c.id) ?? "—"}</div>
@@ -412,11 +448,12 @@ export default function TreeReferralGalaxy({
             ))}
             {Array.from({ length: placeholders }).map((_, idx) => (
               <div key={`ph-${idx}`} style={styles.placeholder}>
-                <AvatarIcon size={40} />
+                <AvatarIcon size={Math.max(32, childAvatar - 8)} />
                 <div style={{ marginTop: 6, fontWeight: 700 }}>Empty</div>
                 <div style={{ ...styles.subtle, marginTop: 2 }}>No member</div>
               </div>
             ))}
+            </div>
           </div>
         </div>
       )}

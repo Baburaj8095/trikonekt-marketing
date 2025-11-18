@@ -58,6 +58,8 @@ import ModelsIndex from "./admin-panel/dynamic/ModelsIndex";
 import ModelList from "./admin-panel/dynamic/ModelList";
 import UsersPage from "./admin-panel/examples/UsersPage";
 import ProductPage from "./admin-panel/examples/ProductPage";
+import Support from "./pages/Support";
+import AdminSupport from "./pages/admin/AdminSupport";
 
 function App() {
   return (
@@ -164,6 +166,16 @@ function App() {
           }
         />
         <Route
+          path="/user/support"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <Support />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/upload"
           element={<Navigate to="/user/lucky-draw" replace />}
         />
@@ -235,6 +247,16 @@ function App() {
             <ProtectedRoute allowedRoles={["agency"]}>
               <AgencyShell>
                 <AgencyReferAndEarn />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agency/support"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <Support />
               </AgencyShell>
             </ProtectedRoute>
           }
@@ -325,6 +347,16 @@ function App() {
             <ProtectedRoute allowedRoles={["employee"]}>
               <EmployeeShell>
                 <Wallet />
+              </EmployeeShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee/support"
+          element={
+            <ProtectedRoute allowedRoles={["employee"]}>
+              <EmployeeShell>
+                <Support />
               </EmployeeShell>
             </ProtectedRoute>
           }
@@ -544,6 +576,16 @@ function App() {
             <AdminProtectedRoute>
               <AdminShell>
                 <AdminReports />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/support"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminSupport />
               </AdminShell>
             </AdminProtectedRoute>
           }

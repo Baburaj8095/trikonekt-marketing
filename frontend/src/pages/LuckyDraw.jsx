@@ -83,10 +83,7 @@ export default function LuckyDraw({ embedded = false }) {
     address: "",
     referral_name: "",
     referral_id: "",
-    agency_name: "",
-    agency_pincode: "",
     tr_referral_id: "",
-    tr_emp_id: "",
   });
   const [file, setFile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -95,6 +92,10 @@ export default function LuckyDraw({ embedded = false }) {
   const [lucky, setLucky] = useState([]);
   const [luckyLoading, setLuckyLoading] = useState(false);
   const [luckyError, setLuckyError] = useState("");
+  // TR resolve (Manual Lucky Coupon)
+  const [trResolving, setTrResolving] = useState(false);
+  const [trResolved, setTrResolved] = useState(null);
+  const [trError, setTrError] = useState("");
 
   // Pre-fill referral_id from URL param ?ref, ?referral, or ?referral_id
   useEffect(() => {
@@ -106,6 +107,26 @@ export default function LuckyDraw({ embedded = false }) {
   }, [location.search]);
 
   const [luckyEnabled, setLuckyEnabled] = useState(true);
+
+  // Prefill pincode from logged-in profile if empty
+  useEffect(() => {
+    try {
+      const pin = String(storedUser?.pincode || "").trim();
+      if (pin) {
+        setForm((f) => (f.pincode ? f : { ...f, pincode: pin }));
+      }
+    } catch (e) {}
+  }, [storedUser?.pincode]);
+
+  // Prefill phone from stored username if it looks like a mobile number
+  useEffect(() => {
+    try {
+      const uname = String(storedUser?.username || "").trim();
+      if (/^\d{10}$/.test(uname)) {
+        setForm((f) => (f.phone ? f : { ...f, phone: uname }));
+      }
+    } catch (e) {}
+  }, [storedUser?.username]);
 
   useEffect(() => {
     const fetchFlag = async () => {
@@ -155,7 +176,7 @@ export default function LuckyDraw({ embedded = false }) {
     const s = String(status || "").toUpperCase();
     switch (s) {
       case "SUBMITTED":
-        return { label: "Pending with TRE (employee)", pending_with: "TRE" };
+        return { label: "Submitted" };
       case "TRE_APPROVED":
         return { label: "Pending with Agency", pending_with: "AGENCY" };
       case "TRE_REJECTED":
@@ -185,6 +206,25 @@ export default function LuckyDraw({ embedded = false }) {
     setFile(f);
   };
 
+  // Resolve TR user (by TR Referral ID) for confirmation
+  const resolveTR = async () => {
+    const u = String(form.tr_referral_id || "").trim();
+    if (!u) return;
+    try {
+      setTrResolving(true);
+      setTrError("");
+      setTrResolved(null);
+      const res = await API.get("/coupons/codes/resolve-user", { params: { username: u } });
+      setTrResolving(false);
+      setTrResolved(res?.data || null);
+    } catch (e) {
+      setTrResolving(false);
+      const msg = e?.response?.data?.detail || "User not found.";
+      setTrResolved(null);
+      setTrError(msg);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!luckyEnabled) {
@@ -193,6 +233,18 @@ export default function LuckyDraw({ embedded = false }) {
     }
     if (!form.sl_number || !form.ledger_number || !form.pincode) {
       alert("Please fill SL Number, Ledger Number and Pincode.");
+      return;
+    }
+    if (!/^\d{6}$/.test(String(form.pincode).trim())) {
+      alert("Enter a valid 6-digit pincode.");
+      return;
+    }
+    if (!/^\d{10}$/.test(String(form.phone).trim())) {
+      alert("Enter a valid 10-digit phone number.");
+      return;
+    }
+    if (!String(form.tr_referral_id || "").trim()) {
+      alert("TR Referral ID is required.");
       return;
     }
     if (!file) {
@@ -215,10 +267,7 @@ export default function LuckyDraw({ embedded = false }) {
       if (form.address) fd.append("address", String(form.address).trim());
       if (form.referral_name) fd.append("referral_name", String(form.referral_name).trim());
       if (form.referral_id) fd.append("referral_id", String(form.referral_id).trim());
-      if (form.agency_name) fd.append("agency_name", String(form.agency_name).trim());
-      if (form.agency_pincode) fd.append("agency_pincode", String(form.agency_pincode).trim());
       if (form.tr_referral_id) fd.append("tr_referral_id", String(form.tr_referral_id).trim());
-      if (form.tr_emp_id) fd.append("tr_emp_id", String(form.tr_emp_id).trim());
       fd.append("image", file);
 
       await API.post("/uploads/lucky-draw/", fd, {
@@ -263,7 +312,7 @@ export default function LuckyDraw({ embedded = false }) {
         }}
       >
         <Typography variant="h5" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>
-          Participate Lucky Draw
+          Manual Lucky Coupon (Lucky Draw)
         </Typography>
         <Typography variant="body2" sx={{ color: "text.secondary", mb: 3 }}>
           Enter your details and upload the coupon image. Only images are accepted.
@@ -365,44 +414,46 @@ export default function LuckyDraw({ embedded = false }) {
               onChange={onChange}
               disabled={!luckyEnabled}
             />
-            <TextField
-              fullWidth
-              label="Agency Name"
-              name="agency_name"
-              value={form.agency_name}
-              onChange={onChange}
-              disabled={!luckyEnabled}
-            />
-            <TextField
-              fullWidth
-              label="Agency Pincode"
-              name="agency_pincode"
-              value={form.agency_pincode}
-              onChange={onChange}
-              inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
-              disabled={!luckyEnabled}
-            />
-            <TextField
-              fullWidth
-              label="TR Referral ID"
-              name="tr_referral_id"
-              value={form.tr_referral_id}
-              onChange={onChange}
-              disabled={!luckyEnabled}
-            />
-            <TextField
-              fullWidth
-              label="TR Emp ID"
-              name="tr_emp_id"
-              value={form.tr_emp_id}
-              onChange={onChange}
-              disabled={!luckyEnabled}
-            />
+            <Stack direction="row" spacing={1} alignItems="center">
+              <TextField
+                fullWidth
+                label="TR Referral ID"
+                name="tr_referral_id"
+                value={form.tr_referral_id}
+                onChange={onChange}
+                onBlur={resolveTR}
+                required
+                error={Boolean(trError)}
+                helperText={trError ? trError : "Required — routes this submission to the specified TR."}
+                disabled={!luckyEnabled}
+              />
+              <Button variant="outlined" size="small" onClick={resolveTR} disabled={!luckyEnabled || trResolving}>
+                {trResolving ? "Checking..." : "Check"}
+              </Button>
+            </Stack>
+            {trResolved ? (
+              <Box sx={{ p: 1, border: "1px solid #eee", borderRadius: 1, backgroundColor: "#fafafa" }}>
+                <Typography variant="body2"><strong>TR:</strong> {trResolved.username}</Typography>
+                <Typography variant="body2"><strong>Name:</strong> {trResolved.full_name || "-"}</Typography>
+                <Typography variant="body2"><strong>Pincode:</strong> {trResolved.pincode || "-"}</Typography>
+              </Box>
+            ) : null}
 
             <Button variant="outlined" component="label" fullWidth disabled={!luckyEnabled}>
               {file ? `Selected: ${file.name}` : "Choose Coupon Image"}
               <input type="file" accept="image/*" hidden onChange={onFileChange} />
             </Button>
+            {file ? (
+              <Box sx={{ mt: 1 }}>
+                <Box
+                  component="img"
+                  src={URL.createObjectURL(file)}
+                  alt="Preview"
+                  sx={{ width: "100%", maxHeight: 240, objectFit: "contain", borderRadius: 1, border: "1px solid #eee" }}
+                />
+                <Typography variant="caption" color="text.secondary">Accepted: JPG/PNG images up to ~5MB.</Typography>
+              </Box>
+            ) : null}
             <Button
               fullWidth
               type="submit"
@@ -434,7 +485,7 @@ export default function LuckyDraw({ embedded = false }) {
         }}
       >
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
-          My Lucky Draw Submissions
+          My Manual Coupon Submissions
         </Typography>
         {luckyLoading ? (
           <Typography variant="body2">Loading...</Typography>
@@ -452,7 +503,6 @@ export default function LuckyDraw({ embedded = false }) {
                 <li key={s.id} style={{ marginBottom: 8 }}>
                   <Typography variant="body2" sx={{ mb: 0.5 }}>
                     <strong>SL:</strong> {s.sl_number} — <strong>Ledger:</strong> {s.ledger_number} — {s.pincode} — {meta.label}
-                    {meta.pending_with ? ` (Pending with ${meta.pending_with})` : ""}
                     {s.assigned_tre_username ? ` — TRE: ${s.assigned_tre_username}` : ""}
                     {s.created_at ? ` — ${new Date(s.created_at).toLocaleString()}` : ""}
                   </Typography>
@@ -548,7 +598,7 @@ export default function LuckyDraw({ embedded = false }) {
                 setMobileOpen(false);
               }}
             >
-              <ListItemText primary="Participate Lucky Draw" />
+              <ListItemText primary="Manual Lucky Coupon" />
             </ListItemButton>
             <ListItemButton
               selected={isMarketplace}
@@ -646,7 +696,7 @@ export default function LuckyDraw({ embedded = false }) {
               sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
               onClick={() => navigate("/user/lucky-draw")}
             >
-              <ListItemText primary="Participate Lucky Draw" />
+              <ListItemText primary="Manual Lucky Coupon" />
             </ListItemButton>
             <ListItemButton
               selected={isMarketplace}

@@ -14,7 +14,6 @@ import {
   TableRow,
   TableCell,
   TableBody,
-  Stack,
 } from "@mui/material";
 
 function StatCard({ title, value, subtitle }) {
@@ -40,9 +39,6 @@ function StatCard({ title, value, subtitle }) {
 export default function MyTeam() {
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
-  const [myTree, setMyTree] = useState(null);
-  const [myTreeLoading, setMyTreeLoading] = useState(false);
-  const [myTreeErr, setMyTreeErr] = useState("");
 
   const role = useMemo(() => {
     try {
@@ -56,7 +52,7 @@ export default function MyTeam() {
     let mounted = true;
     (async () => {
       try {
-        const res = await API.get("/accounts/team/summary/");
+        const res = await API.get("/accounts/team/summary/", { cacheTTL: 10000, retryAttempts: 2 });
         if (!mounted) return;
         setData(res?.data || {});
         setErr("");
@@ -70,28 +66,6 @@ export default function MyTeam() {
     };
   }, []);
 
-  // Load my 5-matrix genealogy tree (spillover-based)
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        setMyTreeLoading(true);
-        const res = await API.get("/accounts/my/matrix/tree/", { params: { max_depth: 6 } });
-        if (!mounted) return;
-        setMyTree(res?.data || null);
-        setMyTreeErr("");
-      } catch (e) {
-        if (!mounted) return;
-        setMyTree(null);
-        setMyTreeErr(e?.response?.data?.detail || "Failed to load hierarchy.");
-      } finally {
-        if (mounted) setMyTreeLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   const down = data?.downline || {};
   const levels = down?.levels || {};
@@ -102,23 +76,6 @@ export default function MyTeam() {
   const recentTeam = Array.isArray(data?.recent_team) ? data.recent_team : [];
   const recentTx = Array.isArray(data?.recent_transactions) ? data.recent_transactions : [];
 
-  function MyTreeNode({ node, depth = 0 }) {
-    const pad = depth * 16;
-    return (
-      <div style={{ paddingLeft: pad, paddingTop: 6, paddingBottom: 6, borderBottom: "1px solid #f1f5f9" }}>
-        <div style={{ fontWeight: 700, color: "#0f172a" }}>
-          {node.username} <span style={{ color: "#64748b", fontWeight: 500 }}>#{node.id} • {node.full_name || "—"}</span>
-        </div>
-        {Array.isArray(node.children) && node.children.length > 0 ? (
-          <div>
-            {node.children.map((c) => (
-              <MyTreeNode key={c.id} node={c} depth={depth + 1} />
-            ))}
-          </div>
-        ) : null}
-      </div>
-    );
-  }
 
   return (
     <Box sx={{ p: { xs: 0, md: 0 } }}>
@@ -142,118 +99,13 @@ export default function MyTeam() {
 
       <Grid container spacing={2}>
         {/* Downline */}
-        <Grid item xs={12} md={6} lg={4}>
-          <Card variant="outlined">
-            <CardContent>
-              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                Downline
-              </Typography>
-              <Divider sx={{ mb: 1 }} />
-              <Grid container spacing={1}>
-                <Grid item xs={6} sm={4}>
-                  <StatCard title="Direct" value={down?.direct ?? 0} />
-                </Grid>
-                <Grid item xs={6} sm={4}>
-                  <StatCard title="Level 1" value={levels?.l1 ?? 0} />
-                </Grid>
-                <Grid item xs={6} sm={4}>
-                  <StatCard title="Level 2" value={levels?.l2 ?? 0} />
-                </Grid>
-                <Grid item xs={6} sm={4}>
-                  <StatCard title="Level 3" value={levels?.l3 ?? 0} />
-                </Grid>
-                <Grid item xs={6} sm={4}>
-                  <StatCard title="Level 4" value={levels?.l4 ?? 0} />
-                </Grid>
-                <Grid item xs={6} sm={4}>
-                  <StatCard title="Level 5" value={levels?.l5 ?? 0} />
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
-        </Grid>
+        
 
         {/* Earnings Totals */}
-        <Grid item xs={12} md={6} lg={8}>
-          <Card variant="outlined">
-            <CardContent>
-              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                Earnings Summary
-              </Typography>
-              <Divider sx={{ mb: 1 }} />
-                <Grid container spacing={1}>
-                  <Grid item xs={6} sm={4} md={4} lg={2.4}>
-                    <StatCard title="Direct Referral" value={`₹${totals?.direct_referral || "0"}`} />
-                  </Grid>
-                  <Grid item xs={6} sm={4} md={4} lg={2.4}>
-                    <StatCard title="Generation Levels" value={`₹${totals?.generation_levels || "0"}`} />
-                  </Grid>
-                  <Grid item xs={6} sm={4} md={4} lg={2.4}>
-                    <StatCard title="Autopool (3-Matrix)" value={`₹${totals?.autopool_three || "0"}`} />
-                  </Grid>
-                  <Grid item xs={6} sm={4} md={4} lg={2.4}>
-                    <StatCard title="Autopool (5-Matrix)" value={`₹${totals?.autopool_five || "0"}`} />
-                  </Grid>
-                  <Grid item xs={6} sm={4} md={4} lg={2.4}>
-                    <StatCard title="Franchise Income" value={`₹${totals?.franchise_income || "0"}`} />
-                  </Grid>
-                  <Grid item xs={6} sm={4} md={4} lg={2.4}>
-                    <StatCard title="Commissions" value={`₹${totals?.commissions || "0"}`} />
-                  </Grid>
-                  <Grid item xs={6} sm={4} md={4} lg={2.4}>
-                    <StatCard title="Rewards" value={`₹${totals?.rewards || "0"}`} />
-                  </Grid>
-                </Grid>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Generation Earnings Breakdown */}
-        <Grid item xs={12} md={6}>
-          <Card variant="outlined">
-            <CardContent>
-              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                Generation Earnings (L1–L5)
-              </Typography>
-              <Divider sx={{ mb: 1 }} />
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Level</TableCell>
-                    <TableCell align="right">Amount (₹)</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {["1", "2", "3", "4", "5"].map((k) => (
-                    <TableRow key={k}>
-                      <TableCell>L{k}</TableCell>
-                      <TableCell align="right">{genBreakdown?.[k] || "0"}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Commission Split */}
-        <Grid item xs={12} md={6}>
-          <Card variant="outlined">
-            <CardContent>
-              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                Commission Split
-              </Typography>
-              <Divider sx={{ mb: 1 }} />
-              <Stack direction="row" spacing={1} flexWrap="wrap">
-                <Chip size="small" label={`Employee: ₹${commSplit?.employee || "0"}`} />
-                <Chip size="small" label={`Agency: ₹${commSplit?.agency || "0"}`} />
-              </Stack>
-            </CardContent>
-          </Card>
-        </Grid>
+        
 
         {/* Matrix Progress */}
-        <Grid item xs={12}>
+        {/* <Grid item xs={12}>
           <Card variant="outlined">
             <CardContent>
               <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
@@ -310,7 +162,7 @@ export default function MyTeam() {
               )}
             </CardContent>
           </Card>
-        </Grid>
+        </Grid> */}
 
         {/* Geneology */}
         <Grid item xs={12}>

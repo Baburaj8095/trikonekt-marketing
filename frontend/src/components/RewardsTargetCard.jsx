@@ -35,33 +35,103 @@ export default function RewardsTargetCard({ role = "employee" }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [countApproved, setCountApproved] = useState(0);
+  const [me, setMe] = useState(null);
+
+  useEffect(() => {
+    // Load my profile to filter audit logs by current actor
+    (async () => {
+      try {
+        const r = await API.get("/accounts/me/", { cacheTTL: 30000, retryAttempts: 1 });
+        setMe(r?.data || null);
+      } catch (_) {
+        setMe(null);
+      }
+    })();
+  }, []);
 
   const load = async () => {
+    setLoading(true);
+    setErr("");
+    let total = 0;
+    let gotAny = false;
+    const errors = [];
+
     try {
-      setLoading(true);
-      setErr("");
-      // This endpoint is role-aware via server queryset:
-      // - Employee: returns submissions for codes/coupons assigned to me
-      // - Agency: returns submissions in my pincode
-      const res = await API.get("/coupons/submissions/");
-      const list = Array.isArray(res.data) ? res.data : (res.data?.results || []);
       const { start, end } = monthWindow();
-      const approved = (list || []).filter((s) =>
-        String(s.status || "").toUpperCase() === "AGENCY_APPROVED" &&
-        inMonthRange(s.agency_reviewed_at || s.created_at, start, end)
-      );
-      setCountApproved(approved.length);
+
+      // 1) Physical coupon approvals in my scope (role-aware by server)
+      try {
+        const subRes = await API.get("/coupons/submissions/", { params: { page_size: 500 }, retryAttempts: 1 });
+        const subList = Array.isArray(subRes.data) ? subRes.data : (subRes.data?.results || []);
+        const approvedSubs = (subList || []).filter(
+          (s) =>
+            String(s.status || "").toUpperCase() === "AGENCY_APPROVED" &&
+            inMonthRange(s.agency_reviewed_at || s.created_at, start, end)
+        );
+        total += approvedSubs.length;
+        if (approvedSubs.length > 0) gotAny = true;
+      } catch (e1) {
+        errors.push(e1?.response?.data?.detail || e1?.message || "submissions failed");
+      }
+
+      // 2) E‑coupon sales this month via AuditTrail, filtered to current actor
+      const myId = me?.id;
+      if (myId && (role === "agency" || role === "employee")) {
+        const fromISO = start.toISOString();
+        const toISO = end.toISOString();
+        const actionCount = role === "agency" ? "agency_assigned_consumer_by_count" : "employee_assigned_consumer_by_count";
+
+        const reqs = [
+          API.get("/coupons/audits/", {
+            params: { action: actionCount, date_from: fromISO, date_to: toISO, page_size: 500 },
+            retryAttempts: 1,
+          }),
+          API.get("/coupons/audits/", {
+            params: { action: "assigned_to_consumer", date_from: fromISO, date_to: toISO, page_size: 500 },
+            retryAttempts: 1,
+          }),
+        ];
+
+        const settled = await Promise.allSettled(reqs);
+        let localAdded = 0;
+        settled.forEach((res, idx) => {
+          if (res.status === "fulfilled") {
+            const data = res.value?.data;
+            const list = Array.isArray(data) ? data : (data?.results || []);
+            const mine = (list || []).filter((r) => {
+              const a = typeof r.actor === "object" ? (r.actor?.id ?? r.actor_id) : (r.actor ?? r.actor_id);
+              return Number(a) === Number(myId);
+            });
+            if (idx === 0) {
+              // grouped count
+              localAdded += mine.reduce((acc, r) => acc + (Number(r?.metadata?.count) || 0), 0);
+            } else {
+              // single assignment entries
+              localAdded += mine.length;
+            }
+          } else {
+            const e2 = res.reason;
+            errors.push(e2?.response?.data?.detail || e2?.message || "audits failed");
+          }
+        });
+        total += localAdded;
+        if (localAdded > 0) gotAny = true;
+      }
     } catch (e) {
-      setErr("Failed to load monthly progress.");
-      setCountApproved(0);
-    } finally {
-      setLoading(false);
+      errors.push(e?.response?.data?.detail || e?.message || "unknown error");
     }
+
+    setCountApproved(total);
+    if (!gotAny && errors.length) {
+      //setErr("Failed to load monthly progress.");
+    }
+    setLoading(false);
   };
 
   useEffect(() => {
+    // Wait for profile for accurate audit attribution; still load if not available
     load();
-  }, [role]);
+  }, [role, me?.id]);
 
 
   return (

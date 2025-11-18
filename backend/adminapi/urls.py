@@ -17,11 +17,18 @@ from .views import (
     AdminMatrixTree,
     AdminMatrix5Tree,
     AdminAutopoolSummary,
+    # Support
+    AdminSupportTicketList,
+    AdminSupportTicketUpdate,
+    AdminSupportTicketMessageCreate,
+    AdminSupportTicketApproveKYC,
+    AdminPingView,
 )
 from .dynamic import router as dynamic_router, admin_meta as dynamic_admin_meta
 
 urlpatterns = [
     path("metrics/", AdminMetricsView.as_view()),
+    path("ping/", AdminPingView.as_view()),
     path("users/tree/root/", AdminUserTreeRoot.as_view()),
     path("users/tree/default-root/", AdminUserTreeDefaultRoot.as_view()),
     path("users/tree/children/", AdminUserTreeChildren.as_view()),
@@ -46,6 +53,12 @@ urlpatterns = [
     path("matrix/tree/", AdminMatrixTree.as_view()),
     path("matrix/tree5/", AdminMatrix5Tree.as_view()),
     path("autopool/summary/", AdminAutopoolSummary.as_view()),
+
+    # Support tickets
+    path("support/tickets/", AdminSupportTicketList.as_view()),
+    path("support/tickets/<int:pk>/", AdminSupportTicketUpdate.as_view()),
+    path("support/tickets/<int:pk>/messages/", AdminSupportTicketMessageCreate.as_view()),
+    path("support/tickets/<int:pk>/approve-kyc/", AdminSupportTicketApproveKYC.as_view()),
     # Dynamic admin models (auto-discovered)
     path("", include(dynamic_router.urls)),
     path("admin-meta/", dynamic_admin_meta),

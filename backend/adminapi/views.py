@@ -8,13 +8,13 @@ from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework import status
 
-from accounts.models import CustomUser, Wallet, WalletTransaction, UserKYC, WithdrawalRequest
+from accounts.models import CustomUser, Wallet, WalletTransaction, UserKYC, WithdrawalRequest, SupportTicket, SupportTicketMessage
 from coupons.models import Coupon, CouponCode, CouponSubmission, CouponBatch
 from uploads.models import FileUpload, DashboardCard, HomeCard, LuckyDrawSubmission
 from market.models import Product, PurchaseRequest, Banner, BannerItem, BannerPurchaseRequest
 from business.models import UserMatrixProgress, AutoPoolAccount
 from .permissions import IsAdminOrStaff
-from .serializers import AdminUserNodeSerializer, AdminKYCSerializer, AdminWithdrawalSerializer, AdminMatrixProgressSerializer
+from .serializers import AdminUserNodeSerializer, AdminKYCSerializer, AdminWithdrawalSerializer, AdminMatrixProgressSerializer, AdminSupportTicketSerializer, AdminSupportTicketMessageSerializer
 
 
 class AdminMetricsView(APIView):
@@ -140,18 +140,19 @@ class AdminUserTreeRoot(APIView):
         # Normalize digits for id/phone queries
         digits = "".join([c for c in identifier if c.isdigit()])
 
+        # Prefer exact prefixed_id (sponsor code)
+        user = CustomUser.objects.filter(prefixed_id__iexact=identifier).first() or user
+
         # Try by id (numeric)
-        if digits and digits == identifier and digits.isdigit():
+        if not user and digits and digits == identifier and digits.isdigit():
             user = CustomUser.objects.filter(id=int(digits)).first()
 
-        # Try by username/email/unique_id/sponsor_id and phone digits
+        # Try by username/email/unique_id and phone digits (avoid matching children by sponsor_id here)
         if not user:
             q = (
                 Q(username__iexact=identifier)
                 | Q(email__iexact=identifier)
                 | Q(unique_id__iexact=identifier)
-                | Q(prefixed_id__iexact=identifier)
-                | Q(sponsor_id__iexact=identifier)
             )
             if digits:
                 q = q | Q(phone__iexact=digits) | Q(username__iexact=digits)
@@ -718,6 +719,167 @@ class AdminWithdrawalApproveView(APIView):
             return Response({"detail": str(e)}, status=400)
         return Response(AdminWithdrawalSerializer(obj).data, status=200)
 
+# Admin health ping for auth/namespace diagnostics
+class AdminPingView(APIView):
+    permission_classes = [IsAdminOrStaff]
+
+    def get(self, request):
+        user = request.user
+        return Response(
+            {
+                "ok": True,
+                "user": getattr(user, "username", None),
+                "id": getattr(user, "id", None),
+                "is_staff": bool(getattr(user, "is_staff", False)),
+                "is_superuser": bool(getattr(user, "is_superuser", False)),
+            },
+            status=200,
+        )
+
+
+# ====================
+# Admin Support Portal
+# ====================
+
+class AdminSupportTicketList(ListAPIView):
+    """
+    List support tickets with powerful filters:
+      - status: open|in_progress|resolved|rejected|closed
+      - type: KYC_REVERIFY|GENERAL
+      - user: id or username/full_name/phone contains
+      - search: subject/message contains
+      - ordering: default -updated_at
+    """
+    permission_classes = [IsAdminOrStaff]
+    serializer_class = AdminSupportTicketSerializer
+
+    def get_queryset(self):
+        qs = SupportTicket.objects.select_related("user", "admin_assignee").all()
+        status_in = (self.request.query_params.get("status") or "").strip().lower()
+        type_in = (self.request.query_params.get("type") or "").strip().upper()
+        user_q = (self.request.query_params.get("user") or "").strip()
+        search = (self.request.query_params.get("search") or "").strip()
+        ordering = (self.request.query_params.get("ordering") or "-updated_at").strip()
+
+        if status_in in ("open", "in_progress", "resolved", "rejected", "closed"):
+            qs = qs.filter(status=status_in)
+        if type_in in ("KYC_REVERIFY", "GENERAL"):
+            qs = qs.filter(type=type_in)
+        if user_q:
+            if user_q.isdigit():
+                qs = qs.filter(Q(user_id=int(user_q)) | Q(user__username__icontains=user_q))
+            else:
+                qs = qs.filter(
+                    Q(user__username__icontains=user_q)
+                    | Q(user__full_name__icontains=user_q)
+                    | Q(user__phone__icontains=user_q)
+                )
+        if search:
+            qs = qs.filter(Q(subject__icontains=search) | Q(message__icontains=search))
+        if ordering:
+            qs = qs.order_by(ordering)
+        return qs
+
+
+class AdminSupportTicketUpdate(APIView):
+    """
+    Update ticket fields: status, admin_assignee, resolution_note.
+    Body:
+      {
+        "status": "open|in_progress|resolved|rejected|closed",
+        "admin_assignee": 123,   // user id of staff/admin
+        "resolution_note": "text to append/replace"
+      }
+    """
+    permission_classes = [IsAdminOrStaff]
+
+    def patch(self, request, pk: int):
+        ticket = SupportTicket.objects.select_related("user").filter(pk=pk).first()
+        if not ticket:
+            return Response({"detail": "Ticket not found"}, status=404)
+
+        data = request.data or {}
+        status_in = (data.get("status") or "").strip().lower()
+        admin_assignee_id = data.get("admin_assignee")
+        resolution_note = (data.get("resolution_note") or "").strip()
+
+        if admin_assignee_id is not None:
+            try:
+                aid = int(admin_assignee_id)
+                assignee = CustomUser.objects.filter(id=aid, is_staff=True).first() or CustomUser.objects.filter(id=aid, is_superuser=True).first()
+                if not assignee:
+                    return Response({"detail": "admin_assignee must be an admin/staff user id"}, status=400)
+                ticket.admin_assignee = assignee
+            except Exception:
+                return Response({"detail": "admin_assignee must be integer id"}, status=400)
+
+        if status_in in ("open", "in_progress", "resolved", "rejected", "closed"):
+            ticket.status = status_in
+
+        if resolution_note:
+            # append note
+            ticket.resolution_note = (ticket.resolution_note or "") + (("\n" if ticket.resolution_note else "") + resolution_note)
+
+        ticket.save(update_fields=["admin_assignee", "status", "resolution_note", "updated_at"])
+        return Response(AdminSupportTicketSerializer(ticket).data, status=200)
+
+
+class AdminSupportTicketMessageCreate(APIView):
+    """
+    Post an admin message to a ticket thread. Also moves status to in_progress when currently open.
+    Body: { "message": "..." }
+    """
+    permission_classes = [IsAdminOrStaff]
+
+    def post(self, request, pk: int):
+        ticket = SupportTicket.objects.select_related("user").filter(pk=pk).first()
+        if not ticket:
+            return Response({"detail": "Ticket not found"}, status=404)
+        msg = (request.data or {}).get("message")
+        if not msg or not str(msg).strip():
+            return Response({"detail": "message is required"}, status=400)
+        m = SupportTicketMessage.objects.create(ticket=ticket, author=request.user, message=str(msg).strip())
+        if ticket.status == "open":
+            ticket.status = "in_progress"
+            ticket.save(update_fields=["status", "updated_at"])
+        return Response(AdminSupportTicketMessageSerializer(m).data, status=201)
+
+
+class AdminSupportTicketApproveKYC(APIView):
+    """
+    Approve KYC re-verification request:
+      - Sets user's kyc.kyc_reopen_allowed = True
+      - Moves ticket to resolved (unless explicitly set otherwise)
+      - Appends resolution note if provided
+    Body: { "note": "optional" }
+    """
+    permission_classes = [IsAdminOrStaff]
+
+    def post(self, request, pk: int):
+        ticket = SupportTicket.objects.select_related("user").filter(pk=pk).first()
+        if not ticket:
+            return Response({"detail": "Ticket not found"}, status=404)
+        if ticket.type != "KYC_REVERIFY":
+            return Response({"detail": "Not a KYC re-verification ticket"}, status=400)
+
+        # Ensure KYC exists and enable reopen flag
+        kyc, _ = UserKYC.objects.get_or_create(user=ticket.user)
+        if not kyc.kyc_reopen_allowed:
+            kyc.kyc_reopen_allowed = True
+            kyc.save(update_fields=["kyc_reopen_allowed", "updated_at"])
+
+        note = (request.data or {}).get("note") or ""
+        if note:
+            ticket.resolution_note = (ticket.resolution_note or "") + (("\n" if ticket.resolution_note else "") + str(note))
+
+        # Auto-assign current admin if not set
+        if not ticket.admin_assignee_id:
+            ticket.admin_assignee = request.user
+
+        ticket.status = "resolved"
+        ticket.save(update_fields=["status", "resolution_note", "admin_assignee", "updated_at"])
+        return Response(AdminSupportTicketSerializer(ticket).data, status=200)
+
 
 class AdminMatrixProgressList(ListAPIView):
     """
@@ -792,7 +954,12 @@ class AdminMatrixTree(APIView):
         max_depth = max(1, min(max_depth, 20))  # hard safety cap
 
         # Prefetch children by registered_by in batches to reduce queries
-        def build_node(user, level):
+        def build_node(user, level, visited=None):
+            if visited is None:
+                visited = set()
+            if getattr(user, "id", None) in visited:
+                return None
+            visited.add(user.id)
             node = {
                 "id": user.id,
                 "username": user.username,
@@ -802,13 +969,65 @@ class AdminMatrixTree(APIView):
             }
             if level >= max_depth:
                 return node
-            children = list(
-                CustomUser.objects.filter(registered_by_id=user.id)
-                .only("id", "username", "full_name")
+            # Build robust sponsor tokens including dashless variant of prefixed_id
+            tokens = set()
+            try:
+                pid = (getattr(user, "prefixed_id", "") or "").strip()
+                if pid:
+                    tokens.add(pid)
+                    tokens.add(pid.replace("-", ""))
+                uname = (getattr(user, "username", "") or "").strip()
+                if uname:
+                    tokens.add(uname)
+                uid = (getattr(user, "unique_id", "") or "").strip()
+                if uid:
+                    tokens.add(uid)
+                phone_digits = "".join(ch for ch in str(getattr(user, "phone", "") or "") if ch.isdigit())
+                if phone_digits:
+                    tokens.add(phone_digits)
+            except Exception:
+                pass
+
+            # Initial candidate query by registered_by or sponsor token match
+            children_q = Q(registered_by_id=user.id)
+            for t in tokens:
+                children_q = children_q | Q(sponsor_id__iexact=t)
+
+            candidates = list(
+                CustomUser.objects.filter(children_q)
+                .exclude(id=user.id)
+                .only("id", "username", "full_name", "registered_by_id", "sponsor_id")
                 .order_by("id")
+                .distinct()
             )
+
+            # Verify each sponsor_id token resolves back to the current user before accepting
+            def _owner_id_by_token(token: str):
+                if not token:
+                    return None
+                q = Q(prefixed_id__iexact=token) | Q(username__iexact=token) | Q(unique_id__iexact=token)
+                t_no_dash = "".join(ch for ch in str(token) if ch.isalnum())
+                if t_no_dash and t_no_dash != token:
+                    q = q | Q(prefixed_id__iexact=t_no_dash)
+                digits = "".join(ch for ch in str(token) if ch.isdigit())
+                if digits:
+                    q = q | Q(phone__iexact=digits) | Q(username__iexact=digits)
+                u2 = CustomUser.objects.filter(q).only("id").first()
+                return getattr(u2, "id", None)
+
+            children = []
+            for c in candidates:
+                if getattr(c, "registered_by_id", None) == user.id:
+                    children.append(c)
+                else:
+                    sid = (getattr(c, "sponsor_id", "") or "").strip()
+                    if _owner_id_by_token(sid) == user.id:
+                        children.append(c)
+
             for c in children:
-                node["children"].append(build_node(c, level + 1))
+                cn = build_node(c, level + 1, visited)
+                if cn:
+                    node["children"].append(cn)
             return node
 
         root = CustomUser.objects.filter(id=root_id).first()
@@ -858,15 +1077,17 @@ class AdminMatrix5Tree(APIView):
 
         if not user and identifier:
             digits = "".join([c for c in identifier if c.isdigit()])
+            # Prefer exact prefixed_id (sponsor code like TR9000000016)
+            user = CustomUser.objects.filter(prefixed_id__iexact=identifier).first() or user
             # Try exact id if numeric-only
-            if digits and digits == identifier and digits.isdigit():
+            if not user and digits and digits == identifier and digits.isdigit():
                 user = CustomUser.objects.filter(id=int(digits)).first()
+            # Generic username/email/unique_id/phone (do not pick a child by sponsor_id here)
             if not user:
                 q = (
                     Q(username__iexact=identifier)
                     | Q(email__iexact=identifier)
                     | Q(unique_id__iexact=identifier)
-                    | Q(sponsor_id__iexact=identifier)
                 )
                 if digits:
                     q = q | Q(phone__iexact=digits) | Q(username__iexact=digits)
@@ -897,7 +1118,12 @@ class AdminMatrix5Tree(APIView):
                 node["children"].append(build_matrix(ch, level + 1))
             return node
 
-        def build_sponsor(u, level: int):
+        def build_sponsor(u, level: int, visited=None):
+            if visited is None:
+                visited = set()
+            if getattr(u, "id", None) in visited:
+                return None
+            visited.add(u.id)
             node = {
                 "id": u.id,
                 "username": u.username,
@@ -907,18 +1133,63 @@ class AdminMatrix5Tree(APIView):
             }
             if level >= max_depth:
                 return node
-            children = list(
-                CustomUser.objects.filter(
-                    Q(registered_by_id=u.id)
-                    | Q(sponsor_id__iexact=u.username)
-                    | Q(sponsor_id__iexact=u.sponsor_id)
-                )
-                .only("id", "username", "full_name")
+            # Build robust sponsor tokens including dashless variant of prefixed_id
+            tokens = set()
+            try:
+                pid = (getattr(u, "prefixed_id", "") or "").strip()
+                if pid:
+                    tokens.add(pid)
+                    tokens.add(pid.replace("-", ""))
+                uname = (getattr(u, "username", "") or "").strip()
+                if uname:
+                    tokens.add(uname)
+                uid = (getattr(u, "unique_id", "") or "").strip()
+                if uid:
+                    tokens.add(uid)
+                phone_digits = "".join(ch for ch in str(getattr(u, "phone", "") or "") if ch.isdigit())
+                if phone_digits:
+                    tokens.add(phone_digits)
+            except Exception:
+                pass
+
+            children_q = Q(registered_by_id=u.id)
+            for t in tokens:
+                children_q = children_q | Q(sponsor_id__iexact=t)
+
+            candidates = list(
+                CustomUser.objects.filter(children_q)
+                .exclude(id=u.id)
+                .only("id", "username", "full_name", "registered_by_id", "sponsor_id")
                 .order_by("id")
                 .distinct()
             )
+
+            def _owner_id_by_token(token: str):
+                if not token:
+                    return None
+                q = Q(prefixed_id__iexact=token) | Q(username__iexact=token) | Q(unique_id__iexact=token)
+                t_no_dash = "".join(ch for ch in str(token) if ch.isalnum())
+                if t_no_dash and t_no_dash != token:
+                    q = q | Q(prefixed_id__iexact=t_no_dash)
+                digits = "".join(ch for ch in str(token) if ch.isdigit())
+                if digits:
+                    q = q | Q(phone__iexact=digits) | Q(username__iexact=digits)
+                u2 = CustomUser.objects.filter(q).only("id").first()
+                return getattr(u2, "id", None)
+
+            children = []
+            for c in candidates:
+                if getattr(c, "registered_by_id", None) == u.id:
+                    children.append(c)
+                else:
+                    sid = (getattr(c, "sponsor_id", "") or "").strip()
+                    if _owner_id_by_token(sid) == u.id:
+                        children.append(c)
+
             for c in children:
-                node["children"].append(build_sponsor(c, level + 1))
+                cn = build_sponsor(c, level + 1, visited)
+                if cn:
+                    node["children"].append(cn)
             return node
 
         # Decide source

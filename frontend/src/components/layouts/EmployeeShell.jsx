@@ -41,6 +41,7 @@ export default function EmployeeShell({ children }) {
     { to: "/employee/dashboard?tab=rewards", label: "Rewards", icon: "chart" },
     { to: "/employee/dashboard?tab=e_coupons", label: "My E‑Coupons", icon: "ticket" },
     { to: "/employee/wallet", label: "Wallet", icon: "wallet" },
+    { to: "/employee/support", label: "Support", icon: "ticket" },
 
     { to: "/employee/daily-report", label: "Daily Report", icon: "box" },
   ];

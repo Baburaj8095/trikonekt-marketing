@@ -1,5 +1,6 @@
 import React from "react";
 import API from "../../api/api";
+import { getAdminMeta } from "../../admin-panel/api/adminMeta";
 import ModelListSimple from "../../admin-panel/dynamic/ModelListSimple";
 
 function Section({ title, children, extraRight }) {
@@ -42,8 +43,8 @@ export default function AdminBusiness() {
     let mounted = true;
     setLoading(true);
     setError("");
-    API.get("admin/admin-meta/")
-      .then(({ data }) => {
+    getAdminMeta()
+      .then((data) => {
         if (!mounted) return;
         const all = Array.isArray(data?.models) ? data.models : [];
 

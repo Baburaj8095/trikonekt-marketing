@@ -430,6 +430,7 @@ class UserKYC(models.Model):
     verified = models.BooleanField(default=False, db_index=True)
     verified_by = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.SET_NULL, related_name="kyc_verified_set")
     verified_at = models.DateTimeField(null=True, blank=True)
+    kyc_reopen_allowed = models.BooleanField(default=False, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -561,3 +562,53 @@ def handle_new_user_post_save(sender, instance: CustomUser, created: bool, **kwa
 
     # DEFERRED: No franchise payouts on registration.
     # Franchise payouts will be triggered on first activation inside ensure_first_purchase_activation.
+
+
+class SupportTicket(models.Model):
+    TYPE_CHOICES = [
+        ('KYC_REVERIFY', 'KYC Re-verification'),
+        ('GENERAL', 'General'),
+    ]
+    STATUS_CHOICES = [
+        ('open', 'Open'),
+        ('in_progress', 'In Progress'),
+        ('resolved', 'Resolved'),
+        ('rejected', 'Rejected'),
+        ('closed', 'Closed'),
+    ]
+
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='support_tickets', db_index=True)
+    type = models.CharField(max_length=32, choices=TYPE_CHOICES, db_index=True)
+    subject = models.CharField(max_length=200)
+    message = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open', db_index=True)
+    admin_assignee = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_tickets')
+    resolution_note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at', '-id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'type'],
+                name='uniq_open_kyc_reverify_ticket',
+                condition=models.Q(type='KYC_REVERIFY') & models.Q(status__in=['open', 'in_progress'])
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"Ticket<{self.id}> {self.type} {self.status}"
+
+
+class SupportTicketMessage(models.Model):
+    ticket = models.ForeignKey(SupportTicket, on_delete=models.CASCADE, related_name='messages')
+    author = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='support_messages')
+    message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at', 'id']
+
+    def __str__(self) -> str:
+        return f"Msg<{self.ticket_id} by {getattr(self.author, 'username', '')}>"

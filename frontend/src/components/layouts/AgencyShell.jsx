@@ -44,7 +44,7 @@ export default function AgencyShell({ children }) {
     { to: "/agency/wallet", label: "Wallet", icon: "wallet" },
 
     // Lucky-coupons tabs
-    { to: "/agency/lucky-coupons?tab=pending", label: "Lucky Draw Submissions", icon: "ticket" },
+    { to: "/agency/lucky-coupons?tab=pending", label: "Manual Coupon Submissions", icon: "ticket" },
     { to: "/agency/lucky-coupons?tab=assign", label: "E Coupon", icon: "ticket" },
     { to: "/agency/lucky-coupons?tab=commission", label: "Commission Summary", icon: "chart" },
 
@@ -60,6 +60,7 @@ export default function AgencyShell({ children }) {
     // Resources
     { to: "/agency/banners", label: "Banners", icon: "image" },
     { to: "/agency/purchase-requests", label: "Purchase Requests", icon: "orders" },
+    { to: "/agency/support", label: "Support", icon: "ticket" },
   ];
 
   // Active link matcher with support for lucky-coupons tabs and marketplace nested routes

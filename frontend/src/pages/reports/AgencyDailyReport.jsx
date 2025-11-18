@@ -14,6 +14,7 @@ import {
   TableRow,
   TableCell,
   TableBody,
+  TableContainer,
   MenuItem,
   Stack,
 } from "@mui/material";
@@ -272,7 +273,7 @@ export default function AgencyDailyReport() {
             <Stack
               direction={{ xs: "column", sm: "row" }}
               spacing={2}
-              sx={{ mb: 2 }}
+              sx={{ mb: 2, flexWrap: "wrap" }}
               alignItems={{ xs: "stretch", sm: "center" }}
             >
               <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", flexGrow: 1 }}>
@@ -283,6 +284,7 @@ export default function AgencyDailyReport() {
                 type="date"
                 label="From"
                 InputLabelProps={{ shrink: true }}
+                sx={{ width: { xs: "100%", sm: "auto" } }}
                 value={myFrom}
                 onChange={(e) => setMyFrom(e.target.value)}
               />
@@ -291,10 +293,11 @@ export default function AgencyDailyReport() {
                 type="date"
                 label="To"
                 InputLabelProps={{ shrink: true }}
+                sx={{ width: { xs: "100%", sm: "auto" } }}
                 value={myTo}
                 onChange={(e) => setMyTo(e.target.value)}
               />
-              <Button variant="outlined" onClick={loadMyReports}>Filter</Button>
+              <Button variant="outlined" onClick={loadMyReports} sx={{ width: { xs: "100%", sm: "auto" } }}>Filter</Button>
             </Stack>
 
             {myLoading ? (
@@ -304,7 +307,8 @@ export default function AgencyDailyReport() {
             ) : myError ? (
               <Alert severity="error">{myError}</Alert>
             ) : (
-              <Table size="small">
+              <TableContainer sx={{ width: "100%", overflowX: "auto" }}>
+                <Table size="small" sx={{ minWidth: 900 }}>
                 <TableHead>
                   <TableRow>
                     <TableCell>Date</TableCell>
@@ -344,7 +348,8 @@ export default function AgencyDailyReport() {
                     </TableRow>
                   )}
                 </TableBody>
-              </Table>
+                </Table>
+              </TableContainer>
             )}
           </Paper>
         </Grid>
@@ -355,7 +360,7 @@ export default function AgencyDailyReport() {
             <Stack
               direction={{ xs: "column", sm: "row" }}
               spacing={2}
-              sx={{ mb: 2 }}
+              sx={{ mb: 2, flexWrap: "wrap" }}
               alignItems={{ xs: "stretch", sm: "center" }}
             >
               <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", flexGrow: 1 }}>
@@ -366,6 +371,7 @@ export default function AgencyDailyReport() {
                 type="date"
                 label="From"
                 InputLabelProps={{ shrink: true }}
+                sx={{ width: { xs: "100%", sm: "auto" } }}
                 value={teamFrom}
                 onChange={(e) => setTeamFrom(e.target.value)}
               />
@@ -374,6 +380,7 @@ export default function AgencyDailyReport() {
                 type="date"
                 label="To"
                 InputLabelProps={{ shrink: true }}
+                sx={{ width: { xs: "100%", sm: "auto" } }}
                 value={teamTo}
                 onChange={(e) => setTeamTo(e.target.value)}
               />
@@ -383,7 +390,7 @@ export default function AgencyDailyReport() {
                 label="Role"
                 value={teamRole}
                 onChange={(e) => setTeamRole(e.target.value)}
-                sx={{ minWidth: 160 }}
+                sx={{ width: { xs: "100%", sm: "auto" }, minWidth: { sm: 160 } }}
               >
                 <MenuItem value="">All</MenuItem>
                 <MenuItem value="EMPLOYEE">Employee</MenuItem>
@@ -394,10 +401,10 @@ export default function AgencyDailyReport() {
                 label="Reporter ID (optional)"
                 value={teamReporter}
                 onChange={(e) => setTeamReporter(e.target.value)}
-                sx={{ minWidth: 200 }}
+                sx={{ width: { xs: "100%", sm: "auto" }, minWidth: { sm: 200 } }}
               />
-              <Button variant="outlined" onClick={loadTeamReports}>Filter</Button>
-              <Button variant="contained" onClick={downloadCSV}>Download CSV</Button>
+              <Button variant="outlined" onClick={loadTeamReports} sx={{ width: { xs: "100%", sm: "auto" } }}>Filter</Button>
+              <Button variant="contained" onClick={downloadCSV} sx={{ width: { xs: "100%", sm: "auto" } }}>Download CSV</Button>
             </Stack>
 
             {teamLoading ? (
@@ -407,7 +414,8 @@ export default function AgencyDailyReport() {
             ) : teamError ? (
               <Alert severity="error">{teamError}</Alert>
             ) : (
-              <Table size="small">
+              <TableContainer sx={{ width: "100%", overflowX: "auto" }}>
+                <Table size="small" sx={{ minWidth: 1100 }}>
                 <TableHead>
                   <TableRow>
                     <TableCell>Date</TableCell>
@@ -449,7 +457,8 @@ export default function AgencyDailyReport() {
                     </TableRow>
                   )}
                 </TableBody>
-              </Table>
+                </Table>
+              </TableContainer>
             )}
           </Paper>
         </Grid>

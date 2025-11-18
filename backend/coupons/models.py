@@ -122,7 +122,10 @@ class CouponSubmission(models.Model):
     # Link to instance when CouponCode exists
     code_ref = models.ForeignKey(CouponCode, null=True, blank=True, on_delete=models.SET_NULL, related_name="submissions")
 
-    pincode = models.CharField(max_length=10, db_index=True)
+    pincode = models.CharField(max_length=10, db_index=True, blank=True)
+    tr_username = models.CharField(max_length=64, blank=True, db_index=True)
+    tr_user = models.ForeignKey(UserModel, null=True, blank=True, on_delete=models.SET_NULL, related_name="manual_tr_submissions")
+    consumer_tr_username = models.CharField(max_length=64, blank=True)
     notes = models.TextField(blank=True)
     file = models.FileField(upload_to="uploads/coupon_submissions/")
     status = models.CharField(max_length=20, choices=STATUS, default="SUBMITTED", db_index=True)

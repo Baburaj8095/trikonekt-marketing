@@ -35,7 +35,7 @@ export default function ConsumerShell({ children }) {
     { to: "/user/wealth-galaxy", label: "Wealth Galaxy", icon: "chart" },
     { to: "/user/app-hub", label: "App Hub", icon: "box" },
     { to: "/user/profile", label: "Profile", icon: "users" },
-    { to: "/user/lucky-draw", label: "Participate Lucky Draw", icon: "ticket" },
+    { to: "/user/lucky-draw", label: "Manual Lucky Coupon", icon: "ticket" },
     { to: "/marketplace", label: "Marketplace", icon: "box" },
     { to: "/marketplace/my-orders", label: "My Orders", icon: "orders" },
     { to: "/user/redeem-coupon", label: "E-Coupon", icon: "ticket" },
@@ -43,6 +43,7 @@ export default function ConsumerShell({ children }) {
     { to: "/user/kyc", label: "KYC", icon: "shield" },
     { to: "/user/my-team", label: "My Team", icon: "tree" },
     { to: "/user/refer-earn", label: "Refer & Earn", icon: "upload" },
+    { to: "/user/support", label: "Support", icon: "ticket" },
   ];
 
   const isActive = (to, loc) => {

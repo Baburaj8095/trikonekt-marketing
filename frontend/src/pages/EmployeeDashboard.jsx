@@ -943,7 +943,7 @@ export default function EmployeeDashboard({ embedded = false }) {
             <Grid item xs={12}>
               <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>
-                  Lucky Draw Submissions Awaiting My Approval
+                  Manual Coupon Submissions Awaiting My Approval
                 </Typography>
                 <Box sx={{ mb: 2 }}>
                   <Alert severity="info">My reviews — Approved: {luckyStats.approved} | Rejected: {luckyStats.rejected}</Alert>
@@ -1541,7 +1541,7 @@ export default function EmployeeDashboard({ embedded = false }) {
               <Grid item xs={12}>
                 <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
                   <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>
-                    Lucky Draw Submissions Awaiting My Approval
+                    Manual Coupon Submissions Awaiting My Approval
                   </Typography>
                   <Box sx={{ mb: 2 }}>
                     <Alert severity="info">My reviews — Approved: {luckyStats.approved} | Rejected: {luckyStats.rejected}</Alert>

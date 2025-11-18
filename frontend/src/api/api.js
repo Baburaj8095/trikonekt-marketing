@@ -1,14 +1,51 @@
 import axios from "axios";
 import { incrementLoading, decrementLoading } from "../hooks/loadingStore";
 
-const baseURL =
+const rawBaseURL =
   process.env.REACT_APP_API_URL ||
   "/api";
+const baseURL = rawBaseURL.endsWith("/") ? rawBaseURL : rawBaseURL + "/";
 
 const API = axios.create({ baseURL });
 
 // Separate client without interceptors for token refresh to avoid recursion/deadlocks
 const refreshClient = axios.create({ baseURL });
+
+// Performance defaults and helpers
+const DEFAULT_TIMEOUT = 15000;
+API.defaults.timeout = DEFAULT_TIMEOUT;
+refreshClient.defaults.timeout = DEFAULT_TIMEOUT;
+
+// In-flight request tracking and simple in-memory cache (GET)
+const inflight = new Map(); // key -> { abort, cancel, ts }
+const cache = new Map(); // key -> { data, headers, expiry }
+const DEFAULT_GET_CACHE_TTL = 0; // default: no caching unless caller opts-in via config.cacheTTL
+
+function makeRequestKey(cfg) {
+  try {
+    const method = (cfg.method || "get").toLowerCase();
+    const url = cfg.url || "";
+    const params = cfg.params || {};
+    // Sanitize params: drop cache-busting keys and sort keys for stability
+    const dropKeys = new Set(["_", "cacheBust", "cache_bust", "ts", "timestamp"]);
+    const sanitize = (obj) => {
+      if (obj == null || typeof obj !== "object") return obj;
+      if (Array.isArray(obj)) return obj.map(sanitize);
+      const out = {};
+      Object.keys(obj)
+        .filter((k) => !dropKeys.has(k))
+        .sort()
+        .forEach((k) => {
+          out[k] = sanitize(obj[k]);
+        });
+      return out;
+    };
+    const paramsStr = JSON.stringify(sanitize(params));
+    return `${method}:${url}?${paramsStr}`;
+  } catch (_) {
+    return `${cfg.method || "get"}:${cfg.url || ""}`;
+  }
+}
 
 // Session namespace helpers: isolate tokens per role (admin, user, agency, employee, business)
 function currentNamespace() {
@@ -87,18 +124,44 @@ function parseJwt(token) {
 }
 
 function getAccessToken() {
-  return readNamespaced("token");
+  const t = readNamespaced("token");
+  if (t) return t;
+  // Fallback: if we're on an admin route but tokens exist under user namespace (e.g. logged in from non-admin URL)
+  try {
+    if (currentNamespace() !== "user") {
+      const k = "token_user";
+      const v =
+        (typeof localStorage !== "undefined" && localStorage.getItem(k)) ||
+        (typeof sessionStorage !== "undefined" && sessionStorage.getItem(k)) ||
+        null;
+      if (v) return v;
+    }
+  } catch (_) {}
+  return null;
 }
 
 function getRefreshToken() {
-  return readNamespaced("refresh");
+  const r = readNamespaced("refresh");
+  if (r) return r;
+  // Fallback for cross-namespace login (e.g., admin using token from user namespace)
+  try {
+    if (currentNamespace() !== "user") {
+      const k = "refresh_user";
+      const v =
+        (typeof localStorage !== "undefined" && localStorage.getItem(k)) ||
+        (typeof sessionStorage !== "undefined" && sessionStorage.getItem(k)) ||
+        null;
+      if (v) return v;
+    }
+  } catch (_) {}
+  return null;
 }
 
 async function refreshAccessToken() {
   const refresh = getRefreshToken();
   if (!refresh) return null;
   try {
-    const resp = await refreshClient.post("/accounts/token/refresh/", { refresh });
+    const resp = await refreshClient.post("accounts/token/refresh/", { refresh });
     const { access, refresh: newRefresh } = resp?.data || {};
     if (access) {
       writeNamespaced("token", access);
@@ -161,6 +224,91 @@ function redact(value) {
   }
   return value;
 }
+
+/* Performance: defaults, GET caching, and request de-duplication (latest wins). */
+API.interceptors.request.use((config) => {
+  try {
+    // Apply default timeout if not provided
+    if (config.timeout == null) {
+      config.timeout = DEFAULT_TIMEOUT;
+    }
+
+    // Normalize request URL to work with both baseURL="/api" (dev proxy) and absolute REACT_APP_API_URL.
+    // If url starts with "/", strip the leading slash when baseURL ends with "/api" or is absolute,
+    // so axios appends the path instead of resetting to the origin root and avoids double "/api".
+    try {
+      const u = config?.url || "";
+      if (typeof u === "string" && u.startsWith("/")) {
+        const b = config.baseURL || API.defaults.baseURL || baseURL || "";
+        const isAbs = /^https?:\/\//i.test(b);
+        const bEndsWithApi = /\/api\/?$/.test(b);
+        if (isAbs || bEndsWithApi) {
+          // Example:
+          //  - baseURL="/api", url="/uploads/cards/" -> "uploads/cards/" => "/api/uploads/cards/"
+          //  - baseURL="http://localhost:8000/api", url="/uploads/cards/" -> "uploads/cards/" => "http://.../api/uploads/cards/"
+          //  - If url already begins with "/api/", strip that prefix to avoid "/api/api/*" when using axios baseURL="/api"
+          let path = u.startsWith("/api/") ? u.slice(5) : u.slice(1);
+          config.url = path;
+        }
+      }
+    } catch (_) {}
+
+    const method = (config.method || "get").toLowerCase();
+
+    if (method === "get") {
+      const key = makeRequestKey(config);
+      const ttl =
+        typeof config.cacheTTL === "number" ? config.cacheTTL : DEFAULT_GET_CACHE_TTL;
+
+      // Serve from cache using a custom adapter to short-circuit the network
+      if (ttl > 0) {
+        const entry = cache.get(key);
+        if (entry && Date.now() < entry.expiry) {
+          config._fromCache = true;
+          config._skipLoadingTrack = true; // prevent spinner for cache hits
+          config.adapter = async () => ({
+            data: entry.data,
+            status: 200,
+            statusText: "OK",
+            headers: entry.headers || {},
+            config,
+            request: null,
+          });
+          return config;
+        }
+      }
+
+      // Request de-duplication: cancel previous in-flight identical GET, keep latest
+      const strategy = config.dedupe || "cancelPrevious"; // "cancelPrevious" | "none"
+      if (strategy !== "none") {
+        const existing = inflight.get(key);
+        if (existing) {
+          try {
+            existing.abort?.();
+            existing.cancel?.("deduped");
+          } catch (_) {}
+        }
+        // Prepare abort handle for current request
+        let abort = null;
+        let cancel = null;
+        try {
+          if (typeof AbortController !== "undefined" && !config.signal) {
+            const controller = new AbortController();
+            config.signal = controller.signal;
+            abort = () => controller.abort();
+          } else if (axios && axios.CancelToken && !config.cancelToken) {
+            const src = axios.CancelToken.source();
+            config.cancelToken = src.token;
+            cancel = src.cancel;
+          }
+        } catch (_) {}
+        inflight.set(key, { abort, cancel, ts: Date.now() });
+        config._reqKey = key;
+      }
+    }
+  } catch (_) {}
+  return config;
+});
 
 /* Track loading + attach JWT Authorization header from storage when available. */
 API.interceptors.request.use(async (config) => {
@@ -227,6 +375,26 @@ API.interceptors.response.use(
     try {
       if (res?.config?._trackLoading) decrementLoading();
     } catch (_) {}
+    // Cache GET responses and clear inflight tracking
+    try {
+      const cfg = res?.config || {};
+      const method = (cfg.method || "get").toLowerCase();
+      if (method === "get") {
+        const ttl =
+          typeof cfg.cacheTTL === "number" ? cfg.cacheTTL : DEFAULT_GET_CACHE_TTL;
+        if (ttl > 0 && !cfg._fromCache) {
+          const key = makeRequestKey(cfg);
+          cache.set(key, {
+            data: res?.data,
+            headers: res?.headers || {},
+            expiry: Date.now() + ttl,
+          });
+        }
+        if (cfg._reqKey && inflight.has(cfg._reqKey)) {
+          inflight.delete(cfg._reqKey);
+        }
+      }
+    } catch (_) {}
     return res;
   },
   async (error) => {
@@ -247,6 +415,38 @@ API.interceptors.response.use(
     const status = error?.response?.status;
     const data = error?.response?.data;
     const originalRequest = error?.config || {};
+
+    // Clear inflight map entry (if any)
+    try {
+      if (originalRequest?._reqKey && inflight.has(originalRequest._reqKey)) {
+        inflight.delete(originalRequest._reqKey);
+      }
+    } catch (_) {}
+
+    // Lightweight retries for idempotent requests on transient errors
+    try {
+      const method = (originalRequest.method || "get").toLowerCase();
+      const isTransient =
+        (typeof status !== "number" || status >= 500) ||
+        error?.code === "ECONNABORTED";
+      const isIdempotent = method === "get" || method === "head";
+      const maxAttempts =
+        typeof originalRequest.retryAttempts === "number"
+          ? originalRequest.retryAttempts
+          : 2;
+      const count = originalRequest._retryCount || 0;
+
+      if (isTransient && isIdempotent && !originalRequest._retrying && count < maxAttempts) {
+        originalRequest._retryCount = count + 1;
+        originalRequest._retrying = true;
+        originalRequest._skipLoadingTrack = true; // avoid re-incrementing loader
+        const base = 200 * Math.pow(2, count);
+        const jitter = Math.floor(Math.random() * 100);
+        const delay = Math.min(1000, base + jitter);
+        await new Promise((r) => setTimeout(r, delay));
+        return API(originalRequest);
+      }
+    } catch (_) {}
 
     const tokenInvalid =
       status === 401 &&
@@ -324,6 +524,12 @@ API.interceptors.response.use(
 
 export async function assignConsumerByCount(payload) {
   const res = await API.post("/coupons/codes/assign-consumer-count/", payload);
+  return res?.data || res;
+}
+
+export async function assignEmployeeByCount(payload) {
+  // payload supports either { employee_username, count, batch?, notes? } or { employee_id, count, ... }
+  const res = await API.post("/coupons/codes/assign-employee-count/", payload);
   return res?.data || res;
 }
 

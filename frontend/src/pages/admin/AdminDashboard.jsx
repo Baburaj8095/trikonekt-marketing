@@ -537,7 +537,7 @@ export default function AdminDashboard() {
                 maxHeight: 500,
               }}
             >
-              <TreeReferralGalaxy mode="admin" />
+              <TreeReferralGalaxy mode="admin" preferredSource="matrix" />
             </div>
           </div>
         </>

@@ -18,6 +18,8 @@ urlpatterns = [
     path('api/location/', include('locations.urls')),
     path('api/business/', include('business.urls')),
     path('api/admin/', include('adminapi.urls')),
+    # Backward-compat alias for old clients that call /api/adminapi/*
+    path('api/adminapi/', include('adminapi.urls')),
     path('api/company/', CompanyInfoView.as_view()),
     path('api/company/packages/', CompanyPackagesView.as_view()),
     path('api/', include('market.urls')),

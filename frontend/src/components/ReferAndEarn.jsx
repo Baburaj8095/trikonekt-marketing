@@ -123,6 +123,35 @@ export default function ReferAndEarn({ title = "Refer & Earn", onlyConsumer = fa
     }
   };
 
+  const buildShareText = (label) => {
+    const idText = sponsorId ? `Sponsor ID: ${sponsorId}\n` : "";
+    return `Join me on Trikonekt.\n${idText}Use this ${label} registration link:`;
+  };
+
+  const openNew = (href) => {
+    try {
+      window.open(href, "_blank", "noopener,noreferrer");
+    } catch (e) {}
+  };
+
+  const getWhatsAppUrl = (link, text) =>
+    `https://wa.me/?text=${encodeURIComponent(`${text} ${link}`)}`;
+
+  const getTelegramUrl = (link, text) =>
+    `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`;
+
+  const shareNative = async (link, text) => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Refer & Earn", text, url: link });
+        setMsg("Share dialog opened.");
+        setTimeout(() => setMsg(""), 1500);
+      } catch (e) {}
+    } else {
+      openNew(getWhatsAppUrl(link, text));
+    }
+  };
+
 
   return (
     <Paper elevation={2} sx={{ p: 2, borderRadius: 2, mb: 2, bgcolor: "#fff" }}>
@@ -141,33 +170,116 @@ export default function ReferAndEarn({ title = "Refer & Earn", onlyConsumer = fa
 
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ flexWrap: "wrap" }}>
         {showConsumerLink && (
-          <Button
-            variant="contained"
-            onClick={() => copy(links.consumer)}
-            sx={{ textTransform: "none" }}
-          >
-            Copy Consumer Link
-          </Button>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Button
+              variant="outlined"
+              sx={{ textTransform: "none" }}
+              onClick={() => shareNative(links.consumer, buildShareText("Consumer"))}
+            >
+              Share
+            </Button>
+            <Button
+              variant="outlined"
+              sx={{ textTransform: "none" }}
+              onClick={() => openNew(getWhatsAppUrl(links.consumer, buildShareText("Consumer")))}
+            >
+              WhatsApp
+            </Button>
+            <Button
+              variant="outlined"
+              sx={{ textTransform: "none" }}
+              onClick={() => openNew(getTelegramUrl(links.consumer, buildShareText("Consumer")))}
+            >
+              Telegram
+            </Button>
+            <Button
+              variant="contained"
+              sx={{ textTransform: "none" }}
+              onClick={() => copy(links.consumer)}
+            >
+              Copy
+            </Button>
+          </Stack>
         )}
 
         {showEmployeeLink && (
-          <Button
-            variant="contained"
-            onClick={() => (sponsorId ? copy(links.employee) : setMsg("Sponsor ID missing. Please re-login."))}
-            sx={{ textTransform: "none" }}
-          >
-            Copy Employee Link
-          </Button>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Button
+              variant="outlined"
+              sx={{ textTransform: "none" }}
+              onClick={() =>
+                sponsorId
+                  ? shareNative(links.employee, buildShareText("Employee"))
+                  : setMsg("Sponsor ID missing. Please re-login.")
+              }
+            >
+              Share Employee
+            </Button>
+            <Button
+              variant="outlined"
+              sx={{ textTransform: "none" }}
+              onClick={() =>
+                sponsorId
+                  ? openNew(getWhatsAppUrl(links.employee, buildShareText("Employee")))
+                  : setMsg("Sponsor ID missing. Please re-login.")
+              }
+            >
+              WhatsApp
+            </Button>
+            <Button
+              variant="outlined"
+              sx={{ textTransform: "none" }}
+              onClick={() =>
+                sponsorId
+                  ? openNew(getTelegramUrl(links.employee, buildShareText("Employee")))
+                  : setMsg("Sponsor ID missing. Please re-login.")
+              }
+            >
+              Telegram
+            </Button>
+            <Button
+              variant="contained"
+              sx={{ textTransform: "none" }}
+              onClick={() =>
+                sponsorId ? copy(links.employee) : setMsg("Sponsor ID missing. Please re-login.")
+              }
+            >
+              Copy Employee
+            </Button>
+          </Stack>
         )}
 
         {showSubFranchiseLink && (
-          <Button
-            variant="contained"
-            onClick={() => copy(links.subFranchise)}
-            sx={{ textTransform: "none" }}
-          >
-            Copy Sub‑Franchise Agency Link
-          </Button>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Button
+              variant="outlined"
+              sx={{ textTransform: "none" }}
+              onClick={() => shareNative(links.subFranchise, buildShareText("Sub‑Franchise"))}
+            >
+              Share Sub‑Franchise
+            </Button>
+            <Button
+              variant="outlined"
+              sx={{ textTransform: "none" }}
+              onClick={() => openNew(getWhatsAppUrl(links.subFranchise, buildShareText("Sub‑Franchise")))}
+            >
+              WhatsApp
+            </Button>
+            <Button
+              variant="outlined"
+              sx={{ textTransform: "none" }}
+              onClick={() => openNew(getTelegramUrl(links.subFranchise, buildShareText("Sub‑Franchise")))}
+            >
+              Telegram
+            </Button>
+            <Button
+              variant="contained"
+              sx={{ textTransform: "none" }}
+              onClick={() => copy(links.subFranchise)}
+            >
+              Copy Sub‑Franchise
+            </Button>
+          </Stack>
         )}
       </Stack>
 

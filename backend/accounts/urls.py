@@ -17,7 +17,13 @@ from .views import (
     TeamSummaryView,
     MyMatrixTree,
     MyMatrixTreeByRoot,
+    MySponsorTree,
+    MySponsorTreeByRoot,
     ProfileMeView,
+    # Support portal (user)
+    SupportTicketListCreate,
+    SupportTicketDetail,
+    SupportTicketMessageCreate,
 )
 from .token_serializers import CustomTokenRefreshView
 
@@ -34,6 +40,8 @@ urlpatterns = [
     path('hierarchy/', hierarchy, name='hierarchy'),
     path('my/matrix/tree/', MyMatrixTree.as_view(), name='my_matrix_tree'),
     path('matrix/tree5/', MyMatrixTreeByRoot.as_view(), name='my_matrix_tree_by_root'),
+    path('my/sponsor/tree/', MySponsorTree.as_view(), name='my_sponsor_tree'),
+    path('sponsor/tree/', MySponsorTreeByRoot.as_view(), name='my_sponsor_tree_by_root'),
     path('team/summary/', TeamSummaryView.as_view(), name='team_summary'),
     # Wallet
     path('wallet/me/', WalletMe.as_view(), name='wallet_me'),
@@ -42,5 +50,9 @@ urlpatterns = [
     path('kyc/me/', UserKYCMeView.as_view(), name='kyc_me'),
     path('withdrawals/', WithdrawalCreateView.as_view(), name='withdrawals_create'),
     path('withdrawals/me/', MyWithdrawalsListView.as_view(), name='my_withdrawals'),
+    # Support (User)
+    path('support/tickets/', SupportTicketListCreate.as_view(), name='support_tickets'),
+    path('support/tickets/<int:pk>/', SupportTicketDetail.as_view(), name='support_ticket_detail'),
+    path('support/tickets/<int:pk>/messages/', SupportTicketMessageCreate.as_view(), name='support_ticket_message_create'),
     path('token/refresh/', CustomTokenRefreshView.as_view(), name='token_refresh'),
 ]

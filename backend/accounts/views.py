@@ -1,6 +1,6 @@
 from rest_framework import generics
-from .models import CustomUser, AgencyRegionAssignment, Wallet, WalletTransaction
-from .serializers import RegisterSerializer, PublicUserSerializer, UserKYCSerializer, WithdrawalRequestSerializer, ProfileMeSerializer
+from .models import CustomUser, AgencyRegionAssignment, Wallet, WalletTransaction, SupportTicket, SupportTicketMessage
+from .serializers import RegisterSerializer, PublicUserSerializer, UserKYCSerializer, WithdrawalRequestSerializer, ProfileMeSerializer, SupportTicketSerializer, SupportTicketMessageSerializer
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .token_serializers import CustomTokenObtainPairSerializer
@@ -797,6 +797,152 @@ class MyMatrixTreeByRoot(APIView):
         return Response(tree, status=status.HTTP_200_OK)
 
 
+class MySponsorTree(APIView):
+    """
+    Returns the authenticated user's sponsor-based genealogy tree (registered_by/sponsor_id).
+    Query params:
+      - max_depth: optional (default 6, capped at 20)
+    Response:
+      { id, username, full_name, children:[...] }
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            max_depth = int(request.query_params.get("max_depth") or 6)
+        except Exception:
+            max_depth = 6
+        max_depth = max(1, min(max_depth, 20))
+
+        def build_node(u, level: int, visited=None):
+            if visited is None:
+                visited = set()
+            if getattr(u, "id", None) in visited:
+                return None
+            visited.add(u.id)
+            node = {
+                "id": u.id,
+                "username": u.username,
+                "full_name": getattr(u, "full_name", ""),
+                "children": [],
+            }
+            if level >= max_depth:
+                return node
+            children = list(
+                CustomUser.objects.filter(
+                    Q(registered_by_id=u.id)
+                    | (Q(registered_by__isnull=True) & Q(sponsor_id__iexact=getattr(u, "prefixed_id", "")))
+                )
+                .exclude(id=u.id)
+                .only("id", "username", "full_name")
+                .order_by("-id")
+                .distinct()
+            )
+            for ch in children:
+                cn = build_node(ch, level + 1, visited)
+                if cn:
+                    node["children"].append(cn)
+            return node
+
+        tree = build_node(request.user, 1)
+        return Response(tree, status=status.HTTP_200_OK)
+
+
+class MySponsorTreeByRoot(APIView):
+    """
+    Returns sponsor-based downline tree for a root user within caller's sponsor downline.
+    Query params:
+      - root_user_id: required
+      - max_depth: optional (default 6, capped at 20)
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            root_id = int(request.query_params.get("root_user_id") or "0")
+        except Exception:
+            return Response({"detail": "root_user_id must be integer"}, status=status.HTTP_400_BAD_REQUEST)
+        if root_id <= 0:
+            return Response({"detail": "root_user_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        root = CustomUser.objects.filter(id=root_id).first()
+        if not root:
+            return Response({"detail": "root user not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Security: ensure requested root is inside caller’s sponsor-based downline (or self)
+        me = request.user
+        cur = root
+        allowed = False
+
+        def _resolve_sponsor_parent(user):
+            try:
+                sid = (getattr(user, "sponsor_id", "") or "").strip()
+            except Exception:
+                sid = ""
+            if not sid:
+                return None
+            q = Q(username__iexact=sid) | Q(prefixed_id__iexact=sid) | Q(unique_id__iexact=sid)
+            digits = "".join(ch for ch in sid if ch.isdigit())
+            if digits:
+                q = q | Q(phone__iexact=digits) | Q(username__iexact=digits)
+            return CustomUser.objects.filter(q).only("id").first()
+
+        for _ in range(50):
+            if not cur:
+                break
+            if cur.id == me.id:
+                allowed = True
+                break
+            parent = getattr(cur, "registered_by", None)
+            if not parent:
+                parent = _resolve_sponsor_parent(cur)
+            if not parent or getattr(parent, "id", None) == getattr(cur, "id", None):
+                break
+            cur = parent
+
+        if not allowed:
+            return Response({"detail": "Requested root is not inside your sponsor downline"}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            max_depth = int(request.query_params.get("max_depth") or 6)
+        except Exception:
+            max_depth = 6
+        max_depth = max(1, min(max_depth, 20))
+
+        def build_node(u, level: int, visited=None):
+            if visited is None:
+                visited = set()
+            if getattr(u, "id", None) in visited:
+                return None
+            visited.add(u.id)
+            node = {
+                "id": u.id,
+                "username": u.username,
+                "full_name": getattr(u, "full_name", ""),
+                "children": [],
+            }
+            if level >= max_depth:
+                return node
+            children = list(
+                CustomUser.objects.filter(
+                    Q(registered_by_id=u.id)
+                    | (Q(registered_by__isnull=True) & Q(sponsor_id__iexact=getattr(u, "prefixed_id", "")))
+                )
+                .exclude(id=u.id)
+                .only("id", "username", "full_name")
+                .order_by("-id")
+                .distinct()
+            )
+            for ch in children:
+                cn = build_node(ch, level + 1, visited)
+                if cn:
+                    node["children"].append(cn)
+            return node
+
+        tree = build_node(root, 1)
+        return Response(tree, status=status.HTTP_200_OK)
+
+
 # ====================
 # Team / Earnings APIs
 # ====================
@@ -1020,3 +1166,50 @@ class MyWithdrawalsListView(generics.ListAPIView):
     def get_queryset(self):
         from .models import WithdrawalRequest
         return WithdrawalRequest.objects.filter(user=self.request.user).order_by("-requested_at")
+
+
+# ====================
+# Support Portal (User)
+# ====================
+
+class SupportTicketListCreate(generics.ListCreateAPIView):
+    """
+    List my support tickets and create a new ticket.
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = SupportTicketSerializer
+
+    def get_queryset(self):
+        return SupportTicket.objects.filter(user=self.request.user).order_by("-updated_at", "-id")
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class SupportTicketDetail(generics.RetrieveAPIView):
+    """
+    Retrieve a specific ticket (restricted to the owner).
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = SupportTicketSerializer
+
+    def get_queryset(self):
+        return SupportTicket.objects.filter(user=self.request.user)
+
+
+class SupportTicketMessageCreate(generics.CreateAPIView):
+    """
+    Post a message on my ticket (simple 1:1 conversation thread with admin).
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = SupportTicketMessageSerializer
+
+    def perform_create(self, serializer):
+        try:
+            pk = int(self.kwargs.get("pk") or 0)
+        except Exception:
+            pk = 0
+        ticket = SupportTicket.objects.filter(pk=pk, user=self.request.user).first()
+        if not ticket:
+            raise serializers.ValidationError({"detail": "Ticket not found."})
+        serializer.save(ticket=ticket, author=self.request.user)

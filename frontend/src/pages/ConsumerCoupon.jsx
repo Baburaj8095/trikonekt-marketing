@@ -83,6 +83,19 @@ export default function ConsumerCoupon() {
   const [transferCodeBusy, setTransferCodeBusy] = useState({});
   const [activateCodeBusy, setActivateCodeBusy] = useState({});
 
+  // Manual lucky coupon submission
+  const [manual, setManual] = useState({
+    coupon_code: "",
+    tr_username: "",
+    consumer_tr_username: String(storedUser?.username || ""),
+    notes: "",
+    file: null,
+    resolving: false,
+    resolved: null,
+    error: "",
+    submitting: false,
+  });
+
   // Transfer dialog (consumer -> consumer)
   const [transferDialog, setTransferDialog] = useState({
     open: false,
@@ -319,6 +332,63 @@ export default function ConsumerCoupon() {
     }
   };
 
+  const onManualChange = (field, value) => {
+    setManual((m) => ({ ...m, [field]: value }));
+  };
+
+  const resolveTR = async () => {
+    const u = String(manual.tr_username || "").trim();
+    if (!u) return;
+    try {
+      setManual((m) => ({ ...m, resolving: true, error: "", resolved: null }));
+      const res = await API.get("/coupons/codes/resolve-user", { params: { username: u } });
+      setManual((m) => ({ ...m, resolving: false, resolved: res.data || null }));
+    } catch (e) {
+      const msg = e?.response?.data?.detail || "User not found.";
+      setManual((m) => ({ ...m, resolving: false, resolved: null, error: msg }));
+    }
+  };
+
+  const submitManual = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    const code = String(manual.coupon_code || "").trim();
+    const tr = String(manual.tr_username || "").trim();
+    if (!code) { try { alert("Coupon Code is required."); } catch {} return; }
+    if (!tr) { try { alert("TR Username is required."); } catch {} return; }
+    try {
+      setManual((m) => ({ ...m, submitting: true, error: "" }));
+      const fd = new FormData();
+      fd.append("coupon_code", code);
+      fd.append("tr_username", tr);
+      const ctr = String(manual.consumer_tr_username || "").trim();
+      if (ctr) fd.append("consumer_tr_username", ctr);
+      const notes = String(manual.notes || "");
+      if (notes) fd.append("notes", notes);
+      if (manual.file) fd.append("file", manual.file);
+      await API.post("/coupons/submissions/", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      try { alert("Manual submission created."); } catch {}
+      setManual({
+        coupon_code: "",
+        tr_username: "",
+        consumer_tr_username: String(storedUser?.username || ""),
+        notes: "",
+        file: null,
+        resolving: false,
+        resolved: null,
+        error: "",
+        submitting: false,
+      });
+      await loadMySubmissions();
+    } catch (e) {
+      const err = e?.response?.data;
+      const msg = (typeof err === "string" ? err : (err?.detail || JSON.stringify(err || {}))) || "Submission failed.";
+      setManual((m) => ({ ...m, submitting: false, error: msg }));
+      try { alert(msg); } catch {}
+    } finally {
+      setManual((m) => ({ ...m, submitting: false }));
+    }
+  };
+
   useEffect(() => {
     loadMySubmissions();
     loadWallet();
@@ -542,6 +612,102 @@ export default function ConsumerCoupon() {
         </Box>
       </Paper> */}
 
+      <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mb: 2 }}>
+        <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
+          Manual Lucky Coupon Submission (Physical only)
+        </Typography>
+        <Box component="form" onSubmit={submitManual}>
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Coupon Code"
+                value={manual.coupon_code}
+                onChange={(e) => onManualChange("coupon_code", e.target.value)}
+                required
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="TR Username"
+                  value={manual.tr_username}
+                  onChange={(e) => onManualChange("tr_username", e.target.value)}
+                  onBlur={resolveTR}
+                  required
+                />
+                <Button variant="outlined" size="small" onClick={resolveTR} disabled={manual.resolving}>
+                  {manual.resolving ? "Checking..." : "Check"}
+                </Button>
+              </Stack>
+            </Grid>
+            {manual.error ? (
+              <Grid item xs={12}>
+                <Alert severity="error">{manual.error}</Alert>
+              </Grid>
+            ) : null}
+            {manual.resolved ? (
+              <Grid item xs={12}>
+                <Box sx={{ p: 1, border: "1px solid #eee", borderRadius: 1 }}>
+                  <Typography variant="body2"><strong>Username:</strong> {manual.resolved.username}</Typography>
+                  <Typography variant="body2"><strong>Name:</strong> {manual.resolved.full_name || "-"}</Typography>
+                  <Typography variant="body2"><strong>Pincode:</strong> {manual.resolved.pincode || "-"}</Typography>
+                </Box>
+              </Grid>
+            ) : null}
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Consumer TR Username"
+                value={manual.consumer_tr_username}
+                onChange={(e) => onManualChange("consumer_tr_username", e.target.value)}
+                helperText="Your username will be sent as Consumer TR."
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Button
+                component="label"
+                variant="outlined"
+                size="small"
+              >
+                {manual.file ? "Change File" : "Attach File (optional)"}
+                <input
+                  type="file"
+                  hidden
+                  onChange={(e) => onManualChange("file", e.target.files && e.target.files[0] ? e.target.files[0] : null)}
+                  accept="image/*,application/pdf"
+                />
+              </Button>
+              {manual.file ? (
+                <Typography variant="caption" sx={{ ml: 1 }}>{manual.file.name}</Typography>
+              ) : null}
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Notes (optional)"
+                value={manual.notes}
+                onChange={(e) => onManualChange("notes", e.target.value)}
+                multiline
+                minRows={2}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <Stack direction="row" spacing={1} justifyContent="flex-end">
+                <Button type="submit" variant="contained" disabled={manual.submitting} sx={{ backgroundColor: "#145DA0", "&:hover": { backgroundColor: "#0C4B82" } }}>
+                  {manual.submitting ? "Submitting..." : "Submit"}
+                </Button>
+              </Stack>
+            </Grid>
+          </Grid>
+        </Box>
+      </Paper>
+
       {/* My E-Coupon Summary */}
       <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mb: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
@@ -639,10 +805,7 @@ export default function ConsumerCoupon() {
                 <TableRow>
                   <TableCell>Code</TableCell>
                   <TableCell>Status</TableCell>
-                  <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Batch</TableCell>
-                  <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Batch</TableCell>
-                  <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Serial</TableCell>
-                  <TableCell>Value</TableCell>
+                   <TableCell>Value</TableCell>
                   <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Assigned Agency</TableCell>
                   <TableCell>Created</TableCell>
                   <TableCell>Actions</TableCell>
@@ -665,8 +828,6 @@ export default function ConsumerCoupon() {
                   <TableRow key={c.id}>
                     <TableCell>{c.code}</TableCell>
                     <TableCell>{c.display_status || c.status}</TableCell>
-                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.batch ? `#${c.batch}` : ""}</TableCell>
-                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.serial || ""}</TableCell>
                     <TableCell>{typeof c.value !== "undefined" ? `₹${c.value}` : ""}</TableCell>
                     <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.assigned_agency_username || ""}</TableCell>
                     <TableCell>{c.created_at ? new Date(c.created_at).toLocaleString() : ""}</TableCell>

@@ -1048,7 +1048,7 @@ export default function UserDashboard({ embedded = false }) {
               <ListItemText primary="Wealth Galaxy" />
             </ListItemButton>
             <ListItemButton selected={selectedMenu === "lucky-draw"} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => { navigate("/user/lucky-draw"); setMobileOpen(false); }}>
-              <ListItemText primary="Participate Lucky Draw" />
+              <ListItemText primary="Manual Lucky Coupon" />
             </ListItemButton>
             <ListItemButton selected={selectedMenu === "marketplace"} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => { navigate("/marketplace"); setMobileOpen(false); }}>
               <ListItemText primary="Marketplace" />
@@ -1100,7 +1100,7 @@ export default function UserDashboard({ embedded = false }) {
               <ListItemText primary="Wealth Galaxy" />
             </ListItemButton>
             <ListItemButton selected={selectedMenu === "lucky-draw"} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => navigate("/user/lucky-draw")}>
-              <ListItemText primary="Participate Lucky Draw" />
+              <ListItemText primary="Manual Lucky Coupon" />
             </ListItemButton>
             <ListItemButton selected={selectedMenu === "marketplace"} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => navigate("/marketplace")}>
               <ListItemText primary="Marketplace" />

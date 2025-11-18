@@ -217,6 +217,8 @@ class CouponSubmissionSerializer(serializers.ModelSerializer):
     consumer_username = serializers.SerializerMethodField(read_only=True)
     coupon_id = serializers.IntegerField(source="coupon.id", read_only=True)
     file = serializers.FileField(write_only=True, required=False)
+    tr_username = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    consumer_tr_username = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
         model = CouponSubmission
@@ -231,6 +233,8 @@ class CouponSubmissionSerializer(serializers.ModelSerializer):
             "pincode",
             "notes",
             "file",
+            "tr_username",
+            "consumer_tr_username",
             "status",
             "employee_reviewer",
             "employee_reviewed_at",
@@ -295,6 +299,9 @@ class CouponSubmissionSerializer(serializers.ModelSerializer):
             if code_ref:
                 if code_ref.status not in ("AVAILABLE", "ASSIGNED_AGENCY", "ASSIGNED_EMPLOYEE"):
                     raise serializers.ValidationError({"coupon_code": f"This code is not available (status={code_ref.status})."})
+                # Disallow manual submissions for E-Coupons (no manual approval/agency workflow)
+                if str(getattr(code_ref, "issued_channel", "")).lower() == "e_coupon":
+                    raise serializers.ValidationError({"coupon_code": "E\u2009coupon codes cannot be submitted for manual approval. Use the E\u2009Coupon activation/redeem flow instead."})
                 open_exists = CouponSubmission.objects.filter(
                     code_ref=code_ref, status__in=("SUBMITTED", "EMPLOYEE_APPROVED")
                 ).exists()
@@ -309,10 +316,25 @@ class CouponSubmissionSerializer(serializers.ModelSerializer):
                         {"coupon_code": "There is already an open submission for this coupon."}
                     )
 
-            # Basic pincode presence check
-            if not attrs.get("pincode"):
-                raise serializers.ValidationError({"pincode": "This field is required."})
+            # TR username routing (resolve to Agency or Consumer)
+            tr_username = (attrs.get("tr_username") or "").strip()
+            if tr_username:
+                from accounts.models import CustomUser
+                tr_u = CustomUser.objects.filter(username__iexact=tr_username).first()
+                if not tr_u:
+                    raise serializers.ValidationError({"tr_username": "Invalid TR ID."})
+                role = getattr(tr_u, "role", None)
+                # Allow Agency or Consumer ('user')
+                if role not in ("agency", "user"):
+                    raise serializers.ValidationError({"tr_username": "TR must be an Agency or Consumer username."})
+                attrs["_validated_tr_user"] = tr_u
+                attrs["_validated_tr_username"] = tr_username
 
+            c_tr = (attrs.get("consumer_tr_username") or "").strip()
+            if c_tr:
+                attrs["_validated_consumer_tr_username"] = c_tr
+
+            # pincode is optional now (no gating). If omitted, we may default from TR user in create().
             attrs["_validated_coupon_obj"] = coupon_obj
             attrs["_validated_code_ref"] = code_ref
 
@@ -324,14 +346,29 @@ class CouponSubmissionSerializer(serializers.ModelSerializer):
 
         coupon = validated_data.pop("_validated_coupon_obj")
         code_ref = validated_data.pop("_validated_code_ref", None)
+
+        tr_user = validated_data.pop("_validated_tr_user", None)
+        tr_username = validated_data.pop("_validated_tr_username", "")
+        consumer_tr_username = validated_data.pop("_validated_consumer_tr_username", "")
+
         entered_code = validated_data.get("coupon_code")
+        pincode = (validated_data.get("pincode") or "").strip()
+        # Default pincode from TR user if not provided
+        if not pincode and tr_user is not None:
+            try:
+                pincode = getattr(tr_user, "pincode", "") or ""
+            except Exception:
+                pincode = ""
 
         sub = CouponSubmission.objects.create(
             consumer=user,
             coupon=coupon,
             coupon_code=entered_code,  # store entered code (either code_ref.code or legacy coupon code)
             code_ref=code_ref,
-            pincode=validated_data.get("pincode"),
+            pincode=pincode,
+            tr_user=tr_user,
+            tr_username=tr_username,
+            consumer_tr_username=consumer_tr_username,
             notes=validated_data.get("notes", ""),
             file=validated_data.get("file"),
             status="SUBMITTED",

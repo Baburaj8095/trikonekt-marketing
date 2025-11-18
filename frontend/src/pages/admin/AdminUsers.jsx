@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
-import API from "../../api/api";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import API, { ensureFreshAccess, getAccessToken } from "../../api/api";
 
 function TextInput({ label, value, onChange, placeholder, style }) {
   return (
@@ -81,24 +81,54 @@ export default function AdminUsers() {
     setLoading(true);
     setErr("");
     try {
+      // Build query params (omit empty)
       const params = {};
       Object.entries(filters).forEach(([k, v]) => {
         if (v !== null && v !== undefined && String(v).trim() !== "") {
           params[k] = v;
         }
       });
-      const res = await API.get("/admin/users/", { params });
-      const items = res?.data?.results || res?.data || [];
+
+      // Construct absolute URL from axios baseURL
+      const base = API?.defaults?.baseURL || "/api/";
+      const joinUrl = (b, p) => {
+        const b2 = b.endsWith("/") ? b : b + "/";
+        const p2 = p.startsWith("/") ? p.slice(1) : p;
+        return b2 + p2;
+      };
+      const url = joinUrl(base, "/admin/users/");
+      const qs = new URLSearchParams(params).toString();
+      const fullUrl = qs ? `${url}?${qs}` : url;
+
+      // Attach JWT (refresh if needed)
+      let token = await ensureFreshAccess();
+      if (!token) token = getAccessToken();
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      const resp = await fetch(fullUrl, { method: "GET", headers });
+      if (!resp.ok) {
+        let detail = "Failed to load users";
+        try {
+          const d = await resp.json();
+          detail = d?.detail || detail;
+        } catch (_) {}
+        throw new Error(detail);
+      }
+      const data = await resp.json().catch(() => ([]));
+      const items = Array.isArray(data) ? data : (Array.isArray(data?.results) ? data.results : []);
       setRows(Array.isArray(items) ? items : []);
     } catch (e) {
-      setErr(e?.response?.data?.detail || "Failed to load users");
+      setErr(e?.message || "Failed to load users");
       setRows([]);
     } finally {
       setLoading(false);
     }
   }
 
+  const didInitRef = useRef(false);
   useEffect(() => {
+    if (didInitRef.current) return;
+    didInitRef.current = true;
     fetchUsers();
   }, []);
 

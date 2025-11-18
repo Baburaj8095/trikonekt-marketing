@@ -3,7 +3,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
 from django.db.models import Q
 
-from .models import CustomUser, AgencyRegionAssignment, WalletTransaction, Wallet, UserKYC, WithdrawalRequest
+from .models import CustomUser, AgencyRegionAssignment, WalletTransaction, Wallet, UserKYC, WithdrawalRequest, SupportTicket, SupportTicketMessage
 from locations.models import Country, State, City
 
 
@@ -555,6 +555,8 @@ class ProfileMeSerializer(serializers.ModelSerializer):
         return None
 
 class UserKYCSerializer(serializers.ModelSerializer):
+    can_submit_kyc = serializers.SerializerMethodField(read_only=True)
+
     class Meta:
         model = UserKYC
         fields = [
@@ -563,10 +565,110 @@ class UserKYCSerializer(serializers.ModelSerializer):
             "ifsc_code",
             "verified",
             "verified_at",
+            "kyc_reopen_allowed",
+            "can_submit_kyc",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["verified", "verified_at", "created_at", "updated_at"]
+        read_only_fields = ["verified", "verified_at", "kyc_reopen_allowed", "can_submit_kyc", "created_at", "updated_at"]
+
+    def get_can_submit_kyc(self, obj):
+        try:
+            return (not bool(getattr(obj, "verified", False))) or bool(getattr(obj, "kyc_reopen_allowed", False))
+        except Exception:
+            return True
+
+    def update(self, instance, validated_data):
+        """
+        Guard: Once KYC is verified, user cannot modify unless kyc_reopen_allowed=True.
+        On any successful edit, reset verified=False and consume the reopen allowance.
+        """
+        # If already verified and not reopened via support, block update
+        if bool(getattr(instance, "verified", False)) and not bool(getattr(instance, "kyc_reopen_allowed", False)):
+            raise serializers.ValidationError({
+                "detail": "KYC already verified. Please create a Support ticket to request re-verification.",
+                "code": "KYC_LOCKED"
+            })
+
+        # Perform updates
+        for f in ("bank_name", "bank_account_number", "ifsc_code"):
+            if f in validated_data:
+                setattr(instance, f, validated_data[f])
+
+        # If previously verified, mark unverified after change
+        if bool(getattr(instance, "verified", False)):
+            instance.verified = False
+            instance.verified_at = None
+            instance.verified_by = None
+
+        # Consume reopen allowance after any edit
+        instance.kyc_reopen_allowed = False
+        instance.save()
+        return instance
+
+
+class SupportTicketMessageSerializer(serializers.ModelSerializer):
+    author_username = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = SupportTicketMessage
+        fields = ["id", "author", "author_username", "message", "created_at"]
+        read_only_fields = ["id", "author_username", "created_at", "author"]
+
+    def get_author_username(self, obj):
+        try:
+            return getattr(obj.author, "username", None)
+        except Exception:
+            return None
+
+
+class SupportTicketSerializer(serializers.ModelSerializer):
+    messages = SupportTicketMessageSerializer(many=True, read_only=True)
+    user_username = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = SupportTicket
+        fields = [
+            "id",
+            "user",
+            "user_username",
+            "type",
+            "subject",
+            "message",
+            "status",
+            "admin_assignee",
+            "resolution_note",
+            "created_at",
+            "updated_at",
+            "messages",
+        ]
+        read_only_fields = ["status", "user", "admin_assignee", "resolution_note", "created_at", "updated_at", "messages", "user_username"]
+
+    def get_user_username(self, obj):
+        try:
+            return getattr(obj.user, "username", None)
+        except Exception:
+            return None
+
+    def validate(self, attrs):
+        # Enforce only one open/in_progress KYC_REVERIFY per user
+        req = self.context.get("request")
+        user = getattr(req, "user", None) if req else None
+        t = (attrs.get("type") or "").strip()
+        if user and t == "KYC_REVERIFY":
+            exists = SupportTicket.objects.filter(
+                user=user, type="KYC_REVERIFY", status__in=["open", "in_progress"]
+            ).exists()
+            if exists:
+                raise serializers.ValidationError({"detail": "An open KYC re-verification request already exists."})
+        return attrs
+
+    def create(self, validated_data):
+        req = self.context.get("request")
+        user = getattr(req, "user", None) if req else None
+        if user and not validated_data.get("user"):
+            validated_data["user"] = user
+        return super().create(validated_data)
 
 
 class WithdrawalRequestSerializer(serializers.ModelSerializer):
