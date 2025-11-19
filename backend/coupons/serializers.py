@@ -1,5 +1,6 @@
 from django.utils import timezone
 from rest_framework import serializers
+from django.db.models import Q
 from django.conf import settings
 
 from .models import (
@@ -359,6 +360,28 @@ class CouponSubmissionSerializer(serializers.ModelSerializer):
                 pincode = getattr(tr_user, "pincode", "") or ""
             except Exception:
                 pincode = ""
+        # Fallback: default pincode from consumer if still empty
+        if not pincode and user is not None:
+            try:
+                pincode = getattr(user, "pincode", "") or ""
+            except Exception:
+                pincode = ""
+        # Determine routing agency for pending-agency visibility
+        route_tr_user = tr_user
+        try:
+            def _is_agency(u):
+                return (getattr(u, "role", None) == "agency") or str(getattr(u, "category", "")).startswith("agency")
+            if not (route_tr_user and _is_agency(route_tr_user)):
+                # Prefer agency from code_ref assignment
+                if code_ref and getattr(code_ref, "assigned_agency_id", None):
+                    route_tr_user = code_ref.assigned_agency
+                elif pincode:
+                    from accounts.models import CustomUser as CU
+                    route_tr_user = CU.objects.filter(Q(role="agency") | Q(category__startswith="agency"), pincode=pincode).first()
+        except Exception:
+            # best-effort routing; leave as-is
+            pass
+        route_tr_username = getattr(route_tr_user, "username", tr_username)
 
         sub = CouponSubmission.objects.create(
             consumer=user,
@@ -366,8 +389,8 @@ class CouponSubmissionSerializer(serializers.ModelSerializer):
             coupon_code=entered_code,  # store entered code (either code_ref.code or legacy coupon code)
             code_ref=code_ref,
             pincode=pincode,
-            tr_user=tr_user,
-            tr_username=tr_username,
+            tr_user=route_tr_user,
+            tr_username=route_tr_username,
             consumer_tr_username=consumer_tr_username,
             notes=validated_data.get("notes", ""),
             file=validated_data.get("file"),

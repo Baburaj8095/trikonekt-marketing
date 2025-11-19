@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Typography,
   Box,
@@ -25,6 +25,16 @@ import { useLocation } from "react-router-dom";
 export default function AgencyLuckyCoupons() {
   const location = useLocation();
 
+  // Read logged-in agency user snapshot (for action gating on SUBMITTED items)
+  const storedUser = useMemo(() => {
+    try {
+      const ls = localStorage.getItem("user_agency") || sessionStorage.getItem("user_agency");
+      return ls ? JSON.parse(ls) : {};
+    } catch {
+      return {};
+    }
+  }, []);
+
   // Tabs
   const TABS = {
     PENDING: "pending",
@@ -47,16 +57,57 @@ export default function AgencyLuckyCoupons() {
   const [pendingLoading, setPendingLoading] = useState(false);
   const [pendingError, setPendingError] = useState("");
   const [pendingBusy, setPendingBusy] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   const loadPending = async () => {
     try {
       setPendingLoading(true);
       setPendingError("");
-      const res = await API.get("/coupons/submissions/pending-agency/");
+
+      // Debug/visibility toggle: Show all agency-visible submissions (by pincode) regardless of status
+      if (showAll) {
+        const all = await API.get("/uploads/lucky-draw/", { retryAttempts: 1 });
+        const allArr = Array.isArray(all.data) ? all.data : all.data?.results || [];
+        setPending(allArr || []);
+        return;
+      }
+
+      // Primary: agency-scoped pending
+      const res = await API.get("/uploads/lucky-draw/pending/agency/", { retryAttempts: 1 });
       const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
-      setPending(arr || []);
+      if (arr && arr.length > 0) {
+        setPending(arr);
+      } else {
+        // Fallback: list all agency-visible submissions (pincode-scoped) and filter to pending-like statuses
+        try {
+          const alt = await API.get("/uploads/lucky-draw/", { retryAttempts: 0 });
+          const data = alt.data;
+          const arr2 = Array.isArray(data) ? data : data?.results || [];
+          const filtered = (arr2 || []).filter((r) => {
+            const st = String(r.status || "").toUpperCase();
+            return st === "TRE_APPROVED" || st === "SUBMITTED";
+          });
+          setPending(filtered);
+          setPendingError("");
+        } catch (e2) {
+          const msg =
+            e2?.response?.data?.detail ||
+            e2?.response?.data?.message ||
+            (typeof e2?.response?.data === "string" ? e2.response.data : "") ||
+            e2?.message ||
+            "Failed to load pending redemptions.";
+          setPendingError(msg);
+          setPending([]);
+        }
+      }
     } catch (e) {
-      setPendingError("Failed to load pending redemptions.");
+      const msg =
+        e?.response?.data?.detail ||
+        e?.response?.data?.message ||
+        (typeof e?.response?.data === "string" ? e.response.data : "") ||
+        e?.message ||
+        "Failed to load pending redemptions.";
+      setPendingError(msg);
       setPending([]);
     } finally {
       setPendingLoading(false);
@@ -66,10 +117,12 @@ export default function AgencyLuckyCoupons() {
   const agencyApprove = async (id) => {
     try {
       setPendingBusy(true);
-      await API.post(`/coupons/submissions/${id}/agency-approve/`, { comment: "" });
+      await API.post(`/uploads/lucky-draw/${id}/agency-approve/`, { comment: "" });
       await loadPending();
     } catch (e) {
-      // ignore
+      const msg = e?.response?.data?.detail || e?.response?.data?.message || e?.message || "Failed to approve.";
+      try { alert(msg); } catch {}
+      await loadPending();
     } finally {
       setPendingBusy(false);
     }
@@ -78,10 +131,12 @@ export default function AgencyLuckyCoupons() {
   const agencyReject = async (id) => {
     try {
       setPendingBusy(true);
-      await API.post(`/coupons/submissions/${id}/agency-reject/`, { comment: "" });
+      await API.post(`/uploads/lucky-draw/${id}/agency-reject/`, { comment: "" });
       await loadPending();
     } catch (e) {
-      // ignore
+      const msg = e?.response?.data?.detail || e?.response?.data?.message || e?.message || "Failed to reject.";
+      try { alert(msg); } catch {}
+      await loadPending();
     } finally {
       setPendingBusy(false);
     }
@@ -383,7 +438,7 @@ export default function AgencyLuckyCoupons() {
     //loadEmployees();
     loadCommissions();
     loadSummary();
-  }, []);
+  }, [showAll]);
 
   // Reload codes when pagination or status changes
   useEffect(() => {
@@ -402,9 +457,15 @@ export default function AgencyLuckyCoupons() {
 
       {activeTab === TABS.PENDING && (
         <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1.5 }}>
             Pending Redemptions (Agency)
           </Typography>
+          <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1, mb: 1 }}>
+            <Button size="small" variant="outlined" onClick={() => setShowAll((v) => !v)}>
+              {showAll ? "Show Pending" : "Show All"}
+            </Button>
+            <Button size="small" onClick={loadPending}>Refresh</Button>
+          </Box>
           {pendingLoading ? (
             <Box sx={{ py: 2, display: "flex", alignItems: "center", gap: 1 }}>
               <CircularProgress size={20} /> <Typography variant="body2">Loading...</Typography>
@@ -417,7 +478,7 @@ export default function AgencyLuckyCoupons() {
                 <TableHead>
                   <TableRow>
                     <TableCell>Date</TableCell>
-                    <TableCell>Coupon Code</TableCell>
+                    <TableCell>SL Number</TableCell>
                     <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Pincode</TableCell>
                     <TableCell>Status</TableCell>
                     <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Consumer</TableCell>
@@ -428,19 +489,29 @@ export default function AgencyLuckyCoupons() {
                 {(pending || []).map((r) => (
                   <TableRow key={r.id}>
                     <TableCell>{r.created_at ? new Date(r.created_at).toLocaleString() : ""}</TableCell>
-                    <TableCell>{r.coupon_code}</TableCell>
+                    <TableCell>{r.sl_number}</TableCell>
                     <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{r.pincode}</TableCell>
                     <TableCell>{r.status}</TableCell>
-                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{r.consumer_username || ""}</TableCell>
+                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{r.username || ""}</TableCell>
                     <TableCell align="right">
-                      <Stack direction="row" spacing={1} justifyContent="flex-end">
-                        <Button size="small" variant="contained" disabled={pendingBusy} onClick={() => agencyApprove(r.id)} sx={{ backgroundColor: "#2E7D32", "&:hover": { backgroundColor: "#1B5E20" } }}>
-                          Approve
-                        </Button>
-                        <Button size="small" variant="outlined" color="error" disabled={pendingBusy} onClick={() => agencyReject(r.id)}>
-                          Reject
-                        </Button>
-                      </Stack>
+                      {(() => {
+                        const st = String(r.status || "").toUpperCase();
+                        const isTreApproved = st === "TRE_APPROVED";
+                        const agencyUsername = String(storedUser?.username || "").toLowerCase();
+                        const directTarget = st === "SUBMITTED" && String(r.tr_emp_id || "").toLowerCase() === agencyUsername;
+                        const canAct = isTreApproved || directTarget;
+                        if (!canAct) return <Typography variant="caption" color="text.secondary">-</Typography>;
+                        return (
+                          <Stack direction="row" spacing={1} justifyContent="flex-end">
+                            <Button size="small" variant="contained" disabled={pendingBusy} onClick={() => agencyApprove(r.id)} sx={{ backgroundColor: "#2E7D32", "&:hover": { backgroundColor: "#1B5E20" } }}>
+                              Approve
+                            </Button>
+                            <Button size="small" variant="outlined" color="error" disabled={pendingBusy} onClick={() => agencyReject(r.id)}>
+                              Reject
+                            </Button>
+                          </Stack>
+                        );
+                      })()}
                     </TableCell>
                   </TableRow>
                 ))}

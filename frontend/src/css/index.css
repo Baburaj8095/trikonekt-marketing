@@ -22,6 +22,11 @@ body {
 .MuiDrawer-paper {
   background-color: #ffffff;
   color: #0f172a;
+  height: 100dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
 }
 /* AppBar should keep light text over dark backgrounds */
 .MuiAppBar-root {
@@ -45,4 +50,3 @@ body {
 a {
   color: inherit;
 }
-

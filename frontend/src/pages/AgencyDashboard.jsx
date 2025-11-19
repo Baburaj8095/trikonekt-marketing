@@ -76,7 +76,22 @@ export default function AgencyDashboard() {
       const url = showAllLucky ? "/uploads/lucky-draw/" : "/uploads/lucky-draw/pending/agency/";
       const res = await API.get(url, { retryAttempts: 1 });
       const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
-      setLuckyList(arr || []);
+      if (!showAllLucky && (!arr || arr.length === 0)) {
+        try {
+          const alt = await API.get("/uploads/lucky-draw/", { retryAttempts: 0 });
+          const data = alt.data;
+          const arr2 = Array.isArray(data) ? data : data?.results || [];
+          const filtered = (arr2 || []).filter((r) => {
+            const st = String(r.status || "").toUpperCase();
+            return st === "TRE_APPROVED" || st === "SUBMITTED";
+          });
+          setLuckyList(filtered);
+        } catch (_) {
+          setLuckyList(arr || []);
+        }
+      } else {
+        setLuckyList(arr || []);
+      }
     } catch (e) {
       // Fallback to "all" endpoint if pending/agency fails (e.g., permission edge-cases)
       try {
@@ -459,13 +474,10 @@ export default function AgencyDashboard() {
                     <TableCell>Date</TableCell>
                     <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>SL</TableCell>
                     <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Ledger</TableCell>
-                    <TableCell>Employee</TableCell>
+                    <TableCell>TR Username</TableCell>
                     <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Pincode</TableCell>
                     <TableCell>Status</TableCell>
-                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>TRE Reviewer</TableCell>
-                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Agency Reviewer</TableCell>
-                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Comments</TableCell>
-                    <TableCell align="right">Actions</TableCell>
+                     <TableCell align="right">Actions</TableCell>
                   </TableRow>
                 </TableHead>
               <TableBody>
@@ -481,42 +493,39 @@ export default function AgencyDashboard() {
                     </TableCell>
                     <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{r.pincode}</TableCell>
                     <TableCell>{r.status}</TableCell>
-                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
-                      {r.tre_reviewer ? r.tre_reviewer : ""} {r.tre_reviewed_at ? `(${new Date(r.tre_reviewed_at).toLocaleString()})` : ""}
-                    </TableCell>
-                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
-                      {r.agency_reviewer ? r.agency_reviewer : ""} {r.agency_reviewed_at ? `(${new Date(r.agency_reviewed_at).toLocaleString()})` : ""}
-                    </TableCell>
-                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
-                      {r.tre_comment ? `TRE: ${r.tre_comment} ` : ""}
-                      {r.agency_comment ? `AGENCY: ${r.agency_comment}` : ""}
-                    </TableCell>
+                    
                     <TableCell align="right">
-                      {String(r.status).toUpperCase() === "TRE_APPROVED" ? (
-                        <Box sx={{ display: "flex", gap: 1, justifyContent: { xs: "stretch", sm: "flex-end" }, flexDirection: { xs: "column", sm: "row" } }}>
-                          <Button
-                            size="small"
-                            variant="contained"
-                            disabled={busyId === r.id}
-                            onClick={() => agencyApproveLucky(r.id)}
-                            sx={{ backgroundColor: "#2E7D32", "&:hover": { backgroundColor: "#1B5E20" }, width: { xs: "100%", sm: "auto" } }}
-                          >
-                            Approve
-                          </Button>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            color="error"
-                            disabled={busyId === r.id}
-                            onClick={() => agencyRejectLucky(r.id)}
-                            sx={{ width: { xs: "100%", sm: "auto" } }}
-                          >
-                            Reject
-                          </Button>
-                        </Box>
-                      ) : (
-                        "-"
-                      )}
+                      {(() => {
+                        const status = String(r.status).toUpperCase();
+                        const isTreApproved = status === "TRE_APPROVED";
+                        const agencyUsername = String(storedUser?.username || "").toLowerCase();
+                        const directTarget = status === "SUBMITTED" && String(r.tr_emp_id || "").toLowerCase() === agencyUsername;
+                        const canAct = isTreApproved || directTarget;
+                        if (!canAct) return "-";
+                        return (
+                          <Box sx={{ display: "flex", gap: 1, justifyContent: { xs: "stretch", sm: "flex-end" }, flexDirection: { xs: "column", sm: "row" } }}>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              disabled={busyId === r.id}
+                              onClick={() => agencyApproveLucky(r.id)}
+                              sx={{ backgroundColor: "#2E7D32", "&:hover": { backgroundColor: "#1B5E20" }, width: { xs: "100%", sm: "auto" } }}
+                            >
+                              Approve
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="error"
+                              disabled={busyId === r.id}
+                              onClick={() => agencyRejectLucky(r.id)}
+                              sx={{ width: { xs: "100%", sm: "auto" } }}
+                            >
+                              Reject
+                            </Button>
+                          </Box>
+                        );
+                      })()}
                     </TableCell>
                   </TableRow>
                 ))}

@@ -8,7 +8,6 @@ import {
   Button,
   Stack,
   Alert,
-  MenuItem,
   Grid,
   Table,
   TableHead,
@@ -26,7 +25,6 @@ import API from "../api/api";
 
 const CHANNELS = [
   { value: "e_coupon", label: "E-Coupon" },
-  { value: "physical", label: "Physical Coupon" },
 ];
 
 const ACTIONS = [
@@ -58,7 +56,6 @@ export default function ConsumerCoupon() {
     action: "ACTIVATE",
     coupon_code: "",
     referral_id: "",
-    pincode: defaultPincode,
     notes: "",
   });
   const [submitting, setSubmitting] = useState(false);
@@ -390,7 +387,6 @@ export default function ConsumerCoupon() {
   };
 
   useEffect(() => {
-    loadMySubmissions();
     loadWallet();
     loadMySummary();
     loadMyCodes();
@@ -420,58 +416,30 @@ export default function ConsumerCoupon() {
       setSubmitting(true);
       setWalletMsg("");
 
-      if (form.channel === "e_coupon") {
-        if (form.action === "ACTIVATE") {
-          const t = form.coupon_type === "50" ? "50" : "150";
-          await API.post("/v1/coupon/activate/", {
-            type: t,
-            source: {
-              channel: "e_coupon",
-              code: String(form.coupon_code).trim(),
-              referral_id: String(form.referral_id).trim(),
-            },
-          });
-          alert(t === "150" ? "Activated: 5-matrix + 3-matrix opened." : "Activated: 3-matrix opened.");
-        } else {
-          await API.post("/v1/coupon/redeem/", {
-            type: "150",
-            source: {
-              channel: "e_coupon",
-              code: String(form.coupon_code).trim(),
-              referral_id: String(form.referral_id).trim(),
-            },
-          });
-          await loadWallet();
-          setWalletMsg("₹140 has been credited to your wallet.");
-          alert("Redeem successful. Wallet credited.");
-        }
+      // Physical/Lucky Draw coupons are not available on the consumer e‑coupon screen
+      if (form.action === "ACTIVATE") {
+        const t = form.coupon_type === "50" ? "50" : "150";
+        await API.post("/v1/coupon/activate/", {
+          type: t,
+          source: {
+            channel: "e_coupon",
+            code: String(form.coupon_code).trim(),
+            referral_id: String(form.referral_id).trim(),
+          },
+        });
+        alert(t === "150" ? "Activated: 5-matrix + 3-matrix opened." : "Activated: 3-matrix opened.");
       } else {
-        if (form.action === "ACTIVATE") {
-          const t = form.coupon_type === "50" ? "50" : "150";
-          await API.post("/v1/coupon/activate/", {
-            type: t,
-            source: {
-              channel: "physical",
-              code: String(form.coupon_code).trim(),
-              referral_id: String(form.referral_id).trim(),
-              pincode: String(form.pincode || "").trim(),
-            },
-          });
-          alert(t === "150" ? "Activated: 5-matrix + 3-matrix opened." : "Activated: 3-matrix opened.");
-        } else {
-          await API.post("/v1/coupon/redeem/", {
-            type: "150",
-            source: {
-              channel: "physical",
-              code: String(form.coupon_code).trim(),
-              referral_id: String(form.referral_id).trim(),
-              pincode: String(form.pincode || "").trim(),
-            },
-          });
-          await loadWallet();
-          setWalletMsg("₹140 has been credited to your wallet.");
-          alert("Redeem successful. Wallet credited.");
-        }
+        await API.post("/v1/coupon/redeem/", {
+          type: "150",
+          source: {
+            channel: "e_coupon",
+            code: String(form.coupon_code).trim(),
+            referral_id: String(form.referral_id).trim(),
+          },
+        });
+        await loadWallet();
+        setWalletMsg("₹140 has been credited to your wallet.");
+        alert("Redeem successful. Wallet credited.");
       }
 
       setForm((f) => ({ ...f, coupon_code: "", notes: "" }));
@@ -612,7 +580,7 @@ export default function ConsumerCoupon() {
         </Box>
       </Paper> */}
 
-      <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mb: 2 }}>
+      {/* <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mb: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
           Manual Lucky Coupon Submission (Physical only)
         </Typography>
@@ -706,7 +674,7 @@ export default function ConsumerCoupon() {
             </Grid>
           </Grid>
         </Box>
-      </Paper>
+      </Paper> */}
 
       {/* My E-Coupon Summary */}
       <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mb: 2 }}>

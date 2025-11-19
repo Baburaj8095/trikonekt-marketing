@@ -81,8 +81,6 @@ export default function LuckyDraw({ embedded = false }) {
     coupon_purchaser_name: "",
     purchase_date: "",
     address: "",
-    referral_name: "",
-    referral_id: "",
     tr_referral_id: "",
   });
   const [file, setFile] = useState(null);
@@ -97,14 +95,6 @@ export default function LuckyDraw({ embedded = false }) {
   const [trResolved, setTrResolved] = useState(null);
   const [trError, setTrError] = useState("");
 
-  // Pre-fill referral_id from URL param ?ref, ?referral, or ?referral_id
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const refParam = params.get("ref") || params.get("referral") || params.get("referral_id");
-    if (refParam) {
-      setForm((f) => ({ ...f, referral_id: refParam }));
-    }
-  }, [location.search]);
 
   const [luckyEnabled, setLuckyEnabled] = useState(true);
 
@@ -117,6 +107,16 @@ export default function LuckyDraw({ embedded = false }) {
       }
     } catch (e) {}
   }, [storedUser?.pincode]);
+
+  // Prefill purchaser name from logged-in profile if empty
+  useEffect(() => {
+    try {
+      const name = String(storedUser?.full_name || storedUser?.username || "").trim();
+      if (name) {
+        setForm((f) => (f.coupon_purchaser_name ? f : { ...f, coupon_purchaser_name: name }));
+      }
+    } catch (e) {}
+  }, [storedUser?.full_name, storedUser?.username]);
 
   // Prefill phone from stored username if it looks like a mobile number
   useEffect(() => {
@@ -265,8 +265,6 @@ export default function LuckyDraw({ embedded = false }) {
       if (form.coupon_purchaser_name) fd.append("coupon_purchaser_name", String(form.coupon_purchaser_name).trim());
       if (form.purchase_date) fd.append("purchase_date", String(form.purchase_date));
       if (form.address) fd.append("address", String(form.address).trim());
-      if (form.referral_name) fd.append("referral_name", String(form.referral_name).trim());
-      if (form.referral_id) fd.append("referral_id", String(form.referral_id).trim());
       if (form.tr_referral_id) fd.append("tr_referral_id", String(form.tr_referral_id).trim());
       fd.append("image", file);
 
@@ -396,22 +394,6 @@ export default function LuckyDraw({ embedded = false }) {
               onChange={onChange}
               multiline
               minRows={2}
-              disabled={!luckyEnabled}
-            />
-            <TextField
-              fullWidth
-              label="Referral Name"
-              name="referral_name"
-              value={form.referral_name}
-              onChange={onChange}
-              disabled={!luckyEnabled}
-            />
-            <TextField
-              fullWidth
-              label="Referral ID"
-              name="referral_id"
-              value={form.referral_id}
-              onChange={onChange}
               disabled={!luckyEnabled}
             />
             <Stack direction="row" spacing={1} alignItems="center">

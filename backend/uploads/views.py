@@ -453,17 +453,20 @@ class LuckyDrawSubmissionView(generics.ListCreateAPIView):
         if not enabled:
             raise PermissionDenied("Lucky draw participation is currently disabled by admin.")
 
-        # Resolve TRE assignee using provided tr_emp_id (match username/unique_id/sponsor_id)
-        emp_identifier = (self.request.data.get("tr_emp_id") or "").strip()
-        tre_user = None
+        # Resolve TR assignee (can be employee or agency) using username/unique_id/sponsor_id
+        # Accept both "tr_emp_id" (preferred) and legacy "tr_referral_id" from clients
+        emp_identifier = (self.request.data.get("tr_emp_id") or self.request.data.get("tr_referral_id") or "").strip()
+        target_user = None
         if emp_identifier:
-            tre_user = (
-                CustomUser.objects.filter(role="employee")
+            target_user = (
+                CustomUser.objects
+                .filter(Q(role="employee") | Q(role="agency"))
                 .filter(Q(username__iexact=emp_identifier) | Q(unique_id=emp_identifier) | Q(sponsor_id__iexact=emp_identifier))
                 .first()
             )
-        if emp_identifier and tre_user is None:
-            raise ValidationError({"tr_emp_id": ["Invalid TRE identifier."]})
+        if emp_identifier and target_user is None:
+            raise ValidationError({"tr_emp_id": ["Invalid TR identifier."]})
+        assigned_tre_user = target_user if getattr(target_user, "role", "") == "employee" else None
 
         user = self.request.user
         if getattr(user, "is_authenticated", False):
@@ -472,14 +475,22 @@ class LuckyDrawSubmissionView(generics.ListCreateAPIView):
                 username=getattr(user, "username", "") or "",
                 role=getattr(user, "role", "") or "",
                 phone=getattr(user, "phone", "") or "",
-                assigned_tre=tre_user,
+                assigned_tre=assigned_tre_user,
+                tr_emp_id=(getattr(target_user, "username", None) or (emp_identifier or "")),
             )
         else:
             # Dev: capture snapshots from payload when unauthenticated
             username = self.request.data.get("username", "")
             role = self.request.data.get("role", "")
             phone = self.request.data.get("phone", "")
-            serializer.save(user=None, username=username, role=role, phone=phone, assigned_tre=tre_user)
+            serializer.save(
+                user=None,
+                username=username,
+                role=role,
+                phone=phone,
+                assigned_tre=assigned_tre_user,
+                tr_emp_id=(getattr(target_user, "username", None) or (emp_identifier or "")),
+            )
 
 
 class LuckyDrawPendingTREView(generics.ListAPIView):
@@ -569,10 +580,21 @@ class LuckyDrawPendingAgencyView(generics.ListAPIView):
         is_agency_actor = (role == "agency") or category.startswith("agency_")
         if not is_agency_actor:
             return LuckyDrawSubmission.objects.none()
+        username = (getattr(user, "username", "") or "")
+        uid = (getattr(user, "unique_id", "") or "")
+        sid = (getattr(user, "sponsor_id", "") or "")
         pc = (getattr(user, "pincode", "") or "").strip()
-        if not pc:
-            return LuckyDrawSubmission.objects.none()
-        return LuckyDrawSubmission.objects.filter(status="TRE_APPROVED", pincode__iexact=pc).order_by("-created_at")
+
+        # Accept SUBMITTED items targeted to agency by username/unique_id/sponsor_id
+        targets = [t for t in [username, uid, sid] if t]
+        q_target = Q()
+        for t in targets:
+            q_target = q_target | Q(tr_emp_id__iexact=t)
+
+        q = Q(status="SUBMITTED") & q_target
+        if pc:
+            q = q | (Q(status="TRE_APPROVED") & Q(pincode__iexact=pc))
+        return LuckyDrawSubmission.objects.filter(q).order_by("-created_at")
 
 
 class LuckyDrawAgencyApproveView(generics.GenericAPIView):
@@ -589,11 +611,25 @@ class LuckyDrawAgencyApproveView(generics.GenericAPIView):
         role = getattr(user, "role", None)
         category = getattr(user, "category", "") or ""
         is_agency_actor = (role == "agency") or category.startswith("agency_")
+        if not is_agency_actor:
+            return Response({"detail": "Not permitted."}, status=status.HTTP_403_FORBIDDEN)
+        # Idempotent: if already agency approved, return success without error
+        if obj.status == "AGENCY_APPROVED":
+            return Response(self.get_serializer(obj).data)
+        username = (getattr(user, "username", "") or "")
+        uid = (getattr(user, "unique_id", "") or "")
+        sid = (getattr(user, "sponsor_id", "") or "")
         pc = (getattr(user, "pincode", "") or "").strip()
         obj_pin = (getattr(obj, "pincode", "") or "").strip()
-        if not is_agency_actor or not pc or obj_pin.lower() != pc.lower():
-            return Response({"detail": "Not permitted."}, status=status.HTTP_403_FORBIDDEN)
-        if obj.status != "TRE_APPROVED":
+        tr = (str(getattr(obj, "tr_emp_id", "") or "")).lower()
+        direct_target = (tr == (username or "").lower()) or (uid and tr == (uid or "").lower()) or (sid and tr == (sid or "").lower())
+        if obj.status == "TRE_APPROVED":
+            if not pc or obj_pin.lower() != pc.lower():
+                return Response({"detail": "Not permitted."}, status=status.HTTP_403_FORBIDDEN)
+        elif obj.status == "SUBMITTED":
+            if not direct_target:
+                return Response({"detail": "Not permitted."}, status=status.HTTP_403_FORBIDDEN)
+        else:
             return Response({"detail": f"Invalid state {obj.status}."}, status=status.HTTP_400_BAD_REQUEST)
 
         comment = request.data.get("comment", "")
@@ -658,11 +694,22 @@ class LuckyDrawAgencyRejectView(generics.GenericAPIView):
         role = getattr(user, "role", None)
         category = getattr(user, "category", "") or ""
         is_agency_actor = (role == "agency") or category.startswith("agency_")
+        if not is_agency_actor:
+            return Response({"detail": "Not permitted."}, status=status.HTTP_403_FORBIDDEN)
+        username = (getattr(user, "username", "") or "")
+        uid = (getattr(user, "unique_id", "") or "")
+        sid = (getattr(user, "sponsor_id", "") or "")
         pc = (getattr(user, "pincode", "") or "").strip()
         obj_pin = (getattr(obj, "pincode", "") or "").strip()
-        if not is_agency_actor or not pc or obj_pin.lower() != pc.lower():
-            return Response({"detail": "Not permitted."}, status=status.HTTP_403_FORBIDDEN)
-        if obj.status != "TRE_APPROVED":
+        tr = (str(getattr(obj, "tr_emp_id", "") or "")).lower()
+        direct_target = (tr == (username or "").lower()) or (uid and tr == (uid or "").lower()) or (sid and tr == (sid or "").lower())
+        if obj.status == "TRE_APPROVED":
+            if not pc or obj_pin.lower() != pc.lower():
+                return Response({"detail": "Not permitted."}, status=status.HTTP_403_FORBIDDEN)
+        elif obj.status == "SUBMITTED":
+            if not direct_target:
+                return Response({"detail": "Not permitted."}, status=status.HTTP_403_FORBIDDEN)
+        else:
             return Response({"detail": f"Invalid state {obj.status}."}, status=status.HTTP_400_BAD_REQUEST)
 
         comment = request.data.get("comment", "")
