@@ -4,7 +4,7 @@ from django.utils import timezone
 from django.db.models import Q
 import csv
 
-from .models import BusinessRegistration, CommissionConfig, AutoPoolAccount, RewardProgress, RewardRedemption, UserMatrixProgress, ReferralJoinPayout, FranchisePayout, DailyReport
+from .models import BusinessRegistration, CommissionConfig, AutoPoolAccount, RewardProgress, RewardRedemption, UserMatrixProgress, ReferralJoinPayout, FranchisePayout, DailyReport, WithholdingReserve
 from accounts.models import CustomUser
 
 
@@ -219,3 +219,13 @@ class DailyReportAdmin(admin.ModelAdmin):
     search_fields = ("reporter__username",)
     raw_id_fields = ("reporter",)
     ordering = ("-date", "-id")
+
+
+@admin.register(WithholdingReserve)
+class WithholdingReserveAdmin(admin.ModelAdmin):
+    list_display = ("user", "source_type", "source_id", "percent", "gross_amount", "withheld_amount", "status", "created_at")
+    list_filter = ("status", "source_type", "created_at")
+    search_fields = ("user__username", "source_id")
+    raw_id_fields = ("user",)
+    readonly_fields = ("created_at", "updated_at")
+    ordering = ("-created_at",)

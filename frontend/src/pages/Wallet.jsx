@@ -11,6 +11,7 @@ import {
 } from "@mui/material";
 import { TextField, Button, Alert } from "@mui/material";
 import API from "../api/api";
+import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination } from "@mui/material";
 
 function fmtAmount(value) {
   const num = Number(value || 0);
@@ -75,9 +76,16 @@ function computeWeeklyWindowLocal() {
 
 export default function Wallet() {
   const [loading, setLoading] = useState(true);
-  const [balance, setBalance] = useState("0.00");
+  const [balance, setBalance] = useState("0.00"); // legacy total (for backward compatibility)
+  const [mainBalance, setMainBalance] = useState("0.00"); // gross earnings
+  const [withdrawableBalance, setWithdrawableBalance] = useState("0.00"); // net (can withdraw)
+  const [taxPercent, setTaxPercent] = useState("0");
   const [updatedAt, setUpdatedAt] = useState(null);
   const [txs, setTxs] = useState([]);
+  const [txPage, setTxPage] = useState(0);
+  const [txPageSize, setTxPageSize] = useState(10);
+  const [txCount, setTxCount] = useState(0);
+  const [txLoading, setTxLoading] = useState(false);
   const [err, setErr] = useState("");
   const [kyc, setKyc] = useState({ verified: false });
   const [windowInfo, setWindowInfo] = useState(computeWeeklyWindowLocal());
@@ -109,11 +117,11 @@ export default function Wallet() {
 
   const disableReason = useMemo(() => {
     if (!kyc?.verified) return "KYC verification required";
-    if (Number(balance) < 500) return "Minimum balance ₹500 required";
+    if (Number(withdrawableBalance) < 500) return "Minimum withdrawable balance ₹500 required";
     if (!windowInfo?.isOpen) return "Withdrawals are allowed only on Sunday 6:00 PM to 11:59 PM (IST)";
     if (inWindowCooldown) return "You have already requested a withdrawal in this week's window";
     return "";
-  }, [kyc, balance, windowInfo, inWindowCooldown]);
+  }, [kyc, withdrawableBalance, windowInfo, inWindowCooldown]);
 
   useEffect(() => {
     const id = setInterval(() => setWindowInfo(computeWeeklyWindowLocal()), 30000);
@@ -126,22 +134,26 @@ export default function Wallet() {
       try {
         setLoading(true);
         setErr("");
-        const [w, t, mw, kycRes] = await Promise.all([
+        const [w, mw, kycRes] = await Promise.all([
           API.get("/accounts/wallet/me/"),
-          API.get("/accounts/wallet/me/transactions/"),
           API.get("/accounts/withdrawals/me/"),
           API.get("/accounts/kyc/me/"),
         ]);
         if (!mounted) return;
         const bal = String(w?.data?.balance ?? "0.00");
+        const mainBal = String(w?.data?.main_balance ?? "0.00");
+        const wdBal = String(w?.data?.withdrawable_balance ?? "0.00");
+        const tax = String(w?.data?.tax_percent ?? "0");
         const upd = w?.data?.updated_at || null;
-        const list = Array.isArray(t?.data) ? t.data : t?.data?.results || [];
         setBalance(bal);
+        setMainBalance(mainBal);
+        setWithdrawableBalance(wdBal);
+        setTaxPercent(tax);
         setUpdatedAt(upd);
-        setTxs((list || []).slice(0, 100));
         const wlist = Array.isArray(mw?.data) ? mw.data : mw?.data?.results || [];
         setMyWithdrawals(wlist || []);
         setKyc(kycRes?.data || { verified: false });
+        await fetchTransactions(0, txPageSize);
         setWindowInfo(computeWeeklyWindowLocal());
       } catch (e) {
         if (!mounted) return;
@@ -157,6 +169,26 @@ export default function Wallet() {
     };
   }, []);
 
+  async function fetchTransactions(page = 0, pageSize = txPageSize) {
+    try {
+      setTxLoading(true);
+      const res = await API.get("/accounts/wallet/me/transactions/", {
+        params: { page: page + 1, page_size: pageSize },
+      });
+      const data = res?.data || {};
+      const list = Array.isArray(data) ? data : data?.results || [];
+      const count = typeof data?.count === "number" ? data.count : list.length;
+      setTxs(list);
+      setTxCount(count);
+    } catch (e) {
+      setErr("Failed to load transactions.");
+      setTxs([]);
+      setTxCount(0);
+    } finally {
+      setTxLoading(false);
+    }
+  }
+
   async function submitWithdrawal(e) {
     e.preventDefault();
     setWdrErr("");
@@ -169,6 +201,11 @@ export default function Wallet() {
       setWdrErr("Enter a valid amount.");
       return;
     }
+    const maxAvail = Number(withdrawableBalance);
+    if (amtNum > maxAvail) {
+      setWdrErr(`Amount exceeds withdrawable balance (₹${fmtAmount(maxAvail)} available).`);
+      return;
+    }
     const payload = {
       amount: amtNum,
       method: "bank",
@@ -178,18 +215,22 @@ export default function Wallet() {
       setWdrSubmitting(true);
       await API.post("/accounts/withdrawals/", payload);
       // Refresh wallet, txs, withdrawals
-      const [w, t, mw] = await Promise.all([
+      const [w, mw] = await Promise.all([
         API.get("/accounts/wallet/me/"),
-        API.get("/accounts/wallet/me/transactions/"),
         API.get("/accounts/withdrawals/me/"),
       ]);
       const bal = String(w?.data?.balance ?? "0.00");
+      const mainBal = String(w?.data?.main_balance ?? "0.00");
+      const wdBal = String(w?.data?.withdrawable_balance ?? "0.00");
+      const tax = String(w?.data?.tax_percent ?? "0");
       const upd = w?.data?.updated_at || null;
-      const list = Array.isArray(t?.data) ? t.data : t?.data?.results || [];
       const wlist = Array.isArray(mw?.data) ? mw.data : mw?.data?.results || [];
       setBalance(bal);
+      setMainBalance(mainBal);
+      setWithdrawableBalance(wdBal);
+      setTaxPercent(tax);
       setUpdatedAt(upd);
-      setTxs((list || []).slice(0, 100));
+      await fetchTransactions(txPage, txPageSize);
       setMyWithdrawals(wlist || []);
       setWdrForm({
         amount: "",
@@ -215,13 +256,30 @@ export default function Wallet() {
         <Grid item xs={12} md={4}>
           <Paper elevation={3} sx={{ p: 2, borderRadius: 2 }}>
             <Typography variant="subtitle2" sx={{ color: "text.secondary" }}>
-              Current Balance
+              Main Wallet (Gross)
             </Typography>
-            <Typography variant="h4" sx={{ fontWeight: 800, mt: 1 }}>
-              ₹ {fmtAmount(balance)}
+            <Typography variant="h5" sx={{ fontWeight: 800, mt: 0.5 }}>
+              ₹ {fmtAmount(mainBalance)}
+            </Typography>
+
+            <Divider sx={{ my: 1.5 }} />
+
+            <Typography variant="subtitle2" sx={{ color: "text.secondary" }}>
+              Withdrawable Wallet (Net)
+            </Typography>
+            <Typography variant="h5" sx={{ fontWeight: 800, mt: 0.5, color: "primary.main" }}>
+              ₹ {fmtAmount(withdrawableBalance)}
+            </Typography>
+
+            <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 1 }}>
+              Tax Withholding: {String(taxPercent)}%
             </Typography>
             <Typography variant="caption" sx={{ color: "text.secondary" }}>
               Updated: {updatedAt ? new Date(updatedAt).toLocaleString() : "-"}
+            </Typography>
+
+            <Typography variant="caption" sx={{ color: "text.disabled", display: "block", mt: 0.5 }}>
+              Total (Legacy): ₹ {fmtAmount(balance)}
             </Typography>
           </Paper>
         </Grid>
@@ -237,9 +295,9 @@ export default function Wallet() {
                 KYC verification required to request withdrawal. Please complete KYC in the KYC section.
               </Alert>
             ) : null}
-            {Number(balance) < 500 ? (
+            {Number(withdrawableBalance) < 500 ? (
               <Alert severity="warning" sx={{ mb: 1 }}>
-                Minimum balance ₹500 required to enable withdrawals. Short by ₹{(Math.max(0, 500 - Number(balance))).toFixed(2)}
+                Minimum withdrawable balance ₹500 required to enable withdrawals. Short by ₹{(Math.max(0, 500 - Number(withdrawableBalance))).toFixed(2)}
               </Alert>
             ) : null}
             {!windowInfo?.isOpen ? (
@@ -263,6 +321,7 @@ export default function Wallet() {
                   value={wdrForm.amount}
                   onChange={onWdrChange}
                   inputProps={{ inputMode: "decimal" }}
+                  helperText={`Available: ₹ ${fmtAmount(withdrawableBalance)}`}
                   required
                 />
                 {/* Method fixed to Bank; UPI removed */}
@@ -276,7 +335,7 @@ export default function Wallet() {
                 />
               </Stack>
               <Alert severity="info" sx={{ mt: 1 }}>
-                Bank details are captured in the KYC screen. Ensure your KYC bank details are correct before requesting a withdrawal.
+                Withdrawals are debited only from your Withdrawable Wallet (Net). Bank details are captured in the KYC screen.
               </Alert>
               <Button
                 type="submit"
@@ -293,60 +352,83 @@ export default function Wallet() {
             <Typography variant="subtitle2" sx={{ color: "text.secondary", mb: 1 }}>
               Recent Activity
             </Typography>
-            {loading ? (
+            {txLoading ? (
               <LinearProgress />
             ) : err ? (
-              <Typography variant="body2" color="error">
-                {err}
-              </Typography>
-            ) : (txs || []).length === 0 ? (
-              <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                No transactions yet.
-              </Typography>
+              <Typography variant="body2" color="error">{err}</Typography>
             ) : (
-              <Box>
-                {(txs || []).map((tx) => (
-                  <Box key={tx.id} sx={{ py: 1.2 }}>
-                    <Grid container spacing={{ xs: 1, sm: 1 }} alignItems="center">
-                      <Grid item xs={12} sm={5} md={4}>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          <TxTypeChip type={tx.type} />
-                          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                            {tx.source_type || "-"}
-                          </Typography>
-                        </Stack>
-                      </Grid>
-                      <Grid item xs={6} sm={3} md={3}>
-                        <Typography variant="body2">
-                          <Amount value={tx.amount} />
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={6} sm={4} md={3}>
-                        <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                          Bal: ₹ {fmtAmount(tx.balance_after)}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12} md={2}>
-                        <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                          {tx.created_at ? new Date(tx.created_at).toLocaleString() : ""}
-                        </Typography>
-                      </Grid>
-                    </Grid>
-                    {tx.meta ? (
-                      <Typography variant="caption" sx={{ color: "text.disabled", wordBreak: "break-word", whiteSpace: "normal" }}>
-                        {(() => {
-                          try {
-                            return JSON.stringify(tx.meta);
-                          } catch {
-                            return String(tx.meta);
-                          }
-                        })()}
-                      </Typography>
-                    ) : null}
-                    <Divider sx={{ mt: 1.2 }} />
-                  </Box>
-                ))}
-              </Box>
+              <React.Fragment>
+                <TableContainer sx={{ maxHeight: 420 }}>
+                  <Table size="small" stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Date</TableCell>
+                        <TableCell>Type</TableCell>
+                        <TableCell>TR Username</TableCell>
+                        <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Full Name</TableCell>
+                        <TableCell>Pincode</TableCell>
+                        <TableCell align="right">Commission (₹)</TableCell>
+                        <TableCell sx={{ display: { xs: "none", md: "table-cell" } }} align="right">Bal After (₹)</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {(txs || []).length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7}>
+                            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                              No transactions yet.
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        (txs || []).map((tx) => (
+                          <TableRow key={tx.id} hover>
+                            <TableCell>
+                              {tx.created_at ? new Date(tx.created_at).toLocaleString() : "-"}
+                            </TableCell>
+                            <TableCell>
+                              <Stack direction="row" spacing={1} alignItems="center">
+                                <TxTypeChip type={tx.type} />
+                                <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                                  {tx.source_type || "-"}
+                                </Typography>
+                              </Stack>
+                            </TableCell>
+                            <TableCell>{tx.tr_username || "-"}</TableCell>
+                            <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                              {tx.full_name || "-"}
+                            </TableCell>
+                            <TableCell>{tx.pincode || "-"}</TableCell>
+                            <TableCell align="right">
+                              <Amount value={tx.commission ?? tx.amount} />
+                            </TableCell>
+                            <TableCell sx={{ display: { xs: "none", md: "table-cell" } }} align="right">
+                              ₹ {fmtAmount(tx.balance_after)}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+                <TablePagination
+                  component="div"
+                  count={txCount}
+                  page={txPage}
+                  onPageChange={(e, newPage) => {
+                    setTxPage(newPage);
+                    fetchTransactions(newPage, txPageSize);
+                  }}
+                  rowsPerPage={txPageSize}
+                  onRowsPerPageChange={(e) => {
+                    const newSize = parseInt(e.target.value, 10);
+                    setTxPageSize(newSize);
+                    setTxPage(0);
+                    fetchTransactions(0, newSize);
+                  }}
+                  rowsPerPageOptions={[10, 25, 50]}
+                />
+              </React.Fragment>
             )}
           </Paper>
         </Grid>

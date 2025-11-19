@@ -1,4 +1,5 @@
 from rest_framework import generics
+from rest_framework.pagination import PageNumberPagination
 from .models import CustomUser, AgencyRegionAssignment, Wallet, WalletTransaction, SupportTicket, SupportTicketMessage
 from .serializers import RegisterSerializer, PublicUserSerializer, UserKYCSerializer, WithdrawalRequestSerializer, ProfileMeSerializer, SupportTicketSerializer, SupportTicketMessageSerializer
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -1111,21 +1112,89 @@ class WalletMe(APIView):
 
     def get(self, request):
         w = Wallet.get_or_create_for_user(request.user)
+        # Lazy import to avoid circulars and to read current tax config
+        try:
+            from business.models import CommissionConfig
+            cfg = CommissionConfig.get_solo()
+            tax_percent = str(getattr(cfg, "tax_percent", 10))
+        except Exception:
+            tax_percent = "10"
         return Response({
-            "balance": str(w.balance),
+            "balance": str(w.balance),                       # total (legacy)
+            "main_balance": str(getattr(w, "main_balance", 0) or 0),
+            "withdrawable_balance": str(getattr(w, "withdrawable_balance", 0) or 0),
+            "tax_percent": tax_percent,
             "updated_at": w.updated_at
         }, status=status.HTTP_200_OK)
 
 
 class WalletTransactionSerializer(serializers.ModelSerializer):
+    tr_username = serializers.SerializerMethodField()
+    full_name = serializers.SerializerMethodField()
+    pincode = serializers.SerializerMethodField()
+    commission = serializers.SerializerMethodField()
+
     class Meta:
         model = WalletTransaction
-        fields = ["id", "amount", "balance_after", "type", "source_type", "source_id", "meta", "created_at"]
+        fields = [
+            "id",
+            "amount",
+            "commission",
+            "balance_after",
+            "type",
+            "source_type",
+            "source_id",
+            "meta",
+            "created_at",
+            "tr_username",
+            "full_name",
+            "pincode",
+        ]
+
+    def get_commission(self, obj):
+        try:
+            return str(obj.amount)
+        except Exception:
+            return None
+
+    def _resolve_counterparty(self, obj):
+        try:
+            meta = obj.meta or {}
+        except Exception:
+            meta = {}
+        uid = meta.get("from_user_id") or meta.get("user_id")
+        uname = meta.get("from_user") or meta.get("username")
+        u = None
+        try:
+            if uid:
+                u = CustomUser.objects.filter(id=uid).only("id", "username", "full_name", "pincode").first()
+            if not u and uname:
+                u = CustomUser.objects.filter(username__iexact=str(uname)).only("id", "username", "full_name", "pincode").first()
+        except Exception:
+            u = None
+        return u or getattr(obj, "user", None)
+
+    def get_tr_username(self, obj):
+        u = self._resolve_counterparty(obj)
+        return getattr(u, "username", None)
+
+    def get_full_name(self, obj):
+        u = self._resolve_counterparty(obj)
+        return getattr(u, "full_name", None)
+
+    def get_pincode(self, obj):
+        u = self._resolve_counterparty(obj)
+        return getattr(u, "pincode", None)
 
 
 class WalletTransactionsList(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = WalletTransactionSerializer
+    pagination_class = type(
+        "WalletTxnPagination",
+        (PageNumberPagination,),
+        {"page_size": 10, "page_size_query_param": "page_size", "max_page_size": 100},
+    )
 
     def get_queryset(self):
         qs = WalletTransaction.objects.filter(user=self.request.user).order_by("-created_at")

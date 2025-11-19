@@ -321,6 +321,9 @@ from django.dispatch import receiver
 class Wallet(models.Model):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='wallet')
     balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    # New dual-balance model
+    main_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)         # Gross earnings (e.g., commissions)
+    withdrawable_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0) # Net withdrawable after tax withholding
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -329,13 +332,107 @@ class Wallet(models.Model):
 
     @transaction.atomic
     def credit(self, amount: Decimal, tx_type: str, meta: dict | None = None, source_type: str | None = None, source_id: str | None = None):
+        """
+        Credit logic with dual-wallet support:
+        - COMMISSION_CREDIT: withhold cfg.tax_percent to company wallet, add gross to main, net to withdrawable.
+        - Other credits: add to main (no withholding), do not change withdrawable unless explicitly done elsewhere.
+        """
+        from decimal import Decimal as D
         # Lock this wallet row
         w = Wallet.objects.select_for_update().get(pk=self.pk)
-        w.balance = (w.balance or Decimal('0')) + Decimal(amount)
-        w.save(update_fields=['balance', 'updated_at'])
+        amt = D(amount or 0)
+
+        meta = meta or {}
+        COMMISSION_WITHHOLD_TYPES = {
+            "COMMISSION_CREDIT",
+            "DIRECT_REF_BONUS",
+            "LEVEL_BONUS",
+            "AUTOPOOL_BONUS_FIVE",
+            "AUTOPOOL_BONUS_THREE",
+            "FRANCHISE_INCOME",
+            "GLOBAL_ROYALTY",
+        }
+        is_commission = (tx_type in COMMISSION_WITHHOLD_TYPES)
+        no_withhold = bool(meta.get("no_withhold"))
+
+        if is_commission and not no_withhold and amt > 0:
+            # Resolve tax percent and company recipient
+            try:
+                from business.models import CommissionConfig
+                cfg = CommissionConfig.get_solo()
+                tax_percent = D(getattr(cfg, "tax_percent", D("10.00")) or D("10.00"))
+                company_user = getattr(cfg, "tax_company_user", None)
+            except Exception:
+                cfg = None
+                tax_percent = D("10.00")
+                company_user = None
+
+            if not company_user:
+                # Fallback: pick first 'company' category user or any superuser
+                try:
+                    company_user = CustomUser.objects.filter(category="company").first() or CustomUser.objects.filter(is_superuser=True).first()
+                except Exception:
+                    company_user = None
+
+            tax = (amt * tax_percent / D("100")).quantize(D("0.01"))
+            net = (amt - tax).quantize(D("0.01"))
+            if net < 0:
+                net = D("0.00")
+
+            # Update own wallet balances
+            w.main_balance = (w.main_balance or D("0")) + amt
+            w.withdrawable_balance = (w.withdrawable_balance or D("0")) + net
+            w.balance = (w.balance or D("0")) + amt
+            w.save(update_fields=["balance", "main_balance", "withdrawable_balance", "updated_at"])
+
+            # Record gross commission (main ledger)
+            WalletTransaction.objects.create(
+                user=self.user,
+                amount=amt,
+                balance_after=w.balance,
+                type=tx_type,
+                source_type=source_type or '',
+                source_id=str(source_id) if source_id is not None else '',
+                meta={**meta, "ledger": "MAIN", "gross": str(amt), "net": str(net), "tax": str(tax), "tax_percent": str(tax_percent)}
+            )
+
+            # Record net withdrawable component
+            if net > 0:
+                WalletTransaction.objects.create(
+                    user=self.user,
+                    amount=net,
+                    balance_after=w.balance,
+                    type="WITHDRAWABLE_CREDIT",
+                    source_type=source_type or '',
+                    source_id=str(source_id) if source_id is not None else '',
+                    meta={**meta, "ledger": "WITHDRAWAL", "gross": str(amt), "net": str(net), "tax": str(tax), "tax_percent": str(tax_percent)}
+                )
+
+            # Route tax to company wallet (no recursive withholding)
+            if company_user and tax > 0:
+                try:
+                    cw = Wallet.get_or_create_for_user(company_user)
+                    # Use a non-commission type to avoid withholding
+                    cw.credit(
+                        tax,
+                        tx_type="TAX_POOL_CREDIT",
+                        meta={"from_user": getattr(self.user, "username", None), **meta},
+                        source_type=source_type or 'TAX_POOL',
+                        source_id=str(source_id) if source_id is not None else '',
+                    )
+                except Exception:
+                    # best-effort
+                    pass
+
+            return w.balance
+
+        # Default: non-commission or withholding disabled
+        w.main_balance = (w.main_balance or D("0")) + amt
+        w.balance = (w.balance or D("0")) + amt
+        w.save(update_fields=['balance', 'main_balance', 'updated_at'])
         WalletTransaction.objects.create(
             user=self.user,
-            amount=Decimal(amount),
+            amount=amt,
             balance_after=w.balance,
             type=tx_type,
             source_type=source_type or '',
@@ -346,18 +443,45 @@ class Wallet(models.Model):
 
     @transaction.atomic
     def debit(self, amount: Decimal, tx_type: str, meta: dict | None = None, source_type: str | None = None, source_id: str | None = None):
-        if Decimal(amount) <= 0:
+        from decimal import Decimal as D
+        amt = D(amount or 0)
+        if amt <= 0:
             raise ValueError("Debit amount must be positive.")
         # Lock this wallet row
         w = Wallet.objects.select_for_update().get(pk=self.pk)
-        new_bal = (w.balance or Decimal('0')) - Decimal(amount)
-        if new_bal < 0:
-            raise ValueError("Insufficient wallet balance.")
-        w.balance = new_bal
-        w.save(update_fields=['balance', 'updated_at'])
+
+        if tx_type == "WITHDRAWAL_DEBIT":
+            # Debit specifically from withdrawable wallet
+            wd = (w.withdrawable_balance or D("0")) - amt
+            if wd < 0:
+                raise ValueError("Insufficient withdrawable balance.")
+            w.withdrawable_balance = wd
+            w.balance = (w.balance or D("0")) - amt
+            if w.balance < 0:
+                # Should not happen if balance tracks sum(main+withdrawable), but guard anyway
+                w.balance = D("0")
+            w.save(update_fields=['balance', 'withdrawable_balance', 'updated_at'])
+        else:
+            # Generic debit from total; reduce main first
+            new_main = (w.main_balance or D("0"))
+            take_main = min(new_main, amt)
+            new_main = new_main - take_main
+            rem = amt - take_main
+            new_wd = (w.withdrawable_balance or D("0"))
+            if rem > 0:
+                if new_wd < rem:
+                    raise ValueError("Insufficient wallet balance.")
+                new_wd = new_wd - rem
+            w.main_balance = new_main
+            w.withdrawable_balance = new_wd
+            w.balance = (w.balance or D("0")) - amt
+            if w.balance < 0:
+                raise ValueError("Insufficient wallet balance.")
+            w.save(update_fields=['balance', 'main_balance', 'withdrawable_balance', 'updated_at'])
+
         WalletTransaction.objects.create(
             user=self.user,
-            amount=Decimal(amount) * Decimal('-1'),
+            amount=amt * D('-1'),
             balance_after=w.balance,
             type=tx_type,
             source_type=source_type or '',
@@ -398,6 +522,9 @@ class WalletTransaction(models.Model):
         ('REWARD_CREDIT', 'Reward Credit'),
         ('REWARD_DEBIT', 'Reward Debit'),
         ('FRANCHISE_INCOME', 'Franchise Income'),
+        # Dual-wallet support
+        ('WITHDRAWABLE_CREDIT', 'Withdrawable Credit'),
+        ('TAX_POOL_CREDIT', 'Tax Pool Credit'),
     ]
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='wallet_transactions', db_index=True)
     amount = models.DecimalField(max_digits=12, decimal_places=2)

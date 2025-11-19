@@ -96,6 +96,10 @@ class CommissionConfig(models.Model):
     base_coupon_value = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("150.00"))
     enable_pool_distribution = models.BooleanField(default=True)
 
+    # Tax withholding for commission credits
+    tax_percent = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("10.00"))
+    tax_company_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="tax_pool_configs")
+
     # L1..L5 percentages (sum can be any number; we don't enforce =100 here)
     l1_percent = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("2.00"))
     l2_percent = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("1.00"))
@@ -711,3 +715,42 @@ class RewardRedemption(models.Model):
 
     def __str__(self):
         return f"Reward<{self.user_id}:{self.reward_key}> {self.status}"
+
+class WithholdingReserve(models.Model):
+    """
+    Holds withheld amounts (e.g., 10% from legacy split) to distribute later.
+    """
+    STATUS_CHOICES = (
+        ("reserved", "reserved"),
+        ("partial", "partial"),
+        ("distributed", "distributed"),
+    )
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="withholding_reserves", db_index=True)
+    source_type = models.CharField(max_length=32, blank=True, default="LEGACY_SPLIT", db_index=True)
+    source_id = models.CharField(max_length=64, blank=True, default="", db_index=True)
+    percent = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("10.00"))
+    gross_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    withheld_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="reserved", db_index=True)
+    breakdown = models.JSONField(null=True, blank=True)  # later distribution details
+    notes = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "status"]),
+            models.Index(fields=["source_type", "source_id"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "source_type", "source_id"],
+                name="uniq_withholding_reserve_user_source",
+            )
+        ]
+
+    def __str__(self):
+        return f"Reserve<{self.user_id}:{self.source_type}:{self.source_id}> {self.withheld_amount}"

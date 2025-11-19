@@ -2163,6 +2163,56 @@ class CouponActivateView(APIView):
                     )
         except Exception:
             pass
+
+        # E-coupon activation commission distribution
+        try:
+            code_str = str(source.get("code") or "").strip()
+            ch = str(source.get("channel") or "")
+            if code_str and ch == "e_coupon":
+                code_obj = CouponCode.objects.filter(code=code_str).select_related("assigned_employee", "assigned_agency").first()
+                if code_obj and code_obj.assigned_consumer_id == request.user.id:
+                    # Idempotency guard: award only once per code
+                    if not AuditTrail.objects.filter(action="ecoupon_commission_awarded", coupon_code=code_obj).exists():
+                        from accounts.models import Wallet
+                        from decimal import Decimal
+                        awards = []
+                        # Employee assigned path: 15 to employee, 15 to agency/sub-franchise
+                        if code_obj.assigned_employee_id:
+                            if code_obj.assigned_employee:
+                                awards.append(("employee", code_obj.assigned_employee, Decimal("15.00")))
+                            if code_obj.assigned_agency:
+                                awards.append(("agency", code_obj.assigned_agency, Decimal("15.00")))
+                        # Agency direct path: 30 to agency
+                        elif code_obj.assigned_agency_id:
+                            if code_obj.assigned_agency:
+                                awards.append(("agency", code_obj.assigned_agency, Decimal("30.00")))
+                        # Credit wallets
+                        for role, user_obj, amt in awards:
+                            try:
+                                w = Wallet.get_or_create_for_user(user_obj)
+                                w.credit(
+                                    amt,
+                                    tx_type="COMMISSION_CREDIT",
+                                    meta={"role": role, "source": "ECOUPON_ACTIVATION", "code": code_obj.code},
+                                    source_type="ECOUPON_COMMISSION",
+                                    source_id=str(code_obj.id),
+                                )
+                            except Exception:
+                                pass
+                        # Audit award summary
+                        try:
+                            AuditTrail.objects.create(
+                                action="ecoupon_commission_awarded",
+                                actor=request.user,
+                                coupon_code=code_obj,
+                                notes="Activation commission split",
+                                metadata={"awards": [{"role": r, "user": getattr(u, "username", None), "amount": str(a)} for (r, u, a) in awards]},
+                            )
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+
         return Response({"activated": bool(ok), "detail": f"Coupon {t} activation processed."}, status=status.HTTP_200_OK)
 
 
