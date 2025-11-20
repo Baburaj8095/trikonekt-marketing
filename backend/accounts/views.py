@@ -14,6 +14,13 @@ from django.core.exceptions import ValidationError
 from django.db.models import Q, Sum
 from locations.views import _build_district_index, india_place_variants
 from locations.models import State
+from django.http import HttpResponse
+from django.conf import settings
+from django.utils import timezone
+from django.contrib.staticfiles import finders
+from io import BytesIO
+import os
+from xhtml2pdf import pisa
 
 
 class RegisterView(generics.CreateAPIView):
@@ -1282,3 +1289,139 @@ class SupportTicketMessageCreate(generics.CreateAPIView):
         if not ticket:
             raise serializers.ValidationError({"detail": "Ticket not found."})
         serializer.save(ticket=ticket, author=self.request.user)
+
+# ====================
+# Employee Offer Letter (PDF)
+# ====================
+def _xhtml2pdf_link_callback(uri, rel):
+    """
+    Convert STATIC/MEDIA URIs to absolute system paths for xhtml2pdf.
+    Falls back to returning the original URI if the file is not resolvable.
+    """
+    try:
+        sUrl = (getattr(settings, "STATIC_URL", None) or "/static/").rstrip("/") + "/"
+        sRoot = getattr(settings, "STATIC_ROOT", "") or ""
+        mUrl = (getattr(settings, "MEDIA_URL", None) or "/media/").rstrip("/") + "/"
+        mRoot = getattr(settings, "MEDIA_ROOT", "") or ""
+
+        if uri.startswith(mUrl) and mRoot:
+            path = os.path.join(mRoot, uri[len(mUrl):])
+        elif uri.startswith(sUrl):
+            # Prefer staticfiles finders during development
+            rel_path = uri[len(sUrl):]
+            path = finders.find(rel_path)
+            if not path and sRoot:
+                path = os.path.join(sRoot, rel_path)
+        else:
+            return uri
+
+        if path and os.path.isfile(path):
+            return path
+    except Exception:
+        pass
+    return uri
+
+
+class OfferLetterPDFView(APIView):
+    """
+    Generate a dynamic Employment Offer Letter (PDF) for the logged-in employee.
+    Includes Trikonekt company branding and user details.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        # Restrict to employees only (either role or category marked as employee)
+        if str(getattr(user, "role", "")).lower() != "employee" and str(getattr(user, "category", "")).lower() != "employee":
+            return Response({"detail": "Offer letter is available for employees only."}, status=status.HTTP_403_FORBIDDEN)
+
+        today = timezone.now().strftime("%d %B %Y")
+        company = "Trikonekt"
+
+        full_name = getattr(user, "full_name", "") or getattr(user, "username", "")
+        username = getattr(user, "username", "") or ""
+        unique_id = getattr(user, "unique_id", "") or ""
+        prefixed_id = getattr(user, "prefixed_id", "") or ""
+        address = getattr(user, "address", "") or ""
+        pincode = getattr(user, "pincode", "") or ""
+        city = getattr(getattr(user, "city", None), "name", "") or ""
+        state_name = getattr(getattr(user, "state", None), "name", "") or ""
+
+        # Static logo path under /static/branding/trikonekt.png (optional).
+        # If not present, PDF will render without image.
+        base_static_url = (getattr(settings, "STATIC_URL", None) or "/static/").rstrip("/") + "/"
+        logo_uri = f"{base_static_url}branding/trikonekt.png"
+
+        html = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  @page {{
+    size: A4;
+    margin: 28mm 20mm 20mm 20mm;
+  }}
+  body {{ font-family: DejaVu Sans, Arial, Helvetica, sans-serif; color: #111827; font-size: 12pt; }}
+  .header {{ text-align: center; margin-bottom: 16px; }}
+  .logo {{ height: 56px; }}
+  .company {{ font-weight: 700; font-size: 20pt; color: #0C2D48; margin-top: 8px; }}
+  .title {{ text-align: center; font-weight: 700; font-size: 16pt; margin: 18px 0; text-transform: uppercase; }}
+  .meta {{ margin: 10px 0 18px 0; line-height: 1.5; }}
+  .para {{ margin: 12px 0; text-align: justify; line-height: 1.65; }}
+  .sig {{ margin-top: 32px; }}
+  .row {{ display: block; margin: 2px 0; }}
+  .label {{ width: 150px; display: inline-block; color: #374151; }}
+  .value {{ font-weight: 600; }}
+  .footer {{ position: fixed; bottom: 10mm; left: 0; right: 0; text-align: center; color: #6b7280; font-size: 9pt; }}
+</style>
+</head>
+<body>
+  <div class="header">
+    <img src="{logo_uri}" class="logo" />
+    <div class="company">{company}</div>
+  </div>
+
+  <div class="title">Employment Offer Letter</div>
+
+  <div class="meta">
+    <div class="row"><span class="label">Date:</span> <span class="value">{today}</span></div>
+    <div class="row"><span class="label">Employee Name:</span> <span class="value">{full_name}</span></div>
+    <div class="row"><span class="label">Username:</span> <span class="value">{username}</span></div>
+    <div class="row"><span class="label">Employee ID:</span> <span class="value">{prefixed_id or unique_id}</span></div>
+    <div class="row"><span class="label">Designation:</span> <span class="value">Employee</span></div>
+    <div class="row"><span class="label">Location:</span> <span class="value">{(city + ', ' if city else '') + (state_name or '')} {pincode}</span></div>
+  </div>
+
+  <div class="para">
+    We are pleased to offer you the position of <b>Employee</b> with <b>{company}</b>. Your skills and experience will be a valuable
+    addition to our team. The terms and conditions of your employment, including compensation, responsibilities, and policies,
+    will be communicated separately and may be updated from time to time as per company norms.
+  </div>
+
+  <div class="para">
+    Your joining is effective upon acceptance of this offer and completion of requisite onboarding formalities.
+    Please keep this letter for your records. This letter is system generated and does not require a physical signature.
+  </div>
+
+  <div class="sig">
+    <div class="row"><span class="label">For:</span> <span class="value">{company}</span></div>
+    <div class="row" style="margin-top: 22px;"><span class="label">Authorized Signatory:</span> <span class="value">HR Department</span></div>
+  </div>
+
+  <div class="footer">
+    {company} • www.trikonekt.com
+  </div>
+</body>
+</html>
+"""
+
+        # Render PDF
+        pdf_io = BytesIO()
+        result = pisa.CreatePDF(src=html, dest=pdf_io, link_callback=_xhtml2pdf_link_callback)
+        if getattr(result, "err", False):
+            return Response({"detail": "Failed to generate PDF."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        filename = f'Trikonekt_Offer_Letter_{username}.pdf'
+        resp = HttpResponse(pdf_io.getvalue(), content_type='application/pdf')
+        resp['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return resp

@@ -24,6 +24,8 @@ from .views import (
     SupportTicketListCreate,
     SupportTicketDetail,
     SupportTicketMessageCreate,
+    # Offer letter
+    OfferLetterPDFView,
 )
 from .token_serializers import CustomTokenRefreshView
 
@@ -55,4 +57,6 @@ urlpatterns = [
     path('support/tickets/<int:pk>/', SupportTicketDetail.as_view(), name='support_ticket_detail'),
     path('support/tickets/<int:pk>/messages/', SupportTicketMessageCreate.as_view(), name='support_ticket_message_create'),
     path('token/refresh/', CustomTokenRefreshView.as_view(), name='token_refresh'),
+    # Employee Offer Letter (PDF download)
+    path('employee/offer-letter/', OfferLetterPDFView.as_view(), name='employee_offer_letter'),
 ]

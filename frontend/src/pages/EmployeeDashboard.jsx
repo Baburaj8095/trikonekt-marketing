@@ -234,6 +234,7 @@ export default function EmployeeDashboard({ embedded = false }) {
     REFER_EARN: "refer_earn",
     WALLET: "wallet",
     REWARDS: "rewards",
+    OFFER_LETTER: "offer_letter",
   };
   const [activeTab, setActiveTab] = useState(() => {
     const q = new URLSearchParams(location.search);
@@ -244,6 +245,7 @@ export default function EmployeeDashboard({ embedded = false }) {
     if (t === "refer_earn") return TABS.REFER_EARN;
     if (t === "wallet") return TABS.WALLET;
     if (t === "rewards") return TABS.REWARDS;
+    if (t === "offer_letter") return TABS.OFFER_LETTER;
     return TABS.DASHBOARD;
   });
 
@@ -264,6 +266,8 @@ export default function EmployeeDashboard({ embedded = false }) {
         ? TABS.WALLET
         : t === "rewards"
         ? TABS.REWARDS
+        : t === "offer_letter"
+        ? TABS.OFFER_LETTER
         : TABS.DASHBOARD;
     setActiveTab(next);
   }, [location.search]);
@@ -670,6 +674,30 @@ export default function EmployeeDashboard({ embedded = false }) {
     }
   };
 
+  // Offer letter download
+  const [offerBusy, setOfferBusy] = useState(false);
+  const downloadOfferLetter = async () => {
+    try {
+      setOfferBusy(true);
+      const res = await API.get("/accounts/employee/offer-letter/", { responseType: "blob" });
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const uname = (storedUser?.username || (storedUser && storedUser.user && storedUser.user.username) || "employee");
+      a.download = `Trikonekt_Offer_Letter_${uname}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+      const msg = e?.response?.data?.detail || "Failed to download offer letter.";
+      alert(String(msg));
+    } finally {
+      setOfferBusy(false);
+    }
+  };
+
   // Initial load
   useEffect(() => {
     loadLuckyPending();
@@ -937,7 +965,18 @@ export default function EmployeeDashboard({ embedded = false }) {
       
     </>
   )}
-        {activeTab === TABS.LUCKY_DRAW_HISTORY && (
+          {activeTab === TABS.OFFER_LETTER && (
+            <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>Employment Offer Letter</Typography>
+              <Typography variant="body2" sx={{ color: "text.secondary", mb: 1 }}>
+                Download your dynamic offer letter with Trikonekt branding.
+              </Typography>
+              <Button variant="contained" onClick={downloadOfferLetter} disabled={offerBusy}>
+                {offerBusy ? "Preparing..." : "Download PDF"}
+              </Button>
+            </Paper>
+          )}
+          {activeTab === TABS.LUCKY_DRAW_HISTORY && (
               <Grid container rowSpacing={2} columnSpacing={{ xs: 0, sm: 2 }}>
             {/* Lucky draw submissions awaiting my (TRE) approval */}
             <Grid item xs={12}>
@@ -1502,6 +1541,16 @@ export default function EmployeeDashboard({ embedded = false }) {
                 </Grid>
               </Grid>
 
+              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff", mt: 2 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>Employment Offer Letter</Typography>
+                <Typography variant="body2" sx={{ color: "text.secondary", mb: 1 }}>
+                  Download your dynamic offer letter with Trikonekt branding.
+                </Typography>
+                <Button variant="contained" onClick={downloadOfferLetter} disabled={offerBusy}>
+                  {offerBusy ? "Preparing..." : "Download PDF"}
+                </Button>
+              </Paper>
+
               <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mt: 2, bgcolor: "#fbfdff" }}>
                 <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Assign E‑Coupon to Consumer</Typography>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
@@ -1535,7 +1584,22 @@ export default function EmployeeDashboard({ embedded = false }) {
               </Paper>
             </>
           )}
-          {activeTab === TABS.LUCKY_DRAW_HISTORY && (
+        {activeTab === TABS.OFFER_LETTER && (
+              <Grid container rowSpacing={2} columnSpacing={{ xs: 0, sm: 2 }}>
+                <Grid item xs={12}>
+                  <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
+                    <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>Employment Offer Letter</Typography>
+                    <Typography variant="body2" sx={{ color: "text.secondary", mb: 1 }}>
+                      Download your dynamic offer letter with Trikonekt branding.
+                    </Typography>
+                    <Button variant="contained" onClick={downloadOfferLetter} disabled={offerBusy}>
+                      {offerBusy ? "Preparing..." : "Download PDF"}
+                    </Button>
+                  </Paper>
+                </Grid>
+              </Grid>
+        )}
+        {activeTab === TABS.LUCKY_DRAW_HISTORY && (
             <Grid container spacing={2}>
               {/* Lucky draw submissions awaiting my (TRE) approval */}
               <Grid item xs={12}>

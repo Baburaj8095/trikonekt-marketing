@@ -178,7 +178,7 @@ export default function ReferAndEarn({ title = "Refer & Earn", onlyConsumer = fa
             >
               Share
             </Button>
-            <Button
+            {/* <Button
               variant="outlined"
               sx={{ textTransform: "none" }}
               onClick={() => openNew(getWhatsAppUrl(links.consumer, buildShareText("Consumer")))}
@@ -191,7 +191,7 @@ export default function ReferAndEarn({ title = "Refer & Earn", onlyConsumer = fa
               onClick={() => openNew(getTelegramUrl(links.consumer, buildShareText("Consumer")))}
             >
               Telegram
-            </Button>
+            </Button> */}
             <Button
               variant="contained"
               sx={{ textTransform: "none" }}
