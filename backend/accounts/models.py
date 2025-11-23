@@ -64,6 +64,8 @@ class CustomUser(AbstractUser):
     rewards_enabled = models.BooleanField(default=False)
     is_agency_unlocked = models.BooleanField(default=False)
     can_create_self_accounts = models.BooleanField(default=False)
+    # Encrypted copy of the last set password (Fernet). Visible only to superusers in admin.
+    last_password_encrypted = models.TextField(null=True, blank=True)
 
     class Meta(AbstractUser.Meta):
         constraints = [

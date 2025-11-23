@@ -86,7 +86,7 @@ export default function AdminBusiness() {
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ margin: 0, color: "#0f172a" }}>Business Registration</h2>
         <div style={{ color: "#64748b", fontSize: 13 }}>
-          Review and approve business registrations. This view uses the new SimpleTable (no DataGrid).
+          Review and approve business registrations. This view uses the enhanced Data Grid tables.
         </div>
       </div>
 

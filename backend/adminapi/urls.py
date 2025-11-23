@@ -5,6 +5,9 @@ from .views import (
     AdminUserTreeDefaultRoot,
     AdminUserTreeChildren,
     AdminUsersList,
+    AdminUserDetail,
+    AdminUserImpersonateView,
+    AdminUserSetTempPasswordView,
     AdminECouponBulkCreateView,
     AdminECouponAssignView,
     AdminKYCList,
@@ -23,8 +26,9 @@ from .views import (
     AdminSupportTicketMessageCreate,
     AdminSupportTicketApproveKYC,
     AdminPingView,
+    AdminUserEditMetaView,
 )
-from .dynamic import router as dynamic_router, admin_meta as dynamic_admin_meta
+from .dynamic import router as dynamic_router, admin_meta as dynamic_admin_meta, admin_meta_summary, admin_meta_fields
 
 urlpatterns = [
     path("metrics/", AdminMetricsView.as_view()),
@@ -33,6 +37,10 @@ urlpatterns = [
     path("users/tree/default-root/", AdminUserTreeDefaultRoot.as_view()),
     path("users/tree/children/", AdminUserTreeChildren.as_view()),
     path("users/", AdminUsersList.as_view()),
+    path("users/edit-meta/", AdminUserEditMetaView.as_view()),
+    path("users/<int:pk>/", AdminUserDetail.as_view()),
+    path("users/<int:pk>/impersonate/", AdminUserImpersonateView.as_view()),
+    path("users/<int:pk>/set-temp-password/", AdminUserSetTempPasswordView.as_view()),
 
     # E-Coupons (ELC)
     path("coupons/bulk-ecoupons/", AdminECouponBulkCreateView.as_view()),
@@ -62,4 +70,6 @@ urlpatterns = [
     # Dynamic admin models (auto-discovered)
     path("", include(dynamic_router.urls)),
     path("admin-meta/", dynamic_admin_meta),
+    path("admin-meta/summary/", admin_meta_summary),
+    path("admin-meta/fields/<str:app_label>/<str:model_name>/", admin_meta_fields),
 ]

@@ -60,35 +60,37 @@ export default function MyOrders() {
           <CircularProgress size={20} /> <Typography variant="body2">Loading...</Typography>
         </Box>
       ) : (
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>Product</TableCell>
-              <TableCell>Quantity</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Requested At</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {(rows || []).map((r) => (
-              <TableRow key={r.id}>
-                <TableCell>{r.product_name || r.product}</TableCell>
-                <TableCell>{r.quantity}</TableCell>
-                <TableCell><StatusChip value={r.status} /></TableCell>
-                <TableCell>{r.created_at ? new Date(r.created_at).toLocaleString() : ""}</TableCell>
-              </TableRow>
-            ))}
-            {(!rows || rows.length === 0) && (
+        <Box sx={{ width: "100%", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+          <Table size="small" sx={{ minWidth: 600 }}>
+            <TableHead>
               <TableRow>
-                <TableCell colSpan={4}>
-                  <Typography variant="body2" color="text.secondary">
-                    You haven't placed any purchase requests yet.
-                  </Typography>
-                </TableCell>
+                <TableCell>Product</TableCell>
+                <TableCell>Quantity</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Requested At</TableCell>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
+            </TableHead>
+            <TableBody>
+              {(rows || []).map((r) => (
+                <TableRow key={r.id}>
+                  <TableCell>{r.product_name || r.product}</TableCell>
+                  <TableCell>{r.quantity}</TableCell>
+                  <TableCell><StatusChip value={r.status} /></TableCell>
+                  <TableCell>{r.created_at ? new Date(r.created_at).toLocaleString() : ""}</TableCell>
+                </TableRow>
+              ))}
+              {(!rows || rows.length === 0) && (
+                <TableRow>
+                  <TableCell colSpan={4}>
+                    <Typography variant="body2" color="text.secondary">
+                      You haven't placed any purchase requests yet.
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </Box>
       )}
 
       <Snackbar

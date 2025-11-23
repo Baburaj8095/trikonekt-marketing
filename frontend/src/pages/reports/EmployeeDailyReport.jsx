@@ -18,6 +18,7 @@ import {
   Stack,
 } from "@mui/material";
 import API from "../../api/api";
+import DataTable from "../../admin-panel/components/data/DataTable";
 
 function intOrZero(v) {
   const n = Number(v);
@@ -85,6 +86,7 @@ export default function EmployeeDailyReport() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
 
   const loadMyReports = async () => {
     try {
@@ -107,6 +109,49 @@ export default function EmployeeDailyReport() {
   useEffect(() => {
     loadMyReports();
   }, []);
+
+  // DataGrid columns and server fetcher
+  const columns = useMemo(
+    () => [
+      { field: "date", headerName: "Date", minWidth: 140 },
+      { field: "role", headerName: "Role", minWidth: 120 },
+      { field: "tr_registered", headerName: "TR", minWidth: 80 },
+      { field: "wg_registered", headerName: "WG", minWidth: 80 },
+      { field: "asia_pay_registered", headerName: "Asia Pay", minWidth: 110 },
+      { field: "dm_account_registered", headerName: "DM Acc", minWidth: 110 },
+      { field: "e_coupon_issued", headerName: "E‑Coupon", minWidth: 110 },
+      { field: "physical_coupon_issued", headerName: "Physical", minWidth: 110 },
+      { field: "product_sold", headerName: "Products", minWidth: 110 },
+      { field: "total_amount", headerName: "Total Amount", minWidth: 140 },
+    ],
+    []
+  );
+
+  const fetcher = React.useCallback(
+    async ({ page, pageSize }) => {
+      const params = {};
+      if (dateFrom) params.from = dateFrom;
+      if (dateTo) params.to = dateTo;
+      const res = await API.get("/v1/reports/my-reports/", { params });
+      const data = Array.isArray(res.data)
+        ? res.data
+        : Array.isArray(res.data?.results)
+        ? res.data.results
+        : [];
+      const count =
+        typeof res.data?.count === "number" ? res.data.count : data.length;
+
+      // If backend isn't paginated, slice locally
+      const start = (page - 1) * pageSize;
+      const end = start + pageSize;
+      const results = Array.isArray(res.data?.results)
+        ? data
+        : data.slice(start, end);
+
+      return { results, count };
+    },
+    [dateFrom, dateTo, reloadKey]
+  );
 
   return (
     <Container maxWidth="lg" sx={{ px: 0 }}>
@@ -249,60 +294,16 @@ export default function EmployeeDailyReport() {
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
               />
-              <Button variant="outlined" onClick={loadMyReports} sx={{ width: { xs: "100%", sm: "auto" } }}>Filter</Button>
+              <Button variant="outlined" onClick={() => setReloadKey((k) => k + 1)} sx={{ width: { xs: "100%", sm: "auto" } }}>Filter</Button>
             </Stack>
 
-            {loading ? (
-              <Box sx={{ py: 2, display: "flex", alignItems: "center", gap: 1 }}>
-                <CircularProgress size={18} /> <Typography variant="body2">Loading…</Typography>
-              </Box>
-            ) : loadError ? (
-              <Alert severity="error">{loadError}</Alert>
-            ) : (
-              <TableContainer sx={{ width: "100%", overflowX: "auto" }}>
-                <Table size="small" sx={{ minWidth: 900 }}>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Date</TableCell>
-                    <TableCell>Role</TableCell>
-                    <TableCell>TR</TableCell>
-                    <TableCell>WG</TableCell>
-                    <TableCell>Asia Pay</TableCell>
-                    <TableCell>DM Acc</TableCell>
-                    <TableCell>E‑Coupon</TableCell>
-                    <TableCell>Physical</TableCell>
-                    <TableCell>Products</TableCell>
-                    <TableCell>Total Amount</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {(rows || []).map((r) => (
-                    <TableRow key={`${r.id}-${r.date}`}>
-                      <TableCell>{r.date}</TableCell>
-                      <TableCell>{r.role}</TableCell>
-                      <TableCell>{r.tr_registered}</TableCell>
-                      <TableCell>{r.wg_registered}</TableCell>
-                      <TableCell>{r.asia_pay_registered}</TableCell>
-                      <TableCell>{r.dm_account_registered}</TableCell>
-                      <TableCell>{r.e_coupon_issued}</TableCell>
-                      <TableCell>{r.physical_coupon_issued}</TableCell>
-                      <TableCell>{r.product_sold}</TableCell>
-                      <TableCell>₹{r.total_amount}</TableCell>
-                    </TableRow>
-                  ))}
-                  {(!rows || rows.length === 0) && (
-                    <TableRow>
-                      <TableCell colSpan={10}>
-                        <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                          No reports found for the selected range.
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-                </Table>
-              </TableContainer>
-            )}
+            <DataTable
+              key={reloadKey}
+              columns={columns}
+              fetcher={fetcher}
+              density="standard"
+              checkboxSelection={false}
+            />
           </Paper>
         </Grid>
       </Grid>

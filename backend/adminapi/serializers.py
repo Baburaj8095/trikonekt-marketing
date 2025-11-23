@@ -3,12 +3,22 @@ from accounts.models import CustomUser, WithdrawalRequest, UserKYC, WalletTransa
 from market.models import PurchaseRequest, BannerPurchaseRequest
 from business.models import UserMatrixProgress
 from locations.models import Country, State, City
+from core.crypto import encrypt_string, decrypt_string
 
 
 class AdminUserNodeSerializer(serializers.ModelSerializer):
     state_name = serializers.SerializerMethodField()
+    country_name = serializers.SerializerMethodField()
+    district_name = serializers.SerializerMethodField()
+    wallet_balance = serializers.SerializerMethodField()
+    wallet_status = serializers.SerializerMethodField()
+    avatar_url = serializers.SerializerMethodField()
     direct_count = serializers.IntegerField(read_only=True)
     has_children = serializers.SerializerMethodField()
+    has_usable_password = serializers.SerializerMethodField()
+    password_status = serializers.SerializerMethodField()
+    password_algo = serializers.SerializerMethodField()
+    password_plain = serializers.SerializerMethodField()
 
     class Meta:
         model = CustomUser
@@ -16,18 +26,82 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
             "id",
             "username",
             "full_name",
+            "email",
             "role",
             "category",
             "phone",
-            "state_name",
             "pincode",
+            "district_name",
+            "state_name",
+            "country_name",
+            "sponsor_id",
+            "date_joined",
+            "wallet_balance",
+            "wallet_status",
+            "avatar_url",
+            "is_active",
             "direct_count",
             "has_children",
+            "has_usable_password",
+            "password_status",
+            "password_algo",
+            "password_plain",
         ]
 
     def get_state_name(self, obj):
         try:
             return obj.state.name if getattr(obj, "state_id", None) else ""
+        except Exception:
+            return ""
+
+    def get_country_name(self, obj):
+        try:
+            return obj.country.name if getattr(obj, "country_id", None) else ""
+        except Exception:
+            return ""
+
+    def get_district_name(self, obj):
+        try:
+            # Map "District" to City model's name (as per schema)
+            return obj.city.name if getattr(obj, "city_id", None) else ""
+        except Exception:
+            return ""
+
+    def get_wallet_balance(self, obj):
+        try:
+            w = getattr(obj, "wallet", None)
+            if not w:
+                return ""
+            # Prefer main_balance if present, fall back to balance
+            bal = getattr(w, "main_balance", None)
+            if bal is None:
+                bal = getattr(w, "balance", None)
+            return float(bal) if bal is not None else ""
+        except Exception:
+            return ""
+
+    def get_wallet_status(self, obj):
+        try:
+            # No explicit status field in Wallet; show "OK" if wallet exists
+            return "OK" if getattr(obj, "wallet", None) else ""
+        except Exception:
+            return ""
+
+    def get_avatar_url(self, obj):
+        try:
+            file = getattr(obj, "avatar", None)
+            if not file:
+                return ""
+            url = getattr(file, "url", "") or ""
+            if not url:
+                return ""
+            req = getattr(self, "context", {}).get("request", None)
+            if req:
+                try:
+                    return req.build_absolute_uri(url)
+                except Exception:
+                    pass
+            return url
         except Exception:
             return ""
 
@@ -37,6 +111,105 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
             return dc > 0
         except Exception:
             return False
+
+    def get_has_usable_password(self, obj):
+        """
+        Return True only when a real, usable hashed password is present.
+        Handle edge cases where password is empty string ('') which Django's
+        has_usable_password may treat as usable in some versions.
+        """
+        try:
+            from django.contrib.auth.hashers import UNUSABLE_PASSWORD_PREFIX
+        except Exception:
+            UNUSABLE_PASSWORD_PREFIX = "!"  # fallback
+
+        try:
+            pwd = getattr(obj, "password", "") or ""
+            # Empty or too short strings are not real hashes
+            if not isinstance(pwd, str) or len(pwd) < 20:
+                return False
+            # Explicit unusable marker
+            if pwd.startswith(UNUSABLE_PASSWORD_PREFIX):
+                return False
+            # Prefer model API if available
+            if hasattr(obj, "has_usable_password"):
+                try:
+                    return bool(obj.has_usable_password())
+                except Exception:
+                    pass
+            # Heuristic: known hash prefixes
+            known_prefixes = ("pbkdf2_", "argon2", "bcrypt", "scrypt")
+            return any(pwd.startswith(pfx) for pfx in known_prefixes)
+        except Exception:
+            return False
+
+    def get_password_status(self, obj):
+        """
+        Human-readable password status for admin grid: Usable | Unusable | Empty.
+        """
+        try:
+            pwd = getattr(obj, "password", "") or ""
+            if not isinstance(pwd, str) or len(pwd) < 20:
+                return "Empty"
+            try:
+                from django.contrib.auth.hashers import UNUSABLE_PASSWORD_PREFIX
+                if pwd.startswith(UNUSABLE_PASSWORD_PREFIX):
+                    return "Unusable"
+            except Exception:
+                pass
+            if hasattr(obj, "has_usable_password"):
+                try:
+                    return "Usable" if obj.has_usable_password() else "Unusable"
+                except Exception:
+                    pass
+            # Fallback heuristic
+            known_prefixes = ("pbkdf2_", "argon2", "bcrypt", "scrypt")
+            return "Usable" if any(pwd.startswith(pfx) for pfx in known_prefixes) else "Unusable"
+        except Exception:
+            return "Empty"
+
+    def get_password_algo(self, obj):
+        """
+        Return the password hash algorithm (e.g., pbkdf2_sha256, bcrypt, argon2).
+        Do NOT expose the hash or salt; only a readable algorithm label.
+        Empty string when password is empty or unusable.
+        """
+        try:
+            from django.contrib.auth.hashers import UNUSABLE_PASSWORD_PREFIX
+        except Exception:
+            UNUSABLE_PASSWORD_PREFIX = "!"  # fallback
+
+        try:
+            pwd = getattr(obj, "password", "") or ""
+            if not isinstance(pwd, str) or len(pwd) < 20:
+                return ""
+            if pwd.startswith(UNUSABLE_PASSWORD_PREFIX):
+                return ""
+            # Django encoded passwords are "algorithm$..." (pbkdf2_sha256$..., bcrypt$..., argon2$argon2id$...)
+            algo = pwd.split("$", 1)[0]
+            return str(algo) if algo else ""
+        except Exception:
+            return ""
+
+
+    def get_password_plain(self, obj):
+        # Performance guard: never decrypt in list views
+        try:
+            ctx = getattr(self, "context", {}) or {}
+            if ctx.get("purpose") != "detail":
+                return ""
+            req = ctx.get("request")
+            u = getattr(req, "user", None) if req else None
+            # Allow both superusers and staff (admin panel operators) to view last-set plaintext
+            if not u or not (getattr(u, "is_superuser", False) or getattr(u, "is_staff", False)):
+                return ""
+            token = getattr(obj, "last_password_encrypted", None)
+            if not token:
+                return ""
+            plain = decrypt_string(token)
+            return plain or ""
+        except Exception:
+            return ""
 
 
 class AdminKYCSerializer(serializers.ModelSerializer):
@@ -147,6 +320,8 @@ class AdminUserEditSerializer(serializers.ModelSerializer):
     country = serializers.PrimaryKeyRelatedField(queryset=Country.objects.all(), required=False, allow_null=True)
     state = serializers.PrimaryKeyRelatedField(queryset=State.objects.all(), required=False, allow_null=True)
     city = serializers.PrimaryKeyRelatedField(queryset=City.objects.all(), required=False, allow_null=True)
+    # Write-only password field to allow admin reset; Django stores hashed passwords (non-reversible)
+    password = serializers.CharField(write_only=True, required=False, allow_blank=False, min_length=8)
 
     class Meta:
         model = CustomUser
@@ -162,8 +337,37 @@ class AdminUserEditSerializer(serializers.ModelSerializer):
             "country",
             "state",
             "city",
+            "sponsor_id",
             "is_active",
+            "password",
         ]
+
+    def update(self, instance, validated_data):
+        # Pop password if provided and set via set_password
+        password = validated_data.pop("password", None)
+
+        # Only superuser can modify sponsor_id; strip whitespace
+        request = getattr(self, "context", {}).get("request", None)
+        if "sponsor_id" in validated_data:
+            is_super = bool(getattr(getattr(request, "user", None), "is_superuser", False))
+            if not is_super:
+                validated_data.pop("sponsor_id", None)
+            else:
+                sid = validated_data.get("sponsor_id")
+                if isinstance(sid, str):
+                    validated_data["sponsor_id"] = sid.strip()
+
+        instance = super().update(instance, validated_data)
+        if password:
+            instance.set_password(password)
+            # Store encrypted reversible copy (visible only to superusers)
+            try:
+                enc = encrypt_string(password)
+                instance.last_password_encrypted = enc
+                instance.save(update_fields=["password", "last_password_encrypted"])
+            except Exception:
+                instance.save(update_fields=["password"])
+        return instance
 
 
 class AdminPurchaseRequestSerializer(serializers.ModelSerializer):

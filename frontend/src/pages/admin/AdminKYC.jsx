@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import API from "../../api/api";
+import DataTable from "../../admin-panel/components/data/DataTable";
 
 function TextInput({ label, value, onChange, placeholder, type = "text", style }) {
   return (
@@ -76,50 +77,12 @@ export default function AdminKYC() {
     date_from: "",
     date_to: "",
   });
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
-  const [rows, setRows] = useState([]);
-
-  // Mobile detection for responsive rendering
-  const [isMobile, setIsMobile] = useState(
-    typeof window !== "undefined" ? window.innerWidth < 768 : false
-  );
-  useEffect(() => {
-    function onResize() {
-      setIsMobile(window.innerWidth < 768);
-    }
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
+  const [density, setDensity] = useState("standard");
+  const [reloadKey, setReloadKey] = useState(0);
 
   function setF(key, val) {
     setFilters((f) => ({ ...f, [key]: val }));
   }
-
-  async function fetchKyc() {
-    setLoading(true);
-    setErr("");
-    try {
-      const params = {};
-      Object.entries(filters).forEach(([k, v]) => {
-        if (v !== null && v !== undefined && String(v).trim() !== "") {
-          params[k] = v;
-        }
-      });
-      const res = await API.get("/admin/kyc/", { params });
-      const items = res?.data?.results || res?.data || [];
-      setRows(Array.isArray(items) ? items : []);
-    } catch (e) {
-      setErr(e?.response?.data?.detail || "Failed to load KYC");
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    fetchKyc();
-  }, []);
 
   const statusOptions = useMemo(
     () => [
@@ -134,7 +97,7 @@ export default function AdminKYC() {
     if (!window.confirm(`Verify KYC for ${row.username}?`)) return;
     try {
       await API.patch(`/admin/kyc/${row.user_id}/verify/`);
-      await fetchKyc();
+      setReloadKey((k) => k + 1);
     } catch (e) {
       alert(e?.response?.data?.detail || "Failed to verify KYC");
     }
@@ -144,95 +107,206 @@ export default function AdminKYC() {
     if (!window.confirm(`Reject KYC for ${row.username}?`)) return;
     try {
       await API.patch(`/admin/kyc/${row.user_id}/reject/`);
-      await fetchKyc();
+      setReloadKey((k) => k + 1);
     } catch (e) {
       alert(e?.response?.data?.detail || "Failed to reject KYC");
     }
   }
 
-  function MobileRow({ r }) {
-    const statusBadge = r.verified ? (
-      <Badge color="#065f46" bg="#d1fae5">Verified</Badge>
-    ) : (
-      <Badge>Pending</Badge>
-    );
+  // DataGrid columns (responsive with flex + minWidth)
+  const columns = useMemo(
+    () => [
+      { field: "user_id", headerName: "UserID", minWidth: 110 },
+      { field: "username", headerName: "Username", minWidth: 160, flex: 1 },
+      { field: "full_name", headerName: "Full Name", minWidth: 200, flex: 1 },
+      { field: "phone", headerName: "Phone", minWidth: 140 },
+      { field: "pincode", headerName: "Pincode", minWidth: 120 },
+      {
+        field: "bank",
+        headerName: "Bank",
+        minWidth: 200,
+        renderCell: (params) => {
+          const r = params?.row || {};
+          return r.bank_name ? `${r.bank_name} (${r.ifsc_code})` : "—";
+        },
+        valueGetter: (_, row) => {
+          if (!row) return "";
+          return row.bank_name ? `${row.bank_name} (${row.ifsc_code})` : "";
+        },
+      },
+      {
+        field: "bank_account_number",
+        headerName: "Account No.",
+        minWidth: 160,
+        renderCell: (params) => {
+          const v = params?.row?.bank_account_number || "";
+          const s = String(v || "");
+          if (!s) return "—";
+          if (s.length <= 4) return s;
+          return "•••• " + s.slice(-4);
+        },
+        valueGetter: (_, row) => (row && row.bank_account_number) || "",
+      },
+      {
+        field: "verified",
+        headerName: "Status",
+        minWidth: 120,
+        renderCell: (params) => {
+          const verified = !!params?.row?.verified;
+          return verified ? (
+            <Badge color="#065f46" bg="#d1fae5">Verified</Badge>
+          ) : (
+            <Badge>Pending</Badge>
+          );
+        },
+        valueFormatter: (v) => (!!v ? "Verified" : "Pending"),
+      },
+      {
+        field: "__actions",
+        headerName: "Actions",
+        sortable: false,
+        filterable: false,
+        minWidth: 200,
+        renderCell: (params) => {
+          const r = params?.row || {};
+          return (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {!r.verified ? (
+                <button
+                  onClick={() => handleVerify(r)}
+                  style={{
+                    padding: "6px 10px",
+                    background: "#059669",
+                    color: "#fff",
+                    border: 0,
+                    borderRadius: 6,
+                    cursor: "pointer",
+                  }}
+                >
+                  Verify
+                </button>
+              ) : null}
+              <button
+                onClick={() => handleReject(r)}
+                style={{
+                  padding: "6px 10px",
+                  background: "#ef4444",
+                  color: "#fff",
+                  border: 0,
+                  borderRadius: 6,
+                  cursor: "pointer",
+                }}
+              >
+                Reject
+              </button>
+            </div>
+          );
+        },
+      },
+    ],
+    []
+  );
 
-    function Item({ label, value }) {
-      return (
-        <div style={{ display: "flex", gap: 8 }}>
-          <div style={{ width: 88, color: "#64748b", fontSize: 12, flexShrink: 0 }}>
-            {label}
-          </div>
-          <div style={{ color: "#0f172a", fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>
-            {value}
-          </div>
-        </div>
-      );
-    }
+  // Server-side fetcher mapped to admin KYC endpoint
+  const fetcher = useCallback(
+    async ({ page, pageSize, search, ordering }) => {
+      const params = { page, page_size: pageSize };
+      // Merge active filters (omit empty)
+      Object.entries(filters).forEach(([k, v]) => {
+        if (v !== null && v !== undefined && String(v).trim() !== "") {
+          params[k] = v;
+        }
+      });
+      // Map quick search to backend-supported "user" filter
+      if (search && String(search).trim()) {
+        params.user = String(search).trim();
+      }
+      // Pass ordering if backend supports it
+      if (ordering) params.ordering = ordering;
 
-    return (
-      <div
-        key={r.user_id}
-        style={{
-          borderBottom: "1px solid #e2e8f0",
-          padding: 12,
-          display: "flex",
-          flexDirection: "column",
-          gap: 8,
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-          <div style={{ fontWeight: 900, color: "#0f172a" }}>#{r.user_id}</div>
-          <div>{statusBadge}</div>
-        </div>
-        <Item label="Username" value={r.username} />
-        <Item label="Full Name" value={r.full_name || "—"} />
-        <Item label="Phone" value={r.phone || "—"} />
-        <Item label="Pincode" value={r.pincode || "—"} />
-        <Item
-          label="Bank"
-          value={r.bank_name ? `${r.bank_name} (${r.ifsc_code})` : "—"}
-        />
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
-          {!r.verified ? (
-            <button
-              onClick={() => handleVerify(r)}
-              style={{
-                padding: "8px 12px",
-                background: "#059669",
-                color: "#fff",
-                border: 0,
-                borderRadius: 6,
-                cursor: "pointer",
-              }}
-            >
-              Verify
-            </button>
-          ) : null}
+      const res = await API.get("/admin/kyc/", { params });
+      const data = res?.data;
+      const results = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
+      const count = typeof data?.count === "number" ? data.count : results.length;
+      return { results, count };
+    },
+    [filters, reloadKey]
+  );
+
+  const toolbar = (
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <label style={{ fontSize: 12, color: "#64748b" }}>Density</label>
+        <div style={{ display: "inline-flex", border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
           <button
-            onClick={() => handleReject(r)}
+            onClick={() => setDensity("comfortable")}
+            aria-pressed={density === "comfortable"}
             style={{
-              padding: "8px 12px",
-              background: "#ef4444",
-              color: "#fff",
+              padding: "6px 10px",
+              fontSize: 12,
+              background: density === "comfortable" ? "#0f172a" : "#fff",
+              color: density === "comfortable" ? "#fff" : "#0f172a",
               border: 0,
-              borderRadius: 6,
               cursor: "pointer",
             }}
           >
-            Reject
+            Comfortable
+          </button>
+          <button
+            onClick={() => setDensity("standard")}
+            aria-pressed={density === "standard"}
+            style={{
+              padding: "6px 10px",
+              fontSize: 12,
+              background: density === "standard" ? "#0f172a" : "#fff",
+              color: density === "standard" ? "#fff" : "#0f172a",
+              border: 0,
+              borderLeft: "1px solid #e5e7eb",
+              cursor: "pointer",
+            }}
+          >
+            Standard
+          </button>
+          <button
+            onClick={() => setDensity("compact")}
+            aria-pressed={density === "compact"}
+            style={{
+              padding: "6px 10px",
+              fontSize: 12,
+              background: density === "compact" ? "#0f172a" : "#fff",
+              color: density === "compact" ? "#fff" : "#0f172a",
+              border: 0,
+              borderLeft: "1px solid #e5e7eb",
+              cursor: "pointer",
+            }}
+          >
+            Compact
           </button>
         </div>
       </div>
-    );
-  }
+      <button
+        onClick={() => setReloadKey((k) => k + 1)}
+        style={{
+          padding: "8px 12px",
+          borderRadius: 8,
+          border: "1px solid #e2e8f0",
+          background: "#fff",
+          color: "#0f172a",
+          cursor: "pointer",
+          fontWeight: 600,
+        }}
+      >
+        Refresh
+      </button>
+    </div>
+  );
 
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ margin: 0, color: "#0f172a" }}>KYC Verification</h2>
         <div style={{ color: "#64748b", fontSize: 13 }}>
-          Review and decide user KYC. Use filters to find records quickly.
+          Review and decide user KYC. Use filters to find records quickly, and quick filter in the table toolbar.
         </div>
       </div>
 
@@ -285,166 +359,14 @@ export default function AdminKYC() {
         />
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center", flexWrap: "wrap" }}>
-        <button
-          onClick={fetchKyc}
-          disabled={loading}
-          style={{
-            padding: "10px 12px",
-            background: "#0f172a",
-            color: "#fff",
-            border: 0,
-            borderRadius: 8,
-            cursor: loading ? "not-allowed" : "pointer",
-          }}
-        >
-          {loading ? "Loading..." : "Apply Filters"}
-        </button>
-        <button
-          onClick={() =>
-            setFilters({
-              status: "pending",
-              user: "",
-              state: "",
-              pincode: "",
-              date_from: "",
-              date_to: "",
-            })
-          }
-          disabled={loading}
-          style={{
-            padding: "10px 12px",
-            background: "#fff",
-            color: "#0f172a",
-            border: "1px solid #e2e8f0",
-            borderRadius: 8,
-            cursor: loading ? "not-allowed" : "pointer",
-          }}
-        >
-          Reset
-        </button>
-        {err ? <div style={{ color: "#dc2626" }}>{err}</div> : null}
-      </div>
-
-      {/* Table / Card list */}
-      <div
-        style={{
-          border: "1px solid #e2e8f0",
-          borderRadius: 10,
-          overflow: "hidden",
-          background: "#fff",
-        }}
-      >
-        {/* Desktop/tablet: table layout with horizontal scroll if needed */}
-        {!isMobile ? (
-          <div style={{ overflowX: "auto" }}>
-            <div
-              style={{
-                minWidth: 940,
-                display: "grid",
-                gridTemplateColumns:
-                  "110px 160px 1fr 120px 120px 160px 120px 220px",
-                gap: 8,
-                padding: "10px",
-                background: "#f8fafc",
-                borderBottom: "1px solid #e2e8f0",
-                fontWeight: 700,
-                color: "#0f172a",
-              }}
-            >
-              <div>UserID</div>
-              <div>Username</div>
-              <div>Full Name</div>
-              <div>Phone</div>
-              <div>Pincode</div>
-              <div>Bank</div>
-              <div>Status</div>
-              <div>Actions</div>
-            </div>
-            <div>
-              {rows.map((r) => {
-                const statusBadge = r.verified ? (
-                  <Badge color="#065f46" bg="#d1fae5">Verified</Badge>
-                ) : (
-                  <Badge>Pending</Badge>
-                );
-                return (
-                  <div
-                    key={r.user_id}
-                    style={{
-                      minWidth: 940,
-                      display: "grid",
-                      gridTemplateColumns:
-                        "110px 160px 1fr 120px 120px 160px 120px 220px",
-                      gap: 8,
-                      padding: "10px",
-                      borderBottom: "1px solid #e2e8f0",
-                      alignItems: "center",
-                    }}
-                  >
-                    <div>{r.user_id}</div>
-                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {r.username}
-                    </div>
-                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {r.full_name || "—"}
-                    </div>
-                    <div>{r.phone || "—"}</div>
-                    <div>{r.pincode || "—"}</div>
-                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {r.bank_name ? `${r.bank_name} (${r.ifsc_code})` : "—"}
-                    </div>
-                    <div>{statusBadge}</div>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      {!r.verified ? (
-                        <button
-                          onClick={() => handleVerify(r)}
-                          style={{
-                            padding: "6px 10px",
-                            background: "#059669",
-                            color: "#fff",
-                            border: 0,
-                            borderRadius: 6,
-                            cursor: "pointer",
-                          }}
-                        >
-                          Verify
-                        </button>
-                      ) : null}
-                      <button
-                        onClick={() => handleReject(r)}
-                        style={{
-                          padding: "6px 10px",
-                          background: "#ef4444",
-                          color: "#fff",
-                          border: 0,
-                          borderRadius: 6,
-                          cursor: "pointer",
-                        }}
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-              {!loading && rows.length === 0 ? (
-                <div style={{ padding: 12, color: "#64748b" }}>No results</div>
-              ) : null}
-            </div>
-          </div>
-        ) : (
-          // Mobile: stacked card layout
-          <div>
-            {rows.map((r) => (
-              <MobileRow key={r.user_id} r={r} />
-            ))}
-            {!loading && rows.length === 0 ? (
-              <div style={{ padding: 12, color: "#64748b" }}>No results</div>
-            ) : null}
-          </div>
-        )}
-      </div>
+      <DataTable
+        columns={columns}
+        fetcher={fetcher}
+        density={density}
+        toolbar={toolbar}
+        checkboxSelection={true}
+        onSelectionChange={() => {}}
+      />
     </div>
   );
 }

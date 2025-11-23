@@ -19,6 +19,9 @@ from locations.views import _build_district_index, india_place_variants
 from django.urls import reverse
 from django.utils.html import format_html
 from django.contrib import messages
+import secrets
+import string
+from core.crypto import decrypt_string, encrypt_string
 
 
 # ======================
@@ -146,6 +149,7 @@ def _process_bulk_region_assignments(user: CustomUser, cleaned_data: dict):
 @admin.register(CustomUser)
 class CustomUserAdmin(UserAdmin):
     form = CustomUserAdminForm
+    actions = ['reset_password_plain']
     list_display = (
         'username', 'email', 'role', 'category', 'unique_id',
         'full_name', 'phone', 'country', 'state', 'city', 'pincode',
@@ -172,9 +176,86 @@ class CustomUserAdmin(UserAdmin):
     # unique_id is non-editable on the model; expose it as read-only in admin
     readonly_fields = ('unique_id',)
 
+    def password_hash(self, obj):
+        try:
+            return getattr(obj, 'password', '') or ''
+        except Exception:
+            return ''
+    password_hash.short_description = 'Password (hash)'
+
+    def visible_password(self, obj):
+        try:
+            token = getattr(obj, 'last_password_encrypted', None)
+            if not token:
+                return '-'
+            plain = decrypt_string(token)
+            return plain or '-'
+        except Exception:
+            return '-'
+    visible_password.short_description = 'Plain Password (last set)'
+
+    # Admin action: reset selected users to a temporary password and store plaintext (encrypted) for superuser display
+    def reset_password_plain(self, request, queryset):
+        updated = 0
+        samples = []
+        for u in queryset:
+            try:
+                # Generate a strong temporary password: 8 alnum + 1 special + 1 digit
+                base = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(8))
+                special = secrets.choice('!@#$%^&*')
+                digit = str(secrets.randbelow(10))
+                pwd = f"{base}{special}{digit}"
+
+                # Set hashed password
+                u.set_password(pwd)
+
+                # Store encrypted plaintext for superuser-only display
+                try:
+                    enc = encrypt_string(pwd)
+                except Exception:
+                    enc = None
+                if enc:
+                    u.last_password_encrypted = enc
+                    u.save(update_fields=["password", "last_password_encrypted"])
+                else:
+                    u.save(update_fields=["password"])
+
+                updated += 1
+                if len(samples) < 5:
+                    samples.append(f"{getattr(u, 'username', '')}: {pwd}")
+            except Exception:
+                # continue with next user
+                continue
+
+        msg = f"Temporary passwords set for {updated} user(s)."
+        if samples:
+            msg += " Examples -> " + "; ".join(samples)
+        self.message_user(request, msg, level=messages.SUCCESS)
+    reset_password_plain.short_description = "Reset to temp password and show (stores Visible Password)"
+
     # Append bulk region fields section on change form
     def get_fieldsets(self, request, obj=None):
         fs = list(super().get_fieldsets(request, obj))
+
+        # Drop raw password field; optionally show decrypted last-set password for superusers
+        try:
+            if fs and isinstance(fs[0], tuple):
+                title, opts = fs[0]
+                flds = list(opts.get('fields') or [])
+                if 'password' in flds:
+                    idx = flds.index('password')
+                    # Remove the raw hash field completely
+                    flds.pop(idx)
+                    # Superuser also sees plain last-set password (if available)
+                    if getattr(request.user, 'is_superuser', False):
+                        flds.insert(idx, 'visible_password')
+                    opts = dict(opts)
+                    opts['fields'] = tuple(flds)
+                    fs[0] = (title, opts)
+        except Exception:
+            # best-effort; do not block admin rendering
+            pass
+
         fields = ()
         cat = getattr(obj, 'category', None) if obj else None
         if cat == 'agency_state_coordinator':
@@ -195,9 +276,33 @@ class CustomUserAdmin(UserAdmin):
 
     # Persist bulk selections into AgencyRegionAssignment
     def save_model(self, request, obj, form, change):
+        # Persist user first (handles add/change, hashing, etc.)
         super().save_model(request, obj, form, change)
+
+        # If this was the Add User form (password1/password2 present), store encrypted plaintext
         try:
-            _process_bulk_region_assignments(obj, form.cleaned_data)
+            new_pwd = None
+            if hasattr(form, "cleaned_data"):
+                p1 = form.cleaned_data.get("password1")
+                p2 = form.cleaned_data.get("password2")
+                if p1 and p2 and p1 == p2:
+                    new_pwd = p1
+            if new_pwd:
+                try:
+                    enc = encrypt_string(new_pwd)
+                    if enc:
+                        obj.last_password_encrypted = enc
+                        obj.save(update_fields=["last_password_encrypted"])
+                except Exception:
+                    # do not block admin save if encryption fails
+                    pass
+        except Exception:
+            # best-effort
+            pass
+
+        # Process region assignments if applicable
+        try:
+            _process_bulk_region_assignments(obj, getattr(form, "cleaned_data", {}) or {})
         except Exception:
             # Avoid blocking normal save if bulk processing fails
             pass
@@ -236,6 +341,11 @@ class CustomUserAdmin(UserAdmin):
     # Make fields read-only for agency staff (view-only access)
     def get_readonly_fields(self, request, obj=None):
         ro = list(super().get_readonly_fields(request, obj))
+        # Superusers can view the decrypted last-set password, but it's read-only
+        if getattr(request.user, 'is_superuser', False):
+            if 'visible_password' not in ro:
+                ro.append('visible_password')
+        # Make almost everything read-only for agency staff
         if not request.user.is_superuser and getattr(request.user, 'role', None) == 'agency':
             ro.extend([
                 'username', 'email', 'role', 'category', 'unique_id', 'registered_by',
@@ -258,6 +368,52 @@ class CustomUserAdmin(UserAdmin):
             return True
         return getattr(request.user, 'role', None) == 'agency' and request.user.is_staff
 
+
+    # Override the admin password change view to also store a reversible copy
+    # so that "Visible Password" shows after admin changes the password here.
+    def user_change_password(self, request, id, form_url=""):
+        from django.template.response import TemplateResponse
+        from django.utils.translation import gettext as _
+        from django.contrib.admin.utils import unquote
+        from django.http import HttpResponseRedirect
+
+        user = self.get_object(request, unquote(id))
+        if user is None:
+            return HttpResponseRedirect("../")
+
+        if request.method == "POST":
+            form = self.change_password_form(user, request.POST)
+            if form.is_valid():
+                new_password = form.cleaned_data.get("password1")
+                # Save hashed password via the form
+                form.save()
+                # Store encrypted plaintext for superuser-only display
+                try:
+                    enc = encrypt_string(new_password)
+                    if enc:
+                        user.last_password_encrypted = enc
+                        user.save(update_fields=["last_password_encrypted"])
+                except Exception:
+                    pass
+                self.message_user(request, _("Password changed successfully."))
+                return HttpResponseRedirect("../")
+        else:
+            form = self.change_password_form(user)
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": _("Change password: %s") % getattr(user, "username", ""),
+            "form": form,
+            "is_popup": False,
+            "add": False,
+            "change": True,
+            "has_view_permission": self.has_view_permission(request, user),
+            "opts": self.model._meta,
+            "original": user,
+            "save_as": False,
+            "show_save": True,
+        }
+        return TemplateResponse(request, "admin/auth/user/change_password.html", context)
 
 @admin.register(PincodeUser)
 class PincodeUserAdmin(admin.ModelAdmin):

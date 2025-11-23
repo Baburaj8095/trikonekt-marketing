@@ -201,9 +201,16 @@ export default function ModelFormDialog({
         dataToSend = form;
       } else {
         const payload = {};
+        const isEdit = record && (record.id || record.pk);
         for (const f of formFields) {
           if (f.read_only) continue;
           let v = values[f.name];
+
+          // On edit, omit empty values to avoid overwriting with blanks (lets backend keep existing)
+          if (isEdit && (v === "" || v === null || v === undefined)) {
+            continue;
+          }
+
           if (isNumeric(f) && v !== "" && v !== null && v !== undefined) {
             if (f.type === "FloatField" || f.type === "DecimalField") {
               const n = Number(v);

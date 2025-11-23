@@ -15,7 +15,9 @@ import {
   CardContent,
   IconButton,
   Button,
-  Collapse
+  Collapse,
+  Tabs,
+  Tab
 } from "@mui/material";
 import API from "../api/api";
 import LOGO from "../assets/TRIKONEKT.png";
@@ -33,7 +35,7 @@ import PLAY_STORE_SCREEN from "../assets/play_store_screen.webp";
 const drawerWidth = 220;
 
 const gradients = [
-  "linear-gradient(135deg, #2563eb 0%, #10b981 100%)",
+  "linear-gradient(135deg, #01091bff 0%, #10b981 100%)",
   "linear-gradient(135deg, #7c3aed 0%, #ec4899 100%)",
   "linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)",
   "linear-gradient(135deg, #059669 0%, #06b6d4 100%)",
@@ -139,7 +141,7 @@ function KpiCard({ title, value, subtitle, onClick, palette = "blue" }) {
         justifyContent: "space-between",
         gap: 8,
         color: pal.text,
-        height: 132,
+        height: 144,
         width: "100%",
         boxSizing: "border-box",
         minWidth: 0,
@@ -162,14 +164,14 @@ function KpiCard({ title, value, subtitle, onClick, palette = "blue" }) {
         e.currentTarget.style.boxShadow = pal.shadow;
       }}
     >
-      <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 0.3, opacity: 0.95, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+      <div style={{ fontSize: "clamp(11px, 2.8vw, 12px)", fontWeight: 800, letterSpacing: 0.3, opacity: 0.95, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
         {title}
       </div>
-      <div style={{ fontSize: 28, fontWeight: 900, lineHeight: 1.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+      <div style={{ fontSize: "clamp(22px, 6vw, 28px)", fontWeight: 900, lineHeight: 1.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
         {value}
       </div>
       {subtitle ? (
-        <div style={{ fontSize: 12, color: pal.sub, lineHeight: 1.4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <div style={{ fontSize: "clamp(11px, 2.6vw, 12px)", color: pal.sub, lineHeight: 1.4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {subtitle}
         </div>
       ) : null}
@@ -511,7 +513,7 @@ export default function UserDashboard({ embedded = false }) {
           .filter((c) => c.is_active !== false)
           .map((card) => (
             <Grid item xs={12} sm={6} md={4} key={card.id || card.key}  sx={{
-           
+
             '@media (max-width:600px)': {
               minWidth: 0,
               boxSizing: 'border-box',
@@ -638,7 +640,6 @@ export default function UserDashboard({ embedded = false }) {
         <Box
           sx={{
             position: "relative",
-            
             height: { xs: 220, sm: 220, md: 400 },
             borderRadius: 3,
             overflow: "hidden",
@@ -657,332 +658,288 @@ export default function UserDashboard({ embedded = false }) {
           </Box>
         </Box>
 
-        {/* KPI Cards */}
-        <Grid container spacing={2} sx={{ width: "100%", minWidth: 0, boxSizing: "border-box", mb: 2 }}>
-          <Grid item xs={12} sm={6} md={4}  sx={{
-           
-            '@media (max-width:600px)': {
-              minWidth: 0,
-              boxSizing: 'border-box',
-              width: '100%',
-            },
-          }}>
-            <KpiCard
-              title="Account Status"
-              value={accountStatusStr}
-              subtitle={accountActive ? "Autopool enabled" : "Activate to unlock benefits"}
-              palette={accountPalette}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}  sx={{
-           
-            '@media (max-width:600px)': {
-              minWidth: 0,
-              boxSizing: 'border-box',
-              width: '100%',
-            },
-          }}>
-            <KpiCard
-              title="Wallet Balance"
-              value={`₹${wallet.balance}`}
-              subtitle="Go to Wallet"
-              palette="cyan"
-              onClick={() => navigate("/user/wallet")}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}  sx={{
-           
-            '@media (max-width:600px)': {
-              minWidth: 0,
-              boxSizing: 'border-box',
-              width: '100%',
-            },
-          }}>
-            <KpiCard
-              title="Coupon Commission"
-              value={`₹${referralCommissionTotal.toFixed(2)}`}
-              subtitle="Coupon commissions"
-              palette="green"
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}  sx={{
-           
-            '@media (max-width:600px)': {
-              minWidth: 0,
-              boxSizing: 'border-box',
-              width: '100%',
-            },
-          }}>
-            <KpiCard
-              title="Direct Referral Commission"
-              value={`₹${walletDirectReferralTotal.toFixed(2)}`}
-              subtitle="Wallet earnings from direct referrals"
-              palette="green"
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}  sx={{
-           
-            '@media (max-width:600px)': {
-              minWidth: 0,
-              boxSizing: 'border-box',
-              width: '100%',
-            },
-          }}>
-            <KpiCard
-              title="E‑Coupons Available"
-              value={availableCodes}
-              subtitle={`Assigned: ${assignedCodes} • Redeemed: ${redeemedCodes}`}
-              palette="purple"
-              onClick={() => navigate("/user/redeem-coupon")}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}  sx={{
-           
-            '@media (max-width:600px)': {
-              minWidth: 0,
-              boxSizing: 'border-box',
-              width: '100%',
-            },
-          }}>
-            <KpiCard
-              title="Marketplace"
-              value="Open"
-              subtitle="Explore products"
-              palette="blue"
-              onClick={() => navigate("/marketplace")}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}  sx={{
-           
-            '@media (max-width:600px)': {
-              minWidth: 0,
-              boxSizing: 'border-box',
-              width: '100%',
-            },
-          }}>
-            <KpiCard
-              title="My Orders"
-              value="View"
-              subtitle="Track your purchases"
-              palette="teal"
-              onClick={() => navigate("/marketplace/my-orders")}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}  sx={{
-           
-            '@media (max-width:600px)': {
-              minWidth: 0,
-              boxSizing: 'border-box',
-              width: '100%',
-            },
-          }}>
-            <KpiCard
-              title="KYC"
-              value="Start"
-              subtitle="Complete your KYC"
-              palette="amber"
-              onClick={() => navigate("/user/kyc")}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}  sx={{
-           
-            '@media (max-width:600px)': {
-              minWidth: 0,
-              boxSizing: 'border-box',
-              width: '100%',
-            },
-          }}>
-            <KpiCard
-              title="My Team"
-              value="Open"
-              subtitle="Grow your network"
-              palette="green"
-              onClick={() => navigate("/user/my-team")}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4} sx={{
-           
-            '@media (max-width:600px)': {
-              minWidth: 0,
-              boxSizing: 'border-box',
-              width: '100%',
-            },
-          }}>
-            <KpiCard
-              title="My Direct Referrals"
-              value={referralLoading ? "..." : referralCount}
-              subtitle="Direct consumers sponsored"
-              palette="indigo"
-            />
-          </Grid>
-          
-          {/* <Grid item xs={12} sm={6} md={4}  sx={{
-           
-            '@media (max-width:600px)': {
-              minWidth: 0,
-              boxSizing: 'border-box',
-              width: '100%',
-            },
-          }}>
-            <KpiCard
-              title="Test: Self 50 Activation"
-              value={activating50 ? "..." : "Run"}
-              subtitle="Trigger 50 activation now"
-              palette="red"
-              onClick={handleSelf50Activation}
-            />
-          </Grid> */}
-          {/* <Grid item xs={12} sm={6} md={4}>
-            <KpiCard
-              title="My Referral ID"
-              value={myReferralId || "-"}
-              subtitle="Share this ID to refer"
-              palette="teal"
-            />
-          </Grid> */}
-        </Grid>
+        {/* Top Navigation Tabs (embedded) */}
+        <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", mb: 2, border: "1px solid #e2e8f0" }}>
+          <Tabs
+            value={selectedMenu}
+            onChange={(e, val) => setSelectedMenu(val)}
+            variant="scrollable"
+            allowScrollButtonsMobile
+            textColor="primary"
+            indicatorColor="primary"
+          >
+            <Tab label="Dashboard" value="dashboard" />
+            <Tab label="Wealth Galaxy" value="wealth-galaxy" />
+            <Tab label="MarketPlace" value="marketplace" />
+            <Tab label="App Hub" value="apphub" />
+          </Tabs>
+        </Box>
 
-            {/* Refer & Earn (consumer) */}
-            {/* <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", mb: 2, border: "1px solid #e2e8f0" }}>
-              <ReferAndEarn title="Refer & Earn" onlyConsumer />
-            </Box> */}
+        {selectedMenu === "dashboard" ? (
+          <>
+            {/* KPI Cards (mobile-first: secondary to 2 columns) */}
+            <Grid
+              container
+              wrap="wrap"
+              className="kpi-grid"
+              spacing={2}
+              alignItems="stretch"
+              sx={{
+                width: "100%",
+                minWidth: 0,
+                boxSizing: "border-box",
+                mb: 2,
+                "& > .MuiGrid-item": { minWidth: 0 }
+              }}
+            >
+              {/* Primary - full width */}
+              <Grid item xs={12} sm={6} md={4} sx={{
+              '@media (max-width:600px)': {
+                minWidth: 0,
+                boxSizing: 'border-box',
+                width: '100%',
+              },
+            }}>
+                <KpiCard
+                  title="Account Status"
+                  value={activationLoading ? "..." : accountActive ? "Active" : "Inactive"}
+                  subtitle={accountActive ? "Autopool enabled" : "Activate to unlock benefits"}
+                  palette={accountActive ? "green" : "red"}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4} sx={{
+              '@media (max-width:600px)': {
+                minWidth: 0,
+                boxSizing: 'border-box',
+                width: '100%',
+              },
+            }}>
+                <KpiCard
+                  title="Wallet Balance"
+                  value={`₹${wallet.balance}`}
+                  subtitle="Go to Wallet"
+                  palette="cyan"
+                  onClick={() => navigate("/user/wallet")}
+                />
+              </Grid>
+
+              {/* Others - keep layout as-is (full width unless listed as secondary) */}
+              <Grid item xs={12} sm={6} md={4} sx={{
+              '@media (max-width:600px)': {
+                minWidth: 0,
+                boxSizing: 'border-box',
+                width: '100%',
+              },
+            }}>
+                <KpiCard
+                  title="Coupon Commission"
+                  value={`₹${referralCommissionTotal.toFixed(2)}`}
+                  subtitle="Coupon commissions"
+                  palette="green"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4} sx={{
+              '@media (max-width:600px)': {
+                minWidth: 0,
+                boxSizing: 'border-box',
+                width: '100%',
+              },
+            }}>
+                <KpiCard
+                  title="Direct Referral Commission"
+                  value={`₹${walletDirectReferralTotal.toFixed(2)}`}
+                  subtitle="Wallet earnings from direct referrals"
+                  palette="green"
+                />
+              </Grid>
+
+              {/* Secondary - 2 columns on mobile */}
+              <Grid item xs={6} sm={6} md={4} sx={{
+              '@media (max-width:600px)': {
+                minWidth: 0,
+                boxSizing: 'border-box',
+                width: '100%',
+              },
+            }}>
+                <KpiCard
+                  title="E‑Coupons Available"
+                  value={availableCodes}
+                  subtitle={`Assigned: ${assignedCodes} • Redeemed: ${redeemedCodes}`}
+                  palette="purple"
+                  onClick={() => navigate("/user/redeem-coupon")}
+                />
+              </Grid>
+              <Grid item xs={6} sm={6} md={4} sx={{
+              '@media (max-width:600px)': {
+                minWidth: 0,
+                boxSizing: 'border-box',
+                width: '100%',
+              },
+            }}>
+                <KpiCard
+                  title="Marketplace"
+                  value="Open"
+                  subtitle="Explore products"
+                  palette="blue"
+                  onClick={() => navigate("/marketplace")}
+                />
+              </Grid>
+              <Grid item xs={6} sm={6} md={4} sx={{
+              '@media (max-width:600px)': {
+                minWidth: 0,
+                boxSizing: 'border-box',
+                width: '100%',
+              },
+            }}>
+                <KpiCard
+                  title="My Orders"
+                  value="View"
+                  subtitle="Track your purchases"
+                  palette="teal"
+                  onClick={() => navigate("/marketplace/my-orders")}
+                />
+              </Grid>
+              <Grid item xs={6} sm={6} md={4} sx={{
+              '@media (max-width:600px)': {
+                minWidth: 0,
+                boxSizing: 'border-box',
+                width: '100%',
+              },
+            }}>
+                <KpiCard
+                  title="KYC"
+                  value="Start"
+                  subtitle="Complete your KYC"
+                  palette="amber"
+                  onClick={() => navigate("/user/kyc")}
+                />
+              </Grid>
+              <Grid item xs={6} sm={6} md={4} sx={{
+              '@media (max-width:600px)': {
+                minWidth: 0,
+                boxSizing: 'border-box',
+                width: '100%',
+              },
+            }}>
+                <KpiCard
+                  title="My Team"
+                  value="Open"
+                  subtitle="Grow your network"
+                  palette="green"
+                  onClick={() => navigate("/user/my-team")}
+                />
+              </Grid>
+
+              {/* Other info - full width */}
+              <Grid item xs={12} sm={6} md={4} sx={{
+              '@media (max-width:600px)': {
+                minWidth: 0,
+                boxSizing: 'border-box',
+                width: '100%',
+              },
+            }}>
+                <KpiCard
+                  title="My Direct Referrals"
+                  value={referralLoading ? "..." : referralCount}
+                  subtitle="Direct consumers sponsored"
+                  palette="indigo"
+                />
+              </Grid>
+            </Grid>
 
             {/* My E‑Coupon Summary (cards) */}
-        <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", mb: 2, border: "1px solid #e2e8f0" }}>
-          <Box sx={{ p: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
-              My E‑Coupon Summary
-            </Typography>
-            {ecSummaryLoading ? (
-              <Typography variant="body2">Loading...</Typography>
-            ) : ecSummaryError ? (
-              <Typography variant="body2" color="error">{ecSummaryError}</Typography>
-            ) : ecSummary ? (
-              <Grid container spacing={2}>
-                <Grid item xs={6} md={3}>
-                  <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)", color: "#fff", border: "1px solid rgba(124,58,237,0.35)", boxShadow: "0 8px 18px rgba(124,58,237,0.35)" }}>
-                    <Typography variant="caption" sx={{ opacity: 0.9 }}>Available</Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.available ?? 0}</Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={6} md={3}>
-                  <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)", color: "#fff", border: "1px solid rgba(244,63,94,0.35)", boxShadow: "0 8px 18px rgba(244,63,94,0.35)" }}>
-                    <Typography variant="caption" sx={{ opacity: 0.9 }}>Redeemed</Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.redeemed ?? 0}</Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={6} md={3}>
-                  <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", color: "#fff", border: "1px solid rgba(16,185,129,0.35)", boxShadow: "0 8px 18px rgba(16,185,129,0.35)" }}>
-                    <Typography variant="caption" sx={{ opacity: 0.9 }}>Activated</Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.activated ?? 0}</Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={6} md={3}>
-                  <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%)", color: "#fff", border: "1px solid rgba(59,130,246,0.35)", boxShadow: "0 8px 18px rgba(59,130,246,0.35)" }}>
-                    <Typography variant="caption" sx={{ opacity: 0.9 }}>Transferred</Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.transferred ?? 0}</Typography>
-                  </Box>
-                </Grid>
-              </Grid>
-            ) : (
-              <Typography variant="body2" color="text.secondary">No data.</Typography>
-            )}
+            <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", mb: 2, border: "1px solid #e2e8f0" }}>
+              <Box sx={{ p: 2 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
+                  My E‑Coupon Summary
+                </Typography>
+                {ecSummaryLoading ? (
+                  <Typography variant="body2">Loading...</Typography>
+                ) : ecSummaryError ? (
+                  <Typography variant="body2" color="error">{ecSummaryError}</Typography>
+                ) : ecSummary ? (
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} md={6} sx={{
+                      '@media (max-width:600px)': {
+                        minWidth: 0,
+                        boxSizing: 'border-box',
+                        width: "45%",
+                        margin: "auto",
+                      },
+                    }}>
+                      <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)", color: "#fff", border: "1px solid rgba(124,58,237,0.35)", boxShadow: "0 8px 18px rgba(124,58,237,0.35)" }}>
+                        <Typography variant="caption" sx={{ opacity: 0.9 }}>Available</Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.available ?? 0}</Typography>
+                      </Box>
+                    
+                    </Grid>
+
+
+                   
+                    <Grid item xs={12} md={6} sx={{
+                      '@media (max-width:600px)': {
+                        minWidth: 0,
+                        boxSizing: 'border-box',
+                        width: "45%",
+                        margin: "auto",
+                      },
+                    }}>
+                      <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)", color: "#fff", border: "1px solid rgba(244,63,94,0.35)", boxShadow: "0 8px 18px rgba(244,63,94,0.35)" }}>
+                        <Typography variant="caption" sx={{ opacity: 0.9 }}>Redeemed</Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.redeemed ?? 0}</Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={12} md={6} sx={{
+                      '@media (max-width:600px)': {
+                        minWidth: 0,
+                        boxSizing: 'border-box',
+                        width: "45%",
+                        margin: "auto",
+                      },
+                    }}>
+                      <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", color: "#fff", border: "1px solid rgba(16,185,129,0.35)", boxShadow: "0 8px 18px rgba(16,185,129,0.35)" }}>
+                        <Typography variant="caption" sx={{ opacity: 0.9 }}>Activated</Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.activated ?? 0}</Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={12} md={6} sx={{
+                      '@media (max-width:600px)': {
+                        minWidth: 0,
+                        boxSizing: 'border-box',
+                        width: "45%",
+                        margin: "auto",
+                      },
+                    }}>
+                      <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%)", color: "#fff", border: "1px solid rgba(59,130,246,0.35)", boxShadow: "0 8px 18px rgba(59,130,246,0.35)" }}>
+                        <Typography variant="caption" sx={{ opacity: 0.9 }}>Transferred</Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.transferred ?? 0}</Typography>
+                      </Box>
+                    </Grid>
+                  </Grid>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">No data.</Typography>
+                )}
+              </Box>
+            </Box>
+          </>
+        ) : selectedMenu === "wealth-galaxy" ? (
+          <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", border: "1px solid #e2e8f0" }}>
+            <WealthGalaxy />
           </Box>
-        </Box>
-
-        {/* Wealth Galaxy Section (in Dashboard) */}
-        <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", mb: 2, border: "1px solid #e2e8f0" }}>
-          <WealthGalaxy />
-        </Box>
-
-        {/* App Hub Section (part of dashboard) */}
-        <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", border: "1px solid #e2e8f0" }}>
-          <AppHub />
-        </Box>
-
-        {/* Marketplace section - wrapped inside AppHub-like cards (two variants) */}
-        <MarketplaceCard
-          title="Trikonekt Products"
-          variant="plain"
-          defaultExpanded
-          onViewMarketplace={() => navigate("/marketplace")}
-        >
-          {renderMarketplaceContent()}
-        </MarketplaceCard>
-
-        {/* <MarketplaceCard
-          title="Explore Market Place, Trikonekt Products (Gradient Variant)"
-          variant="gradient"
-          defaultExpanded={false}
-          onViewMarketplace={() => navigate("/marketplace")}
-        >
-          {renderMarketplaceContent()}
-        </MarketplaceCard> */}
-
-        {/* legacy marketplace (embedded) - hidden after refactor */}
-        {false && (
-          <Typography variant="body1" sx={{ color: "text.secondary" }}>
-            Loading cards...
-          </Typography>
-        )}
-        {false && (
-          <Grid container spacing={2} sx={{ mx: { xs: -2, md: 0 } }}>
-            {computedCards
-              .filter((c) => c.is_active !== false)
-              .map((card, idx) => (
-                <Grid item xs={12} sm={6} md={4} key={card.id || card.key}  sx={{
-           
-            '@media (max-width:600px)': {
-              minWidth: 0,
-              boxSizing: 'border-box',
-              width: '100%',
-            },
-          }}>
-                  <Card
-                    sx={{
-                      height: "100%",
-                      display: "flex",
-                      flexDirection: "column",
-                      borderRadius: 2,
-                      backgroundColor: "#ffffff",
-                      border: "1px solid",
-                      borderColor: "divider",
-                      boxShadow: 1,
-                      width: "100%",
-                      transition: "box-shadow 120ms ease, transform 120ms ease",
-                      overflow: "hidden",
-                      color: "text.primary",
-                      "&:hover": {
-                        boxShadow: 4,
-                        transform: { xs: "none", sm: "translateY(-2px)" }
-                      }
-                    }}
-                  >
-                    {card.image && (
-                      <Box
-                        component="img"
-                        src={
-                          card.image?.startsWith("http")
-                            ? card.image
-                            : `${MEDIA_BASE}${card.image}`
-                        }
-                        alt={card.title}
-                        sx={{ width: "100%", height: 140, objectFit: "cover", display: "block", borderBottom: "1px solid", borderColor: "divider" }}
-                      />
-                    )}
-                    <CardContent sx={{ flexGrow: 1, p: 2 }}>
-                      <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-                        {card.title}
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                        {card.description || ""}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-          </Grid>
-        )}
+        ) : selectedMenu === "marketplace" ? (
+          <MarketplaceCard
+            title="Trikonekt Products"
+            variant="plain"
+            defaultExpanded
+            onViewMarketplace={() => navigate("/marketplace")}
+          >
+            {renderMarketplaceContent()}
+          </MarketplaceCard>
+        ) : selectedMenu === "apphub" ? (
+          <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", border: "1px solid #e2e8f0" }}>
+            <AppHub />
+          </Box>
+        ) : null}
       </Box>
     );
   }
@@ -1138,38 +1095,70 @@ export default function UserDashboard({ embedded = false }) {
         }}
       >
         <Toolbar />
-        {selectedMenu === "wealth-galaxy" ? <WealthGalaxy /> : (
+        {/* Banner */}
+        <Box
+          sx={{
+            position: "relative",
+            width: { xs: "calc(100% + 32px)", md: "100%" },
+            ml: { xs: -2, md: 0 },
+            mr: { xs: -2, md: 0 },
+            height: { xs: 140, sm: 180, md: 220 },
+            borderRadius: 3,
+            overflow: "hidden",
+            mb: 2,
+            boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
+            background: `linear-gradient(rgba(12,45,72,0.35), rgba(12,45,72,0.35)), url(${LOGO}) center/cover no-repeat`,
+          }}
+        >
+          <Box sx={{ position: "absolute", bottom: 16, left: 16, color: "#fff" }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+              Welcome, {displayName}
+            </Typography>
+            <Typography variant="body2" sx={{ opacity: 0.9 }}>
+              Explore offers, redeem coupons and more
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Top Navigation Tabs */}
+        <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", mb: 2, border: "1px solid #e2e8f0" }}>
+          <Tabs
+            value={selectedMenu}
+            onChange={(e, val) => setSelectedMenu(val)}
+            variant="scrollable"
+            allowScrollButtonsMobile
+            textColor="primary"
+            indicatorColor="primary"
+          >
+            <Tab label="Dashboard" value="dashboard" />
+            <Tab label="Wealth Galaxy" value="wealth-galaxy" />
+            <Tab label="MarketPlace" value="marketplace" />
+            <Tab label="App Hub" value="apphub" />
+          </Tabs>
+        </Box>
+
+        {selectedMenu === "dashboard" ? (
           <>
-            {/* Banner */}
-            <Box
-              sx={{
-                position: "relative",
-                width: { xs: "calc(100% + 32px)", md: "100%" },
-                ml: { xs: -2, md: 0 },
-                mr: { xs: -2, md: 0 },
-                height: { xs: 140, sm: 180, md: 220 },
-                borderRadius: 3,
-                overflow: "hidden",
-                mb: 2,
-                boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
-                background: `linear-gradient(rgba(12,45,72,0.35), rgba(12,45,72,0.35)), url(${LOGO}) center/cover no-repeat`,
-              }}
-            >
-              <Box sx={{ position: "absolute", bottom: 16, left: 16, color: "#fff" }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-                  Welcome, {displayName}
-                </Typography>
-                <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                  Explore offers, redeem coupons and more
-                </Typography>
-              </Box>
-            </Box>
             <Typography variant="h5" sx={{ mb: 2, fontWeight: 700, color: "#0C2D48" }}>
               Welcome
             </Typography>
 
             {/* KPI Cards - Dashboard type */}
-            <Grid container spacing={2} sx={{ width: "100%", minWidth: 0, boxSizing: "border-box", mb: 2 }}>
+            <Grid
+              container
+              wrap="wrap"
+              className="kpi-grid"
+              spacing={2}
+              alignItems="stretch"
+              sx={{
+                width: "100%",
+                minWidth: 0,
+                boxSizing: "border-box",
+                mb: 2,
+                "& > .MuiGrid-item": { minWidth: 0 }
+              }}
+            >
+              {/* Primary - full width */}
               <Grid item xs={12} sm={6} md={4}>
                 <KpiCard
                   title="Account Status"
@@ -1187,6 +1176,8 @@ export default function UserDashboard({ embedded = false }) {
                   onClick={() => navigate("/user/wallet")}
                 />
               </Grid>
+
+              {/* Others - keep layout as-is (full width unless listed as secondary) */}
               <Grid item xs={12} sm={6} md={4}>
                 <KpiCard
                   title="Coupon Commission"
@@ -1203,7 +1194,9 @@ export default function UserDashboard({ embedded = false }) {
                   palette="green"
                 />
               </Grid>
-              <Grid item xs={12} sm={6} md={4}>
+
+              {/* Secondary - 2 columns on mobile */}
+              <Grid item xs={6} sm={6} md={4}>
                 <KpiCard
                   title="E‑Coupons Available"
                   value={availableCodes}
@@ -1212,7 +1205,7 @@ export default function UserDashboard({ embedded = false }) {
                   onClick={() => navigate("/user/redeem-coupon")}
                 />
               </Grid>
-              <Grid item xs={12} sm={6} md={4}>
+              <Grid item xs={6} sm={6} md={4}>
                 <KpiCard
                   title="Marketplace"
                   value="Open"
@@ -1221,7 +1214,7 @@ export default function UserDashboard({ embedded = false }) {
                   onClick={() => navigate("/marketplace")}
                 />
               </Grid>
-              <Grid item xs={12} sm={6} md={4}>
+              <Grid item xs={6} sm={6} md={4}>
                 <KpiCard
                   title="My Orders"
                   value="View"
@@ -1230,7 +1223,7 @@ export default function UserDashboard({ embedded = false }) {
                   onClick={() => navigate("/marketplace/my-orders")}
                 />
               </Grid>
-              <Grid item xs={12} sm={6} md={4}>
+              <Grid item xs={6} sm={6} md={4}>
                 <KpiCard
                   title="KYC"
                   value="Start"
@@ -1239,7 +1232,7 @@ export default function UserDashboard({ embedded = false }) {
                   onClick={() => navigate("/user/kyc")}
                 />
               </Grid>
-              <Grid item xs={12} sm={6} md={4}>
+              <Grid item xs={6} sm={6} md={4}>
                 <KpiCard
                   title="My Team"
                   value="Open"
@@ -1248,6 +1241,8 @@ export default function UserDashboard({ embedded = false }) {
                   onClick={() => navigate("/user/my-team")}
                 />
               </Grid>
+
+              {/* Other info - full width */}
               <Grid item xs={12} sm={6} md={4}>
                 <KpiCard
                   title="My Direct Referrals"
@@ -1287,25 +1282,25 @@ export default function UserDashboard({ embedded = false }) {
                   <Typography variant="body2" color="error">{ecSummaryError}</Typography>
                 ) : ecSummary ? (
                   <Grid container spacing={2}>
-                    <Grid item xs={6} md={3}>
+                    <Grid item xs={12} md={3}>
                       <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)", color: "#fff", border: "1px solid rgba(124,58,237,0.35)", boxShadow: "0 8px 18px rgba(124,58,237,0.35)" }}>
                         <Typography variant="caption" sx={{ opacity: 0.9 }}>Available</Typography>
                         <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.available ?? 0}</Typography>
                       </Box>
                     </Grid>
-                    <Grid item xs={6} md={3}>
+                    <Grid item xs={12} md={3}>
                       <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)", color: "#fff", border: "1px solid rgba(244,63,94,0.35)", boxShadow: "0 8px 18px rgba(244,63,94,0.35)" }}>
                         <Typography variant="caption" sx={{ opacity: 0.9 }}>Redeemed</Typography>
                         <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.redeemed ?? 0}</Typography>
                       </Box>
                     </Grid>
-                    <Grid item xs={6} md={3}>
+                    <Grid item xs={12} md={3}>
                       <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", color: "#fff", border: "1px solid rgba(16,185,129,0.35)", boxShadow: "0 8px 18px rgba(16,185,129,0.35)" }}>
                         <Typography variant="caption" sx={{ opacity: 0.9 }}>Activated</Typography>
                         <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.activated ?? 0}</Typography>
                       </Box>
                     </Grid>
-                    <Grid item xs={6} md={3}>
+                    <Grid item xs={12} md={3}>
                       <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%)", color: "#fff", border: "1px solid rgba(59,130,246,0.35)", boxShadow: "0 8px 18px rgba(59,130,246,0.35)" }}>
                         <Typography variant="caption" sx={{ opacity: 0.9 }}>Transferred</Typography>
                         <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.transferred ?? 0}</Typography>
@@ -1317,96 +1312,25 @@ export default function UserDashboard({ embedded = false }) {
                 )}
               </Box>
             </Box>
-
-            {/* Wealth Galaxy Section (in Dashboard) */}
-            <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", mb: 2, border: "1px solid #e2e8f0" }}>
-              <WealthGalaxy />
-            </Box>
-
-            {/* App Hub Section (part of dashboard) */}
-            <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", border: "1px solid #e2e8f0" }}>
-              <AppHub />
-            </Box>
-
-            {/* Marketplace section - wrapped inside AppHub-like cards (two variants) */}
-            <MarketplaceCard
-              title="Explore Trikonekt Products"
-              variant="plain"
-              defaultExpanded={false}
-              onViewMarketplace={() => navigate("/marketplace")}
-            >
-              {renderMarketplaceContent()}
-            </MarketplaceCard>
-
-            {/* <MarketplaceCard
-              title="Explore Market Place, Trikonekt Products (Gradient Variant)"
-              variant="gradient"
-              defaultExpanded={false}
-              onViewMarketplace={() => navigate("/marketplace")}
-            >
-              {renderMarketplaceContent()}
-            </MarketplaceCard> */}
-
-            {/* Dynamic Dashboard Cards (from Admin uploads) */}
-            {/* legacy marketplace (standalone) - hidden after refactor */}
-            {false && (
-              <Typography variant="body1" sx={{ mt: 2, color: "text.secondary" }}>
-                Loading cards...
-              </Typography>
-            )}
-            {false && (
-              <Grid container spacing={2} sx={{ mt: 2, mx: { xs: -2, md: 0 } }}>
-                {computedCards
-                  .filter((c) => c.is_active !== false) // show if true or missing
-                  .map((card, idx) => (
-                    <Grid item xs={12} sm={6} md={4} key={card.id || card.key}>
-                      <Card
-                        sx={{
-                          height: "100%",
-                          display: "flex",
-                          flexDirection: "column",
-                          borderRadius: 2,
-                          backgroundColor: "#ffffff",
-                          border: "1px solid",
-                          borderColor: "divider",
-                          boxShadow: 1,
-                          width: "100%",
-                          transition: "box-shadow 120ms ease, transform 120ms ease",
-                          overflow: "hidden",
-                          color: "text.primary",
-                          "&:hover": {
-                            boxShadow: 4,
-                            transform: { xs: "none", sm: "translateY(-2px)" }
-                          }
-                        }}
-                      >
-                        {card.image && (
-                          <Box
-                            component="img"
-                            src={
-                              card.image?.startsWith("http")
-                                ? card.image
-                                : `${MEDIA_BASE}${card.image}`
-                            }
-                            alt={card.title}
-                            sx={{ width: "100%", height: 140, objectFit: "cover", display: "block", borderBottom: "1px solid", borderColor: "divider" }}
-                          />
-                        )}
-                        <CardContent sx={{ flexGrow: 1, p: 2 }}>
-                          <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-                            {card.title}
-                          </Typography>
-                          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                            {card.description || ""}
-                          </Typography>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                  ))}
-              </Grid>
-            )}
           </>
-        )}
+        ) : selectedMenu === "wealth-galaxy" ? (
+          <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", border: "1px solid #e2e8f0" }}>
+            <WealthGalaxy />
+          </Box>
+        ) : selectedMenu === "marketplace" ? (
+          <MarketplaceCard
+            title="Explore Trikonekt Products"
+            variant="plain"
+            defaultExpanded
+            onViewMarketplace={() => navigate("/marketplace")}
+          >
+            {renderMarketplaceContent()}
+          </MarketplaceCard>
+        ) : selectedMenu === "apphub" ? (
+          <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", border: "1px solid #e2e8f0" }}>
+            <AppHub />
+          </Box>
+        ) : null}
       </Box>
     </Box>
   );

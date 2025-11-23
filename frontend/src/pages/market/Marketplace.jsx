@@ -19,6 +19,8 @@ import {
 } from "@mui/material";
 import { useNavigate, useLocation } from "react-router-dom";
 import API from "../../api/api";
+import ProductGrid from "../../components/market/ProductGrid";
+import QuickViewModal from "../../components/market/QuickViewModal";
 
 export default function Marketplace() {
   const navigate = useNavigate();
@@ -59,6 +61,11 @@ export default function Marketplace() {
   // Banners
   const [banners, setBanners] = useState([]);
   const [loadingBanners, setLoadingBanners] = useState(false);
+
+  // UI state for e-commerce layout
+  const [sort, setSort] = useState("");
+  const [dense, setDense] = useState(false);
+  const [quickView, setQuickView] = useState({ open: false, product: null });
 
   useEffect(() => {
     async function loadCountries() {
@@ -127,6 +134,7 @@ export default function Marketplace() {
       if (filters.pincode) params.pincode = filters.pincode;
       if (filters.category) params.category = filters.category;
       if (filters.name) params.name = filters.name;
+      if (sort) params.sort = sort;
       const res = await API.get("/products", { params: { ...params, _: Date.now() } });
       const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
       setRows(arr);
@@ -162,6 +170,11 @@ export default function Marketplace() {
     fetchProducts();
     fetchBanners();
   }, []);
+
+  // Apply sorting automatically when changed
+  useEffect(() => {
+    fetchProducts();
+  }, [sort]);
 
   // Refresh on window focus to avoid stale stock after approvals
   useEffect(() => {
@@ -401,74 +414,58 @@ export default function Marketplace() {
           <CircularProgress size={22} /> <Typography variant="body2">Loading products...</Typography>
         </Box>
       ) : (
-        <Grid container spacing={2}>
-          {(rows || []).map((p) => {
-            const finalPrice = Number(p.price || 0) * (1 - Number(p.discount || 0) / 100);
-            return (
-              <Grid key={p.id} item xs={12} sm={6} md={4} lg={3}>
-                <Card variant="outlined" sx={{ borderRadius: 2, overflow: "hidden" }}>
-                  <CardActionArea
-                    onClick={() => {
-                      if (Number(p.quantity || 0) <= 0) {
-                        setSnack({ open: true, type: "error", msg: "This product is out of stock." });
-                        return;
-                      }
-                      navigate(`${basePath}/products/${p.id}`);
-                    }}
-                  >
-                    {p.image_url ? (
-                      <CardMedia
-                        component="img"
-                        image={p.image_url}
-                        alt={p.name}
-                        sx={{ width: "100%", aspectRatio: "4 / 3", objectFit: "cover" }}
-                      />
-                    ) : (
-                      <Box sx={{ width: "100%", aspectRatio: "4 / 3", bgcolor: "#f1f5f9" }} />
-                    )}
-                    <CardContent sx={{ p: 1.5 }}>
-                      <Typography variant="subtitle2" noWrap title={p.name} sx={{ fontWeight: 600 }}>
-                        {p.name}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" noWrap>
-                        {[p.city, p.state, p.country].filter(Boolean).join(", ")}
-                      </Typography>
-                      <Box sx={{ mt: 0.5, display: "flex", alignItems: "baseline", gap: 1 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                          ₹{finalPrice.toFixed(2)}
-                        </Typography>
-                        {Number(p.discount || 0) > 0 && (
-                          <Typography variant="caption" color="text.secondary" sx={{ textDecoration: "line-through" }}>
-                            ₹{Number(p.price || 0).toFixed(2)}
-                          </Typography>
-                        )}
-                      </Box>
-                      {Number(p.quantity || 0) <= 0 && (
-                        <Typography variant="caption" color="error" sx={{ fontWeight: 700 }}>
-                          Sold Out
-                        </Typography>
-                      )}
-                      <Typography variant="caption" color="text.secondary">
-                        Seller: {p.created_by_name || "N/A"}
-                      </Typography>
-                    </CardContent>
-                  </CardActionArea>
-                </Card>
-              </Grid>
-            );
-          })}
-          {/* {(!rows || rows.length === 0) && (
-            <Grid item xs={12}>
-              <Paper variant="outlined" sx={{ p: 2, textAlign: "center" }}>
-                <Typography variant="body2" color="text.secondary">
-                  No products found for the selected filters.
-                </Typography>
-              </Paper>
-            </Grid>
-          )} */}
-        </Grid>
+        <>
+          <Box sx={{ mb: 1.5, display: "flex", alignItems: "center", gap: 1, justifyContent: "space-between" }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+              Products {rows?.length ? `(${rows.length})` : ""}
+            </Typography>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <TextField
+                select
+                size="small"
+                label="Sort by"
+                value={sort}
+                onChange={(e) => setSort(e.target.value)}
+                sx={{ minWidth: 160 }}
+              >
+                <MenuItem value="">Relevance</MenuItem>
+                <MenuItem value="price_asc">Price: Low to High</MenuItem>
+                <MenuItem value="price_desc">Price: High to Low</MenuItem>
+                <MenuItem value="newest">Newest</MenuItem>
+                <MenuItem value="rating_desc">Rating</MenuItem>
+              </TextField>
+              <Button size="small" variant="outlined" onClick={() => setDense((d) => !d)}>
+                {dense ? "Cozy view" : "Compact view"}
+              </Button>
+              <Button size="small" onClick={fetchProducts}>Refresh</Button>
+            </Box>
+          </Box>
+          <ProductGrid
+            items={rows || []}
+            dense={dense}
+            onSelect={(p) => {
+              if (Number(p?.quantity || 0) <= 0) {
+                setSnack({ open: true, type: "error", msg: "This product is out of stock." });
+                return;
+              }
+              navigate(`${basePath}/products/${p.id}`);
+            }}
+            onQuickView={(p) => setQuickView({ open: true, product: p })}
+          />
+        </>
       )}
 
+      <QuickViewModal
+        open={quickView.open}
+        product={quickView.product}
+        onClose={() => setQuickView({ open: false, product: null })}
+        onGoToDetails={() => {
+          if (quickView.product?.id) {
+            navigate(`${basePath}/products/${quickView.product.id}`);
+            setQuickView({ open: false, product: null });
+          }
+        }}
+      />
       <Snackbar
         open={snack.open}
         autoHideDuration={3000}

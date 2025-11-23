@@ -3,6 +3,8 @@ from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
 from django.db.models import Q
 
+from core.crypto import encrypt_string
+
 from .models import CustomUser, AgencyRegionAssignment, WalletTransaction, Wallet, UserKYC, WithdrawalRequest, SupportTicket, SupportTicketMessage
 from locations.models import Country, State, City
 
@@ -428,7 +430,12 @@ class RegisterSerializer(serializers.ModelSerializer):
                 user.sponsor_id = sponsor_id
         except Exception:
             user.sponsor_id = sponsor_id
-        user.set_password(validated_data['password'])
+        pwd_raw = validated_data.get('password')
+        user.set_password(pwd_raw)
+        try:
+            user.last_password_encrypted = encrypt_string(pwd_raw)
+        except Exception:
+            user.last_password_encrypted = user.last_password_encrypted or None
         user.save()  # triggers post_save(created=True) with registered_by present
 
         # Post-create agency region handling

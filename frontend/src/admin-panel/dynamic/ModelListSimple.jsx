@@ -1,41 +1,47 @@
 import React from "react";
 import { useParams } from "react-router-dom";
 import API from "../api/client";
-import SimpleTable from "../components/data/SimpleTable";
+import DataTable from "../components/data/DataTable";
 import ModelFormDialog from "./ModelFormDialog";
 import { getAdminMeta } from "../api/adminMeta";
 
 /**
- * ModelListSimple — Dynamic model list using SimpleTable instead of DataGrid.
+ * ModelListSimple — Upgraded to use MUI DataGrid (via DataTable wrapper)
+ * - Server-side pagination, sorting, and debounced search
+ * - Clean UI with toolbar (Create) + density toggle
+ * - Mobile friendly (flex columns with sensible minWidth, horizontal scroll when needed)
  *
- * Usage:
- * - As a route component with params :app/:model
- * - Or pass props { app, model } to explicitly choose a model
- *
- * Features:
- * - Server-side pagination and search via admin dynamic route (meta.route)
- * - Columns from meta.list_display (with deep field fallback)
- * - Create/Edit via ModelFormDialog
+ * Route usage:
+ *   /admin/dashboard/models/:app/:model
  */
 export default function ModelListSimple(props) {
   const routeParams = useParams();
   const app = props.app || routeParams.app;
   const model = props.model || routeParams.model;
 
+  const storageKeyBase = `admin.table.${app}.${model}`;
+
+  const readInitialString = (key, def) => {
+    try {
+      const fromLS = localStorage.getItem(`${storageKeyBase}.${key}`);
+      if (fromLS != null) return fromLS;
+    } catch (_) {}
+    return def;
+  };
+
   const [meta, setMeta] = React.useState(null);
   const [error, setError] = React.useState("");
   const [loadingMeta, setLoadingMeta] = React.useState(true);
 
-  const [rows, setRows] = React.useState([]);
-  const [count, setCount] = React.useState(0);
-  const [page, setPage] = React.useState(1);
-  const [pageSize] = React.useState(25);
-  const [search, setSearch] = React.useState("");
-  const [loading, setLoading] = React.useState(false);
-
   const [formOpen, setFormOpen] = React.useState(false);
   const [editing, setEditing] = React.useState(null);
   const [reload, setReload] = React.useState(0);
+
+  const [density, setDensity] = React.useState(readInitialString("density", "standard"));
+
+  React.useEffect(() => {
+    try { localStorage.setItem(`${storageKeyBase}.density`, String(density)); } catch (_) {}
+  }, [storageKeyBase, density]);
 
   // Load model meta
   React.useEffect(() => {
@@ -60,108 +66,12 @@ export default function ModelListSimple(props) {
     return () => { mounted = false; };
   }, [app, model]);
 
-  // Helpers
-  const deepGet = (obj, path) => {
-    if (!obj || !path) return undefined;
-    const parts = String(path).replace(/\[(\d+)\]/g, ".$1").split(".");
-    let cur = obj;
-    for (const p of parts) {
-      if (cur == null) return undefined;
-      cur = cur[p];
-    }
-    return cur;
-  };
-  const getFieldValue = (row, field) => {
-    if (!row) return "";
-    if (field === "__str__") return row.repr ?? row.__str__ ?? row.name ?? "";
-    if (field === "id") return row.id ?? row.pk ?? row.uuid ?? row._id ?? row.key ?? "";
-    let v = deepGet(row, field);
-    if (v == null) v = deepGet(row.fields, field);
-    if (v == null) v = deepGet(row.data, field);
-    if (v == null) return "";
-    if (typeof v === "object") return v.username || v.name || v.id || String(v);
-    return v;
-  };
-
-  // Load rows
-  React.useEffect(() => {
-    if (!meta) return;
-    let cancelled = false;
-    setLoading(true);
-    const t = setTimeout(async () => {
-      try {
-        const params = { page, page_size: pageSize };
-        if (search) params.search = search;
-        const { data } = await API.get(meta.route, { params });
-        if (cancelled) return;
-        const results = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
-        const norm = (results || []).map((r) => {
-          const id = r.id ?? r.pk ?? r.uuid ?? r._id ?? r.key ?? `${Math.random()}`;
-          const fieldsObj = r && typeof r === "object" && r.fields && typeof r.fields === "object" ? r.fields : {};
-          const dataObj = r && typeof r === "object" && r.data && typeof r.data === "object" ? r.data : {};
-          return { ...fieldsObj, ...dataObj, ...r, id };
-        });
-        setRows(norm);
-        setCount(typeof data?.count === "number" ? data.count : norm.length);
-      } catch {
-        if (!cancelled) {
-          setRows([]);
-          setCount(0);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }, 250);
-    return () => { cancelled = true; clearTimeout(t); };
-  }, [meta, page, pageSize, search, reload]);
-
   function setEditRow(row) {
     setEditing(row);
     setFormOpen(true);
   }
 
-  if (loadingMeta) return <div style={{ color: "#64748b" }}>Loading…</div>;
-  if (error) return <div style={{ color: "#dc2626" }}>{error}</div>;
-  if (!meta) return null;
-
-  const listDisplay = (meta.list_display && meta.list_display.length)
-    ? meta.list_display
-    : ["id", "__str__"];
-
-  const columns = [
-    ...listDisplay
-      .filter((name) => name && name !== "repr")
-      .map((name) => ({
-        key: name,
-        header: name === "__str__"
-          ? (meta.verbose_name_singular || "Repr")
-          : String(name).replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-        renderCell: (row) => {
-          const v = getFieldValue(row, name);
-          return v == null || v === "" ? "—" : String(v);
-        },
-      })),
-    {
-      key: "__actions",
-      header: "Actions",
-      renderCell: (row) => (
-        meta?.permissions?.change ? (
-          <button
-            onClick={() => setEditRow(row)}
-            style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #e5e7eb", background: "#fff", cursor: "pointer", fontSize: 12 }}
-          >
-            Edit
-          </button>
-        ) : null
-      ),
-    },
-  ];
-
   // Resolve dialog fields per model and per mode with safe fallbacks.
-  // Priority:
-  // 1) Explicit form fields (create/edit) from admin-meta when provided
-  // 2) Generic fields array from admin-meta
-  // 3) Derive from list_display as a last resort (id read-only, other fields editable text)
   function resolveFields(metaObj, isEdit) {
     if (!metaObj) return [];
     const pick = (...cands) => cands.find((x) => Array.isArray(x) && x.length) || null;
@@ -192,8 +102,62 @@ export default function ModelListSimple(props) {
     });
   }
 
+  const listDisplay = (meta?.list_display && meta.list_display.length)
+    ? meta.list_display
+    : ["id", "__str__"];
+
+  // Build MUI DataGrid column definitions; value/resolution handled by DataTable's default getters.
+  const columns = React.useMemo(() => {
+    const cols = (listDisplay || [])
+      .filter((name) => name && name !== "repr")
+      .map((name) => ({
+        field: name,
+        headerName:
+          name === "__str__"
+            ? (meta?.verbose_name_singular || "Repr")
+            : String(name).replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        // Defaults for responsiveness; DataTable will ensure minWidth/flex if unspecified
+        // minWidth: 140, flex: 1
+      }));
+
+    // Actions column (edit)
+    cols.push({
+      field: "__actions",
+      headerName: "Actions",
+      sortable: false,
+      filterable: false,
+      minWidth: 120,
+      renderCell: (params) => {
+        const row = params?.row || {};
+        if (!meta?.permissions?.change) return null;
+        return (
+          <button
+            onClick={() => setEditRow(row)}
+            style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #e5e7eb", background: "#fff", cursor: "pointer", fontSize: 12 }}
+          >
+            Edit
+          </button>
+        );
+      },
+    });
+
+    return cols;
+  }, [listDisplay, meta]);
+
+  // Server-side fetcher for DataTable
+  const fetcher = React.useCallback(async ({ page, pageSize, search, ordering }) => {
+    if (!meta?.route) return { results: [], count: 0 };
+    const params = { page, page_size: pageSize };
+    if (search && String(search).trim()) params.search = String(search).trim();
+    if (ordering) params.ordering = ordering;
+    const { data } = await API.get(meta.route, { params });
+    const results = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
+    const count = typeof data?.count === "number" ? data.count : results.length;
+    return { results, count };
+  }, [meta, reload]);
+
   const toolbar = (
-    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
       <button
         onClick={() => { setEditing(null); setFormOpen(true); }}
         disabled={!(meta?.permissions?.add)}
@@ -209,8 +173,62 @@ export default function ModelListSimple(props) {
       >
         Create
       </button>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <label style={{ fontSize: 12, color: "#64748b" }}>Density</label>
+        <div style={{ display: "inline-flex", border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
+          <button
+            onClick={() => setDensity("comfortable")}
+            aria-pressed={density === "comfortable"}
+            style={{
+              padding: "6px 10px",
+              fontSize: 12,
+              background: density === "comfortable" ? "#0f172a" : "#fff",
+              color: density === "comfortable" ? "#fff" : "#0f172a",
+              border: 0,
+              cursor: "pointer",
+            }}
+          >
+            Comfortable
+          </button>
+          <button
+            onClick={() => setDensity("standard")}
+            aria-pressed={density === "standard"}
+            style={{
+              padding: "6px 10px",
+              fontSize: 12,
+              background: density === "standard" ? "#0f172a" : "#fff",
+              color: density === "standard" ? "#fff" : "#0f172a",
+              border: 0,
+              borderLeft: "1px solid #e5e7eb",
+              cursor: "pointer",
+            }}
+          >
+            Standard
+          </button>
+          <button
+            onClick={() => setDensity("compact")}
+            aria-pressed={density === "compact"}
+            style={{
+              padding: "6px 10px",
+              fontSize: 12,
+              background: density === "compact" ? "#0f172a" : "#fff",
+              color: density === "compact" ? "#fff" : "#0f172a",
+              border: 0,
+              borderLeft: "1px solid #e5e7eb",
+              cursor: "pointer",
+            }}
+          >
+            Compact
+          </button>
+        </div>
+      </div>
     </div>
   );
+
+  if (loadingMeta) return <div style={{ color: "#64748b" }}>Loading…</div>;
+  if (error) return <div style={{ color: "#dc2626" }}>{error}</div>;
+  if (!meta) return null;
 
   return (
     <div style={{ width: "100%" }}>
@@ -221,17 +239,14 @@ export default function ModelListSimple(props) {
         <div style={{ color: "#64748b", fontSize: 12 }}>{meta.route}</div>
       </div>
 
-      <SimpleTable
+      <DataTable
         columns={columns}
-        rows={rows}
-        loading={loading}
-        total={count}
-        page={page}
-        pageSize={pageSize}
-        onPageChange={setPage}
-        search={search}
-        onSearch={(s) => { setPage(1); setSearch(s); }}
+        fetcher={fetcher}
+        onRowEdit={(row) => setEditRow(row)}
+        density={density}
         toolbar={toolbar}
+        checkboxSelection={true}
+        onSelectionChange={() => {}}
       />
 
       <ModelFormDialog

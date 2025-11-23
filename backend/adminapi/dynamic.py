@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from .permissions import IsAdminOrStaff
+from django.core.cache import cache
 
 
 def build_serializer(model):
@@ -121,6 +122,11 @@ for model, modeladmin in admin.site._registry.items():
 def field_meta_from_serializer(serializer_class):
     """
     Introspect serializer fields to produce UI metadata.
+
+    Performance notes:
+    - Avoid enumerating choices for relation fields (PrimaryKeyRelatedField/SlugRelatedField),
+      as accessing `.choices` triggers a queryset evaluation over entire table.
+    - Only include choices for small, explicit ChoiceField-like fields.
     """
     s = serializer_class()
     meta = []
@@ -132,31 +138,43 @@ def field_meta_from_serializer(serializer_class):
             "required": getattr(field, "required", False),
             "label": getattr(field, "label", name),
         }
-        # choices
-        choices = getattr(field, "choices", None)
-        if choices:
-            try:
-                f["choices"] = list(choices.items())
-            except Exception:
-                # choices can be a dict-like
-                try:
-                    f["choices"] = [(k, v) for k, v in choices]
-                except Exception:
-                    pass
+
+        # Include help_text when available
+        try:
+            ht = getattr(field, "help_text", "")
+            if ht:
+                f["help_text"] = str(ht)
+        except Exception:
+            pass
+
+        # choices (skip for relation fields to prevent heavy DB scans)
+        try:
+            is_relation = hasattr(field, "queryset") or f["type"] in ("PrimaryKeyRelatedField", "SlugRelatedField")
+            if not is_relation:
+                choices = getattr(field, "choices", None)
+                if choices:
+                    # Attempt to materialize small static choices only
+                    # Many ChoiceFields expose dict-like `.choices`
+                    try:
+                        items = list(choices.items())
+                        # If it's unreasonably large, skip to avoid UI bloat
+                        if len(items) <= 200:
+                            f["choices"] = items
+                    except Exception:
+                        try:
+                            items = [(k, v) for k, v in choices]
+                            if len(items) <= 200:
+                                f["choices"] = items
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+
         meta.append(f)
     return meta
 
 
-@api_view(["GET"])
-@permission_classes([IsAdminOrStaff])
-def admin_meta(request):
-    """
-    Return metadata for all admin-registered models:
-      - app_label, model, verbose names
-      - API route (to the dynamic viewset)
-      - list_display, search_fields, list_filter, actions
-      - serializer field metadata (for form generation)
-    """
+def _build_admin_meta_static():
     payload = []
     for model, modeladmin in admin.site._registry.items():
         ser = build_serializer(model)
@@ -173,24 +191,14 @@ def admin_meta(request):
         except Exception:
             explicit_names = []
 
-        # Plus discovered actions from get_actions (returns dict: name -> (func, name, desc))
+        # Discovered actions; request-independent to keep this static segment cacheable
         try:
-            get_actions_dict = modeladmin.get_actions(request)
+            get_actions_dict = modeladmin.get_actions(None)
             discovered_names = list((get_actions_dict or {}).keys())
         except Exception:
             discovered_names = []
 
         actions = sorted(set(explicit_names + discovered_names + ["bulk_delete"]))
-        # Compute DjangoModelPermissions for current user to drive frontend UI
-        try:
-            app_label = model._meta.app_label
-            model_name = model._meta.model_name
-            perm_view = request.user.has_perm(f"{app_label}.view_{model_name}")
-            perm_add = request.user.has_perm(f"{app_label}.add_{model_name}")
-            perm_change = request.user.has_perm(f"{app_label}.change_{model_name}")
-            perm_delete = request.user.has_perm(f"{app_label}.delete_{model_name}")
-        except Exception:
-            perm_view = perm_add = perm_change = perm_delete = False
 
         payload.append({
             "app_label": model._meta.app_label,
@@ -202,12 +210,153 @@ def admin_meta(request):
             "search_fields": list(getattr(modeladmin, "search_fields", [])),
             "list_filter": _normalize_list_filter(getattr(modeladmin, "list_filter", [])),
             "actions": actions,
+            # Static field metadata (can be heavy): safe to cache
             "fields": field_meta_from_serializer(ser),
-            "permissions": {
-                "view": perm_view,
-                "add": perm_add,
-                "change": perm_change,
-                "delete": perm_delete,
-            },
         })
-    return Response({"models": payload})
+    return payload
+
+
+ADMIN_META_CACHE_KEY = "admin_meta_static_v1"
+ADMIN_META_TTL = 300  # seconds
+
+@api_view(["GET"])
+@permission_classes([IsAdminOrStaff])
+def admin_meta(request):
+    """
+    Return metadata for all admin-registered models:
+      - app_label, model, verbose names
+      - API route (to the dynamic viewset)
+      - list_display, search_fields, list_filter, actions
+      - static field metadata (cached)
+      - per-request permissions merged into cached static payload
+    """
+    static = cache.get(ADMIN_META_CACHE_KEY)
+    if static is None:
+        static = _build_admin_meta_static()
+        cache.set(ADMIN_META_CACHE_KEY, static, ADMIN_META_TTL)
+
+    # Merge per-user permissions quickly
+    user = getattr(request, "user", None)
+    models = []
+    for m in static:
+        try:
+            app_label = m["app_label"]
+            model_name = m["model"]
+            perm_view = user.has_perm(f"{app_label}.view_{model_name}")
+            perm_add = user.has_perm(f"{app_label}.add_{model_name}")
+            perm_change = user.has_perm(f"{app_label}.change_{model_name}")
+            perm_delete = user.has_perm(f"{app_label}.delete_{model_name}")
+        except Exception:
+            perm_view = perm_add = perm_change = perm_delete = False
+        mm = dict(m)
+        mm["permissions"] = {
+            "view": perm_view,
+            "add": perm_add,
+            "change": perm_change,
+            "delete": perm_delete,
+        }
+        models.append(mm)
+
+    return Response({"models": models})
+
+# Lightweight summary (no fields) to make first call fast
+def _build_admin_meta_summary():
+    payload = []
+    for model, modeladmin in admin.site._registry.items():
+        # Gather action names safely from explicit actions (callables or strings)
+        try:
+            explicit_actions = getattr(modeladmin, "actions", None) or []
+            explicit_names = []
+            for a in explicit_actions:
+                if isinstance(a, str):
+                    explicit_names.append(a)
+                else:
+                    explicit_names.append(getattr(a, "__name__", str(a)))
+        except Exception:
+            explicit_names = []
+
+        # Discovered actions; request-independent to keep summary cacheable
+        try:
+            get_actions_dict = modeladmin.get_actions(None)
+            discovered_names = list((get_actions_dict or {}).keys())
+        except Exception:
+            discovered_names = []
+
+        actions = sorted(set(explicit_names + discovered_names + ["bulk_delete"]))
+
+        payload.append({
+            "app_label": model._meta.app_label,
+            "model": model._meta.model_name,
+            "verbose_name": getattr(model._meta, "verbose_name_plural", model.__name__),
+            "verbose_name_singular": getattr(model._meta, "verbose_name", model.__name__),
+            "route": f"admin/dynamic/{model._meta.app_label}/{model._meta.model_name}/",
+            "list_display": list(getattr(modeladmin, "list_display", ["__str__"])),
+            "search_fields": list(getattr(modeladmin, "search_fields", [])),
+            "list_filter": _normalize_list_filter(getattr(modeladmin, "list_filter", [])),
+            "actions": actions,
+        })
+    return payload
+
+
+ADMIN_META_SUMMARY_CACHE_KEY = "admin_meta_summary_v1"
+ADMIN_META_FIELDS_CACHE_KEY_PREFIX = "admin_meta_fields_v1"
+ADMIN_META_SUMMARY_TTL = 300  # 5 minutes
+ADMIN_META_FIELDS_TTL = 600   # 10 minutes
+
+@api_view(["GET"])
+@permission_classes([IsAdminOrStaff])
+def admin_meta_summary(request):
+    """
+    Fast summary for admin models without heavy 'fields' metadata.
+    Per-user permissions merged per request.
+    """
+    summary = cache.get(ADMIN_META_SUMMARY_CACHE_KEY)
+    if summary is None:
+        summary = _build_admin_meta_summary()
+        cache.set(ADMIN_META_SUMMARY_CACHE_KEY, summary, ADMIN_META_SUMMARY_TTL)
+
+    user = getattr(request, "user", None)
+    models = []
+    for m in summary:
+        try:
+            app_label = m["app_label"]
+            model_name = m["model"]
+            perm_view = user.has_perm(f"{app_label}.view_{model_name}")
+            perm_add = user.has_perm(f"{app_label}.add_{model_name}")
+            perm_change = user.has_perm(f"{app_label}.change_{model_name}")
+            perm_delete = user.has_perm(f"{app_label}.delete_{model_name}")
+        except Exception:
+            perm_view = perm_add = perm_change = perm_delete = False
+        mm = dict(m)
+        mm["permissions"] = {
+            "view": perm_view,
+            "add": perm_add,
+            "change": perm_change,
+            "delete": perm_delete,
+        }
+        models.append(mm)
+    return Response({"models": models})
+
+
+@api_view(["GET"])
+@permission_classes([IsAdminOrStaff])
+def admin_meta_fields(request, app_label: str, model_name: str):
+    """
+    Return field metadata for a single model (cached).
+    """
+    # find model from registry
+    target_model = None
+    for model, _admin in admin.site._registry.items():
+        if model._meta.app_label == app_label and model._meta.model_name == model_name:
+            target_model = model
+            break
+    if target_model is None:
+        return Response({"detail": "Model not found"}, status=404)
+
+    cache_key = f"{ADMIN_META_FIELDS_CACHE_KEY_PREFIX}:{app_label}.{model_name}"
+    fields = cache.get(cache_key)
+    if fields is None:
+        ser = build_serializer(target_model)
+        fields = field_meta_from_serializer(ser)
+        cache.set(cache_key, fields, ADMIN_META_FIELDS_TTL)
+    return Response({"app_label": app_label, "model": model_name, "fields": fields})

@@ -50,3 +50,5 @@ body {
 a {
   color: inherit;
 }
+
+/* KPI mobile full-width enforcement removed to rely on proper MUI Grid props (xs=12) and default gutters to avoid overlap */

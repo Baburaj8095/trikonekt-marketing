@@ -227,7 +227,8 @@ export default function BannerDetails() {
             <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
               Product List
             </Typography>
-            <Table size="small">
+            <Box sx={{ width: "100%", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+            <Table size="small" sx={{ minWidth: 900 }}>
             <TableHead>
               <TableRow>
                 <TableCell>Name</TableCell>
@@ -269,13 +270,14 @@ export default function BannerDetails() {
                 })}
                 {(!items || items.length === 0) && (
                   <TableRow>
-                    <TableCell colSpan={7}>
+                    <TableCell colSpan={9}>
                       <Typography variant="body2" color="text.secondary">No items configured by the agency yet.</Typography>
                     </TableCell>
                   </TableRow>
                 )}
               </TableBody>
             </Table>
+            </Box>
           </Paper>
         </Grid>
       </Grid>

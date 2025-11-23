@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import CustomUser, Wallet, WalletTransaction, UserKYC, WithdrawalRequest, SupportTicket, SupportTicketMessage
 from coupons.models import Coupon, CouponCode, CouponSubmission, CouponBatch
@@ -14,7 +15,8 @@ from uploads.models import FileUpload, DashboardCard, HomeCard, LuckyDrawSubmiss
 from market.models import Product, PurchaseRequest, Banner, BannerItem, BannerPurchaseRequest
 from business.models import UserMatrixProgress, AutoPoolAccount
 from .permissions import IsAdminOrStaff
-from .serializers import AdminUserNodeSerializer, AdminKYCSerializer, AdminWithdrawalSerializer, AdminMatrixProgressSerializer, AdminSupportTicketSerializer, AdminSupportTicketMessageSerializer
+from .serializers import AdminUserNodeSerializer, AdminKYCSerializer, AdminWithdrawalSerializer, AdminMatrixProgressSerializer, AdminSupportTicketSerializer, AdminSupportTicketMessageSerializer, AdminUserEditSerializer
+from .dynamic import field_meta_from_serializer
 
 
 class AdminMetricsView(APIView):
@@ -280,7 +282,7 @@ class AdminUsersList(ListAPIView):
     serializer_class = AdminUserNodeSerializer
 
     def get_queryset(self):
-        qs = CustomUser.objects.all().annotate(
+        qs = CustomUser.objects.select_related("country", "state", "city", "wallet").annotate(
             direct_count=Count("registrations", distinct=True)
         )
         role = (self.request.query_params.get("role") or "").strip()
@@ -314,7 +316,172 @@ class AdminUsersList(ListAPIView):
                 | Q(unique_id__icontains=search)
             )
 
-        return qs.order_by("-date_joined")
+        ordering = (self.request.query_params.get("ordering") or "-date_joined").strip()
+        if ordering:
+            qs = qs.order_by(ordering)
+        return qs
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        # Allow decrypted last password to be included for admins in list view as well
+        ctx["purpose"] = "detail"
+        return ctx
+
+    def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        try:
+            page = int(request.query_params.get("page") or 1)
+        except Exception:
+            page = 1
+        try:
+            page_size = int(request.query_params.get("page_size") or 25)
+        except Exception:
+            page_size = 25
+        page = max(1, page)
+        page_size = max(1, min(page_size, 200))
+
+        total = qs.count()
+        start = (page - 1) * page_size
+        end = start + page_size
+        serializer = self.get_serializer(qs[start:end], many=True)
+        return Response({"count": total, "results": serializer.data}, status=200)
+
+
+class AdminUserEditMetaView(APIView):
+    """
+    Return dynamic field metadata for Admin user edit dialog based on AdminUserEditSerializer.
+    """
+    permission_classes = [IsAdminOrStaff]
+
+    def get(self, request):
+        from .serializers import AdminUserEditSerializer
+        try:
+            meta = field_meta_from_serializer(AdminUserEditSerializer) or []
+
+            # Normalize and enhance meta for UI
+            # - Ensure password is shown as PasswordField and not required
+            for f in meta:
+                name = f.get("name")
+                if name == "password":
+                    f["type"] = "PasswordField"
+                    f["required"] = False
+                    f["label"] = f.get("label") or "Set New Password"
+                if name == "sponsor_id" and not getattr(request.user, "is_superuser", False):
+                    f["read_only"] = True
+                    hint = "Only superuser can modify Sponsor ID"
+                    if f.get("help_text"):
+                        f["help_text"] = f"{f['help_text']} | {hint}"
+                    else:
+                        f["help_text"] = hint
+        except Exception:
+            # Fallback minimal meta
+            meta = [
+                {"name": "email", "type": "EmailField", "required": False, "label": "Email"},
+                {"name": "full_name", "type": "CharField", "required": False, "label": "Full Name"},
+                {"name": "phone", "type": "CharField", "required": False, "label": "Mobile"},
+                {"name": "pincode", "type": "CharField", "required": False, "label": "Pincode"},
+                {"name": "country", "type": "IntegerField", "required": False, "label": "Country (ID)"},
+                {"name": "state", "type": "IntegerField", "required": False, "label": "State (ID)"},
+                {"name": "city", "type": "IntegerField", "required": False, "label": "District/City (ID)"},
+                {"name": "role", "type": "CharField", "required": False, "label": "Role"},
+                {"name": "category", "type": "CharField", "required": False, "label": "Category"},
+                {"name": "is_active", "type": "BooleanField", "required": False, "label": "Active"},
+                {"name": "password", "type": "PasswordField", "required": False, "label": "Set New Password"},
+                {"name": "sponsor_id", "type": "CharField", "required": False, "label": "Sponsor ID", "read_only": not getattr(request.user, "is_superuser", False)},
+            ]
+        return Response({"fields": meta}, status=200)
+
+
+class AdminUserDetail(APIView):
+    """
+    Retrieve/Update admin-editable fields for a specific user.
+    """
+    permission_classes = [IsAdminOrStaff]
+
+    def get(self, request, pk: int):
+        user = CustomUser.objects.filter(pk=pk).first()
+        if not user:
+            return Response({"detail": "Not found"}, status=404)
+        data = AdminUserEditSerializer(user).data
+        return Response(data, status=200)
+
+    def patch(self, request, pk: int):
+        user = CustomUser.objects.filter(pk=pk).first()
+        if not user:
+            return Response({"detail": "Not found"}, status=404)
+        serializer = AdminUserEditSerializer(user, data=request.data, partial=True)
+        if serializer.is_valid():
+            obj = serializer.save()
+            return Response(AdminUserEditSerializer(obj).data, status=200)
+        return Response(serializer.errors, status=400)
+
+
+class AdminUserImpersonateView(APIView):
+    """
+    Admin-only: mint JWT tokens for a specific user to allow 'view as' login.
+    """
+    permission_classes = [IsAdminOrStaff]
+
+    def post(self, request, pk: int):
+        user = CustomUser.objects.filter(pk=pk).first()
+        if not user:
+            return Response({"detail": "Not found"}, status=404)
+        try:
+            refresh = RefreshToken.for_user(user)
+            data = {
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+                "role": getattr(user, "role", "user") or "user",
+                "username": getattr(user, "username", None),
+                "id": getattr(user, "id", None),
+            }
+            return Response(data, status=200)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=400)
+
+
+class AdminUserSetTempPasswordView(APIView):
+    """
+    Admin-only: generate a secure temporary password for a user, set it,
+    and store an encrypted copy for display in Admin Users grid.
+    Response: { "temp_password": "..." }
+    """
+    permission_classes = [IsAdminOrStaff]
+
+    def post(self, request, pk: int):
+        user = CustomUser.objects.filter(pk=pk).first()
+        if not user:
+            return Response({"detail": "Not found"}, status=404)
+
+        # Generate a strong temporary password: 8 alnum + 1 special + 1 digit
+        try:
+            import secrets, string
+            base = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(8))
+            special = secrets.choice('!@#$%^&*')
+            digit = str(secrets.randbelow(10))
+            pwd = f"{base}{special}{digit}"
+        except Exception:
+            # Extremely rare, fallback
+            pwd = "Tr!k0-" + str(int(timezone.now().timestamp()))[-6:]
+
+        try:
+            user.set_password(pwd)
+            # Store encrypted plaintext for admin visibility
+            try:
+                from core.crypto import encrypt_string
+                enc = encrypt_string(pwd)
+            except Exception:
+                enc = None
+
+            if enc:
+                user.last_password_encrypted = enc
+                user.save(update_fields=["password", "last_password_encrypted"])
+            else:
+                user.save(update_fields=["password"])
+        except Exception as e:
+            return Response({"detail": str(e)}, status=400)
+
+        return Response({"temp_password": pwd}, status=200)
 
 
 class AdminECouponBulkCreateView(APIView):

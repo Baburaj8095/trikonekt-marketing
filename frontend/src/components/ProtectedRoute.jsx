@@ -4,8 +4,13 @@ import API, { ensureFreshAccess } from "../api/api";
 
 function parseJwt(token) {
   try {
-    const [, payload] = token.split(".");
-    return JSON.parse(atob(payload));
+    const [, payload] = String(token || "").split(".");
+    if (!payload) return null;
+    // Handle base64url (JWT) decoding
+    let base = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const pad = base.length % 4;
+    if (pad) base += "=".repeat(4 - pad);
+    return JSON.parse(atob(base));
   } catch {
     return null;
   }
@@ -78,12 +83,12 @@ export default function ProtectedRoute({ children, allowedRoles }) {
     async function checkAuth() {
       try {
         let access = getStoredAccess();
-        let claim = access ? parseJwt(access) : null;
         const now = Math.floor(Date.now() / 1000);
+        let claim = access ? parseJwt(access) : null;
         let exp = claim?.exp || 0;
 
-        // If no access or expired, try refresh once via keep-alive helper
-        if (!access || !claim || !exp || exp <= now) {
+        // If access exists but appears expired, attempt one refresh
+        if (access && exp && exp <= now) {
           try {
             const newAccess = await ensureFreshAccess();
             if (newAccess) {
@@ -91,18 +96,34 @@ export default function ProtectedRoute({ children, allowedRoles }) {
               claim = parseJwt(newAccess);
               exp = claim?.exp || 0;
             }
-          } catch (_) {
-            // ignore
-          }
+          } catch (_) {}
+        }
+        // If no access at all, try to mint one (e.g., refresh flow)
+        if (!access) {
+          try {
+            const newAccess = await ensureFreshAccess();
+            if (newAccess) {
+              access = newAccess;
+              claim = parseJwt(newAccess);
+              exp = claim?.exp || 0;
+            }
+          } catch (_) {}
         }
 
-        if (!access || !claim || !exp || exp <= Math.floor(Date.now() / 1000)) {
+        // Final decision:
+        if (!access) {
           if (!cancelled) {
             try {
-              if (typeof window !== "undefined") {
-                window.__tk_auth_blocked = true;
-              }
+              if (typeof window !== "undefined") window.__tk_auth_blocked = true;
             } catch {}
+            setGranted(false);
+            setPayload(null);
+          }
+          return;
+        }
+        // If token has no exp (opaque or non-JWT), accept it
+        if (exp && exp <= Math.floor(Date.now() / 1000)) {
+          if (!cancelled) {
             setGranted(false);
             setPayload(null);
           }
@@ -131,9 +152,24 @@ export default function ProtectedRoute({ children, allowedRoles }) {
   }
 
   if (Array.isArray(allowedRoles) && allowedRoles.length > 0) {
-    const role = payload?.role;
-    if (!role || !allowedRoles.includes(role)) {
-      const target = role ? `/${role}/dashboard` : "/login";
+    const ns = currentNamespaceFromPath();
+    const claimRoleRaw = payload?.role || "";
+    const cr = String(claimRoleRaw || "").toLowerCase();
+
+    // Prefer the route namespace for non-consumer areas so impersonation tokens
+    // with a "user" role still pass guards on /agency and /employee routes.
+    let normalized = ns;
+    if (ns === "agency" || ns === "employee" || ns === "business") {
+      normalized = ns; // force namespace
+    } else {
+      // For consumer (user) area, map token roles to app namespaces
+      if (cr.startsWith("agency")) normalized = "agency";
+      else if (cr.startsWith("employee")) normalized = "employee";
+      else normalized = (cr === "user" || cr === "consumer" || cr === "") ? "user" : "user";
+    }
+
+    if (!allowedRoles.includes(normalized)) {
+      const target = `/${normalized}/dashboard`;
       return <Navigate to={target} replace />;
     }
   }

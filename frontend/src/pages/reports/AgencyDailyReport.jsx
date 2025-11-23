@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Box,
   Container,
@@ -19,6 +19,7 @@ import {
   Stack,
 } from "@mui/material";
 import API from "../../api/api";
+import DataTable from "../../admin-panel/components/data/DataTable";
 
 function intOrZero(v) {
   const n = Number(v);
@@ -86,6 +87,7 @@ export default function AgencyDailyReport() {
   const [myRows, setMyRows] = useState([]);
   const [myLoading, setMyLoading] = useState(false);
   const [myError, setMyError] = useState("");
+  const [myReloadKey, setMyReloadKey] = useState(0);
 
   const loadMyReports = async () => {
     try {
@@ -113,6 +115,7 @@ export default function AgencyDailyReport() {
   const [teamRows, setTeamRows] = useState([]);
   const [teamLoading, setTeamLoading] = useState(false);
   const [teamError, setTeamError] = useState("");
+  const [teamReloadKey, setTeamReloadKey] = useState(0);
 
   const loadTeamReports = async () => {
     try {
@@ -153,6 +156,93 @@ export default function AgencyDailyReport() {
   useEffect(() => {
     loadMyReports();
   }, []);
+
+  // DataGrid columns and server fetchers
+  const myColumns = useMemo(
+    () => [
+      { field: "date", headerName: "Date", minWidth: 140 },
+      { field: "role", headerName: "Role", minWidth: 120 },
+      { field: "tr_registered", headerName: "TR", minWidth: 80 },
+      { field: "wg_registered", headerName: "WG", minWidth: 80 },
+      { field: "asia_pay_registered", headerName: "Asia Pay", minWidth: 110 },
+      { field: "dm_account_registered", headerName: "DM Acc", minWidth: 110 },
+      { field: "e_coupon_issued", headerName: "E‑Coupon", minWidth: 110 },
+      { field: "physical_coupon_issued", headerName: "Physical", minWidth: 110 },
+      { field: "product_sold", headerName: "Products", minWidth: 110 },
+      { field: "total_amount", headerName: "Total Amount", minWidth: 140 },
+    ],
+    []
+  );
+
+  const myFetcher = React.useCallback(
+    async ({ page, pageSize }) => {
+      const params = {};
+      if (myFrom) params.from = myFrom;
+      if (myTo) params.to = myTo;
+      const res = await API.get("/v1/reports/my-reports/", { params });
+      const data = Array.isArray(res.data)
+        ? res.data
+        : Array.isArray(res.data?.results)
+        ? res.data.results
+        : [];
+      const count =
+        typeof res.data?.count === "number" ? res.data.count : data.length;
+
+      // If backend isn't paginated, slice locally
+      const start = (page - 1) * pageSize;
+      const end = start + pageSize;
+      const results = Array.isArray(res.data?.results)
+        ? data
+        : data.slice(start, end);
+
+      return { results, count };
+    },
+    [myFrom, myTo, myReloadKey]
+  );
+
+  const teamColumns = useMemo(
+    () => [
+      { field: "date", headerName: "Date", minWidth: 140 },
+      { field: "reporter", headerName: "Reporter", minWidth: 160, flex: 1 },
+      { field: "role", headerName: "Role", minWidth: 140 },
+      { field: "tr_registered", headerName: "TR", minWidth: 80 },
+      { field: "wg_registered", headerName: "WG", minWidth: 80 },
+      { field: "asia_pay_registered", headerName: "Asia Pay", minWidth: 110 },
+      { field: "dm_account_registered", headerName: "DM Acc", minWidth: 110 },
+      { field: "e_coupon_issued", headerName: "E‑Coupon", minWidth: 110 },
+      { field: "physical_coupon_issued", headerName: "Physical", minWidth: 110 },
+      { field: "product_sold", headerName: "Products", minWidth: 110 },
+      { field: "total_amount", headerName: "Total Amount", minWidth: 140 },
+    ],
+    []
+  );
+
+  const teamFetcher = React.useCallback(
+    async ({ page, pageSize }) => {
+      const params = {};
+      if (teamFrom) params.from = teamFrom;
+      if (teamTo) params.to = teamTo;
+      if (teamRole) params.role = teamRole;
+      if (teamReporter) params.reporter = teamReporter;
+      const res = await API.get("/v1/reports/all/", { params });
+      const data = Array.isArray(res.data)
+        ? res.data
+        : Array.isArray(res.data?.results)
+        ? res.data.results
+        : [];
+      const count =
+        typeof res.data?.count === "number" ? res.data.count : data.length;
+
+      const start = (page - 1) * pageSize;
+      const end = start + pageSize;
+      const results = Array.isArray(res.data?.results)
+        ? data
+        : data.slice(start, end);
+
+      return { results, count };
+    },
+    [teamFrom, teamTo, teamRole, teamReporter, teamReloadKey]
+  );
 
   return (
     <Container maxWidth="lg" sx={{ px: 0 }}>
@@ -297,60 +387,16 @@ export default function AgencyDailyReport() {
                 value={myTo}
                 onChange={(e) => setMyTo(e.target.value)}
               />
-              <Button variant="outlined" onClick={loadMyReports} sx={{ width: { xs: "100%", sm: "auto" } }}>Filter</Button>
+              <Button variant="outlined" onClick={() => setMyReloadKey((k) => k + 1)} sx={{ width: { xs: "100%", sm: "auto" } }}>Filter</Button>
             </Stack>
 
-            {myLoading ? (
-              <Box sx={{ py: 2, display: "flex", alignItems: "center", gap: 1 }}>
-                <CircularProgress size={18} /> <Typography variant="body2">Loading…</Typography>
-              </Box>
-            ) : myError ? (
-              <Alert severity="error">{myError}</Alert>
-            ) : (
-              <TableContainer sx={{ width: "100%", overflowX: "auto" }}>
-                <Table size="small" sx={{ minWidth: 900 }}>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Date</TableCell>
-                    <TableCell>Role</TableCell>
-                    <TableCell>TR</TableCell>
-                    <TableCell>WG</TableCell>
-                    <TableCell>Asia Pay</TableCell>
-                    <TableCell>DM Acc</TableCell>
-                    <TableCell>E‑Coupon</TableCell>
-                    <TableCell>Physical</TableCell>
-                    <TableCell>Products</TableCell>
-                    <TableCell>Total Amount</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {(myRows || []).map((r) => (
-                    <TableRow key={`${r.id}-${r.date}`}>
-                      <TableCell>{r.date}</TableCell>
-                      <TableCell>{r.role}</TableCell>
-                      <TableCell>{r.tr_registered}</TableCell>
-                      <TableCell>{r.wg_registered}</TableCell>
-                      <TableCell>{r.asia_pay_registered}</TableCell>
-                      <TableCell>{r.dm_account_registered}</TableCell>
-                      <TableCell>{r.e_coupon_issued}</TableCell>
-                      <TableCell>{r.physical_coupon_issued}</TableCell>
-                      <TableCell>{r.product_sold}</TableCell>
-                      <TableCell>₹{r.total_amount}</TableCell>
-                    </TableRow>
-                  ))}
-                  {(!myRows || myRows.length === 0) && (
-                    <TableRow>
-                      <TableCell colSpan={10}>
-                        <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                          No reports found for the selected range.
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-                </Table>
-              </TableContainer>
-            )}
+            <DataTable
+              key={myReloadKey}
+              columns={myColumns}
+              fetcher={myFetcher}
+              density="standard"
+              checkboxSelection={false}
+            />
           </Paper>
         </Grid>
 
@@ -403,63 +449,17 @@ export default function AgencyDailyReport() {
                 onChange={(e) => setTeamReporter(e.target.value)}
                 sx={{ width: { xs: "100%", sm: "auto" }, minWidth: { sm: 200 } }}
               />
-              <Button variant="outlined" onClick={loadTeamReports} sx={{ width: { xs: "100%", sm: "auto" } }}>Filter</Button>
+              <Button variant="outlined" onClick={() => setTeamReloadKey((k) => k + 1)} sx={{ width: { xs: "100%", sm: "auto" } }}>Filter</Button>
               <Button variant="contained" onClick={downloadCSV} sx={{ width: { xs: "100%", sm: "auto" } }}>Download CSV</Button>
             </Stack>
 
-            {teamLoading ? (
-              <Box sx={{ py: 2, display: "flex", alignItems: "center", gap: 1 }}>
-                <CircularProgress size={18} /> <Typography variant="body2">Loading…</Typography>
-              </Box>
-            ) : teamError ? (
-              <Alert severity="error">{teamError}</Alert>
-            ) : (
-              <TableContainer sx={{ width: "100%", overflowX: "auto" }}>
-                <Table size="small" sx={{ minWidth: 1100 }}>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Date</TableCell>
-                    <TableCell>Reporter</TableCell>
-                    <TableCell>Role</TableCell>
-                    <TableCell>TR</TableCell>
-                    <TableCell>WG</TableCell>
-                    <TableCell>Asia Pay</TableCell>
-                    <TableCell>DM Acc</TableCell>
-                    <TableCell>E‑Coupon</TableCell>
-                    <TableCell>Physical</TableCell>
-                    <TableCell>Products</TableCell>
-                    <TableCell>Total Amount</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {(teamRows || []).map((r) => (
-                    <TableRow key={`${r.id}-${r.date}`}>
-                      <TableCell>{r.date}</TableCell>
-                      <TableCell>{r.reporter}</TableCell>
-                      <TableCell>{r.role}</TableCell>
-                      <TableCell>{r.tr_registered}</TableCell>
-                      <TableCell>{r.wg_registered}</TableCell>
-                      <TableCell>{r.asia_pay_registered}</TableCell>
-                      <TableCell>{r.dm_account_registered}</TableCell>
-                      <TableCell>{r.e_coupon_issued}</TableCell>
-                      <TableCell>{r.physical_coupon_issued}</TableCell>
-                      <TableCell>{r.product_sold}</TableCell>
-                      <TableCell>₹{r.total_amount}</TableCell>
-                    </TableRow>
-                  ))}
-                  {(!teamRows || teamRows.length === 0) && (
-                    <TableRow>
-                      <TableCell colSpan={11}>
-                        <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                          No team reports found for the selected filters.
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-                </Table>
-              </TableContainer>
-            )}
+            <DataTable
+              key={teamReloadKey}
+              columns={teamColumns}
+              fetcher={teamFetcher}
+              density="standard"
+              checkboxSelection={false}
+            />
           </Paper>
         </Grid>
       </Grid>

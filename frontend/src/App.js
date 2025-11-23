@@ -60,6 +60,7 @@ import UsersPage from "./admin-panel/examples/UsersPage";
 import ProductPage from "./admin-panel/examples/ProductPage";
 import Support from "./pages/Support";
 import AdminSupport from "./pages/admin/AdminSupport";
+import ImpersonateLanding from "./pages/Auth/ImpersonateLanding";
 
 function App() {
   return (
@@ -74,6 +75,9 @@ function App() {
         <Route path="/register" element={<EnhancedLogin />} />
         <Route path="/enhanced-login" element={<EnhancedLogin />} />
         <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/impersonate" element={<ImpersonateLanding />} />
+        <Route path="/agency/impersonate" element={<ImpersonateLanding />} />
+        <Route path="/employee/impersonate" element={<ImpersonateLanding />} />
         {/* User Routes */}
         <Route
           path="/user/dashboard"

@@ -1,75 +1,118 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../../api/api";
-import TreeReferralGalaxy from "../../components/TreeReferralGalaxy";
 import { getAdminMeta } from "../../admin-panel/api/adminMeta";
 
 function paletteStyles(key) {
-  // Solid, high-contrast gradients for colored cards
+  // Solid, high-contrast gradients for colored cards with elevated shadows
   switch (key) {
     case "indigo":
       return {
         bg: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
         border: "rgba(99,102,241,0.35)",
         text: "#ffffff",
-        sub: "rgba(255,255,255,0.9)",
-        shadow: "0 8px 18px rgba(99,102,241,0.35)",
+        sub: "rgba(255,255,255,0.92)",
+        shadow: "0 10px 24px rgba(99,102,241,0.32)",
+        hoverShadow: "0 14px 30px rgba(99,102,241,0.38)",
       };
     case "blue":
       return {
         bg: "linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%)",
         border: "rgba(59,130,246,0.35)",
         text: "#ffffff",
-        sub: "rgba(255,255,255,0.9)",
-        shadow: "0 8px 18px rgba(59,130,246,0.35)",
+        sub: "rgba(255,255,255,0.92)",
+        shadow: "0 10px 24px rgba(59,130,246,0.32)",
+        hoverShadow: "0 14px 30px rgba(59,130,246,0.38)",
       };
     case "green":
       return {
         bg: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
         border: "rgba(16,185,129,0.35)",
         text: "#ffffff",
-        sub: "rgba(255,255,255,0.9)",
-        shadow: "0 8px 18px rgba(16,185,129,0.35)",
+        sub: "rgba(255,255,255,0.92)",
+        shadow: "0 10px 24px rgba(16,185,129,0.32)",
+        hoverShadow: "0 14px 30px rgba(16,185,129,0.38)",
       };
     case "red":
       return {
         bg: "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
         border: "rgba(244,63,94,0.35)",
         text: "#ffffff",
-        sub: "rgba(255,255,255,0.9)",
-        shadow: "0 8px 18px rgba(244,63,94,0.35)",
-      };
-    case "purple":
-      return {
-        bg: "linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)",
-        border: "rgba(124,58,237,0.35)",
-        text: "#ffffff",
-        sub: "rgba(255,255,255,0.9)",
-        shadow: "0 8px 18px rgba(124,58,237,0.35)",
-      };
-    case "cyan":
-      return {
-        bg: "linear-gradient(135deg, #06b6d4 0%, #0ea5e9 100%)",
-        border: "rgba(14,165,233,0.35)",
-        text: "#ffffff",
-        sub: "rgba(255,255,255,0.9)",
-        shadow: "0 8px 18px rgba(14,165,233,0.35)",
+        sub: "rgba(255,255,255,0.92)",
+        shadow: "0 10px 24px rgba(244,63,94,0.32)",
+        hoverShadow: "0 14px 30px rgba(244,63,94,0.38)",
       };
     case "amber":
       return {
         bg: "linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)",
         border: "rgba(245,158,11,0.35)",
         text: "#0f172a",
-        sub: "rgba(15,23,42,0.75)",
-        shadow: "0 8px 18px rgba(245,158,11,0.35)",
+        sub: "rgba(15,23,42,0.8)",
+        shadow: "0 10px 24px rgba(245,158,11,0.30)",
+        hoverShadow: "0 14px 30px rgba(245,158,11,0.36)",
+      };
+    case "purple":
+      return {
+        bg: "linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)",
+        border: "rgba(168,85,247,0.35)",
+        text: "#ffffff",
+        sub: "rgba(255,255,255,0.92)",
+        shadow: "0 10px 24px rgba(168,85,247,0.32)",
+        hoverShadow: "0 14px 30px rgba(168,85,247,0.38)",
+      };
+    case "pink":
+      return {
+        bg: "linear-gradient(135deg, #ec4899 0%, #db2777 100%)",
+        border: "rgba(236,72,153,0.35)",
+        text: "#ffffff",
+        sub: "rgba(255,255,255,0.92)",
+        shadow: "0 10px 24px rgba(236,72,153,0.32)",
+        hoverShadow: "0 14px 30px rgba(236,72,153,0.38)",
       };
     case "teal":
       return {
-        bg: "linear-gradient(135deg, #14b8a6 0%, #2dd4bf 100%)",
+        bg: "linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)",
         border: "rgba(20,184,166,0.35)",
+        text: "#ffffff",
+        sub: "rgba(255,255,255,0.92)",
+        shadow: "0 10px 24px rgba(20,184,166,0.32)",
+        hoverShadow: "0 14px 30px rgba(20,184,166,0.38)",
+      };
+    case "cyan":
+      return {
+        bg: "linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)",
+        border: "rgba(6,182,212,0.35)",
+        text: "#ffffff",
+        sub: "rgba(255,255,255,0.92)",
+        shadow: "0 10px 24px rgba(6,182,212,0.32)",
+        hoverShadow: "0 14px 30px rgba(6,182,212,0.38)",
+      };
+    case "lime":
+      return {
+        bg: "linear-gradient(135deg, #84cc16 0%, #65a30d 100%)",
+        border: "rgba(132,204,22,0.35)",
         text: "#0f172a",
-        sub: "rgba(15,23,42,0.75)",
-        shadow: "0 8px 18px rgba(20,184,166,0.35)",
+        sub: "rgba(15,23,42,0.8)",
+        shadow: "0 10px 24px rgba(132,204,22,0.30)",
+        hoverShadow: "0 14px 30px rgba(132,204,22,0.36)",
+      };
+    case "orange":
+      return {
+        bg: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
+        border: "rgba(249,115,22,0.35)",
+        text: "#ffffff",
+        sub: "rgba(255,255,255,0.92)",
+        shadow: "0 10px 24px rgba(249,115,22,0.32)",
+        hoverShadow: "0 14px 30px rgba(249,115,22,0.38)",
+      };
+    case "rose":
+      return {
+        bg: "linear-gradient(135deg, #fb7185 0%, #e11d48 100%)",
+        border: "rgba(251,113,133,0.35)",
+        text: "#ffffff",
+        sub: "rgba(255,255,255,0.92)",
+        shadow: "0 10px 24px rgba(251,113,133,0.30)",
+        hoverShadow: "0 14px 30px rgba(251,113,133,0.36)",
       };
     default:
       return {
@@ -77,9 +120,24 @@ function paletteStyles(key) {
         border: "#e2e8f0",
         text: "#0f172a",
         sub: "#64748b",
-        shadow: "0 1px 2px rgba(0,0,0,0.06)",
+        shadow: "0 6px 14px rgba(15,23,42,0.10)",
+        hoverShadow: "0 12px 24px rgba(15,23,42,0.16)",
       };
   }
+}
+
+const paletteOrder = ["indigo", "blue", "green", "red", "amber", "purple", "pink", "teal", "cyan", "lime", "orange", "rose"];
+
+function hashIndex(str) {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) + h) + str.charCodeAt(i); // h * 33 + c
+  }
+  return Math.abs(h);
+}
+function choosePaletteForModel(app, model) {
+  const key = `${String(app || "")}.${String(model || "")}`.toLowerCase();
+  return paletteOrder[hashIndex(key) % paletteOrder.length];
 }
 
 function Card({ title, value, subtitle, onClick, palette = "blue" }) {
@@ -111,7 +169,7 @@ function Card({ title, value, subtitle, onClick, palette = "blue" }) {
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = "translateY(-2px)";
-        e.currentTarget.style.boxShadow = "0 10px 22px rgba(0,0,0,0.12)";
+        e.currentTarget.style.boxShadow = pal.hoverShadow || "0 12px 24px rgba(15,23,42,0.16)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = "translateY(0)";
@@ -133,51 +191,67 @@ function Card({ title, value, subtitle, onClick, palette = "blue" }) {
   );
 }
 
+/**
+ * AdminDashboard
+ * - Merged overview counters and Admin Models into a single responsive card grid.
+ * - Keeps only the requested account counters: Users, Withdrawal Requests, User KYC, Wallets, Transactions.
+ * - Removed Quick Actions and Recent E‑Coupon Assignments sections as requested.
+ */
 export default function AdminDashboard() {
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
-  const [ap, setAp] = useState(null);
-  const nav = useNavigate();
 
   // Dynamic models (from Django Admin)
   const [modelsMeta, setModelsMeta] = useState([]);
   const [modelsErr, setModelsErr] = useState("");
+  const nav = useNavigate();
 
-  // Recent E‑Coupon assignments (compact dashboard widget)
-  const [recentAssign, setRecentAssign] = useState([]);
-  const [recentAssignLoading, setRecentAssignLoading] = useState(false);
-
+  // Load metrics
   useEffect(() => {
     let mounted = true;
     setLoading(true);
-    Promise.all([API.get("/admin/metrics/"), API.get("/admin/autopool/summary/")])
-      .then(([m, a]) => {
-        if (mounted) {
-          setData(m?.data || {});
-          setAp(a?.data || {});
+    const fetchMetrics = async () => {
+      try {
+        const res = await API.get("admin/metrics/", { timeout: 12000, retryAttempts: 1, dedupe: "none" });
+        if (!mounted) return;
+        setData(res?.data || {});
+        setErr("");
+      } catch (e1) {
+        try {
+          // Fallback alias path registered in backend/core/urls.py
+          const res2 = await API.get("adminapi/metrics/", { timeout: 12000, retryAttempts: 1, dedupe: "none" });
+          if (!mounted) return;
+          setData(res2?.data || {});
           setErr("");
+        } catch (e2) {
+          if (!mounted) return;
+          const msg = (e2 && (e2.message || e2.code)) || "";
+          if (msg === "deduped" || msg === "ERR_CANCELED" || msg === "canceled") return;
+          setData({});
+          setErr("Failed to load metrics");
         }
-      })
-      .catch(() => {
-        setErr("Failed to load metrics");
-      })
-      .finally(() => setLoading(false));
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    fetchMetrics();
     return () => {
       mounted = false;
     };
   }, []);
 
-  // Load admin model metadata for dashboard cards
+  // Load admin model metadata for cards
   useEffect(() => {
     let mounted = true;
     getAdminMeta()
-      .then((data) => {
+      .then((meta) => {
         if (!mounted) return;
-        setModelsMeta(data?.models || []);
+        setModelsMeta(meta?.models || []);
         setModelsErr("");
       })
       .catch(() => {
+        if (!mounted) return;
         setModelsMeta([]);
         setModelsErr("Failed to load admin models");
       });
@@ -189,25 +263,8 @@ export default function AdminDashboard() {
   const users = data?.users || {};
   const wallets = data?.wallets || {};
   const withdrawals = data?.withdrawals || {};
-  const coupons = data?.coupons || {};
-  const uploads = data?.uploads || {};
-  const uploadsModels = data?.uploadsModels || {};
-  const market = data?.market || {};
 
-  const apSummary = ap || {};
-  const prog = apSummary.progress || {};
-  const acc = apSummary.accounts || {};
-  const fiveProg = prog["FIVE_150"] || {};
-  const three150Prog = prog["THREE_150"] || {};
-  const three50Prog = prog["THREE_50"] || {};
-  const threeUsers = (three150Prog.users || 0) + (three50Prog.users || 0);
-  const threeEarned = Number(three150Prog.total_earned || 0) + Number(three50Prog.total_earned || 0);
-  const activeAccounts = ["FIVE_150", "THREE_150", "THREE_50"].reduce(
-    (sum, k) => sum + (acc[k]?.ACTIVE || 0),
-    0
-  );
-
-  // Group models by app with de-duplication and build a filtered set for "All Admin Models"
+  // Group models by app with de-duplication
   const modelsByApp = React.useMemo(() => {
     const norm = (s) => String(s || "").toLowerCase();
     const seen = new Set();
@@ -224,38 +281,9 @@ export default function AdminDashboard() {
     return grouped;
   }, [modelsMeta]);
 
-  // Exclude apps that already have dedicated sections to avoid duplicates on the dashboard
-  const modelsByAppAllFiltered = React.useMemo(() => {
-    const excludedApps = new Set(["uploads", "market", "auth", "token_blacklist", "locations"]);
-    const out = {};
-    Object.keys(modelsByApp).forEach((appLabel) => {
-      const appLower = String(appLabel).toLowerCase();
-      if (excludedApps.has(appLower)) return;
-      out[appLabel] = modelsByApp[appLabel];
-    });
-    return out;
-  }, [modelsByApp]);
-
-  async function loadRecentAssignments() {
-    setRecentAssignLoading(true);
-    try {
-      const res = await API.get("/coupons/assignments/", { params: { page_size: 5 } });
-      const items = res?.data?.results || res?.data || [];
-      setRecentAssign(Array.isArray(items) ? items : []);
-    } catch (_) {
-      setRecentAssign([]);
-    } finally {
-      setRecentAssignLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    loadRecentAssignments();
-  }, []);
-
   return (
     <div>
-      {/* Page heading - subtle and compact for desktop, wraps on mobile */}
+      {/* Page heading */}
       <div
         style={{
           marginBottom: 12,
@@ -268,9 +296,7 @@ export default function AdminDashboard() {
       >
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
           <h2 style={{ margin: 0, color: "#0f172a", fontSize: 20, fontWeight: 900 }}>Overview</h2>
-          <span style={{ color: "#64748b", fontSize: 12 }}>
-            Quick metrics and shortcuts
-          </span>
+          <span style={{ color: "#64748b", fontSize: 12 }}>Accounts and Admin Models</span>
         </div>
         <div style={{ color: "#64748b", fontSize: 12 }}>
           {new Date().toLocaleDateString()}
@@ -279,11 +305,11 @@ export default function AdminDashboard() {
 
       {loading ? (
         <div style={{ color: "#64748b" }}>Loading...</div>
-      ) : err ? (
-        <div style={{ color: "#dc2626" }}>{err}</div>
-      ) : (
+      ) : null /* do not block UI on metrics errors */}
+      {/* Always render the cards with safe fallbacks so the dashboard never hard-fails */}
+      <>
         <>
-          {/* Primary KPI cards (responsive) */}
+          {/* Merged Overview Counters + Admin Models */}
           <div
             style={{
               display: "grid",
@@ -291,257 +317,100 @@ export default function AdminDashboard() {
               gap: 12,
             }}
           >
+            {/* Required account counters */}
             <Card
-              title="User Accounts"
+              title="Users"
               value={users.total ?? 0}
-              subtitle={`Active: ${users.active ?? 0} • Today: ${users.todayNew ?? 0} • KYC pending: ${users.kycPending ?? 0}`}
+              subtitle=""
               onClick={() => nav("/admin/users")}
               palette="indigo"
             />
             <Card
-              title="User Tree"
-              value={users.byRole ? Object.values(users.byRole).reduce((a, b) => a + b, 0) : 0}
-              subtitle="Explore hierarchy by sponsor"
-              onClick={() => nav("/admin/user-tree")}
-              palette="blue"
-            />
-            <Card
-              title="Wallets"
-              value={`₹${Number(wallets.totalBalance || 0).toFixed(2)}`}
-              subtitle={`Transactions today: ${wallets.transactionsToday || 0}`}
-              onClick={() => nav("/admin/users")}
-              palette="green"
-            />
-            <Card
-              title="Withdrawals"
-              value={withdrawals.pendingCount || 0}
-              subtitle={`Pending amount: ₹${Number(withdrawals.pendingAmount || 0).toFixed(2)}`}
+              title="Withdrawal Requests"
+              value={(withdrawals.totalCount ?? withdrawals.pendingCount ?? 0)}
+              subtitle=""
               onClick={() => nav("/admin/withdrawals")}
               palette="red"
             />
             <Card
-              title="Coupons"
-              value={coupons.total || 0}
-              subtitle={`Assigned: ${coupons.assigned || 0} • Redeemed: ${coupons.redeemed || 0} • Pending: ${coupons.pendingSubmissions || 0}`}
-              onClick={() => nav("/admin/e-coupons")}
-              palette="purple"
-            />
-            <Card
-              title="Uploads"
-              value={uploads.total || 0}
-              subtitle={`Today: ${uploads.todayNew || 0}`}
-              onClick={() => nav("/admin/uploads")}
-              palette="cyan"
-            />
-            <Card
-              title="Lucky Draw (Create)"
-              value={coupons.total || 0}
-              subtitle="Create and manage lucky draw coupons"
-              onClick={() => nav("/admin/lucky-draw")}
-              palette="indigo"
-            />
-            <Card
-              title="Business Registration"
-              value={0}
-              subtitle="Review and approve businesses"
-              onClick={() => nav("/admin/business")}
-              palette="amber"
-            />
-          </div>
-
-          {/* Secondary cards */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-              gap: 12,
-              marginTop: 12,
-            }}
-          >
-            <Card
-              title="KYC"
-              value={users.kycPending ?? 0}
-              subtitle="Pending verifications"
+              title="User KYC"
+              value={(users.kycTotal ?? users.kycPending ?? 0)}
+              subtitle=""
               onClick={() => nav("/admin/kyc")}
               palette="blue"
             />
             <Card
-              title="5‑Matrix"
-              value={fiveProg.users || 0}
-              subtitle={`Earned: ₹${Number(fiveProg.total_earned || 0).toFixed(2)}`}
-              onClick={() => nav("/admin/matrix/five")}
-              palette="purple"
+              title="Wallets"
+              value={(wallets.totalCount ?? wallets.count ?? 0)}
+              subtitle=""
+              onClick={() => nav("/admin/users")}
+              palette="green"
             />
             <Card
-              title="3‑Matrix"
-              value={threeUsers || 0}
-              subtitle={`Earned: ₹${Number(threeEarned || 0).toFixed(2)}`}
-              onClick={() => nav("/admin/matrix/three")}
-              palette="teal"
-            />
-            <Card
-              title="Auto Commission Pool"
-              value={activeAccounts || 0}
-              subtitle="Active accounts"
-              onClick={() => nav("/admin/autopool")}
+              title="Transactions"
+              value={(wallets.transactionsTotal ?? wallets.transactionsToday ?? 0)}
+              subtitle=""
+              onClick={() => nav("/admin/users")}
               palette="amber"
             />
+
+            {/* Admin models as cards (flattened) */}
+            {(Object.keys(modelsByApp) || [])
+              .sort()
+              .flatMap((appLabel) =>
+                (modelsByApp[appLabel] || [])
+                  .slice()
+                  .sort((a, b) => (a.verbose_name || a.model).localeCompare(b.verbose_name || b.model))
+                  .map((m) => {
+                    const palName = choosePaletteForModel(m.app_label, m.model);
+                    const pal = paletteStyles(palName);
+                    return (
+                      <div
+                        key={`${m.app_label}.${m.model}`}
+                        onClick={() => nav(`/admin/dashboard/models/${m.app_label}/${m.model}`)}
+                        role="button"
+                        tabIndex={0}
+                        style={{
+                          cursor: "pointer",
+                          background: pal.bg,
+                          border: `1px solid ${pal.border}`,
+                          color: pal.text,
+                          borderRadius: 14,
+                          padding: 12,
+                          boxShadow: pal.shadow,
+                          transition: "transform 120ms ease, box-shadow 120ms ease",
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            nav(`/admin/dashboard/models/${m.app_label}/${m.model}`);
+                          }
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = "translateY(-2px)";
+                          e.currentTarget.style.boxShadow = pal.hoverShadow || "0 12px 24px rgba(15,23,42,0.16)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = "translateY(0)";
+                          e.currentTarget.style.boxShadow = pal.shadow;
+                        }}
+                      >
+                        <div style={{ fontWeight: 800 }}>{m.verbose_name || m.model}</div>
+                        <div style={{ fontSize: 12, color: pal.sub }}>
+                          {m.app_label}.{m.model}
+                        </div>
+                      </div>
+                    );
+                  })
+              )}
           </div>
 
-
-
-
-          {/* Quick actions - fully responsive */}
-          <div style={{ marginTop: 16 }}>
-            <h3 style={{ margin: "8px 0", color: "#0f172a", fontSize: 16, fontWeight: 800 }}>Quick Actions</h3>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button
-                onClick={() => nav("/admin/user-tree")}
-                style={{
-                  padding: "10px 14px",
-                  background: "#0f172a",
-                  color: "#fff",
-                  border: 0,
-                  borderRadius: 8,
-                  cursor: "pointer",
-                }}
-              >
-                Open User Tree
-              </button>
-              <button
-                onClick={() => nav("/admin/users")}
-                style={{
-                  padding: "10px 14px",
-                  background: "#334155",
-                  color: "#fff",
-                  border: 0,
-                  borderRadius: 8,
-                  cursor: "pointer",
-                }}
-              >
-                Browse Users
-              </button>
-              <button
-                onClick={() => nav("/admin/e-coupons")}
-                style={{
-                  padding: "10px 14px",
-                  background: "#7c3aed",
-                  color: "#fff",
-                  border: 0,
-                  borderRadius: 8,
-                  cursor: "pointer",
-                }}
-              >
-                Manage E‑Coupons
-              </button>
-            </div>
-          </div>
-
-      {/* Recent E‑Coupon Assignments (compact) */}
-      <div style={{ marginTop: 16 }}>
-        <h3 style={{ margin: "8px 0", color: "#0f172a", fontSize: 16, fontWeight: 800 }}>Recent E‑Coupon Assignments</h3>
-        <div
-          style={{
-            border: "1px solid #e2e8f0",
-            borderRadius: 10,
-            background: "#fff",
-            overflow: "hidden",
-          }}
-        >
-          <div style={{ overflowX: "auto" }}>
-            <div
-              style={{
-                minWidth: 900,
-                display: "grid",
-                gridTemplateColumns: "120px 1fr 200px 120px 220px",
-                gap: 8,
-                padding: "10px",
-                background: "#f8fafc",
-                borderBottom: "1px solid #e2e8f0",
-                fontWeight: 700,
-                color: "#0f172a",
-              }}
-            >
-              <div>Role</div>
-              <div>Assignee</div>
-              <div>Range</div>
-              <div>Count</div>
-              <div>Assigned At</div>
-            </div>
-            <div>
-              {(recentAssign || []).map((a) => {
-                const role = a.role || (a.agency_id ? "agency" : a.employee_id ? "employee" : "");
-                const assignee =
-                  a.assignee_name ||
-                  (a.assignee && (a.assignee.username || a.assignee.name)) ||
-                  a.agency_name ||
-                  a.employee_name ||
-                  (a.agency && (a.agency.username || a.agency.name)) ||
-                  (a.employee && (a.employee.username || a.employee.name)) ||
-                  `#${a.assignee_id || a.agency_id || a.employee_id || ""}`;
-                const start = a.serial_start ?? a.start ?? a.range_start;
-                const end = a.serial_end ?? a.end ?? a.range_end;
-                const count =
-                  a.count ?? (typeof start === "number" && typeof end === "number" ? end - start + 1 : "");
-                const at = a.assigned_at || a.created_at || a.created || "";
-                return (
-                  <div
-                    key={a.id || `${role}-${assignee}-${start}-${end}-${Math.random()}`}
-                    style={{
-                      minWidth: 900,
-                      display: "grid",
-                      gridTemplateColumns: "120px 1fr 200px 120px 220px",
-                      gap: 8,
-                      padding: "10px",
-                      borderBottom: "1px solid #e2e8f0",
-                    }}
-                  >
-                    <div style={{ textTransform: "capitalize" }}>{role || "—"}</div>
-                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{assignee || "—"}</div>
-                    <div>{(start ?? "—")} - {(end ?? "—")}</div>
-                    <div>{count ?? "—"}</div>
-                    <div>{at ? new Date(at).toLocaleString() : "—"}</div>
-                  </div>
-                );
-              })}
-              {!recentAssignLoading && (!recentAssign || recentAssign.length === 0) ? (
-                <div style={{ padding: 12, color: "#64748b" }}>No recent assignments</div>
-              ) : null}
-            </div>
-          </div>
-        </div>
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
-          <button
-            onClick={() => nav("/admin/e-coupons")}
-            style={{
-              padding: "8px 12px",
-              background: "#0f172a",
-              color: "#fff",
-              border: 0,
-              borderRadius: 8,
-              cursor: "pointer",
-              fontWeight: 700,
-            }}
-          >
-            View all
-          </button>
-        </div>
-
-        <h3 style={{ margin: "8px 0", color: "#0f172a", fontSize: 16, fontWeight: 800 }}>5‑Matrix Quick Viewer</h3>
-            <div
-              style={{
-                border: "1px solid #e2e8f0",
-                borderRadius: 10,
-                background: "#fff",
-                overflow: "auto",
-                maxHeight: 500,
-              }}
-            >
-              <TreeReferralGalaxy mode="admin" preferredSource="matrix" />
-            </div>
-          </div>
+          {/* Model meta load error (non-blocking) */}
+          {modelsErr ? (
+            <div style={{ marginTop: 8, color: "#94a3b8", fontSize: 12 }}>{modelsErr}</div>
+          ) : null}
         </>
-      )}
+      </>
     </div>
   );
 }

@@ -59,6 +59,11 @@ export default function DataTable({
   }, [fetcher, paginationModel, sortModel, search]);
 
   useEffect(() => {
+    // Reset to first page when search text or fetcher (filters) change
+    setPaginationModel((m) => ({ ...m, page: 0 }));
+  }, [search, fetcher]);
+
+  useEffect(() => {
     load();
   }, [load]);
 
@@ -97,19 +102,30 @@ export default function DataTable({
             .replace(/_/g, " ")
             .replace(/\b\w/g, (c) => c.toUpperCase());
         }
-        // Default valueGetter supporting both MUI X signatures (<=v7: params) (v8: value,row)
+        // Default valueGetter robust to MUI X signatures (v8: (value,row,...), v5-v7: (params))
         if (!base.valueGetter) {
-          base.valueGetter = (...args) => {
-            // v8+ signature: (value, row)
-            if (args.length >= 2 && args[1] && typeof args[1] === "object" && !("row" in (args[0] || {}))) {
-              const [, row] = args;
-              return getFieldValue(row, base.field);
-            }
-            // v5-v7 signature: (params)
-            const params = args[0];
-            const row = params?.row || {};
-            return getFieldValue(row, base.field);
-          };
+          const f = String(base.field || "");
+          if (f.startsWith("__")) {
+            // for synthetic columns like "__actions" just return empty value
+            base.valueGetter = () => "";
+          } else {
+            base.valueGetter = (...args) => {
+              try {
+                // v8+ signature: (value, row, ...rest)
+                if (args.length >= 2 && args[1] && typeof args[1] === "object" && !("row" in (args[0] || {}))) {
+                  const [, row] = args;
+                  return getFieldValue(row, base.field);
+                }
+                // v5-v7 signature: (params)
+                const params = args[0] || {};
+                const row = params?.row || {};
+                return getFieldValue(row, base.field);
+              } catch {
+                // Fallback to raw value when anything goes wrong
+                return args && args.length ? args[0] : "";
+              }
+            };
+          }
         }
         // Default renderCell ensures text renders even if theme colors conflict
         if (!base.renderCell) {
@@ -120,11 +136,16 @@ export default function DataTable({
             return String(v);
           };
         }
-        // Default valueFormatter to keep exported/sorted text consistent
+        // Default valueFormatter tolerant of both v7 (params) and v8 (value, ctx) shapes
         if (!base.valueFormatter) {
-          base.valueFormatter = (v) => {
-            if (v == null) return "";
-            return typeof v === "object" ? (v?.username || v?.name || v?.id || JSON.stringify(v)) : String(v);
+          base.valueFormatter = (...args) => {
+            try {
+              const v = args && args.length ? args[0] : undefined;
+              if (v == null) return "";
+              return typeof v === "object" ? (v?.username || v?.name || v?.id || JSON.stringify(v)) : String(v);
+            } catch {
+              return "";
+            }
           };
         }
         // Ensure reasonable width if not specified
@@ -177,7 +198,7 @@ export default function DataTable({
         disableVirtualization
         sx={{
           // Base text color to avoid theme inversion
-          "& .MuiDataGrid-cell": { outline: "none !important", color: "#0f172a !important", backgroundColor: "#ffffff" },
+          "& .MuiDataGrid-cell": { outline: "none !important", color: "#0f172a !important", backgroundColor: "#ffffff", borderRight: "1px solid #e5e7eb" },
           "& .MuiDataGrid-cellContent": { color: "#0f172a !important" },
           "& .MuiDataGrid-columnHeaderTitle": { color: "#0f172a !important", fontWeight: 600 },
           "& .MuiDataGrid-columnHeaderTitleContainerContent": { color: "#0f172a !important" },
@@ -185,7 +206,7 @@ export default function DataTable({
           // Force white backgrounds for all grid surfaces to avoid partial/transparent cells
           "&.MuiDataGrid-root": { backgroundColor: "#ffffff" },
           "& .MuiDataGrid-main": { backgroundColor: "#ffffff" },
-          "& .MuiDataGrid-columnHeaders": { backgroundColor: "#ffffff" },
+          "& .MuiDataGrid-columnHeaders": { backgroundColor: "#ffffff", borderBottom: "1px solid #e5e7eb" },
           "& .MuiDataGrid-virtualScroller": { backgroundColor: "#ffffff" },
           "& .MuiDataGrid-virtualScrollerContent": { backgroundColor: "#ffffff" },
           "& .MuiDataGrid-virtualScrollerRenderZone": { backgroundColor: "#ffffff" },
@@ -198,7 +219,12 @@ export default function DataTable({
           "& .MuiDataGrid-row.Mui-selected": { backgroundColor: "#ffffff !important" },
           "& .MuiDataGrid-row.Mui-selected:hover": { backgroundColor: "#ffffff !important" },
           "& .MuiDataGrid-overlay": { backgroundColor: "#ffffff" },
-          "& .MuiDataGrid-filler": { backgroundColor: "#ffffff" }
+          "& .MuiDataGrid-filler": { backgroundColor: "#ffffff" },
+          // Add table-like borders
+          "& .MuiDataGrid-row": { backgroundColor: "#ffffff", borderBottom: "1px solid #e5e7eb" },
+          "& .MuiDataGrid-columnHeader": { borderRight: "1px solid #e5e7eb" },
+          "& .MuiDataGrid-columnHeader:last-of-type": { borderRight: "none" },
+          "& .MuiDataGrid-cell:last-of-type": { borderRight: "none" }
         }}
       />
     </div>

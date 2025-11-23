@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import API from "../../api/api";
 import { getAdminMeta } from "../../admin-panel/api/adminMeta";
@@ -15,6 +15,22 @@ export default function AdminShell({ children }) {
     typeof window !== "undefined" ? window.innerWidth >= 1024 : true
   );
 
+  // Desktop mini/rail mode (icons only)
+  const [mini, setMini] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("admin.sidebar.mini") === "1";
+  });
+
+  // Collapsible group open state (persisted)
+  const [groupOpen, setGroupOpen] = useState(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      return JSON.parse(localStorage.getItem("admin.sidebar.groups") || "{}");
+    } catch {
+      return {};
+    }
+  });
+
   useEffect(() => {
     function onResize() {
       const m = window.innerWidth < 1024;
@@ -30,56 +46,68 @@ export default function AdminShell({ children }) {
     if (isMobile) setSidebarOpen(false);
   }, [loc.pathname, isMobile]);
 
-  // Admin auth ping to surface clear guidance
+  // Persist mini mode (desktop only)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("admin.sidebar.mini", mini ? "1" : "0");
+    }
+  }, [mini]);
+
+  // Persist group states
+  function updateGroupOpen(updater) {
+    setGroupOpen((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      try {
+        localStorage.setItem("admin.sidebar.groups", JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }
+  function toggleGroup(key) {
+    updateGroupOpen((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+  function isGroupOpen(key, hasActive, effectiveMini) {
+    if (effectiveMini) return true; // always show children when mini (no headers)
+    const v = groupOpen[key];
+    if (v === undefined) return hasActive; // default open if a child is active
+    return v;
+  }
+
+  // Admin auth ping removed to avoid extra network call
   const [authErr, setAuthErr] = useState("");
+  const [adminInfo, setAdminInfo] = useState(null);
+
+  // Admin metrics for badges (KYC, Withdrawals) – fetch only on dashboard route
+  const [metrics, setMetrics] = useState(null);
   useEffect(() => {
     let cancelled = false;
-    API.get("/admin/ping/")
-      .then(() => {
-        if (!cancelled) setAuthErr("");
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        const s = e?.response?.status;
-        if (s === 401) {
-          setAuthErr(
-            "Not authenticated for admin. Login from an /admin/* URL so the admin token namespace is used."
-          );
-        } else if (s === 403) {
-          setAuthErr(
-            "This account lacks admin/staff privileges. Use a staff/superuser account or grant is_staff."
-          );
-        } else {
-          setAuthErr("Admin API not reachable or blocked by network/proxy.");
-        }
-      });
+    let timer = null;
+    const onDashboard = loc.pathname.startsWith("/admin/dashboard");
+    if (!onDashboard) {
+      setMetrics(null);
+      return () => {};
+    }
+    const fetchMetrics = () => {
+      API.get("admin/metrics/", { timeout: 12000, retryAttempts: 1, dedupe: "none" })
+        .then((res) => {
+          if (!cancelled) setMetrics(res?.data || null);
+        })
+        .catch((e) => {
+          const msg = (e && (e.message || e.code)) || "";
+          if (msg === "deduped" || msg === "ERR_CANCELED" || msg === "canceled") return;
+        });
+    };
+    fetchMetrics();
+    timer = setInterval(fetchMetrics, 60000);
     return () => {
       cancelled = true;
+      if (timer) clearInterval(timer);
     };
   }, [loc.pathname]);
 
-  // Nav definition
-  const items = [
-    { to: "/admin/dashboard", label: "Dashboard", icon: "dashboard" },
-    { to: "/admin/user-tree", label: "Genealogy", icon: "tree" },
-    { to: "/admin/users", label: "Users", icon: "users" },
-    { to: "/admin/banners", label: "Banners", icon: "image" },
-    { to: "/admin/orders", label: "Orders", icon: "orders" },
-    { to: "/admin/lucky-draw", label: "Lucky Draw", icon: "ticket" },
-    { to: "/admin/kyc", label: "KYC", icon: "shield" },
-    { to: "/admin/withdrawals", label: "Withdrawals", icon: "wallet" },
-    { to: "/admin/support", label: "Support", icon: "ticket" },
-    { to: "/admin/dashboard/models/business/dailyreport", label: "Reports", icon: "chart" },
-    { to: "/admin/dashboard/models", label: "Developer Service", icon: "box" },
-    { to: "/admin/matrix/five", label: "5‑Matrix", icon: "matrix5" },
-    { to: "/admin/matrix/three", label: "3‑Matrix", icon: "matrix3" },
-    { to: "/admin/autopool", label: "Auto Commission", icon: "pool" },
-  ];
-
-  // Dynamic admin models metadata
+  // Dynamic admin models metadata (loaded, not yet displayed by default)
   const [models, setModels] = useState([]);
   const [modelsErr, setModelsErr] = useState("");
-
   useEffect(() => {
     let mounted = true;
     getAdminMeta()
@@ -89,34 +117,14 @@ export default function AdminShell({ children }) {
         setModelsErr("");
       })
       .catch(() => setModelsErr("Failed to load admin models"));
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, []);
-
-  // Deduplicate dynamic models against static sidebar items to avoid duplicates.
-  const normalize = (s) =>
-    String(s || "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, "")
-      .replace(/s\b/, "");
-  const reservedSet = new Set(items.map((i) => normalize(i.label)));
-  const shouldHideModel = (m) => {
-    const app = String(m?.app_label || "").toLowerCase();
-    const model = String(m?.model || "").toLowerCase();
-    const label = String(m?.verbose_name || m?.model || "");
-    const n = normalize(label);
-    if (reservedSet.has(n)) return true;
-    const has = (t) => n.includes(t) || model.includes(t);
-    // Hide models that have dedicated static pages in the sidebar
-    if (app === "accounts" && has("user")) return true;
-    if (app === "market" && (has("product") || has("banner") || has("order"))) return true;
-    if (app === "uploads" && ((has("dashboard") && has("card")) || (has("home") && has("card")))) return true;
-    return false;
-  };
-  const modelsByApp = React.useMemo(() => {
+  const modelsByApp = useMemo(() => {
     const g = {};
     const seen = new Set();
     (models || []).forEach((m) => {
-      if (shouldHideModel(m)) return;
       const key = `${String(m.app_label || "").toLowerCase()}.${String(m.model || "").toLowerCase()}`;
       if (seen.has(key)) return;
       seen.add(key);
@@ -125,17 +133,21 @@ export default function AdminShell({ children }) {
     return g;
   }, [models]);
 
-  function isActive(to) {
+  // Route active detection
+  function isRouteActive(to) {
     if (to === "/admin/matrix/five" || to === "/admin/matrix/three") {
       return loc.pathname.startsWith("/admin/matrix");
     }
-    return loc.pathname === to;
+    if (to === "/admin/dashboard/models") {
+      return loc.pathname.startsWith("/admin/dashboard/models");
+    }
+    return loc.pathname === to || loc.pathname.startsWith(to + "/");
   }
 
+  // Minimal, generic icons to avoid external deps
   function Icon({ name, active }) {
     const stroke = active ? "#0ea5e9" : "#94a3b8";
     const size = 18;
-    // Minimal, generic icons to avoid external deps
     switch (name) {
       case "dashboard":
         return (
@@ -251,16 +263,104 @@ export default function AdminShell({ children }) {
     }
   }
 
-  function NavLink({ to, label, icon }) {
-    const active = isActive(to);
+  // Navigation groups
+  const groups = [
+    {
+      key: "user",
+      label: "User Management",
+      items: [
+        { to: "/admin/users", label: "Users", icon: "users" },
+        { to: "/admin/user-tree", label: "Genealogy", icon: "tree" },
+      ],
+    },
+    {
+      key: "ops",
+      label: "Operations",
+      items: [
+        { to: "/admin/products", label: "Products", icon: "box" },
+        { to: "/admin/banners", label: "Banners", icon: "image" },
+        { to: "/admin/orders", label: "Orders", icon: "orders" },
+        { to: "/admin/uploads", label: "Uploads", icon: "upload" },
+      ],
+    },
+    {
+      key: "compliance",
+      label: "Compliance & Finance",
+      items: [
+        { to: "/admin/kyc", label: "KYC", icon: "shield" },
+        { to: "/admin/withdrawals", label: "Withdrawals", icon: "wallet" },
+        { to: "/admin/support", label: "Support", icon: "ticket" },
+      ],
+    },
+    {
+      key: "promotions",
+      label: "Promotions",
+      items: [
+        { to: "/admin/lucky-draw", label: "Lucky Draw", icon: "ticket" },
+        { to: "/admin/e-coupons", label: "E‑Coupons", icon: "ticket" },
+      ],
+    },
+    {
+      key: "reports",
+      label: "Reports & Business",
+      items: [
+        { to: "/admin/reports", label: "Reports", icon: "chart" },
+        { to: "/admin/business", label: "Business", icon: "briefcase" },
+      ],
+    },
+    {
+      key: "administration",
+      label: "Administration",
+      items: [
+        { to: "/admin/dashboard/models/auth/user", label: "Admin Users", icon: "users" },
+        { to: "/admin/dashboard/models/auth/group", label: "Roles", icon: "shield" },
+        { to: "/admin/dashboard/models/auth/permission", label: "Permissions", icon: "shield" },
+        { to: "/admin/dashboard/models/auth/group", label: "Role Permissions", icon: "shield" }
+      ],
+    },
+    {
+      key: "commissions",
+      label: "Commissions & Matrix",
+      items: [
+        { to: "/admin/matrix/five", label: "5‑Matrix", icon: "matrix5" },
+        { to: "/admin/matrix/three", label: "3‑Matrix", icon: "matrix3" },
+        { to: "/admin/autopool", label: "Auto Commission", icon: "pool" },
+      ],
+    },
+    {
+      key: "dev",
+      label: "Developer Tools",
+      requiresSuperuser: true,
+      items: [{ to: "/admin/dashboard/models", label: "Developer Service", icon: "box" }],
+    },
+  ];
+
+  const visibleGroups = useMemo(() => {
+    if (!adminInfo) {
+      // Hide superuser-only sections until we know privileges
+      return groups.filter((g) => !g.requiresSuperuser);
+    }
+    return groups.filter((g) => (g.requiresSuperuser ? !!adminInfo.is_superuser : true));
+  }, [adminInfo]);
+
+  const flatItems = visibleGroups.flatMap((g) => g.items);
+
+  function NavLink({ to, label, icon, compact, badge }) {
+    const active = isRouteActive(to);
+    const badgeVal = typeof badge === "number" ? badge : (badge ? Number(badge) : 0);
+    const showBadge = !!badgeVal && badgeVal > 0;
+    const badgeText = badgeVal > 99 ? "99+" : String(badgeVal);
     return (
       <Link
         to={to}
+        title={label}
         style={{
+          position: "relative",
           display: "flex",
           alignItems: "center",
-          gap: 10,
-          padding: "10px 12px",
+          gap: compact ? 0 : 10,
+          justifyContent: compact ? "center" : "flex-start",
+          padding: compact ? "10px 0" : "10px 12px",
           borderRadius: 8,
           color: active ? "#0ea5e9" : "#cbd5e1",
           textDecoration: "none",
@@ -269,15 +369,89 @@ export default function AdminShell({ children }) {
         }}
       >
         <Icon name={icon} active={active} />
-        <span style={{ fontWeight: active ? 700 : 600, fontSize: 14 }}>{label}</span>
+        {!compact ? (
+          <>
+            <span style={{ fontWeight: active ? 700 : 600, fontSize: 14 }}>{label}</span>
+            {showBadge ? (
+              <span
+                aria-label="count"
+                style={{
+                  marginLeft: "auto",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minWidth: 18,
+                  height: 18,
+                  padding: "0 6px",
+                  borderRadius: 999,
+                  background: "#ef4444",
+                  color: "#fff",
+                  fontSize: 11,
+                  fontWeight: 800,
+                  lineHeight: "18px",
+                }}
+              >
+                {badgeText}
+              </span>
+            ) : null}
+          </>
+        ) : null}
+        {compact && showBadge ? (
+          <span
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              top: 4,
+              right: 6,
+              minWidth: 16,
+              height: 16,
+              padding: "0 4px",
+              borderRadius: 999,
+              background: "#ef4444",
+              color: "#fff",
+              fontSize: 10,
+              fontWeight: 800,
+              lineHeight: "16px",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {badgeText}
+          </span>
+        ) : null}
       </Link>
     );
   }
 
   const headerHeightMobile = 56;
-  const sidebarWidth = 260;
+  const sidebarWidthFull = 260;
+  const sidebarWidthMini = 72;
   const sidebarGap = 20;
   const topOffset = isMobile ? headerHeightMobile : 0;
+  const effectiveMini = !isMobile && mini;
+
+  // Helpers to compute group active/open
+  function groupHasActive(g) {
+    return g.items.some((it) => isRouteActive(it.to));
+  }
+
+  function getBadgeFor(to) {
+    try {
+      const m = metrics || {};
+      if (to.startsWith("/admin/kyc")) {
+        const v = m.users && m.users.kycPending;
+        return typeof v === "number" ? v : 0;
+      }
+      if (to.startsWith("/admin/withdrawals")) {
+        const v = m.withdrawals && m.withdrawals.pendingCount;
+        return typeof v === "number" ? v : 0;
+      }
+      return 0;
+    } catch {
+      return 0;
+    }
+  }
 
   return (
     <div className="admin-scope" style={{ minHeight: "100vh", background: "#f1f5f9" }}>
@@ -349,54 +523,124 @@ export default function AdminShell({ children }) {
             top: topOffset,
             left: 0,
             zIndex: 25,
-            width: isMobile ? (sidebarOpen ? sidebarWidth : 0) : sidebarWidth,
-            minWidth: isMobile ? (sidebarOpen ? sidebarWidth : 0) : sidebarWidth,
+            width: isMobile ? (sidebarOpen ? sidebarWidthFull : 0) : (effectiveMini ? sidebarWidthMini : sidebarWidthFull),
+            minWidth: isMobile ? (sidebarOpen ? sidebarWidthFull : 0) : (effectiveMini ? sidebarWidthMini : sidebarWidthFull),
             height: `calc(100dvh - ${topOffset}px)`,
             overflowY: "auto",
             overflowX: "hidden",
             WebkitOverflowScrolling: "touch",
             overscrollBehavior: "contain",
             touchAction: "pan-y",
-            transition: isMobile ? "width 200ms ease, min-width 200ms ease" : "none",
+            transition: isMobile ? "width 200ms ease, min-width 200ms ease" : "width 150ms ease, min-width 150ms ease",
             background: "#0f172a",
             borderRight: "1px solid #0b1220",
-            padding: (isMobile && !sidebarOpen) ? 0 : "12px",
+            padding: isMobile && !sidebarOpen ? 0 : "12px",
           }}
         >
-          {(isMobile && !sidebarOpen) ? null : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <div style={{ color: "#cbd5e1", fontWeight: 900, fontSize: 14, padding: "2px 4px 10px" }}>
-                Admin Menu
-              </div>
-              {items.map((it) => (
-                <NavLink key={it.to} to={it.to} label={it.label} icon={it.icon} />
-              ))}
+          {isMobile && !sidebarOpen ? null : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {/* Desktop header inside sidebar */}
+              {!isMobile ? (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: effectiveMini ? "center" : "space-between", padding: "4px 4px 8px" }}>
+                  {!effectiveMini ? (
+                    <div style={{ color: "#cbd5e1", fontWeight: 900, fontSize: 14 }}>Admin Menu</div>
+                  ) : null}
+                  <button
+                    aria-label="Toggle mini sidebar"
+                    onClick={() => setMini((v) => !v)}
+                    title={effectiveMini ? "Expand sidebar" : "Collapse to icons"}
+                    style={{
+                      marginLeft: "auto",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: 32,
+                      height: 32,
+                      borderRadius: 8,
+                      border: "1px solid #0b1220",
+                      background: "#0c1427",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {/* Simple chevron icon */}
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      {effectiveMini ? (
+                        <>
+                          <polyline points="9 18 15 12 9 6" />
+                        </>
+                      ) : (
+                        <>
+                          <polyline points="15 18 9 12 15 6" />
+                        </>
+                      )}
+                    </svg>
+                  </button>
+                </div>
+              ) : (
+                <div style={{ color: "#cbd5e1", fontWeight: 900, fontSize: 14, padding: "2px 4px 6px" }}>Admin Menu</div>
+              )}
 
-              {/* Dynamic Admin Models in sidebar */}
-              {false ? (
-                <div style={{ marginTop: 8 }}>
-                  <div style={{ color: "#cbd5e1", fontWeight: 900, fontSize: 12, padding: "8px 4px 4px" }}>
-                    Models
-                  </div>
-                  {Object.keys(modelsByApp).sort().map((app) => (
-                    <div key={app} style={{ marginBottom: 6 }}>
-                      <div style={{ color: "#64748b", fontSize: 11, padding: "0 4px 4px" }}>{app}</div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        {modelsByApp[app]
-                          .sort((a, b) => (a.verbose_name || a.model).localeCompare(b.verbose_name || b.model))
-                          .map((m) => (
-                            <NavLink
-                              key={`${m.app_label}.${m.model}`}
-                              to={`/admin/dashboard/models/${m.app_label}/${m.model}`}
-                              label={m.verbose_name || m.model}
-                              icon="box"
-                            />
-                          ))}
-                      </div>
-                    </div>
+              {/* Always show Dashboard on top */}
+              <NavLink to="/admin/dashboard" label="Dashboard" icon="dashboard" compact={effectiveMini} badge={getBadgeFor("/admin/dashboard")} />
+
+              {/* In mini mode, flatten all links; in full mode, show collapsible groups */}
+              {effectiveMini ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {flatItems.map((it) => (
+                    <NavLink key={it.to} to={it.to} label={it.label} icon={it.icon} compact badge={getBadgeFor(it.to)} />
                   ))}
                 </div>
-              ) : null}
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {visibleGroups.map((g) => {
+                    const active = groupHasActive(g);
+                    const open = isGroupOpen(g.key, active, effectiveMini);
+                    return (
+                      <div key={g.key} style={{}}>
+                        <button
+                          onClick={() => toggleGroup(g.key)}
+                          aria-expanded={open}
+                          style={{
+                            width: "100%",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            padding: "8px 10px",
+                            borderRadius: 8,
+                            border: "1px solid #0b1220",
+                            background: active ? "#0c1427" : "#0a1120",
+                            color: active ? "#93c5fd" : "#94a3b8",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <span style={{ fontWeight: 700, fontSize: 12, letterSpacing: 0.2 }}>{g.label}</span>
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke={active ? "#93c5fd" : "#94a3b8"}
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 120ms ease" }}
+                            aria-hidden="true"
+                          >
+                            <polyline points="9 18 15 12 9 6" />
+                          </svg>
+                        </button>
+                        {open ? (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 6 }}>
+                            {g.items.map((it) => (
+                              <NavLink key={it.to} to={it.to} label={it.label} icon={it.icon} compact={false} badge={getBadgeFor(it.to)} />
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
               <div style={{ marginTop: 8, borderTop: "1px solid #0b1220" }} />
               <div style={{ color: "#64748b", fontSize: 11, padding: "8px 4px" }}>
@@ -412,7 +656,7 @@ export default function AdminShell({ children }) {
             flex: 1,
             minWidth: 0,
             padding: isMobile ? 12 : 16,
-            marginLeft: isMobile ? 0 : (sidebarWidth + sidebarGap),
+            marginLeft: isMobile ? 0 : ((effectiveMini ? sidebarWidthMini : sidebarWidthFull) + sidebarGap),
             width: "100%",
           }}
         >

@@ -90,7 +90,7 @@ export default function ReferAndEarn({ title = "Refer & Earn", onlyConsumer = fa
   // Employees and Sub‑Franchise should also get Consumer and Sub‑Franchise links
   const showEmployeeLink = !onlyConsumer && (isEmployee || isSubFranchise);
   const showConsumerLink = onlyConsumer || isEmployee || isSubFranchise || (!isEmployee && !isSubFranchise);
-  const showSubFranchiseLink = !onlyConsumer && (isEmployee || isSubFranchise);
+  const showSubFranchiseLink = onlyConsumer && (isEmployee || isSubFranchise);
 
   const getLink = (role, extra = {}) => {
     const params = new URLSearchParams({
@@ -176,7 +176,7 @@ export default function ReferAndEarn({ title = "Refer & Earn", onlyConsumer = fa
               sx={{ textTransform: "none" }}
               onClick={() => shareNative(links.consumer, buildShareText("Consumer"))}
             >
-              Share
+              Share Consumer
             </Button>
             {/* <Button
               variant="outlined"
@@ -192,13 +192,13 @@ export default function ReferAndEarn({ title = "Refer & Earn", onlyConsumer = fa
             >
               Telegram
             </Button> */}
-            <Button
+            {/* <Button
               variant="contained"
               sx={{ textTransform: "none" }}
               onClick={() => copy(links.consumer)}
             >
               Copy
-            </Button>
+            </Button> */}
           </Stack>
         )}
 
@@ -215,7 +215,7 @@ export default function ReferAndEarn({ title = "Refer & Earn", onlyConsumer = fa
             >
               Share Employee
             </Button>
-            <Button
+            {/* <Button
               variant="outlined"
               sx={{ textTransform: "none" }}
               onClick={() =>
@@ -245,20 +245,20 @@ export default function ReferAndEarn({ title = "Refer & Earn", onlyConsumer = fa
               }
             >
               Copy Employee
-            </Button>
+            </Button> */}
           </Stack>
         )}
 
         {showSubFranchiseLink && (
           <Stack direction="row" spacing={1} alignItems="center">
-            <Button
+            {/* <Button
               variant="outlined"
               sx={{ textTransform: "none" }}
               onClick={() => shareNative(links.subFranchise, buildShareText("Sub‑Franchise"))}
             >
               Share Sub‑Franchise
-            </Button>
-            <Button
+            </Button> */}
+            {/* <Button
               variant="outlined"
               sx={{ textTransform: "none" }}
               onClick={() => openNew(getWhatsAppUrl(links.subFranchise, buildShareText("Sub‑Franchise")))}
@@ -278,7 +278,7 @@ export default function ReferAndEarn({ title = "Refer & Earn", onlyConsumer = fa
               onClick={() => copy(links.subFranchise)}
             >
               Copy Sub‑Franchise
-            </Button>
+            </Button> */}
           </Stack>
         )}
       </Stack>
