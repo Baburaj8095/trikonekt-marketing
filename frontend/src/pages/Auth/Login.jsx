@@ -48,6 +48,7 @@ import {
   Home as HomeIcon,
   Mail as MailIcon,
   Phone as PhoneIcon,
+  CheckCircle as CheckCircleIcon,
 } from "@mui/icons-material";
 
 import "@fontsource/poppins";
@@ -140,6 +141,11 @@ const Login = () => {
 
   const [sponsorId, setSponsorId] = useState("");
   const [agencyLevel, setAgencyLevel] = useState("");
+
+  // Live Sponsor validation state
+  const [sponsorChecking, setSponsorChecking] = useState(false);
+  const [sponsorValid, setSponsorValid] = useState(null); // null unknown, true valid, false invalid
+  const [sponsorDisplay, setSponsorDisplay] = useState({ name: "", pincode: "", username: "" });
 
   // Non-agency (Consumer/Employee) sponsor-driven pincode selection
   const [sponsorConsumerPincodes, setSponsorConsumerPincodes] = useState([]);
@@ -636,6 +642,55 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
 
 
 
+  // Live Sponsor validation (register): verify sponsor exists and show identity
+  useEffect(() => {
+    if (mode !== "register") {
+      setSponsorValid(null);
+      return;
+    }
+    const s = normalizeSponsor(sponsorId);
+    if (!s) {
+      setSponsorValid(null);
+      setSponsorDisplay({ name: "", pincode: "", username: "" });
+      return;
+    }
+    setSponsorChecking(true);
+    const t = setTimeout(async () => {
+      let exists = false;
+      let name = "";
+      let pcode = "";
+      let uname = s;
+      try {
+        // Try hierarchy endpoint to fetch user basic info
+        try {
+          const h = await API.get("/accounts/hierarchy/", { params: { username: s } });
+          const u = h?.data?.user || h?.data || {};
+          if (u && u.username) {
+            exists = true;
+            uname = u.username;
+            name = u.full_name || "";
+            pcode = u.pincode || "";
+          }
+        } catch (_) {}
+        // Fallback: regions/by-sponsor existence check
+        if (!exists) {
+          try {
+            await API.get("/accounts/regions/by-sponsor/", { params: { sponsor: s, level: "state" } });
+            exists = true;
+          } catch (_) {}
+        }
+      } finally {
+        setSponsorValid(exists);
+        setSponsorDisplay({ name, pincode: pcode, username: uname });
+        setSponsorChecking(false);
+      }
+    }, 450);
+    return () => {
+      setSponsorChecking(false);
+      clearTimeout(t);
+    };
+  }, [mode, sponsorId]);
+
   // Effective pincode options for consumer/employee (intersect when both available)
   const pincodeOptionsConsumer = useMemo(() => {
     return Array.isArray(sponsorConsumerPincodes) ? sponsorConsumerPincodes : [];
@@ -991,6 +1046,34 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
     placeholder: "Enter username",
   };
 
+  // Pretty-print role for contextual login error message
+  const prettyRole = (r) =>
+    ({
+      user: "Consumer",
+      agency: "Agency",
+      employee: "Employee",
+      business: "Business",
+    }[String(r || "").toLowerCase()] || String(r || ""));
+
+  // Resolve registered role/category for a username to detect role mismatch before login
+  const resolveRegisteredRole = async (uname) => {
+    try {
+      const r = await API.get("/accounts/hierarchy/", { params: { username: String(uname || "").trim() } });
+      const u = r?.data?.user || r?.data || {};
+      let ro = (u?.role || "").toLowerCase();
+      if (!ro) {
+        const c = (u?.category || "").toLowerCase();
+        if (c.startsWith("agency")) ro = "agency";
+        else if (c === "consumer") ro = "user";
+        else if (c === "employee") ro = "employee";
+        else if (c === "business") ro = "business";
+      }
+      return ro || null;
+    } catch {
+      return null;
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -999,6 +1082,13 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
         // Accept username or phone; backend resolves and disambiguates if needed
         let username = (formData.username || "").trim();
         const submitRole = role;
+
+        // Preflight: resolve user's registered role and show a targeted mismatch error
+        const resolved = await resolveRegisteredRole(username);
+        if (resolved && resolved !== submitRole) {
+          setErrorMsg(`You are registered as ${prettyRole(resolved)} but trying to login as ${prettyRole(submitRole)}.`);
+          return;
+        }
 
         const res = await API.post("/accounts/login/", {
           username,
@@ -1128,6 +1218,11 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
     // Sponsor ID mandatory (from URL param or manual entry)
     if (!sponsorId) {
       setErrorMsg("Sponsor Username is required");
+      return;
+    }
+    // If validation ran and sponsor is invalid, block submission with targeted message
+    if (sponsorValid === false) {
+      setErrorMsg("Invalid Sponsor Username. Please correct the Sponsor ID.");
       return;
     }
 
@@ -1931,19 +2026,47 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
                   borderColor: "#e0e0e0",
                   justifyContent: "flex-start",
                 },
+                "& .MuiToggleButton-root.Mui-selected": {
+                  borderColor: "#2e7d32",
+                  backgroundColor: "rgba(46,125,50,0.08)",
+                  color: "#2e7d32",
+                },
+                "& .MuiToggleButton-root.Mui-selected:hover": {
+                  backgroundColor: "rgba(46,125,50,0.12)",
+                },
               }}
             >
               <ToggleButton value="user" aria-label="consumer">
-                <PersonIcon sx={{ mr: 1 }} /> Consumer
+                <Box sx={{ display: "flex", alignItems: "center", width: "100%", justifyContent: "space-between" }}>
+                  <Box sx={{ display: "flex", alignItems: "center" }}>
+                    <PersonIcon sx={{ mr: 1 }} /> Consumer
+                  </Box>
+                  {role === "user" && <CheckCircleIcon color="success" fontSize="small" />}
+                </Box>
               </ToggleButton>
               <ToggleButton value="agency" aria-label="agency">
-                <StoreIcon sx={{ mr: 1 }} /> Agency
+                <Box sx={{ display: "flex", alignItems: "center", width: "100%", justifyContent: "space-between" }}>
+                  <Box sx={{ display: "flex", alignItems: "center" }}>
+                    <StoreIcon sx={{ mr: 1 }} /> Agency
+                  </Box>
+                  {role === "agency" && <CheckCircleIcon color="success" fontSize="small" />}
+                </Box>
               </ToggleButton>
               <ToggleButton value="employee" aria-label="employee">
-                <WorkIcon sx={{ mr: 1 }} /> Employee
+                <Box sx={{ display: "flex", alignItems: "center", width: "100%", justifyContent: "space-between" }}>
+                  <Box sx={{ display: "flex", alignItems: "center" }}>
+                    <WorkIcon sx={{ mr: 1 }} /> Employee
+                  </Box>
+                  {role === "employee" && <CheckCircleIcon color="success" fontSize="small" />}
+                </Box>
               </ToggleButton>
               <ToggleButton value="business" aria-label="business">
-                <BusinessIcon sx={{ mr: 1 }} /> Business
+                <Box sx={{ display: "flex", alignItems: "center", width: "100%", justifyContent: "space-between" }}>
+                  <Box sx={{ display: "flex", alignItems: "center" }}>
+                    <BusinessIcon sx={{ mr: 1 }} /> Business
+                  </Box>
+                  {role === "business" && <CheckCircleIcon color="success" fontSize="small" />}
+                </Box>
               </ToggleButton>
             </ToggleButtonGroup>
           </Box>
@@ -1957,21 +2080,40 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
                 {renderRegistrationFields()}
 
                 {!isAgency && (
-                  <TextField
-                    fullWidth
-                    label="Sponsor Username"
-                    value={sponsorId}
-                    onChange={(e) => setSponsorId(e.target.value)}
-                    required
-                    sx={{ mb: 2 }}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <HomeIcon />
-                        </InputAdornment>
-                      ),
-                    }}
-                  />
+                  <Box sx={{ textAlign: "left" }}>
+                    <TextField
+                      fullWidth
+                      label="Sponsor Username"
+                      value={sponsorId}
+                      onChange={(e) => setSponsorId(e.target.value)}
+                      required
+                      sx={{ mb: 1 }}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <HomeIcon />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                    {sponsorChecking && (
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+                        <CircularProgress size={16} />
+                        <Typography variant="body2" color="text.secondary">Validating sponsor…</Typography>
+                      </Box>
+                    )}
+                    {sponsorValid === true && (
+                      <Alert severity="success" sx={{ mb: 1 }}>
+                        Verified Sponsor: {sponsorDisplay.name || sponsorDisplay.username}
+                        {sponsorDisplay.pincode ? ` (Pincode: ${sponsorDisplay.pincode})` : ""}
+                      </Alert>
+                    )}
+                    {sponsorValid === false && (
+                      <Alert severity="error" sx={{ mb: 1 }}>
+                        Invalid Sponsor ID. Please correct the Sponsor ID.
+                      </Alert>
+                    )}
+                  </Box>
                 )}
 
 

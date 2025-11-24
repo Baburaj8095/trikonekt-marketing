@@ -16,7 +16,7 @@ def agency_pin(user):
 
 @admin.register(FileUpload)
 class FileUploadAdmin(admin.ModelAdmin):
-    list_display = ("id", "file_thumb", "title", "user", "user_pincode", "user_city", "user_state", "user_country", "file", "created_at")
+    list_display = ("id", "file_thumb", "title", "user", "user_pincode", "file", "created_at")
     list_filter = ("created_at", "user")
     search_fields = ("title", "user__username")
     ordering = ("-created_at",)
@@ -244,9 +244,6 @@ class LuckyDrawSubmissionAdmin(admin.ModelAdmin):
         "agency_pincode",
         "tr_referral_id",
         "tr_emp_id",
-        "user_city",
-        "user_state",
-        "user_country",
         "image_thumb",
         "created_at",
     )
@@ -434,18 +431,12 @@ class JobApplicationAdmin(admin.ModelAdmin):
         return super().changelist_view(request, extra_context)
 
 
-@admin.register(AgencyCouponQuota)
-class AgencyCouponQuotaAdmin(admin.ModelAdmin):
-    list_display = ("agency", "quota", "updated_at", "created_at")
-    search_fields = ("agency__username", "agency__pincode")
-    autocomplete_fields = ("agency",)
-    ordering = ("-updated_at",)
 
 # Conditionally register JobApplication admin only if the DB table exists
 try:
     tables = connection.introspection.table_names()
     if JobApplication._meta.db_table in tables:
-        admin.site.register(JobApplication, JobApplicationAdmin)
+        pass
 except Exception:
     # During migrations or initial setup, table may not exist; skip registration
     pass

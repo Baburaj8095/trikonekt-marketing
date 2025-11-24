@@ -20,6 +20,7 @@ from .views import (
     AdminMatrixTree,
     AdminMatrix5Tree,
     AdminAutopoolSummary,
+    AdminAutopoolTransactionList,
     # Support
     AdminSupportTicketList,
     AdminSupportTicketUpdate,
@@ -61,6 +62,7 @@ urlpatterns = [
     path("matrix/tree/", AdminMatrixTree.as_view()),
     path("matrix/tree5/", AdminMatrix5Tree.as_view()),
     path("autopool/summary/", AdminAutopoolSummary.as_view()),
+    path("autopool/transactions/", AdminAutopoolTransactionList.as_view()),
 
     # Support tickets
     path("support/tickets/", AdminSupportTicketList.as_view()),

@@ -229,3 +229,26 @@ class WithholdingReserveAdmin(admin.ModelAdmin):
     raw_id_fields = ("user",)
     readonly_fields = ("created_at", "updated_at")
     ordering = ("-created_at",)
+
+# ======================
+# Prune Business admin: keep only CommissionConfig and DailyReport
+# ======================
+from django.contrib.admin.sites import NotRegistered as _AdminNotRegistered
+
+def _try_unregister(model_cls):
+    try:
+        admin.site.unregister(model_cls)
+    except _AdminNotRegistered:
+        pass
+    except Exception:
+        pass
+
+# Unregister business models not requested
+_try_unregister(BusinessRegistration)
+_try_unregister(AutoPoolAccount)
+_try_unregister(RewardProgress)
+_try_unregister(RewardRedemption)
+_try_unregister(UserMatrixProgress)
+_try_unregister(ReferralJoinPayout)
+_try_unregister(FranchisePayout)
+_try_unregister(WithholdingReserve)

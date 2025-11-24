@@ -82,13 +82,13 @@ export default function AdminShell({ children }) {
   useEffect(() => {
     let cancelled = false;
     let timer = null;
-    const onDashboard = loc.pathname.startsWith("/admin/dashboard");
-    if (!onDashboard) {
+    const onDashboardRoot = loc.pathname === "/admin/dashboard";
+    if (onDashboardRoot) {
       setMetrics(null);
       return () => {};
     }
     const fetchMetrics = () => {
-      API.get("admin/metrics/", { timeout: 12000, retryAttempts: 1, dedupe: "none" })
+      API.get("admin/metrics/", { timeout: 12000, retryAttempts: 1, cacheTTL: 15000, dedupe: "cancelPrevious" })
         .then((res) => {
           if (!cancelled) setMetrics(res?.data || null);
         })

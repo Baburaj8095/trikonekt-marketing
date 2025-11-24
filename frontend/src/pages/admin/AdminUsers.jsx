@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState, useEffect } from "react";
 import API from "../../api/api";
 import DataTable from "../../admin-panel/components/data/DataTable";
 import ModelFormDialog from "../../admin-panel/dynamic/ModelFormDialog";
+import { useLocation } from "react-router-dom";
 
 function TextInput({ label, value, onChange, placeholder, style }) {
   return (
@@ -59,12 +60,42 @@ export default function AdminUsers() {
     pincode: "",
     state: "",
     kyc: "",
+    activated: "",
   });
   const [density, setDensity] = useState("standard");
   const [reloadKey, setReloadKey] = useState(0);
   const [editOpen, setEditOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [tempPw, setTempPw] = useState({});
+  // Mobile responsiveness hint
+  const [isMobile, setIsMobile] = useState(typeof window !== "undefined" ? window.innerWidth < 640 : false);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  // Hide less important columns on small screens for better readability
+  const mobileHiddenCols = useMemo(
+    () =>
+      isMobile
+        ? {
+            email: false,
+            sponsor_id: false,
+            country_name: false,
+            district_name: false,
+            state_name: false,
+            wallet_status: false,
+            kyc_verified_at: false,
+            pincode: false,
+          }
+        : {},
+    [isMobile]
+  );
+  const [colVis, setColVis] = useState({});
+  useEffect(() => {
+    setColVis(mobileHiddenCols);
+  }, [mobileHiddenCols]);
 
   function setF(key, val) {
     setFilters((f) => ({ ...f, [key]: val }));
@@ -175,6 +206,27 @@ export default function AdminUsers() {
     };
   }, []);
 
+  // Sync '?activated=1|0|true|false' from URL into filters.activated
+  const location = useLocation();
+  useEffect(() => {
+    const params = new URLSearchParams(location.search || "");
+    const raw = (params.get("activated") || "").toLowerCase();
+    const norm = ["1","true","yes","activated"].includes(raw)
+      ? "1"
+      : (["0","false","no","inactive","not_activated","unactivated","notactivated"].includes(raw) ? "0" : "");
+    setFilters((f) => {
+      if ((f.activated || "") !== norm) {
+        return { ...f, activated: norm };
+      }
+      return f;
+    });
+  }, [location.search]);
+
+  // Trigger reload when activated filter changes
+  useEffect(() => {
+    setReloadKey((k) => k + 1);
+  }, [filters.activated]);
+
   const roleOptions = useMemo(
     () => [
       { value: "", label: "Any role" },
@@ -234,25 +286,6 @@ export default function AdminUsers() {
         renderCell: (params) => {
           const row = params?.row || {};
           const uname = row.username || "—";
-
-          const onLogin = async (e) => {
-            e?.stopPropagation?.();
-            try {
-              if (!row?.id) return;
-              const res = await API.post(`/admin/users/${row.id}/impersonate/`);
-              const { access, refresh, role } = res?.data || {};
-              if (!access || !refresh) return;
-              // Robust namespace detection: use API role or row.role/category
-              const r = String(role || row?.role || "").toLowerCase();
-              const c = String(row?.category || "").toLowerCase();
-              const pickNs = (s) => (s.startsWith("agency") ? "agency" : s.startsWith("employee") ? "employee" : "");
-              let ns = pickNs(r) || pickNs(c) || (r === "agency" ? "agency" : r === "employee" ? "employee" : "user");
-              const base = ns === "user" ? "" : `/${ns}`;
-              const url = `${base}/impersonate?access=${encodeURIComponent(access)}&refresh=${encodeURIComponent(refresh)}&ns=${encodeURIComponent(ns)}`;
-              window.location.assign(url);
-            } catch (_) {}
-          };
-
           return (
             <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
               <button
@@ -263,15 +296,52 @@ export default function AdminUsers() {
               >
                 {uname}
               </button>
-              <button
-                type="button"
-                onClick={onLogin}
-                title="Login as this TR"
-                style={{ border: "1px solid #e2e8f0", borderRadius: 6, padding: "2px 6px", background: "#fff", cursor: "pointer" }}
-              >
-                🔑
-              </button>
             </div>
+          );
+        },
+      },
+      {
+        field: "__login",
+        headerName: "Login",
+        minWidth: 110,
+        sortable: false,
+        filterable: false,
+        renderCell: (params) => {
+          const row = params?.row || {};
+          const onLogin = async (e) => {
+            e?.stopPropagation?.();
+            try {
+              if (!row?.id) return;
+              const res = await API.post(`/admin/users/${row.id}/impersonate/`);
+              const { access, refresh, role } = res?.data || {};
+              if (!access || !refresh) return;
+              const r = String(role || row?.role || "").toLowerCase();
+              const c = String(row?.category || "").toLowerCase();
+              const pickNs = (s) => (s.startsWith("agency") ? "agency" : s.startsWith("employee") ? "employee" : "");
+              let ns = pickNs(r) || pickNs(c) || (r === "agency" ? "agency" : r === "employee" ? "employee" : "user");
+              const base = ns === "user" ? "" : `/${ns}`;
+              const url = `${base}/impersonate?access=${encodeURIComponent(access)}&refresh=${encodeURIComponent(refresh)}&ns=${encodeURIComponent(ns)}`;
+              window.location.assign(url);
+            } catch (_) {}
+          };
+          return (
+            <button
+              type="button"
+              onClick={onLogin}
+              title="Login as this user"
+              style={{
+                borderRadius: 8,
+                padding: "6px 10px",
+                background: "#2563eb",
+                color: "#fff",
+                border: "1px solid #1d4ed8",
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 700,
+              }}
+            >
+              Login
+            </button>
           );
         },
       },
@@ -279,10 +349,100 @@ export default function AdminUsers() {
       { field: "sponsor_id", headerName: "Sponsor ID", minWidth: 160 },
       { field: "phone", headerName: "Mobile", minWidth: 140 },
       { field: "email", headerName: "Email", minWidth: 200, flex: 1 },
+      {
+        field: "kyc_status",
+        headerName: "KYC",
+        minWidth: 120,
+        renderCell: (params) => {
+          const row = params?.row || {};
+          const verified = !!row.kyc_verified;
+          const label = verified ? "Verified" : (row.kyc_status || "Pending");
+          const bg = verified ? "#10b981" : "#ffffff"; // green / white
+          const color = verified ? "#ffffff" : "#b45309"; // white on green, amber-700 text
+          const border = verified ? "1px solid #059669" : "1px solid #f59e0b";
+          // Button-like styling for Pending and Verified
+          const btnStyles = verified
+            ? { backgroundColor: "#10b981", border: "1px solid #059669", color: "#ffffff" }
+            : { backgroundColor: "#f59e0b", border: "1px solid #d97706", color: "#ffffff" };
+          return (
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: isMobile ? "2px 8px" : "3px 8px",
+                borderRadius: 8,
+                fontSize: isMobile ? 11 : 12,
+                fontWeight: 700,
+                lineHeight: 1,
+                ...btnStyles,
+              }}
+              title={label}
+            >
+              {label}
+            </div>
+          );
+        },
+      },
+      {
+        field: "kyc_verified_at",
+        headerName: "KYC Verified At",
+        minWidth: 170,
+        valueFormatter: (v) => {
+          if (!v) return "";
+          try { return new Date(v).toLocaleString(); } catch (_) { return String(v); }
+        },
+      },
       { field: "pincode", headerName: "Pincode", minWidth: 110 },
       { field: "district_name", headerName: "District", minWidth: 150 },
       { field: "state_name", headerName: "State", minWidth: 150 },
       { field: "country_name", headerName: "Country", minWidth: 150 },
+      {
+        field: "commission_level",
+        headerName: isMobile ? "Level" : "Commission Level",
+        minWidth: isMobile ? 110 : 150,
+        renderCell: (params) => {
+          const lvl = Number(params?.row?.commission_level || 0);
+          const baseStyle = {
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: isMobile ? "2px 8px" : "3px 8px",
+            borderRadius: 8,
+            fontSize: isMobile ? 11 : 12,
+            fontWeight: 700,
+            lineHeight: 1,
+          };
+          if (!lvl) {
+            return (
+              <div
+                style={{
+                  ...baseStyle,
+                  backgroundColor: "#f1f5f9", // slate-100
+                  border: "1px solid #cbd5e1", // slate-300
+                  color: "#0f172a",
+                }}
+                title="No level"
+              >
+                —
+              </div>
+            );
+          }
+          return (
+            <div
+              style={{
+                ...baseStyle,
+                backgroundColor: "#7c3aed", // violet-600
+                border: "1px solid #6d28d9", // violet-700
+                color: "#ffffff",
+              }}
+              title={`Level L${lvl}`}
+            >
+              L{lvl}
+            </div>
+          );
+        },
+      },
       {
         field: "wallet_balance",
         headerName: "Wallet",
@@ -303,35 +463,8 @@ export default function AdminUsers() {
           try { return new Date(v).toLocaleString(); } catch (_) { return String(v); }
         },
       },
-      {
-        field: "is_active",
-        headerName: "Status",
-        minWidth: 150,
-        renderCell: (params) => {
-          const row = params?.row || {};
-          const checked = !!row.is_active;
-          const onToggle = async (e) => {
-            e?.stopPropagation?.();
-            try {
-              await API.patch(`/admin/users/${row.id}/`, { is_active: !checked });
-              setReloadKey((k) => k + 1);
-            } catch (_) {}
-          };
-          return (
-            <label style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={checked}
-                onChange={onToggle}
-                onClick={(e) => e.stopPropagation()}
-              />
-              <span>{checked ? "Active" : "Inactive"}</span>
-            </label>
-          );
-        },
-      },
     ],
-    [openEdit, setReloadKey, tempPw]
+    [openEdit, setReloadKey, tempPw, isMobile]
   );
 
   // Server-side fetcher for DataTable
@@ -487,6 +620,8 @@ export default function AdminUsers() {
         toolbar={toolbar}
         checkboxSelection={true}
         onSelectionChange={() => {}}
+        columnVisibilityModel={colVis}
+        onColumnVisibilityModelChange={setColVis}
       />
       <ModelFormDialog
         open={editOpen}

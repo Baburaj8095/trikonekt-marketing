@@ -202,6 +202,87 @@ class CouponBatch(models.Model):
         return f"{self.prefix}{str(self.serial_start).zfill(self.serial_width)}-{self.prefix}{str(self.serial_end).zfill(self.serial_width)}"
 
 
+class ECouponPaymentConfig(models.Model):
+    title = models.CharField(max_length=100)
+    upi_qr_image = models.ImageField(upload_to="uploads/ecoupon_payment/", null=True, blank=True)
+    upi_id = models.CharField(max_length=100, blank=True)
+    payee_name = models.CharField(max_length=100, blank=True)
+    instructions = models.TextField(blank=True)
+    is_active = models.BooleanField(default=False)
+    created_by = models.ForeignKey(UserModel, on_delete=models.SET_NULL, null=True, blank=True, related_name="created_payment_configs")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.title} ({'Active' if self.is_active else 'Inactive'})"
+
+
+class ECouponProduct(models.Model):
+    coupon = models.ForeignKey(Coupon, on_delete=models.PROTECT, related_name="store_products")
+    denomination = models.DecimalField(max_digits=8, decimal_places=2)
+    price_per_unit = models.DecimalField(max_digits=10, decimal_places=2)
+    enable_consumer = models.BooleanField(default=True)
+    enable_agency = models.BooleanField(default=True)
+    enable_employee = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True)
+    max_per_order = models.PositiveIntegerField(null=True, blank=True)
+    display_title = models.CharField(max_length=150)
+    display_desc = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["is_active"]),
+            models.Index(fields=["denomination"]),
+        ]
+
+    def __str__(self):
+        return f"{self.display_title} ₹{self.price_per_unit}"
+
+
+class ECouponOrder(models.Model):
+    STATUS_CHOICES = (
+        ("SUBMITTED", "SUBMITTED"),
+        ("APPROVED", "APPROVED"),
+        ("REJECTED", "REJECTED"),
+        ("CANCELLED", "CANCELLED"),
+    )
+
+    buyer = models.ForeignKey(UserModel, on_delete=models.PROTECT, related_name="ecoupon_orders")
+    role_at_purchase = models.CharField(max_length=20)  # consumer | agency | employee
+    product = models.ForeignKey(ECouponProduct, on_delete=models.PROTECT, related_name="orders")
+    denomination_snapshot = models.DecimalField(max_digits=8, decimal_places=2)
+    quantity = models.PositiveIntegerField()
+    amount_total = models.DecimalField(max_digits=12, decimal_places=2)
+
+    payment_config = models.ForeignKey(ECouponPaymentConfig, on_delete=models.SET_NULL, null=True, blank=True, related_name="orders")
+    payment_proof_file = models.FileField(upload_to="uploads/ecoupon_orders/", null=True, blank=True)
+    utr = models.CharField(max_length=100, blank=True)
+    notes = models.TextField(blank=True)
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="SUBMITTED", db_index=True)
+    reviewer = models.ForeignKey(UserModel, on_delete=models.SET_NULL, null=True, blank=True, related_name="reviewed_ecoupon_orders")
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_note = models.TextField(blank=True)
+
+    allocated_count = models.PositiveIntegerField(default=0)
+    allocated_sample_codes = models.JSONField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["status"]),
+            models.Index(fields=["buyer"]),
+        ]
+
+    def __str__(self):
+        return f"Order #{self.id} by {getattr(self.buyer, 'username', '')} [{self.status}]"
+
 class Commission(models.Model):
     ROLE_CHOICES = (
         ("agency", "Agency"),

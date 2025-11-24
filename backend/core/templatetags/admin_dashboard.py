@@ -8,14 +8,10 @@ register = template.Library()
 DEFAULT_CARDS = [
     {"title": "Users", "model": "accounts.CustomUser", "icon": "users", "color": "primary"},
     {"title": "Pending KYC", "model": "accounts.UserKYC", "filters": {"verified": False}, "icon": "kyc", "color": "accent"},
-    {"title": "Wallets", "model": "accounts.Wallet", "icon": "wallet", "color": "secondary"},
-    {"title": "Transactions", "model": "accounts.WalletTransaction", "icon": "receipt", "color": "primary"},
-    {"title": "Withdrawals", "model": "accounts.WithdrawalRequest", "icon": "withdrawal", "color": "secondary"},
-    {"title": "Withdrawals Pending", "model": "accounts.WithdrawalRequest", "filters": {"status": "pending"}, "icon": "withdrawal", "color": "danger"},
-    {"title": "E-Coupon Submissions", "model": "coupons.CouponSubmission", "icon": "coupon", "color": "accent"},
+    {"title": "E‑Coupons", "model": "coupons.CouponSubmission", "icon": "coupon", "color": "accent"},
+    {"title": "Products", "model": "market.Product", "icon": "image", "color": "secondary"},
     {"title": "Lucky Draw Submissions", "model": "uploads.LuckyDrawSubmission", "icon": "ticket", "color": "secondary"},
-    {"title": "Lucky Draw Pending TRE", "model": "uploads.LuckyDrawSubmission", "filters": {"status": "SUBMITTED"}, "icon": "ticket", "color": "accent"},
-    {"title": "Lucky Draw Pending Agency", "model": "uploads.LuckyDrawSubmission", "filters": {"status": "TRE_APPROVED"}, "icon": "ticket", "color": "accent"},
+    {"title": "Withdrawals Pending", "model": "accounts.WithdrawalRequest", "filters": {"status": "pending"}, "icon": "withdrawal", "color": "danger"},
 ]
 
 
@@ -181,23 +177,23 @@ def default_menu():
     """
     return [
         {"title": "Dashboard", "icon": "fa-solid fa-gauge", "url": "/admin/"},
-        {"title": "Genealogy", "icon": "fa-solid fa-sitemap", "url": "#"},
         {"title": "Users", "icon": "fa-solid fa-users", "url": "accounts.CustomUser"},
-        {"title": "Products", "icon": "fa-solid fa-box", "url": "market.Product"},
-        {"title": "Banners", "icon": "fa-solid fa-image", "url": "market.Banner"},
-        {"title": "Orders", "icon": "fa-solid fa-clipboard-list", "url": "market.PurchaseRequest"},
-        {"title": "Uploads", "icon": "fa-solid fa-upload", "url": "uploads.Upload"},
-        {"title": "Dashboard Cards", "icon": "fa-solid fa-border-all", "url": "#"},
-        {"title": "Home Cards", "icon": "fa-solid fa-house", "url": "#"},
-        {"title": "Lucky Draw", "icon": "fa-solid fa-ticket", "url": "#"},
-        {"title": "KYC", "icon": "fa-solid fa-id-card", "url": "accounts.UserKYC"},
-        {"title": "Withdrawals", "icon": "fa-solid fa-money-bill-transfer", "url": "accounts.WithdrawalRequest"},
         {"title": "E‑Coupons", "icon": "fa-solid fa-ticket-simple", "url": "coupons.CouponSubmission"},
-        {"title": "Business", "icon": "fa-solid fa-briefcase", "url": "#"},
-        {"title": "Reports", "icon": "fa-solid fa-chart-line", "url": "#"},
-        {"title": "5‑Matrix", "icon": "fa-solid fa-diagram-project", "url": "#"},
-        {"title": "3‑Matrix", "icon": "fa-solid fa-diagram-project", "url": "#"},
-        {"title": "Auto Commission", "icon": "fa-solid fa-sack-dollar", "url": "#"},
+        {"title": "Products", "icon": "fa-solid fa-box", "url": "market.Product"},
+        {
+            "title": "Uploads",
+            "icon": "fa-solid fa-upload",
+            "children": [
+                {"title": "File Uploads", "url": "uploads.FileUpload"},
+                {"title": "Dashboard Cards", "url": "uploads.DashboardCard"},
+                {"title": "Home Cards", "url": "uploads.HomeCard"},
+                {"title": "Lucky Draw Submissions", "url": "uploads.LuckyDrawSubmission"},
+            ],
+        },
+        {"title": "Commission", "icon": "fa-solid fa-sack-dollar", "url": "business.CommissionConfig"},
+        {"title": "Daily Reports", "icon": "fa-solid fa-chart-line", "url": "business.DailyReport"},
+        {"title": "Withdrawals", "icon": "fa-solid fa-money-bill-transfer", "url": "accounts.WithdrawalRequest"},
+        {"title": "KYC", "icon": "fa-solid fa-id-card", "url": "accounts.UserKYC"},
     ]
 
 

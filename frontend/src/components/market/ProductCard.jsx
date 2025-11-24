@@ -41,7 +41,6 @@ function ProductCard({ product, onSelect, onQuickView, dense = false }) {
     .join(", ");
 
   const handleClick = () => {
-    if (outOfStock) return;
     if (typeof onSelect === "function") onSelect(product);
   };
 
@@ -99,7 +98,7 @@ function ProductCard({ product, onSelect, onQuickView, dense = false }) {
               loading="lazy"
               sx={{
                 width: "100%",
-                aspectRatio: "4 / 3",
+                aspectRatio: dense ? "1 / 1" : "4 / 3",
                 objectFit: "cover",
                 transition: "transform 0.25s ease",
                 "&:hover": { transform: "scale(1.02)" },
@@ -111,10 +110,10 @@ function ProductCard({ product, onSelect, onQuickView, dense = false }) {
         </CardActionArea>
       </Box>
 
-      <CardContent sx={{ p: dense ? 1.25 : 1.5 }}>
+      <CardContent sx={{ p: dense ? 1 : 1.5 }}>
         {/* Title */}
         <Typography
-          variant="subtitle2"
+          variant={dense ? "body2" : "subtitle2"}
           title={product?.name}
           sx={{
             fontWeight: 700,
@@ -122,7 +121,7 @@ function ProductCard({ product, onSelect, onQuickView, dense = false }) {
             WebkitLineClamp: 2,
             WebkitBoxOrient: "vertical",
             overflow: "hidden",
-            minHeight: 36,
+            minHeight: dense ? 28 : 36,
           }}
         >
           {product?.name}
@@ -134,7 +133,7 @@ function ProductCard({ product, onSelect, onQuickView, dense = false }) {
             variant="caption"
             color="text.secondary"
             sx={{
-              display: "block",
+              display: dense ? { xs: "none", sm: "block" } : "block",
               mt: 0.25,
               whiteSpace: "nowrap",
               overflow: "hidden",
@@ -188,7 +187,7 @@ function ProductCard({ product, onSelect, onQuickView, dense = false }) {
             <Box />
           )}
 
-          {product?.created_by_name ? (
+          {!dense && product?.created_by_name ? (
             <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
               Seller: {product.created_by_name}
             </Typography>
@@ -201,7 +200,7 @@ function ProductCard({ product, onSelect, onQuickView, dense = false }) {
           alignItems="center"
           justifyContent="flex-end"
           spacing={0.5}
-          sx={{ mt: 0.5 }}
+          sx={{ mt: 0.5, display: dense ? "none" : "flex" }}
         >
           {typeof onQuickView === "function" && (
             <Tooltip title="Quick view">

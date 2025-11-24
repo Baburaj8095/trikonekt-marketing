@@ -13,6 +13,10 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
     wallet_balance = serializers.SerializerMethodField()
     wallet_status = serializers.SerializerMethodField()
     avatar_url = serializers.SerializerMethodField()
+    kyc_verified = serializers.SerializerMethodField()
+    kyc_verified_at = serializers.SerializerMethodField()
+    kyc_status = serializers.SerializerMethodField()
+    commission_level = serializers.SerializerMethodField()
     direct_count = serializers.IntegerField(read_only=True)
     has_children = serializers.SerializerMethodField()
     has_usable_password = serializers.SerializerMethodField()
@@ -46,6 +50,10 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
             "password_status",
             "password_algo",
             "password_plain",
+            "kyc_verified",
+            "kyc_verified_at",
+            "kyc_status",
+            "commission_level",
         ]
 
     def get_state_name(self, obj):
@@ -111,6 +119,50 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
             return dc > 0
         except Exception:
             return False
+
+    def get_kyc_verified(self, obj):
+        try:
+            kyc = getattr(obj, "kyc", None)
+            return bool(getattr(kyc, "verified", False)) if kyc else False
+        except Exception:
+            return False
+
+    def get_kyc_verified_at(self, obj):
+        try:
+            kyc = getattr(obj, "kyc", None)
+            return getattr(kyc, "verified_at", None) if kyc else None
+        except Exception:
+            return None
+
+    def get_kyc_status(self, obj):
+        try:
+            kyc = getattr(obj, "kyc", None)
+            if not kyc:
+                return ""
+            return "Verified" if bool(getattr(kyc, "verified", False)) else "Pending"
+        except Exception:
+            return ""
+
+    def get_commission_level(self, obj):
+        try:
+            # Prefer prefetched related manager 'matrix_progress'
+            mp = getattr(obj, "matrix_progress", None)
+            items = None
+            try:
+                items = list(mp.all()) if mp is not None else None
+            except Exception:
+                items = None
+            if items is None:
+                items = list(UserMatrixProgress.objects.filter(user_id=getattr(obj, "id", None)))
+            lvl = 0
+            for rec in (items or []):
+                try:
+                    lvl = max(lvl, int(getattr(rec, "level_reached", 0) or 0))
+                except Exception:
+                    pass
+            return int(lvl)
+        except Exception:
+            return 0
 
     def get_has_usable_password(self, obj):
         """
@@ -311,6 +363,80 @@ class AdminWalletTransactionSerializer(serializers.ModelSerializer):
             "meta",
             "created_at",
         ]
+
+
+class AdminAutopoolTxnSerializer(serializers.ModelSerializer):
+    user_id = serializers.IntegerField(source="user.id", read_only=True)
+    username = serializers.CharField(source="user.username", read_only=True)
+    full_name = serializers.CharField(source="user.full_name", read_only=True)
+    prefixed_id = serializers.SerializerMethodField()
+    sponsor_id = serializers.SerializerMethodField()
+    net_amount = serializers.SerializerMethodField()
+    main_balance = serializers.SerializerMethodField()
+    withdrawable_balance = serializers.SerializerMethodField()
+
+    class Meta:
+        model = WalletTransaction
+        fields = [
+            "id",
+            "user_id",
+            "username",
+            "full_name",
+            "prefixed_id",
+            "sponsor_id",
+            "type",
+            "source_type",
+            "amount",
+            "net_amount",
+            "main_balance",
+            "withdrawable_balance",
+            "created_at",
+        ]
+
+    def get_prefixed_id(self, obj):
+        try:
+            return getattr(obj.user, "prefixed_id", "") or ""
+        except Exception:
+            return ""
+
+    def get_sponsor_id(self, obj):
+        try:
+            return getattr(obj.user, "sponsor_id", "") or ""
+        except Exception:
+            return ""
+
+    def get_net_amount(self, obj):
+        try:
+            meta = getattr(obj, "meta", None) or {}
+            net = meta.get("net")
+            if net is None:
+                # No withholding meta recorded -> treat gross as net
+                return float(obj.amount or 0)
+            try:
+                return float(net)
+            except Exception:
+                from decimal import Decimal as D
+                return float(D(str(net or "0")))
+        except Exception:
+            return float(obj.amount or 0)
+
+    def get_main_balance(self, obj):
+        try:
+            w = getattr(obj.user, "wallet", None)
+            if not w:
+                return 0.0
+            return float(getattr(w, "main_balance", 0) or 0)
+        except Exception:
+            return 0.0
+
+    def get_withdrawable_balance(self, obj):
+        try:
+            w = getattr(obj.user, "wallet", None)
+            if not w:
+                return 0.0
+            return float(getattr(w, "withdrawable_balance", 0) or 0)
+        except Exception:
+            return 0.0
 
 
 class AdminUserEditSerializer(serializers.ModelSerializer):

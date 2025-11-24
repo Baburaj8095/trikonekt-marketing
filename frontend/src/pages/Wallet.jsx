@@ -5,36 +5,14 @@ import {
   Typography,
   Grid,
   Divider,
-  Chip,
   Stack,
-  LinearProgress,
 } from "@mui/material";
 import { TextField, Button, Alert } from "@mui/material";
 import API from "../api/api";
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination } from "@mui/material";
 
 function fmtAmount(value) {
   const num = Number(value || 0);
   return num.toFixed(2);
-}
-
-function Amount({ value }) {
-  const num = Number(value || 0);
-  const color = num >= 0 ? "success.main" : "error.main";
-  const sign = num >= 0 ? "+" : "";
-  return (
-    <Typography component="span" sx={{ color, fontWeight: 600 }}>
-      {sign}
-      {fmtAmount(num)}
-    </Typography>
-  );
-}
-
-function TxTypeChip({ type }) {
-  let color = "default";
-  if (type === "COMMISSION_CREDIT" || (type || "").endsWith("_CREDIT")) color = "success";
-  if ((type || "").endsWith("_DEBIT")) color = "warning";
-  return <Chip size="small" color={color} label={type || "TX"} />;
 }
 
 function computeWeeklyWindowLocal() {
@@ -81,11 +59,6 @@ export default function Wallet() {
   const [withdrawableBalance, setWithdrawableBalance] = useState("0.00"); // net (can withdraw)
   const [taxPercent, setTaxPercent] = useState("0");
   const [updatedAt, setUpdatedAt] = useState(null);
-  const [txs, setTxs] = useState([]);
-  const [txPage, setTxPage] = useState(0);
-  const [txPageSize, setTxPageSize] = useState(10);
-  const [txCount, setTxCount] = useState(0);
-  const [txLoading, setTxLoading] = useState(false);
   const [err, setErr] = useState("");
   const [kyc, setKyc] = useState({ verified: false });
   const [windowInfo, setWindowInfo] = useState(computeWeeklyWindowLocal());
@@ -153,12 +126,10 @@ export default function Wallet() {
         const wlist = Array.isArray(mw?.data) ? mw.data : mw?.data?.results || [];
         setMyWithdrawals(wlist || []);
         setKyc(kycRes?.data || { verified: false });
-        await fetchTransactions(0, txPageSize);
         setWindowInfo(computeWeeklyWindowLocal());
       } catch (e) {
         if (!mounted) return;
         setErr("Failed to load wallet. Please try again.");
-        setTxs([]);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -168,26 +139,6 @@ export default function Wallet() {
       mounted = false;
     };
   }, []);
-
-  async function fetchTransactions(page = 0, pageSize = txPageSize) {
-    try {
-      setTxLoading(true);
-      const res = await API.get("/accounts/wallet/me/transactions/", {
-        params: { page: page + 1, page_size: pageSize },
-      });
-      const data = res?.data || {};
-      const list = Array.isArray(data) ? data : data?.results || [];
-      const count = typeof data?.count === "number" ? data.count : list.length;
-      setTxs(list);
-      setTxCount(count);
-    } catch (e) {
-      setErr("Failed to load transactions.");
-      setTxs([]);
-      setTxCount(0);
-    } finally {
-      setTxLoading(false);
-    }
-  }
 
   async function submitWithdrawal(e) {
     e.preventDefault();
@@ -214,7 +165,7 @@ export default function Wallet() {
     try {
       setWdrSubmitting(true);
       await API.post("/accounts/withdrawals/", payload);
-      // Refresh wallet, txs, withdrawals
+      // Refresh wallet and withdrawals after submitting
       const [w, mw] = await Promise.all([
         API.get("/accounts/wallet/me/"),
         API.get("/accounts/withdrawals/me/"),
@@ -230,7 +181,6 @@ export default function Wallet() {
       setWithdrawableBalance(wdBal);
       setTaxPercent(tax);
       setUpdatedAt(upd);
-      await fetchTransactions(txPage, txPageSize);
       setMyWithdrawals(wlist || []);
       setWdrForm({
         amount: "",
@@ -346,90 +296,6 @@ export default function Wallet() {
                 {wdrSubmitting ? "Requesting..." : "Request Withdrawal"}
               </Button>
             </Box>
-
-            <Divider sx={{ mb: 2 }} />
-
-            <Typography variant="subtitle2" sx={{ color: "text.secondary", mb: 1 }}>
-              Recent Activity
-            </Typography>
-            {txLoading ? (
-              <LinearProgress />
-            ) : err ? (
-              <Typography variant="body2" color="error">{err}</Typography>
-            ) : (
-              <React.Fragment>
-                <TableContainer sx={{ maxHeight: 420 }}>
-                  <Table size="small" stickyHeader>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Date</TableCell>
-                        <TableCell>Type</TableCell>
-                        <TableCell>TR Username</TableCell>
-                        <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Full Name</TableCell>
-                        <TableCell>Pincode</TableCell>
-                        <TableCell align="right">Commission (₹)</TableCell>
-                        <TableCell sx={{ display: { xs: "none", md: "table-cell" } }} align="right">Bal After (₹)</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {(txs || []).length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={7}>
-                            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                              No transactions yet.
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        (txs || []).map((tx) => (
-                          <TableRow key={tx.id} hover>
-                            <TableCell>
-                              {tx.created_at ? new Date(tx.created_at).toLocaleString() : "-"}
-                            </TableCell>
-                            <TableCell>
-                              <Stack direction="row" spacing={1} alignItems="center">
-                                <TxTypeChip type={tx.type} />
-                                <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                                  {tx.source_type || "-"}
-                                </Typography>
-                              </Stack>
-                            </TableCell>
-                            <TableCell>{tx.tr_username || "-"}</TableCell>
-                            <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
-                              {tx.full_name || "-"}
-                            </TableCell>
-                            <TableCell>{tx.pincode || "-"}</TableCell>
-                            <TableCell align="right">
-                              <Amount value={tx.commission ?? tx.amount} />
-                            </TableCell>
-                            <TableCell sx={{ display: { xs: "none", md: "table-cell" } }} align="right">
-                              ₹ {fmtAmount(tx.balance_after)}
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-                <TablePagination
-                  component="div"
-                  count={txCount}
-                  page={txPage}
-                  onPageChange={(e, newPage) => {
-                    setTxPage(newPage);
-                    fetchTransactions(newPage, txPageSize);
-                  }}
-                  rowsPerPage={txPageSize}
-                  onRowsPerPageChange={(e) => {
-                    const newSize = parseInt(e.target.value, 10);
-                    setTxPageSize(newSize);
-                    setTxPage(0);
-                    fetchTransactions(0, newSize);
-                  }}
-                  rowsPerPageOptions={[10, 25, 50]}
-                />
-              </React.Fragment>
-            )}
           </Paper>
         </Grid>
       </Grid>

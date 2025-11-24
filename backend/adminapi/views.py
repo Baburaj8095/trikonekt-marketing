@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
+from django.core.cache import cache
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
@@ -13,9 +14,9 @@ from accounts.models import CustomUser, Wallet, WalletTransaction, UserKYC, With
 from coupons.models import Coupon, CouponCode, CouponSubmission, CouponBatch
 from uploads.models import FileUpload, DashboardCard, HomeCard, LuckyDrawSubmission
 from market.models import Product, PurchaseRequest, Banner, BannerItem, BannerPurchaseRequest
-from business.models import UserMatrixProgress, AutoPoolAccount
+from business.models import UserMatrixProgress, AutoPoolAccount, DailyReport, CommissionConfig
 from .permissions import IsAdminOrStaff
-from .serializers import AdminUserNodeSerializer, AdminKYCSerializer, AdminWithdrawalSerializer, AdminMatrixProgressSerializer, AdminSupportTicketSerializer, AdminSupportTicketMessageSerializer, AdminUserEditSerializer
+from .serializers import AdminUserNodeSerializer, AdminKYCSerializer, AdminWithdrawalSerializer, AdminMatrixProgressSerializer, AdminSupportTicketSerializer, AdminSupportTicketMessageSerializer, AdminUserEditSerializer, AdminAutopoolTxnSerializer
 from .dynamic import field_meta_from_serializer
 
 
@@ -25,70 +26,81 @@ class AdminMetricsView(APIView):
     def get(self, request):
         today = timezone.now().date()
 
-        # Users
-        users_total = CustomUser.objects.all().count()
-        users_active = CustomUser.objects.filter(is_active=True).count()
-        users_today = CustomUser.objects.filter(date_joined__date=today).count()
+        # Return cached metrics unless explicitly bypassed with ?refresh=1
+        try:
+            refresh = str(request.query_params.get("refresh") or "").lower()
+        except Exception:
+            refresh = ""
+        if refresh not in ("1", "true", "yes"):
+            cached = cache.get("admin_metrics_v1")
+            if cached is not None:
+                return Response(cached, status=status.HTTP_200_OK)
+
+        # Ensure CommissionConfig exists (seed if missing)
+        try:
+            CommissionConfig.get_solo()
+        except Exception:
+            pass
+
+        # Users (condensed into a single aggregate where possible)
+        users_agg = CustomUser.objects.aggregate(
+            total=Count("id"),
+            active=Count("id", filter=Q(first_purchase_activated_at__isnull=False)),
+            todayNew=Count("id", filter=Q(date_joined__date=today)),
+            consumers_without_kyc=Count("id", filter=Q(category="consumer") & Q(kyc__isnull=True)),
+        )
 
         # KYC pending: users with KYC not verified + users without KYC (consumers)
         kyc_unverified = UserKYC.objects.filter(verified=False).count()
-        consumers_without_kyc = CustomUser.objects.filter(category="consumer").filter(~Q(kyc__isnull=False)).count()
-        kyc_pending = kyc_unverified + consumers_without_kyc
+        kyc_pending = (kyc_unverified or 0) + (users_agg.get("consumers_without_kyc") or 0)
 
-        # Users by role/category (quick cards)
-        by_role = (
-            CustomUser.objects.values("role")
-            .annotate(c=Count("id"))
-            .order_by()
-        )
-        by_category = (
-            CustomUser.objects.values("category")
-            .annotate(c=Count("id"))
-            .order_by()
-        )
         users_block = {
-            "total": users_total,
-            "active": users_active,
-            "todayNew": users_today,
-            "kycPending": kyc_pending,
-            "byRole": {r["role"]: r["c"] for r in by_role if r["role"]},
-            "byCategory": {r["category"]: r["c"] for r in by_category if r["category"]},
+            "total": users_agg.get("total") or 0,
+            "active": users_agg.get("active") or 0,
+            "inactive": (users_agg.get("total") or 0) - (users_agg.get("active") or 0),
+            "todayNew": users_agg.get("todayNew") or 0,
+            "kycPending": int(kyc_pending),
         }
 
-        # Wallets
-        total_balance = Wallet.objects.aggregate(s=Sum("balance"))["s"] or Decimal("0.00")
-        tx_today = WalletTransaction.objects.filter(created_at__date=today).count()
+        # Wallets (aggregate total balance and count together)
+        wagg = Wallet.objects.aggregate(s=Sum("balance"), c=Count("id"))
+        total_balance = wagg.get("s") or Decimal("0.00")
         wallets_block = {
             "totalBalance": float(total_balance),
-            "transactionsToday": tx_today,
+            "transactionsToday": WalletTransaction.objects.filter(created_at__date=today).count(),
+            "count": wagg.get("c") or 0,
         }
 
-        # Withdrawals
-        wdr_pending_qs = WithdrawalRequest.objects.filter(status="pending")
+        # Withdrawals (single aggregate for count and amount)
+        wagg2 = WithdrawalRequest.objects.filter(status="pending").aggregate(c=Count("id"), s=Sum("amount"))
         withdrawals_block = {
-            "pendingCount": wdr_pending_qs.count(),
-            "pendingAmount": float(wdr_pending_qs.aggregate(s=Sum("amount"))["s"] or Decimal("0.00")),
+            "pendingCount": wagg2.get("c") or 0,
+            "pendingAmount": float(wagg2.get("s") or Decimal("0.00")),
         }
 
-        # Coupons
-        cc_total = CouponCode.objects.all().count()
-        cc_assigned = CouponCode.objects.filter(status__in=["ASSIGNED_AGENCY", "ASSIGNED_EMPLOYEE"]).count()
-        cc_redeemed = CouponCode.objects.filter(status="REDEEMED").count()
+        # Coupons (single aggregate for multiple counts)
+        cagg = CouponCode.objects.aggregate(
+            total=Count("id"),
+            assigned=Count("id", filter=Q(status__in=["ASSIGNED_AGENCY", "ASSIGNED_EMPLOYEE"])),
+            redeemed=Count("id", filter=Q(status="REDEEMED")),
+        )
         # Pending submissions considered as waiting for approvals (SUBMITTED or EMPLOYEE_APPROVED)
         pending_submissions = CouponSubmission.objects.filter(status__in=["SUBMITTED", "EMPLOYEE_APPROVED"]).count()
         coupons_block = {
-            "total": cc_total,
-            "assigned": cc_assigned,
-            "redeemed": cc_redeemed,
+            "total": cagg.get("total") or 0,
+            "assigned": cagg.get("assigned") or 0,
+            "redeemed": cagg.get("redeemed") or 0,
             "pendingSubmissions": pending_submissions,
         }
 
-        # Uploads
-        uploads_total = FileUpload.objects.all().count()
-        uploads_today = FileUpload.objects.filter(created_at__date=today).count()
+        # Uploads (single aggregate for total and today's new)
+        uagg = FileUpload.objects.aggregate(
+            total=Count("id"),
+            todayNew=Count("id", filter=Q(created_at__date=today)),
+        )
         uploads_block = {
-            "total": uploads_total,
-            "todayNew": uploads_today,
+            "total": uagg.get("total") or 0,
+            "todayNew": uagg.get("todayNew") or 0,
             "failed": 0,
         }
 
@@ -112,18 +124,45 @@ class AdminMetricsView(APIView):
             "bannerPurchaseRequestsPending": BannerPurchaseRequest.objects.filter(status=BannerPurchaseRequest.STATUS_PENDING).count(),
         }
 
-        return Response(
-            {
-                "users": users_block,
-                "wallets": wallets_block,
-                "withdrawals": withdrawals_block,
-                "coupons": coupons_block,
-                "uploads": uploads_block,
-                "uploadsModels": uploads_models_block,
-                "market": market_block,
-            },
-            status=status.HTTP_200_OK,
+        # Reports aggregate (today and total in one query)
+        ragg = DailyReport.objects.aggregate(
+            today=Count("id", filter=Q(date=today)),
+            total=Count("id"),
         )
+
+        # Autopool aggregates (single DB hit)
+        acc_by_status = list(
+            AutoPoolAccount.objects.values("status")
+            .annotate(c=Count("id"))
+            .order_by()
+        )
+
+        payload = {
+            "users": users_block,
+            "wallets": wallets_block,
+            "withdrawals": withdrawals_block,
+            "coupons": coupons_block,
+            "uploads": uploads_block,
+            "uploadsModels": uploads_models_block,
+            "market": market_block,
+            "autopool": {
+                "total": sum(row["c"] for row in acc_by_status),
+                "byStatus": {row["status"]: row["c"] for row in acc_by_status},
+            },
+            "reports": {
+                "dailyReportsToday": ragg.get("today") or 0,
+                "dailyReportsTotal": ragg.get("total") or 0,
+            },
+            "commission": {
+                "configs": CommissionConfig.objects.count(),
+            },
+        }
+        # Cache for a short duration to avoid heavy repeated aggregation under load
+        try:
+            cache.set("admin_metrics_v1", payload, timeout=20)  # seconds
+        except Exception:
+            pass
+        return Response(payload, status=status.HTTP_200_OK)
 
 
 class AdminUserTreeRoot(APIView):
@@ -282,8 +321,11 @@ class AdminUsersList(ListAPIView):
     serializer_class = AdminUserNodeSerializer
 
     def get_queryset(self):
-        qs = CustomUser.objects.select_related("country", "state", "city", "wallet").annotate(
-            direct_count=Count("registrations", distinct=True)
+        qs = (
+            CustomUser.objects
+            .select_related("country", "state", "city", "wallet", "kyc")
+            .prefetch_related("matrix_progress")
+            .annotate(direct_count=Count("registrations", distinct=True))
         )
         role = (self.request.query_params.get("role") or "").strip()
         phone = (self.request.query_params.get("phone") or "").strip()
@@ -292,11 +334,29 @@ class AdminUsersList(ListAPIView):
         state_id = (self.request.query_params.get("state") or "").strip()
         kyc = (self.request.query_params.get("kyc") or "").strip()
         search = (self.request.query_params.get("search") or "").strip()
+        activated = (self.request.query_params.get("activated") or "").strip().lower()
 
+        # Normalize role/category to be case-insensitive and accept human labels/tokens
         if role:
-            qs = qs.filter(role=role)
+            r = str(role).strip()
+            r_key = r.lower()
+            try:
+                role_keys = {str(k).lower(): k for k, _ in getattr(CustomUser, "ROLE_CHOICES", [])}
+                role_labels = {str(v).lower().replace(" ", "_").replace("-", "_"): k for k, v in getattr(CustomUser, "ROLE_CHOICES", [])}
+                r_norm = role_keys.get(r_key) or role_labels.get(r_key.replace(" ", "_").replace("-", "_")) or r
+            except Exception:
+                r_norm = r
+            qs = qs.filter(role__iexact=r_norm)
         if category:
-            qs = qs.filter(category=category)
+            c = str(category).strip()
+            c_key = c.lower().replace(" ", "_").replace("-", "_")
+            try:
+                cat_values = {str(k).lower(): k for k, _ in getattr(CustomUser, "CATEGORY_CHOICES", [])}
+                cat_labels = {str(v).lower().replace(" ", "_").replace("-", "_"): k for k, v in getattr(CustomUser, "CATEGORY_CHOICES", [])}
+                c_norm = cat_values.get(c_key) or cat_labels.get(c_key) or c
+            except Exception:
+                c_norm = c
+            qs = qs.filter(category__iexact=c_norm)
         if phone:
             qs = qs.filter(phone__icontains=phone)
         if pincode:
@@ -308,6 +368,10 @@ class AdminUsersList(ListAPIView):
                 qs = qs.filter(Q(kyc__verified=False) | Q(kyc__isnull=True))
             elif kyc == "verified":
                 qs = qs.filter(kyc__verified=True)
+        if activated in ("1", "true", "yes", "activated"):
+            qs = qs.filter(first_purchase_activated_at__isnull=False)
+        elif activated in ("0", "false", "no", "inactive", "not_activated", "unactivated", "notactivated"):
+            qs = qs.filter(first_purchase_activated_at__isnull=True)
         if search:
             qs = qs.filter(
                 Q(username__icontains=search)
@@ -1414,6 +1478,86 @@ class AdminAutopoolSummary(APIView):
             "accounts": acc_map,
         }
         return Response(data, status=200)
+
+
+class AdminAutopoolTransactionList(ListAPIView):
+    """
+    List recent Auto Pool and related commission transactions in a table-friendly format.
+    Columns: TR (prefixed_id), Username, Sponsor ID, Amount (gross), Type, Main Wallet, Withdrawable (net), Date.
+    Filters:
+      - types: comma-separated WalletTransaction.type values (optional, defaults to commission/autopool related)
+      - user: user id or username/full_name/phone contains
+      - date_from, date_to: created_at (date)
+      - ordering: default -created_at
+      - page, page_size: pagination
+    """
+    permission_classes = [IsAdminOrStaff]
+    serializer_class = AdminAutopoolTxnSerializer
+
+    def get_queryset(self):
+        qs = WalletTransaction.objects.select_related("user").all()
+
+        # Default transaction types focused on commissions/autopool flows
+        default_types = (
+            "COMMISSION_CREDIT",
+            "DIRECT_REF_BONUS",
+            "LEVEL_BONUS",
+            "AUTOPOOL_BONUS_FIVE",
+            "AUTOPOOL_BONUS_THREE",
+            "FRANCHISE_INCOME",
+            "GLOBAL_ROYALTY",
+            # Include coupon redeem credit since it may be a source for pool entries
+            "REDEEM_ECOUPON_CREDIT",
+        )
+        types_param = (self.request.query_params.get("types") or "").strip()
+        if types_param:
+            types_list = [t.strip() for t in types_param.split(",") if t.strip()]
+            if types_list:
+                qs = qs.filter(type__in=types_list)
+        else:
+            qs = qs.filter(type__in=default_types)
+
+        user_q = (self.request.query_params.get("user") or "").strip()
+        if user_q:
+            if user_q.isdigit():
+                qs = qs.filter(Q(user_id=int(user_q)) | Q(user__username__icontains=user_q))
+            else:
+                qs = qs.filter(
+                    Q(user__username__icontains=user_q)
+                    | Q(user__full_name__icontains=user_q)
+                    | Q(user__phone__icontains=user_q)
+                )
+
+        date_from = (self.request.query_params.get("date_from") or "").strip()
+        date_to = (self.request.query_params.get("date_to") or "").strip()
+        if date_from:
+            qs = qs.filter(created_at__date__gte=date_from)
+        if date_to:
+            qs = qs.filter(created_at__date__lte=date_to)
+
+        ordering = (self.request.query_params.get("ordering") or "-created_at").strip()
+        if ordering:
+            qs = qs.order_by(ordering)
+        return qs
+
+    def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        try:
+            page = int(request.query_params.get("page") or 1)
+        except Exception:
+            page = 1
+        try:
+            page_size = int(request.query_params.get("page_size") or 50)
+        except Exception:
+            page_size = 50
+        page = max(1, page)
+        page_size = max(1, min(page_size, 200))
+
+        total = qs.count()
+        start = (page - 1) * page_size
+        end = start + page_size
+        serializer = self.get_serializer(qs[start:end], many=True, context=self.get_serializer_context())
+        return Response({"count": total, "results": serializer.data}, status=200)
 
 
 class AdminWithdrawalRejectView(APIView):

@@ -14,6 +14,9 @@ from .models import (
     CouponBatch,
     Commission,
     AuditTrail,
+    ECouponPaymentConfig,
+    ECouponProduct,
+    ECouponOrder,
 )
 
 # Hide coupons-related models from Django Admin unless explicitly enabled.
@@ -289,5 +292,58 @@ if not HIDE_COUPONS_IN_ADMIN:
         list_filter = ("action", "created_at")
         search_fields = ("coupon_code__code", "submission__coupon_code", "actor__username")
         autocomplete_fields = ("actor", "coupon_code", "submission", "batch")
+        date_hierarchy = "created_at"
+        ordering = ("-created_at",)
+
+# Always visible: E‑Coupon Store admin (allow admin to seed payment QR and manage products/orders)
+@admin.register(ECouponPaymentConfig)
+class ECouponPaymentConfigAdmin(admin.ModelAdmin):
+    list_display = ("title", "upi_id", "payee_name", "is_active", "created_by", "created_at")
+    list_filter = ("is_active", "created_at")
+    search_fields = ("title", "upi_id", "payee_name")
+    readonly_fields = ("created_by", "created_at")
+
+    def save_model(self, request, obj, form, change):
+        if not change and not obj.created_by_id:
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(ECouponProduct)
+class ECouponProductAdmin(admin.ModelAdmin):
+    list_display = ("display_title", "coupon", "denomination", "price_per_unit", "is_active", "enable_consumer", "enable_agency", "enable_employee", "created_at")
+    list_filter = ("is_active", "enable_consumer", "enable_agency", "enable_employee", "created_at")
+    search_fields = ("display_title", "coupon__title")
+    autocomplete_fields = ("coupon",)
+    ordering = ("-created_at",)
+
+
+@admin.register(ECouponOrder)
+class ECouponOrderAdmin(admin.ModelAdmin):
+    list_display = ("id", "buyer", "role_at_purchase", "product", "quantity", "amount_total", "status", "reviewer", "reviewed_at", "created_at")
+    list_filter = ("status", "role_at_purchase", "created_at", "reviewed_at")
+    search_fields = ("buyer__username", "product__display_title", "utr")
+    autocomplete_fields = ("buyer", "product", "payment_config", "reviewer")
+    readonly_fields = ("allocated_count", "allocated_sample_codes", "created_at", "reviewed_at")
+    ordering = ("-created_at",)
+
+# Ensure E‑Coupons (CouponSubmission) admin is available even when other coupon screens are hidden
+if HIDE_COUPONS_IN_ADMIN:
+    @admin.register(CouponSubmission)
+    class CouponSubmissionAdmin(admin.ModelAdmin):
+        list_display = (
+            "coupon_code",
+            "consumer",
+            "pincode",
+            "status",
+            "employee_reviewer",
+            "employee_reviewed_at",
+            "agency_reviewer",
+            "agency_reviewed_at",
+            "created_at",
+        )
+        list_filter = ("status", "pincode", "created_at")
+        search_fields = ("coupon_code", "consumer__username", "employee_reviewer__username", "agency_reviewer__username")
+        autocomplete_fields = ("consumer", "coupon", "employee_reviewer", "agency_reviewer", "code_ref")
         date_hierarchy = "created_at"
         ordering = ("-created_at",)

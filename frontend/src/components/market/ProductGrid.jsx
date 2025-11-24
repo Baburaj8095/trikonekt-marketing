@@ -25,10 +25,10 @@ function ProductGrid({ items = [], onSelect, onQuickView, dense = false, emptyMe
   }
 
   return (
-    <Grid container spacing={2}>
+    <Grid container spacing={dense ? 1 : 2}>
       {items.map((p) => (
-        <Grid key={p.id ?? `${p.name}-${p.image_url}-${p.price}`} item xs={12} sm={6} md={4} lg={3}>
-          <Box sx={{ height: "100%" }}>
+        <Grid key={p.id ?? `${p.name}-${p.image_url}-${p.price}`} item xs={dense ? 6 : 6} sm={dense ? 4 : 4} md={dense ? 3 : 3} lg={dense ? 2 : 3}>
+          <Box sx={{ height: "100%", maxWidth: 320, mx: "auto", width: "100%" }}>
             <ProductCard product={p} onSelect={onSelect} onQuickView={onQuickView} dense={dense} />
           </Box>
         </Grid>

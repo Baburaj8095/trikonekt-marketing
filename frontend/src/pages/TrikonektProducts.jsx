@@ -11,21 +11,23 @@ import {
   CircularProgress,
   Snackbar,
   Alert,
-  Card,
-  CardActionArea,
-  CardMedia,
-  CardContent,
   Stack,
 } from "@mui/material";
 import { useNavigate, useLocation } from "react-router-dom";
-import API from "../../api/api";
-import ProductGrid from "../../components/market/ProductGrid";
-import QuickViewModal from "../../components/market/QuickViewModal";
+import API from "../api/api";
+import ProductGrid from "../components/market/ProductGrid";
+import QuickViewModal from "../components/market/QuickViewModal";
 
-export default function Marketplace() {
+export default function TrikonektProducts() {
   const navigate = useNavigate();
   const location = useLocation();
-  const basePath = location.pathname.startsWith("/agency/marketplace") ? "/agency/marketplace" : "/marketplace";
+
+  // Determine base path depending on the current role's mount point
+  const basePath = location.pathname.startsWith("/agency/trikonekt-products")
+    ? "/agency/trikonekt-products"
+    : location.pathname.startsWith("/employee/trikonekt-products")
+    ? "/employee/trikonekt-products"
+    : "/trikonekt-products";
 
   // Filters
   const [filters, setFilters] = useState({
@@ -58,13 +60,10 @@ export default function Marketplace() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [snack, setSnack] = useState({ open: false, type: "success", msg: "" });
-  // Banners
-  const [banners, setBanners] = useState([]);
-  const [loadingBanners, setLoadingBanners] = useState(false);
 
   // UI state for e-commerce layout
   const [sort, setSort] = useState("");
-  const [dense, setDense] = useState(false);
+  const [dense, setDense] = useState(true);
   const [quickView, setQuickView] = useState({ open: false, product: null });
 
   useEffect(() => {
@@ -146,29 +145,9 @@ export default function Marketplace() {
     }
   };
 
-  const fetchBanners = async () => {
-    try {
-      setLoadingBanners(true);
-      const params = {};
-      if (filters.country) params.country = filters.country;
-      if (filters.state) params.state = filters.state;
-      if (filters.city) params.city = filters.city;
-      if (filters.pincode) params.pincode = filters.pincode;
-      const res = await API.get("/banners", { params: { ...params, active: 1, _: Date.now() } });
-      const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
-      setBanners(arr);
-    } catch {
-      setBanners([]);
-      setSnack({ open: true, type: "error", msg: "Failed to load banners" });
-    } finally {
-      setLoadingBanners(false);
-    }
-  };
-
   // Initial load
   useEffect(() => {
     fetchProducts();
-    fetchBanners();
   }, []);
 
   // Apply sorting automatically when changed
@@ -180,24 +159,11 @@ export default function Marketplace() {
   useEffect(() => {
     const onFocus = () => {
       fetchProducts();
-      fetchBanners();
     };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, []);
 
-  // Periodic refresh while there are items shown
-  useEffect(() => {
-    let timer = null;
-    if (rows && rows.length > 0) {
-      timer = setInterval(() => {
-        fetchProducts();
-      }, 5000);
-    }
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [rows.length]);
 
   const onFilterChange = (e) => {
     const { name, value } = e.target;
@@ -206,7 +172,7 @@ export default function Marketplace() {
 
   const onApply = async (e) => {
     e.preventDefault();
-    await Promise.all([fetchProducts(), fetchBanners()]);
+    await fetchProducts();
   };
 
   const onClear = () => {
@@ -221,13 +187,12 @@ export default function Marketplace() {
     setStates([]);
     setCities([]);
     fetchProducts();
-    fetchBanners();
   };
 
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 2, md: 3 } }}>
       <Typography variant="h5" sx={{ fontWeight: 700, mb: 2, color: "#0C2D48" }}>
-        Marketplace
+        Trikonekt Products
       </Typography>
 
       <Paper elevation={1} sx={{ p: 2, borderRadius: 2, mb: 2 }}>
@@ -356,64 +321,6 @@ export default function Marketplace() {
             </Grid>
           </Grid>
         </Box>
-      </Paper>
-
-      {/* Banners Section */}
-      <Paper elevation={1} sx={{ p: 2, borderRadius: 2, mb: 2 }}>
-        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Agency Banners</Typography>
-          <Button size="small" onClick={fetchBanners} disabled={loadingBanners}>
-            {loadingBanners ? "Loading..." : "Refresh"}
-          </Button>
-        </Box>
-        {loadingBanners ? (
-          <Box sx={{ py: 2, display: "flex", alignItems: "center", gap: 1 }}>
-            <CircularProgress size={20} /> <Typography variant="body2">Loading banners...</Typography>
-          </Box>
-        ) : (
-          <Grid container spacing={2}>
-            {(banners || []).map((b) => (
-              <Grid key={b.id} item xs={12} sm={6} md={4} lg={3}>
-                <Card variant="outlined" sx={{ borderRadius: 2, overflow: "hidden", width: "100%", maxWidth: 340, mx: "auto" }}>
-                  <CardActionArea onClick={() => navigate(`${basePath}/banners/${b.id}`)}>
-                    {b.image_url ? (
-                      <CardMedia
-                        component="img"
-                        image={b.image_url}
-                        alt={b.title}
-                        sx={{ width: "100%", height: 225, objectFit: "cover" }}
-                      />
-                    ) : (
-                      <Box sx={{ width: "100%", height: 225, bgcolor: "#f1f5f9" }} />
-                    )}
-                    <CardContent sx={{ p: 1.5 }}>
-                      <Typography variant="subtitle2" noWrap title={b.title} sx={{ fontWeight: 600 }}>
-                        {b.title}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" noWrap>
-                        {[b.city, b.state, b.country].filter(Boolean).join(", ")}
-                      </Typography>
-                      {Array.isArray(b.items) && b.items.length > 0 ? (
-                        <Typography variant="caption" sx={{ display: "block", mt: 0.5, color: "text.secondary" }}>
-                          {b.items.length} item{b.items.length > 1 ? "s" : ""}
-                        </Typography>
-                      ) : null}
-                    </CardContent>
-                  </CardActionArea>
-                </Card>
-              </Grid>
-            ))}
-            {(!banners || banners.length === 0) && (
-              <Grid item xs={12}>
-                <Paper variant="outlined" sx={{ p: 2, textAlign: "center" }}>
-                  <Typography variant="body2" color="text.secondary">
-                    No banners found for the selected location filters.
-                  </Typography>
-                </Paper>
-              </Grid>
-            )}
-          </Grid>
-        )}
       </Paper>
 
       {/* Products Section */}

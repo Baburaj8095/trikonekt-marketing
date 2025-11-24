@@ -16,6 +16,9 @@ from .models import (
     CouponBatch,
     Commission,
     AuditTrail,
+    ECouponPaymentConfig,
+    ECouponProduct,
+    ECouponOrder,
 )
 from .serializers import (
     CouponSerializer,
@@ -25,6 +28,9 @@ from .serializers import (
     CouponBatchSerializer,
     CommissionSerializer,
     AuditTrailSerializer,
+    ECouponPaymentConfigSerializer,
+    ECouponProductSerializer,
+    ECouponOrderSerializer,
 )
 
 # Pagination (per-view) for coupon codes
@@ -1182,14 +1188,15 @@ class CouponBatchViewSet(mixins.CreateModelMixin,
         if count <= 0:
             return Response({"count": ["Must be > 0."]}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Denomination support: accept 50, 150, 750 (fallback to 150)
+        # Denomination: accept any positive decimal, default 150 if not provided
         value_param = request.data.get("value") or request.data.get("denomination") or request.data.get("amount")
+        from decimal import Decimal, InvalidOperation
         try:
-            code_value = int(float(value_param)) if value_param is not None else 150
-        except Exception:
-            code_value = 150
-        if code_value not in (50, 150, 750):
-            code_value = 150
+            code_value = Decimal(str(value_param)) if value_param is not None else Decimal("150")
+        except (InvalidOperation, TypeError, ValueError):
+            return Response({"value": ["Invalid denomination. Provide a positive number."], "detail": "Invalid denomination."}, status=status.HTTP_400_BAD_REQUEST)
+        if code_value <= 0:
+            return Response({"value": ["Denomination must be > 0."], "detail": "Denomination must be positive."}, status=status.HTTP_400_BAD_REQUEST)
 
         prefix = (str(request.data.get("prefix") or "LDGR")).strip().upper() or "LDGR"
 
@@ -1286,14 +1293,15 @@ class CouponBatchViewSet(mixins.CreateModelMixin,
             if issued_channel not in ("physical", "e_coupon"):
                 issued_channel = "physical"
 
-            # Denomination support: accept 50, 150, 750 (fallback to 150)
+            # Denomination: accept any positive decimal, default 150 if not provided
             value_param = request.data.get("value") or request.data.get("denomination") or request.data.get("amount")
+            from decimal import Decimal, InvalidOperation
             try:
-                code_value = int(float(value_param))
-            except Exception:
-                code_value = 150
-            if code_value not in (50, 150, 750):
-                code_value = 150
+                code_value = Decimal(str(value_param)) if value_param is not None else Decimal("150")
+            except (InvalidOperation, TypeError, ValueError):
+                return Response({"value": ["Invalid denomination. Provide a positive number."], "detail": "Invalid denomination."}, status=status.HTTP_400_BAD_REQUEST)
+            if code_value <= 0:
+                return Response({"value": ["Denomination must be > 0."], "detail": "Denomination must be positive."}, status=status.HTTP_400_BAD_REQUEST)
 
             # Validate no duplicate codes
             to_create = []
@@ -2255,3 +2263,351 @@ class CouponRedeemView(APIView):
         except Exception:
             pass
         return Response({"redeemed": bool(ok), "detail": "Coupon 150 redeem processed."}, status=status.HTTP_200_OK)
+
+
+# ===============================
+# E‑Coupon Store/Admin Endpoints
+# ===============================
+class ECouponPaymentConfigViewSet(viewsets.ModelViewSet):
+    queryset = ECouponPaymentConfig.objects.all().order_by("-created_at")
+    serializer_class = ECouponPaymentConfigSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if is_admin_user(self.request.user):
+            return qs
+        # Non-admins can only see active config(s)
+        return qs.filter(is_active=True)
+
+    def create(self, request, *args, **kwargs):
+        if not is_admin_user(request.user):
+            return Response({"detail": "Only admin can create payment configs."}, status=status.HTTP_403_FORBIDDEN)
+        ser = self.get_serializer(data=request.data, context={"request": request})
+        ser.is_valid(raise_exception=True)
+        instance = ser.save(created_by=request.user)
+        return Response(self.get_serializer(instance).data, status=status.HTTP_201_CREATED)
+
+    def update(self, request, *args, **kwargs):
+        if not is_admin_user(request.user):
+            return Response({"detail": "Only admin can update payment configs."}, status=status.HTTP_403_FORBIDDEN)
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        if not is_admin_user(request.user):
+            return Response({"detail": "Only admin can update payment configs."}, status=status.HTTP_403_FORBIDDEN)
+        return super().partial_update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        if not is_admin_user(request.user):
+            return Response({"detail": "Only admin can delete payment configs."}, status=status.HTTP_403_FORBIDDEN)
+        return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=["post"], url_path="set-active")
+    def set_active(self, request, pk=None):
+        if not is_admin_user(request.user):
+            return Response({"detail": "Only admin can set active config."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            cfg = self.get_object()
+        except Exception:
+            return Response({"detail": "Config not found."}, status=status.HTTP_404_NOT_FOUND)
+        with transaction.atomic():
+            ECouponPaymentConfig.objects.exclude(id=cfg.id).update(is_active=False)
+            cfg.is_active = True
+            cfg.save(update_fields=["is_active"])
+        return Response(self.get_serializer(cfg).data, status=status.HTTP_200_OK)
+
+
+class ECouponProductViewSet(viewsets.ModelViewSet):
+    queryset = ECouponProduct.objects.select_related("coupon").all()
+    serializer_class = ECouponProductSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        qs = super().get_queryset().order_by("denomination", "-created_at")
+        user = self.request.user
+        # Admin sees everything; can optionally filter by role param
+        if is_admin_user(user):
+            role = (self.request.query_params.get("role") or "").strip().lower()
+            if role == "consumer":
+                qs = qs.filter(enable_consumer=True)
+            elif role == "agency":
+                qs = qs.filter(enable_agency=True)
+            elif role == "employee":
+                qs = qs.filter(enable_employee=True)
+            return qs
+
+        # Non-admins see only active + role-enabled
+        qs = qs.filter(is_active=True)
+        if is_consumer_user(user):
+            qs = qs.filter(enable_consumer=True)
+        elif is_agency_user(user):
+            qs = qs.filter(enable_agency=True)
+        elif is_employee_user(user):
+            qs = qs.filter(enable_employee=True)
+        else:
+            # Unknown role → hide
+            qs = qs.none()
+        return qs
+
+    def create(self, request, *args, **kwargs):
+        if not is_admin_user(request.user):
+            return Response({"detail": "Only admin can create products."}, status=status.HTTP_403_FORBIDDEN)
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        if not is_admin_user(request.user):
+            return Response({"detail": "Only admin can update products."}, status=status.HTTP_403_FORBIDDEN)
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        if not is_admin_user(request.user):
+            return Response({"detail": "Only admin can update products."}, status=status.HTTP_403_FORBIDDEN)
+        return super().partial_update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        if not is_admin_user(request.user):
+            return Response({"detail": "Only admin can delete products."}, status=status.HTTP_403_FORBIDDEN)
+        return super().destroy(request, *args, **kwargs)
+
+
+class ECouponOrderViewSet(mixins.CreateModelMixin,
+                          mixins.ListModelMixin,
+                          mixins.RetrieveModelMixin,
+                          viewsets.GenericViewSet):
+    queryset = ECouponOrder.objects.select_related("buyer", "product", "payment_config", "reviewer").all().order_by("-created_at")
+    serializer_class = ECouponOrderSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
+
+    def _role_of(self, user):
+        if is_consumer_user(user):
+            return "consumer"
+        if is_agency_user(user):
+            return "agency"
+        if is_employee_user(user):
+            return "employee"
+        return None
+
+    def list(self, request, *args, **kwargs):
+        # Default list: admin sees all, others see their own via /mine
+        if not is_admin_user(request.user):
+            return self.mine(request)
+        return super().list(request, *args, **kwargs)
+
+    def create(self, request, *args, **kwargs):
+        from decimal import Decimal, InvalidOperation
+        user = request.user
+        role = self._role_of(user)
+        if role is None:
+            return Response({"detail": "Your role is not allowed to purchase e‑coupons."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Product and quantity
+        try:
+            product_id = int(request.data.get("product"))
+        except Exception:
+            return Response({"product": ["This field is required (integer)."]}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            qty = int(request.data.get("quantity"))
+        except Exception:
+            return Response({"quantity": ["This field is required (integer)."]}, status=status.HTTP_400_BAD_REQUEST)
+        if qty <= 0:
+            return Response({"quantity": ["Must be > 0."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        product = ECouponProduct.objects.select_related("coupon").filter(id=product_id).first()
+        if not product:
+            return Response({"product": ["Invalid product id."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Visibility rules for non-admins
+        if not is_admin_user(user):
+            if not product.is_active:
+                return Response({"detail": "Product is not active."}, status=status.HTTP_400_BAD_REQUEST)
+            if role == "consumer" and not product.enable_consumer:
+                return Response({"detail": "Product not available for consumers."}, status=status.HTTP_403_FORBIDDEN)
+            if role == "agency" and not product.enable_agency:
+                return Response({"detail": "Product not available for agencies."}, status=status.HTTP_403_FORBIDDEN)
+            if role == "employee" and not product.enable_employee:
+                return Response({"detail": "Product not available for employees."}, status=status.HTTP_403_FORBIDDEN)
+
+        if product.max_per_order and qty > int(product.max_per_order):
+            return Response({"quantity": [f"Max per order is {product.max_per_order}."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Active payment config required
+        cfg = ECouponPaymentConfig.objects.filter(is_active=True).order_by("-created_at").first()
+        if not cfg:
+            return Response({"detail": "Payment is temporarily unavailable. Please try later."}, status=status.HTTP_409_CONFLICT)
+
+        # Compute totals
+        try:
+            unit_price = product.price_per_unit
+            amount_total = unit_price * qty
+        except Exception:
+            from decimal import Decimal as D
+            amount_total = D("0.00")
+
+        order = ECouponOrder.objects.create(
+            buyer=user,
+            role_at_purchase=role,
+            product=product,
+            denomination_snapshot=product.denomination,
+            quantity=qty,
+            amount_total=amount_total,
+            payment_config=cfg,
+            payment_proof_file=request.FILES.get("payment_proof_file"),
+            utr=(request.data.get("utr") or "").strip(),
+            notes=(request.data.get("notes") or "").strip(),
+            status="SUBMITTED",
+        )
+
+        # Audit trail (best effort)
+        try:
+            AuditTrail.objects.create(
+                action="store_order_submitted",
+                actor=user,
+                notes=f"Submitted order #{order.id}",
+                metadata={"order_id": order.id, "product_id": product.id, "qty": qty, "total": str(amount_total)},
+            )
+        except Exception:
+            pass
+
+        return Response(self.get_serializer(order).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["get"], url_path="mine")
+    def mine(self, request):
+        qs = self.get_queryset().filter(buyer=request.user)
+        page = self.paginate_queryset(qs)
+        ser = self.get_serializer(page if page is not None else qs, many=True)
+        return self.get_paginated_response(ser.data) if page is not None else Response(ser.data)
+
+    @action(detail=False, methods=["get"], url_path="pending")
+    def pending(self, request):
+        if not is_admin_user(request.user):
+            return Response({"detail": "Only admin can view pending orders."}, status=status.HTTP_403_FORBIDDEN)
+        qs = self.get_queryset().filter(status="SUBMITTED")
+        page = self.paginate_queryset(qs)
+        ser = self.get_serializer(page if page is not None else qs, many=True)
+        return self.get_paginated_response(ser.data) if page is not None else Response(ser.data)
+
+    @action(detail=False, methods=["get"], url_path="bootstrap")
+    def bootstrap(self, request):
+        # Products for current role + active payment config
+        user = request.user
+        role = "consumer" if is_consumer_user(user) else ("agency" if is_agency_user(user) else ("employee" if is_employee_user(user) else None))
+        prods = ECouponProduct.objects.filter(is_active=True).order_by("denomination")
+        if role == "consumer":
+            prods = prods.filter(enable_consumer=True)
+        elif role == "agency":
+            prods = prods.filter(enable_agency=True)
+        elif role == "employee":
+            prods = prods.filter(enable_employee=True)
+        else:
+            prods = ECouponProduct.objects.none()
+
+        cfg = ECouponPaymentConfig.objects.filter(is_active=True).order_by("-created_at").first()
+        prod_ser = ECouponProductSerializer(prods, many=True, context={"request": request})
+        cfg_ser = ECouponPaymentConfigSerializer(cfg, context={"request": request}) if cfg else None
+        return Response({"products": prod_ser.data, "payment_config": (cfg_ser.data if cfg_ser else None)})
+
+    @action(detail=True, methods=["post"], url_path="approve")
+    def approve(self, request, pk=None):
+        if not is_admin_user(request.user):
+            return Response({"detail": "Only admin can approve orders."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            order = self.get_object()
+        except Exception:
+            return Response({"detail": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if order.status == "APPROVED":
+            return Response(self.get_serializer(order).data, status=status.HTTP_200_OK)
+
+        role = order.role_at_purchase
+        if role not in ("consumer", "agency", "employee"):
+            return Response({"detail": "Invalid role on order."}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            base_qs = CouponCode.objects.filter(
+                issued_channel="e_coupon",
+                coupon=order.product.coupon,
+                value=order.denomination_snapshot,
+                status="AVAILABLE",
+                assigned_agency__isnull=True,
+                assigned_employee__isnull=True,
+                assigned_consumer__isnull=True,
+            )
+            try:
+                locking_qs = base_qs.select_for_update(skip_locked=True)
+            except Exception:
+                locking_qs = base_qs
+
+            need = int(order.quantity or 0)
+            pick_ids = list(locking_qs.order_by("serial", "id").values_list("id", flat=True)[:need])
+            if len(pick_ids) < need:
+                return Response({"detail": "Insufficient e‑coupon inventory for this denomination."}, status=status.HTTP_409_CONFLICT)
+
+            update_kwargs = {}
+            if role == "consumer":
+                update_kwargs = {"assigned_consumer_id": order.buyer_id, "status": "SOLD"}
+            elif role == "agency":
+                update_kwargs = {"assigned_agency_id": order.buyer_id, "status": "ASSIGNED_AGENCY"}
+            elif role == "employee":
+                update_kwargs = {"assigned_employee_id": order.buyer_id, "status": "ASSIGNED_EMPLOYEE"}
+
+            write_qs = CouponCode.objects.filter(id__in=pick_ids).filter(
+                issued_channel="e_coupon",
+                status="AVAILABLE",
+                assigned_agency__isnull=True,
+                assigned_employee__isnull=True,
+                assigned_consumer__isnull=True,
+            )
+            affected = write_qs.update(**update_kwargs)
+            sample_codes = list(CouponCode.objects.filter(id__in=pick_ids).values_list("code", flat=True)[:5])
+
+            order.status = "APPROVED"
+            order.reviewer = request.user
+            order.reviewed_at = timezone.now()
+            order.review_note = (request.data.get("review_note") or "").strip()
+            order.allocated_count = int(affected or 0)
+            order.allocated_sample_codes = sample_codes
+            order.save(update_fields=["status", "reviewer", "reviewed_at", "review_note", "allocated_count", "allocated_sample_codes"])
+
+            try:
+                AuditTrail.objects.create(
+                    action="store_order_approved",
+                    actor=request.user,
+                    notes=f"Approved order #{order.id}",
+                    metadata={"order_id": order.id, "allocated": int(affected or 0), "role": role},
+                )
+            except Exception:
+                pass
+
+        return Response(self.get_serializer(order).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="reject")
+    def reject(self, request, pk=None):
+        if not is_admin_user(request.user):
+            return Response({"detail": "Only admin can reject orders."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            order = self.get_object()
+        except Exception:
+            return Response({"detail": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if order.status in ("APPROVED", "REJECTED", "CANCELLED"):
+            return Response({"detail": f"Order already {order.status}."}, status=status.HTTP_400_BAD_REQUEST)
+
+        order.status = "REJECTED"
+        order.reviewer = request.user
+        order.reviewed_at = timezone.now()
+        order.review_note = (request.data.get("review_note") or "").strip()
+        order.save(update_fields=["status", "reviewer", "reviewed_at", "review_note"])
+
+        try:
+            AuditTrail.objects.create(
+                action="store_order_rejected",
+                actor=request.user,
+                notes=f"Rejected order #{order.id}",
+                metadata={"order_id": order.id},
+            )
+        except Exception:
+            pass
+
+        return Response(self.get_serializer(order).data, status=status.HTTP_200_OK)

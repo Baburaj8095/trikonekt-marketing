@@ -9,8 +9,6 @@ import {
   MenuItem,
   Button,
   CircularProgress,
-  Snackbar,
-  Alert,
   Card,
   CardActionArea,
   CardMedia,
@@ -19,13 +17,11 @@ import {
 } from "@mui/material";
 import { useNavigate, useLocation } from "react-router-dom";
 import API from "../../api/api";
-import ProductGrid from "../../components/market/ProductGrid";
-import QuickViewModal from "../../components/market/QuickViewModal";
 
-export default function Marketplace() {
+export default function AgencyMarketplace() {
   const navigate = useNavigate();
   const location = useLocation();
-  const basePath = location.pathname.startsWith("/agency/marketplace") ? "/agency/marketplace" : "/marketplace";
+  const basePath = location.pathname.startsWith("/agency/marketplace") ? "/agency/marketplace" : "/agency-marketplace";
 
   // Filters
   const [filters, setFilters] = useState({
@@ -33,8 +29,6 @@ export default function Marketplace() {
     state: "",
     city: "",
     pincode: "",
-    category: "",
-    name: "",
   });
 
   // Cascading dropdown sources
@@ -54,18 +48,9 @@ export default function Marketplace() {
     [states, filters.state]
   );
 
-  // Products
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [snack, setSnack] = useState({ open: false, type: "success", msg: "" });
   // Banners
   const [banners, setBanners] = useState([]);
   const [loadingBanners, setLoadingBanners] = useState(false);
-
-  // UI state for e-commerce layout
-  const [sort, setSort] = useState("");
-  const [dense, setDense] = useState(false);
-  const [quickView, setQuickView] = useState({ open: false, product: null });
 
   useEffect(() => {
     async function loadCountries() {
@@ -124,28 +109,6 @@ export default function Marketplace() {
     loadCities();
   }, [stateObj?.id]);
 
-  const fetchProducts = async () => {
-    try {
-      setLoading(true);
-      const params = {};
-      if (filters.country) params.country = filters.country;
-      if (filters.state) params.state = filters.state;
-      if (filters.city) params.city = filters.city;
-      if (filters.pincode) params.pincode = filters.pincode;
-      if (filters.category) params.category = filters.category;
-      if (filters.name) params.name = filters.name;
-      if (sort) params.sort = sort;
-      const res = await API.get("/products", { params: { ...params, _: Date.now() } });
-      const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
-      setRows(arr);
-    } catch {
-      setRows([]);
-      setSnack({ open: true, type: "error", msg: "Failed to load products" });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const fetchBanners = async () => {
     try {
       setLoadingBanners(true);
@@ -159,7 +122,6 @@ export default function Marketplace() {
       setBanners(arr);
     } catch {
       setBanners([]);
-      setSnack({ open: true, type: "error", msg: "Failed to load banners" });
     } finally {
       setLoadingBanners(false);
     }
@@ -167,37 +129,15 @@ export default function Marketplace() {
 
   // Initial load
   useEffect(() => {
-    fetchProducts();
     fetchBanners();
   }, []);
 
-  // Apply sorting automatically when changed
+  // Refresh on window focus
   useEffect(() => {
-    fetchProducts();
-  }, [sort]);
-
-  // Refresh on window focus to avoid stale stock after approvals
-  useEffect(() => {
-    const onFocus = () => {
-      fetchProducts();
-      fetchBanners();
-    };
+    const onFocus = () => fetchBanners();
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, []);
-
-  // Periodic refresh while there are items shown
-  useEffect(() => {
-    let timer = null;
-    if (rows && rows.length > 0) {
-      timer = setInterval(() => {
-        fetchProducts();
-      }, 5000);
-    }
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [rows.length]);
 
   const onFilterChange = (e) => {
     const { name, value } = e.target;
@@ -206,7 +146,7 @@ export default function Marketplace() {
 
   const onApply = async (e) => {
     e.preventDefault();
-    await Promise.all([fetchProducts(), fetchBanners()]);
+    await fetchBanners();
   };
 
   const onClear = () => {
@@ -215,21 +155,19 @@ export default function Marketplace() {
       state: "",
       city: "",
       pincode: "",
-      category: "",
-      name: "",
     });
     setStates([]);
     setCities([]);
-    fetchProducts();
     fetchBanners();
   };
 
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 2, md: 3 } }}>
       <Typography variant="h5" sx={{ fontWeight: 700, mb: 2, color: "#0C2D48" }}>
-        Marketplace
+        Agency Products
       </Typography>
 
+      {/* Location Filters */}
       <Paper elevation={1} sx={{ p: 2, borderRadius: 2, mb: 2 }}>
         <Box component="form" onSubmit={onApply}>
           <Grid container spacing={{ xs: 1, sm: 2 }}>
@@ -316,40 +254,13 @@ export default function Marketplace() {
               />
             </Grid>
 
+            <Grid item xs={12} md={9} />
             <Grid item xs={12} md={3}>
-              <TextField
-                fullWidth
-                size="small"
-                label="Category"
-                name="category"
-                value={filters.category}
-                onChange={onFilterChange}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                size="small"
-                label="Search by Product Name"
-                name="name"
-                value={filters.name}
-                onChange={onFilterChange}
-              />
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <Stack
-                direction="row"
-                spacing={1}
-                sx={{
-                  width: { xs: "100%", md: "auto" },
-                  flexWrap: "wrap",
-                  justifyContent: { xs: "flex-start", md: "flex-end" }
-                }}
-              >
+              <Stack direction="row" spacing={1} sx={{ justifyContent: { xs: "flex-start", md: "flex-end" } }}>
                 <Button type="button" variant="text" onClick={onClear}>
                   Clear
                 </Button>
-                <Button type="submit" variant="contained">
+                <Button type="submit" variant="contained" disabled={loadingBanners}>
                   Apply
                 </Button>
               </Stack>
@@ -358,14 +269,15 @@ export default function Marketplace() {
         </Box>
       </Paper>
 
-      {/* Banners Section */}
-      <Paper elevation={1} sx={{ p: 2, borderRadius: 2, mb: 2 }}>
+      {/* Banners as "Agency Products" */}
+      <Paper elevation={1} sx={{ p: 2, borderRadius: 2 }}>
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Agency Banners</Typography>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Agency Products</Typography>
           <Button size="small" onClick={fetchBanners} disabled={loadingBanners}>
             {loadingBanners ? "Loading..." : "Refresh"}
           </Button>
         </Box>
+
         {loadingBanners ? (
           <Box sx={{ py: 2, display: "flex", alignItems: "center", gap: 1 }}>
             <CircularProgress size={20} /> <Typography variant="body2">Loading banners...</Typography>
@@ -407,7 +319,7 @@ export default function Marketplace() {
               <Grid item xs={12}>
                 <Paper variant="outlined" sx={{ p: 2, textAlign: "center" }}>
                   <Typography variant="body2" color="text.secondary">
-                    No banners found for the selected location filters.
+                    No banners found for the selected filters.
                   </Typography>
                 </Paper>
               </Grid>
@@ -415,89 +327,6 @@ export default function Marketplace() {
           </Grid>
         )}
       </Paper>
-
-      {/* Products Section */}
-      {loading ? (
-        <Box sx={{ py: 4, display: "flex", alignItems: "center", gap: 1 }}>
-          <CircularProgress size={22} /> <Typography variant="body2">Loading products...</Typography>
-        </Box>
-      ) : (
-        <>
-          <Box
-            sx={{
-              mb: 1.5,
-              display: "flex",
-              alignItems: { xs: "flex-start", sm: "center" },
-              gap: 1,
-              justifyContent: "space-between",
-              flexDirection: { xs: "column", sm: "row" }
-            }}
-          >
-            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-              Products {rows?.length ? `(${rows.length})` : ""}
-            </Typography>
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                flexWrap: "wrap",
-                width: { xs: "100%", sm: "auto" },
-                justifyContent: { xs: "flex-start", sm: "flex-end" }
-              }}
-            >
-              <TextField
-                select
-                size="small"
-                label="Sort by"
-                value={sort}
-                onChange={(e) => setSort(e.target.value)}
-                sx={{ width: { xs: "100%", sm: 180 } }}
-              >
-                <MenuItem value="">Relevance</MenuItem>
-                <MenuItem value="price_asc">Price: Low to High</MenuItem>
-                <MenuItem value="price_desc">Price: High to Low</MenuItem>
-                <MenuItem value="newest">Newest</MenuItem>
-                <MenuItem value="rating_desc">Rating</MenuItem>
-              </TextField>
-              <Button size="small" variant="outlined" onClick={() => setDense((d) => !d)}>
-                {dense ? "Cozy view" : "Compact view"}
-              </Button>
-              <Button size="small" onClick={fetchProducts}>Refresh</Button>
-            </Box>
-          </Box>
-          <ProductGrid
-            items={rows || []}
-            dense={dense}
-            onSelect={(p) => {
-              navigate(`${basePath}/products/${p.id}`);
-            }}
-            onQuickView={(p) => setQuickView({ open: true, product: p })}
-          />
-        </>
-      )}
-
-      <QuickViewModal
-        open={quickView.open}
-        product={quickView.product}
-        onClose={() => setQuickView({ open: false, product: null })}
-        onGoToDetails={() => {
-          if (quickView.product?.id) {
-            navigate(`${basePath}/products/${quickView.product.id}`);
-            setQuickView({ open: false, product: null });
-          }
-        }}
-      />
-      <Snackbar
-        open={snack.open}
-        autoHideDuration={3000}
-        onClose={() => setSnack((s) => ({ ...s, open: false }))}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <Alert severity={snack.type} onClose={() => setSnack((s) => ({ ...s, open: false }))}>
-          {snack.msg}
-        </Alert>
-      </Snackbar>
     </Container>
   );
 }

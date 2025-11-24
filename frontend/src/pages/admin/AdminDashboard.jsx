@@ -206,21 +206,33 @@ export default function AdminDashboard() {
   const [modelsMeta, setModelsMeta] = useState([]);
   const [modelsErr, setModelsErr] = useState("");
   const nav = useNavigate();
+  const didRunRef = React.useRef(false);
 
   // Load metrics
   useEffect(() => {
+    if (didRunRef.current) return;
+    didRunRef.current = true;
     let mounted = true;
     setLoading(true);
+
+    // Global gate to prevent duplicate fetch in React 18 StrictMode (dev double mount)
+    if (typeof window !== "undefined" && window.__tk_admin_metrics_inflight) {
+      return;
+    }
+    if (typeof window !== "undefined") {
+      window.__tk_admin_metrics_inflight = true;
+    }
+
     const fetchMetrics = async () => {
       try {
-        const res = await API.get("admin/metrics/", { timeout: 12000, retryAttempts: 1, dedupe: "none" });
+        const res = await API.get("admin/metrics/", { timeout: 12000, retryAttempts: 1 });
         if (!mounted) return;
         setData(res?.data || {});
         setErr("");
       } catch (e1) {
         try {
           // Fallback alias path registered in backend/core/urls.py
-          const res2 = await API.get("adminapi/metrics/", { timeout: 12000, retryAttempts: 1, dedupe: "none" });
+          const res2 = await API.get("adminapi/metrics/", { timeout: 12000, retryAttempts: 1 });
           if (!mounted) return;
           setData(res2?.data || {});
           setErr("");
@@ -232,6 +244,9 @@ export default function AdminDashboard() {
           setErr("Failed to load metrics");
         }
       } finally {
+        if (typeof window !== "undefined") {
+          try { delete window.__tk_admin_metrics_inflight; } catch (_) {}
+        }
         if (mounted) setLoading(false);
       }
     };
@@ -319,11 +334,25 @@ export default function AdminDashboard() {
           >
             {/* Required account counters */}
             <Card
-              title="Users"
-              value={users.total ?? 0}
+              title="Accounts Total"
+              value={(users.total ?? 0)}
               subtitle=""
               onClick={() => nav("/admin/users")}
-              palette="indigo"
+              palette="blue"
+            />
+            <Card
+              title="Accounts Active"
+              value={(users.active ?? 0)}
+              subtitle=""
+              onClick={() => nav("/admin/users?activated=1")}
+              palette="green"
+            />
+            <Card
+              title="Accounts Inactive"
+              value={(users.inactive ?? ((users.total ?? 0) - (users.active ?? 0)))}
+              subtitle=""
+              onClick={() => nav("/admin/users?activated=0")}
+              palette="red"
             />
             <Card
               title="Withdrawal Requests"
@@ -333,15 +362,8 @@ export default function AdminDashboard() {
               palette="red"
             />
             <Card
-              title="User KYC"
-              value={(users.kycTotal ?? users.kycPending ?? 0)}
-              subtitle=""
-              onClick={() => nav("/admin/kyc")}
-              palette="blue"
-            />
-            <Card
               title="Wallets"
-              value={(wallets.totalCount ?? wallets.count ?? 0)}
+              value={(wallets.count ?? 0)}
               subtitle=""
               onClick={() => nav("/admin/users")}
               palette="green"
@@ -353,9 +375,51 @@ export default function AdminDashboard() {
               onClick={() => nav("/admin/users")}
               palette="amber"
             />
+            <Card
+              title="E‑Coupons"
+              value={(data?.coupons?.total ?? 0)}
+              subtitle=""
+              onClick={() => nav("/admin/e-coupons")}
+              palette="purple"
+            />
+            <Card
+              title="Daily Reports"
+              value={(data?.reports?.dailyReportsToday ?? 0)}
+              subtitle=""
+              onClick={() => nav("/admin/reports")}
+              palette="indigo"
+            />
+            <Card
+              title="Auto Pool"
+              value={(data?.autopool?.total ?? 0)}
+              subtitle=""
+              onClick={() => nav("/admin/autopool")}
+              palette="cyan"
+            />
+            <Card
+              title="Commission Master"
+              value={(data?.commission?.configs ?? 0)}
+              subtitle=""
+              onClick={() => nav("/admin/dashboard/models/business/commissionconfig")}
+              palette="pink"
+            />
+            <Card
+              title="Trikonekt Products"
+              value={(data?.market?.products ?? 0)}
+              subtitle=""
+              onClick={() => nav("/admin/products")}
+              palette="teal"
+            />
+            <Card
+              title="Upload Cards"
+              value={((data?.uploadsModels?.dashboardCards ?? 0) + (data?.uploadsModels?.homeCards ?? 0))}
+              subtitle=""
+              onClick={() => nav("/admin/dashboard-cards")}
+              palette="orange"
+            />
 
             {/* Admin models as cards (flattened) */}
-            {(Object.keys(modelsByApp) || [])
+            {([])
               .sort()
               .flatMap((appLabel) =>
                 (modelsByApp[appLabel] || [])

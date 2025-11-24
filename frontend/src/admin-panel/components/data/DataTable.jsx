@@ -19,6 +19,8 @@ export default function DataTable({
   toolbar,
   checkboxSelection = true,
   onSelectionChange,
+  columnVisibilityModel,
+  onColumnVisibilityModelChange,
 }) {
   const [rows, setRows] = useState([]);
   const [rowCount, setRowCount] = useState(0);
@@ -196,9 +198,11 @@ export default function DataTable({
         columnHeaderHeight={44}
         // Workaround for virtualization measurement issues causing "invisible" rows in some layouts
         disableVirtualization
+        columnVisibilityModel={columnVisibilityModel}
+        onColumnVisibilityModelChange={onColumnVisibilityModelChange}
         sx={{
           // Base text color to avoid theme inversion
-          "& .MuiDataGrid-cell": { outline: "none !important", color: "#0f172a !important", backgroundColor: "#ffffff", borderRight: "1px solid #e5e7eb" },
+          "& .MuiDataGrid-cell": { outline: "none !important", color: "#0f172a !important", backgroundColor: "transparent", borderRight: "1px solid #e5e7eb" },
           "& .MuiDataGrid-cellContent": { color: "#0f172a !important" },
           "& .MuiDataGrid-columnHeaderTitle": { color: "#0f172a !important", fontWeight: 600 },
           "& .MuiDataGrid-columnHeaderTitleContainerContent": { color: "#0f172a !important" },
@@ -206,7 +210,7 @@ export default function DataTable({
           // Force white backgrounds for all grid surfaces to avoid partial/transparent cells
           "&.MuiDataGrid-root": { backgroundColor: "#ffffff" },
           "& .MuiDataGrid-main": { backgroundColor: "#ffffff" },
-          "& .MuiDataGrid-columnHeaders": { backgroundColor: "#ffffff", borderBottom: "1px solid #e5e7eb" },
+          "& .MuiDataGrid-columnHeaders": { backgroundColor: "#eef2ff", borderBottom: "1px solid #e5e7eb" },
           "& .MuiDataGrid-virtualScroller": { backgroundColor: "#ffffff" },
           "& .MuiDataGrid-virtualScrollerContent": { backgroundColor: "#ffffff" },
           "& .MuiDataGrid-virtualScrollerRenderZone": { backgroundColor: "#ffffff" },
@@ -214,14 +218,16 @@ export default function DataTable({
           "& .MuiDataGrid-footerContainer": { backgroundColor: "#ffffff" },
 
           // Remove hover/selection tinting so rows remain solid white
-          "& .MuiDataGrid-row:hover": { backgroundColor: "#ffffff !important" },
-          "& .MuiDataGrid-row.Mui-hover": { backgroundColor: "#ffffff !important" },
-          "& .MuiDataGrid-row.Mui-selected": { backgroundColor: "#ffffff !important" },
-          "& .MuiDataGrid-row.Mui-selected:hover": { backgroundColor: "#ffffff !important" },
+          "& .MuiDataGrid-row:hover": { backgroundColor: "rgba(99, 102, 241, 0.06) !important" },
+          "& .MuiDataGrid-row.Mui-hover": { backgroundColor: "rgba(99, 102, 241, 0.06) !important" },
+          "& .MuiDataGrid-row.Mui-selected": { backgroundColor: "rgba(99, 102, 241, 0.12) !important" },
+          "& .MuiDataGrid-row.Mui-selected:hover": { backgroundColor: "rgba(99, 102, 241, 0.16) !important" },
           "& .MuiDataGrid-overlay": { backgroundColor: "#ffffff" },
           "& .MuiDataGrid-filler": { backgroundColor: "#ffffff" },
           // Add table-like borders
-          "& .MuiDataGrid-row": { backgroundColor: "#ffffff", borderBottom: "1px solid #e5e7eb" },
+          "& .MuiDataGrid-row:nth-of-type(odd)": { backgroundColor: "#ffffff" },
+          "& .MuiDataGrid-row:nth-of-type(even)": { backgroundColor: "#f8fafc" },
+          "& .MuiDataGrid-row": { borderBottom: "1px solid #e5e7eb" },
           "& .MuiDataGrid-columnHeader": { borderRight: "1px solid #e5e7eb" },
           "& .MuiDataGrid-columnHeader:last-of-type": { borderRight: "none" },
           "& .MuiDataGrid-cell:last-of-type": { borderRight: "none" }

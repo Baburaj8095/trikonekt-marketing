@@ -266,6 +266,12 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
             pool_type="THREE_150",
         )
 
+    # Mark first purchase activation (idempotent)
+    try:
+        ensure_first_purchase_activation(user, source)
+    except Exception:
+        pass
+
     return created
 
 
@@ -360,6 +366,12 @@ def activate_50(user: CustomUser, source: Dict[str, Any], package_code: str = "G
         meta={"source": "THREE_MATRIX_50", "source_type": src_type, "source_id": src_id},
         pool_type="THREE_50",
     )
+
+    # Mark first purchase activation (idempotent)
+    try:
+        ensure_first_purchase_activation(user, source)
+    except Exception:
+        pass
 
     return created
 

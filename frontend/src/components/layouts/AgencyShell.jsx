@@ -42,17 +42,20 @@ export default function AgencyShell({ children }) {
     { to: "/agency/dashboard", label: "Dashboard", icon: "dashboard" },
     { to: "/agency/profile", label: "Profile", icon: "users" },
     { to: "/agency/wallet", label: "Wallet", icon: "wallet" },
+    { to: "/agency/history", label: "History", icon: "orders" },
 
     // Lucky-coupons tabs
     { to: "/agency/lucky-coupons?tab=pending", label: "Manual Coupon Submissions", icon: "ticket" },
     { to: "/agency/lucky-coupons?tab=assign", label: "E Coupon", icon: "ticket" },
+    { to: "/agency/e-coupon-store", label: "E-Coupon Store", icon: "box" },
     { to: "/agency/lucky-coupons?tab=commission", label: "Commission Summary", icon: "chart" },
 
     { to: "/agency/my-team", label: "My Team", icon: "tree" },
     { to: "/agency/daily-report", label: "Daily Report", icon: "chart" },
 
-    // Marketplace
-    { to: "/agency/marketplace", label: "Marketplace", icon: "box" },
+
+    // Trikonekt Products
+    { to: "/agency/trikonekt-products", label: "Trikonekt Products", icon: "box" },
 
     // Refer & Earn
     { to: "/agency/refer-earn", label: "Refer & Earn", icon: "users" },
@@ -80,9 +83,14 @@ export default function AgencyShell({ children }) {
       return currentTab === targetTab;
     }
 
-    // Marketplace (including nested routes)
+    // Agency Marketplace (including nested routes)
     if (toPath === "/agency/marketplace") {
       return loc.pathname === "/agency/marketplace" || loc.pathname.startsWith("/agency/marketplace/");
+    }
+
+    // Trikonekt Products (including nested routes)
+    if (toPath === "/agency/trikonekt-products") {
+      return loc.pathname === "/agency/trikonekt-products" || loc.pathname.startsWith("/agency/trikonekt-products/");
     }
 
     // Exact match including query for everything else

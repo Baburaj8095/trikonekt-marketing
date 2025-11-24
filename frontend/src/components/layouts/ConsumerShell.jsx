@@ -36,10 +36,13 @@ export default function ConsumerShell({ children }) {
     { to: "/user/app-hub", label: "App Hub", icon: "box" },
     { to: "/user/profile", label: "Profile", icon: "users" },
     { to: "/user/lucky-draw", label: "Manual Lucky Coupon", icon: "ticket" },
-    { to: "/marketplace", label: "Marketplace", icon: "box" },
+    { to: "/trikonekt-products", label: "Trikonekt Products", icon: "box" },
+    { to: "/agency-marketplace", label: "Agency Marketplace", icon: "box" },
     { to: "/marketplace/my-orders", label: "My Orders", icon: "orders" },
     { to: "/user/redeem-coupon", label: "E-Coupon", icon: "ticket" },
+    { to: "/user/e-coupon-store", label: "E-Coupon Store", icon: "box" },
     { to: "/user/wallet", label: "Wallet", icon: "wallet" },
+    { to: "/user/history", label: "History", icon: "orders" },
     { to: "/user/kyc", label: "KYC", icon: "shield" },
     { to: "/user/my-team", label: "My Team", icon: "tree" },
     { to: "/user/refer-earn", label: "Refer & Earn", icon: "upload" },
@@ -47,9 +50,13 @@ export default function ConsumerShell({ children }) {
   ];
 
   const isActive = (to, loc) => {
-    // Marketplace should be active for nested routes too
-    if (to === "/marketplace") {
-      return loc.pathname === "/marketplace" || loc.pathname.startsWith("/marketplace/");
+    // Trikonekt Products should be active for nested routes too
+    if (to === "/trikonekt-products") {
+      return loc.pathname === "/trikonekt-products" || loc.pathname.startsWith("/trikonekt-products/");
+    }
+    // Agency Marketplace should be active for nested routes too
+    if (to === "/agency-marketplace") {
+      return loc.pathname === "/agency-marketplace" || loc.pathname.startsWith("/agency-marketplace/");
     }
     return `${loc.pathname}${loc.search}` === to;
   };

@@ -13,7 +13,6 @@ import EmployeeLuckyCoupons from "./pages/EmployeeLuckyCoupons";
 import ProductUpload from "./pages/agency/products/ProductUpload";
 import ProductList from "./pages/agency/products/ProductList";
 import PurchaseRequests from "./pages/agency/purchase/PurchaseRequests";
-import Marketplace from "./pages/market/Marketplace";
 import ProductDetails from "./pages/market/ProductDetails";
 import MyOrders from "./pages/market/MyOrders";
 import BannerDetails from "./pages/market/BannerDetails";
@@ -23,6 +22,7 @@ import AgencyShell from "./components/layouts/AgencyShell";
 import EmployeeShell from "./components/layouts/EmployeeShell";
 import EnhancedLogin from "./pages/Auth/EnhancedLogin";
 import Wallet from "./pages/Wallet";
+import History from "./pages/History";
 import LoadingOverlay from "./components/LoadingOverlay";
 import MyTeam from "./pages/team/MyTeam";
 import EmployeeDailyReport from "./pages/reports/EmployeeDailyReport";
@@ -61,6 +61,9 @@ import ProductPage from "./admin-panel/examples/ProductPage";
 import Support from "./pages/Support";
 import AdminSupport from "./pages/admin/AdminSupport";
 import ImpersonateLanding from "./pages/Auth/ImpersonateLanding";
+import ECouponStore from "./pages/ECouponStore";
+import TrikonektProducts from "./pages/TrikonektProducts";
+import AgencyMarketplace from "./pages/agency/AgencyMarketplace";
 
 function App() {
   return (
@@ -115,6 +118,16 @@ function App() {
             <ProtectedRoute allowedRoles={["user"]}>
               <ConsumerShell>
                 <Wallet />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/history"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <History />
               </ConsumerShell>
             </ProtectedRoute>
           }
@@ -175,6 +188,16 @@ function App() {
             <ProtectedRoute allowedRoles={["user"]}>
               <ConsumerShell>
                 <Support />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/e-coupon-store"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <ECouponStore />
               </ConsumerShell>
             </ProtectedRoute>
           }
@@ -246,6 +269,16 @@ function App() {
           }
         />
         <Route
+          path="/agency/history"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <History />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/agency/refer-earn"
           element={
             <ProtectedRoute allowedRoles={["agency"]}>
@@ -265,37 +298,17 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/agency/e-coupon-store"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <ECouponStore />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
 
-        <Route
-          path="/agency/marketplace"
-          element={
-            <ProtectedRoute allowedRoles={["agency"]}>
-              <AgencyShell>
-                <Marketplace />
-              </AgencyShell>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/agency/marketplace/products/:id"
-          element={
-            <ProtectedRoute allowedRoles={["agency"]}>
-              <AgencyShell>
-                <ProductDetails />
-              </AgencyShell>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/agency/marketplace/banners/:id"
-          element={
-            <ProtectedRoute allowedRoles={["agency"]}>
-              <AgencyShell>
-                <BannerDetails />
-              </AgencyShell>
-            </ProtectedRoute>
-          }
-        />
 
         {/* Employee Routes */}
         <Route
@@ -356,11 +369,31 @@ function App() {
           }
         />
         <Route
+          path="/employee/history"
+          element={
+            <ProtectedRoute allowedRoles={["employee"]}>
+              <EmployeeShell>
+                <History />
+              </EmployeeShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/employee/support"
           element={
             <ProtectedRoute allowedRoles={["employee"]}>
               <EmployeeShell>
                 <Support />
+              </EmployeeShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee/e-coupon-store"
+          element={
+            <ProtectedRoute allowedRoles={["employee"]}>
+              <EmployeeShell>
+                <ECouponStore />
               </EmployeeShell>
             </ProtectedRoute>
           }
@@ -376,10 +409,16 @@ function App() {
             </ProtectedRoute>
           }
         />
-        {/* Marketplace (Public + Consumer) */}
-        <Route path="/marketplace" element={<ConsumerShell><Marketplace /></ConsumerShell>} />
-        <Route path="/marketplace/products/:id" element={<ConsumerShell><ProductDetails /></ConsumerShell>} />
-        <Route path="/marketplace/banners/:id" element={<ConsumerShell><BannerDetails /></ConsumerShell>} />
+        {/* Trikonekt Products (Public + Consumer) */}
+        <Route path="/trikonekt-products" element={<ConsumerShell><TrikonektProducts /></ConsumerShell>} />
+        <Route path="/trikonekt-products/products/:id" element={<ConsumerShell><ProductDetails /></ConsumerShell>} />
+        {/* Agency Marketplace visible to consumers */}
+        <Route path="/agency-marketplace" element={<ConsumerShell><AgencyMarketplace /></ConsumerShell>} />
+        <Route path="/agency-marketplace/banners/:id" element={<ConsumerShell><BannerDetails /></ConsumerShell>} />
+        {/* Backward compatibility redirects */}
+        <Route path="/marketplace" element={<Navigate to="/trikonekt-products" replace />} />
+        <Route path="/marketplace/products/:id" element={<Navigate to="/trikonekt-products/products/:id" replace />} />
+        <Route path="/marketplace/banners/:id" element={<Navigate to="/agency/marketplace/banners/:id" replace />} />
         <Route
           path="/marketplace/my-orders"
           element={
@@ -393,42 +432,73 @@ function App() {
 
         {/* Agency - Products and Purchase Requests */}
         <Route
-          path="/agency/products/upload"
+          path="/agency/trikonekt-products"
           element={
             <ProtectedRoute allowedRoles={["agency"]}>
               <AgencyShell>
-                <ProductUpload />
+                <TrikonektProducts />
               </AgencyShell>
             </ProtectedRoute>
           }
         />
         <Route
-          path="/agency/products"
+          path="/agency/trikonekt-products/products/:id"
           element={
             <ProtectedRoute allowedRoles={["agency"]}>
               <AgencyShell>
-                <ProductList />
+                <ProductDetails />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
+        {/* Agency Marketplace (Agency banners-only) */}
+        <Route
+          path="/agency/marketplace"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <AgencyMarketplace />
               </AgencyShell>
             </ProtectedRoute>
           }
         />
         <Route
-          path="/agency/banners"
+          path="/agency/marketplace/banners/:id"
           element={
             <ProtectedRoute allowedRoles={["agency"]}>
               <AgencyShell>
-                <BannerManage />
+                <BannerDetails />
               </AgencyShell>
             </ProtectedRoute>
           }
         />
         <Route
-          path="/agency/purchase-requests"
+          path="/employee/e-coupon-store"
           element={
-            <ProtectedRoute allowedRoles={["agency"]}>
-              <AgencyShell>
-                <PurchaseRequests />
-              </AgencyShell>
+            <ProtectedRoute allowedRoles={["employee"]}>
+              <EmployeeShell>
+                <ECouponStore />
+              </EmployeeShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee/trikonekt-products"
+          element={
+            <ProtectedRoute allowedRoles={["employee"]}>
+              <EmployeeShell>
+                <TrikonektProducts />
+              </EmployeeShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee/trikonekt-products/products/:id"
+          element={
+            <ProtectedRoute allowedRoles={["employee"]}>
+              <EmployeeShell>
+                <ProductDetails />
+              </EmployeeShell>
             </ProtectedRoute>
           }
         />

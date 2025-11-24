@@ -50,14 +50,26 @@ class ProductListCreate(generics.ListCreateAPIView):
         pincode = (params.get("pincode") or "").strip()
         category = (params.get("category") or "").strip()
         name = (params.get("name") or "").strip()
+        q = (params.get("q") or "").strip()
+        sort = (params.get("sort") or params.get("ordering") or "").strip().lower()
+        active_str = (params.get("active") or "").strip().lower()
+        hide_sold_out = (params.get("hide_sold_out") or "").strip().lower() in ("1", "true", "yes")
         mine = (params.get("mine") or "").strip() in ("1", "true", "yes")
+
         if mine and self.request.user and self.request.user.is_authenticated:
             qs = qs.filter(created_by_id=self.request.user.id)
-        # Hide out-of-stock items for public/consumer marketplace.
-        # Agencies using ?mine=1 still see their sold-out items.
-        if not (mine and self.request.user and self.request.user.is_authenticated):
+
+        # Map active flag to quantity-based status when provided
+        if active_str in ("true", "1", "yes"):
+            qs = qs.filter(quantity__gt=0)
+        elif active_str in ("false", "0", "no"):
+            qs = qs.filter(quantity=0)
+
+        # Hide out-of-stock items only when explicitly requested for public marketplace
+        if hide_sold_out and not (mine and self.request.user and self.request.user.is_authenticated):
             qs = qs.filter(quantity__gt=0)
 
+        # Location and attribute filters
         if country:
             qs = qs.filter(country__iexact=country)
         if state:
@@ -70,6 +82,26 @@ class ProductListCreate(generics.ListCreateAPIView):
             qs = qs.filter(category__iexact=category)
         if name:
             qs = qs.filter(name__icontains=name)
+
+        # Keyword search across key fields
+        if q:
+            qs = qs.filter(
+                Q(name__icontains=q)
+                | Q(description__icontains=q)
+                | Q(category__icontains=q)
+                | Q(pincode__icontains=q)
+            )
+
+        # Sorting support
+        if sort == "price_asc":
+            qs = qs.order_by("price")
+        elif sort == "price_desc":
+            qs = qs.order_by("-price")
+        elif sort == "newest":
+            qs = qs.order_by("-created_at")
+        elif sort == "oldest":
+            qs = qs.order_by("created_at")
+        # default remains newest from initial order_by
 
         return qs
 

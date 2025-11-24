@@ -533,5 +533,104 @@ export async function assignEmployeeByCount(payload) {
   return res?.data || res;
 }
 
+/**
+ * E‑Coupon Store APIs
+ */
+
+// Bootstrap: role‑filtered products + active payment config (for create order screen)
+export async function getEcouponStoreBootstrap() {
+  const res = await API.get("/coupons/store/orders/bootstrap/", {
+    // cache for short time to reduce flicker
+    cacheTTL: 15_000,
+    dedupe: "cancelPrevious",
+  });
+  return res?.data || res;
+}
+
+// Create an e‑coupon order (multipart). Fields: product, quantity, utr?, notes?, payment_proof_file?
+export async function createEcouponOrder({ product, quantity, utr = "", notes = "", file = null }) {
+  const fd = new FormData();
+  fd.append("product", String(product));
+  fd.append("quantity", String(quantity));
+  if (utr) fd.append("utr", String(utr));
+  if (notes) fd.append("notes", String(notes));
+  if (file) fd.append("payment_proof_file", file);
+  const res = await API.post("/coupons/store/orders/", fd, {
+    headers: { "Content-Type": "multipart/form-data" },
+    timeout: 30000,
+  });
+  return res?.data || res;
+}
+
+// List my orders (consumer/agency/employee)
+export async function getMyEcouponOrders(params = {}) {
+  const res = await API.get("/coupons/store/orders/mine/", { params, dedupe: "cancelPrevious" });
+  return res?.data || res;
+}
+
+// Admin: list pending orders
+export async function adminGetPendingEcouponOrders(params = {}) {
+  const res = await API.get("/coupons/store/orders/pending/", { params, dedupe: "cancelPrevious" });
+  return res?.data || res;
+}
+
+// Admin: approve an order and allocate codes
+export async function adminApproveEcouponOrder(id, review_note = "") {
+  const res = await API.post(`/coupons/store/orders/${id}/approve/`, { review_note });
+  return res?.data || res;
+}
+
+// Admin: reject an order
+export async function adminRejectEcouponOrder(id, review_note = "") {
+  const res = await API.post(`/coupons/store/orders/${id}/reject/`, { review_note });
+  return res?.data || res;
+}
+
+// Admin: payment configs and products (basic CRUD helpers)
+export async function listPaymentConfigs(params = {}) {
+  const res = await API.get("/coupons/store/payment-configs/", { params });
+  return res?.data || res;
+}
+export async function setActivePaymentConfig(id) {
+  const res = await API.post(`/coupons/store/payment-configs/${id}/set-active/`, {});
+  return res?.data || res;
+}
+export async function listStoreProducts(params = {}) {
+  const res = await API.get("/coupons/store/products/", { params });
+  return res?.data || res;
+}
+
+/**
+ * Consumer e‑coupon wallet helpers
+ */
+export async function getMyECoupons(params = {}) {
+  const res = await API.get("/coupons/codes/mine-consumer/", { params, dedupe: "cancelPrevious" });
+  return res?.data || res;
+}
+export async function getMyECouponSummary() {
+  const res = await API.get("/coupons/codes/consumer-summary/", { cacheTTL: 10_000, dedupe: "cancelPrevious" });
+  return res?.data || res;
+}
+export async function transferECoupon(codeId, { to_username, pincode = "", notes = "" }) {
+  const res = await API.post(`/coupons/codes/${codeId}/transfer/`, { to_username, pincode, notes });
+  return res?.data || res;
+}
+
+// Activation/Redeem using v1 endpoints with e‑coupon source context
+export async function activateECoupon150({ code }) {
+  const res = await API.post("/v1/coupon/activate/", {
+    type: "150",
+    source: { channel: "e_coupon", code },
+  });
+  return res?.data || res;
+}
+export async function redeemECoupon150({ code }) {
+  const res = await API.post("/v1/coupon/redeem/", {
+    type: "150",
+    source: { channel: "e_coupon", code },
+  });
+  return res?.data || res;
+}
+
 export { ensureFreshAccess, getAccessToken, getRefreshToken };
 export default API;

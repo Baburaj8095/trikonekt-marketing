@@ -5,9 +5,9 @@ from .models import Product, PurchaseRequest, Banner, BannerItem, BannerPurchase
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('id', 'image_thumb', 'name', 'category', 'price', 'quantity', 'discount', 'country', 'state', 'city', 'pincode', 'created_by', 'created_at')
-    list_filter = ('category', 'country', 'state', 'city', 'pincode', 'created_at')
-    search_fields = ('name', 'description', 'category', 'city', 'pincode', 'created_by__username', 'created_by__full_name')
+    list_display = ('id', 'image_thumb', 'name', 'category', 'price', 'quantity', 'discount', 'pincode', 'created_by', 'created_at')
+    list_filter = ('category', 'pincode', 'created_at')
+    search_fields = ('name', 'description', 'category', 'pincode', 'created_by__username', 'created_by__full_name')
     autocomplete_fields = ('created_by',)
     readonly_fields = ('created_at', 'image_thumb')
     fieldsets = (
@@ -18,7 +18,7 @@ class ProductAdmin(admin.ModelAdmin):
             'fields': ('price', 'quantity', 'discount')
         }),
         ('Location', {
-            'fields': ('country', 'state', 'city', 'pincode')
+            'fields': ('pincode',)
         }),
         ('Ownership', {
             'fields': ('created_by', 'created_at')
@@ -88,3 +88,21 @@ class BannerPurchaseRequestAdmin(admin.ModelAdmin):
     search_fields = ('banner__title', 'banner_item__name', 'consumer_name', 'consumer_email', 'consumer_phone')
     autocomplete_fields = ('banner', 'banner_item', 'created_by')
     readonly_fields = ('created_at',)
+
+# ======================
+# Prune Market admin: keep only Product
+# ======================
+from django.contrib.admin.sites import NotRegistered as _AdminNotRegistered
+
+def _try_unregister(model_cls):
+    try:
+        admin.site.unregister(model_cls)
+    except _AdminNotRegistered:
+        pass
+    except Exception:
+        pass
+
+_try_unregister(Banner)
+_try_unregister(BannerItem)
+_try_unregister(PurchaseRequest)
+_try_unregister(BannerPurchaseRequest)

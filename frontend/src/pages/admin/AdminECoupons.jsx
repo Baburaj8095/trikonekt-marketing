@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import API from "../../api/api";
 
+/* Reusable inputs */
 function TextInput({ label, value, onChange, placeholder, type = "text", style }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -49,9 +50,10 @@ function Select({ label, value, onChange, options, style }) {
   );
 }
 
-function Section({ title, children, extraRight }) {
+function Section({ title, children, extraRight, id }) {
   return (
     <div
+      id={id}
       style={{
         border: "1px solid #e2e8f0",
         borderRadius: 10,
@@ -381,7 +383,6 @@ export default function AdminECoupons() {
               : (r.notes || "").replace(/^.* to /, "").trim();
 
           let start = null, end = null, count = null;
-          // Keep backward compatibility if server still emits serial_range
           if (Array.isArray(meta.serial_range) && meta.serial_range.length === 2) {
             start = meta.serial_range[0];
             end = meta.serial_range[1];
@@ -444,7 +445,6 @@ export default function AdminECoupons() {
 
   async function fetchCount(url, params = {}) {
     try {
-      // Request small page_size so DRF returns {"count": <N>, "results": [...]}
       const res = await API.get(url, { params: { page_size: 1, ...params } });
       const c =
         typeof res?.data?.count === "number"
@@ -488,7 +488,7 @@ export default function AdminECoupons() {
     }
   }
 
-  // Consolidated loaders: bootstrap (static + initial dynamic) and dashboard (dynamic on filter/batch changes)
+  // Consolidated loaders
   async function loadBootstrap() {
     setBootstrapLoading(true);
     setErr("");
@@ -593,16 +593,12 @@ export default function AdminECoupons() {
     loadDashboard(false);
   }, [selectedBatch, assignPage, assignPageSize, assignFilters]);
 
-  useEffect(() => {
-    // handled by the combined effect above
-  }, [selectedBatch]);
-
+  // Options
   const couponOptions = useMemo(
     () => coupons.map((c) => ({ value: String(c.id), label: `${c.title} (id:${c.id})` })),
     [coupons]
   );
 
-  // Show label with total count when available, fallback to prefix
   const batchOptions = useMemo(
     () =>
       batches.map((b) => {
@@ -629,19 +625,723 @@ export default function AdminECoupons() {
     [employees]
   );
 
+  // =========================
+  // E‑Coupon Store Management
+  // =========================
+
+  // Payment Configs
+  const [pcItems, setPcItems] = useState([]);
+  const [pcLoading, setPcLoading] = useState(false);
+  const [pcForm, setPcForm] = useState({
+    title: "",
+    upi_id: "",
+    payee_name: "",
+    instructions: "",
+    file: null,
+  });
+  const [pcSubmitting, setPcSubmitting] = useState(false);
+
+  async function loadPaymentConfigs() {
+    setPcLoading(true);
+    try {
+      const res = await API.get("/coupons/store/payment-configs/", { params: { page_size: 100 } });
+      const items = res?.data?.results || res?.data || [];
+      setPcItems(Array.isArray(items) ? items : []);
+    } catch (_) {
+      setPcItems([]);
+    } finally {
+      setPcLoading(false);
+    }
+  }
+
+  async function createPaymentConfig() {
+    setPcSubmitting(true);
+    try {
+      const fd = new FormData();
+      if (pcForm.title) fd.append("title", pcForm.title);
+      if (pcForm.upi_id) fd.append("upi_id", pcForm.upi_id);
+      if (pcForm.payee_name) fd.append("payee_name", pcForm.payee_name);
+      if (pcForm.instructions) fd.append("instructions", pcForm.instructions);
+      if (pcForm.file) fd.append("upi_qr_image", pcForm.file);
+      await API.post("/coupons/store/payment-configs/", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      await loadPaymentConfigs();
+      setPcForm({ title: "", upi_id: "", payee_name: "", instructions: "", file: null });
+      alert("Payment config created.");
+    } catch (e) {
+      const msg = e?.response?.data?.detail || "Failed to create payment config";
+      alert(msg);
+    } finally {
+      setPcSubmitting(false);
+    }
+  }
+
+  async function setActivePc(id) {
+    try {
+      await API.post(`/coupons/store/payment-configs/${id}/set-active/`, {});
+      await loadPaymentConfigs();
+      alert("Active config set.");
+    } catch (e) {
+      const msg = e?.response?.data?.detail || "Failed to set active config";
+      alert(msg);
+    }
+  }
+
+  // Store Products
+  const [spItems, setSpItems] = useState([]);
+  const [spLoading, setSpLoading] = useState(false);
+  const [spSubmitting, setSpSubmitting] = useState(false);
+  const [spForm, setSpForm] = useState({
+    coupon_id: "",
+    denomination: "150",
+    price_per_unit: "",
+    enable_consumer: true,
+    enable_agency: false,
+    enable_employee: false,
+    is_active: true,
+    max_per_order: "10",
+    display_title: "E‑Coupon",
+    display_desc: "",
+  });
+
+  async function loadStoreProducts() {
+    setSpLoading(true);
+    try {
+      const res = await API.get("/coupons/store/products/", { params: { page_size: 200 } });
+      const items = res?.data?.results || res?.data || [];
+      setSpItems(Array.isArray(items) ? items : []);
+    } catch (_) {
+      setSpItems([]);
+    } finally {
+      setSpLoading(false);
+    }
+  }
+
+  async function createStoreProduct() {
+    setSpSubmitting(true);
+    try {
+      const payload = {
+        coupon: spForm.coupon_id ? parseInt(spForm.coupon_id, 10) : null,
+        denomination: spForm.denomination ? Number(spForm.denomination) : null,
+        price_per_unit: spForm.price_per_unit ? Number(spForm.price_per_unit) : Number(spForm.denomination || 0),
+        enable_consumer: !!spForm.enable_consumer,
+        enable_agency: !!spForm.enable_agency,
+        enable_employee: !!spForm.enable_employee,
+        is_active: !!spForm.is_active,
+        max_per_order: spForm.max_per_order ? Number(spForm.max_per_order) : null,
+        display_title: spForm.display_title || "",
+        display_desc: spForm.display_desc || "",
+      };
+      if (!payload.coupon) {
+        alert("Select Coupon");
+        setSpSubmitting(false);
+        return;
+      }
+      if (!payload.denomination || payload.denomination <= 0) {
+        alert("Enter valid denomination (>0)");
+        setSpSubmitting(false);
+        return;
+      }
+      await API.post("/coupons/store/products/", payload);
+      await loadStoreProducts();
+      alert("Product created.");
+      setSpForm((f) => ({
+        ...f,
+        price_per_unit: "",
+        max_per_order: "10",
+        display_title: "E‑Coupon",
+        display_desc: "",
+      }));
+    } catch (e) {
+      const msg = e?.response?.data?.detail || "Failed to create product";
+      alert(msg);
+    } finally {
+      setSpSubmitting(false);
+    }
+  }
+
+  async function patchProduct(id, patch) {
+    try {
+      await API.patch(`/coupons/store/products/${id}/`, patch);
+      await loadStoreProducts();
+    } catch (e) {
+      const msg = e?.response?.data?.detail || "Update failed";
+      alert(msg);
+    }
+  }
+
+  // Default product coupon from master coupons list
+  useEffect(() => {
+    if (!spForm.coupon_id && coupons && coupons.length) {
+      setSpForm((f) => ({ ...f, coupon_id: String(coupons[0].id) }));
+    }
+  }, [coupons]); // eslint-disable-line
+
+  // Pending Orders (Admin)
+  const [pendingOrders, setPendingOrders] = useState([]);
+  const [poLoading, setPoLoading] = useState(false);
+  const [orderNotes, setOrderNotes] = useState({});
+  const [orderBusy, setOrderBusy] = useState({});
+
+  async function loadPendingOrders() {
+    setPoLoading(true);
+    try {
+      const res = await API.get("/coupons/store/orders/pending/", { params: { page_size: 50 } });
+      const items = res?.data?.results || res?.data || [];
+      setPendingOrders(Array.isArray(items) ? items : []);
+    } catch (_) {
+      setPendingOrders([]);
+    } finally {
+      setPoLoading(false);
+    }
+  }
+
+  async function approveOrder(id) {
+    setOrderBusy((m) => ({ ...m, [id]: true }));
+    try {
+      const note = orderNotes[id] || "";
+      await API.post(`/coupons/store/orders/${id}/approve/`, { review_note: note });
+      await loadPendingOrders();
+      alert("Order approved and codes allocated.");
+    } catch (e) {
+      const msg = e?.response?.data?.detail || "Approval failed";
+      alert(msg);
+    } finally {
+      setOrderBusy((m) => ({ ...m, [id]: false }));
+    }
+  }
+
+  async function rejectOrder(id) {
+    setOrderBusy((m) => ({ ...m, [id]: true }));
+    try {
+      const note = orderNotes[id] || "";
+      await API.post(`/coupons/store/orders/${id}/reject/`, { review_note: note });
+      await loadPendingOrders();
+      alert("Order rejected.");
+    } catch (e) {
+      const msg = e?.response?.data?.detail || "Rejection failed";
+      alert(msg);
+    } finally {
+      setOrderBusy((m) => ({ ...m, [id]: false }));
+    }
+  }
+
+  // Initial loads for store sections
+  useEffect(() => {
+    loadPaymentConfigs();
+    loadStoreProducts();
+    loadPendingOrders();
+  }, []); // eslint-disable-line
+
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ margin: 0, color: "#0f172a" }}>E-Coupons</h2>
         <div style={{ color: "#64748b", fontSize: 13 }}>
-          Create random e-coupon batches (Prefix + 7-char alphanumeric), assign by count to agencies or employees, and view redemption metrics.
+          Create random e-coupon batches (Prefix + 7-char alphanumeric), assign by count to agencies or employees, manage e-coupon store and view redemption metrics.
         </div>
       </div>
 
+      <div style={{ position: "sticky", top: 0, zIndex: 4, background: "transparent", marginBottom: 12 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", overflowX: "auto" }}>
+          <a href="#sec-payment" style={{ padding: "6px 10px", background: "#fff", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, textDecoration: "none", fontWeight: 700 }}>Payment</a>
+          <a href="#sec-products" style={{ padding: "6px 10px", background: "#fff", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, textDecoration: "none", fontWeight: 700 }}>Products</a>
+          <a href="#sec-orders" style={{ padding: "6px 10px", background: "#fff", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, textDecoration: "none", fontWeight: 700 }}>Orders</a>
+          <a href="#sec-create-coupon" style={{ padding: "6px 10px", background: "#fff", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, textDecoration: "none", fontWeight: 700 }}>Create Coupon</a>
+          <a href="#sec-create-batch" style={{ padding: "6px 10px", background: "#fff", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, textDecoration: "none", fontWeight: 700 }}>Create Batch</a>
+          <a href="#sec-assign" style={{ padding: "6px 10px", background: "#fff", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, textDecoration: "none", fontWeight: 700 }}>Assign</a>
+          <a href="#sec-history" style={{ padding: "6px 10px", background: "#fff", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, textDecoration: "none", fontWeight: 700 }}>History</a>
+          <a href="#sec-metrics" style={{ padding: "6px 10px", background: "#fff", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, textDecoration: "none", fontWeight: 700 }}>Metrics</a>
+          <a href="#sec-agency-summary" style={{ padding: "6px 10px", background: "#fff", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, textDecoration: "none", fontWeight: 700 }}>Agency Summary</a>
+        </div>
+      </div>
       {err ? <div style={{ color: "#dc2626", marginBottom: 12 }}>{err}</div> : null}
+
+      {/* E‑Coupon Store: Payment Config */}
+      <Section
+        id="sec-payment"
+        title="E‑Coupon Store: Payment Config"
+        extraRight={
+          <button
+            onClick={createPaymentConfig}
+            disabled={pcSubmitting}
+            style={{
+              padding: "8px 12px",
+              background: "#0f172a",
+              color: "#fff",
+              border: 0,
+              borderRadius: 8,
+              cursor: pcSubmitting ? "not-allowed" : "pointer",
+              fontWeight: 700,
+            }}
+          >
+            {pcSubmitting ? "Saving..." : "Create"}
+          </button>
+        }
+      >
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+            gap: 12,
+          }}
+        >
+          <TextInput
+            label="Title"
+            value={pcForm.title}
+            onChange={(v) => setPcForm((f) => ({ ...f, title: v }))}
+            placeholder="e.g., UPI Payments"
+          />
+          <TextInput
+            label="UPI ID"
+            value={pcForm.upi_id}
+            onChange={(v) => setPcForm((f) => ({ ...f, upi_id: v }))}
+            placeholder="e.g., payee@upi"
+          />
+          <TextInput
+            label="Payee Name"
+            value={pcForm.payee_name}
+            onChange={(v) => setPcForm((f) => ({ ...f, payee_name: v }))}
+            placeholder="e.g., Company Pvt Ltd"
+          />
+          <TextInput
+            label="Instructions"
+            value={pcForm.instructions}
+            onChange={(v) => setPcForm((f) => ({ ...f, instructions: v }))}
+            placeholder="Steps for payment (optional)"
+          />
+          <div>
+            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>QR Image</div>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) =>
+                setPcForm((f) => ({ ...f, file: e.target.files && e.target.files[0] ? e.target.files[0] : null }))
+              }
+            />
+            {pcForm.file ? <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{pcForm.file.name}</div> : null}
+          </div>
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>Existing Configs</div>
+          {pcLoading ? (
+            <div style={{ color: "#64748b" }}>Loading...</div>
+          ) : (pcItems || []).length === 0 ? (
+            <div style={{ color: "#64748b" }}>No configs</div>
+          ) : (
+            <div style={{ display: "grid", gap: 8 }}>
+              {(pcItems || []).map((c) => (
+                <div
+                  key={c.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 8,
+                    padding: 8,
+                  }}
+                >
+                  <div style={{ fontWeight: 700 }}>{c.title || `#${c.id}`}</div>
+                  <div style={{ color: "#64748b" }}>{c.upi_id || ""}</div>
+                  <div style={{ color: c.is_active ? "#16a34a" : "#64748b", fontWeight: 700 }}>
+                    {c.is_active ? "ACTIVE" : "INACTIVE"}
+                  </div>
+                  <div style={{ marginLeft: "auto" }}>
+                    {!c.is_active ? (
+                      <button
+                        onClick={() => setActivePc(c.id)}
+                        style={{
+                          padding: "6px 10px",
+                          background: "#0f172a",
+                          color: "#fff",
+                          border: 0,
+                          borderRadius: 8,
+                          cursor: "pointer",
+                          fontWeight: 700,
+                        }}
+                      >
+                        Set Active
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Section>
+
+      {/* E‑Coupon Store: Products */}
+      <Section
+        id="sec-products"
+        title="E‑Coupon Store: Products"
+        extraRight={
+          <button
+            onClick={createStoreProduct}
+            disabled={spSubmitting}
+            style={{
+              padding: "8px 12px",
+              background: "#0f172a",
+              color: "#fff",
+              border: 0,
+              borderRadius: 8,
+              cursor: spSubmitting ? "not-allowed" : "pointer",
+              fontWeight: 700,
+            }}
+          >
+            {spSubmitting ? "Saving..." : "Create"}
+          </button>
+        }
+      >
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+            gap: 12,
+          }}
+        >
+          <Select
+            label="Coupon"
+            value={spForm.coupon_id}
+            onChange={(v) => setSpForm((f) => ({ ...f, coupon_id: v }))}
+            options={[{ value: "", label: "Select..." }, ...couponOptions]}
+          />
+          <TextInput
+            label="Denomination"
+            type="number"
+            value={spForm.denomination}
+            onChange={(v) => setSpForm((f) => ({ ...f, denomination: v }))}
+            placeholder="e.g., 150"
+          />
+          <TextInput
+            label="Unit Price (optional)"
+            type="number"
+            value={spForm.price_per_unit}
+            onChange={(v) => setSpForm((f) => ({ ...f, price_per_unit: v }))}
+            placeholder="defaults to denomination"
+          />
+          <TextInput
+            label="Max per order"
+            type="number"
+            value={spForm.max_per_order}
+            onChange={(v) => setSpForm((f) => ({ ...f, max_per_order: v }))}
+            placeholder="e.g., 10"
+          />
+          <TextInput
+            label="Display Title"
+            value={spForm.display_title}
+            onChange={(v) => setSpForm((f) => ({ ...f, display_title: v }))}
+            placeholder="e.g., E‑Coupon ₹150"
+          />
+          <TextInput
+            label="Display Description"
+            value={spForm.display_desc}
+            onChange={(v) => setSpForm((f) => ({ ...f, display_desc: v }))}
+            placeholder="Optional description"
+          />
+          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <input
+                type="checkbox"
+                checked={!!spForm.enable_consumer}
+                onChange={(e) => setSpForm((f) => ({ ...f, enable_consumer: e.target.checked }))}
+              />
+              Consumer
+            </label>
+            <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <input
+                type="checkbox"
+                checked={!!spForm.enable_agency}
+                onChange={(e) => setSpForm((f) => ({ ...f, enable_agency: e.target.checked }))}
+              />
+              Agency
+            </label>
+            <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <input
+                type="checkbox"
+                checked={!!spForm.enable_employee}
+                onChange={(e) => setSpForm((f) => ({ ...f, enable_employee: e.target.checked }))}
+              />
+              Employee
+            </label>
+            <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <input
+                type="checkbox"
+                checked={!!spForm.is_active}
+                onChange={(e) => setSpForm((f) => ({ ...f, is_active: e.target.checked }))}
+              />
+              Active
+            </label>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>Existing Products</div>
+          {spLoading ? (
+            <div style={{ color: "#64748b" }}>Loading...</div>
+          ) : (spItems || []).length === 0 ? (
+            <div style={{ color: "#64748b" }}>No products</div>
+          ) : (
+            <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden", background: "#fff" }}>
+              <div style={{ overflowX: "auto" }}>
+                <div
+                  style={{
+                    minWidth: 1000,
+                    display: "grid",
+                    gridTemplateColumns: "60px 1fr 100px 100px 120px 240px 120px 140px",
+                    gap: 8,
+                    padding: "10px",
+                    background: "#f8fafc",
+                    borderBottom: "1px solid #e2e8f0",
+                    fontWeight: 700,
+                    color: "#0f172a",
+                  }}
+                >
+                  <div>ID</div>
+                  <div>Title</div>
+                  <div>Denom</div>
+                  <div>Price</div>
+                  <div>Visibility</div>
+                  <div>Description</div>
+                  <div>Status</div>
+                  <div>Actions</div>
+                </div>
+                <div>
+                  {(spItems || []).map((p) => {
+                    const vis = [
+                      p.enable_consumer ? "Consumer" : null,
+                      p.enable_agency ? "Agency" : null,
+                      p.enable_employee ? "Employee" : null,
+                    ]
+                      .filter(Boolean)
+                      .join(", ") || "—";
+                    return (
+                      <div
+                        key={p.id}
+                        style={{
+                          minWidth: 1000,
+                          display: "grid",
+                          gridTemplateColumns: "60px 1fr 100px 100px 120px 240px 120px 140px",
+                          gap: 8,
+                          padding: "10px",
+                          borderBottom: "1px solid #e2e8f0",
+                        }}
+                      >
+                        <div>#{p.id}</div>
+                        <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {p.display_title || p.coupon_title || "—"}
+                        </div>
+                        <div>₹{p.denomination}</div>
+                        <div>₹{p.price_per_unit}</div>
+                        <div>{vis}</div>
+                        <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{p.display_desc || "—"}</div>
+                        <div style={{ color: p.is_active ? "#16a34a" : "#64748b", fontWeight: 700 }}>
+                          {p.is_active ? "ACTIVE" : "INACTIVE"}
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          <button
+                            onClick={() => patchProduct(p.id, { is_active: !p.is_active })}
+                            style={{
+                              padding: "6px 10px",
+                              background: "#fff",
+                              color: "#0f172a",
+                              border: "1px solid #e2e8f0",
+                              borderRadius: 8,
+                              cursor: "pointer",
+                            }}
+                          >
+                            {p.is_active ? "Deactivate" : "Activate"}
+                          </button>
+                          <button
+                            onClick={() => patchProduct(p.id, { enable_consumer: !p.enable_consumer })}
+                            style={{
+                              padding: "6px 10px",
+                              background: "#fff",
+                              color: "#0f172a",
+                              border: "1px solid #e2e8f0",
+                              borderRadius: 8,
+                              cursor: "pointer",
+                            }}
+                          >
+                            {p.enable_consumer ? "Hide Consumer" : "Show Consumer"}
+                          </button>
+                          <button
+                            onClick={() => patchProduct(p.id, { enable_agency: !p.enable_agency })}
+                            style={{
+                              padding: "6px 10px",
+                              background: "#fff",
+                              color: "#0f172a",
+                              border: "1px solid #e2e8f0",
+                              borderRadius: 8,
+                              cursor: "pointer",
+                            }}
+                          >
+                            {p.enable_agency ? "Hide Agency" : "Show Agency"}
+                          </button>
+                          <button
+                            onClick={() => patchProduct(p.id, { enable_employee: !p.enable_employee })}
+                            style={{
+                              padding: "6px 10px",
+                              background: "#fff",
+                              color: "#0f172a",
+                              border: "1px solid #e2e8f0",
+                              borderRadius: 8,
+                              cursor: "pointer",
+                            }}
+                          >
+                            {p.enable_employee ? "Hide Employee" : "Show Employee"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </Section>
+
+      {/* Pending E‑Coupon Orders */}
+      <Section
+        id="sec-orders"
+        title="Pending E‑Coupon Orders"
+        extraRight={
+          <button
+            onClick={loadPendingOrders}
+            disabled={poLoading}
+            style={{
+              padding: "8px 12px",
+              background: "#0f172a",
+              color: "#fff",
+              border: 0,
+              borderRadius: 8,
+              cursor: poLoading ? "not-allowed" : "pointer",
+              fontWeight: 700,
+            }}
+          >
+            {poLoading ? "Refreshing..." : "Refresh"}
+          </button>
+        }
+      >
+        {poLoading ? (
+          <div style={{ color: "#64748b" }}>Loading...</div>
+        ) : (pendingOrders || []).length === 0 ? (
+          <div style={{ color: "#64748b" }}>No pending orders</div>
+        ) : (
+          <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden", background: "#fff" }}>
+            <div style={{ overflowX: "auto" }}>
+              <div
+                style={{
+                  minWidth: 1200,
+                  display: "grid",
+                  gridTemplateColumns: "80px 160px 100px 80px 100px 160px 160px 240px 220px",
+                  gap: 8,
+                  padding: "10px",
+                  background: "#f8fafc",
+                  borderBottom: "1px solid #e2e8f0",
+                  fontWeight: 700,
+                  color: "#0f172a",
+                }}
+              >
+                <div>ID</div>
+                <div>Buyer</div>
+                <div>Role</div>
+                <div>Qty</div>
+                <div>Total</div>
+                <div>Product</div>
+                <div>UTR</div>
+                <div>Proof</div>
+                <div>Actions</div>
+              </div>
+              <div>
+                {(pendingOrders || []).map((o) => {
+                  const busy = !!orderBusy[o.id];
+                  const note = orderNotes[o.id] || "";
+                  const proofUrl = o.payment_proof_file || "";
+                  return (
+                    <div
+                      key={o.id}
+                      style={{
+                        minWidth: 1200,
+                        display: "grid",
+                        gridTemplateColumns: "80px 160px 100px 80px 100px 160px 160px 240px 220px",
+                        gap: 8,
+                        padding: "10px",
+                        borderBottom: "1px solid #e2e8f0",
+                        alignItems: "center",
+                      }}
+                    >
+                      <div>#{o.id}</div>
+                      <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {o.buyer_username || o.buyer || "—"}
+                      </div>
+                      <div>{o.role_at_purchase || "—"}</div>
+                      <div>{o.quantity || 0}</div>
+                      <div>₹{o.amount_total || 0}</div>
+                      <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{o.product_title || "—"}</div>
+                      <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{o.utr || "—"}</div>
+                      <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {proofUrl ? (
+                          <a href={proofUrl} target="_blank" rel="noreferrer">
+                            View Proof
+                          </a>
+                        ) : (
+                          <span style={{ color: "#64748b" }}>No file</span>
+                        )}
+                      </div>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <input
+                          style={{ padding: 8, border: "1px solid #e2e8f0", borderRadius: 8, minWidth: 160 }}
+                          placeholder="Review note"
+                          value={note}
+                          onChange={(e) => setOrderNotes((m) => ({ ...m, [o.id]: e.target.value }))}
+                        />
+                        <button
+                          onClick={() => approveOrder(o.id)}
+                          disabled={busy}
+                          style={{
+                            padding: "6px 10px",
+                            background: "#16a34a",
+                            color: "#fff",
+                            border: 0,
+                            borderRadius: 8,
+                            cursor: busy ? "not-allowed" : "pointer",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {busy ? "Processing..." : "Approve"}
+                        </button>
+                        <button
+                          onClick={() => rejectOrder(o.id)}
+                          disabled={busy}
+                          style={{
+                            padding: "6px 10px",
+                            background: "#dc2626",
+                            color: "#fff",
+                            border: 0,
+                            borderRadius: 8,
+                            cursor: busy ? "not-allowed" : "pointer",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {busy ? "Processing..." : "Reject"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+      </Section>
 
       {/* Create Coupon */}
       <Section
+        id="sec-create-coupon"
         title="Create Coupon (master)"
         extraRight={
           <button
@@ -705,7 +1405,8 @@ export default function AdminECoupons() {
 
       {/* Create E-Coupon Batch */}
       <Section
-        title="Create Random E-Coupon Batch (Prefix + 7 chars)"
+        id="sec-create-batch"
+        title="Create Random E‑Coupon Batch (Prefix + 7 chars)"
         extraRight={
           <button
             onClick={createBatch}
@@ -768,6 +1469,7 @@ export default function AdminECoupons() {
 
       {/* Assign to Agency/Employee */}
       <Section
+        id="sec-assign"
         title="Assign E-Coupons (Count-based)"
         extraRight={
           <button
@@ -839,6 +1541,7 @@ export default function AdminECoupons() {
 
       {/* Assignment History */}
       <Section
+        id="sec-history"
         title="Assignment History"
         extraRight={
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1094,6 +1797,7 @@ export default function AdminECoupons() {
 
       {/* Metrics */}
       <Section
+        id="sec-metrics"
         title="Redemption Summary"
         extraRight={
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1144,6 +1848,7 @@ export default function AdminECoupons() {
 
       {/* Admin: Agency Assignment Summary */}
       <Section
+        id="sec-agency-summary"
         title="Agency Assignment Summary"
         extraRight={
           <div style={{ display: "flex", alignItems: "end", gap: 8 }}>
@@ -1197,7 +1902,8 @@ export default function AdminECoupons() {
               style={{
                 minWidth: 1200,
                 display: "grid",
-                gridTemplateColumns: "180px 220px 120px 140px 140px 120px 120px 140px 120px 120px 120px",
+                gridTemplateColumns:
+                  "180px 220px 120px 140px 140px 120px 120px 140px 120px 120px 120px",
                 gap: 8,
                 padding: "10px",
                 background: "#f8fafc",
@@ -1227,14 +1933,19 @@ export default function AdminECoupons() {
                     style={{
                       minWidth: 1200,
                       display: "grid",
-                      gridTemplateColumns: "180px 220px 120px 140px 140px 120px 120px 140px 120px 120px 120px",
+                      gridTemplateColumns:
+                        "180px 220px 120px 140px 140px 120px 120px 140px 120px 120px 120px",
                       gap: 8,
                       padding: "10px",
                       borderBottom: "1px solid #e2e8f0",
                     }}
                   >
-                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{row.username || "—"}</div>
-                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{row.full_name || "—"}</div>
+                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {row.username || "—"}
+                    </div>
+                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {row.full_name || "—"}
+                    </div>
                     <div>{row.pincode || "—"}</div>
                     <div>{row.city || "—"}</div>
                     <div>{row.state || "—"}</div>
@@ -1254,7 +1965,6 @@ export default function AdminECoupons() {
           </div>
         </div>
       </Section>
-
     </div>
   );
 }

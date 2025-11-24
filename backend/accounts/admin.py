@@ -1182,3 +1182,32 @@ class WithdrawalRequestAdmin(admin.ModelAdmin):
                 continue
         self.message_user(request, f"Rejected {updated} withdrawal(s).")
     reject_selected.short_description = "Reject selected withdrawals"
+
+# ======================
+# Prune extra account-related admin models: keep only Users, KYC, Withdrawal Requests
+# ======================
+from django.contrib.admin.sites import NotRegistered as _AdminNotRegistered
+
+def _try_unregister(model_cls):
+    try:
+        admin.site.unregister(model_cls)
+    except _AdminNotRegistered:
+        pass
+    except Exception:
+        pass
+
+# Remove proxy/region/wallet screens from Admin as requested
+_try_unregister(PincodeUser)
+_try_unregister(ConsumerAccount)
+_try_unregister(EmployeeAccount)
+_try_unregister(CompanyAccount)
+_try_unregister(AgencyStateCoordinator)
+_try_unregister(AgencyState)
+_try_unregister(AgencyDistrictCoordinator)
+_try_unregister(AgencyDistrict)
+_try_unregister(AgencyPincodeCoordinator)
+_try_unregister(AgencyPincode)
+_try_unregister(AgencySubFranchise)
+_try_unregister(AgencyRegionAssignment)
+_try_unregister(Wallet)
+_try_unregister(WalletTransaction)

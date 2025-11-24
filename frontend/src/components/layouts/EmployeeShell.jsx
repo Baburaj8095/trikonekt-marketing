@@ -40,8 +40,11 @@ export default function EmployeeShell({ children }) {
     { to: "/employee/dashboard?tab=refer_earn", label: "Refer & Earn", icon: "upload" },
     { to: "/employee/dashboard?tab=rewards", label: "Rewards", icon: "chart" },
     { to: "/employee/dashboard?tab=e_coupons", label: "My E‑Coupons", icon: "ticket" },
+    { to: "/employee/e-coupon-store", label: "E-Coupon Store", icon: "box" },
+    { to: "/employee/trikonekt-products", label: "Trikonekt Products", icon: "box" },
     { to: "/employee/dashboard?tab=offer_letter", label: "Offer Letter", icon: "file" },
     { to: "/employee/wallet", label: "Wallet", icon: "wallet" },
+    { to: "/employee/history", label: "History", icon: "orders" },
     { to: "/employee/support", label: "Support", icon: "ticket" },
 
     { to: "/employee/daily-report", label: "Daily Report", icon: "box" },
@@ -59,6 +62,10 @@ export default function EmployeeShell({ children }) {
         return loc.pathname === "/employee/dashboard" && !q.get("tab");
       }
       return loc.pathname === "/employee/dashboard" && tab === String(targetTab).toLowerCase();
+    }
+    // Trikonekt Products (including nested routes)
+    if (toPath === "/employee/trikonekt-products") {
+      return loc.pathname === "/employee/trikonekt-products" || loc.pathname.startsWith("/employee/trikonekt-products/");
     }
     // Exact path match for other pages
     return `${loc.pathname}${loc.search}` === to;

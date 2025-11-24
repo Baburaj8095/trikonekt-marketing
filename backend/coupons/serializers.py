@@ -11,6 +11,9 @@ from .models import (
     CouponBatch,
     Commission,
     AuditTrail,
+    ECouponPaymentConfig,
+    ECouponProduct,
+    ECouponOrder,
 )
 
 
@@ -494,5 +497,144 @@ class AuditTrailSerializer(serializers.ModelSerializer):
     def get_actor_username(self, obj):
         try:
             return obj.actor.username if obj.actor_id else None
+        except Exception:
+            return None
+
+
+class ECouponPaymentConfigSerializer(serializers.ModelSerializer):
+    upi_qr_image_url = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = ECouponPaymentConfig
+        fields = [
+            "id",
+            "title",
+            "upi_qr_image",
+            "upi_qr_image_url",
+            "upi_id",
+            "payee_name",
+            "instructions",
+            "is_active",
+            "created_by",
+            "created_at",
+        ]
+        read_only_fields = ["created_by", "created_at"]
+
+    def get_upi_qr_image_url(self, obj):
+        try:
+            request = self.context.get("request")
+            if obj.upi_qr_image and hasattr(obj.upi_qr_image, "url"):
+                url = obj.upi_qr_image.url
+                return request.build_absolute_uri(url) if request else url
+        except Exception:
+            pass
+        return None
+
+
+class ECouponProductSerializer(serializers.ModelSerializer):
+    coupon_title = serializers.CharField(source="coupon.title", read_only=True)
+
+    class Meta:
+        model = ECouponProduct
+        fields = [
+            "id",
+            "coupon",
+            "coupon_title",
+            "denomination",
+            "price_per_unit",
+            "enable_consumer",
+            "enable_agency",
+            "enable_employee",
+            "is_active",
+            "max_per_order",
+            "display_title",
+            "display_desc",
+            "created_at",
+        ]
+        read_only_fields = ["created_at"]
+
+    def validate(self, attrs):
+        denom = attrs.get("denomination", getattr(self.instance, "denomination", None))
+        price = attrs.get("price_per_unit", getattr(self.instance, "price_per_unit", None))
+        if denom is None:
+            raise serializers.ValidationError({"denomination": "This field is required."})
+        try:
+            if denom <= 0:
+                raise serializers.ValidationError({"denomination": "Must be > 0."})
+        except Exception:
+            raise serializers.ValidationError({"denomination": "Invalid value."})
+        if price is None:
+            # Default price to denomination if not provided
+            attrs["price_per_unit"] = denom
+        else:
+            try:
+                if price <= 0:
+                    raise serializers.ValidationError({"price_per_unit": "Must be > 0."})
+            except Exception:
+                raise serializers.ValidationError({"price_per_unit": "Invalid value."})
+        mpo = attrs.get("max_per_order", getattr(self.instance, "max_per_order", None))
+        if mpo is not None and mpo <= 0:
+            raise serializers.ValidationError({"max_per_order": "Must be positive when provided."})
+        return attrs
+
+
+class ECouponOrderSerializer(serializers.ModelSerializer):
+    buyer_username = serializers.SerializerMethodField(read_only=True)
+    product_title = serializers.CharField(source="product.display_title", read_only=True)
+    reviewer_username = serializers.SerializerMethodField(read_only=True)
+    payment_config_title = serializers.CharField(source="payment_config.title", read_only=True)
+
+    class Meta:
+        model = ECouponOrder
+        fields = [
+            "id",
+            "buyer",
+            "buyer_username",
+            "role_at_purchase",
+            "product",
+            "product_title",
+            "denomination_snapshot",
+            "quantity",
+            "amount_total",
+            "payment_config",
+            "payment_config_title",
+            "payment_proof_file",
+            "utr",
+            "notes",
+            "status",
+            "reviewer",
+            "reviewer_username",
+            "reviewed_at",
+            "review_note",
+            "allocated_count",
+            "allocated_sample_codes",
+            "created_at",
+        ]
+        read_only_fields = [
+            "buyer",
+            "buyer_username",
+            "role_at_purchase",
+            "denomination_snapshot",
+            "amount_total",
+            "payment_config",
+            "status",
+            "reviewer",
+            "reviewer_username",
+            "reviewed_at",
+            "review_note",
+            "allocated_count",
+            "allocated_sample_codes",
+            "created_at",
+        ]
+
+    def get_buyer_username(self, obj):
+        try:
+            return obj.buyer.username
+        except Exception:
+            return None
+
+    def get_reviewer_username(self, obj):
+        try:
+            return obj.reviewer.username if obj.reviewer_id else None
         except Exception:
             return None
