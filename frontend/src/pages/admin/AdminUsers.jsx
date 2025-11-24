@@ -3,6 +3,7 @@ import API from "../../api/api";
 import DataTable from "../../admin-panel/components/data/DataTable";
 import ModelFormDialog from "../../admin-panel/dynamic/ModelFormDialog";
 import { useLocation } from "react-router-dom";
+import AgencyPackageCardsPanel from "./components/AgencyPackageCardsPanel";
 
 function TextInput({ label, value, onChange, placeholder, style }) {
   return (
@@ -67,6 +68,9 @@ export default function AdminUsers() {
   const [editOpen, setEditOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [tempPw, setTempPw] = useState({});
+  // Packages drawer (agency-only)
+  const [pkgOpen, setPkgOpen] = useState(false);
+  const [pkgUser, setPkgUser] = useState(null);
   // Mobile responsiveness hint
   const [isMobile, setIsMobile] = useState(typeof window !== "undefined" ? window.innerWidth < 640 : false);
   useEffect(() => {
@@ -341,6 +345,44 @@ export default function AdminUsers() {
               }}
             >
               Login
+            </button>
+          );
+        },
+      },
+      {
+        field: "__packages",
+        headerName: "Packages",
+        minWidth: 130,
+        sortable: false,
+        filterable: false,
+        renderCell: (params) => {
+          const row = params?.row || {};
+          const role = String(row.role || "").toLowerCase();
+          const cat = String(row.category || "").toLowerCase();
+          const isAgency = role === "agency" || cat.startsWith("agency");
+          if (!isAgency) return "—";
+          const onOpen = (e) => {
+            e?.stopPropagation?.();
+            setPkgUser({ id: row.id, username: row.username, full_name: row.full_name });
+            setPkgOpen(true);
+          };
+          return (
+            <button
+              type="button"
+              onClick={onOpen}
+              title="View packages for this agency"
+              style={{
+                borderRadius: 8,
+                padding: "6px 10px",
+                background: "#0ea5e9",
+                color: "#fff",
+                border: "1px solid #0284c7",
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 700,
+              }}
+            >
+              Packages
             </button>
           );
         },
@@ -631,6 +673,13 @@ export default function AdminUsers() {
         fields={editFields}
         onSaved={() => setReloadKey((k) => k + 1)}
         title={selected ? `Edit ${selected.username || selected.full_name || selected.id}` : "Edit User"}
+      />
+
+      <AgencyPackageCardsPanel
+        open={pkgOpen}
+        onClose={() => setPkgOpen(false)}
+        agencyId={pkgUser?.id}
+        username={pkgUser?.username || pkgUser?.full_name}
       />
     </div>
   );

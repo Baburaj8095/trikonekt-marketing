@@ -208,6 +208,53 @@ export default function AdminDashboard() {
   const nav = useNavigate();
   const didRunRef = React.useRef(false);
 
+  // Admin: Agency Package Cards
+  const [agencyQuery, setAgencyQuery] = useState("");
+  const [resolvedAgency, setResolvedAgency] = useState(null);
+  const [pkgCards, setPkgCards] = useState([]);
+  const [cardsLoading, setCardsLoading] = useState(false);
+  const [cardsError, setCardsError] = useState("");
+
+  const resolveAgencyId = async (q) => {
+    const s = String(q || "").trim();
+    if (!s) throw new Error("Enter agency username or numeric ID");
+    if (/^\d+$/.test(s)) return Number(s);
+    // Resolve by username via hierarchy endpoint
+    const res = await API.get("accounts/hierarchy/", { params: { username: s } });
+    const id = res?.data?.user?.id;
+    if (!id) throw new Error("Agency not found");
+    return id;
+  };
+
+  const loadAdminAgencyCards = async () => {
+    try {
+      setCardsLoading(true);
+      setCardsError("");
+      const id = await resolveAgencyId(agencyQuery);
+      setResolvedAgency({ id, username: agencyQuery });
+      const res = await API.get("business/agency-packages/", { params: { agency_id: id }, retryAttempts: 1 });
+      const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
+      setPkgCards(arr || []);
+    } catch (e) {
+      const msg =
+        e?.response?.data?.detail ||
+        (typeof e?.response?.data === "string" ? e.response.data : "") ||
+        e?.message ||
+        "Failed to load packages";
+      setCardsError(msg);
+      setPkgCards([]);
+    } finally {
+      setCardsLoading(false);
+    }
+  };
+
+  const statusBg = (status) => {
+    const s = String(status || "").toLowerCase();
+    if (s === "inactive") return "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)";
+    if (s === "partial") return "linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)";
+    return "linear-gradient(135deg, #10b981 0%, #059669 100%)";
+  };
+
   // Load metrics
   useEffect(() => {
     if (didRunRef.current) return;
@@ -315,6 +362,84 @@ export default function AdminDashboard() {
         </div>
         <div style={{ color: "#64748b", fontSize: 12 }}>
           {new Date().toLocaleDateString()}
+        </div>
+      </div>
+
+      {/* Agency Package Cards (Admin) */}
+      <div style={{ border: "1px solid #e2e8f0", borderRadius: 14, background: "#fff", marginBottom: 12, overflow: "hidden" }}>
+        <div style={{ padding: 10, background: "#f8fafc", borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+          <div style={{ fontWeight: 900, color: "#0f172a" }}>Agency Package Cards</div>
+          <div style={{ color: "#64748b", fontSize: 12 }}>View package status for any agency (Amount, Paid, Remaining)</div>
+        </div>
+        <div style={{ padding: 12 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
+            <input
+              type="text"
+              placeholder="Agency username or ID"
+              value={agencyQuery}
+              onChange={(e) => setAgencyQuery(e.target.value)}
+              style={{ padding: "8px 10px", border: "1px solid #e2e8f0", borderRadius: 8, minWidth: 220, outline: "none" }}
+            />
+            <button
+              onClick={loadAdminAgencyCards}
+              style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #93c5fd", background: "#eff6ff", color: "#1d4ed8", fontWeight: 800, cursor: "pointer" }}
+            >
+              Load
+            </button>
+            {resolvedAgency ? (
+              <div style={{ color: "#64748b", fontSize: 12 }}>
+                Showing for ID #{resolvedAgency.id} ({resolvedAgency.username})
+              </div>
+            ) : null}
+          </div>
+
+          {cardsLoading ? (
+            <div style={{ color: "#64748b" }}>Loading packages...</div>
+          ) : cardsError ? (
+            <div style={{ color: "#dc2626" }}>{cardsError}</div>
+          ) : (pkgCards || []).length > 0 ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, alignItems: "stretch", minWidth: 0, width: "100%" }}>
+              {(pkgCards || []).map((p) => {
+                const st = String(p.status || "").toLowerCase();
+                const inactive = st === "inactive";
+                const bg = statusBg(st);
+                const color = inactive ? "#fff" : "#0f172a";
+                const title = p?.package?.name || p?.package?.code || "Package";
+                const mark = inactive ? "✗" : "✓";
+                const stText = inactive ? "Inactive" : st === "partial" ? "Partial" : "Active";
+                return (
+                  <div key={p.id} style={{ padding: 12, borderRadius: 12, background: bg, color, boxShadow: "0 8px 18px rgba(0,0,0,0.12)", border: "1px solid rgba(0,0,0,0.05)", boxSizing: "border-box", minWidth: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, minWidth: 0, flexWrap: "wrap" }}>
+                      <div style={{ fontWeight: 900, whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere", minWidth: 0 }}>{title}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 800, flexWrap: "wrap", minWidth: 0 }}>
+                        <span>{mark}</span>
+                        <span>{stText}</span>
+                      </div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 8, marginTop: 8, width: "100%", minWidth: 0 }}>
+                      <div style={{ padding: 8, borderRadius: 8, background: "rgba(255,255,255,0.15)", minWidth: 0 }}>
+                      <div style={{ fontSize: 12, opacity: 0.9, color: inactive ? "#f1f5f9" : "#0f172a" }}>Amount</div>
+                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a", whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere", minWidth: 0 }}>₹{p.total_amount || "0.00"}</div>
+                      </div>
+                      <div style={{ padding: 8, borderRadius: 8, background: "rgba(255,255,255,0.15)", minWidth: 0 }}>
+                      <div style={{ fontSize: 12, opacity: 0.9, color: inactive ? "#f1f5f9" : "#0f172a" }}>Paid</div>
+                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a", whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere", minWidth: 0 }}>₹{p.paid_amount || "0.00"}</div>
+                      </div>
+                      <div style={{ padding: 8, borderRadius: 8, background: "rgba(255,255,255,0.15)", minWidth: 0 }}>
+                      <div style={{ fontSize: 12, opacity: 0.9, color: inactive ? "#f1f5f9" : "#0f172a" }}>Remaining</div>
+                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a", whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere", minWidth: 0 }}>₹{p.remaining_amount || "0.00"}</div>
+                      </div>
+                    </div>
+                    <div style={{ marginTop: 6, fontSize: 12, fontWeight: 700, whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere" }}>
+                      Renewal: {typeof p.months_remaining === "number" ? `${p.months_remaining} month${p.months_remaining === 1 ? "" : "s"} remaining` : "—"}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div style={{ color: "#64748b" }}>No package assigned for this agency.</div>
+          )}
         </div>
       </div>
 

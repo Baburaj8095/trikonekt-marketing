@@ -1052,7 +1052,7 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
       user: "Consumer",
       agency: "Agency",
       employee: "Employee",
-      business: "Business",
+      business: "Merchant",
     }[String(r || "").toLowerCase()] || String(r || ""));
 
   // Resolve registered role/category for a username to detect role mismatch before login
@@ -1194,15 +1194,15 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
     }
     if (category === "business") {
       if (!formData.email) {
-        setErrorMsg("Email is required for business registration");
+        setErrorMsg("Email is required for merchant registration");
         return;
       }
       if (!formData.business_name) {
-        setErrorMsg("Business Name is required");
+        setErrorMsg("Merchant Name is required");
         return;
       }
       if (!formData.business_category) {
-        setErrorMsg("Business Category is required");
+        setErrorMsg("Merchant Category is required");
         return;
       }
       if (!formData.address) {
@@ -1302,7 +1302,7 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
           city_name: geoCityName || "",
         };
         await API.post("/business/register/", brPayload);
-        setSuccessMsg("Business registration submitted successfully. Admin will review and forward it to the concerned agency. Business login is disabled.");
+        setSuccessMsg("Merchant registration submitted successfully. Admin will review and forward it to the concerned agency. Merchant login is disabled.");
         setFormData({
           username: "",
           password: "",
@@ -1851,7 +1851,7 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
             />
             <TextField
               fullWidth
-              label="Business Name"
+              label="Merchant Name"
               name="business_name"
               value={formData.business_name}
               onChange={handleChange}
@@ -2060,10 +2060,10 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
                   {role === "employee" && <CheckCircleIcon color="success" fontSize="small" />}
                 </Box>
               </ToggleButton>
-              <ToggleButton value="business" aria-label="business">
+              <ToggleButton value="business" aria-label="merchant">
                 <Box sx={{ display: "flex", alignItems: "center", width: "100%", justifyContent: "space-between" }}>
                   <Box sx={{ display: "flex", alignItems: "center" }}>
-                    <BusinessIcon sx={{ mr: 1 }} /> Business
+                    <BusinessIcon sx={{ mr: 1 }} /> Merchant
                   </Box>
                   {role === "business" && <CheckCircleIcon color="success" fontSize="small" />}
                 </Box>
@@ -2200,7 +2200,7 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
                   control={<Checkbox checked={remember} onChange={(e) => setRemember(e.target.checked)} size="small" />}
                   label="Remember me"
                 />
-                <Box sx={{ ml: { sm: 0 }, textAlign: { xs: "left", sm: "right" } }}>
+                <Box sx={{ ml: { sm: 0 }, textAlign: { xs: "left", sm: "right" }, display: { xs: "none", sm: "block" } }}>
                   <Button type="button" size="small" sx={{ textTransform: "none" }} onClick={() => setForgotOpen(true)}>
                     Forgot password?
                   </Button>
@@ -2225,6 +2225,14 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
             >
               {isLogin ? "LOGIN" : "REGISTER"}
             </Button>
+
+            {isLogin && (
+              <Box sx={{ display: { xs: "block", sm: "none" }, textAlign: "center", mt: 0.5, mb: 1 }}>
+                <Button type="button" size="small" sx={{ textTransform: "none" }} onClick={() => setForgotOpen(true)}>
+                  Forgot password?
+                </Button>
+              </Box>
+            )}
 
             <Typography variant="body2" align="center" sx={{ color: "text.secondary" }}>
               {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}

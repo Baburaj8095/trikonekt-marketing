@@ -18,10 +18,15 @@ import {
   MenuItem,
   Button,
   Pagination,
+  Avatar,
+  useMediaQuery,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import API from "../api/api";
 import RewardsTargetCard from "../components/RewardsTargetCard";
 import TreeReferralGalaxy from "../components/TreeReferralGalaxy";
+import ReferAndEarn from "../components/ReferAndEarn";
+import { CheckCircle, Cancel } from "@mui/icons-material";
 
 export default function AgencyDashboard() {
   // Nav identity (for filtering employees by agency pincode)
@@ -34,6 +39,10 @@ export default function AgencyDashboard() {
     }
   }, []);
   const agencyPincode = (storedUser?.pincode || "").toString();
+  const sponsorUsername = (storedUser?.username || storedUser?.user?.username || "");
+
+  const theme = useTheme();
+  const isXs = useMediaQuery(theme.breakpoints.down('sm'));
 
   // Sidebar tabs (internal page tabs)
   const TABS = {
@@ -41,7 +50,7 @@ export default function AgencyDashboard() {
     ASSIGN: "assign",
     EMPLOYEES: "employees",
   };
-  const [activeTab, setActiveTab] = useState(TABS.LUCKY);
+const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
   const [showAllLucky, setShowAllLucky] = useState(false);
 
   // Lucky Draw history (agency scope: pincode)
@@ -53,6 +62,11 @@ export default function AgencyDashboard() {
   const [ecSummary, setEcSummary] = useState(null);
   const [ecSummaryLoading, setEcSummaryLoading] = useState(false);
   const [ecSummaryError, setEcSummaryError] = useState("");
+
+  // Packages assigned to this agency
+  const [packages, setPackages] = useState([]);
+  const [packagesLoading, setPackagesLoading] = useState(false);
+  const [packagesError, setPackagesError] = useState("");
 
   // Agency E‑Coupon codes (history)
   const [agencyCodes, setAgencyCodes] = useState([]);
@@ -157,6 +171,27 @@ export default function AgencyDashboard() {
       setEcSummaryError("Failed to load E‑Coupon summary.");
     } finally {
       setEcSummaryLoading(false);
+    }
+  };
+
+  // Load assigned packages for Agency Dashboard cards
+  const loadAgencyPackages = async () => {
+    try {
+      setPackagesLoading(true);
+      setPackagesError("");
+      const res = await API.get("/business/agency-packages/", { retryAttempts: 1, cacheTTL: 5000 });
+      const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
+      setPackages(arr || []);
+    } catch (e) {
+      const msg =
+        e?.response?.data?.detail ||
+        (typeof e?.response?.data === "string" ? e.response.data : "") ||
+        e?.message ||
+        "Failed to load packages.";
+      setPackagesError(msg);
+      setPackages([]);
+    } finally {
+      setPackagesLoading(false);
     }
   };
 
@@ -330,6 +365,10 @@ export default function AgencyDashboard() {
     loadEcSummary();
   }, []);
 
+  useEffect(() => {
+    loadAgencyPackages();
+  }, []);
+
 
   function MyTreeNode({ node, depth = 0 }) {
     const pad = depth * 16;
@@ -350,11 +389,7 @@ export default function AgencyDashboard() {
   }
 
   // Reload lucky list when toggle or tab changes
-  useEffect(() => {
-    if (activeTab === TABS.LUCKY) {
-      loadLuckyHistory();
-    }
-  }, [showAllLucky, activeTab]);
+  // (Hidden: Lucky Draw Submission History not shown on Agency Dashboard)
 
   // Reload employees list when switching to Assign or Employees tabs
   useEffect(() => {
@@ -378,17 +413,215 @@ export default function AgencyDashboard() {
         </Typography>
       </Box>
 
-      <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-        {/* <Button variant={activeTab === TABS.LUCKY ? "contained" : "outlined"} onClick={() => setActiveTab(TABS.LUCKY)}>
-          Lucky Draw Submission
-        </Button>
-         */}
+      {/* <Box sx={{ mb: 2 }}>
+        <ReferAndEarn title="Refer & Earn" sponsorUsername={sponsorUsername} />
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          Share your referral links to invite Consumers, Employees, Sub‑Franchise agencies, and Merchants. Sponsor ID will be auto-filled.
+        </Typography>
+      </Box> */}
+
+      {/* Assigned Package Cards */}
+      <Box sx={{ mb: 2 }}>
+        {packagesLoading ? (
+          <Box sx={{ py: 2, display: "flex", alignItems: "center", gap: 1 }}>
+            <CircularProgress size={20} /> <Typography variant="body2">Loading packages...</Typography>
+          </Box>
+        ) : packagesError ? (
+          <Alert severity="error">{packagesError}</Alert>
+        ) : (packages || []).length > 0 ? (
+          <Grid container spacing={2} alignItems="stretch" sx={{
+                      '@media (max-width:600px)': {
+                        minWidth: 0,
+                        boxSizing: 'border-box',
+                        width: "100%",
+                        margin: "auto",
+                      },
+                    }}>
+            {(packages || []).map((p) => {
+              const status = String(p.status || "").toLowerCase();
+              const isInactive = status === "inactive";
+              const isPartial = status === "partial";
+              const isActive = status === "active";
+              const bg =
+                isInactive
+                  ? "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)"
+                  : isPartial
+                  ? "linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)"
+                  : "linear-gradient(135deg, #10b981 0%, #059669 100%)";
+              const color = isInactive ? "#fff" : "#0f172a";
+              return (
+                <Grid item xs={12} md={4} key={p.id} sx={{
+                      '@media (max-width:600px)': {
+                        minWidth: 0,
+                        boxSizing: 'border-box',
+                        width: "100%",
+                        margin: "auto",
+                      },
+                    }}>
+                  <Box sx={{ p: 2, borderRadius: 2, background: bg, color, boxShadow: "0 8px 18px rgba(0,0,0,0.15)", border: "1px solid rgba(0,0,0,0.05)", height: "100%", display: "flex", flexDirection: "column", flex: 1 }}>
+                    <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+                        {p?.package?.name || p?.package?.code || "Package"}
+                      </Typography>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                        {(isActive || isPartial) ? (
+                          <CheckCircle fontSize="small" sx={{ color: isPartial ? "#065f46" : "#065f46" }} />
+                        ) : (
+                          <Cancel fontSize="small" sx={{ color: "#fff" }} />
+                        )}
+                        <Typography variant="caption" sx={{ fontWeight: 700 }}>
+                          {isInactive ? "Inactive" : isPartial ? "Partial" : "Active"}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                    <Grid container spacing={1} sx={{ mt: 1 }}>
+                      <Grid item xs={4}>
+                        <Box sx={{ p: 1, borderRadius: 1, background: "rgba(255,255,255,0.15)", color: "#111827" }}>
+                          <Typography variant="caption" sx={{ opacity: 0.9, color: isInactive ? "#f1f5f9" : "#0f172a" }}>Amount</Typography>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 900, color: isInactive ? "#fff" : "#0f172a" }}>
+                            ₹{p.total_amount || "0.00"}
+                          </Typography>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={4}>
+                        <Box sx={{ p: 1, borderRadius: 1, background: "rgba(255,255,255,0.15)", color: "#111827" }}>
+                          <Typography variant="caption" sx={{ opacity: 0.9, color: isInactive ? "#f1f5f9" : "#0f172a" }}>Paid</Typography>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 900, color: isInactive ? "#fff" : "#0f172a" }}>
+                            ₹{p.paid_amount || "0.00"}
+                          </Typography>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={4}>
+                        <Box sx={{ p: 1, borderRadius: 1, background: "rgba(255,255,255,0.15)", color: "#111827" }}>
+                          <Typography variant="caption" sx={{ opacity: 0.9, color: isInactive ? "#f1f5f9" : "#0f172a" }}>Remaining</Typography>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 900, color: isInactive ? "#fff" : "#0f172a" }}>
+                            ₹{p.remaining_amount || "0.00"}
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    </Grid>
+                    <Box sx={{ mt: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700 }}>
+                        Renewal: {typeof p.months_remaining === "number" ? `${p.months_remaining} month${p.months_remaining === 1 ? "" : "s"} remaining` : "—"}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Grid>
+              );
+            })}
+          </Grid>
+        ) : (
+          <Alert severity="info">No package assigned yet.</Alert>
+        )}
+      </Box>
+
+      {/* Overview Cards */}
+      <Box sx={{ mb: 2 }}>
+        <Grid container spacing={2} alignItems="stretch">
+          <Grid item xs={12} sx={{ display: "flex", "& > *": { width: "100%", flex: 1 } }}>
+            <RewardsTargetCard role="agency" variant="basic-package" />
+          </Grid>
+        </Grid>
+      </Box>
+
+      {/* E‑Coupon Summary */}
+      <Box sx={{ mb: 2 }}>
+        {ecSummaryLoading ? (
+          <Typography variant="body2">Loading E‑Coupon summary...</Typography>
+        ) : ecSummaryError ? (
+          <Alert severity="error">{ecSummaryError}</Alert>
+        ) : ecSummary ? (
+          <Grid container spacing={2} alignItems="stretch" >
+            <Grid item xs={12} md={2} sx={{
+                      '@media (max-width:600px)': {
+                        minWidth: 0,
+                        boxSizing: 'border-box',
+                        width: "45%",
+                        margin: "auto",
+                      },
+                    }}>
+              <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)", color: "#fff", border: "1px solid rgba(124,58,237,0.35)", boxShadow: "0 8px 18px rgba(124,58,237,0.35)", height: "100%" }}>
+                <Typography variant="caption" sx={{ opacity: 0.9 }}>Available</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.available ?? 0}</Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} md={2} sx={{
+                      '@media (max-width:600px)': {
+                        minWidth: 0,
+                        boxSizing: 'border-box',
+                        width: "45%",
+                        margin: "auto",
+                      },
+                    }}>
+              <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #14b8a6 0%, #2dd4bf 100%)", color: "#0f172a", border: "1px solid rgba(20,184,166,0.35)", boxShadow: "0 8px 18px rgba(20,184,166,0.35)", height: "100%" }}>
+                <Typography variant="caption" sx={{ opacity: 0.9 }}>Assigned to Employee</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.assigned_employee ?? 0}</Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} md={2} sx={{
+                      '@media (max-width:600px)': {
+                        minWidth: 0,
+                        boxSizing: 'border-box',
+                        width: "45%",
+                        margin: "auto",
+                      },
+                    }}>
+              <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)", color: "#0f172a", border: "1px solid rgba(245,158,11,0.35)", boxShadow: "0 8px 18px rgba(245,158,11,0.35)", height: "100%" }}>
+                <Typography variant="caption" sx={{ opacity: 0.9 }}>Sold</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.sold ?? 0}</Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} md={2} sx={{
+                      '@media (max-width:600px)': {
+                        minWidth: 0,
+                        boxSizing: 'border-box',
+                        width: "45%",
+                        margin: "auto",
+                      },
+                    }}>
+              <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", color: "#fff", border: "1px solid rgba(16,185,129,0.35)", boxShadow: "0 8px 18px rgba(16,185,129,0.35)", height: "100%" }}>
+                <Typography variant="caption" sx={{ opacity: 0.9 }}>Redeemed</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.redeemed ?? 0}</Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} md={2} sx={{
+                      '@media (max-width:600px)': {
+                        minWidth: 0,
+                        boxSizing: 'border-box',
+                        width: "45%",
+                        margin: "auto",
+                      },
+                    }}>
+              <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%)", color: "#fff", border: "1px solid rgba(59,130,246,0.35)", boxShadow: "0 8px 18px rgba(59,130,246,0.35)", height: "100%" }}>
+                <Typography variant="caption" sx={{ opacity: 0.9 }}>Revoked</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.revoked ?? 0}</Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} md={2} sx={{
+                      '@media (max-width:600px)': {
+                        minWidth: 0,
+                        boxSizing: 'border-box',
+                        width: "45%",
+                        margin: "auto",
+                      },
+                    }}>
+              <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #06b6d4 0%, #0ea5e9 100%)", color: "#fff", border: "1px solid rgba(14,165,233,0.35)", boxShadow: "0 8px 18px rgba(14,165,233,0.35)", height: "100%" }}>
+                <Typography variant="caption" sx={{ opacity: 0.9 }}>Total</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 900 }}>{ecSummary.total ?? 0}</Typography>
+              </Box>
+            </Grid>
+          </Grid>
+        ) : null}
+      </Box>
+
+      {/* <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+       
         <Button variant={activeTab === TABS.EMPLOYEES ? "contained" : "outlined"} onClick={() => setActiveTab(TABS.EMPLOYEES)}>
           Employee Details
         </Button>
-      </Stack>
+      </Stack> */}
 
-      {activeTab === TABS.LUCKY && (
+      {false && (
         <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: '#e3f2fd' }}>
           <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>
@@ -660,7 +893,7 @@ export default function AgencyDashboard() {
       )}
 
       {activeTab === TABS.EMPLOYEES && (
-        <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mt: 2, backgroundColor: '#fff3e0' }}>
+        <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mt: 2, backgroundColor: '#ffffff' }}>
           <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>
               Employee Details
@@ -676,41 +909,94 @@ export default function AgencyDashboard() {
           ) : empError ? (
             <Alert severity="error">{empError}</Alert>
           ) : (
-            <TableContainer sx={{ overflowX: 'auto' }}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Username</TableCell>
-                    <TableCell>Full Name</TableCell>
-                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Email</TableCell>
-                    <TableCell>Phone</TableCell>
-                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Address</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
+            <>
+              <Box sx={{ display: { xs: 'block', md: 'none' } }}>
+                <Grid container spacing={1.5}>
                   {(myEmployees || []).map((u) => (
-                    <TableRow key={u.id}>
-                      <TableCell sx={{ whiteSpace: 'normal', wordBreak: 'break-word', maxWidth: { xs: 140, sm: 'unset' } }}>{u.username}</TableCell>
-                      <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' }, whiteSpace: 'normal', wordBreak: 'break-word', maxWidth: { xs: 160, sm: 'unset' } }}>{u.full_name || ""}</TableCell>
-                      <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' }, whiteSpace: 'normal', wordBreak: 'break-word' }}>{u.email || ""}</TableCell>
-                      <TableCell sx={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>{u.phone || ""}</TableCell>
-                      <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' }, whiteSpace: 'normal', wordBreak: 'break-word' }}>
-                        {u.pincode || ""}{u.city ? `, ${u.city}` : ""}{u.state ? `, ${u.state}` : ""}{u.country ? `, ${u.country}` : ""}
-                      </TableCell>
-                    </TableRow>
+                    <Grid item xs={12} key={u.id}>
+                      <Paper
+                        elevation={2}
+                        sx={{
+                          p: 1.5,
+                          borderRadius: 2,
+                          background: "linear-gradient(180deg,#f8fafc 0%,#ffffff 100%)",
+                          border: "1px solid #e2e8f0",
+                          boxShadow: "0 4px 12px rgba(2,6,23,0.06)",
+                        }}
+                      >
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                          <Avatar sx={{ bgcolor: "#0C2D48", color: "#fff", width: 40, height: 40 }}>
+                            {String(u.full_name || u.username || "").slice(0, 2).toUpperCase()}
+                          </Avatar>
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {u.username}
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: "text.secondary", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {u.full_name || "—"}
+                            </Typography>
+                            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mt: 0.5 }}>
+                              <Typography variant="caption" sx={{ color: "text.secondary" }}>📞 {u.phone || "—"}</Typography>
+                              <Typography variant="caption" sx={{ color: "text.secondary" }}>✉️ {u.email || "—"}</Typography>
+                            </Box>
+                            <Typography variant="caption" sx={{ display: "block", color: "text.secondary", mt: 0.5 }}>
+                              {(u.pincode || "")}{u.city ? `, ${u.city}` : ""}{u.state ? `, ${u.state}` : ""}{u.country ? `, ${u.country}` : ""}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Paper>
+                    </Grid>
                   ))}
                   {(!myEmployees || myEmployees.length === 0) && (
-                    <TableRow>
-                      <TableCell colSpan={5}>
+                    <Grid item xs={12}>
+                      <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: "1px dashed #cbd5e1", backgroundColor: "#f8fafc", textAlign: "center" }}>
                         <Typography variant="body2" sx={{ color: "text.secondary" }}>
                           No employees found.
                         </Typography>
-                      </TableCell>
-                    </TableRow>
+                      </Paper>
+                    </Grid>
                   )}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                </Grid>
+              </Box>
+
+              <Box sx={{ display: { xs: "none", md: "block" } }}>
+                <TableContainer sx={{ overflowX: "auto" }}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Username</TableCell>
+                        <TableCell>Full Name</TableCell>
+                        <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Email</TableCell>
+                        <TableCell>Phone</TableCell>
+                        <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Address</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {(myEmployees || []).map((u) => (
+                        <TableRow key={u.id}>
+                          <TableCell sx={{ whiteSpace: "normal", wordBreak: "break-word", maxWidth: { xs: 140, sm: "unset" } }}>{u.username}</TableCell>
+                          <TableCell sx={{ display: { xs: "none", sm: "table-cell" }, whiteSpace: "normal", wordBreak: "break-word", maxWidth: { xs: 160, sm: "unset" } }}>{u.full_name || ""}</TableCell>
+                          <TableCell sx={{ display: { xs: "none", sm: "table-cell" }, whiteSpace: "normal", wordBreak: "break-word" }}>{u.email || ""}</TableCell>
+                          <TableCell sx={{ whiteSpace: "normal", wordBreak: "break-word" }}>{u.phone || ""}</TableCell>
+                          <TableCell sx={{ display: { xs: "none", sm: "table-cell" }, whiteSpace: "normal", wordBreak: "break-word" }}>
+                            {u.pincode || ""}{u.city ? `, ${u.city}` : ""}{u.state ? `, ${u.state}` : ""}{u.country ? `, ${u.country}` : ""}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {(!myEmployees || myEmployees.length === 0) && (
+                        <TableRow>
+                          <TableCell colSpan={5}>
+                            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                              No employees found.
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Box>
+            </>
           )}
         </Paper>
       )}

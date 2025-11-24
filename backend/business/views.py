@@ -6,8 +6,8 @@ from django.db import transaction
 from django.utils import timezone
 from django.http import HttpResponse
 from django.db.models import Q
-from .models import BusinessRegistration, RewardProgress, RewardRedemption, DailyReport, AutoPoolAccount, SubscriptionActivation
-from .serializers import BusinessRegistrationSerializer, DailyReportSerializer
+from .models import BusinessRegistration, RewardProgress, RewardRedemption, DailyReport, AutoPoolAccount, SubscriptionActivation, Package, AgencyPackageAssignment, AgencyPackagePayment
+from .serializers import BusinessRegistrationSerializer, DailyReportSerializer, AgencyPackageAssignmentSerializer, AgencyPackagePaymentSerializer
 
 
 class BusinessRegistrationCreateView(generics.CreateAPIView):
@@ -267,6 +267,112 @@ class DailyReportMyView(APIView):
                 pass
         ser = DailyReportSerializer(qs, many=True)
         return Response(ser.data, status=status.HTTP_200_OK)
+
+
+# =======================
+# Packages: Agency + Admin
+# =======================
+class AgencyPackagesMeView(APIView):
+    """
+    GET /api/business/agency-packages/
+    Returns packages assigned to the current user (agency) with computed totals.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        target_user = user
+
+        # Admin override: allow admin to view cards for any agency via ?agency_id=PK
+        agency_id = request.query_params.get("agency_id")
+        if agency_id and (getattr(user, "is_staff", False) or getattr(user, "is_superuser", False)):
+            try:
+                from accounts.models import CustomUser
+                target_user = CustomUser.objects.get(pk=int(agency_id))
+            except Exception:
+                return Response({"detail": "Agency not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Enforce: packages apply only to Agency role/categories
+        is_agency = False
+        try:
+            role = str(getattr(target_user, "role", "") or "").lower()
+            cat = str(getattr(target_user, "category", "") or "").lower()
+            is_agency = (role == "agency") or cat.startswith("agency")
+        except Exception:
+            is_agency = False
+
+        if not is_agency:
+            # Return empty list for non-agency users; no auto-assignment
+            return Response([], status=status.HTTP_200_OK)
+
+        # Auto-assign default packages to the target agency if missing
+        try:
+            defaults_qs = Package.objects.filter(is_active=True, is_default=True)
+            existing_pkg_ids = set(
+                AgencyPackageAssignment.objects.filter(agency=target_user, package__in=defaults_qs).values_list("package_id", flat=True)
+            )
+            to_create = [AgencyPackageAssignment(agency=target_user, package=p) for p in defaults_qs if p.id not in existing_pkg_ids]
+            if to_create:
+                # Avoid bulk_create pitfalls; save one-by-one to trigger validations
+                for obj in to_create:
+                    try:
+                        obj.save()
+                    except Exception:
+                        continue
+        except Exception:
+            # best-effort; do not block response on auto-assign failure
+            pass
+
+        qs = AgencyPackageAssignment.objects.filter(agency=target_user).select_related("package").prefetch_related("payments")
+        ser = AgencyPackageAssignmentSerializer(qs, many=True)
+        return Response(ser.data, status=status.HTTP_200_OK)
+
+
+class AdminCreateAgencyPackagePaymentView(APIView):
+    """
+    POST /api/business/agency-packages/{pk}/payments/
+    Body: { "amount": <number>, "reference": "optional", "notes": "optional" }
+    Admin-only: records a payment against an agency's package assignment.
+    """
+    permission_classes = [IsAdminUser]
+
+    def post(self, request, pk):
+        from decimal import Decimal
+        try:
+            assignment = AgencyPackageAssignment.objects.select_related("package", "agency").get(pk=pk)
+        except AgencyPackageAssignment.DoesNotExist:
+            return Response({"detail": "Assignment not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        amt_raw = request.data.get("amount")
+        try:
+            amount = Decimal(str(amt_raw))
+        except Exception:
+            return Response({"amount": ["Invalid amount."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        if amount <= 0:
+            return Response({"amount": ["Amount must be greater than 0."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        reference = str(request.data.get("reference") or "").strip()
+        notes = str(request.data.get("notes") or "").strip()
+
+        pay = AgencyPackagePayment.objects.create(
+            assignment=assignment,
+            amount=amount,
+            reference=reference,
+            notes=notes,
+        )
+        # Minimal response (intentionally not using serializer to avoid N+1 on admin bulk ops)
+        return Response(
+            {
+                "id": pay.id,
+                "assignment": assignment.id,
+                "amount": f"{pay.amount}",
+                "paid_at": pay.paid_at,
+                "reference": pay.reference,
+                "notes": pay.notes,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class DailyReportAllView(APIView):

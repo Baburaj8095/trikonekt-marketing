@@ -4,7 +4,7 @@ from django.utils import timezone
 from django.db.models import Q
 import csv
 
-from .models import BusinessRegistration, CommissionConfig, AutoPoolAccount, RewardProgress, RewardRedemption, UserMatrixProgress, ReferralJoinPayout, FranchisePayout, DailyReport, WithholdingReserve
+from .models import BusinessRegistration, CommissionConfig, AutoPoolAccount, RewardProgress, RewardRedemption, UserMatrixProgress, ReferralJoinPayout, FranchisePayout, DailyReport, WithholdingReserve, Package, AgencyPackageAssignment, AgencyPackagePayment
 from accounts.models import CustomUser
 
 
@@ -229,6 +229,94 @@ class WithholdingReserveAdmin(admin.ModelAdmin):
     raw_id_fields = ("user",)
     readonly_fields = ("created_at", "updated_at")
     ordering = ("-created_at",)
+
+
+# ==============================
+# Packages (Admin)
+# ==============================
+class AgencyPackagePaymentInline(admin.TabularInline):
+    model = AgencyPackagePayment
+    extra = 0
+    readonly_fields = ("paid_at",)
+    fields = ("amount", "reference", "notes", "paid_at")
+
+
+@admin.register(Package)
+class PackageAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "amount", "is_active", "is_default", "created_at")
+    list_filter = ("is_active", "is_default")
+    search_fields = ("code", "name")
+    readonly_fields = ("created_at", "updated_at")
+    ordering = ("code",)
+    fieldsets = (
+        ("Package", {"fields": ("code", "name", "description", "amount", "is_active", "is_default")}),
+        ("Audit", {"fields": ("created_at", "updated_at")}),
+    )
+
+
+@admin.register(AgencyPackageAssignment)
+class AgencyPackageAssignmentAdmin(admin.ModelAdmin):
+    list_display = ("agency", "package", "total_amount", "paid_amount", "remaining_amount", "status_label", "created_at")
+    list_filter = ("package", "created_at")
+    search_fields = ("agency__username", "package__code", "package__name")
+    raw_id_fields = ("agency", "package")
+    readonly_fields = ("created_at",)
+    ordering = ("-created_at",)
+    inlines = [AgencyPackagePaymentInline]
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related("package", "agency").prefetch_related("payments")
+
+    def total_amount(self, obj):
+        return getattr(obj.package, "amount", 0)
+    total_amount.short_description = "Total (₹)"
+
+    def paid_amount(self, obj):
+        try:
+            return sum((p.amount or 0) for p in getattr(obj, "payments").all())
+        except Exception:
+            return 0
+    paid_amount.short_description = "Paid (₹)"
+
+    def remaining_amount(self, obj):
+        try:
+            total = self.total_amount(obj) or 0
+            paid = self.paid_amount(obj) or 0
+            rem = total - paid
+            return rem if rem > 0 else 0
+        except Exception:
+            return 0
+    remaining_amount.short_description = "Remaining (₹)"
+
+    def status_label(self, obj):
+        try:
+            total = self.total_amount(obj) or 0
+            paid = self.paid_amount(obj) or 0
+            if paid <= 0:
+                return "Inactive ✗"
+            if paid < total:
+                return "Partial ✓"
+            return "Active ✓"
+        except Exception:
+            return "Inactive ✗"
+    status_label.short_description = "Status"
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        # Restrict agency choices to only agency users (role=agency or category startswith 'agency')
+        if db_field.name == "agency":
+            kwargs["queryset"] = CustomUser.objects.filter(Q(role="agency") | Q(category__startswith="agency"))
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
+@admin.register(AgencyPackagePayment)
+class AgencyPackagePaymentAdmin(admin.ModelAdmin):
+    list_display = ("id", "assignment", "amount", "paid_at", "reference")
+    list_filter = ("paid_at",)
+    search_fields = ("assignment__agency__username", "assignment__package__code", "reference")
+    raw_id_fields = ("assignment",)
+    ordering = ("-paid_at", "-id")
+
 
 # ======================
 # Prune Business admin: keep only CommissionConfig and DailyReport

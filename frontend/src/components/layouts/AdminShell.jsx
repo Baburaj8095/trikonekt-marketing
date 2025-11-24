@@ -277,6 +277,7 @@ export default function AdminShell({ children }) {
       key: "ops",
       label: "Operations",
       items: [
+        { to: "/admin/packages", label: "Packages", icon: "box" },
         { to: "/admin/products", label: "Products", icon: "box" },
         { to: "/admin/banners", label: "Banners", icon: "image" },
         { to: "/admin/orders", label: "Orders", icon: "orders" },

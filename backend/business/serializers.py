@@ -148,3 +148,111 @@ class DailyReportSerializer(serializers.ModelSerializer):
             "total_amount",
         ]
         read_only_fields = ("id", "reporter", "role", "date")
+
+
+# ==============================
+# Packages: Serializers
+# ==============================
+from .models import Package, AgencyPackageAssignment, AgencyPackagePayment
+from decimal import Decimal
+from django.utils import timezone
+
+
+class PackageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Package
+        fields = [
+            "id",
+            "code",
+            "name",
+            "description",
+            "amount",
+            "is_active",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class AgencyPackagePaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AgencyPackagePayment
+        fields = ["id", "amount", "paid_at", "reference", "notes", "assignment"]
+        read_only_fields = ["id", "paid_at"]
+
+
+class AgencyPackageAssignmentSerializer(serializers.ModelSerializer):
+    package = PackageSerializer(read_only=True)
+    total_amount = serializers.SerializerMethodField()
+    paid_amount = serializers.SerializerMethodField()
+    remaining_amount = serializers.SerializerMethodField()
+    months_remaining = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AgencyPackageAssignment
+        fields = [
+            "id",
+            "package",
+            "created_at",
+            "total_amount",
+            "paid_amount",
+            "remaining_amount",
+            "months_remaining",
+            "status",
+        ]
+
+    def _sum_payments(self, obj) -> Decimal:
+        try:
+            # Use prefetched payments if available
+            pays = getattr(obj, "payments").all()
+            total = sum((p.amount or Decimal("0.00")) for p in pays)
+            return (Decimal(total or 0)).quantize(Decimal("0.01"))
+        except Exception:
+            return Decimal("0.00")
+
+    def get_total_amount(self, obj) -> str:
+        amt = getattr(getattr(obj, "package", None), "amount", Decimal("0.00")) or Decimal("0.00")
+        return f"{Decimal(amt).quantize(Decimal('0.01'))}"
+
+    def get_paid_amount(self, obj) -> str:
+        return f"{self._sum_payments(obj)}"
+
+    def get_remaining_amount(self, obj) -> str:
+        try:
+            total = Decimal(getattr(obj.package, "amount", Decimal("0.00")) or 0)
+            paid = self._sum_payments(obj)
+            rem = total - paid
+            if rem < 0:
+                rem = Decimal("0.00")
+            return f"{rem.quantize(Decimal('0.01'))}"
+        except Exception:
+            return "0.00"
+
+    def get_months_remaining(self, obj) -> int:
+        try:
+            start = getattr(obj, "created_at", None) or timezone.now()
+            now = timezone.now()
+            years = now.year - start.year
+            months = years * 12 + (now.month - start.month)
+            # If current day hasn't reached assignment day, count as not a full month
+            if now.day < start.day:
+                months -= 1
+            if months < 0:
+                months = 0
+            if months > 12:
+                months = 12
+            return max(0, 12 - months)
+        except Exception:
+            return 0
+
+    def get_status(self, obj) -> str:
+        try:
+            total = Decimal(getattr(obj.package, "amount", Decimal("0.00")) or 0)
+            paid = self._sum_payments(obj)
+            if paid <= 0:
+                return "inactive"
+            if paid < total:
+                return "partial"
+            return "active"
+        except Exception:
+            return "inactive"

@@ -209,7 +209,7 @@ export default function MyTeam() {
           </Card>
         </Grid>
 
-        <Grid item xs={12} md={6}>
+        {/* <Grid item xs={12} md={6}>
           <Card variant="outlined">
             <CardContent>
               <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
@@ -248,7 +248,7 @@ export default function MyTeam() {
               )}
             </CardContent>
           </Card>
-        </Grid>
+        </Grid> */}
       </Grid>
     </Box>
   );

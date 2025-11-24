@@ -12,6 +12,8 @@ DEFAULT_CARDS = [
     {"title": "Products", "model": "market.Product", "icon": "image", "color": "secondary"},
     {"title": "Lucky Draw Submissions", "model": "uploads.LuckyDrawSubmission", "icon": "ticket", "color": "secondary"},
     {"title": "Withdrawals Pending", "model": "accounts.WithdrawalRequest", "filters": {"status": "pending"}, "icon": "withdrawal", "color": "danger"},
+    {"title": "Packages", "model": "business.Package", "icon": "stat", "color": "primary"},
+    {"title": "Agency Assignments", "model": "business.AgencyPackageAssignment", "icon": "stat", "color": "secondary"},
 ]
 
 
@@ -191,6 +193,15 @@ def default_menu():
             ],
         },
         {"title": "Commission", "icon": "fa-solid fa-sack-dollar", "url": "business.CommissionConfig"},
+        {
+            "title": "Packages",
+            "icon": "fa-solid fa-box",
+            "children": [
+                {"title": "Packages", "url": "business.Package"},
+                {"title": "Assignments", "url": "business.AgencyPackageAssignment"},
+                {"title": "Payments", "url": "business.AgencyPackagePayment"},
+            ],
+        },
         {"title": "Daily Reports", "icon": "fa-solid fa-chart-line", "url": "business.DailyReport"},
         {"title": "Withdrawals", "icon": "fa-solid fa-money-bill-transfer", "url": "accounts.WithdrawalRequest"},
         {"title": "KYC", "icon": "fa-solid fa-id-card", "url": "accounts.UserKYC"},

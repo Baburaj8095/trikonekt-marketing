@@ -31,7 +31,7 @@ function TargetRow({ label, value, target }) {
   );
 }
 
-export default function RewardsTargetCard({ role = "employee" }) {
+export default function RewardsTargetCard({ role = "employee", variant = "paper" }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [countApproved, setCountApproved] = useState(0);
@@ -135,27 +135,55 @@ export default function RewardsTargetCard({ role = "employee" }) {
 
 
   return (
-    <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
-      <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between" sx={{ mb: 1 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>
-          My Rewards Target (Monthly)
-        </Typography>
-        <Typography variant="caption" color="text.secondary">
-          Role: {role}
-        </Typography>
-      </Stack>
+    variant === "basic-package" ? (
+      <Box sx={{ p: 2, borderRadius: 2, background: "linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%)", color: "#fff", boxShadow: "0 8px 18px rgba(59,130,246,0.35)", border: "1px solid rgba(59,130,246,0.35)", width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "#fff" }}>
+            My Rewards Target (Monthly)
+          </Typography>
+          <Typography variant="caption" sx={{ fontWeight: 700, color: "rgba(255,255,255,0.9)" }}>
+            Role: {role}
+          </Typography>
+        </Stack>
 
-      {err ? <Alert severity="error" sx={{ mb: 1 }}>{err}</Alert> : null}
-      {loading ? <Typography variant="body2">Loading...</Typography> : (
-        <Box>
-          <Alert severity="info" sx={{ mb: 2 }}>
-            Approved sales this month: {countApproved}
-          </Alert>
-          <TargetRow label="600 — Resort Trip / Mobile Fund" value={countApproved} target={600} />
-          <TargetRow label="1500 — Bike Fund" value={countApproved} target={1500} />
-          <TargetRow label="2800 — Thailand Trip" value={countApproved} target={2800} />
-        </Box>
-      )}
-    </Paper>
+        {err ? <Alert severity="error" sx={{ mb: 1, bgcolor: "#fee2e2", color: "#991b1b" }}>{err}</Alert> : null}
+        {loading ? (
+          <Typography variant="body2" sx={{ color: "#fff" }}>Loading...</Typography>
+        ) : (
+          <Box>
+            <Box sx={{ p: 1, borderRadius: 1, background: "rgba(255,255,255,0.15)", color: "#fff", mb: 1.5 }}>
+              <Typography variant="caption" sx={{ opacity: 0.95 }}>Approved sales this month</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 900 }}>{countApproved}</Typography>
+            </Box>
+            <TargetRow label="600 — Resort Trip / Mobile Fund" value={countApproved} target={600} />
+            <TargetRow label="1500 — Bike Fund" value={countApproved} target={1500} />
+            <TargetRow label="2800 — Thailand Trip" value={countApproved} target={2800} />
+          </Box>
+        )}
+      </Box>
+    ) : (
+      <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+        <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between" sx={{ mb: 1 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>
+            My Rewards Target (Monthly)
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Role: {role}
+          </Typography>
+        </Stack>
+
+        {err ? <Alert severity="error" sx={{ mb: 1 }}>{err}</Alert> : null}
+        {loading ? <Typography variant="body2">Loading...</Typography> : (
+          <Box>
+            <Alert severity="info" sx={{ mb: 2 }}>
+              Approved sales this month: {countApproved}
+            </Alert>
+            <TargetRow label="600 — Resort Trip / Mobile Fund" value={countApproved} target={600} />
+            <TargetRow label="1500 — Bike Fund" value={countApproved} target={1500} />
+            <TargetRow label="2800 — Thailand Trip" value={countApproved} target={2800} />
+          </Box>
+        )}
+      </Paper>
+    )
   );
 }

@@ -83,6 +83,7 @@ export default function ReferAndEarn({ title = "Refer & Earn", onlyConsumer = fa
   }, [user]);
 
   const isEmployee = appRole === "employee";
+  const isAgency = appRole === "agency";
   const isSubFranchise =
     appRole === "agency" && (userCategory === "agency_sub_franchise" || userCategory === "sub_franchise");
 
@@ -91,6 +92,7 @@ export default function ReferAndEarn({ title = "Refer & Earn", onlyConsumer = fa
   const showEmployeeLink = !onlyConsumer && (isEmployee || isSubFranchise);
   const showConsumerLink = onlyConsumer || isEmployee || isSubFranchise || (!isEmployee && !isSubFranchise);
   const showSubFranchiseLink = !onlyConsumer && (isEmployee || isSubFranchise);
+  const showMerchantLink = !onlyConsumer && (isEmployee || isAgency || isSubFranchise);
 
   const getLink = (role, extra = {}) => {
     const params = new URLSearchParams({
@@ -109,7 +111,9 @@ export default function ReferAndEarn({ title = "Refer & Earn", onlyConsumer = fa
     const employee = getLink("employee");
     // 3) Sub-Franchise Agency registration link
     const subFranchise = getLink("agency", { agency_level: "sub_franchise" });
-    return { consumer, employee, subFranchise };
+    // 4) Merchant (Business) registration link
+    const merchant = getLink("business");
+    return { consumer, employee, subFranchise, merchant };
   }, [sponsorId, origin]);
 
   const copy = async (text) => {
@@ -261,6 +265,22 @@ export default function ReferAndEarn({ title = "Refer & Earn", onlyConsumer = fa
               }
             >
               Share Sub‑Franchise
+            </Button>
+          </Stack>
+        )}
+
+        {showMerchantLink && (
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Button
+              variant="outlined"
+              sx={{ textTransform: "none" }}
+              onClick={() =>
+                sponsorId
+                  ? shareNative(links.merchant, buildShareText("Merchant"))
+                  : setMsg("Sponsor ID missing. Please re-login.")
+              }
+            >
+              Share Merchant
             </Button>
           </Stack>
         )}

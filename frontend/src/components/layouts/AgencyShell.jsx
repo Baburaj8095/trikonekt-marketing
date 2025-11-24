@@ -48,7 +48,7 @@ export default function AgencyShell({ children }) {
     { to: "/agency/lucky-coupons?tab=pending", label: "Manual Coupon Submissions", icon: "ticket" },
     { to: "/agency/lucky-coupons?tab=assign", label: "E Coupon", icon: "ticket" },
     { to: "/agency/e-coupon-store", label: "E-Coupon Store", icon: "box" },
-    { to: "/agency/lucky-coupons?tab=commission", label: "Commission Summary", icon: "chart" },
+    // { to: "/agency/lucky-coupons?tab=commission", label: "Commission Summary", icon: "chart" },
 
     { to: "/agency/my-team", label: "My Team", icon: "tree" },
     { to: "/agency/daily-report", label: "Daily Report", icon: "chart" },

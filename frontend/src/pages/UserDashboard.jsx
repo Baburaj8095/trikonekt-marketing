@@ -670,7 +670,7 @@ export default function UserDashboard({ embedded = false }) {
           >
             <Tab label="Dashboard" value="dashboard" />
             <Tab label="Wealth Galaxy" value="wealth-galaxy" />
-            <Tab label="MarketPlace" value="marketplace" />
+            <Tab label="Agency MarketPlace" value="marketplace" />
             <Tab label="App Hub" value="apphub" />
           </Tabs>
         </Box>
@@ -928,7 +928,7 @@ export default function UserDashboard({ embedded = false }) {
           </Box>
         ) : selectedMenu === "marketplace" ? (
           <MarketplaceCard
-            title="Trikonekt Products"
+            title="Agency Products"
             variant="plain"
             defaultExpanded
             onViewMarketplace={() => navigate("/marketplace")}

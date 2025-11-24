@@ -61,6 +61,15 @@ def default_menu():
             ],
         },
         {"title": "Market", "icon": "fa fa-image", "url": "market.Banner"},
+        {
+            "title": "Packages",
+            "icon": "fa fa-box",
+            "children": [
+                {"title": "Packages", "url": "business.Package"},
+                {"title": "Assignments", "url": "business.AgencyPackageAssignment"},
+                {"title": "Payments", "url": "business.AgencyPackagePayment"},
+            ],
+        },
         {"title": "Uploads", "icon": "fa fa-upload", "url": "uploads.Upload"},
         {"title": "Locations", "icon": "fa fa-globe", "url": "/admin/locations/"},
     ]

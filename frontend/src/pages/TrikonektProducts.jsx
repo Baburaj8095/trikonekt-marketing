@@ -1,9 +1,7 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Container,
-  Grid,
-  Paper,
   Typography,
   TextField,
   MenuItem,
@@ -11,7 +9,6 @@ import {
   CircularProgress,
   Snackbar,
   Alert,
-  Stack,
 } from "@mui/material";
 import { useNavigate, useLocation } from "react-router-dom";
 import API from "../api/api";
@@ -29,32 +26,8 @@ export default function TrikonektProducts() {
     ? "/employee/trikonekt-products"
     : "/trikonekt-products";
 
-  // Filters
-  const [filters, setFilters] = useState({
-    country: "",
-    state: "",
-    city: "",
-    pincode: "",
-    category: "",
-    name: "",
-  });
 
-  // Cascading dropdown sources
-  const [countries, setCountries] = useState([]);
-  const [states, setStates] = useState([]);
-  const [cities, setCities] = useState([]);
-  const [loadingCountries, setLoadingCountries] = useState(false);
-  const [loadingStates, setLoadingStates] = useState(false);
-  const [loadingCities, setLoadingCities] = useState(false);
 
-  const countryObj = useMemo(
-    () => countries.find((c) => c.name === filters.country) || null,
-    [countries, filters.country]
-  );
-  const stateObj = useMemo(
-    () => states.find((s) => s.name === filters.state) || null,
-    [states, filters.state]
-  );
 
   // Products
   const [rows, setRows] = useState([]);
@@ -66,80 +39,20 @@ export default function TrikonektProducts() {
   const [dense, setDense] = useState(true);
   const [quickView, setQuickView] = useState({ open: false, product: null });
 
-  useEffect(() => {
-    async function loadCountries() {
-      setLoadingCountries(true);
-      try {
-        const res = await API.get("/location/countries/");
-        setCountries(Array.isArray(res.data) ? res.data : res.data?.results || []);
-      } catch {
-        setCountries([]);
-      } finally {
-        setLoadingCountries(false);
-      }
-    }
-    loadCountries();
-  }, []);
 
-  useEffect(() => {
-    async function loadStates() {
-      if (!countryObj?.id) {
-        setStates([]);
-        return;
-      }
-      setLoadingStates(true);
-      try {
-        const res = await API.get("/location/states/", { params: { country: countryObj.id } });
-        setStates(Array.isArray(res.data) ? res.data : res.data?.results || []);
-      } catch {
-        setStates([]);
-      } finally {
-        setLoadingStates(false);
-      }
-    }
-    // reset deeper filters when parent changes
-    setFilters((f) => ({ ...f, state: "", city: "" }));
-    setCities([]);
-    loadStates();
-  }, [countryObj?.id]);
 
-  useEffect(() => {
-    async function loadCities() {
-      if (!stateObj?.id) {
-        setCities([]);
-        return;
-      }
-      setLoadingCities(true);
-      try {
-        const res = await API.get("/location/cities/", { params: { state: stateObj.id } });
-        setCities(Array.isArray(res.data) ? res.data : res.data?.results || []);
-      } catch {
-        setCities([]);
-      } finally {
-        setLoadingCities(false);
-      }
-    }
-    setFilters((f) => ({ ...f, city: "" }));
-    loadCities();
-  }, [stateObj?.id]);
 
   const fetchProducts = async () => {
     try {
       setLoading(true);
       const params = {};
-      if (filters.country) params.country = filters.country;
-      if (filters.state) params.state = filters.state;
-      if (filters.city) params.city = filters.city;
-      if (filters.pincode) params.pincode = filters.pincode;
-      if (filters.category) params.category = filters.category;
-      if (filters.name) params.name = filters.name;
       if (sort) params.sort = sort;
       const res = await API.get("/products", { params: { ...params, _: Date.now() } });
       const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
       setRows(arr);
     } catch {
       setRows([]);
-      setSnack({ open: true, type: "error", msg: "Failed to load products" });
+      //setSnack({ open: true, type: "error", msg: "Failed to load products" });
     } finally {
       setLoading(false);
     }
@@ -155,39 +68,14 @@ export default function TrikonektProducts() {
     fetchProducts();
   }, [sort]);
 
-  // Refresh on window focus to avoid stale stock after approvals
+  // Disabled auto-refresh on window focus to prevent reload when returning from new tab
   useEffect(() => {
-    const onFocus = () => {
-      fetchProducts();
-    };
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
+    // no-op
   }, []);
 
 
-  const onFilterChange = (e) => {
-    const { name, value } = e.target;
-    setFilters((f) => ({ ...f, [name]: value }));
-  };
 
-  const onApply = async (e) => {
-    e.preventDefault();
-    await fetchProducts();
-  };
 
-  const onClear = () => {
-    setFilters({
-      country: "",
-      state: "",
-      city: "",
-      pincode: "",
-      category: "",
-      name: "",
-    });
-    setStates([]);
-    setCities([]);
-    fetchProducts();
-  };
 
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 2, md: 3 } }}>
@@ -195,133 +83,6 @@ export default function TrikonektProducts() {
         Trikonekt Products
       </Typography>
 
-      <Paper elevation={1} sx={{ p: 2, borderRadius: 2, mb: 2 }}>
-        <Box component="form" onSubmit={onApply}>
-          <Grid container spacing={{ xs: 1, sm: 2 }}>
-            <Grid item xs={12} md={3}>
-              <TextField
-                select
-                fullWidth
-                size="small"
-                label="Country"
-                name="country"
-                value={filters.country}
-                onChange={onFilterChange}
-              >
-                {loadingCountries ? (
-                  <MenuItem disabled>
-                    <CircularProgress size={18} sx={{ mr: 1 }} /> Loading...
-                  </MenuItem>
-                ) : (
-                  countries.map((c) => (
-                    <MenuItem key={c.id} value={c.name}>
-                      {c.name}
-                    </MenuItem>
-                  ))
-                )}
-              </TextField>
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <TextField
-                select
-                fullWidth
-                size="small"
-                label="State"
-                name="state"
-                value={filters.state}
-                onChange={onFilterChange}
-                disabled={!countryObj}
-              >
-                {loadingStates ? (
-                  <MenuItem disabled>
-                    <CircularProgress size={18} sx={{ mr: 1 }} /> Loading...
-                  </MenuItem>
-                ) : (
-                  states.map((s) => (
-                    <MenuItem key={s.id} value={s.name}>
-                      {s.name}
-                    </MenuItem>
-                  ))
-                )}
-              </TextField>
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <TextField
-                select
-                fullWidth
-                size="small"
-                label="City"
-                name="city"
-                value={filters.city}
-                onChange={onFilterChange}
-                disabled={!stateObj}
-              >
-                {loadingCities ? (
-                  <MenuItem disabled>
-                    <CircularProgress size={18} sx={{ mr: 1 }} /> Loading...
-                  </MenuItem>
-                ) : (
-                  cities.map((c) => (
-                    <MenuItem key={c.id} value={c.name}>
-                      {c.name}
-                    </MenuItem>
-                  ))
-                )}
-              </TextField>
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <TextField
-                fullWidth
-                size="small"
-                label="Pincode"
-                name="pincode"
-                value={filters.pincode}
-                onChange={onFilterChange}
-                inputProps={{ maxLength: 10 }}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={3}>
-              <TextField
-                fullWidth
-                size="small"
-                label="Category"
-                name="category"
-                value={filters.category}
-                onChange={onFilterChange}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                size="small"
-                label="Search by Product Name"
-                name="name"
-                value={filters.name}
-                onChange={onFilterChange}
-              />
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <Stack
-                direction="row"
-                spacing={1}
-                sx={{
-                  width: { xs: "100%", md: "auto" },
-                  flexWrap: "wrap",
-                  justifyContent: { xs: "flex-start", md: "flex-end" }
-                }}
-              >
-                <Button type="button" variant="text" onClick={onClear}>
-                  Clear
-                </Button>
-                <Button type="submit" variant="contained">
-                  Apply
-                </Button>
-              </Stack>
-            </Grid>
-          </Grid>
-        </Box>
-      </Paper>
 
       {/* Products Section */}
       {loading ? (

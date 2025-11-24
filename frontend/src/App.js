@@ -43,6 +43,7 @@ import AdminProducts from "./pages/admin/AdminProducts";
 import AdminBanners from "./pages/admin/AdminBanners";
 import AdminOrders from "./pages/admin/AdminOrders";
 import AdminUploads from "./pages/admin/AdminUploads";
+import AdminPackages from "./pages/admin/AdminPackages";
 import AdminBusiness from "./pages/admin/AdminBusiness";
 import AdminReports from "./pages/admin/AdminReports";
 import AdminDashboardCards from "./pages/admin/AdminDashboardCards";
@@ -620,6 +621,16 @@ function App() {
             <AdminProtectedRoute>
               <AdminShell>
                 <AdminOrders />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/packages"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminPackages />
               </AdminShell>
             </AdminProtectedRoute>
           }

@@ -754,3 +754,79 @@ class WithholdingReserve(models.Model):
 
     def __str__(self):
         return f"Reserve<{self.user_id}:{self.source_type}:{self.source_id}> {self.withheld_amount}"
+
+
+# ==============================
+# Packages for Agency Dashboard
+# ==============================
+from django.core.validators import MinValueValidator
+from django.core.exceptions import ValidationError
+
+
+class Package(models.Model):
+    code = models.CharField(max_length=16, unique=True, db_index=True)
+    name = models.CharField(max_length=150)
+    description = models.TextField(blank=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0)])
+    is_active = models.BooleanField(default=True)
+    is_default = models.BooleanField(default=False, help_text="If true, auto-assign to every agency by default")
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["code"]
+
+    def __str__(self):
+        return f"{self.code} — {self.name} (₹{self.amount})"
+
+
+class AgencyPackageAssignment(models.Model):
+    """
+    Assign a Package to an Agency (CustomUser with role/category agency_*).
+    One (agency, package) pair is unique to prevent duplicates.
+    """
+    agency = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="package_assignments", db_index=True)
+    package = models.ForeignKey(Package, on_delete=models.CASCADE, related_name="assignments")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "agency_id"]
+        unique_together = (("agency", "package"),)
+        indexes = [
+            models.Index(fields=["agency", "package"]),
+        ]
+
+    def __str__(self):
+        return f"{getattr(self.agency, 'username', self.agency_id)} → {self.package.code}"
+
+    def _ensure_agency_user(self):
+        u = getattr(self, "agency", None)
+        role = str(getattr(u, "role", "") or "").lower()
+        cat = str(getattr(u, "category", "") or "").lower()
+        if not (role == "agency" or cat.startswith("agency")):
+            raise ValidationError({"agency": "Packages can only be assigned to agency users."})
+
+    def save(self, *args, **kwargs):
+        # Enforce agency-only assignments on all creation/update paths
+        self._ensure_agency_user()
+        return super().save(*args, **kwargs)
+
+
+class AgencyPackagePayment(models.Model):
+    """
+    Payment recorded by Admin against an AgencyPackageAssignment.
+    """
+    assignment = models.ForeignKey(AgencyPackageAssignment, on_delete=models.CASCADE, related_name="payments")
+    amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0.01)])
+    paid_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    reference = models.CharField(max_length=100, blank=True, default="")
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-paid_at", "-id"]
+        indexes = [
+            models.Index(fields=["assignment", "paid_at"]),
+        ]
+
+    def __str__(self):
+        return f"Pay<{self.assignment_id}> ₹{self.amount} @ {self.paid_at:%Y-%m-%d}"

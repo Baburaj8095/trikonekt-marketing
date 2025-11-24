@@ -6,6 +6,8 @@ from .views import (
     RewardProgressMeView,
     RewardRedeemView,
     ActivationStatusView,
+    AgencyPackagesMeView,
+    AdminCreateAgencyPackagePaymentView,
 )
 
 urlpatterns = [
@@ -15,6 +17,10 @@ urlpatterns = [
     # MLM packages
     path('activations/self-50/', SelfActivation50View.as_view(), name='self_activation_50'),
     path('activation/status/', ActivationStatusView.as_view(), name='activation_status'),
+
+    # Agency Packages
+    path('agency-packages/', AgencyPackagesMeView.as_view(), name='agency_packages_me'),
+    path('agency-packages/<int:pk>/payments/', AdminCreateAgencyPackagePaymentView.as_view(), name='agency_package_payment_create'),
 
     # Rewards
     path('rewards/me/', RewardProgressMeView.as_view(), name='reward_progress_me'),

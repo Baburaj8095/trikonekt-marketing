@@ -1324,7 +1324,7 @@ export default function EmployeeDashboard({ embedded = false }) {
         )}
 
         {activeTab === TABS.REFER_EARN && (
-            <ReferAndEarn title="Refer Consumer" onlyConsumer sponsorUsername={(storedUser?.username || (storedUser && storedUser.user && storedUser.user.username) || "")} />
+            <ReferAndEarn title="Refer & Earn" sponsorUsername={(storedUser?.username || (storedUser && storedUser.user && storedUser.user.username) || "")} />
         )}
 
         {activeTab === TABS.REWARDS && <RewardsTargetCard role="employee" />}
@@ -2014,7 +2014,7 @@ export default function EmployeeDashboard({ embedded = false }) {
             </Grid>
           )}
           {activeTab === TABS.REFER_EARN && (
-            <ReferAndEarn title="Refer Consumer" onlyConsumer sponsorUsername={(storedUser?.username || (storedUser && storedUser.user && storedUser.user.username) || "")} />
+            <ReferAndEarn title="Refer & Earn" sponsorUsername={(storedUser?.username || (storedUser && storedUser.user && storedUser.user.username) || "")} />
           )}
 
           {activeTab === TABS.REWARDS && <RewardsTargetCard role="employee" />}
