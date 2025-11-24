@@ -76,6 +76,18 @@ export default function MyTeam() {
   const recentTeam = Array.isArray(data?.recent_team) ? data.recent_team : [];
   const recentTx = Array.isArray(data?.recent_transactions) ? data.recent_transactions : [];
 
+  const maskTRUsername = (username) => {
+    if (typeof username !== "string") return username;
+    const match = username.match(/^(TR)(\d+)(.*)$/i);
+    if (!match) return username;
+    const prefix = match[1];
+    const digits = match[2];
+    const suffix = match[3] || "";
+    const firstMask = Math.min(2, digits.length);
+    const lastMask = Math.min(2, Math.max(0, digits.length - firstMask));
+    const middle = digits.slice(firstMask, digits.length - lastMask);
+    return `${prefix}${"X".repeat(firstMask)}${middle}${"x".repeat(lastMask)}${suffix}`;
+  };
 
   return (
     <Box sx={{ p: { xs: 0, md: 0 } }}>
@@ -196,7 +208,7 @@ export default function MyTeam() {
                   <TableBody>
                     {recentTeam.map((r) => (
                       <TableRow key={r.id}>
-                        <TableCell>{r.username}</TableCell>
+                        <TableCell>{maskTRUsername(r.username)}</TableCell>
                         <TableCell>{r.category}</TableCell>
                         <TableCell>{r.role}</TableCell>
                         <TableCell>{r.date_joined}</TableCell>

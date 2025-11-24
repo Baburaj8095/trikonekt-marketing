@@ -1208,6 +1208,22 @@ class WalletTransactionsList(generics.ListAPIView):
         t = (self.request.query_params.get("type") or "").strip()
         if t:
             qs = qs.filter(type=t)
+
+        # Date range filtering on created_at (date). Defaults to today's date if not provided.
+        date_from = (self.request.query_params.get("date_from") or "").strip()
+        date_to = (self.request.query_params.get("date_to") or "").strip()
+        if not date_from and not date_to:
+            try:
+                today = timezone.now().date()
+                date_from = str(today)
+                date_to = str(today)
+            except Exception:
+                pass
+        if date_from:
+            qs = qs.filter(created_at__date__gte=date_from)
+        if date_to:
+            qs = qs.filter(created_at__date__lte=date_to)
+
         return qs
 
 
