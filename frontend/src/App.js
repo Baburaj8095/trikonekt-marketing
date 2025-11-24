@@ -49,6 +49,8 @@ import AdminReports from "./pages/admin/AdminReports";
 import AdminDashboardCards from "./pages/admin/AdminDashboardCards";
 import AdminHomeCards from "./pages/admin/AdminHomeCards";
 import AdminLuckyDraw from "./pages/admin/AdminLuckyDraw";
+import AdminLevelCommission from "./pages/admin/AdminLevelCommission";
+import AdminMatrixCommission from "./pages/admin/AdminMatrixCommission";
 import Profile from "./pages/Profile";
 import RoleSelect from "./pages/Auth/RoleSelect";
 import ReferAndEarnPage from "./pages/ReferAndEarn";
@@ -701,6 +703,26 @@ function App() {
             <AdminProtectedRoute>
               <AdminShell>
                 <AdminLuckyDraw />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/commissions/matrix"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminMatrixCommission />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/commissions/levels"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminLevelCommission />
               </AdminShell>
             </AdminProtectedRoute>
           }

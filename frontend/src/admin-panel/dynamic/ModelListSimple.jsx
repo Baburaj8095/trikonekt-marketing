@@ -132,8 +132,9 @@ export default function ModelListSimple(props) {
         if (!meta?.permissions?.change) return null;
         return (
           <button
+            className="tk-btn"
             onClick={() => setEditRow(row)}
-            style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #e5e7eb", background: "#fff", cursor: "pointer", fontSize: 12 }}
+            style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #e5e7eb", cursor: "pointer", fontSize: 12 }}
           >
             Edit
           </button>
@@ -159,15 +160,13 @@ export default function ModelListSimple(props) {
   const toolbar = (
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
       <button
+        className="tk-btn"
         onClick={() => { setEditing(null); setFormOpen(true); }}
         disabled={!(meta?.permissions?.add)}
         style={{
           padding: "8px 12px",
           borderRadius: 8,
           border: "1px solid #e2e8f0",
-          background: meta?.permissions?.add ? "#0f172a" : "#f1f5f9",
-          color: meta?.permissions?.add ? "#fff" : "#94a3b8",
-          cursor: meta?.permissions?.add ? "pointer" : "not-allowed",
           fontWeight: 700,
         }}
       >

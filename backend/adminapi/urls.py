@@ -28,6 +28,9 @@ from .views import (
     AdminSupportTicketApproveKYC,
     AdminPingView,
     AdminUserEditMetaView,
+    AdminLevelCommissionView,
+    AdminLevelCommissionSeedView,
+    AdminMatrixCommissionConfig,
 )
 from .dynamic import router as dynamic_router, admin_meta as dynamic_admin_meta, admin_meta_summary, admin_meta_fields
 
@@ -63,6 +66,11 @@ urlpatterns = [
     path("matrix/tree5/", AdminMatrix5Tree.as_view()),
     path("autopool/summary/", AdminAutopoolSummary.as_view()),
     path("autopool/transactions/", AdminAutopoolTransactionList.as_view()),
+    # Master Level Commission (Direct + L1..L5)
+    path("commission/levels/", AdminLevelCommissionView.as_view()),
+    path("commission/levels/seed/", AdminLevelCommissionSeedView.as_view()),
+    # Matrix commission configuration (5-matrix and 3-matrix)
+    path("commission/matrix/", AdminMatrixCommissionConfig.as_view()),
 
     # Support tickets
     path("support/tickets/", AdminSupportTicketList.as_view()),

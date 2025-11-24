@@ -16,7 +16,7 @@ from uploads.models import FileUpload, DashboardCard, HomeCard, LuckyDrawSubmiss
 from market.models import Product, PurchaseRequest, Banner, BannerItem, BannerPurchaseRequest
 from business.models import UserMatrixProgress, AutoPoolAccount, DailyReport, CommissionConfig
 from .permissions import IsAdminOrStaff
-from .serializers import AdminUserNodeSerializer, AdminKYCSerializer, AdminWithdrawalSerializer, AdminMatrixProgressSerializer, AdminSupportTicketSerializer, AdminSupportTicketMessageSerializer, AdminUserEditSerializer, AdminAutopoolTxnSerializer
+from .serializers import AdminUserNodeSerializer, AdminKYCSerializer, AdminWithdrawalSerializer, AdminMatrixProgressSerializer, AdminSupportTicketSerializer, AdminSupportTicketMessageSerializer, AdminUserEditSerializer, AdminAutopoolTxnSerializer, AdminAutopoolConfigSerializer
 from .dynamic import field_meta_from_serializer
 
 
@@ -1577,3 +1577,112 @@ class AdminWithdrawalRejectView(APIView):
         except Exception as e:
             return Response({"detail": str(e)}, status=400)
         return Response(AdminWithdrawalSerializer(obj).data, status=200)
+
+
+# ================================
+# Master Level Commission (L0..L5)
+# ================================
+class AdminLevelCommissionView(APIView):
+    """
+    GET: Return current Direct and L1..L5 fixed level commissions (rupees) from CommissionConfig.referral_join_fixed_json
+         { direct, l1, l2, l3, l4, l5, updated_at }
+    PATCH: Update any subset of the above keys with numeric values
+         Body e.g. { "direct": 15, "l1": 2, "l2": 1, "l3": 1, "l4": 0.5, "l5": 0.5 }
+    """
+    permission_classes = [IsAdminOrStaff]
+
+    def _serialize(self, cfg):
+        fixed = dict(getattr(cfg, "referral_join_fixed_json", {}) or {})
+        def _f(k, d):
+            from decimal import Decimal as D
+            try:
+                return float(D(str(fixed.get(k, d))))
+            except Exception:
+                return float(d)
+        payload = {
+            "direct": _f("direct", 15),
+            "l1": _f("l1", 2),
+            "l2": _f("l2", 1),
+            "l3": _f("l3", 1),
+            "l4": _f("l4", 0.5),
+            "l5": _f("l5", 0.5),
+            "updated_at": getattr(cfg, "updated_at", None),
+        }
+        return payload
+
+    def get(self, request):
+        cfg = CommissionConfig.get_solo()
+        return Response(self._serialize(cfg), status=200)
+
+    def patch(self, request):
+        from decimal import Decimal as D
+        cfg = CommissionConfig.get_solo()
+        fixed = dict(getattr(cfg, "referral_join_fixed_json", {}) or {})
+        data = request.data or {}
+        # Accept only known keys
+        for k in ("direct", "l1", "l2", "l3", "l4", "l5"):
+            if k in data:
+                try:
+                    v = D(str(data.get(k)))
+                    if v < 0:
+                        return Response({"detail": f"{k} must be >= 0"}, status=400)
+                    # Quantize to 2 decimals string to avoid float drift in JSON
+                    fixed[k] = float(v.quantize(D("0.01")))
+                except Exception:
+                    return Response({"detail": f"{k} must be a number"}, status=400)
+        cfg.referral_join_fixed_json = fixed
+        try:
+            cfg.save(update_fields=["referral_join_fixed_json", "updated_at"])
+        except Exception:
+            cfg.save()
+        return Response(self._serialize(cfg), status=200)
+
+
+class AdminLevelCommissionSeedView(APIView):
+    """
+    POST: Reset Direct and L1..L5 to defaults {15, 2, 1, 1, 0.5, 0.5}
+    """
+    permission_classes = [IsAdminOrStaff]
+
+    def post(self, request):
+        cfg = CommissionConfig.get_solo()
+        cfg.referral_join_fixed_json = {
+            "direct": 15,
+            "l1": 2,
+            "l2": 1,
+            "l3": 1,
+            "l4": 0.5,
+            "l5": 0.5,
+        }
+        try:
+            cfg.save(update_fields=["referral_join_fixed_json", "updated_at"])
+        except Exception:
+            cfg.save()
+        return Response({"ok": True, "defaults": cfg.referral_join_fixed_json}, status=200)
+
+
+class AdminMatrixCommissionConfig(APIView):
+    """
+    GET: Return current 5‑matrix and 3‑matrix commission configuration (levels + amounts/percents)
+         {
+           five_matrix_levels, five_matrix_amounts_json, five_matrix_percents_json,
+           three_matrix_levels, three_matrix_amounts_json, three_matrix_percents_json,
+           updated_at
+         }
+    PATCH: Update any subset of those keys with numeric arrays (coerced to length by levels)
+           Body e.g. { "five_matrix_amounts_json": [15, 2, 2.5, 0.5, 0.05, 0.1] }
+    """
+    permission_classes = [IsAdminOrStaff]
+
+    def get(self, request):
+        cfg = CommissionConfig.get_solo()
+        ser = AdminAutopoolConfigSerializer(cfg)
+        return Response(ser.data, status=200)
+
+    def patch(self, request):
+        cfg = CommissionConfig.get_solo()
+        ser = AdminAutopoolConfigSerializer(cfg, data=request.data, partial=True)
+        if ser.is_valid():
+            obj = ser.save()
+            return Response(AdminAutopoolConfigSerializer(obj).data, status=200)
+        return Response(ser.errors, status=400)

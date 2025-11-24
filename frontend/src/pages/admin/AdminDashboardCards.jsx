@@ -1,4 +1,5 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { getAdminMeta } from "../../admin-panel/api/adminMeta";
 import ModelListSimple from "../../admin-panel/dynamic/ModelListSimple";
 
@@ -45,6 +46,7 @@ export default function AdminDashboardCards() {
   const [error, setError] = React.useState("");
   const [uploadsModels, setUploadsModels] = React.useState([]);
   const [selectedKey, setSelectedKey] = React.useState("");
+  const nav = useNavigate();
 
   React.useEffect(() => {
     let mounted = true;
@@ -101,6 +103,49 @@ export default function AdminDashboardCards() {
           Manage dashboard tiles via the dynamic admin engine. File/image fields are supported.
         </div>
       </div>
+
+      <Section title="Quick Links">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => nav("/admin/commissions/levels")}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); nav("/admin/commissions/levels"); } }}
+            style={{
+              cursor: "pointer",
+              border: "1px solid #e2e8f0",
+              borderRadius: 10,
+              padding: 12,
+              background: "#f0fdf4",
+              color: "#14532d",
+              fontWeight: 800,
+              boxShadow: "0 6px 12px rgba(22,163,74,0.12)"
+            }}
+          >
+            Level Commission Master
+            <div style={{ fontSize: 12, color: "#166534", fontWeight: 600 }}>Direct + L1–L5 settings</div>
+          </div>
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => nav("/admin/commissions/matrix")}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); nav("/admin/commissions/matrix"); } }}
+            style={{
+              cursor: "pointer",
+              border: "1px solid #e2e8f0",
+              borderRadius: 10,
+              padding: 12,
+              background: "#eff6ff",
+              color: "#1e3a8a",
+              fontWeight: 800,
+              boxShadow: "0 6px 12px rgba(59,130,246,0.12)"
+            }}
+          >
+            Matrix Commission Master
+            <div style={{ fontSize: 12, color: "#1d4ed8", fontWeight: 600 }}>5‑Matrix & 3‑Matrix settings</div>
+          </div>
+        </div>
+      </Section>
 
       <Section
         title="Select Upload Model"

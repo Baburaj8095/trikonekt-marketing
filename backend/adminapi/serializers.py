@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from accounts.models import CustomUser, WithdrawalRequest, UserKYC, WalletTransaction, SupportTicket, SupportTicketMessage
 from market.models import PurchaseRequest, BannerPurchaseRequest
-from business.models import UserMatrixProgress
+from business.models import UserMatrixProgress, CommissionConfig
 from locations.models import Country, State, City
 from core.crypto import encrypt_string, decrypt_string
 
@@ -608,3 +608,96 @@ class AdminSupportTicketSerializer(serializers.ModelSerializer):
             return getattr(obj.admin_assignee, "username", None)
         except Exception:
             return None
+
+
+class AdminAutopoolConfigSerializer(serializers.Serializer):
+    """
+    Admin editable config for consumer autopool (3-matrix and 5-matrix).
+    Reads/writes CommissionConfig singleton.
+    """
+    five_matrix_levels = serializers.IntegerField(min_value=1, required=False)
+    five_matrix_amounts_json = serializers.ListField(child=serializers.FloatField(min_value=0), allow_null=True, required=False)
+    five_matrix_percents_json = serializers.ListField(child=serializers.FloatField(min_value=0), allow_null=True, required=False)
+
+    three_matrix_levels = serializers.IntegerField(min_value=1, required=False)
+    three_matrix_amounts_json = serializers.ListField(child=serializers.FloatField(min_value=0), allow_null=True, required=False)
+    three_matrix_percents_json = serializers.ListField(child=serializers.FloatField(min_value=0), allow_null=True, required=False)
+
+    updated_at = serializers.DateTimeField(read_only=True, required=False)
+
+    def to_representation(self, instance):
+        from decimal import Decimal as D
+        cfg = instance if isinstance(instance, CommissionConfig) else CommissionConfig.get_solo()
+
+        def _norm_list(lst, n):
+            arr = list(lst or [])
+            out = []
+            for i in range(min(len(arr), n)):
+                try:
+                    v = D(str(arr[i]))
+                    if v < 0:
+                        v = D("0")
+                    out.append(float(v.quantize(D("0.01"))))
+                except Exception:
+                    out.append(0.0)
+            while len(out) < n:
+                out.append(0.0)
+            return out
+
+        five_levels = int(getattr(cfg, "five_matrix_levels", 6) or 6)
+        three_levels = int(getattr(cfg, "three_matrix_levels", 15) or 15)
+
+        return {
+            "five_matrix_levels": five_levels,
+            "five_matrix_amounts_json": _norm_list(getattr(cfg, "five_matrix_amounts_json", []) or [], five_levels),
+            "five_matrix_percents_json": _norm_list(getattr(cfg, "five_matrix_percents_json", []) or [], five_levels),
+            "three_matrix_levels": three_levels,
+            "three_matrix_amounts_json": _norm_list(getattr(cfg, "three_matrix_amounts_json", []) or [], three_levels),
+            "three_matrix_percents_json": _norm_list(getattr(cfg, "three_matrix_percents_json", []) or [], three_levels),
+            "updated_at": getattr(cfg, "updated_at", None),
+        }
+
+    def update(self, instance, validated_data):
+        from decimal import Decimal as D
+        cfg = instance
+
+        five_levels = int(validated_data.get("five_matrix_levels", getattr(cfg, "five_matrix_levels", 6) or 6))
+        three_levels = int(validated_data.get("three_matrix_levels", getattr(cfg, "three_matrix_levels", 15) or 15))
+        cfg.five_matrix_levels = max(1, five_levels)
+        cfg.three_matrix_levels = max(1, three_levels)
+
+        def _coerce(lst, n):
+            if lst is None:
+                return []
+            arr = list(lst or [])
+            out = []
+            for i in range(min(len(arr), n)):
+                try:
+                    v = D(str(arr[i]))
+                    if v < 0:
+                        v = D("0")
+                    out.append(float(v.quantize(D("0.01"))))
+                except Exception:
+                    out.append(0.0)
+            while len(out) < n:
+                out.append(0.0)
+            return out
+
+        if "five_matrix_amounts_json" in validated_data:
+            cfg.five_matrix_amounts_json = _coerce(validated_data.get("five_matrix_amounts_json"), cfg.five_matrix_levels)
+        if "five_matrix_percents_json" in validated_data:
+            cfg.five_matrix_percents_json = _coerce(validated_data.get("five_matrix_percents_json"), cfg.five_matrix_levels)
+        if "three_matrix_amounts_json" in validated_data:
+            cfg.three_matrix_amounts_json = _coerce(validated_data.get("three_matrix_amounts_json"), cfg.three_matrix_levels)
+        if "three_matrix_percents_json" in validated_data:
+            cfg.three_matrix_percents_json = _coerce(validated_data.get("three_matrix_percents_json"), cfg.three_matrix_levels)
+
+        try:
+            cfg.save()
+        except Exception:
+            cfg.save()
+        return cfg
+
+    def create(self, validated_data):
+        cfg = CommissionConfig.get_solo()
+        return self.update(cfg, validated_data)

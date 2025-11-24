@@ -161,7 +161,7 @@ export default function DataTable({
   }, [columns]);
 
   return (
-    <div className="tk-grid" style={{ width: "100%", background: "#ffffff", borderRadius: 12, border: "1px solid #e5e7eb", overflow: "hidden", position: "relative", isolation: "isolate" }}>
+    <div className="tk-card tk-grid" style={{ width: "100%", background: "#ffffff", borderRadius: 12, border: "1px solid #e5e7eb", overflow: "hidden", position: "relative", isolation: "isolate" }}>
       <div style={{ padding: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         {toolbar}
         <input

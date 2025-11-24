@@ -209,14 +209,16 @@ export default function CustomUserListSimple() {
                     style={{ padding: 6, borderRadius: 6, border: "1px solid #e5e7eb", width: 160 }}
                   />
                   <button
+                    className="tk-btn"
                     onClick={() => saveSponsor(row)}
-                    style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #16a34a", background: "#16a34a", color: "#fff", cursor: "pointer" }}
+                    style={{ padding: "6px 10px", borderRadius: 6 }}
                   >
                     Save
                   </button>
                   <button
+                    className="tk-btn"
                     onClick={cancelEdit}
-                    style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #e5e7eb", background: "#fff", cursor: "pointer" }}
+                    style={{ padding: "6px 10px", borderRadius: 6 }}
                   >
                     Cancel
                   </button>
@@ -228,8 +230,9 @@ export default function CustomUserListSimple() {
                 <span>{String(val || "")}</span>
                 {canEdit ? (
                   <button
+                    className="tk-btn"
                     onClick={() => startEdit(row)}
-                    style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #e5e7eb", background: "#fff", cursor: "pointer", fontSize: 12 }}
+                    style={{ padding: "4px 8px", borderRadius: 6, fontSize: 12 }}
                     title="Edit Sponsor ID"
                   >
                     Edit
@@ -290,8 +293,9 @@ export default function CustomUserListSimple() {
         />
 
         <button
+          className="tk-btn"
           onClick={() => { setFilters({ role: "", category: "", pincode: "" }); setPage(1); }}
-          style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", cursor: "pointer" }}
+          style={{ padding: "6px 10px", borderRadius: 8 }}
           title="Clear filters"
         >
           Clear

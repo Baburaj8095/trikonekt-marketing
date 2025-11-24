@@ -148,6 +148,12 @@ class CommissionConfig(models.Model):
         help_text='e.g., {"direct":5,"l1":2,"l2":1,"l3":1,"l4":0.5,"l5":0.5}'
     )
 
+    # Master Commission configuration JSON (Agency/Employee uplines, Consumer matrices)
+    master_commission_json = models.JSONField(
+        default=dict,
+        help_text='Editable config for agency/employee upline splits and consumer 3/5 matrix. Keys: agency, employee, consumer_matrix_3, consumer_matrix_5, general'
+    )
+
     # Fixed amount overrides for matrix payouts (if non-empty, overrides percent-based distribution)
     three_matrix_amounts_json = models.JSONField(default=list, help_text="Fixed rupees per level for 3-matrix (length 15)")
     five_matrix_amounts_json = models.JSONField(default=list, help_text="Fixed rupees per level for 5-matrix (length 6)")

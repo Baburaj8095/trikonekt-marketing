@@ -46,6 +46,20 @@ def _credit_wallet(user: CustomUser, amount: Decimal, tx_type: str, meta: dict |
         pass
 
 
+def _is_agency_or_employee(u: CustomUser) -> bool:
+    """
+    Return True if the user is an agency or employee account.
+    Agency detection: role == 'agency' or category startswith 'agency'
+    Employee detection: role == 'employee' or category == 'employee'
+    """
+    try:
+        role = (getattr(u, "role", "") or "")
+        cat = (getattr(u, "category", "") or "")
+        return (role in ("agency", "employee")) or (cat == "employee") or str(cat).startswith("agency")
+    except Exception:
+        return False
+
+
 def _distribute_three_matrix(user: CustomUser, base_amount: Decimal, source: Dict[str, Any]):
     """
     Distribute 15-level autopool income for THREE_50 using fixed amounts if configured,
@@ -72,6 +86,9 @@ def _distribute_three_matrix(user: CustomUser, base_amount: Decimal, source: Dic
             amt = _q2(fixed[idx] or 0)
             if amt <= 0:
                 continue
+            # Skip matrix payout for agency/employee recipients
+            if _is_agency_or_employee(recipient):
+                continue
             meta = {
                 "source": "THREE_MATRIX_FIXED",
                 "source_type": src_type,
@@ -96,6 +113,9 @@ def _distribute_three_matrix(user: CustomUser, base_amount: Decimal, source: Dic
         pct = Decimal(str(percents[idx] or 0))
         amt = _q2(base_q * pct / Decimal("100"))
         if amt <= 0:
+            continue
+        # Skip matrix payout for agency/employee recipients
+        if _is_agency_or_employee(recipient):
             continue
         meta = {
             "source": "THREE_MATRIX_PERCENT",
@@ -208,6 +228,9 @@ def _distribute_five_matrix(new_user: CustomUser, source: Dict[str, Any]):
             break
         amt = _q2(fixed[idx] or 0)
         if amt <= 0:
+            continue
+        # Skip matrix payout for agency/employee recipients
+        if _is_agency_or_employee(recipient):
             continue
         meta = {
             "source": "FIVE_MATRIX_FIXED",

@@ -529,6 +529,20 @@ export default function AdminDashboard() {
               palette="pink"
             />
             <Card
+              title="Level Commission Master"
+              value={"Direct + L1–L5"}
+              subtitle=""
+              onClick={() => nav("/admin/commissions/levels")}
+              palette="lime"
+            />
+            <Card
+              title="Matrix Commission Master"
+              value={"5 & 3 Matrix"}
+              subtitle=""
+              onClick={() => nav("/admin/commissions/matrix")}
+              palette="lime"
+            />
+            <Card
               title="Trikonekt Products"
               value={(data?.market?.products ?? 0)}
               subtitle=""

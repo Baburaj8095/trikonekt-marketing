@@ -130,7 +130,7 @@ export default function SimpleTable({
   }
 
   return (
-    <div style={{ width: "100%", background: "#ffffff", borderRadius: 12, border: "1px solid #e5e7eb" }}>
+    <div className="tk-card" style={{ width: "100%", background: "#ffffff", borderRadius: 12, border: "1px solid #e5e7eb" }}>
       <div style={{ padding: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", borderBottom: "1px solid #e5e7eb" }}>
         {toolbar}
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -189,6 +189,7 @@ export default function SimpleTable({
 
           {exportable ? (
             <button
+              className="tk-btn"
               onClick={() => (onExportCsv ? onExportCsv() : defaultExportCsv())}
               style={{
                 padding: "8px 12px",
@@ -307,6 +308,7 @@ export default function SimpleTable({
 
       <div style={{ padding: 8, display: "flex", alignItems: "center", gap: 8, borderTop: "1px solid #e5e7eb", flexWrap: "wrap" }}>
         <button
+          className="tk-btn"
           onClick={handlePrev}
           disabled={page <= 1}
           style={{
@@ -320,6 +322,7 @@ export default function SimpleTable({
           Prev
         </button>
         <button
+          className="tk-btn"
           onClick={handleNext}
           disabled={page >= totalPages}
           style={{

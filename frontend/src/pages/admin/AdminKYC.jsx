@@ -54,9 +54,13 @@ function Badge({ children, color = "#0369a1", bg = "#e0f2fe" }) {
   return (
     <span
       style={{
-        display: "inline-block",
-        padding: "2px 8px",
-        fontSize: 12,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "1px 6px",
+        lineHeight: 1,
+        height: 18,
+        fontSize: 10,
         borderRadius: 999,
         color,
         background: bg,
@@ -151,6 +155,8 @@ export default function AdminKYC() {
         field: "verified",
         headerName: "Status",
         minWidth: 120,
+        align: "center",
+        headerAlign: "center",
         renderCell: (params) => {
           const verified = !!params?.row?.verified;
           return verified ? (
@@ -167,15 +173,17 @@ export default function AdminKYC() {
         sortable: false,
         filterable: false,
         minWidth: 200,
+        align: "center",
+        headerAlign: "center",
         renderCell: (params) => {
           const r = params?.row || {};
           return (
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 8, width: "100%", height: "100%", alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
               {!r.verified ? (
                 <button
                   onClick={() => handleVerify(r)}
                   style={{
-                    padding: "6px 10px",
+                    padding: "4px 8px",
                     background: "#059669",
                     color: "#fff",
                     border: 0,
@@ -189,7 +197,7 @@ export default function AdminKYC() {
               <button
                 onClick={() => handleReject(r)}
                 style={{
-                  padding: "6px 10px",
+                  padding: "4px 8px",
                   background: "#ef4444",
                   color: "#fff",
                   border: 0,

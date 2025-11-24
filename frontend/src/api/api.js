@@ -632,5 +632,43 @@ export async function redeemECoupon150({ code }) {
   return res?.data || res;
 }
 
+/**
+ * Admin: Master Level Commission APIs
+ */
+export async function adminGetLevelCommission() {
+  const res = await API.get("/admin/commission/levels/", {
+    cacheTTL: 10_000,
+    dedupe: "cancelPrevious",
+  });
+  return res?.data || res;
+}
+
+export async function adminUpdateLevelCommission(payload = {}) {
+  // Accepts any subset of { direct, l1, l2, l3, l4, l5 }
+  const res = await API.patch("/admin/commission/levels/", payload);
+  return res?.data || res;
+}
+
+export async function adminSeedLevelCommission() {
+  const res = await API.post("/admin/commission/levels/seed/", {});
+  return res?.data || res;
+}
+
+export async function adminGetMatrixCommissionConfig() {
+  const res = await API.get("/admin/commission/matrix/", {
+    cacheTTL: 10_000,
+    dedupe: "cancelPrevious",
+  });
+  return res?.data || res;
+}
+
+export async function adminUpdateMatrixCommissionConfig(payload = {}) {
+  // Accepts any subset of:
+  //  - five_matrix_levels, five_matrix_amounts_json, five_matrix_percents_json
+  //  - three_matrix_levels, three_matrix_amounts_json, three_matrix_percents_json
+  const res = await API.patch("/admin/commission/matrix/", payload);
+  return res?.data || res;
+}
+
 export { ensureFreshAccess, getAccessToken, getRefreshToken };
 export default API;

@@ -325,6 +325,8 @@ export default function AdminShell({ children }) {
       items: [
         { to: "/admin/matrix/five", label: "5‑Matrix", icon: "matrix5" },
         { to: "/admin/matrix/three", label: "3‑Matrix", icon: "matrix3" },
+        { to: "/admin/commissions/matrix", label: "Matrix Commission", icon: "wallet" },
+        { to: "/admin/commissions/levels", label: "Level Commission", icon: "wallet" },
         { to: "/admin/autopool", label: "Auto Commission", icon: "pool" },
       ],
     },
@@ -653,6 +655,7 @@ export default function AdminShell({ children }) {
 
         {/* Main content */}
         <main
+          className="tk-main"
           style={{
             flex: 1,
             minWidth: 0,

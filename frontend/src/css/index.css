@@ -52,3 +52,112 @@ a {
 }
 
 /* KPI mobile full-width enforcement removed to rely on proper MUI Grid props (xs=12) and default gutters to avoid overlap */
+
+/* =========================
+   Admin visual polish
+   ========================= */
+.admin-scope .tk-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+/* Buttons inside admin cards (primary, classy look) */
+.admin-scope .tk-btn {
+  appearance: none;
+  padding: 10px 14px !important;
+  border-radius: 10px !important;
+  border: 1px solid #dbe3ef !important;
+  background: linear-gradient(180deg, #2ea6ff 0%, #0ea5e9 100%) !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 160ms ease, background 160ms ease, opacity 160ms ease;
+  box-shadow: 0 4px 10px rgba(14, 165, 233, 0.25);
+}
+
+.admin-scope .tk-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(14, 165, 233, 0.28);
+  background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%) !important;
+}
+
+.admin-scope .tk-btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 3px 8px rgba(14, 165, 233, 0.22);
+}
+
+.admin-scope .tk-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Inputs/selects inside admin cards */
+.admin-scope .tk-card select,
+.admin-scope .tk-card input[type="text"],
+.admin-scope .tk-card input[type="search"],
+.admin-scope .tk-card input[type="number"],
+.admin-scope .tk-card input:not([type]) {
+  padding: 9px 12px !important;
+  border: 1px solid #dbe3ef !important;
+  border-radius: 10px !important;
+  background: #fff !important;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+  outline: none !important;
+}
+
+.admin-scope .tk-card input::placeholder {
+  color: #94a3b8;
+}
+
+.admin-scope .tk-card input:focus,
+.admin-scope .tk-card select:focus {
+  border-color: #60a5fa !important;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
+}
+
+/* Table aesthetic inside admin cards */
+.admin-scope .tk-card table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.admin-scope .tk-card thead th {
+  position: sticky;
+  top: 0;
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+  color: #0f172a;
+  font-weight: 800;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.admin-scope .tk-card tbody tr {
+  transition: background-color 120ms ease;
+}
+
+.admin-scope .tk-card tbody tr:hover {
+  background-color: rgba(99, 102, 241, 0.06);
+}
+
+/* DataGrid tweaks scoped to tk-grid */
+.admin-scope .tk-grid .MuiDataGrid-columnHeaders {
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%) !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+.admin-scope .tk-grid .MuiDataGrid-row:hover {
+  background-color: rgba(99, 102, 241, 0.06) !important;
+}
+
+.admin-scope .tk-grid .MuiDataGrid-cell,
+.admin-scope .tk-grid .MuiDataGrid-columnHeader {
+  border-right: 1px solid #e5e7eb;
+}
+
+.admin-scope .tk-grid .MuiDataGrid-cell:last-of-type,
+.admin-scope .tk-grid .MuiDataGrid-columnHeader:last-of-type {
+  border-right: none;
+}

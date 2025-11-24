@@ -315,8 +315,20 @@ export default function TreeReferralGalaxy({
   };
 
   // UI helpers
+  const maskTRUsername = (username) => {
+    if (typeof username !== "string") return username;
+    const match = username.match(/^(TR)(\d+)(.*)$/i);
+    if (!match) return username;
+    const prefix = match[1];
+    const digits = match[2];
+    const suffix = match[3] || "";
+    const firstMask = Math.min(2, digits.length);
+    const lastMask = Math.min(2, Math.max(0, digits.length - firstMask));
+    const middle = digits.slice(firstMask, digits.length - lastMask);
+    return `${prefix}${"X".repeat(firstMask)}${middle}${"x".repeat(lastMask)}${suffix}`;
+  };
   const displayName = (u) => (u?.full_name || u?.username || "").toString();
-  const displayTR = (u) => (u?.username || "").toString();
+  const displayTR = (u) => maskTRUsername((u?.username || "").toString());
 
   const AvatarIcon = ({ size = 56 }) => (
     <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">

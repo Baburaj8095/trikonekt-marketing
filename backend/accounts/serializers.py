@@ -100,15 +100,22 @@ class RegisterSerializer(serializers.ModelSerializer):
         if category == 'business':
             raise serializers.ValidationError({'category': 'Business registration has moved. Use /api/business/register/.'})
 
-        # Sponsor required: must be a valid username
+        # Sponsor required: accept username, prefixed_id (with/without dash), phone digits, or unique_id
         if not sponsor:
-            raise serializers.ValidationError({'sponsor_id': 'Sponsor username is required.'})
+            raise serializers.ValidationError({'sponsor_id': 'Sponsor ID is required.'})
 
-        # Resolve sponsor strictly by username.
-        raw = sponsor
-        sponsor_user = CustomUser.objects.filter(username__iexact=raw).first()
+        raw = sponsor.strip()
+        q = Q(username__iexact=raw) | Q(prefixed_id__iexact=raw) | Q(unique_id__iexact=raw)
+        # also support dashless prefixed codes
+        t_no_dash = ''.join(ch for ch in raw if ch.isalnum())
+        if t_no_dash and t_no_dash != raw:
+            q = q | Q(prefixed_id__iexact=t_no_dash)
+        digits = ''.join(ch for ch in raw if ch.isdigit())
+        if digits:
+            q = q | Q(phone__iexact=digits) | Q(username__iexact=digits)
+        sponsor_user = CustomUser.objects.filter(q).first()
         if not sponsor_user:
-            raise serializers.ValidationError({'sponsor_id': 'Sponsor username not found.'})
+            raise serializers.ValidationError({'sponsor_id': 'Sponsor not found. Use username/prefixed code/phone.'})
 
         # Enforce agency hierarchy transitions only for agency categories
         if category in AGENCY_CATEGORIES:
@@ -125,7 +132,7 @@ class RegisterSerializer(serializers.ModelSerializer):
                     'agency_district': {'agency_pincode_coordinator'},
                     'agency_pincode_coordinator': {'agency_pincode'},
                     'agency_pincode': {'agency_sub_franchise'},
-                    'agency_sub_franchise': set(),
+                    'agency_sub_franchise': {'agency_sub_franchise'},
                 }
                 sponsor_cat = getattr(sponsor_user, 'category', '') or ''
                 allowed_next = allowed.get(sponsor_cat, set())

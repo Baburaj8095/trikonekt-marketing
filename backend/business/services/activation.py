@@ -57,6 +57,20 @@ def _credit_wallet(user: CustomUser, amount: Decimal, tx_type: str, meta: Option
         pass
 
 
+def _is_agency_or_employee(u: CustomUser) -> bool:
+    """
+    True if the user is an agency or employee account.
+    Agency detection: role == 'agency' or category startswith 'agency'
+    Employee detection: role == 'employee' or category == 'employee'
+    """
+    try:
+        role = (getattr(u, "role", "") or "")
+        cat = (getattr(u, "category", "") or "")
+        return (role in ("agency", "employee")) or (cat == "employee") or str(cat).startswith("agency")
+    except Exception:
+        return False
+
+
 def _update_matrix_progress(user: CustomUser, pool_type: str, level: int, amount: Decimal):
     """
     Best-effort rollup for matrix progress and totals.
@@ -93,6 +107,9 @@ def _distribute_levels(upline: Iterable[CustomUser], base_amount: Decimal, perce
         pct = percents[idx] or Decimal("0")
         amt = _q2(base_q * pct / Decimal("100"))
         if amt <= 0:
+            continue
+        # Skip matrix payouts to agency/employee recipients
+        if tx_type in ("AUTOPOOL_BONUS_THREE", "AUTOPOOL_BONUS_FIVE") and _is_agency_or_employee(user):
             continue
         meta2 = dict(meta or {})
         meta2.update({"level_index": idx + 1, "percent": str(pct)})
@@ -245,6 +262,9 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
                 break
             amt = _q2(fixed_amounts[idx] or 0)
             if amt <= 0:
+                continue
+            # Skip matrix payout for agency/employee recipients
+            if _is_agency_or_employee(recipient):
                 continue
             meta = {
                 "source": "THREE_MATRIX_150_FIXED",
