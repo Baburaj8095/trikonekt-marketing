@@ -20,8 +20,11 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Chip,
 } from "@mui/material";
 import API from "../api/api";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 
 const CHANNELS = [
   { value: "e_coupon", label: "E-Coupon" },
@@ -143,6 +146,8 @@ export default function ConsumerCoupon() {
       await API.post(`/coupons/codes/${codeId}/transfer/`, { to_username: u });
       try { alert("Transfer successful."); } catch {}
       setTransferDialog((d) => ({ ...d, submitting: false, open: false }));
+      // Immediately reflect transferred state locally
+      setMyCodes((prev) => prev.map((x) => x.id === codeId ? { ...x, display_status: "TRANSFERRED", can_transfer: false, can_activate: false } : x));
       await loadMyCodes();
       await loadMySummary();
     } catch (e) {
@@ -278,6 +283,8 @@ export default function ConsumerCoupon() {
         notes: String(data.notes || "").trim(),
       });
       alert("Transfer successful.");
+      // Immediately reflect transferred state locally
+      setMyCodes((prev) => prev.map((x) => x.id === codeId ? { ...x, display_status: "TRANSFERRED", can_transfer: false, can_activate: false } : x));
       setTransferCodeForms((m) => ({ ...m, [codeId]: { to_username: "", pincode: "", notes: "" } }));
       await loadMyCodes();
       await loadMySummary();
@@ -767,15 +774,101 @@ export default function ConsumerCoupon() {
             No e‑coupon entries.
           </Typography>
         ) : (
-          <TableContainer sx={{ maxWidth: "100%", overflowX: "auto" }}>
+          <>
+          <Box sx={{ display: { xs: "block", sm: "none" } }}>
+            {(myCodes || []).map((c) => {
+              const status = String(c.display_status || c.status || "").toUpperCase();
+              const isActivated = status === "ACTIVATED";
+              const isPending = status === "PENDING";
+              const isRedeemed = status === "REDEEMED";
+              const canAct = !!c.can_activate;
+              const canTrans = !!c.can_transfer;
+              const busy = !!transferCodeBusy[c.id];
+              const forceEnable = isPending;
+              const dialogBusyThis = Boolean(transferDialog.submitting && transferDialog.code && transferDialog.code.id === c.id);
+              const isTransferred = status === "TRANSFERRED";
+              const disableActivate = (isActivated || isTransferred) ? true : (Boolean(activateCodeBusy[c.id]) || busy || dialogBusyThis || !form.referral_id || !canAct);
+              const disableTransfer = forceEnable
+                ? (!!busy || Boolean(activateCodeBusy[c.id]) || dialogBusyThis)
+                : (busy || !canTrans || Boolean(activateCodeBusy[c.id]) || isActivated || isTransferred || dialogBusyThis);
+              const chipColor = isActivated ? "success" : (isRedeemed ? "error" : (isPending ? "warning" : (isTransferred ? "info" : "default")));
+              return (
+                <Paper key={c.id} sx={{ p: 1.5, mb: 1.5, borderRadius: 2 }}>
+                  <Stack spacing={1}>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{c.code}</Typography>
+                      <Chip size="small" label={c.display_status || c.status} color={chipColor} />
+                    </Box>
+                    <Typography variant="caption" color="text.secondary">
+                      {typeof c.value !== "undefined" ? `₹${c.value}` : ""}{c.created_at ? ` • ${new Date(c.created_at).toLocaleString()}` : ""}
+                    </Typography>
+                    {!isRedeemed ? (
+                      <Stack direction="row" spacing={1}>
+                        <Button
+                          size="small"
+                          variant={isActivated ? "outlined" : "contained"}
+                          color={isActivated ? "success" : "primary"}
+                          disabled={disableActivate}
+                          sx={{
+                            flex: 1,
+                            "&.Mui-disabled": isActivated
+                              ? { borderColor: "#10b981", color: "#10b981", backgroundColor: "#ecfdf5" }
+                              : { backgroundColor: "#9e9e9e", color: "#fff" },
+                          }}
+                          onClick={() => !isActivated && handleActivateCode(c)}
+                          startIcon={isActivated ? <CheckCircleIcon /> : undefined}
+                        >
+                          {isActivated
+                            ? "Activated"
+                            : (activateCodeBusy[c.id] ? "Activating..." : "Activate")}
+                        </Button>
+                        <Button
+                          size="small"
+                          variant={isTransferred ? "outlined" : (disableTransfer ? "outlined" : "contained")}
+                          color={isTransferred ? "success" : (disableTransfer ? "inherit" : "primary")}
+                          disabled={isTransferred || disableTransfer}
+                          sx={{
+                            flex: 1,
+                            ...(isTransferred
+                              ? { "&.Mui-disabled": { borderColor: "#10b981", color: "#10b981", backgroundColor: "#ecfdf5" } }
+                              : {
+                                  backgroundColor: disableTransfer ? "#e0e0e0 !important" : undefined,
+                                  color: disableTransfer ? "#757575 !important" : undefined,
+                                  borderColor: disableTransfer ? "#bdbdbd !important" : undefined,
+                                  "&:hover": {
+                                    backgroundColor: disableTransfer ? "#e0e0e0 !important" : undefined,
+                                    borderColor: disableTransfer ? "#bdbdbd !important" : undefined
+                                  },
+                                  "&.Mui-disabled": {
+                                    backgroundColor: "#e0e0e0 !important",
+                                    color: "#9e9e9e !important",
+                                    borderColor: "#bdbdbd !important"
+                                  }
+                                }),
+                          }}
+                          onClick={() => openTransferDialog(c)}
+                          startIcon={isTransferred ? <CheckCircleIcon /> : (disableTransfer ? <LockOutlinedIcon /> : undefined)}
+                        >
+                          {isTransferred ? "Transferred" : (busy ? "Processing..." : "Transfer")}
+                        </Button>
+                      </Stack>
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">Redeemed</Typography>
+                    )}
+                  </Stack>
+                </Paper>
+              );
+            })}
+          </Box>
+          <TableContainer sx={{ maxWidth: "100%", overflowX: "auto", display: { xs: "none", sm: "block" } }}>
             <Table size="small">
               <TableHead>
                 <TableRow>
                   <TableCell>Code</TableCell>
                   <TableCell>Status</TableCell>
-                   <TableCell>Value</TableCell>
+                   <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Value</TableCell>
                   <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Assigned Agency</TableCell>
-                  <TableCell>Created</TableCell>
+                  <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Created</TableCell>
                   <TableCell>Actions</TableCell>
                 </TableRow>
               </TableHead>
@@ -790,36 +883,66 @@ export default function ConsumerCoupon() {
                 const tf = transferCodeForms[c.id] || {};
                 const busy = !!transferCodeBusy[c.id];
                 const forceEnable = isPending;
-                const disableActivate = forceEnable ? Boolean(activateCodeBusy[c.id]) : (Boolean(activateCodeBusy[c.id]) || !form.referral_id || !canAct);
-                const disableTransfer = forceEnable ? !!busy : (busy || !canTrans);
+                const dialogBusyThis = Boolean(transferDialog.submitting && transferDialog.code && transferDialog.code.id === c.id);
+                const isTransferred = status === "TRANSFERRED";
+                const disableActivate = (isActivated || isTransferred) ? true : (Boolean(activateCodeBusy[c.id]) || busy || dialogBusyThis || !form.referral_id || !canAct);
+                const disableTransfer = forceEnable
+                  ? (!!busy || Boolean(activateCodeBusy[c.id]) || dialogBusyThis)
+                  : (busy || !canTrans || Boolean(activateCodeBusy[c.id]) || isActivated || isTransferred || dialogBusyThis);
                 return (
                   <TableRow key={c.id}>
                     <TableCell>{c.code}</TableCell>
                     <TableCell>{c.display_status || c.status}</TableCell>
-                    <TableCell>{typeof c.value !== "undefined" ? `₹${c.value}` : ""}</TableCell>
+                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{typeof c.value !== "undefined" ? `₹${c.value}` : ""}</TableCell>
                     <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.assigned_agency_username || ""}</TableCell>
-                    <TableCell>{c.created_at ? new Date(c.created_at).toLocaleString() : ""}</TableCell>
+                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.created_at ? new Date(c.created_at).toLocaleString() : ""}</TableCell>
                     <TableCell>
                       {!isRedeemed ? (
                         <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                           <Button
                             size="small"
-                            variant="contained"
-                            color="primary"
+                            variant={isActivated ? "outlined" : "contained"}
+                            color={isActivated ? "success" : "primary"}
                             disabled={disableActivate}
-                            sx={{ "&.Mui-disabled": { backgroundColor: "#9e9e9e", color: "#fff" } }}
-                            onClick={() => handleActivateCode(c)}
+                            sx={{
+                              "&.Mui-disabled": isActivated
+                                ? { borderColor: "#10b981", color: "#10b981", backgroundColor: "#ecfdf5" }
+                                : { backgroundColor: "#9e9e9e", color: "#fff" },
+                            }}
+                            onClick={() => !isActivated && handleActivateCode(c)}
+                            startIcon={isActivated ? <CheckCircleIcon /> : undefined}
                           >
-                            {activateCodeBusy[c.id] ? "Activating..." : "Activate"}
+                            {isActivated
+                              ? "Activated"
+                              : (activateCodeBusy[c.id] ? "Activating..." : "Activate")}
                           </Button>
                           <Button
                             size="small"
-                            variant="contained"
-                            disabled={disableTransfer}
-                            sx={{ "&.Mui-disabled": { backgroundColor: "#9e9e9e", color: "#fff" } }}
+                            variant={isTransferred ? "outlined" : (disableTransfer ? "outlined" : "contained")}
+                            color={isTransferred ? "success" : (disableTransfer ? "inherit" : "primary")}
+                            disabled={isTransferred || disableTransfer}
+                            sx={{
+                              ...(isTransferred
+                                ? { "&.Mui-disabled": { borderColor: "#10b981", color: "#10b981", backgroundColor: "#ecfdf5" } }
+                                : {
+                                    backgroundColor: disableTransfer ? "#e0e0e0 !important" : undefined,
+                                    color: disableTransfer ? "#757575 !important" : undefined,
+                                    borderColor: disableTransfer ? "#bdbdbd !important" : undefined,
+                                    "&:hover": {
+                                      backgroundColor: disableTransfer ? "#e0e0e0 !important" : undefined,
+                                      borderColor: disableTransfer ? "#bdbdbd !important" : undefined
+                                    },
+                                    "&.Mui-disabled": {
+                                      backgroundColor: "#e0e0e0 !important",
+                                      color: "#9e9e9e !important",
+                                      borderColor: "#bdbdbd !important"
+                                    }
+                                  }),
+                            }}
                             onClick={() => openTransferDialog(c)}
+                            startIcon={isTransferred ? <CheckCircleIcon /> : (disableTransfer ? <LockOutlinedIcon /> : undefined)}
                           >
-                            {busy ? "Processing..." : "Transfer"}
+                            {isTransferred ? "Transferred" : (busy ? "Processing..." : "Transfer")}
                           </Button>
                         </Stack>
                       ) : (
@@ -832,6 +955,7 @@ export default function ConsumerCoupon() {
             </TableBody>
             </Table>
           </TableContainer>
+          </>
         )}
       </Paper>
 
