@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Case, When, Value, IntegerField
 
 from core.crypto import encrypt_string
 
@@ -105,15 +105,126 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({'sponsor_id': 'Sponsor ID is required.'})
 
         raw = sponsor.strip()
-        q = Q(username__iexact=raw) | Q(prefixed_id__iexact=raw) | Q(unique_id__iexact=raw)
-        # also support dashless prefixed codes
+        # Resolve sponsor deterministically:
+        # 1) Try exact identifiers (prefixed_id with/without dash, username, unique_id)
+        # 2) Fallback to phone/possible numeric-username and prefer non-consumer agency accounts
         t_no_dash = ''.join(ch for ch in raw if ch.isalnum())
-        if t_no_dash and t_no_dash != raw:
-            q = q | Q(prefixed_id__iexact=t_no_dash)
-        digits = ''.join(ch for ch in raw if ch.isdigit())
-        if digits:
-            q = q | Q(phone__iexact=digits) | Q(username__iexact=digits)
-        sponsor_user = CustomUser.objects.filter(q).first()
+        # Derive category hint from known username prefixes (e.g., TRSF -> agency_sub_franchise)
+        try:
+            prefix = (raw[:4] or '').upper()
+        except Exception:
+            prefix = ''
+        category_by_prefix = {
+            'TRSF': 'agency_sub_franchise',
+            'TRPN': 'agency_pincode',
+            'TRST': 'agency_state',
+            'TRDT': 'agency_district',
+            'TREP': 'employee',
+            'TRBS': 'business',
+            'TRSC': 'agency_state_coordinator',
+            'TRDC': 'agency_district_coordinator',
+            'TRPC': 'agency_pincode_coordinator',
+        }
+        cat_hint = category_by_prefix.get(prefix)
+        sponsor_user = None
+
+        # 1) prefixed_id exact (with dash)
+        sponsor_user = CustomUser.objects.filter(prefixed_id__iexact=raw).first()
+        # 1a) prefixed_id exact (dashless)
+        if not sponsor_user and t_no_dash and t_no_dash != raw:
+            sponsor_user = CustomUser.objects.filter(prefixed_id__iexact=t_no_dash).first()
+
+        # 2) username exact (TRSF##########, coordinators numeric usernames, etc.)
+        if not sponsor_user:
+            # Prefer exact username match within hinted category first
+            if cat_hint:
+                sponsor_user = CustomUser.objects.filter(username__iexact=raw, category=cat_hint).first()
+            if not sponsor_user:
+                sponsor_user = CustomUser.objects.filter(username__iexact=raw).first()
+                # If matched username is not of the hinted category, discard and continue searching
+                if sponsor_user and cat_hint and getattr(sponsor_user, 'category', '') != cat_hint:
+                    sponsor_user = None
+
+        # 3) unique_id exact (6-digit)
+        if not sponsor_user:
+            sponsor_user = CustomUser.objects.filter(unique_id__iexact=raw).first()
+
+        # 3a) If we have a category hint from the username prefix, resolve by category+phone
+        if not sponsor_user and cat_hint:
+            digits = ''.join(ch for ch in raw if ch.isdigit())
+            if digits:
+                sponsor_user = (
+                    CustomUser.objects
+                    .filter(category=cat_hint)
+                    .filter(Q(phone__iexact=digits) | Q(username__iexact=raw))
+                    .order_by('-id')
+                    .first()
+                )
+
+        # 3b) If category hint and digits exist, try username ending with the digits within the hinted category
+        #     This supports sponsor codes like TRSF<phone> even if the exact username lookup failed.
+        if not sponsor_user and cat_hint:
+            digits2 = ''.join(ch for ch in raw if ch.isdigit())
+            if digits2:
+                sponsor_user = (
+                    CustomUser.objects
+                    .filter(category=cat_hint, username__iendswith=digits2)
+                    .order_by('-id')
+                    .first()
+                )
+
+        # 4) fallback by phone digits or numeric username; prefer agency over consumer; if a category hint exists, restrict to it
+        if not sponsor_user:
+            digits = ''.join(ch for ch in raw if ch.isdigit())
+            if digits:
+                base_qs = CustomUser.objects.filter(Q(phone__iexact=digits) | Q(username__iexact=digits))
+                if cat_hint:
+                    base_qs = base_qs.filter(category=cat_hint)
+                if base_qs.exists():
+                    qs = base_qs.annotate(
+                        rank=Case(
+                            When(category='agency_sub_franchise', then=Value(0)),
+                            When(category__in=list(AGENCY_CATEGORIES - {'agency_sub_franchise'}), then=Value(1)),
+                            When(category='employee', then=Value(2)),
+                            When(category='consumer', then=Value(9)),
+                            default=Value(5),
+                            output_field=IntegerField(),
+                        )
+                    ).order_by('rank', '-id')
+                    sponsor_user = qs.first()
+
+        if not sponsor_user:
+            # Final attempt: if a category hint exists from the username prefix (e.g., TRSF...),
+            # try to locate a sponsor strictly within that category using phone or exact username.
+            if cat_hint:
+                digits2 = ''.join(ch for ch in raw if ch.isdigit())
+                alt = None
+                if digits2:
+                    alt = (
+                        CustomUser.objects
+                        .filter(category=cat_hint, phone__iexact=digits2)
+                        .order_by('-id')
+                        .first()
+                    )
+                if not alt:
+                    alt = CustomUser.objects.filter(category=cat_hint, username__iexact=raw).first()
+                if alt:
+                    sponsor_user = alt
+
+        # If resolved sponsor does not match hinted category (e.g., resolved to consumer while TRSF was provided),
+        # prefer an alternate match within the hinted category by phone/username suffix.
+        if sponsor_user and cat_hint and getattr(sponsor_user, 'category', '') != cat_hint:
+            digits3 = ''.join(ch for ch in raw if ch.isdigit())
+            alt2 = (
+                CustomUser.objects
+                .filter(category=cat_hint)
+                .filter(Q(username__iexact=raw) | Q(phone__iexact=digits3) | Q(username__iendswith=digits3))
+                .order_by('-id')
+                .first()
+            )
+            if alt2:
+                sponsor_user = alt2
+
         if not sponsor_user:
             raise serializers.ValidationError({'sponsor_id': 'Sponsor not found. Use username/prefixed code/phone.'})
 
@@ -134,7 +245,9 @@ class RegisterSerializer(serializers.ModelSerializer):
                     'agency_pincode': {'agency_sub_franchise'},
                     'agency_sub_franchise': {'agency_sub_franchise'},
                 }
-                sponsor_cat = getattr(sponsor_user, 'category', '') or ''
+                # Use effective sponsor category derived from the provided sponsor code prefix if available
+                # (e.g., TRSF -> agency_sub_franchise), else fall back to DB category.
+                sponsor_cat = (cat_hint if cat_hint in AGENCY_CATEGORIES else (getattr(sponsor_user, 'category', '') or ''))
                 allowed_next = allowed.get(sponsor_cat, set())
 
             if category not in allowed_next:

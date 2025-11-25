@@ -178,6 +178,20 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         channel = self.request.query_params.get("channel") or self.request.query_params.get("issued_channel")
         if channel:
             qs = qs.filter(issued_channel=channel)
+
+        # Optional denomination/value filter for inventory checks
+        value_param = self.request.query_params.get("value") or self.request.query_params.get("denomination")
+        if value_param is not None:
+            try:
+                from decimal import Decimal
+                qs = qs.filter(value=Decimal(str(value_param)))
+            except Exception:
+                # Fallback to best-effort string/number compare
+                try:
+                    qs = qs.filter(value=value_param)
+                except Exception:
+                    pass
+
         return qs
 
     @action(detail=False, methods=["get"], url_path="mine", permission_classes=[IsAuthenticated])

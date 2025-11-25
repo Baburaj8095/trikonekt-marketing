@@ -50,7 +50,8 @@ function Select({ label, value, onChange, options, style }) {
   );
 }
 
-function Section({ title, children, extraRight, id }) {
+function Section({ title, children, extraRight, id, visible = true }) {
+  if (!visible) return null;
   return (
     <div
       id={id}
@@ -147,6 +148,7 @@ export default function AdminECoupons() {
 
   const [err, setErr] = useState("");
   const [bootstrapLoading, setBootstrapLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("orders");
 
   // Admin Agency Assignment Summary
   const [summary, setSummary] = useState([]);
@@ -797,10 +799,66 @@ export default function AdminECoupons() {
     }
   }
 
-  async function approveOrder(id) {
+  async function approveOrder(order) {
+    const id = order?.id;
+    if (!id) return;
     setOrderBusy((m) => ({ ...m, [id]: true }));
     try {
       const note = orderNotes[id] || "";
+
+      // Pre-check inventory for this denomination (and coupon if resolvable)
+      let couponId = null;
+      try {
+        const prodRes = await API.get(`/coupons/store/products/${order.product}/`);
+        couponId = prodRes?.data?.coupon || null;
+      } catch (_) {}
+
+      let available = 0;
+      try {
+        const params = {
+          issued_channel: "e_coupon",
+          status: "AVAILABLE",
+          page_size: 1,
+        };
+        if (couponId) params.coupon = couponId;
+        const denom =
+          typeof order.denomination_snapshot !== "undefined" && order.denomination_snapshot !== null
+            ? order.denomination_snapshot
+            : null;
+        if (denom !== null) params.value = denom;
+        const invRes = await API.get("/coupons/codes/", { params });
+        available =
+          typeof invRes?.data?.count === "number"
+            ? invRes.data.count
+            : Array.isArray(invRes?.data)
+            ? invRes.data.length
+            : 0;
+      } catch (_) {}
+
+      const needed = Number(order.quantity || 0);
+      if (available < needed) {
+        const shortage = Math.max(0, needed - available);
+        // Prefill Create Batch form to quickly top-up inventory
+        try {
+          if (couponId) {
+            setBatchForm((f) => ({
+              ...f,
+              coupon_id: String(couponId),
+              denomination: String(Number(order.denomination_snapshot || 150)),
+              count: String(shortage || needed || 0),
+            }));
+            try {
+              document.getElementById("sec-create-batch")?.scrollIntoView({ behavior: "smooth" });
+            } catch {}
+          }
+        } catch {}
+        alert(
+          `Insufficient e‑coupon inventory for this denomination. Available: ${available}, Needed: ${needed}. Prefilled Create Batch for quick top‑up.`
+        );
+        return;
+      }
+
+      // Enough inventory, proceed with approval
       await API.post(`/coupons/store/orders/${id}/approve/`, { review_note: note });
       await loadPendingOrders();
       alert("Order approved and codes allocated.");
@@ -845,15 +903,48 @@ export default function AdminECoupons() {
 
       <div style={{ position: "sticky", top: 0, zIndex: 4, background: "transparent", marginBottom: 12 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", overflowX: "auto" }}>
-          <a href="#sec-payment" style={{ padding: "6px 10px", background: "#fff", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, textDecoration: "none", fontWeight: 700 }}>Payment</a>
-          <a href="#sec-products" style={{ padding: "6px 10px", background: "#fff", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, textDecoration: "none", fontWeight: 700 }}>Products</a>
-          <a href="#sec-orders" style={{ padding: "6px 10px", background: "#fff", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, textDecoration: "none", fontWeight: 700 }}>Orders</a>
-          <a href="#sec-create-coupon" style={{ padding: "6px 10px", background: "#fff", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, textDecoration: "none", fontWeight: 700 }}>Create Coupon</a>
-          <a href="#sec-create-batch" style={{ padding: "6px 10px", background: "#fff", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, textDecoration: "none", fontWeight: 700 }}>Create Batch</a>
-          <a href="#sec-assign" style={{ padding: "6px 10px", background: "#fff", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, textDecoration: "none", fontWeight: 700 }}>Assign</a>
-          <a href="#sec-history" style={{ padding: "6px 10px", background: "#fff", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, textDecoration: "none", fontWeight: 700 }}>History</a>
-          <a href="#sec-metrics" style={{ padding: "6px 10px", background: "#fff", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, textDecoration: "none", fontWeight: 700 }}>Metrics</a>
-          <a href="#sec-agency-summary" style={{ padding: "6px 10px", background: "#fff", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, textDecoration: "none", fontWeight: 700 }}>Agency Summary</a>
+          <button
+            onClick={() => setActiveTab("orders")}
+            style={{
+              padding: "6px 10px",
+              background: activeTab === "orders" ? "#0f172a" : "#fff",
+              color: activeTab === "orders" ? "#fff" : "#0f172a",
+              border: "1px solid #e2e8f0",
+              borderRadius: 8,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            Orders
+          </button>
+          <button
+            onClick={() => setActiveTab("inventory")}
+            style={{
+              padding: "6px 10px",
+              background: activeTab === "inventory" ? "#0f172a" : "#fff",
+              color: activeTab === "inventory" ? "#fff" : "#0f172a",
+              border: "1px solid #e2e8f0",
+              borderRadius: 8,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            Inventory
+          </button>
+          <button
+            onClick={() => setActiveTab("setup")}
+            style={{
+              padding: "6px 10px",
+              background: activeTab === "setup" ? "#0f172a" : "#fff",
+              color: activeTab === "setup" ? "#fff" : "#0f172a",
+              border: "1px solid #e2e8f0",
+              borderRadius: 8,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            Setup
+          </button>
         </div>
       </div>
       {err ? <div style={{ color: "#dc2626", marginBottom: 12 }}>{err}</div> : null}
@@ -861,7 +952,8 @@ export default function AdminECoupons() {
       {/* E‑Coupon Store: Payment Config */}
       <Section
         id="sec-payment"
-        title="E‑Coupon Store: Payment Config"
+        visible={activeTab === "setup"}
+        title="Payment settings"
         extraRight={
           <button
             onClick={createPaymentConfig}
@@ -943,9 +1035,36 @@ export default function AdminECoupons() {
                     padding: 8,
                   }}
                 >
-                  <div style={{ fontWeight: 700 }}>{c.title || `#${c.id}`}</div>
-                  <div style={{ color: "#64748b" }}>{c.upi_id || ""}</div>
-                  <div style={{ color: c.is_active ? "#16a34a" : "#64748b", fontWeight: 700 }}>
+                  <div
+                    style={{
+                      width: 68,
+                      height: 68,
+                      borderRadius: 8,
+                      border: "1px solid #e2e8f0",
+                      background: "#fff",
+                      overflow: "hidden",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {c.upi_qr_image_url ? (
+                      <img
+                        alt="QR"
+                        src={c.upi_qr_image_url}
+                        style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                      />
+                    ) : (
+                      <div style={{ fontSize: 10, color: "#64748b", padding: 4, textAlign: "center" }}>No QR</div>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 220 }}>
+                    <div style={{ fontWeight: 700 }}>{c.title || `#${c.id}`}</div>
+                    <div style={{ color: "#64748b", fontSize: 12 }}>{c.payee_name || "—"}</div>
+                    <div style={{ color: "#64748b", fontSize: 12 }}>{c.upi_id || ""}</div>
+                  </div>
+                  <div style={{ color: "#64748b", fontSize: 12, maxWidth: 360, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {c.instructions || "—"}
+                  </div>
+                  <div style={{ color: c.is_active ? "#16a34a" : "#64748b", fontWeight: 700, marginLeft: 8 }}>
                     {c.is_active ? "ACTIVE" : "INACTIVE"}
                   </div>
                   <div style={{ marginLeft: "auto" }}>
@@ -976,7 +1095,8 @@ export default function AdminECoupons() {
       {/* E‑Coupon Store: Products */}
       <Section
         id="sec-products"
-        title="E‑Coupon Store: Products"
+        visible={activeTab === "setup"}
+        title="Store products"
         extraRight={
           <button
             onClick={createStoreProduct}
@@ -1207,7 +1327,8 @@ export default function AdminECoupons() {
       {/* Pending E‑Coupon Orders */}
       <Section
         id="sec-orders"
-        title="Pending E‑Coupon Orders"
+        visible={activeTab === "orders"}
+        title="Awaiting approval"
         extraRight={
           <button
             onClick={loadPendingOrders}
@@ -1299,8 +1420,8 @@ export default function AdminECoupons() {
                           value={note}
                           onChange={(e) => setOrderNotes((m) => ({ ...m, [o.id]: e.target.value }))}
                         />
-                        <button
-                          onClick={() => approveOrder(o.id)}
+                          <button
+                          onClick={() => approveOrder(o)}
                           disabled={busy}
                           style={{
                             padding: "6px 10px",
@@ -1342,6 +1463,7 @@ export default function AdminECoupons() {
       {/* Create Coupon */}
       <Section
         id="sec-create-coupon"
+        visible={activeTab === "setup"}
         title="Create Coupon (master)"
         extraRight={
           <button
@@ -1406,7 +1528,8 @@ export default function AdminECoupons() {
       {/* Create E-Coupon Batch */}
       <Section
         id="sec-create-batch"
-        title="Create Random E‑Coupon Batch (Prefix + 7 chars)"
+        visible={activeTab === "inventory"}
+        title="Top‑up inventory (random codes)"
         extraRight={
           <button
             onClick={createBatch}
@@ -1470,6 +1593,7 @@ export default function AdminECoupons() {
       {/* Assign to Agency/Employee */}
       <Section
         id="sec-assign"
+        visible={activeTab === "inventory"}
         title="Assign E-Coupons (Count-based)"
         extraRight={
           <button
@@ -1542,6 +1666,7 @@ export default function AdminECoupons() {
       {/* Assignment History */}
       <Section
         id="sec-history"
+        visible={activeTab === "inventory"}
         title="Assignment History"
         extraRight={
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1798,7 +1923,8 @@ export default function AdminECoupons() {
       {/* Metrics */}
       <Section
         id="sec-metrics"
-        title="Redemption Summary"
+        visible={activeTab === "inventory"}
+        title="Inventory Summary"
         extraRight={
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <Select
@@ -1849,6 +1975,7 @@ export default function AdminECoupons() {
       {/* Admin: Agency Assignment Summary */}
       <Section
         id="sec-agency-summary"
+        visible={activeTab === "inventory"}
         title="Agency Assignment Summary"
         extraRight={
           <div style={{ display: "flex", alignItems: "end", gap: 8 }}>

@@ -25,9 +25,11 @@ import {
   getEcouponStoreBootstrap,
   createEcouponOrder,
   getMyEcouponOrders,
+  assignConsumerByCount,
+  assignEmployeeByCount,
 } from "../api/api";
 
-function ProductCard({ product, form, onChange, onSubmit, submitting }) {
+function ProductCard({ product, form, onChange, onSubmit, submitting, onAddToCart }) {
   const unit = Number(product?.price_per_unit || 0);
   const qty = Number(form.quantity || 0);
   const total = isFinite(unit * qty) ? unit * qty : 0;
@@ -113,7 +115,7 @@ function ProductCard({ product, form, onChange, onSubmit, submitting }) {
           </Typography>
         </Stack>
       </CardContent>
-      <CardActions sx={{ p: 2, pt: 0 }}>
+      <CardActions sx={{ p: 2, pt: 0, gap: 1 }}>
         <Button
           variant="contained"
           onClick={() => onSubmit(product.id)}
@@ -121,6 +123,20 @@ function ProductCard({ product, form, onChange, onSubmit, submitting }) {
           sx={{ fontWeight: 700 }}
         >
           {submitting ? "Submitting..." : "Place Order"}
+        </Button>
+        <Button
+          variant="outlined"
+          onClick={() =>
+            onAddToCart &&
+            onAddToCart(
+              product.id,
+              Math.max(1, parseInt(form.quantity || "1", 10))
+            )
+          }
+          disabled={!!submitting || !form.quantity || Number(form.quantity) <= 0}
+          sx={{ fontWeight: 700 }}
+        >
+          Add to Cart
         </Button>
       </CardActions>
     </Card>
@@ -138,6 +154,43 @@ export default function ECouponStore() {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [orders, setOrders] = useState([]);
   const [ordersErr, setOrdersErr] = useState("");
+
+  // Cart state (all roles: consumer/agency/employee)
+  const [cart, setCart] = useState({}); // { [productId]: quantity }
+  const cartItems = useMemo(() => {
+    const items = [];
+    for (const pid of Object.keys(cart)) {
+      const p = (products || []).find((x) => String(x.id) === String(pid));
+      if (!p) continue;
+      const qty = parseInt(cart[pid] || "0", 10);
+      if (qty > 0) {
+        const unit = Number(p.price_per_unit || 0);
+        const subtotal = isFinite(unit * qty) ? unit * qty : 0;
+        items.push({ product: p, qty, subtotal });
+      }
+    }
+    return items;
+  }, [cart, products]);
+  const cartTotal = useMemo(
+    () =>
+      (cartItems || []).reduce(
+        (sum, it) => sum + (isFinite(it.subtotal) ? it.subtotal : 0),
+        0
+      ),
+    [cartItems]
+  );
+  const [cartPayment, setCartPayment] = useState({ utr: "", notes: "", file: null });
+  const [checkingOut, setCheckingOut] = useState(false);
+
+  // Agency/Employee: assign to consumer form state
+  const [consumerAssign, setConsumerAssign] = useState({ username: "", count: 1, notes: "" });
+  const [assigningConsumer, setAssigningConsumer] = useState(false);
+  const [assignConsumerMsg, setAssignConsumerMsg] = useState("");
+
+  // Agency only: distribute to employee form state
+  const [empAssign, setEmpAssign] = useState({ username: "", count: 1, notes: "" });
+  const [assigningEmp, setAssigningEmp] = useState(false);
+  const [assignEmpMsg, setAssignEmpMsg] = useState("");
 
   const roleHint = useMemo(() => {
     try {
@@ -236,6 +289,63 @@ export default function ECouponStore() {
     }
   };
 
+  // Cart helpers
+  const addToCart = (pid, qty = 1) => {
+    const q = Math.max(1, parseInt(qty || "1", 10));
+    setCart((c) => {
+      const cur = parseInt(c[pid] || "0", 10);
+      const next = cur + q;
+      return { ...c, [pid]: next };
+    });
+    try { alert("Added to cart."); } catch {}
+  };
+  const updateCartQty = (pid, qty) => {
+    const q = Math.max(1, parseInt(qty || "1", 10));
+    setCart((c) => ({ ...c, [pid]: q }));
+  };
+  const removeFromCart = (pid) => {
+    setCart((c) => {
+      const next = { ...c };
+      delete next[pid];
+      return next;
+    });
+  };
+  const clearCart = () => setCart({});
+
+  const checkoutCart = async () => {
+    if (!cartItems.length) {
+      try { alert("Cart is empty."); } catch {}
+      return;
+    }
+    setCheckingOut(true);
+    try {
+      for (const it of cartItems) {
+        await createEcouponOrder({
+          product: it.product.id,
+          quantity: it.qty,
+          utr: String(cartPayment.utr || ""),
+          notes: String(cartPayment.notes || ""),
+          file: cartPayment.file || null,
+        });
+      }
+      try { alert("Orders submitted for review."); } catch {}
+      clearCart();
+      setCartPayment({ utr: "", notes: "", file: null });
+      await loadOrders();
+    } catch (e) {
+      const err = e?.response?.data;
+      const msg =
+        (typeof err === "string"
+          ? err
+          : e?.message ||
+            err?.detail ||
+            JSON.stringify(err || {})) || "Checkout failed.";
+      try { alert(msg); } catch {}
+    } finally {
+      setCheckingOut(false);
+    }
+  };
+
   return (
     <Container maxWidth="lg" sx={{ px: { xs: 0.5, md: 2 }, py: { xs: 1, md: 2 } }}>
       <Box sx={{ mb: 2 }}>
@@ -330,12 +440,288 @@ export default function ECouponStore() {
                   onChange={setForm}
                   onSubmit={submitOrder}
                   submitting={!!placing[p.id]}
+                  onAddToCart={(pid, qty) => addToCart(pid, qty)}
                 />
               </Grid>
             ))}
           </Grid>
         )}
       </Paper>
+
+      <Paper elevation={3} sx={{ p: 2, borderRadius: 2, mb: 2 }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "#0f172a", mb: 1 }}>
+          Cart & Payment
+        </Typography>
+
+        {cartItems.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">Your cart is empty. Add items from above.</Typography>
+        ) : (
+          <Box sx={{ overflowX: "auto" }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Product</TableCell>
+                  <TableCell>Denomination</TableCell>
+                  <TableCell>Qty</TableCell>
+                  <TableCell>Unit</TableCell>
+                  <TableCell>Subtotal</TableCell>
+                  <TableCell align="right">Action</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {cartItems.map((it) => (
+                  <TableRow key={it.product.id}>
+                    <TableCell>{it.product.display_title || "E‑Coupon"}</TableCell>
+                    <TableCell>₹{it.product.denomination}</TableCell>
+                    <TableCell style={{ maxWidth: 120 }}>
+                      <TextField
+                        size="small"
+                        type="number"
+                        inputProps={{ min: 1 }}
+                        value={it.qty}
+                        onChange={(e) => updateCartQty(it.product.id, e.target.value)}
+                      />
+                    </TableCell>
+                    <TableCell>₹{it.product.price_per_unit}</TableCell>
+                    <TableCell>₹{it.subtotal.toFixed(2)}</TableCell>
+                    <TableCell align="right">
+                      <Button size="small" color="error" onClick={() => removeFromCart(it.product.id)}>Remove</Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                <TableRow>
+                  <TableCell colSpan={4} align="right" style={{ fontWeight: 800 }}>Total</TableCell>
+                  <TableCell style={{ fontWeight: 800 }}>₹{cartTotal.toFixed(2)}</TableCell>
+                  <TableCell align="right">
+                    <Button size="small" onClick={clearCart}>Clear</Button>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </Box>
+        )}
+
+        <Divider sx={{ my: 2 }} />
+
+        <Grid container spacing={1.5}>
+          <Grid item xs={12} md={4}>
+            <TextField
+              size="small"
+              label="UTR (optional)"
+              fullWidth
+              value={cartPayment.utr}
+              onChange={(e) => setCartPayment((s) => ({ ...s, utr: e.target.value }))}
+            />
+          </Grid>
+          <Grid item xs={12} md={8}>
+            <TextField
+              size="small"
+              label="Notes (optional)"
+              fullWidth
+              value={cartPayment.notes}
+              onChange={(e) => setCartPayment((s) => ({ ...s, notes: e.target.value }))}
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <Button variant="outlined" size="small" component="label">
+              {cartPayment.file ? "Change Payment Proof" : "Attach Payment Proof (optional)"}
+              <input
+                type="file"
+                hidden
+                onChange={(e) =>
+                  setCartPayment((s) => ({
+                    ...s,
+                    file:
+                      e.target.files && e.target.files[0]
+                        ? e.target.files[0]
+                        : null,
+                  }))
+                }
+                accept="image/*,application/pdf"
+              />
+            </Button>
+            {cartPayment.file ? (
+              <Typography variant="caption" sx={{ ml: 1 }}>
+                {cartPayment.file.name}
+              </Typography>
+            ) : null}
+          </Grid>
+          <Grid item xs={12}>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Button
+                variant="contained"
+                onClick={checkoutCart}
+                disabled={checkingOut || cartItems.length === 0}
+                sx={{ fontWeight: 800 }}
+              >
+                {checkingOut ? "Submitting..." : "Checkout"}
+              </Button>
+              <Typography variant="caption" color="text.secondary">
+                Orders are reviewed by admin. Upon approval, e‑coupon codes will be allocated to your account.
+              </Typography>
+            </Stack>
+          </Grid>
+        </Grid>
+      </Paper>
+
+      {(roleHint === "agency" || roleHint === "employee") ? (
+        <Paper elevation={3} sx={{ p: 2, borderRadius: 2, mb: 2 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "#0f172a", mb: 1 }}>
+            Send E‑Coupons to Consumer (by Count)
+          </Typography>
+          <Grid container spacing={1.5}>
+            <Grid item xs={12} md={4}>
+              <TextField
+                size="small"
+                label="Consumer Username"
+                fullWidth
+                value={consumerAssign.username}
+                onChange={(e) => setConsumerAssign((s) => ({ ...s, username: e.target.value }))}
+              />
+            </Grid>
+            <Grid item xs={12} md={2}>
+              <TextField
+                size="small"
+                label="Count"
+                type="number"
+                fullWidth
+                inputProps={{ min: 1 }}
+                value={consumerAssign.count}
+                onChange={(e) => setConsumerAssign((s) => ({ ...s, count: e.target.value }))}
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                size="small"
+                label="Notes (optional)"
+                fullWidth
+                value={consumerAssign.notes}
+                onChange={(e) => setConsumerAssign((s) => ({ ...s, notes: e.target.value }))}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                <Button
+                  variant="contained"
+                  onClick={async () => {
+                    setAssignConsumerMsg("");
+                    const u = (consumerAssign.username || "").trim();
+                    const c = parseInt(consumerAssign.count || "0", 10);
+                    if (!u || !c || c <= 0) {
+                      try { alert("Enter consumer username and a valid count (>0)."); } catch {}
+                      return;
+                    }
+                    try {
+                      setAssigningConsumer(true);
+                      const res = await assignConsumerByCount({
+                        consumer_username: u,
+                        count: c,
+                        notes: consumerAssign.notes || "",
+                      });
+                      const assigned = Number(res?.assigned || 0);
+                      const after = Number(res?.available_after || 0);
+                      const samples = Array.isArray(res?.sample_codes) ? res.sample_codes : [];
+                      setAssignConsumerMsg(`Assigned ${assigned}. Remaining in your pool: ${after}. Samples: ${samples.join(", ")}`);
+                      // reset count only
+                      setConsumerAssign((s) => ({ ...s, count: 1, notes: "" }));
+                    } catch (e) {
+                      const err = e?.response?.data;
+                      const msg = (typeof err === "string" ? err : (err?.detail || JSON.stringify(err || {}))) || "Assignment failed.";
+                      try { alert(msg); } catch {}
+                    } finally {
+                      setAssigningConsumer(false);
+                    }
+                  }}
+                  disabled={assigningConsumer}
+                  sx={{ fontWeight: 700 }}
+                >
+                  {assigningConsumer ? "Assigning..." : "Assign to Consumer"}
+                </Button>
+                {assignConsumerMsg ? <Typography variant="caption" color="text.secondary">{assignConsumerMsg}</Typography> : null}
+              </Stack>
+            </Grid>
+          </Grid>
+        </Paper>
+      ) : null}
+
+      {roleHint === "agency" ? (
+        <Paper elevation={3} sx={{ p: 2, borderRadius: 2, mb: 2 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "#0f172a", mb: 1 }}>
+            Distribute to Employee (by Count)
+          </Typography>
+          <Grid container spacing={1.5}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                size="small"
+                label="Employee Username"
+                fullWidth
+                value={empAssign.username}
+                onChange={(e) => setEmpAssign((s) => ({ ...s, username: e.target.value }))}
+              />
+            </Grid>
+            <Grid item xs={12} md={2}>
+              <TextField
+                size="small"
+                label="Count"
+                type="number"
+                fullWidth
+                inputProps={{ min: 1 }}
+                value={empAssign.count}
+                onChange={(e) => setEmpAssign((s) => ({ ...s, count: e.target.value }))}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField
+                size="small"
+                label="Notes (optional)"
+                fullWidth
+                value={empAssign.notes}
+                onChange={(e) => setEmpAssign((s) => ({ ...s, notes: e.target.value }))}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                <Button
+                  variant="outlined"
+                  onClick={async () => {
+                    setAssignEmpMsg("");
+                    const u = (empAssign.username || "").trim();
+                    const c = parseInt(empAssign.count || "0", 10);
+                    if (!u || !c || c <= 0) {
+                      try { alert("Enter employee username and a valid count (>0)."); } catch {}
+                      return;
+                    }
+                    try {
+                      setAssigningEmp(true);
+                      const res = await assignEmployeeByCount({
+                        employee_username: u,
+                        count: c,
+                        notes: empAssign.notes || "",
+                      });
+                      const assigned = Number(res?.assigned || 0);
+                      const after = Number(res?.available_after || 0);
+                      const samples = Array.isArray(res?.sample_codes) ? res.sample_codes : [];
+                      setAssignEmpMsg(`Assigned ${assigned} to ${u}. Remaining in agency pool: ${after}. Samples: ${samples.join(", ")}`);
+                      setEmpAssign((s) => ({ ...s, count: 1, notes: "" }));
+                    } catch (e) {
+                      const err = e?.response?.data;
+                      const msg = (typeof err === "string" ? err : (err?.detail || JSON.stringify(err || {}))) || "Assignment failed.";
+                      try { alert(msg); } catch {}
+                    } finally {
+                      setAssigningEmp(false);
+                    }
+                  }}
+                  disabled={assigningEmp}
+                  sx={{ fontWeight: 700 }}
+                >
+                  {assigningEmp ? "Assigning..." : "Assign to Employee"}
+                </Button>
+                {assignEmpMsg ? <Typography variant="caption" color="text.secondary">{assignEmpMsg}</Typography> : null}
+              </Stack>
+            </Grid>
+          </Grid>
+        </Paper>
+      ) : null}
 
       <Paper elevation={3} sx={{ p: 2, borderRadius: 2 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
