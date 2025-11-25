@@ -238,15 +238,21 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         except Exception:
             redeemed_assigned = 0
 
-        # Audits for actions taken by this consumer
+        # Audits for actions taken by this consumer (distinct by coupon to avoid double counting)
+        activated_count = 0
+        transferred_count = 0
         try:
-            activated_count = AuditTrail.objects.filter(action="coupon_activated", actor=request.user).count()
+            activated_count = (AuditTrail.objects
+                               .filter(action="coupon_activated", actor=request.user)
+                               .values("coupon_code_id")
+                               .distinct()
+                               .count())
         except Exception:
-            activated_count = 0
+            pass
         try:
             transferred_count = AuditTrail.objects.filter(action="consumer_transfer", actor=request.user).count()
         except Exception:
-            transferred_count = 0
+            pass
 
         # Available excludes those already activated
         available_final = available_assigned - activated_count
@@ -2169,20 +2175,21 @@ class CouponActivateView(APIView):
             ensure_first_purchase_activation(request.user, {"type": "coupon_first_purchase", **source})
         except Exception:
             pass
-        # Record activation audit for e-coupons (no approval flow)
+        # Record activation audit for e-coupons (no approval flow) - idempotent per user+code
         try:
             code_str = str(source.get("code") or "").strip()
             ch = str(source.get("channel") or "")
             if code_str and ch == "e_coupon":
                 code_obj = CouponCode.objects.filter(code=code_str).first()
                 if code_obj and code_obj.assigned_consumer_id == request.user.id:
-                    AuditTrail.objects.create(
-                        action="coupon_activated",
-                        actor=request.user,
-                        coupon_code=code_obj,
-                        notes="",
-                        metadata={"type": t},
-                    )
+                    if not AuditTrail.objects.filter(action="coupon_activated", actor=request.user, coupon_code=code_obj).exists():
+                        AuditTrail.objects.create(
+                            action="coupon_activated",
+                            actor=request.user,
+                            coupon_code=code_obj,
+                            notes="",
+                            metadata={"type": t},
+                        )
         except Exception:
             pass
 

@@ -305,13 +305,15 @@ export default function ConsumerCoupon() {
     const t = denom <= 50 ? "50" : "150";
     try {
       setActivateCodeBusy((m) => ({ ...m, [codeId]: true }));
+      const src = {
+        channel: "e_coupon",
+        code: String(code.code).trim(),
+      };
+      const ref = String(form.referral_id || "").trim();
+      if (ref) src.referral_id = ref;
       await API.post("/v1/coupon/activate/", {
         type: t,
-        source: {
-          channel: "e_coupon",
-          code: String(code.code).trim(),
-          referral_id: String(form.referral_id || "").trim(),
-        },
+        source: src,
       });
       try { alert(`Activated (${t}).`); } catch {}
       // Immediately disable actions locally for this code
@@ -759,6 +761,7 @@ export default function ConsumerCoupon() {
         )}
       </Paper>
 
+
       <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mb: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
           All My E‑Coupon Codes
@@ -787,7 +790,7 @@ export default function ConsumerCoupon() {
               const forceEnable = isPending;
               const dialogBusyThis = Boolean(transferDialog.submitting && transferDialog.code && transferDialog.code.id === c.id);
               const isTransferred = status === "TRANSFERRED";
-              const disableActivate = (isActivated || isTransferred) ? true : (Boolean(activateCodeBusy[c.id]) || busy || dialogBusyThis || !form.referral_id || !canAct);
+              const disableActivate = (isActivated || isTransferred) ? true : (Boolean(activateCodeBusy[c.id]) || busy || dialogBusyThis || (!forceEnable && !canAct));
               const disableTransfer = forceEnable
                 ? (!!busy || Boolean(activateCodeBusy[c.id]) || dialogBusyThis)
                 : (busy || !canTrans || Boolean(activateCodeBusy[c.id]) || isActivated || isTransferred || dialogBusyThis);
@@ -885,7 +888,7 @@ export default function ConsumerCoupon() {
                 const forceEnable = isPending;
                 const dialogBusyThis = Boolean(transferDialog.submitting && transferDialog.code && transferDialog.code.id === c.id);
                 const isTransferred = status === "TRANSFERRED";
-                const disableActivate = (isActivated || isTransferred) ? true : (Boolean(activateCodeBusy[c.id]) || busy || dialogBusyThis || !form.referral_id || !canAct);
+                const disableActivate = (isActivated || isTransferred) ? true : (Boolean(activateCodeBusy[c.id]) || busy || dialogBusyThis || (!forceEnable && !canAct));
                 const disableTransfer = forceEnable
                   ? (!!busy || Boolean(activateCodeBusy[c.id]) || dialogBusyThis)
                   : (busy || !canTrans || Boolean(activateCodeBusy[c.id]) || isActivated || isTransferred || dialogBusyThis);
