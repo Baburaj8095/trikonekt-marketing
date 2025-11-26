@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import API from "../../api/api";
+import normalizeMediaUrl from "../../utils/media";
 
 /* Reusable inputs */
 function TextInput({ label, value, onChange, placeholder, type = "text", style }) {
@@ -1049,7 +1050,7 @@ export default function AdminECoupons() {
                     {c.upi_qr_image_url ? (
                       <img
                         alt="QR"
-                        src={c.upi_qr_image_url}
+                        src={normalizeMediaUrl(c.upi_qr_image_url)}
                         style={{ width: "100%", height: "100%", objectFit: "contain" }}
                       />
                     ) : (
@@ -1406,7 +1407,7 @@ export default function AdminECoupons() {
                       <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{o.utr || "—"}</div>
                       <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
                         {proofUrl ? (
-                          <a href={proofUrl} target="_blank" rel="noreferrer">
+                          <a href={normalizeMediaUrl(proofUrl)} target="_blank" rel="noreferrer">
                             View Proof
                           </a>
                         ) : (

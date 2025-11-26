@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState, useEffect } from "react";
 import API from "../../api/api";
+import normalizeMediaUrl from "../../utils/media";
 import DataTable from "../../admin-panel/components/data/DataTable";
 import ModelFormDialog from "../../admin-panel/dynamic/ModelFormDialog";
 import { useLocation } from "react-router-dom";
@@ -61,6 +62,7 @@ export default function AdminUsers() {
     pincode: "",
     state: "",
     kyc: "",
+    account_active: "",
     activated: "",
   });
   const [density, setDensity] = useState("standard");
@@ -210,26 +212,34 @@ export default function AdminUsers() {
     };
   }, []);
 
-  // Sync '?activated=1|0|true|false' from URL into filters.activated
+  // Sync '?activated=1|0|true|false' and '?account_active=1|0|true|false|active|inactive' from URL
   const location = useLocation();
   useEffect(() => {
     const params = new URLSearchParams(location.search || "");
-    const raw = (params.get("activated") || "").toLowerCase();
-    const norm = ["1","true","yes","activated"].includes(raw)
+    const rawActivated = (params.get("activated") || "").toLowerCase();
+    const normActivated = ["1","true","yes","activated"].includes(rawActivated)
       ? "1"
-      : (["0","false","no","inactive","not_activated","unactivated","notactivated"].includes(raw) ? "0" : "");
+      : (["0","false","no","inactive","not_activated","unactivated","notactivated"].includes(rawActivated) ? "0" : "");
+    const rawAccountActive = (params.get("account_active") || "").toLowerCase();
+    const normAccountActive = ["1","true","yes","active"].includes(rawAccountActive)
+      ? "1"
+      : (["0","false","no","inactive"].includes(rawAccountActive) ? "0" : "");
     setFilters((f) => {
-      if ((f.activated || "") !== norm) {
-        return { ...f, activated: norm };
+      let next = f;
+      if ((f.activated || "") !== normActivated) {
+        next = { ...next, activated: normActivated };
       }
-      return f;
+      if ((f.account_active || "") !== normAccountActive) {
+        next = { ...next, account_active: normAccountActive };
+      }
+      return next;
     });
   }, [location.search]);
 
-  // Trigger reload when activated filter changes
+  // Trigger reload when activated/account_active filter changes
   useEffect(() => {
     setReloadKey((k) => k + 1);
-  }, [filters.activated]);
+  }, [filters.activated, filters.account_active]);
 
   const roleOptions = useMemo(
     () => [
@@ -246,6 +256,15 @@ export default function AdminUsers() {
       { value: "", label: "Any KYC" },
       { value: "pending", label: "KYC Pending" },
       { value: "verified", label: "KYC Verified" },
+    ],
+    []
+  );
+
+  const accountStatusOptions = useMemo(
+    () => [
+      { value: "", label: "Any account status" },
+      { value: "1", label: "Active" },
+      { value: "0", label: "Inactive" },
     ],
     []
   );
@@ -276,7 +295,7 @@ export default function AdminUsers() {
         renderCell: (params) => {
           const url = params?.row?.avatar_url;
           return url ? (
-            <img src={url} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", border: "1px solid #e2e8f0" }} />
+            <img src={normalizeMediaUrl(url)} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", border: "1px solid #e2e8f0" }} />
           ) : (
             <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#e2e8f0", display: "inline-block" }} />
           );
@@ -488,14 +507,125 @@ export default function AdminUsers() {
       {
         field: "wallet_balance",
         headerName: "Wallet",
-        minWidth: 120,
-        valueFormatter: (v) => {
-          const num = Number(v);
-          if (Number.isFinite(num)) return num.toFixed(2);
-          return String(v || "");
+        minWidth: isMobile ? 220 : 300,
+        renderCell: (params) => {
+          const row = params?.row || {};
+          const balNum = Number(row.wallet_balance);
+          const bal = Number.isFinite(balNum) ? balNum.toFixed(2) : (row.wallet_balance ?? "");
+          const onAdjust = async (action) => {
+            try {
+              if (!row?.id) return;
+              const amtStr = window.prompt(`Enter amount to ${action}:`, "");
+              if (amtStr === null) return; // cancelled
+              const amt = parseFloat(String(amtStr).trim());
+              if (!Number.isFinite(amt) || amt <= 0) {
+                window.alert("Amount must be a positive number.");
+                return;
+              }
+              const note = window.prompt("Optional note (will be stored in transaction meta):", "") || "";
+              await API.post(`/admin/users/${row.id}/wallet-adjust/`, {
+                action,
+                amount: amt,
+                note,
+              });
+              setReloadKey((k) => k + 1);
+            } catch (e) {
+              const msg = e?.response?.data?.detail || e?.message || "Wallet adjust failed";
+              window.alert(String(msg));
+            }
+          };
+          return (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span title="Main wallet balance" style={{ minWidth: 64 }}>{bal}</span>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation?.(); onAdjust("credit"); }}
+                title="Credit wallet"
+                style={{
+                  borderRadius: 6,
+                  padding: "2px 6px",
+                  background: "#16a34a",
+                  color: "#fff",
+                  border: "1px solid #15803d",
+                  cursor: "pointer",
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                + Credit
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation?.(); onAdjust("debit"); }}
+                title="Debit wallet"
+                style={{
+                  borderRadius: 6,
+                  padding: "2px 6px",
+                  background: "#ef4444",
+                  color: "#fff",
+                  border: "1px solid #b91c1c",
+                  cursor: "pointer",
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                - Debit
+              </button>
+            </div>
+          );
         },
       },
       { field: "wallet_status", headerName: "Wallet Status", minWidth: 140 },
+      {
+        field: "account_active",
+        headerName: "Account",
+        minWidth: 160,
+        renderCell: (params) => {
+          const row = params?.row || {};
+          const active = !!row.account_active;
+          const onToggle = async (e) => {
+            e?.stopPropagation?.();
+            try {
+              if (!row?.id) return;
+              await API.patch(`/admin/users/${row.id}/`, { account_active: !active });
+              setReloadKey((k) => k + 1);
+            } catch (_) {}
+          };
+          const trackStyle = {
+            width: 44,
+            height: isMobile ? 18 : 22,
+            borderRadius: 999,
+            display: "inline-flex",
+            alignItems: "center",
+            padding: 2,
+            backgroundColor: active ? "#16a34a" : "#ef4444",
+            border: active ? "1px solid #15803d" : "1px solid #b91c1c",
+            cursor: "pointer",
+            transition: "background-color 120ms ease, border-color 120ms ease",
+          };
+          const knobStyle = {
+            width: isMobile ? 12 : 16,
+            height: isMobile ? 12 : 16,
+            borderRadius: "50%",
+            backgroundColor: "#ffffff",
+            transform: active ? `translateX(${isMobile ? 22 : 24}px)` : "translateX(0px)",
+            transition: "transform 120ms ease",
+          };
+          return (
+            <div
+              role="switch"
+              aria-checked={active}
+              tabIndex={0}
+              onClick={onToggle}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(e); } }}
+              title={active ? "Active" : "Inactive"}
+              style={trackStyle}
+            >
+              <div style={knobStyle} />
+            </div>
+          );
+        },
+      },
       {
         field: "date_joined",
         headerName: "Joined",
@@ -652,6 +782,12 @@ export default function AdminUsers() {
           value={filters.kyc}
           onChange={(v) => setF("kyc", v)}
           options={kycOptions}
+        />
+        <Select
+          label="Account status"
+          value={filters.account_active}
+          onChange={(v) => setF("account_active", v)}
+          options={accountStatusOptions}
         />
       </div>
 

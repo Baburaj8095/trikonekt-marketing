@@ -244,6 +244,45 @@ class MyEmployeesListView(generics.ListAPIView):
         )
 
 
+class AgencyEmployeeActivationView(APIView):
+    """
+    Agency can activate/deactivate their own employee accounts.
+    PATCH body: { "account_active": true|false } (if omitted, toggles current state)
+    """
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk: int):
+        actor = request.user
+        # Actor must be an agency account (role=agency or category startswith 'agency')
+        is_agency_actor = (str(getattr(actor, "role", "")).lower() == "agency") or str(getattr(actor, "category", "")).startswith("agency")
+        if not is_agency_actor:
+            return Response({"detail": "Only agency users can activate/deactivate their employees."}, status=status.HTTP_403_FORBIDDEN)
+
+        target = CustomUser.objects.filter(pk=pk).first()
+        if not target:
+            return Response({"detail": "Employee not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Target must be an employee under this agency
+        is_employee = (str(getattr(target, "role", "")).lower() == "employee") or (str(getattr(target, "category", "")).lower() == "employee")
+        if not is_employee:
+            return Response({"detail": "Target is not an employee account."}, status=status.HTTP_400_BAD_REQUEST)
+        if getattr(target, "registered_by_id", None) != getattr(actor, "id", None):
+            return Response({"detail": "You can only manage employees registered by you."}, status=status.HTTP_403_FORBIDDEN)
+
+        val = (request.data or {}).get("account_active", None)
+        if val is None:
+            new_active = not bool(getattr(target, "account_active", False))
+        else:
+            sval = str(val).strip().lower()
+            new_active = sval in ("1", "true", "yes", "on")
+
+        if bool(getattr(target, "account_active", False)) != new_active:
+            target.account_active = new_active
+            target.save(update_fields=["account_active"])
+
+        return Response(PublicUserSerializer(target).data, status=status.HTTP_200_OK)
+
+
 class MyBusinessesListView(generics.ListAPIView):
     serializer_class = PublicUserSerializer
     permission_classes = [IsAuthenticated]
@@ -1066,7 +1105,7 @@ class TeamSummaryView(APIView):
         recent_team = list(
             CustomUser.objects.filter(registered_by=user)
             .order_by("-date_joined")
-            .values("id", "username", "category", "role", "date_joined")[:10]
+            .values("id", "username", "category", "role", "date_joined", "account_active")[:10]
         )
 
         # Recent reward-related wallet transactions (latest 20 across relevant types)
@@ -1209,16 +1248,9 @@ class WalletTransactionsList(generics.ListAPIView):
         if t:
             qs = qs.filter(type=t)
 
-        # Date range filtering on created_at (date). Defaults to today's date if not provided.
+        # Optional date range filtering on created_at (date). Apply only if provided.
         date_from = (self.request.query_params.get("date_from") or "").strip()
         date_to = (self.request.query_params.get("date_to") or "").strip()
-        if not date_from and not date_to:
-            try:
-                today = timezone.now().date()
-                date_from = str(today)
-                date_to = str(today)
-            except Exception:
-                pass
         if date_from:
             qs = qs.filter(created_at__date__gte=date_from)
         if date_to:

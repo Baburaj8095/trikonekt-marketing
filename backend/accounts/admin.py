@@ -149,17 +149,17 @@ def _process_bulk_region_assignments(user: CustomUser, cleaned_data: dict):
 @admin.register(CustomUser)
 class CustomUserAdmin(UserAdmin):
     form = CustomUserAdminForm
-    actions = ['reset_password_plain']
+    actions = ['reset_password_plain', 'mark_active', 'mark_inactive']
     list_display = (
         'username', 'email', 'role', 'category', 'unique_id',
         'full_name', 'phone', 'country', 'state', 'city', 'pincode',
-        'sponsor_id', 'registered_by', 'is_staff', 'is_active'
+        'sponsor_id', 'registered_by', 'is_staff', 'is_active', 'account_active'
     )
-    list_filter = ('role', 'category', 'is_staff', 'is_active', 'country', 'state', 'registered_by')
+    list_filter = ('role', 'category', 'is_staff', 'is_active', 'account_active', 'country', 'state', 'registered_by')
     fieldsets = (
         (None, {'fields': ('username', 'email', 'password', 'role', 'category', 'registered_by')}),
         ('Profile', {'fields': ('full_name', 'phone', 'country', 'state', 'city', 'pincode', 'sponsor_id')}),
-        ('Permissions', {'fields': ('is_staff', 'is_active', 'is_superuser', 'groups', 'user_permissions')}),
+        ('Permissions', {'fields': ('is_staff', 'is_active', 'account_active', 'is_superuser', 'groups', 'user_permissions')}),
         ('Important dates', {'fields': ('last_login', 'date_joined')}),
     )
     add_fieldsets = (
@@ -232,6 +232,33 @@ class CustomUserAdmin(UserAdmin):
             msg += " Examples -> " + "; ".join(samples)
         self.message_user(request, msg, level=messages.SUCCESS)
     reset_password_plain.short_description = "Reset to temp password and show (stores Visible Password)"
+
+    # Bulk toggle account_active
+    def mark_active(self, request, queryset):
+        updated = 0
+        for u in queryset:
+            try:
+                if not getattr(u, "account_active", False):
+                    u.account_active = True
+                    u.save(update_fields=["account_active"])
+                    updated += 1
+            except Exception:
+                continue
+        self.message_user(request, f"Marked {updated} user(s) as Active.", level=messages.SUCCESS)
+    mark_active.short_description = "Mark account Active"
+
+    def mark_inactive(self, request, queryset):
+        updated = 0
+        for u in queryset:
+            try:
+                if getattr(u, "account_active", False):
+                    u.account_active = False
+                    u.save(update_fields=["account_active"])
+                    updated += 1
+            except Exception:
+                continue
+        self.message_user(request, f"Marked {updated} user(s) as Inactive.", level=messages.SUCCESS)
+    mark_inactive.short_description = "Mark account Inactive"
 
     # Append bulk region fields section on change form
     def get_fieldsets(self, request, obj=None):
@@ -631,11 +658,11 @@ class CategoryProxyAdmin(admin.ModelAdmin):
 
     list_display = (
         'username', 'unique_id', 'email', 'full_name', 'phone',
-        'country', 'state', 'city', 'pincode', 'sponsor_id', 'registered_by', 'date_joined', 'is_active',
+        'country', 'state', 'city', 'pincode', 'sponsor_id', 'registered_by', 'date_joined', 'is_active', 'account_active',
         'next_level_count', 'view_next_level'
     )
     search_fields = ('username', 'unique_id', 'email', 'full_name', 'phone', 'pincode', 'sponsor_id')
-    list_filter = ('country', 'state', 'is_active')
+    list_filter = ('country', 'state', 'is_active', 'account_active')
     list_select_related = ('country', 'state', 'city', 'registered_by')
     ordering = ('-date_joined',)
 

@@ -46,18 +46,42 @@ def _credit_wallet(user: CustomUser, amount: Decimal, tx_type: str, meta: dict |
         pass
 
 
-def _is_agency_or_employee(u: CustomUser) -> bool:
-    """
-    Return True if the user is an agency or employee account.
-    Agency detection: role == 'agency' or category startswith 'agency'
-    Employee detection: role == 'employee' or category == 'employee'
-    """
+def _is_consumer(u: CustomUser) -> bool:
     try:
-        role = (getattr(u, "role", "") or "")
-        cat = (getattr(u, "category", "") or "")
-        return (role in ("agency", "employee")) or (cat == "employee") or str(cat).startswith("agency")
+        return str(getattr(u, "category", "")).strip().lower() == "consumer"
     except Exception:
         return False
+
+
+def _is_aeb(u: CustomUser) -> bool:
+    """
+    Return True if the user is Agency/Employee/Business.
+    """
+    try:
+        role = (getattr(u, "role", "") or "").strip().lower()
+        cat = (getattr(u, "category", "") or "").strip().lower()
+        return (
+            role in ("agency", "employee")
+            or cat in ("employee", "business")
+            or cat.startswith("agency")
+        )
+    except Exception:
+        return False
+
+
+def _is_active_user(u: CustomUser) -> bool:
+    try:
+        return bool(getattr(u, "account_active", False))
+    except Exception:
+        return False
+
+
+def _is_level_commission_eligible(u: CustomUser) -> bool:
+    """
+    Level commissions (L1..L5) eligibility is limited to Agency, Employee and Business accounts
+    that are account_active=True.
+    """
+    return _is_aeb(u) and _is_active_user(u)
 
 
 def _distribute_three_matrix(user: CustomUser, base_amount: Decimal, source: Dict[str, Any]):
@@ -86,8 +110,8 @@ def _distribute_three_matrix(user: CustomUser, base_amount: Decimal, source: Dic
             amt = _q2(fixed[idx] or 0)
             if amt <= 0:
                 continue
-            # Skip matrix payout for agency/employee recipients
-            if _is_agency_or_employee(recipient):
+            # Pay only to ACTIVE consumers
+            if not (_is_consumer(recipient) and _is_active_user(recipient)):
                 continue
             meta = {
                 "source": "THREE_MATRIX_FIXED",
@@ -114,8 +138,8 @@ def _distribute_three_matrix(user: CustomUser, base_amount: Decimal, source: Dic
         amt = _q2(base_q * pct / Decimal("100"))
         if amt <= 0:
             continue
-        # Skip matrix payout for agency/employee recipients
-        if _is_agency_or_employee(recipient):
+        # Pay only to ACTIVE consumers
+        if not (_is_consumer(recipient) and _is_active_user(recipient)):
             continue
         meta = {
             "source": "THREE_MATRIX_PERCENT",
@@ -229,8 +253,8 @@ def _distribute_five_matrix(new_user: CustomUser, source: Dict[str, Any]):
         amt = _q2(fixed[idx] or 0)
         if amt <= 0:
             continue
-        # Skip matrix payout for agency/employee recipients
-        if _is_agency_or_employee(recipient):
+        # Pay only to ACTIVE Agency/Employee/Business
+        if not (_is_aeb(recipient) and _is_active_user(recipient)):
             continue
         meta = {
             "source": "FIVE_MATRIX_FIXED",
@@ -313,6 +337,9 @@ def on_user_join(new_user: CustomUser, source: Dict[str, Any] | None = None) -> 
         amt = _q2(arr[idx])
         if amt <= 0:
             continue
+        # Level commission only to eligible active Agency/Employee/Business
+        if not _is_level_commission_eligible(recipient):
+            continue
         _credit_wallet(
             recipient,
             amt,
@@ -334,16 +361,17 @@ def on_user_join(new_user: CustomUser, source: Dict[str, Any] | None = None) -> 
             st = (src_type or "").lower()
             # Skip autopool here when join is executed as part of an activation flow to avoid double payouts
             if not (st.startswith("coupon_") or st.startswith("product_")):
-                # Use 50 as base for THREE_50
-                base50 = _q2(getattr(cfg, "global_activation_amount", 50) or 50)
-                _distribute_three_matrix(new_user, base50, {"type": "JOIN_REFERRAL", "id": getattr(new_user, "id", "")})
-                # Enable flags on new user
-                try:
-                    new_user.autopool_enabled = True
-                    new_user.rewards_enabled = True
-                    new_user.save(update_fields=["autopool_enabled", "rewards_enabled"])
-                except Exception:
-                    pass
+                # Only consumers participate in THREE_50 autopool
+                if _is_consumer(new_user):
+                    base50 = _q2(getattr(cfg, "global_activation_amount", 50) or 50)
+                    _distribute_three_matrix(new_user, base50, {"type": "JOIN_REFERRAL", "id": getattr(new_user, "id", "")})
+                    # Enable flags on new user (consumer only)
+                    try:
+                        new_user.autopool_enabled = True
+                        new_user.rewards_enabled = True
+                        new_user.save(update_fields=["autopool_enabled", "rewards_enabled"])
+                    except Exception:
+                        pass
         except Exception:
             pass
 

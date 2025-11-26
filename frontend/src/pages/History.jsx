@@ -1,13 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   Box,
   Paper,
   Typography,
   LinearProgress,
+  CircularProgress,
   Chip,
   Stack,
-  TextField,
-  Button,
   Avatar,
 } from "@mui/material";
 import {
@@ -17,7 +16,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  TablePagination,
 } from "@mui/material";
 import API from "../api/api";
 import useMediaQuery from "@mui/material/useMediaQuery";
@@ -42,15 +40,6 @@ function Amount({ value }) {
   );
 }
 
-// Format a Date to YYYY-MM-DD for HTML date input, respecting local timezone
-function toDateInputValue(d = new Date()) {
-  try {
-    const tzoffset = d.getTimezoneOffset() * 60000; // offset in ms
-    return new Date(d.getTime() - tzoffset).toISOString().slice(0, 10);
-  } catch {
-    return new Date().toISOString().slice(0, 10);
-  }
-}
 
 function humanizeType(t) {
   try {
@@ -75,36 +64,63 @@ export default function History() {
   const [txCount, setTxCount] = useState(0);
   const [txLoading, setTxLoading] = useState(false);
   const [err, setErr] = useState("");
-  const [dateFrom, setDateFrom] = useState(toDateInputValue());
-  const [dateTo, setDateTo] = useState(toDateInputValue());
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const containerRef = useRef(null);
+  const sentinelRef = useRef(null);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
-  async function fetchTransactions(page = 0, pageSize = txPageSize, from = dateFrom, to = dateTo) {
+  async function fetchTransactions(page = 0, pageSize = txPageSize) {
     try {
-      setTxLoading(true);
       setErr("");
+      if (page === 0) setTxLoading(true);
+      else setLoadingMore(true);
       const res = await API.get("/accounts/wallet/me/transactions/", {
-        params: { page: page + 1, page_size: pageSize, date_from: from, date_to: to },
+        params: { page: page + 1, page_size: pageSize },
       });
       const data = res?.data || {};
       const list = Array.isArray(data) ? data : data?.results || [];
-      const count = typeof data?.count === "number" ? data.count : list.length;
-      setTxs(list);
-      setTxCount(count);
+      const count = typeof data?.count === "number" ? data.count : undefined;
+      let newLength = 0;
+      setTxs((prev) => {
+        const merged = page === 0 ? list : [...prev, ...list];
+        newLength = merged.length;
+        return merged;
+      });
+      setTxCount(typeof count === "number" ? count : newLength);
+      setHasMore(typeof count === "number" ? newLength < count : list.length === pageSize);
     } catch (e) {
+      if (page === 0) setTxs([]);
       setErr("Failed to load transactions.");
-      setTxs([]);
-      setTxCount(0);
     } finally {
-      setTxLoading(false);
+      if (page === 0) setTxLoading(false);
+      else setLoadingMore(false);
     }
   }
 
   useEffect(() => {
     fetchTransactions(0, txPageSize);
   }, []);
+
+  useEffect(() => {
+    const root = containerRef.current || null;
+    const observer = new IntersectionObserver((entries) => {
+      const first = entries[0];
+      if (first.isIntersecting && !txLoading && !loadingMore && hasMore) {
+        const nextPage = txPage + 1;
+        setTxPage(nextPage);
+        fetchTransactions(nextPage, txPageSize);
+      }
+    }, { root, rootMargin: "200px 0px 200px 0px", threshold: 0 });
+    const sent = sentinelRef.current;
+    if (sent) observer.observe(sent);
+    return () => {
+      if (sent) observer.unobserve(sent);
+      observer.disconnect();
+    };
+  }, [txLoading, loadingMore, hasMore, txPage, txPageSize]);
 
   return (
     <Box sx={{ maxWidth: 1000, mx: "auto", px: { xs: 2, sm: 3 }, py: { xs: 2, sm: 3 } }}>
@@ -117,58 +133,6 @@ export default function History() {
           Recent Activity
         </Typography>
 
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ mb: 1 }}>
-          <TextField
-            label="From"
-            type="date"
-            size="small"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-          />
-          <TextField
-            label="To"
-            type="date"
-            size="small"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-          />
-          <Button
-            variant="contained"
-            size="small"
-            onClick={() => {
-              // Guard: if from is after to, swap
-              let f = dateFrom, t = dateTo;
-              try {
-                if (f && t && new Date(f) > new Date(t)) {
-                  const tmp = f; f = t; t = tmp;
-                  setDateFrom(f);
-                  setDateTo(t);
-                }
-              } catch {}
-              setTxPage(0);
-              fetchTransactions(0, txPageSize, f, t);
-            }}
-            sx={{ textTransform: "none" }}
-          >
-            Apply
-          </Button>
-          <Button
-            variant="text"
-            size="small"
-            onClick={() => {
-              const today = toDateInputValue();
-              setDateFrom(today);
-              setDateTo(today);
-              setTxPage(0);
-              fetchTransactions(0, txPageSize, today, today);
-            }}
-            sx={{ textTransform: "none" }}
-          >
-            Today
-          </Button>
-        </Stack>
 
         {txLoading ? (
           <LinearProgress />
@@ -182,7 +146,7 @@ export default function History() {
                   No transactions yet.
                 </Typography>
               ) : (
-                <Stack spacing={1} sx={{ maxHeight: 520, overflowY: "auto", pr: 0.5 }}>
+                <Stack spacing={1} sx={{ maxHeight: 520, overflowY: "auto", pr: 0.5 }} ref={containerRef}>
                   {(txs || []).map((tx) => {
                     const created = tx.created_at ? new Date(tx.created_at).toLocaleString() : "-";
                     const amount = Number((tx.commission ?? tx.amount ?? 0));
@@ -237,10 +201,15 @@ export default function History() {
                       </Paper>
                     );
                   })}
+                  <Box ref={sentinelRef} sx={{ display: "flex", justifyContent: "center", py: 1 }}>
+                    {loadingMore ? <CircularProgress size={20} /> : !hasMore && (
+                      <Typography variant="caption" sx={{ color: "text.secondary" }}>No more transactions</Typography>
+                    )}
+                  </Box>
                 </Stack>
               )
             ) : (
-              <TableContainer sx={{ maxHeight: 520 }}>
+              <TableContainer sx={{ maxHeight: 520 }} ref={containerRef}>
                 <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow>
@@ -292,25 +261,13 @@ export default function History() {
                     )}
                   </TableBody>
                 </Table>
+                <Box ref={sentinelRef} sx={{ display: "flex", justifyContent: "center", py: 1 }}>
+                  {loadingMore ? <CircularProgress size={20} /> : !hasMore && (
+                    <Typography variant="caption" sx={{ color: "text.secondary" }}>No more transactions</Typography>
+                  )}
+                </Box>
               </TableContainer>
             )}
-            <TablePagination
-              component="div"
-              count={txCount}
-              page={txPage}
-              onPageChange={(e, newPage) => {
-                setTxPage(newPage);
-                fetchTransactions(newPage, txPageSize, dateFrom, dateTo);
-              }}
-              rowsPerPage={txPageSize}
-              onRowsPerPageChange={(e) => {
-                const newSize = parseInt(e.target.value, 10);
-                setTxPageSize(newSize);
-                setTxPage(0);
-                fetchTransactions(0, newSize, dateFrom, dateTo);
-              }}
-              rowsPerPageOptions={[10, 25, 50]}
-            />
           </React.Fragment>
         )}
       </Paper>

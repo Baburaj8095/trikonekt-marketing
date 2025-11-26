@@ -17,6 +17,7 @@ import {
 } from "@mui/material";
 import { useNavigate, useLocation } from "react-router-dom";
 import API from "../../api/api";
+import normalizeMediaUrl from "../../utils/media";
 
 export default function AgencyMarketplace() {
   const navigate = useNavigate();
@@ -291,7 +292,7 @@ export default function AgencyMarketplace() {
                     {b.image_url ? (
                       <CardMedia
                         component="img"
-                        image={b.image_url}
+                        image={normalizeMediaUrl(b.image_url)}
                         alt={b.title}
                         sx={{ width: "100%", height: 225, objectFit: "cover" }}
                       />

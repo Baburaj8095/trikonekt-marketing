@@ -22,6 +22,7 @@ import {
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import API from "../../../api/api";
+import normalizeMediaUrl from "../../../utils/media";
 
 function EditDialog({ open, onClose, product, onSaved }) {
   const [form, setForm] = useState(() => ({
@@ -193,7 +194,7 @@ export default function ProductList() {
               <TableRow key={p.id}>
                 <TableCell>
                   {p.image_url ? (
-                    <Box component="img" src={p.image_url} alt={p.name} sx={{ width: 64, height: 48, objectFit: "cover", borderRadius: 1 }} />
+                    <Box component="img" src={normalizeMediaUrl(p.image_url)} alt={p.name} sx={{ width: 64, height: 48, objectFit: "cover", borderRadius: 1 }} />
                   ) : (
                     "-"
                   )}

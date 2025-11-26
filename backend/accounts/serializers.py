@@ -501,6 +501,29 @@ class RegisterSerializer(serializers.ModelSerializer):
         sponsor_id = validated_data.pop('sponsor_id', '')
         category = validated_data.pop('category', 'consumer') or 'consumer'
 
+        # Best-effort fallback: derive country/state/district (city) from pincode for Consumer, Employee and Sub-Franchise
+        try:
+            from locations.views import PINCODES_OFFLINE
+        except Exception:
+            PINCODES_OFFLINE = {}
+        try:
+            fallback_cats = {'consumer', 'employee', 'agency_sub_franchise'}
+            pin_digits = ''.join(c for c in (pincode or '') if c.isdigit())
+            if (not country or not state or not city) and pin_digits and len(pin_digits) == 6 and category in fallback_cats:
+                meta = PINCODES_OFFLINE.get(pin_digits) or {}
+                c_name = (meta.get('country') or '').strip()
+                s_name = (meta.get('state') or '').strip()
+                d_name = (meta.get('district') or '').strip()
+                if c_name and not country:
+                    country = Country.objects.filter(name__iexact=c_name).first() or Country.objects.create(name=c_name)
+                if s_name and country and not state:
+                    state = State.objects.filter(country=country, name__iexact=s_name).first() or State.objects.create(name=s_name, country=country)
+                if d_name and state and not city:
+                    city = City.objects.filter(state=state, name__iexact=d_name).first() or City.objects.create(name=d_name, state=state)
+        except Exception:
+            # fallback errors should not block registration
+            pass
+
         # Region assignment inputs (write-only) already validated and cached on self.*
         # But pop from validated_data to avoid passing to create_user
         validated_data.pop('assign_states', None)
@@ -638,7 +661,7 @@ class PublicUserSerializer(serializers.ModelSerializer):
             'country', 'state', 'city', 'pincode', 'address', 'sponsor_id',
             'category', 'role', 'registered_by', 'registered_by_username',
             'avatar_url',
-            'date_joined', 'is_active'
+            'date_joined', 'account_active', 'is_active'
         ]
         read_only_fields = fields
 

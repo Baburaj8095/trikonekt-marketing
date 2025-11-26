@@ -469,14 +469,14 @@ export default function AdminDashboard() {
               title="Accounts Active"
               value={(users.active ?? 0)}
               subtitle=""
-              onClick={() => nav("/admin/users?activated=1")}
+              onClick={() => nav("/admin/users?account_active=1")}
               palette="green"
             />
             <Card
               title="Accounts Inactive"
               value={(users.inactive ?? ((users.total ?? 0) - (users.active ?? 0)))}
               subtitle=""
-              onClick={() => nav("/admin/users?activated=0")}
+              onClick={() => nav("/admin/users?account_active=0")}
               palette="red"
             />
             <Card

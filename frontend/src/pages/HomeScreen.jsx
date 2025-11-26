@@ -4,6 +4,7 @@ import PublicNavbar from "../components/PublicNavbar";
 import GeoBanner from "../components/GeoBanner";
 import API from "../api/api";
 import SmartLocation from "../components/SmartLocation";
+import normalizeMediaUrl from "../utils/media";
 
 const HomeScreen = () => {
   const [slides, setSlides] = useState([]);
@@ -168,7 +169,7 @@ const HomeScreen = () => {
           <>
             {slides.map((s, i) => {
               const visible = i === idx;
-              const src = s?.image_url || toImageUrl(s?.image);
+              const src = normalizeMediaUrl(s?.image_url || toImageUrl(s?.image));
               return (
                 <Box
                   key={s?.id ?? i}

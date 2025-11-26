@@ -8,6 +8,7 @@ from .views import (
     AdminUserDetail,
     AdminUserImpersonateView,
     AdminUserSetTempPasswordView,
+    AdminUserWalletAdjustView,
     AdminECouponBulkCreateView,
     AdminECouponAssignView,
     AdminKYCList,
@@ -45,6 +46,7 @@ urlpatterns = [
     path("users/<int:pk>/", AdminUserDetail.as_view()),
     path("users/<int:pk>/impersonate/", AdminUserImpersonateView.as_view()),
     path("users/<int:pk>/set-temp-password/", AdminUserSetTempPasswordView.as_view()),
+    path("users/<int:pk>/wallet-adjust/", AdminUserWalletAdjustView.as_view()),
 
     # E-Coupons (ELC)
     path("coupons/bulk-ecoupons/", AdminECouponBulkCreateView.as_view()),

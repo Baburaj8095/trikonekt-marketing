@@ -1274,7 +1274,7 @@ class CouponBatchViewSet(mixins.CreateModelMixin,
                 actor=request.user,
                 batch=batch,
                 notes=f"Generated {len(to_create)} random e-codes",
-                metadata={"prefix": prefix, "count": len(to_create), "value": code_value},
+                metadata={"prefix": prefix, "count": len(to_create), "value": str(code_value)},
             )
 
         return Response(self.get_serializer(batch).data, status=status.HTTP_201_CREATED)
@@ -1351,7 +1351,7 @@ class CouponBatchViewSet(mixins.CreateModelMixin,
                 actor=request.user,
                 batch=batch,
                 notes=f"Generated {len(final_list)} codes",
-                metadata={"prefix": prefix, "range": [start, end], "width": width, "issued_channel": issued_channel, "value": code_value},
+                metadata={"prefix": prefix, "range": [start, end], "width": width, "issued_channel": issued_channel, "value": str(code_value)},
             )
 
         return Response(self.get_serializer(batch).data, status=status.HTTP_201_CREATED)

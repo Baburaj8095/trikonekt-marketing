@@ -30,6 +30,7 @@ import {
   IconButton,
 } from "@mui/material";
 import API from "../../../api/api";
+import normalizeMediaUrl from "../../../utils/media";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 
@@ -496,7 +497,7 @@ export default function BannerManage() {
               <Grid key={b.id} item xs={12} md={6} lg={4}>
                 <Card variant="outlined" sx={{ borderRadius: 2, height: "100%", display: "flex", flexDirection: "column" }}>
                   {b.image_url ? (
-                    <CardMedia component="img" image={b.image_url} alt={b.title} sx={{ aspectRatio: "4 / 2", objectFit: "cover" }} />
+                    <CardMedia component="img" image={normalizeMediaUrl(b.image_url)} alt={b.title} sx={{ aspectRatio: "4 / 2", objectFit: "cover" }} />
                   ) : (
                     <Box sx={{ width: "100%", aspectRatio: "4 / 2", bgcolor: "#f1f5f9" }} />
                   )}

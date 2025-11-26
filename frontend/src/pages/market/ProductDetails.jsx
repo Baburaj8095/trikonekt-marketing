@@ -25,6 +25,7 @@ import {
 } from "@mui/material";
 import { useParams, useNavigate } from "react-router-dom";
 import API from "../../api/api";
+import normalizeMediaUrl from "../../utils/media";
 
 export default function ProductDetails() {
   const { id } = useParams();
@@ -220,7 +221,7 @@ export default function ProductDetails() {
             {data.image_url ? (
               <CardMedia
                 component="img"
-                image={data.image_url}
+                image={normalizeMediaUrl(data.image_url)}
                 alt={data.name}
                 sx={{ width: "100%", aspectRatio: "4 / 3", objectFit: "cover" }}
               />

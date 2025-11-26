@@ -28,6 +28,7 @@ import {
   assignConsumerByCount,
   assignEmployeeByCount,
 } from "../api/api";
+import normalizeMediaUrl from "../utils/media";
 
 function ProductCard({ product, form, onChange, onSubmit, submitting, onAddToCart }) {
   const unit = Number(product?.price_per_unit || 0);
@@ -379,7 +380,7 @@ export default function ECouponStore() {
                 {payment.upi_qr_image_url ? (
                   <img
                     alt="UPI QR Code"
-                    src={payment.upi_qr_image_url}
+                    src={normalizeMediaUrl(payment.upi_qr_image_url)}
                     style={{ width: "100%", height: "100%", objectFit: "contain" }}
                   />
                 ) : (

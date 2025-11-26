@@ -10,6 +10,7 @@ import {
   Alert,
 } from "@mui/material";
 import API from "../api/api";
+import normalizeMediaUrl from "../utils/media";
 
 export default function Profile() {
   const storedUser = useMemo(() => {
@@ -157,7 +158,7 @@ export default function Profile() {
         <Stack spacing={2}>
           <Stack direction="row" spacing={2} alignItems="center">
             <Avatar
-              src={avatarUrl || undefined}
+              src={avatarUrl ? normalizeMediaUrl(avatarUrl) : undefined}
               alt={storedUser?.username || "You"}
               sx={{ width: 72, height: 72 }}
             />

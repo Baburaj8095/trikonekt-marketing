@@ -11,6 +11,7 @@ import {
   Rating,
   Chip,
 } from "@mui/material";
+import normalizeMediaUrl from "../../utils/media";
 
 /**
  * QuickViewModal
@@ -64,7 +65,7 @@ function QuickViewModal({ open, product, onClose, onGoToDetails }) {
             {product?.image_url ? (
               <Box
                 component="img"
-                src={product.image_url}
+                src={normalizeMediaUrl(product.image_url)}
                 alt={product?.name || "Product"}
                 loading="lazy"
                 sx={{

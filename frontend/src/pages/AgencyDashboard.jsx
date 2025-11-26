@@ -19,6 +19,8 @@ import {
   Button,
   Pagination,
   Avatar,
+  Chip,
+  Switch,
   useMediaQuery,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
@@ -81,6 +83,7 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
   const [wallet, setWallet] = useState({ balance: "0", updated_at: null });
   const [walletLoading, setWalletLoading] = useState(false);
   const [walletError, setWalletError] = useState("");
+  const [me, setMe] = useState(null);
 
   const loadLuckyHistory = async () => {
     try {
@@ -173,7 +176,17 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
       setEcSummaryLoading(false);
     }
   };
-
+  
+  // Load my own profile (to show Agency account status)
+  const loadMe = async () => {
+    try {
+      const res = await API.get("/accounts/me/");
+      setMe(res?.data || null);
+    } catch (e) {
+      setMe(null);
+    }
+  };
+  
   // Load assigned packages for Agency Dashboard cards
   const loadAgencyPackages = async () => {
     try {
@@ -249,6 +262,7 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
   const [assignableEmployees, setAssignableEmployees] = useState([]);
   const [empLoading, setEmpLoading] = useState(false);
   const [empError, setEmpError] = useState("");
+  const [empBusyId, setEmpBusyId] = useState(null);
 
   const loadEmployees = async () => {
     try {
@@ -270,6 +284,21 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
       setAssignableEmployees([]);
     } finally {
       setEmpLoading(false);
+    }
+  };
+
+  // Activate/Deactivate an employee under this agency
+  const toggleEmployeeActive = async (emp, desired) => {
+    if (!emp || !emp.id) return;
+    const value = typeof desired === "boolean" ? desired : !Boolean(emp.account_active);
+    try {
+      setEmpBusyId(emp.id);
+      await API.patch(`/accounts/agency/employees/${emp.id}/activate/`, { account_active: value });
+      await loadEmployees();
+    } catch (e) {
+      // ignore; UI will remain unchanged on failure
+    } finally {
+      setEmpBusyId(null);
     }
   };
 
@@ -363,6 +392,7 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
     //loadCommission();
     //loadWallet();
     loadEcSummary();
+    loadMe();
   }, []);
 
   useEffect(() => {
@@ -412,8 +442,13 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
           Pincode: {agencyPincode || "-"}
         </Typography>
       </Box>
+      {me && (
+        <Alert severity={me.account_active ? "success" : "warning"} sx={{ mb: 2 }}>
+          Account status: <b>{me.account_active ? "Active" : "Inactive"}</b>
+        </Alert>
+      )}
 
-      {/* <Box sx={{ mb: 2 }}>
+      {/* <Box sx={{ mb: 2 }}> 
         <ReferAndEarn title="Refer & Earn" sponsorUsername={sponsorUsername} />
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
           Share your referral links to invite Consumers, Employees, Sub‑Franchise agencies, and Merchants. Sponsor ID will be auto-filled.
@@ -942,6 +977,19 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
                             <Typography variant="caption" sx={{ display: "block", color: "text.secondary", mt: 0.5 }}>
                               {(u.pincode || "")}{u.city ? `, ${u.city}` : ""}{u.state ? `, ${u.state}` : ""}{u.country ? `, ${u.country}` : ""}
                             </Typography>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}>
+                              <Chip
+                                size="small"
+                                label={u.account_active ? "Active" : "Inactive"}
+                                color={u.account_active ? "success" : "default"}
+                              />
+                              <Switch
+                                checked={!!u.account_active}
+                                disabled={empBusyId === u.id}
+                                onChange={(e) => toggleEmployeeActive(u, e.target.checked)}
+                                inputProps={{ "aria-label": "Toggle account active" }}
+                              />
+                            </Box>
                           </Box>
                         </Box>
                       </Paper>
@@ -969,6 +1017,8 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
                         <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Email</TableCell>
                         <TableCell>Phone</TableCell>
                         <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Address</TableCell>
+                        <TableCell>Account</TableCell>
+                        <TableCell align="right">Action</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -980,6 +1030,21 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
                           <TableCell sx={{ whiteSpace: "normal", wordBreak: "break-word" }}>{u.phone || ""}</TableCell>
                           <TableCell sx={{ display: { xs: "none", sm: "table-cell" }, whiteSpace: "normal", wordBreak: "break-word" }}>
                             {u.pincode || ""}{u.city ? `, ${u.city}` : ""}{u.state ? `, ${u.state}` : ""}{u.country ? `, ${u.country}` : ""}
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              size="small"
+                              label={u.account_active ? "Active" : "Inactive"}
+                              color={u.account_active ? "success" : "default"}
+                            />
+                          </TableCell>
+                          <TableCell align="right">
+                            <Switch
+                              checked={!!u.account_active}
+                              disabled={empBusyId === u.id}
+                              onChange={(e) => toggleEmployeeActive(u, e.target.checked)}
+                              inputProps={{ "aria-label": "Toggle account active" }}
+                            />
                           </TableCell>
                         </TableRow>
                       ))}

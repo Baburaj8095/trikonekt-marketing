@@ -5,6 +5,7 @@ from .views import (
     ResetPasswordView,
     UsersListView,
     MyEmployeesListView,
+    AgencyEmployeeActivationView,
     MyBusinessesListView,
     MeView,
     regions_by_sponsor,
@@ -37,6 +38,8 @@ urlpatterns = [
     path('me/', MeView.as_view(), name='me'),
     path('profile/', ProfileMeView.as_view(), name='profile_me'),
     path('my/employees/', MyEmployeesListView.as_view(), name='my_employees'),
+    # Agency can activate/deactivate their employees
+    path('agency/employees/<int:pk>/activate/', AgencyEmployeeActivationView.as_view(), name='agency_employee_activate'),
     path('my/businesses/', MyBusinessesListView.as_view(), name='my_businesses'),
     path('regions/by-sponsor/', regions_by_sponsor, name='regions_by_sponsor'),
     path('hierarchy/', hierarchy, name='hierarchy'),

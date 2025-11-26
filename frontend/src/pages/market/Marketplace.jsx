@@ -21,6 +21,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import API from "../../api/api";
 import ProductGrid from "../../components/market/ProductGrid";
 import QuickViewModal from "../../components/market/QuickViewModal";
+import normalizeMediaUrl from "../../utils/media";
 
 export default function Marketplace() {
   const navigate = useNavigate();
@@ -379,7 +380,7 @@ export default function Marketplace() {
                     {b.image_url ? (
                       <CardMedia
                         component="img"
-                        image={b.image_url}
+                        image={normalizeMediaUrl(b.image_url)}
                         alt={b.title}
                         sx={{ width: "100%", height: 225, objectFit: "cover" }}
                       />

@@ -60,6 +60,8 @@ class CustomUser(AbstractUser):
 
     # Activation/eligibility flags
     first_purchase_activated_at = models.DateTimeField(null=True, blank=True)
+    # Admin-controlled account status for earnings/eligibility
+    account_active = models.BooleanField(default=False, db_index=True)
     autopool_enabled = models.BooleanField(default=False)
     rewards_enabled = models.BooleanField(default=False)
     is_agency_unlocked = models.BooleanField(default=False)
@@ -146,6 +148,20 @@ class CustomUser(AbstractUser):
         # Sponsor ID defaults to hierarchical prefixed_id if available, else username
         if not self.sponsor_id:
             self.sponsor_id = self.prefixed_id or self.username or ""
+
+        # Initialize account_active default on creation:
+        # - Agencies, Employees, and Business start Active by default
+        if getattr(self._state, "adding", False):
+            try:
+                # Default Active:
+                # - All agencies (role=agency or category startswith 'agency')
+                # - All business (merchant) accounts
+                # Employees and Consumers start Inactive by default
+                if (self.role in ("agency",)) or (self.category == "business" or str(self.category).startswith("agency")):
+                    self.account_active = True
+            except Exception:
+                # best-effort
+                pass
 
         super().save(*args, **kwargs)
 

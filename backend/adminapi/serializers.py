@@ -10,6 +10,7 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
     state_name = serializers.SerializerMethodField()
     country_name = serializers.SerializerMethodField()
     district_name = serializers.SerializerMethodField()
+    sponsor_id = serializers.SerializerMethodField()
     wallet_balance = serializers.SerializerMethodField()
     wallet_status = serializers.SerializerMethodField()
     avatar_url = serializers.SerializerMethodField()
@@ -54,6 +55,7 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
             "kyc_verified_at",
             "kyc_status",
             "commission_level",
+            "account_active",
         ]
 
     def get_state_name(self, obj):
@@ -74,6 +76,29 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
             return obj.city.name if getattr(obj, "city_id", None) else ""
         except Exception:
             return ""
+
+    def get_sponsor_id(self, obj):
+        try:
+            # Prefer the actual upline (registered_by) used during registration
+            rb = getattr(obj, "registered_by", None)
+            sid = (getattr(obj, "sponsor_id", "") or "").strip()
+
+            if rb:
+                # Username is commonly used as sponsor code; fallback to prefixed_id
+                val = (getattr(rb, "username", "") or "").strip() or (getattr(rb, "prefixed_id", "") or "").strip()
+                if val:
+                    return val
+
+            # If stored sponsor_id equals self identifiers, hide it
+            uname = (getattr(obj, "username", "") or "").strip()
+            pid = (getattr(obj, "prefixed_id", "") or "").strip()
+            pid2 = pid.replace("-", "") if pid else ""
+            if sid and sid.lower() in {uname.lower(), pid.lower(), pid2.lower()}:
+                return ""
+
+            return sid
+        except Exception:
+            return (getattr(obj, "sponsor_id", "") or "")
 
     def get_wallet_balance(self, obj):
         try:
@@ -464,6 +489,7 @@ class AdminUserEditSerializer(serializers.ModelSerializer):
             "state",
             "city",
             "sponsor_id",
+            "account_active",
             "is_active",
             "password",
         ]

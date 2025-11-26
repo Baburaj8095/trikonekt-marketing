@@ -45,7 +45,7 @@ class AdminMetricsView(APIView):
         # Users (condensed into a single aggregate where possible)
         users_agg = CustomUser.objects.aggregate(
             total=Count("id"),
-            active=Count("id", filter=Q(first_purchase_activated_at__isnull=False)),
+            active=Count("id", filter=Q(account_active=True)),
             todayNew=Count("id", filter=Q(date_joined__date=today)),
             consumers_without_kyc=Count("id", filter=Q(category="consumer") & Q(kyc__isnull=True)),
         )
@@ -368,6 +368,14 @@ class AdminUsersList(ListAPIView):
                 qs = qs.filter(Q(kyc__verified=False) | Q(kyc__isnull=True))
             elif kyc == "verified":
                 qs = qs.filter(kyc__verified=True)
+
+        # New: filter by explicit account_active (admin "Account status")
+        account_active = (self.request.query_params.get("account_active") or "").strip().lower()
+        if account_active in ("1", "true", "yes", "active"):
+            qs = qs.filter(account_active=True)
+        elif account_active in ("0", "false", "no", "inactive"):
+            qs = qs.filter(account_active=False)
+
         if activated in ("1", "true", "yes", "activated"):
             qs = qs.filter(first_purchase_activated_at__isnull=False)
         elif activated in ("0", "false", "no", "inactive", "not_activated", "unactivated", "notactivated"):
@@ -546,6 +554,67 @@ class AdminUserSetTempPasswordView(APIView):
             return Response({"detail": str(e)}, status=400)
 
         return Response({"temp_password": pwd}, status=200)
+
+
+class AdminUserWalletAdjustView(APIView):
+    """
+    Admin-only: adjust a user's wallet by credit or debit.
+    Body: { "action": "credit" | "debit", "amount": number, "note": "optional", "type": "optional override type" }
+    - Credits go to main balance with no withholding.
+    - Debits reduce balances using Wallet.debit rules.
+    Response: { balance, main_balance, withdrawable_balance }
+    """
+    permission_classes = [IsAdminOrStaff]
+
+    def post(self, request, pk: int):
+        user = CustomUser.objects.filter(pk=pk).first()
+        if not user:
+            return Response({"detail": "Not found"}, status=404)
+
+        data = request.data or {}
+        action = str(data.get("action") or "").strip().lower()
+        note = str(data.get("note") or "").strip()
+        tx_type_in = str(data.get("type") or "").strip()
+
+        # Coerce amount
+        from decimal import Decimal as D
+        try:
+            amount = D(str(data.get("amount")))
+        except Exception:
+            return Response({"detail": "amount must be a number"}, status=400)
+        if amount <= 0:
+            return Response({"detail": "amount must be > 0"}, status=400)
+
+        if action not in ("credit", "debit"):
+            return Response({"detail": "action must be 'credit' or 'debit'"}, status=400)
+
+        w = Wallet.get_or_create_for_user(user)
+        meta = {"note": note, "by_admin": getattr(request.user, "username", None) or ""}
+
+        try:
+            if action == "credit":
+                tx_type = tx_type_in or "ADJUSTMENT_CREDIT"
+                # No withholding on manual admin credit
+                w.credit(amount, tx_type=tx_type, meta={**meta, "no_withhold": True}, source_type="ADMIN", source_id=str(getattr(request.user, "id", "")))
+            else:
+                tx_type = tx_type_in or "ADJUSTMENT_DEBIT"
+                w.debit(amount, tx_type=tx_type, meta=meta, source_type="ADMIN", source_id=str(getattr(request.user, "id", "")))
+        except Exception as e:
+            return Response({"detail": str(e)}, status=400)
+
+        # Fresh balances
+        try:
+            w_refreshed = Wallet.objects.get(pk=w.pk)
+        except Exception:
+            w_refreshed = w
+        return Response(
+            {
+                "balance": float(w_refreshed.balance or 0),
+                "main_balance": float(w_refreshed.main_balance or 0),
+                "withdrawable_balance": float(w_refreshed.withdrawable_balance or 0),
+            },
+            status=200,
+        )
 
 
 class AdminECouponBulkCreateView(APIView):

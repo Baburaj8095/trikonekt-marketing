@@ -14,6 +14,7 @@ import {
 } from "@mui/material";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
+import normalizeMediaUrl from "../../utils/media";
 
 /**
  * ProductCard
@@ -93,7 +94,7 @@ function ProductCard({ product, onSelect, onQuickView, dense = false }) {
           {product?.image_url ? (
             <CardMedia
               component="img"
-              image={product.image_url}
+              image={normalizeMediaUrl(product.image_url)}
               alt={product?.name || "Product"}
               loading="lazy"
               sx={{
