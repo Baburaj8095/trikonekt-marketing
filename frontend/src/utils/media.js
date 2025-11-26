@@ -43,14 +43,11 @@ export function normalizeMediaUrl(input) {
           return `${b.origin}${u.pathname}${u.search}${u.hash}`;
         }
       }
-      // If page is https but image is http on same host, upgrade to https to avoid mixed content block
+      // If page is https and image is http, upgrade to https to avoid mixed content block on mobile/strict browsers
       try {
         if (typeof window !== "undefined" && window.location?.protocol === "https:" && u.protocol === "http:") {
-          const pageHost = window.location.host;
-          if (u.host === pageHost) {
-            u.protocol = "https:";
-            return u.toString();
-          }
+          u.protocol = "https:";
+          return u.toString();
         }
       } catch (_) {}
       // Already an absolute, return as-is

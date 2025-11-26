@@ -5,6 +5,15 @@ from django.utils import timezone
 
 UserModel = settings.AUTH_USER_MODEL
 
+# Optional Cloudinary storages for images/files (align with uploads app pattern)
+try:
+    from cloudinary_storage.storage import RawMediaCloudinaryStorage, MediaCloudinaryStorage
+    RAW_STORAGE = RawMediaCloudinaryStorage()
+    MEDIA_STORAGE = MediaCloudinaryStorage()
+except Exception:
+    RAW_STORAGE = None
+    MEDIA_STORAGE = None
+
 
 class Coupon(models.Model):
     code = models.CharField(max_length=64, unique=True, db_index=True)
@@ -204,7 +213,7 @@ class CouponBatch(models.Model):
 
 class ECouponPaymentConfig(models.Model):
     title = models.CharField(max_length=100)
-    upi_qr_image = models.ImageField(upload_to="uploads/ecoupon_payment/", null=True, blank=True)
+    upi_qr_image = models.ImageField(upload_to="uploads/ecoupon_payment/", null=True, blank=True, storage=MEDIA_STORAGE)
     upi_id = models.CharField(max_length=100, blank=True)
     payee_name = models.CharField(max_length=100, blank=True)
     instructions = models.TextField(blank=True)
@@ -259,7 +268,7 @@ class ECouponOrder(models.Model):
     amount_total = models.DecimalField(max_digits=12, decimal_places=2)
 
     payment_config = models.ForeignKey(ECouponPaymentConfig, on_delete=models.SET_NULL, null=True, blank=True, related_name="orders")
-    payment_proof_file = models.FileField(upload_to="uploads/ecoupon_orders/", null=True, blank=True)
+    payment_proof_file = models.FileField(upload_to="uploads/ecoupon_orders/", null=True, blank=True, storage=RAW_STORAGE)
     utr = models.CharField(max_length=100, blank=True)
     notes = models.TextField(blank=True)
 

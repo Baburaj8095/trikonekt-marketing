@@ -19,6 +19,12 @@ from .models import (
 
 UserModel = settings.AUTH_USER_MODEL
 
+# Optional Cloudinary storage helper (for existence checks and URL building)
+try:
+    from cloudinary_storage.storage import MediaCloudinaryStorage
+except Exception:
+    MediaCloudinaryStorage = None
+
 
 class CouponSerializer(serializers.ModelSerializer):
     issuer_username = serializers.SerializerMethodField(read_only=True)
@@ -522,13 +528,43 @@ class ECouponPaymentConfigSerializer(serializers.ModelSerializer):
 
     def get_upi_qr_image_url(self, obj):
         try:
-            request = self.context.get("request")
-            if obj.upi_qr_image and hasattr(obj.upi_qr_image, "url"):
-                url = obj.upi_qr_image.url
-                return request.build_absolute_uri(url) if request else url
+            request = self.context.get("request") if hasattr(self, "context") else None
+            f = getattr(obj, "upi_qr_image", None)
+            if not f:
+                return None
+
+            name = getattr(f, "name", None) or ""
+            url = None
+
+            # Prefer Cloudinary URL only if the asset actually exists there (handles legacy data)
+            if MediaCloudinaryStorage:
+                try:
+                    storage = MediaCloudinaryStorage()
+                    if name and hasattr(storage, "exists") and storage.exists(name):
+                        url = storage.url(name)
+                except Exception:
+                    url = None
+
+            # Fallback 1: use field URL (might be cloudinary or local /media based on storage)
+            if not url:
+                try:
+                    url = f.url
+                except Exception:
+                    url = None
+
+            # Fallback 2: construct local media URL directly for legacy files
+            if not url and name:
+                base = getattr(settings, "MEDIA_URL", "/media/")
+                if request and not str(base).startswith("http"):
+                    url = request.build_absolute_uri(base + name)
+                else:
+                    url = (base + name) if base else None
+
+            if not url:
+                return None
+            return request.build_absolute_uri(url) if (request and not str(url).startswith("http")) else url
         except Exception:
-            pass
-        return None
+            return None
 
 
 class ECouponProductSerializer(serializers.ModelSerializer):

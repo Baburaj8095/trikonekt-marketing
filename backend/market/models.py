@@ -3,6 +3,13 @@ from django.db.models import F
 from django.core.exceptions import ValidationError
 from django.conf import settings
 
+# Optional Cloudinary storage for images (align with DashboardCard/HomeCard approach)
+try:
+    from cloudinary_storage.storage import MediaCloudinaryStorage
+    MEDIA_STORAGE = MediaCloudinaryStorage()
+except Exception:
+    MEDIA_STORAGE = None
+
 
 class Product(models.Model):
     """
@@ -18,7 +25,7 @@ class Product(models.Model):
     # discount represented as percentage (e.g., 10.00 for 10%)
     discount = models.DecimalField(max_digits=5, decimal_places=2, default=0)
 
-    image = models.ImageField(upload_to='products/', null=True, blank=True)
+    image = models.ImageField(upload_to='products/', null=True, blank=True, storage=MEDIA_STORAGE)
 
     country = models.CharField(max_length=64, db_index=True)
     state = models.CharField(max_length=64, db_index=True)
@@ -93,7 +100,7 @@ class Banner(models.Model):
     """
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
-    image = models.ImageField(upload_to='products/banners/', null=True, blank=True)
+    image = models.ImageField(upload_to='products/banners/', null=True, blank=True, storage=MEDIA_STORAGE)
 
     # Simple location filters (same model as Product for easy marketplace filtering)
     country = models.CharField(max_length=64, db_index=True, blank=True, default="")
