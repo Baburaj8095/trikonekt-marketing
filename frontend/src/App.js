@@ -312,6 +312,26 @@ function App() {
           }
         />
 
+        <Route
+          path="/agency/banners"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <BannerManage />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agency/purchase-requests"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <PurchaseRequests />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
 
         {/* Employee Routes */}
         <Route
