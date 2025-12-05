@@ -136,7 +136,7 @@ export default function RoleSelect() {
   const buildUrl = (role, mode) => {
     if (mode === "register") {
       // Use role-scoped register route and carry sponsor as query if present
-      return `/auth/register/${role}${sponsorQuery ? `?${sponsorQuery.slice(1)}` : ""}`;
+      return `/auth/register-v2/${role}${sponsorQuery ? `?${sponsorQuery.slice(1)}` : ""}`;
     }
     // Use role-scoped login route
     return `/auth/login/${role}`;

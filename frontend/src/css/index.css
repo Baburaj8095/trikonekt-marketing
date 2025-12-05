@@ -10,7 +10,7 @@ html, body {
 }
 
 body {
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Montserrat', sans-serif;
   color: #0f172a; /* Ensure readable default text color on light backgrounds */
 }
 
@@ -28,17 +28,7 @@ body {
   overscroll-behavior: contain;
   touch-action: pan-y;
 }
-/* AppBar should keep light text over dark backgrounds */
-.MuiAppBar-root {
-  color: #ffffff;
-}
-.MuiAppBar-root .MuiIconButton-root,
-.MuiAppBar-root .MuiSvgIcon-root,
-.MuiAppBar-root .MuiButton-root,
-.MuiAppBar-root .MuiTypography-root,
-.MuiAppBar-root a {
-  color: #000000;
-}
+/* AppBar text/icon color now follows each page's AppBar sx (dark or light) */
 
 /* Keep root container neutral */
 #root {
@@ -160,4 +150,36 @@ a {
 .admin-scope .tk-grid .MuiDataGrid-cell:last-of-type,
 .admin-scope .tk-grid .MuiDataGrid-columnHeader:last-of-type {
   border-right: none;
+}
+
+/* =========================
+   Auth forms: mobile-friendly full-width
+   ========================= */
+.auth-mobile-full {
+  width: 100%;
+}
+
+.auth-mobile-full .MuiFormControl-root,
+.auth-mobile-full .MuiTextField-root,
+.auth-mobile-full .MuiButton-root {
+  width: 100%;
+}
+
+@media (max-width: 600px) {
+  .auth-mobile-full {
+    padding: 0;
+  }
+  .auth-mobile-full .MuiButton-root {
+    min-height: 48px;
+    font-size: 1rem;
+  }
+  /* Avoid iOS zoom on focus by keeping font-size >= 16px */
+  .auth-mobile-full .MuiInputBase-input,
+  .auth-mobile-full .MuiSelect-select {
+    font-size: 16px;
+  }
+  /* Force role toggle buttons to stack on small screens */
+  .auth-mobile-full .MuiToggleButtonGroup-root .MuiToggleButton-root {
+    flex: 1 1 100%;
+  }
 }

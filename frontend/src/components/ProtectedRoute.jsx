@@ -148,7 +148,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
   }
 
   if (!granted) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
+    return <Navigate to="/auth/login" replace state={{ from: location }} />;
   }
 
   if (Array.isArray(allowedRoles) && allowedRoles.length > 0) {

@@ -27,7 +27,6 @@ import {
   DialogActions,
   Alert,
 } from "@mui/material";
-import "@fontsource/poppins";
 import { Link, useNavigate } from "react-router-dom";
 import API from "../api/api";
 import LOGO from "../assets/TRIKONEKT.png";
@@ -40,9 +39,6 @@ const HomeScreen = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const navigate = useNavigate();
 
-  useEffect(() => {
-    document.body.style.fontFamily = "'Poppins', sans-serif";
-  }, []);
 
   const handleModeChange = () => setMode(mode === "login" ? "register" : "login");
   const handleRoleChange = (e) => setRole(e.target.value);
@@ -582,7 +578,7 @@ const HomeScreen = () => {
               {successMsg}
             </Alert>
           )}
-          <Box component="form" onSubmit={handleSubmit}>
+          <Box component="form" onSubmit={handleSubmit} className="auth-mobile-full">
             {!isLogin && renderRegistrationFields()}
 
             <TextField

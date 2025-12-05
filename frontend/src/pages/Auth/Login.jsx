@@ -26,6 +26,11 @@ import {
   Alert,
   Autocomplete,
   CircularProgress,
+  Drawer,
+  List,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
   Tabs,
   Tab,
   ToggleButton,
@@ -49,9 +54,9 @@ import {
   Mail as MailIcon,
   Phone as PhoneIcon,
   CheckCircle as CheckCircleIcon,
+  Menu as MenuIcon,
 } from "@mui/icons-material";
 
-import "@fontsource/poppins";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import API from "../../api/api";
 import LOGO from "../../assets/TRIKONEKT.png";
@@ -68,14 +73,12 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const [sponsorId, setSponsorId] = useState("");
   const [agencyLevel, setAgencyLevel] = useState("");
 
-  useEffect(() => {
-    document.body.style.fontFamily = "'Poppins', sans-serif";
-  }, []);
 
   // If a role is locked via route param, force-select it
   useEffect(() => {
@@ -192,6 +195,11 @@ const Login = () => {
   const handleRoleChange = (_, val) => {
     if (lockedRole) return;
     if (val) setRole(val);
+  };
+  const handleRegisterNav = () => {
+    const s = normalizeSponsor(sponsorId);
+    const qs = s ? `?sponsor=${encodeURIComponent(s)}` : "";
+    navigate(`/auth/register-v2/${role}${qs}`);
   };
 
   const [formData, setFormData] = useState({
@@ -609,7 +617,7 @@ const [pinByDistrictLoadingNA, setPinByDistrictLoadingNA] = useState(false);
     }
   };
 
-  const isLogin = mode === "login";
+  const isLogin = true;
 
   // Load sponsor-constrained pincodes for Consumer/Employee registration
   useEffect(() => {
@@ -1216,9 +1224,7 @@ const pincodeOptionsConsumer = useMemo(() => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (mode === "login") {
-      try {
+    try {
         // Accept username or phone; backend resolves and disambiguates if needed
         let username = (formData.username || "").trim();
         const submitRole = role;
@@ -1298,200 +1304,17 @@ const pincodeOptionsConsumer = useMemo(() => {
         } else {
           navigate(`/${tokenRole || "user"}/dashboard`, { replace: true });
         }
-      } catch (err) {
-        console.error(err);
-        const data = err?.response?.data;
-        if (data?.multiple_accounts && Array.isArray(data.multiple_accounts)) {
-          const choices = data.multiple_accounts.map((a) => a.username).join(", ");
-          setErrorMsg(`Multiple accounts ambiguity. Please enter one of these usernames: ${choices}`);
-        } else {
-          const msg =
-            data?.detail || (data ? JSON.stringify(data) : "Login failed!");
-          setErrorMsg(typeof msg === "string" ? msg : String(msg));
-        }
-      }
-      return;
-    }
-
-    // Registration path
-    setErrorMsg("");
-    setSuccessMsg("");
-
-    if (!formData.password) {
-      setErrorMsg("Password is required");
-      return;
-    }
-    if (formData.password !== confirmPassword) {
-      setErrorMsg("Password and Confirm Password do not match");
-      return;
-    }
-    const category = mapUIRoleToCategory();
-    if (category === "employee" || category === "consumer") {
-      if (!formData.phone) {
-        setErrorMsg("Phone number is required for Consumer/Employee registration");
-        return;
-      }
-    }
-    if (category === "business") {
-      if (!formData.email) {
-        setErrorMsg("Email is required for merchant registration");
-        return;
-      }
-      if (!formData.business_name) {
-        setErrorMsg("Merchant Name is required");
-        return;
-      }
-      if (!formData.business_category) {
-        setErrorMsg("Merchant Category is required");
-        return;
-      }
-      if (!formData.address) {
-        setErrorMsg("Address is required");
-        return;
-      }
-    }
-    if (role === "agency" && !agencyLevel) {
-      setErrorMsg("Select Agency Registration Type");
-      return;
-    }
-
-    // Sponsor ID mandatory (from URL param or manual entry)
-    if (!sponsorId) {
-      setErrorMsg("Sponsor Username is required");
-      return;
-    }
-    // If validation ran and sponsor is invalid, block submission with targeted message
-    if (sponsorValid === false) {
-      setErrorMsg("Invalid Sponsor Username. Please correct the Sponsor ID.");
-      return;
-    }
-
-    // Additional agency-level validations
-    if (AGENCY_CATEGORIES.has(category) && !validateAgencyInputs()) {
-      return;
-    }
-
-    // Location selection mandatory for non-agency registrations
-    if (!AGENCY_CATEGORIES.has(category)) {
-      if (!selectedCountry || !selectedState || !selectedCity || !pincode) {
-        setErrorMsg("Please select Country, State, District and Pincode");
-        return;
-      }
-    }
-
-    // Base payload
-    const payload = {
-      password: formData.password,
-      email: formData.email || "",
-      full_name: formData.full_name || "",
-      phone: formData.phone || "",
-      sponsor_id: normalizeSponsor(sponsorId) || "",
-      category,
-    };
-
-    // Non-agency: include location data
-    if (!AGENCY_CATEGORIES.has(category)) {
-      Object.assign(payload, {
-        country: selectedCountry || null,
-        state: selectedState || null,
-        city: selectedCity || null,
-        pincode,
-        country_name: geoCountryName || "",
-        country_code: geoCountryCode || "",
-        state_name: geoStateName || "",
-        city_name: geoCityName || "",
-      });
-    }
-
-    // Attach agency-specific fields
-    if (category === "agency_state_coordinator") {
-      payload.assign_states = assignStates.map((id) => Number(id)).filter(Boolean);
-    } else if (category === "agency_state") {
-      if (selectedState) payload.selected_state = Number(selectedState);
-    } else if (category === "agency_district_coordinator") {
-      if (selectedState) payload.selected_state = Number(selectedState);
-      if (assignDistricts.length) payload.assign_districts = assignDistricts;
-    } else if (category === "agency_district") {
-      if (selectedState) payload.selected_state = Number(selectedState);
-      if (selectedDistrictAgency) payload.selected_district = selectedDistrictAgency.trim();
-    } else if (category === "agency_pincode_coordinator") {
-      if (selectedState) payload.selected_state = Number(selectedState);
-      if (selectedDistrictAgency) payload.selected_district = selectedDistrictAgency.trim();
-      if (assignPincodes.length) payload.assign_pincodes = assignPincodes;
-    } else if (category === "agency_pincode" || category === "agency_sub_franchise") {
-      if (selectedPincodeAgency) payload.selected_pincode = selectedPincodeAgency.trim();
-    }
-
-    try {
-      if (category === "business") {
-        const brPayload = {
-          full_name: formData.full_name || "",
-          email: formData.email || "",
-          phone: formData.phone || "",
-          business_name: formData.business_name || "",
-          business_category: formData.business_category || "",
-          address: formData.address || "",
-          sponsor_id: sponsorId || "",
-          country: selectedCountry || null,
-          state: selectedState || null,
-          city: selectedCity || null,
-          pincode,
-          country_name: geoCountryName || "",
-          country_code: geoCountryCode || "",
-          state_name: geoStateName || "",
-          city_name: geoCityName || "",
-        };
-        await API.post("/business/register/", brPayload);
-        setSuccessMsg("Merchant registration submitted successfully. Admin will review and forward it to the concerned agency. Merchant login is disabled.");
-        setFormData({
-          username: "",
-          password: "",
-          email: "",
-          full_name: "",
-          phone: "",
-          business_name: "",
-          business_category: "",
-          address: "",
-        });
-      } else {
-        const submittedPassword = formData.password;
-        const resp = await API.post("/accounts/register/", payload);
-        const data = resp?.data || {};
-        const uname = data.username || "(generated)";
-        // Success alert + popup with username and password as requested
-        setSuccessMsg(`Welcome to Trikonekt!\nUsername: ${uname}\nPassword: ${submittedPassword}`);
-        setRegSuccessText({ username: uname, password: submittedPassword });
-        setRegSuccessOpen(true);
-        setMode("login");
-        setFormData({
-          username: uname,
-          password: "",
-          email: "",
-          full_name: "",
-          phone: "",
-          business_name: "",
-          business_category: "",
-          address: "",
-        });
-      }
-      setConfirmPassword("");
-      setSelectedCountry("");
-      setSelectedState("");
-      setSelectedCity("");
-      setPincode("");
-      setStates([]);
-      setCities([]);
-      // reset agency inputs
-      setAssignStates([]);
-      setAssignDistricts([]);
-      setSelectedDistrictAgency("");
-      setAssignPincodes([]);
-      setSelectedPincodeAgency("");
     } catch (err) {
       console.error(err);
-      const msg =
-        err?.response?.data ? JSON.stringify(err.response.data) : "Registration failed!";
-      setErrorMsg(typeof msg === "string" ? msg : String(msg));
+      const data = err?.response?.data;
+      if (data?.multiple_accounts && Array.isArray(data.multiple_accounts)) {
+        const choices = data.multiple_accounts.map((a) => a.username).join(", ");
+        setErrorMsg(`Multiple accounts ambiguity. Please enter one of these usernames: ${choices}`);
+      } else {
+        const msg =
+          data?.detail || (data ? JSON.stringify(data) : "Login failed!");
+        setErrorMsg(typeof msg === "string" ? msg : String(msg));
+      }
     }
   };
 
@@ -2245,15 +2068,22 @@ const pincodeOptionsConsumer = useMemo(() => {
       }}
     >
       {/* Nav */}
-      <AppBar position="sticky" sx={{ backgroundColor: "#0C2D48", color: "#fff", boxShadow: "0 2px 8px rgba(2,6,23,0.18)" }}>
+      <AppBar position="sticky" color="default" elevation={0} sx={{ backgroundColor: "#ffffff", color: "#0f172a", borderBottom: "1px solid #e2e8f0" }}>
         <Toolbar sx={{ gap: 2 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, cursor: "pointer" }} onClick={() => navigate("/")}>
             <img src={LOGO} alt="Trikonekt" style={{ height: 38 }} />
           </Box>
           <Box sx={{ flexGrow: 1 }} />
-          <Button color="inherit" sx={{ textTransform: "none", fontWeight: 500 }} onClick={() => navigate("/")}>
-            Home
+          <Button
+            color="inherit"
+            sx={{ textTransform: "none", fontWeight: 600, mr: 1 }}
+            onClick={() => setDrawerOpen(true)}
+          >
+            {prettyRole(role)}
           </Button>
+          <IconButton color="inherit" onClick={() => setDrawerOpen(true)} aria-label="open menu">
+            <MenuIcon />
+          </IconButton>
         </Toolbar>
       </AppBar>
 
@@ -2285,13 +2115,13 @@ const pincodeOptionsConsumer = useMemo(() => {
             onChange={(_, nv) => setMode(nv)}
             variant="fullWidth"
             TabIndicatorProps={{ sx: { backgroundColor: "#1976d2", height: 2 } }}
-            sx={{ mb: 2, "& .MuiTab-root": { textTransform: "none", fontWeight: 600 } }}
+            sx={{ display: "none" }}
           >
             <Tab label="Login" value="login" />
             <Tab label="Register" value="register" />
           </Tabs>
 
-          <Box sx={{ mb: 2 }}>
+          <Box sx={{ mb: 2, display: "none" }}>
             <ToggleButtonGroup
               value={role}
               exclusive
@@ -2359,7 +2189,7 @@ const pincodeOptionsConsumer = useMemo(() => {
           {errorMsg && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setErrorMsg("")}>{errorMsg}</Alert>}
           {successMsg && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccessMsg("")}>{successMsg}</Alert>}
 
-          <Box component="form" noValidate onSubmit={handleSubmit}>
+          <Box component="form" noValidate onSubmit={handleSubmit} className="auth-mobile-full">
             {!isLogin && (
               <Box>
                 {renderRegistrationFields()}
@@ -2475,7 +2305,7 @@ const pincodeOptionsConsumer = useMemo(() => {
             )}
 
             {isLogin && (
-              <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, alignItems: "center", justifyContent: "space-between", mb: 2, gap: 1 }}>
+              <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, alignItems: { xs: "flex-start", sm: "center" }, justifyContent: { xs: "flex-start", sm: "space-between" }, width: "100%", mb: 2, gap: 1 }}>
                 <FormControlLabel
                   sx={{
                     alignItems: "center",
@@ -2512,19 +2342,22 @@ const pincodeOptionsConsumer = useMemo(() => {
             </Button>
 
             {isLogin && (
-              <Box sx={{ display: { xs: "block", sm: "none" }, textAlign: "center", mt: 0.5, mb: 1 }}>
+              <Box sx={{ display: { xs: "block", sm: "none" }, textAlign: "left", mt: 0.5, mb: 1 }}>
                 <Button type="button" size="small" sx={{ textTransform: "none" }} onClick={() => setForgotOpen(true)}>
                   Forgot password?
                 </Button>
               </Box>
             )}
 
-            <Typography variant="body2" align="center" sx={{ color: "text.secondary" }}>
-              {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
-              <Link component="button" type="button" variant="body2" onClick={handleModeChange} sx={{ fontWeight: 700 }}>
-                {isLogin ? "Register" : "Login"}
-              </Link>
-            </Typography>
+            <Box sx={{ mt: 1.5, textAlign: { xs: "left", sm: "center" } }}>
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                Don't have an account?{" "}
+                <Link component="button" type="button" variant="body2" onClick={handleRegisterNav} sx={{ fontWeight: 700 }}>
+                  Register here
+                </Link>
+              </Typography>
+            </Box>
+
           </Box>
 
           {/* Registration success popup */}
@@ -2555,6 +2388,35 @@ const pincodeOptionsConsumer = useMemo(() => {
           </Dialog>
         </Paper>
       </Container>
+
+      {/* Category Drawer */}
+      <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+        <Box sx={{ width: 280 }} role="presentation" onKeyDown={(e) => e.key === "Escape" && setDrawerOpen(false)}>
+          <Box sx={{ px: 2, py: 2 }}>
+            <Typography variant="h6">Select Category</Typography>
+            <Typography variant="body2" color="text.secondary">Choose the category to login.</Typography>
+          </Box>
+          <Divider />
+          <List>
+            <ListItemButton selected={role === "user"} onClick={() => { setRole("user"); setDrawerOpen(false); }}>
+              <ListItemIcon><PersonIcon /></ListItemIcon>
+              <ListItemText primary="Consumer" />
+            </ListItemButton>
+            <ListItemButton selected={role === "agency"} onClick={() => { setRole("agency"); setDrawerOpen(false); }}>
+              <ListItemIcon><StoreIcon /></ListItemIcon>
+              <ListItemText primary="Agency" />
+            </ListItemButton>
+            <ListItemButton selected={role === "employee"} onClick={() => { setRole("employee"); setDrawerOpen(false); }}>
+              <ListItemIcon><WorkIcon /></ListItemIcon>
+              <ListItemText primary="Employee" />
+            </ListItemButton>
+            <ListItemButton selected={role === "business"} onClick={() => { setRole("business"); setDrawerOpen(false); }}>
+              <ListItemIcon><BusinessIcon /></ListItemIcon>
+              <ListItemText primary="Merchant" />
+            </ListItemButton>
+          </List>
+        </Box>
+      </Drawer>
 
       <Box sx={{ py: { xs: 2.5, md: 3 }, textAlign: "center", backgroundColor: "rgba(255,255,255,0.85) !important",
           color: "#000",

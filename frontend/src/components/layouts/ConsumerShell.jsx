@@ -36,6 +36,7 @@ export default function ConsumerShell({ children }) {
     // { to: "/user/app-hub", label: "App Hub", icon: "box" },
     { to: "/user/redeem-coupon", label: "E-Coupon", icon: "ticket" },
     { to: "/user/e-coupon-store", label: "E-Coupon Store", icon: "box" },
+    { to: "/user/cart", label: "Cart", icon: "orders" },
     { to: "/user/wallet", label: "Wallet", icon: "wallet" },
     { to: "/user/refer-earn", label: "Refer & Earn", icon: "upload" },
     { to: "/user/profile", label: "Profile", icon: "users" },

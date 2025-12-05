@@ -51,7 +51,6 @@ import {
   CheckCircleRounded as CheckIcon,
 } from "@mui/icons-material";
 
-import "@fontsource/poppins";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import API from "../../api/api";
 import LOGO from "../../assets/TRIKONEKT.png";
@@ -73,9 +72,6 @@ const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  useEffect(() => {
-    document.body.style.fontFamily = "'Poppins', sans-serif";
-  }, []);
 
   // If a role is locked via route param, force-select it and default to register view for register links
   useEffect(() => {
@@ -2041,7 +2037,7 @@ const Login = () => {
           {errorMsg && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setErrorMsg("")}>{errorMsg}</Alert>}
           {successMsg && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccessMsg("")}>{successMsg}</Alert>}
 
-          <Box component="form" noValidate onSubmit={handleSubmit}>
+          <Box component="form" noValidate onSubmit={handleSubmit} className="auth-mobile-full">
             {!isLogin && (
               <Box>
                 {renderRegistrationFields()}

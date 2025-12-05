@@ -763,6 +763,15 @@ export async function adminRejectPromoPurchase(id, reason = "") {
 }
 
 /**
+ * Marketplace: Product purchase request (consumer checkout -> admin/owner approval)
+ * Payload: { product, quantity, consumer_name, consumer_email, consumer_phone, consumer_address, payment_method }
+ */
+export async function createProductPurchaseRequest(payload = {}) {
+  const res = await API.post("/purchase-requests", payload);
+  return res?.data || res;
+}
+
+/**
  * Rewards Points (coupon activation milestones)
  */
 export async function getRewardPointsSummary() {

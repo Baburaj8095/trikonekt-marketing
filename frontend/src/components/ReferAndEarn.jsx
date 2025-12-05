@@ -96,12 +96,11 @@ export default function ReferAndEarn({ title = "Refer & Earn", onlyConsumer = fa
 
   const getLink = (role, extra = {}) => {
     const params = new URLSearchParams({
-      mode: "register",
-      role,
       ...(sponsorId ? { sponsor: sponsorId } : {}),
       ...extra,
     });
-    return `${origin}/login?${params.toString()}`;
+    const qs = params.toString();
+    return `${origin}/auth/register-v2/${role}${qs ? `?${qs}` : ""}`;
   };
 
   const links = useMemo(() => {

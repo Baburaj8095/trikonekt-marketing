@@ -34,9 +34,9 @@ const theme = createTheme({
     divider: "#e5e7eb",
   },
   typography: {
-    // Professional, readable stack; falls back safely if Inter isn't present
+    // Professional, readable stack; use Montserrat globally
     fontFamily:
-      'Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"',
+      'Montserrat, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"',
     fontSize: 14,
     button: {
       textTransform: "none",
@@ -55,12 +55,26 @@ const theme = createTheme({
       },
     },
 
+    // Set fullWidth by default for inputs and form controls
+    MuiTextField: {
+      defaultProps: {
+        fullWidth: true,
+      },
+    },
+    MuiFormControl: {
+      defaultProps: {
+        fullWidth: true,
+      },
+    },
+
     // Buttons: colorful & professional primary by default
     MuiButton: {
       styleOverrides: {
         root: {
           borderRadius: 10,
           fontWeight: 700,
+          minHeight: 44,
+          padding: "10px 16px",
         },
         containedPrimary: {
           // Subtle blue->green gradient for primary actions across the app
@@ -121,6 +135,7 @@ const theme = createTheme({
           },
         },
         input: {
+          padding: "12px 14px",
           "&.Mui-disabled": {
             WebkitTextFillColor: "#0f172a",
           },

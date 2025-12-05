@@ -19,13 +19,23 @@ export default function PublicNavbar() {
         <Box sx={{ flexGrow: 1, display: "flex", alignItems: "center" }}>
           <img src={LOGO} alt="Trikonekt" style={{ height: 40, marginRight: 10 }} />
         </Box>
-        <Button
-          color="inherit"
-          sx={{ fontWeight: 500, textTransform: "none" }}
-          onClick={() => navigate("/auth/select")}
-        >
-          Trikonekt Account
-        </Button>
+        <Box sx={{ display: "flex", gap: 1 }}>
+          <Button
+            color="inherit"
+            sx={{ fontWeight: 600, textTransform: "none" }}
+            onClick={() => navigate("/auth/login")}
+          >
+            Login
+          </Button>
+          <Button
+            color="inherit"
+            variant="outlined"
+            sx={{ fontWeight: 600, textTransform: "none", borderColor: "rgba(255,255,255,0.7)" }}
+            onClick={() => navigate("/auth/select")}
+          >
+            Register
+          </Button>
+        </Box>
       </Toolbar>
     </AppBar>
   );

@@ -71,6 +71,9 @@ import PromoPackages from "./pages/PromoPackages";
 import TrikonektProducts from "./pages/TrikonektProducts";
 import AgencyMarketplace from "./pages/agency/AgencyMarketplace";
 import AdminRewardPoints from "./pages/admin/AdminRewardPoints";
+import Cart from "./pages/Cart";
+import Checkout from "./pages/Checkout";
+import RegisterV2 from "./pages/Auth/RegisterV2";
 
 function LegacyAuthEntry() {
   const location = useLocation();
@@ -108,6 +111,8 @@ function App() {
         <Route path="/auth/register/:role" element={<EnhancedLogin />} />
         <Route path="/auth/login" element={<Login />} />
         <Route path="/auth/register" element={<EnhancedLogin />} />
+        <Route path="/auth/register-v2" element={<RegisterV2 />} />
+        <Route path="/auth/register-v2/:role" element={<RegisterV2 />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/impersonate" element={<ImpersonateLanding />} />
         <Route path="/agency/impersonate" element={<ImpersonateLanding />} />
@@ -244,6 +249,26 @@ function App() {
           }
         />
         <Route
+          path="/user/cart"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <Cart />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/checkout"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <Checkout />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/upload"
           element={<Navigate to="/user/lucky-draw" replace />}
         />
@@ -345,6 +370,26 @@ function App() {
             <ProtectedRoute allowedRoles={["agency"]}>
               <AgencyShell>
                 <ECouponStore />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agency/cart"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <Cart />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agency/checkout"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <Checkout />
               </AgencyShell>
             </ProtectedRoute>
           }
@@ -455,6 +500,26 @@ function App() {
             <ProtectedRoute allowedRoles={["employee"]}>
               <EmployeeShell>
                 <ECouponStore />
+              </EmployeeShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee/cart"
+          element={
+            <ProtectedRoute allowedRoles={["employee"]}>
+              <EmployeeShell>
+                <Cart />
+              </EmployeeShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee/checkout"
+          element={
+            <ProtectedRoute allowedRoles={["employee"]}>
+              <EmployeeShell>
+                <Checkout />
               </EmployeeShell>
             </ProtectedRoute>
           }

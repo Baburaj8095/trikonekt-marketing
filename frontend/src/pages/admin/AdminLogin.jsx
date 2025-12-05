@@ -237,7 +237,7 @@ export default function AdminLogin() {
             justifyContent: "space-between",
           }}
         >
-          <RouterLink to="/login" style={{ color: "#0f172a", textDecoration: "none" }}>
+          <RouterLink to="/auth/login" style={{ color: "#0f172a", textDecoration: "none" }}>
             Back to User Login
           </RouterLink>
           <RouterLink to="/" style={{ color: "#0f172a", textDecoration: "none" }}>

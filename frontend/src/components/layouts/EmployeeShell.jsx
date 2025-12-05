@@ -41,6 +41,7 @@ export default function EmployeeShell({ children }) {
     { to: "/employee/dashboard?tab=rewards", label: "Rewards", icon: "chart" },
     { to: "/employee/dashboard?tab=e_coupons", label: "My E‑Coupons", icon: "ticket" },
     { to: "/employee/e-coupon-store", label: "E-Coupon Store", icon: "box" },
+    { to: "/employee/cart", label: "Cart", icon: "orders" },
     { to: "/employee/trikonekt-products", label: "Trikonekt Products", icon: "box" },
     { to: "/employee/dashboard?tab=offer_letter", label: "Offer Letter", icon: "file" },
     { to: "/employee/wallet", label: "Wallet", icon: "wallet" },
