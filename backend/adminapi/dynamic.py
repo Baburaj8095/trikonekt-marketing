@@ -11,9 +11,22 @@ from django.core.cache import cache
 def build_serializer(model):
     """
     Create a basic ModelSerializer for the given model with a 'repr' field for __str__.
+    Also expose commonly-needed denormalized fields for UI lists, e.g. user_username
+    when the model has a ForeignKey named 'user'.
     """
+    # Detect presence of FK named 'user' (safe best-effort)
+    try:
+        has_user_fk = any(
+            getattr(f, "name", "") == "user" and getattr(f, "many_to_one", False)
+            for f in model._meta.get_fields()
+        )
+    except Exception:
+        has_user_fk = False
+
     class DynamicSerializer(serializers.ModelSerializer):
         repr = serializers.SerializerMethodField()
+        if has_user_fk:
+            user_username = serializers.SerializerMethodField()
 
         def get_repr(self, obj):
             try:
@@ -21,8 +34,17 @@ def build_serializer(model):
             except Exception:
                 return f"{model.__name__}({getattr(obj, 'pk', None)})"
 
+        if has_user_fk:
+            def get_user_username(self, obj):
+                try:
+                    u = getattr(obj, "user", None)
+                    return getattr(u, "username", None)
+                except Exception:
+                    return None
+
         class Meta:
             model = model
+            # Keep all model fields; declared SerializerMethodFields are included automatically
             fields = "__all__"
 
     return DynamicSerializer

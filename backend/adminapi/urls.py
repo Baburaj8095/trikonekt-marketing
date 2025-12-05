@@ -32,6 +32,7 @@ from .views import (
     AdminLevelCommissionView,
     AdminLevelCommissionSeedView,
     AdminMatrixCommissionConfig,
+    AdminRewardPointsConfig,
 )
 from .dynamic import router as dynamic_router, admin_meta as dynamic_admin_meta, admin_meta_summary, admin_meta_fields
 
@@ -73,6 +74,8 @@ urlpatterns = [
     path("commission/levels/seed/", AdminLevelCommissionSeedView.as_view()),
     # Matrix commission configuration (5-matrix and 3-matrix)
     path("commission/matrix/", AdminMatrixCommissionConfig.as_view()),
+    # Rewards Points (admin configurable schedule)
+    path("rewards/points-config/", AdminRewardPointsConfig.as_view()),
 
     # Support tickets
     path("support/tickets/", AdminSupportTicketList.as_view()),

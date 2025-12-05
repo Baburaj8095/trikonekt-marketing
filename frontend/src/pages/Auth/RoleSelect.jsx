@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Container,
@@ -14,10 +14,12 @@ import PersonIcon from "@mui/icons-material/Person";
 import StoreIcon from "@mui/icons-material/Store";
 import WorkIcon from "@mui/icons-material/Work";
 import BusinessIcon from "@mui/icons-material/Business";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import LOGO from "../../assets/TRIKONEKT.png";
 
-const RoleCard = ({ icon, title, desc, onLogin, onRegister, colors, loginDisabled = false }) => (
+const RoleCard = ({ icon, title, desc, onLogin, onRegister, colors, loginDisabled = false, isActive = false, onSelect }) => (
   <Card
+    onClick={onSelect}
     elevation={4}
     sx={{
       height: "100%",
@@ -27,12 +29,21 @@ const RoleCard = ({ icon, title, desc, onLogin, onRegister, colors, loginDisable
       flexDirection: "column",
       borderRadius: 3,
       overflow: "hidden",
+      position: "relative",
+      cursor: "pointer",
+      transform: isActive ? "translateY(-2px)" : "none",
+      transition: "transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease",
       background: `linear-gradient(135deg, ${colors.bg1} 0%, ${colors.bg2} 100%)`,
       color: colors.fg,
-      boxShadow: `0 10px 24px ${colors.shadow}`,
-      border: `1px solid ${colors.border}`,
+      boxShadow: isActive ? "0 12px 26px rgba(46,125,50,0.35)" : `0 10px 24px ${colors.shadow}`,
+      border: isActive ? "2px solid #2e7d32" : `1px solid ${colors.border}`,
     }}
   >
+    {isActive && (
+      <Box sx={{ position: "absolute", top: 10, right: 10, zIndex: 2 }}>
+        <CheckCircleRoundedIcon sx={{ color: "#2e7d32" }} />
+      </Box>
+    )}
     <Box
       sx={{
         px: 2,
@@ -105,6 +116,7 @@ const RoleCard = ({ icon, title, desc, onLogin, onRegister, colors, loginDisable
 
 export default function RoleSelect() {
   const navigate = useNavigate();
+  const [activeRole, setActiveRole] = useState(null);
 
   // Preserve sponsor param (if provided in the URL) when going to Register
   const sponsorQuery = useMemo(() => {
@@ -121,7 +133,14 @@ export default function RoleSelect() {
     }
   }, []);
 
-  const buildUrl = (role, mode) => `/login?mode=${mode}&role=${role}${mode === "register" ? sponsorQuery : ""}`;
+  const buildUrl = (role, mode) => {
+    if (mode === "register") {
+      // Use role-scoped register route and carry sponsor as query if present
+      return `/auth/register/${role}${sponsorQuery ? `?${sponsorQuery.slice(1)}` : ""}`;
+    }
+    // Use role-scoped login route
+    return `/auth/login/${role}`;
+  };
 
   const palette = {
     consumer: {
@@ -238,6 +257,8 @@ export default function RoleSelect() {
               onLogin={() => navigate(buildUrl("user", "login"))}
               onRegister={() => navigate(buildUrl("user", "register"))}
               colors={palette.consumer}
+              isActive={activeRole === "user"}
+              onSelect={() => setActiveRole("user")}
             />
           </Grid>
 
@@ -249,6 +270,8 @@ export default function RoleSelect() {
               onLogin={() => navigate(buildUrl("employee", "login"))}
               onRegister={() => navigate(buildUrl("employee", "register"))}
               colors={palette.employee}
+              isActive={activeRole === "employee"}
+              onSelect={() => setActiveRole("employee")}
             />
           </Grid>
 
@@ -260,6 +283,8 @@ export default function RoleSelect() {
               onLogin={() => navigate(buildUrl("agency", "login"))}
               onRegister={() => navigate(buildUrl("agency", "register"))}
               colors={palette.agency}
+              isActive={activeRole === "agency"}
+              onSelect={() => setActiveRole("agency")}
             />
           </Grid>
 
@@ -271,6 +296,8 @@ export default function RoleSelect() {
               onRegister={() => navigate(buildUrl("business", "register"))}
               colors={palette.business}
               loginDisabled={true}
+              isActive={activeRole === "business"}
+              onSelect={() => setActiveRole("business")}
             />
           </Grid>
         </Grid>

@@ -48,10 +48,11 @@ import {
   Home as HomeIcon,
   Mail as MailIcon,
   Phone as PhoneIcon,
+  CheckCircleRounded as CheckIcon,
 } from "@mui/icons-material";
 
 import "@fontsource/poppins";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import API from "../../api/api";
 import LOGO from "../../assets/TRIKONEKT.png";
 import "./EnhancedLogin.css";
@@ -61,17 +62,73 @@ const Login = () => {
   // === LOGIC STATES (kept from original) ===
   const [mode, setMode] = useState("login"); // "login" | "register"
   const [role, setRole] = useState("user"); // user | agency | employee | business
+  const ALLOWED_ROLES = ["user", "agency", "employee", "business"];
+  const { role: roleParam } = useParams();
+  const lockedRole = ALLOWED_ROLES.includes(String(roleParam || "").toLowerCase())
+    ? String(roleParam).toLowerCase()
+    : null;
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     document.body.style.fontFamily = "'Poppins', sans-serif";
   }, []);
 
+  // If a role is locked via route param, force-select it and default to register view for register links
+  useEffect(() => {
+    if (lockedRole && role !== lockedRole) {
+      setRole(lockedRole);
+    }
+    if (lockedRole && mode !== "register") {
+      setMode("register");
+    }
+  }, [lockedRole]);
+
+  // Auth redirect behavior:
+  // - Do NOT redirect on any Register route or when query param mode=register.
+  // - In Login mode with a locked role, redirect ONLY if a session exists for that role.
+  // - In Login mode without a locked role, redirect to the first available session.
+  useEffect(() => {
+    try {
+      const path = (location && location.pathname) || "";
+      const qMode = new URLSearchParams((location && location.search) || "").get("mode");
+      if (path.includes("/register") || mode === "register" || String(qMode).toLowerCase() === "register") return;
+
+      const mapLockedToNs = (r) => {
+        const rl = String(r || "").toLowerCase();
+        return ["admin", "user", "agency", "employee", "business"].includes(rl) ? rl : null;
+      };
+
+      const preferredNs = mapLockedToNs(lockedRole);
+      if (preferredNs) {
+        const has =
+          localStorage.getItem(`token_${preferredNs}`) ||
+          sessionStorage.getItem(`token_${preferredNs}`);
+        if (has) {
+          const to = preferredNs === "admin" ? "/admin/dashboard" : `/${preferredNs}/dashboard`;
+          navigate(to, { replace: true });
+        }
+      } else {
+        const nsCandidates = ["admin", "agency", "employee", "user"];
+        const found = nsCandidates.find(
+          (ns) =>
+            localStorage.getItem(`token_${ns}`) ||
+            sessionStorage.getItem(`token_${ns}`)
+        );
+        if (found) {
+          const to = found === "admin" ? "/admin/dashboard" : `/${found}/dashboard`;
+          navigate(to, { replace: true });
+        }
+      }
+    } catch {}
+  }, [location.pathname, location.search, mode, lockedRole, navigate]);
+
   const handleModeChange = () => setMode(mode === "login" ? "register" : "login");
   const handleRoleChange = (_, val) => {
+    if (lockedRole) return;
     if (val) setRole(val);
   };
 
@@ -118,6 +175,10 @@ const Login = () => {
 
   const [sponsorId, setSponsorId] = useState("");
   const [agencyLevel, setAgencyLevel] = useState("");
+  const [sponsorLocked, setSponsorLocked] = useState(false);
+  const [sponsorChecking, setSponsorChecking] = useState(false);
+  const [sponsorValid, setSponsorValid] = useState(null); // null unknown, true valid, false invalid
+  const [sponsorDisplay, setSponsorDisplay] = useState({ name: "", pincode: "", username: "" });
 
   // Normalize sponsor input to avoid passing URLs or malformed strings to the API
   const normalizeSponsor = (val) => {
@@ -290,14 +351,64 @@ const Login = () => {
         params.get("sponsor_id") ||
         params.get("ref");
       const norm = normalizeSponsor(raw || "");
-      if (norm) setSponsorId(norm);
+      if (norm) {
+        setSponsorId(norm);
+        setSponsorLocked(true);
+      }
     } catch {}
   }, []);
 
+  // Auto-select Sub Franchise when registering agency via sponsor link
+  useEffect(() => {
+    if (mode === "register" && role === "agency" && sponsorLocked && !agencyLevel) {
+      setAgencyLevel("sub_franchise");
+    }
+  }, [mode, role, sponsorLocked, agencyLevel]);
+
+  // Live Sponsor validation (register): verify sponsor exists and show identity
+  useEffect(() => {
+    if (mode !== "register") {
+      setSponsorValid(null);
+      return;
+    }
+    const s = normalizeSponsor(sponsorId);
+    if (!s) {
+      setSponsorValid(null);
+      setSponsorDisplay({ name: "", pincode: "", username: "" });
+      return;
+    }
+    setSponsorChecking(true);
+    const t = setTimeout(async () => {
+      let exists = false;
+      let name = "";
+      let pcode = "";
+      let uname = "";
+      try {
+        // Prefer public endpoint that now returns sponsor identity
+        const r = await API.get("/accounts/regions/by-sponsor/", { params: { sponsor: s, level: "state" } });
+        const sp = r?.data?.sponsor || {};
+        name = sp.full_name || sp.username || "";
+        pcode = sp.pincode || "";
+        uname = sp.username || "";
+        exists = Boolean(name || pcode || uname);
+      } catch (_) {
+        exists = false;
+      } finally {
+        setSponsorValid(exists);
+        setSponsorDisplay({ name, pincode: pcode, username: uname || s });
+        setSponsorChecking(false);
+      }
+    }, 450);
+    return () => {
+      setSponsorChecking(false);
+      clearTimeout(t);
+    };
+  }, [mode, sponsorId]);
+
   // Auto detect location
   useEffect(() => {
-    // Only run geolocation during Register and when not Agency/Business
-    if (mode !== "register" || role === "agency" || role === "business") {
+    // Only run geolocation during Register and when not Agency
+    if (mode !== "register" || role === "agency") {
       setManualMode(true);
       setAutoLoading(false);
       return;
@@ -485,6 +596,14 @@ const Login = () => {
 
   // helpers unchanged
   const onlyDigits = (s) => (s || "").replace(/\D/g, "");
+  const normalizePins = (arr) =>
+    Array.from(
+      new Set(
+        (arr || [])
+          .map((p) => onlyDigits(String(p)).slice(0, 6))
+          .filter((p) => /^\d{6}$/.test(p))
+      )
+    );
   const mapAgencyLevelToCategory = (lvl) => {
     switch (lvl) {
       case "state_coordinator":
@@ -546,6 +665,9 @@ const Login = () => {
   const [sponsorPincodes, setSponsorPincodes] = useState([]); // ["585103", ...]
   const [districtPincodes, setDistrictPincodes] = useState([]);
   const [pinByDistrictLoading, setPinByDistrictLoading] = useState(false);
+  // Non-agency (Consumer/Employee/Merchant) district->pincode options
+  const [nonAgencyDistrictPincodes, setNonAgencyDistrictPincodes] = useState([]);
+  const [pinByDistrictLoadingNA, setPinByDistrictLoadingNA] = useState(false);
   // Inputs specific to each category
   const [assignStates, setAssignStates] = useState([]); // array of state IDs (SC)
   // NOTE: reusing selectedState from location section as state PK for agency selection as well
@@ -624,15 +746,19 @@ const Login = () => {
     })();
   }, [isDC, isDistrictCat, isPC, sponsorId, selectedState]);
 
-  // Also load fallback cities list for selected state (for DC when sponsor has no districts)
+  // Also load fallback cities list for selected state (for DC/District/Sub-Franchise)
   useEffect(() => {
-    if ((isDC || isDistrictCat) && selectedState) {
+    if ((isDC || isDistrictCat || isSubFranchiseCat) && selectedState) {
       loadCities(selectedState);
     }
-  }, [isDC, isDistrictCat, selectedState]);
+  }, [isDC, isDistrictCat, isSubFranchiseCat, selectedState]);
 
-  // Compute district options: prefer sponsorDistricts, else fallback to cities list
+  // Compute district options: for Sub-Franchise prefer cities list; otherwise prefer sponsorDistricts, else fallback to cities list
   const districtOptions = useMemo(() => {
+    if (isSubFranchiseCat) {
+      const fromCities = (cities || []).map((c) => c?.name || c?.Name || c?.city || c?.City).filter(Boolean);
+      return Array.from(new Set(fromCities));
+    }
     const fromSponsor = (sponsorDistricts || [])
       .filter((d) => String(d.state_id) === String(selectedState))
       .map((d) => d.district)
@@ -641,10 +767,78 @@ const Login = () => {
     if (fromSponsor.length) {
       return Array.from(new Set(fromSponsor));
     }
-    // Fallback to cities list
     const fromCities = (cities || []).map((c) => c?.name || c?.Name || c?.city || c?.City).filter(Boolean);
     return Array.from(new Set(fromCities));
-  }, [sponsorDistricts, selectedState, cities]);
+  }, [isSubFranchiseCat, sponsorDistricts, selectedState, cities]);
+
+  // Default Country to India for Sub-Franchise and load states
+  useEffect(() => {
+    if (!isSubFranchiseCat) return;
+    if (selectedCountry) return;
+    if (!Array.isArray(countries) || !countries.length) return;
+    const india = countries.find((c) => /india/i.test(String(c?.name || "")));
+    const id = india ? String(india.id) : String(countries[0].id);
+    if (id) {
+      setSelectedCountry(id);
+      loadStates(id);
+    }
+  }, [isSubFranchiseCat, selectedCountry, countries]);
+
+  // Auto-map geo detected Country -> Country select (non-agency)
+  useEffect(() => {
+    if (isAgency || mode !== "register") return;
+    if (selectedCountry) return;
+    const name = String(geoCountryName || "").toLowerCase();
+    if (!name || !Array.isArray(countries) || !countries.length) return;
+    const match = countries.find((c) => String(c?.name || "").toLowerCase() === name);
+    if (match) {
+      const id = String(match.id);
+      setSelectedCountry(id);
+      loadStates(id);
+    }
+  }, [isAgency, mode, geoCountryName, countries, selectedCountry]);
+
+  // Auto-map geo detected State -> State select (non-agency)
+  useEffect(() => {
+    if (isAgency || mode !== "register") return;
+    if (!selectedCountry || selectedState) return;
+    const name = String(geoStateName || "").toLowerCase();
+    if (!name || !Array.isArray(states) || !states.length) return;
+    const match = states.find((s) => String(s?.name || "").toLowerCase() === name);
+    if (match) {
+      const id = String(match.id);
+      setSelectedState(id);
+      loadCities(id);
+    }
+  }, [isAgency, mode, selectedCountry, geoStateName, states, selectedState]);
+
+  // Auto-map geo detected District/City -> District select (non-agency)
+  useEffect(() => {
+    if (isAgency || mode !== "register") return;
+    if (!selectedState || selectedCity) return;
+    const name = String(geoCityName || "").toLowerCase();
+    if (!name || !Array.isArray(cities) || !cities.length) return;
+    const match = cities.find((c) => {
+      const nm = String(c?.name || c?.Name || c?.city || c?.City || "").toLowerCase();
+      return nm === name;
+    });
+    const nm = match?.name || match?.Name || match?.city || match?.City;
+    if (nm) setSelectedCity(nm);
+  }, [isAgency, mode, selectedState, geoCityName, cities, selectedCity]);
+
+  // Auto-select Pincode for non-agency once district pincodes are loaded
+  useEffect(() => {
+    if (isAgency || mode !== "register") return;
+    if (!selectedState || !selectedCity) return;
+    if (!Array.isArray(nonAgencyDistrictPincodes) || nonAgencyDistrictPincodes.length === 0) return;
+    const pin = String(pincode || "").replace(/\D/g, "");
+    if (/^\d{6}$/.test(pin) && nonAgencyDistrictPincodes.includes(pin)) {
+      // already a valid autoselected pin
+      return;
+    }
+    // fallback to the first available pin for the detected district
+    setPincode(nonAgencyDistrictPincodes[0]);
+  }, [isAgency, mode, selectedState, selectedCity, nonAgencyDistrictPincodes, pincode]);
 
   // Fetch sponsor-based pincodes for PC, P and SF
   useEffect(() => {
@@ -663,7 +857,7 @@ const Login = () => {
           params: { sponsor: s, level: "pincode" },
         });
         const pins = resp?.data?.pincodes || [];
-        setSponsorPincodes(pins);
+        setSponsorPincodes(normalizePins(pins));
       } catch {
         setSponsorPincodes([]);
       }
@@ -686,12 +880,22 @@ const Login = () => {
         const resp = await API.get("/location/pincodes/by-district/", {
           params: { district_name: selectedDistrictAgency, state_id: selectedState },
         });
-        const pins = resp?.data?.pincodes || [];
+        const pinsRaw = resp?.data?.pincodes || [];
+        const pins = normalizePins(pinsRaw);
         setDistrictPincodes(pins);
         // Keep only valid selections if options changed
-        setAssignPincodes((prev) => (Array.isArray(prev) ? prev.filter((p) => pins.includes(p)) : []));
-        if (selectedPincodeAgency && !pins.includes(selectedPincodeAgency)) {
-          setSelectedPincodeAgency("");
+        setAssignPincodes((prev) =>
+          Array.isArray(prev)
+            ? prev
+                .map((p) => onlyDigits(String(p)).slice(0, 6))
+                .filter((p) => pins.includes(p))
+            : []
+        );
+        if (selectedPincodeAgency) {
+          const sel = onlyDigits(String(selectedPincodeAgency)).slice(0, 6);
+          if (!pins.includes(sel)) {
+            setSelectedPincodeAgency("");
+          }
         }
       } catch (err) {
         setDistrictPincodes([]);
@@ -702,7 +906,40 @@ const Login = () => {
   }, [isPC, isPincodeCat, isSubFranchiseCat, selectedDistrictAgency, selectedState]);
 
   // Effective pincode options: prefer district-based; if sponsor constraint exists, intersect
+  // Non-agency: load pincode options when State and District (City) are selected
+  useEffect(() => {
+    if (isAgency) {
+      setNonAgencyDistrictPincodes([]);
+      return;
+    }
+    if (!selectedState || !selectedCity) {
+      setNonAgencyDistrictPincodes([]);
+      return;
+    }
+    setPinByDistrictLoadingNA(true);
+    (async () => {
+      try {
+        const resp = await API.get("/location/pincodes/by-district/", {
+          params: { district_name: selectedCity, state_id: selectedState },
+        });
+        const pinsRaw = resp?.data?.pincodes || [];
+        const pins = normalizePins(pinsRaw);
+        setNonAgencyDistrictPincodes(pins);
+        // Clear pincode if it is no longer valid for the selected district
+        setPincode((prev) => (pins.includes(onlyDigits(String(prev)).slice(0, 6)) ? onlyDigits(String(prev)).slice(0, 6) : ""));
+      } catch {
+        setNonAgencyDistrictPincodes([]);
+      } finally {
+        setPinByDistrictLoadingNA(false);
+      }
+    })();
+  }, [isAgency, selectedCity, selectedState]);
+
   const pincodeOptions = useMemo(() => {
+    // Sub‑Franchise should list all pincodes for the selected district irrespective of sponsor coverage
+    if (isSubFranchiseCat) {
+      return Array.isArray(districtPincodes) ? districtPincodes : [];
+    }
     const hasDistrict = Array.isArray(districtPincodes) && districtPincodes.length > 0;
     const hasSponsor = Array.isArray(sponsorPincodes) && sponsorPincodes.length > 0;
     if (hasDistrict && hasSponsor) {
@@ -710,7 +947,7 @@ const Login = () => {
       return districtPincodes.filter((p) => sponsorSet.has(p));
     }
     return hasDistrict ? districtPincodes : sponsorPincodes;
-  }, [districtPincodes, sponsorPincodes]);
+  }, [isSubFranchiseCat, districtPincodes, sponsorPincodes]);
 
   const validateAgencyInputs = () => {
     if (!sponsorId.trim()) {
@@ -790,7 +1027,28 @@ const Login = () => {
         setErrorMsg("One or more selected pincodes are not under the Sponsor's assignment.");
         return false;
       }
-    } else if (isPincodeCat || isSubFranchiseCat) {
+    } else if (isSubFranchiseCat) {
+      if (!selectedState) {
+        setErrorMsg("Please select a State.");
+        return false;
+      }
+      if (!selectedDistrictAgency.trim()) {
+        setErrorMsg("Please select a District.");
+        return false;
+      }
+      if (!selectedPincodeAgency.trim() || !/^\d{6}$/.test(selectedPincodeAgency.trim())) {
+        setErrorMsg("Please select a valid 6-digit pincode.");
+        return false;
+      }
+    } else if (isPincodeCat) {
+      if (!selectedState) {
+        setErrorMsg("Please select a State.");
+        return false;
+      }
+      if (!selectedDistrictAgency.trim()) {
+        setErrorMsg("Please select a District.");
+        return false;
+      }
       if (!selectedPincodeAgency.trim() || !/^\d{6}$/.test(selectedPincodeAgency.trim())) {
         setErrorMsg("Please select a valid 6-digit pincode.");
         return false;
@@ -940,26 +1198,20 @@ const Login = () => {
       setErrorMsg("Sponsor Username is required");
       return;
     }
+    if (sponsorValid === false) {
+      setErrorMsg("Invalid Sponsor Username. Please correct the Sponsor ID.");
+      return;
+    }
 
     // Additional agency-level validations
     if (AGENCY_CATEGORIES.has(category) && !validateAgencyInputs()) {
       return;
     }
 
-    // Keep original location validation ONLY for non-agency registrations
+    // Location selection mandatory for non-agency registrations
     if (!AGENCY_CATEGORIES.has(category)) {
-      const hasSelected = selectedCountry && selectedState;
-      const hasGeo = geoCountryName && geoStateName;
-      if (!(hasSelected || hasGeo)) {
-        setErrorMsg("Select Country & State or enter a valid Pincode to auto-fill");
-        return;
-      }
-      if (!geoCityName) {
-        setErrorMsg("Please enter/confirm City");
-        return;
-      }
-      if (!pincode) {
-        setErrorMsg("Please enter Pincode");
+      if (!selectedCountry || !selectedState || !selectedCity || !pincode) {
+        setErrorMsg("Please select Country, State, District and Pincode");
         return;
       }
     }
@@ -1004,7 +1256,41 @@ const Login = () => {
       if (selectedDistrictAgency) payload.selected_district = selectedDistrictAgency.trim();
       if (assignPincodes.length) payload.assign_pincodes = assignPincodes;
     } else if (category === "agency_pincode" || category === "agency_sub_franchise") {
+      if (selectedState) payload.selected_state = Number(selectedState);
+      if (selectedDistrictAgency) payload.selected_district = selectedDistrictAgency.trim();
       if (selectedPincodeAgency) payload.selected_pincode = selectedPincodeAgency.trim();
+    }
+
+    // Also persist base location on the user for agency categories so Admin table shows Country/State/District/Pincode
+    if (AGENCY_CATEGORIES.has(category)) {
+      const patch = {};
+      if (selectedCountry) patch.country = selectedCountry;
+      if (selectedState) patch.state = Number(selectedState);
+      if (selectedDistrictAgency) patch.city = String(selectedDistrictAgency).trim();
+
+      // pincode: prefer selected single pincode; else first of assign list (for coordinators)
+      if (selectedPincodeAgency) {
+        patch.pincode = String(selectedPincodeAgency).trim();
+      } else if (Array.isArray(assignPincodes) && assignPincodes.length) {
+        patch.pincode = String(assignPincodes[0]).trim();
+      }
+
+      // Friendly names for admin display if backend maps these into user fields
+      const findName = (arr, id) => {
+        try {
+          const m = (arr || []).find((x) => String(x?.id) === String(id));
+          return m?.name || "";
+        } catch {
+          return "";
+        }
+      };
+      const cName = findName(countries, selectedCountry);
+      const sName = findName(states, selectedState);
+      if (cName) patch.country_name = cName;
+      if (sName) patch.state_name = sName;
+      if (selectedDistrictAgency) patch.city_name = String(selectedDistrictAgency).trim();
+
+      Object.assign(payload, patch);
     }
 
     try {
@@ -1226,8 +1512,10 @@ const Login = () => {
               value={sponsorId}
               onChange={(e) => setSponsorId(e.target.value)}
               required
+              disabled={sponsorLocked}
               sx={{ mb: 2 }}
               InputProps={{
+                readOnly: sponsorLocked,
                 startAdornment: (
                   <InputAdornment position="start">
                     <HomeIcon />
@@ -1239,6 +1527,30 @@ const Login = () => {
             {!sponsorId.trim() && (
               <Alert severity="info" sx={{ mb: 2 }}>
                 Enter Sponsor Username to continue selecting regions.
+              </Alert>
+            )}
+
+            {sponsorChecking && (
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+                <CircularProgress size={16} />
+                <Typography variant="body2" color="text.secondary">Validating sponsor…</Typography>
+              </Box>
+            )}
+            {sponsorValid === true && (
+              <Box sx={{ mb: 2 }}>
+                <Alert severity="success" sx={{ mb: 1 }}>
+                  Sponsor verified
+                </Alert>
+                <Box sx={{ p: 1.5, borderRadius: 1, bgcolor: "#f5f9ff", border: "1px solid #e3f2fd" }}>
+                  <Typography variant="body2"><b>Sponsor ID:</b> {sponsorDisplay.username || normalizeSponsor(sponsorId) || "—"}</Typography>
+                  <Typography variant="body2"><b>Name:</b> {sponsorDisplay.name || "—"}</Typography>
+                  <Typography variant="body2"><b>Pincode:</b> {sponsorDisplay.pincode || "—"}</Typography>
+                </Box>
+              </Box>
+            )}
+            {sponsorValid === false && (
+              <Alert severity="error" sx={{ mb: 1 }}>
+                Invalid Sponsor ID. Please correct the Sponsor ID.
               </Alert>
             )}
 
@@ -1289,6 +1601,78 @@ const Login = () => {
               </>
             )}
 
+            {isSubFranchiseCat && (
+              <>
+                <FormControl fullWidth sx={{ mb: 2 }}>
+                  <InputLabel>Country</InputLabel>
+                  <Select
+                    label="Country"
+                    value={selectedCountry}
+                    onChange={handleCountryChange}
+                  >
+                    {(countries || []).map((c) => (
+                      <MenuItem key={c.id} value={String(c.id)}>
+                        {c.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <FormControl fullWidth sx={{ mb: 2 }}>
+                  <InputLabel>State</InputLabel>
+                  <Select
+                    label="State"
+                    value={selectedState}
+                    onChange={(e) => {
+                      setSelectedState(e.target.value);
+                      setAssignDistricts([]);
+                      setSelectedDistrictAgency("");
+                      setSelectedPincodeAgency("");
+                    }}
+                    disabled={!selectedCountry}
+                  >
+                    <MenuItem value="">-- Select --</MenuItem>
+                    {(states || []).map((s) => (
+                      <MenuItem key={s.id} value={String(s.id)}>{s.name}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <FormControl fullWidth sx={{ mb: 2 }}>
+                  <InputLabel>District</InputLabel>
+                  <Select
+                    label="District"
+                    value={selectedDistrictAgency}
+                    onChange={(e) => {
+                      setSelectedDistrictAgency(e.target.value);
+                      setSelectedPincodeAgency("");
+                    }}
+                    disabled={!selectedState}
+                  >
+                    <MenuItem value="">-- Select --</MenuItem>
+                    {(districtOptions || []).map((d) => (
+                      <MenuItem key={d} value={d}>{d}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <FormControl fullWidth sx={{ mb: 2 }}>
+                  <InputLabel>Pincode</InputLabel>
+                  <Select
+                    label="Pincode"
+                    value={selectedPincodeAgency}
+                    onChange={(e) => setSelectedPincodeAgency(e.target.value)}
+                    disabled={!selectedState || !selectedDistrictAgency}
+                  >
+                    <MenuItem value="">-- Select --</MenuItem>
+                    {(pincodeOptions || []).map((pin) => (
+                      <MenuItem key={pin} value={pin}>{pin}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </>
+            )}
+
             {(sponsorId && (isStateCat || isDC || isDistrictCat || isPC)) && (
               <FormControl fullWidth sx={{ mb: 2 }}>
                 <InputLabel>State (under Sponsor)</InputLabel>
@@ -1331,7 +1715,7 @@ const Login = () => {
               </FormControl>
             )}
 
-            {(sponsorId && (isDistrictCat || isPC)) && (
+            {(sponsorId && (isDistrictCat || isPC || isPincodeCat)) && (
               <FormControl fullWidth sx={{ mb: 2 }}>
                 <InputLabel>District (under Sponsor)</InputLabel>
                 <Select
@@ -1374,7 +1758,7 @@ const Login = () => {
               </FormControl>
             )}
 
-            {(sponsorId && (isPincodeCat || isSubFranchiseCat)) && (
+            {(sponsorId && isPincodeCat) && (
               <FormControl fullWidth sx={{ mb: 2 }}>
                 <InputLabel>Pincode (under Sponsor)</InputLabel>
                 <Select
@@ -1629,19 +2013,27 @@ const Login = () => {
                   borderColor: "#e0e0e0",
                   justifyContent: "flex-start",
                 },
+                "& .MuiToggleButton-root.Mui-selected": {
+                  borderColor: "#2e7d32",
+                  backgroundColor: "rgba(46,125,50,0.06)",
+                },
               }}
             >
-              <ToggleButton value="user" aria-label="consumer">
+              <ToggleButton value="user" aria-label="consumer" disabled={Boolean(lockedRole && lockedRole !== "user")}>
                 <PersonIcon sx={{ mr: 1 }} /> Consumer
+                {role === "user" && <CheckIcon sx={{ color: "#2e7d32", ml: "auto" }} />}
               </ToggleButton>
-              <ToggleButton value="agency" aria-label="agency">
+              <ToggleButton value="agency" aria-label="agency" disabled={Boolean(lockedRole && lockedRole !== "agency")}>
                 <StoreIcon sx={{ mr: 1 }} /> Agency
+                {role === "agency" && <CheckIcon sx={{ color: "#2e7d32", ml: "auto" }} />}
               </ToggleButton>
-              <ToggleButton value="employee" aria-label="employee">
+              <ToggleButton value="employee" aria-label="employee" disabled={Boolean(lockedRole && lockedRole !== "employee")}>
                 <WorkIcon sx={{ mr: 1 }} /> Employee
+                {role === "employee" && <CheckIcon sx={{ color: "#2e7d32", ml: "auto" }} />}
               </ToggleButton>
-              <ToggleButton value="business" aria-label="business">
+              <ToggleButton value="business" aria-label="business" disabled={Boolean(lockedRole && lockedRole !== "business")}>
                 <BusinessIcon sx={{ mr: 1 }} /> Business
+                {role === "business" && <CheckIcon sx={{ color: "#2e7d32", ml: "auto" }} />}
               </ToggleButton>
             </ToggleButtonGroup>
           </Box>
@@ -1655,21 +2047,48 @@ const Login = () => {
                 {renderRegistrationFields()}
 
                 {!isAgency && (
-                  <TextField
-                    fullWidth
-                    label="Sponsor Username"
-                    value={sponsorId}
-                    onChange={(e) => setSponsorId(e.target.value)}
-                    required
-                    sx={{ mb: 2 }}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <HomeIcon />
-                        </InputAdornment>
-                      ),
-                    }}
-                  />
+                  <Box sx={{ textAlign: "left" }}>
+                    <TextField
+                      fullWidth
+                      label="Sponsor Username"
+                      value={sponsorId}
+                      onChange={(e) => setSponsorId(e.target.value)}
+                      required
+                      disabled={sponsorLocked}
+                      sx={{ mb: 1 }}
+                      InputProps={{
+                        readOnly: sponsorLocked,
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <HomeIcon />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                    {sponsorChecking && (
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+                        <CircularProgress size={16} />
+                        <Typography variant="body2" color="text.secondary">Validating sponsor…</Typography>
+                      </Box>
+                    )}
+                    {sponsorValid === true && (
+                      <Box sx={{ mb: 2 }}>
+                        <Alert severity="success" sx={{ mb: 1 }}>
+                          Sponsor verified
+                        </Alert>
+                <Box sx={{ p: 1.5, borderRadius: 1, bgcolor: "#f5f9ff", border: "1px solid #e3f2fd" }}>
+                  <Typography variant="body2"><b>Sponsor ID:</b> {sponsorDisplay.username || normalizeSponsor(sponsorId) || "—"}</Typography>
+                  <Typography variant="body2"><b>Name:</b> {sponsorDisplay.name || "—"}</Typography>
+                  <Typography variant="body2"><b>Pincode:</b> {sponsorDisplay.pincode || "—"}</Typography>
+                </Box>
+                      </Box>
+                    )}
+                    {sponsorValid === false && (
+                      <Alert severity="error" sx={{ mb: 1 }}>
+                        Invalid Sponsor ID. Please correct the Sponsor ID.
+                      </Alert>
+                    )}
+                  </Box>
                 )}
 
                 {/* Hide location/pincode/branch UI for Agency registrations */}
@@ -1683,15 +2102,84 @@ const Login = () => {
                     ) : null}
 
                    
-                    <TextField
-                      fullWidth
-                      label="Pincode"
-                      value={pincode}
-                      onChange={(e) => handlePincodeChange(e.target.value)}
-                      type="tel"
-                      inputProps={{ inputMode: "numeric", pattern: "[0-9]*", maxLength: 6 }}
-                      sx={{ mb: 2 }}
-                    />
+                    <FormControl fullWidth sx={{ mb: 2 }}>
+                      <InputLabel>Country</InputLabel>
+                      <Select
+                        label="Country"
+                        value={selectedCountry}
+                        onChange={handleCountryChange}
+                        required
+                      >
+                        {(countries || []).map((c) => (
+                          <MenuItem key={c.id} value={String(c.id)}>
+                            {c.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+
+                    <FormControl fullWidth sx={{ mb: 2 }}>
+                      <InputLabel>State</InputLabel>
+                      <Select
+                        label="State"
+                        value={selectedState}
+                        onChange={handleStateChange}
+                        required
+                        disabled={!selectedCountry}
+                      >
+                        <MenuItem value="">-- Select --</MenuItem>
+                        {(states || []).map((s) => (
+                          <MenuItem key={s.id} value={String(s.id)}>
+                            {s.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+
+                    <FormControl fullWidth sx={{ mb: 2 }}>
+                      <InputLabel>District</InputLabel>
+                      <Select
+                        label="District"
+                        value={selectedCity}
+                        onChange={(e) => {
+                          setSelectedCity(e.target.value);
+                          setPincode("");
+                        }}
+                        required
+                        disabled={!selectedState}
+                      >
+                        <MenuItem value="">-- Select --</MenuItem>
+                        {Array.from(
+                          new Set(
+                            (cities || [])
+                              .map((c) => c?.name || c?.Name || c?.city || c?.City)
+                              .filter(Boolean)
+                          )
+                        ).map((name) => (
+                          <MenuItem key={name} value={name}>
+                            {name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+
+                    <FormControl fullWidth sx={{ mb: 2 }}>
+                      <InputLabel>Pincode</InputLabel>
+                      <Select
+                        label="Pincode"
+                        value={pincode}
+                        onChange={(e) => setPincode(e.target.value)}
+                        required
+                        disabled={!selectedCity || pinByDistrictLoadingNA}
+                      >
+                        <MenuItem value="">-- Select --</MenuItem>
+                        {(nonAgencyDistrictPincodes || []).map((pin) => (
+                          <MenuItem key={pin} value={pin}>
+                            {pin}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
 
                     {/* <Button fullWidth variant="contained" onClick={handleFetchBranches} disabled={(pincode || "").length !== 6 || branchLoading} sx={{ mb: 2, borderRadius: 1, py: 1.05 }}>
                       {branchLoading ? <CircularProgress size={18} color="inherit" /> : "Detect Location"}

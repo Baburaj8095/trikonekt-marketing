@@ -670,5 +670,105 @@ export async function adminUpdateMatrixCommissionConfig(payload = {}) {
   return res?.data || res;
 }
 
+/**
+ * Admin: Rewards Points Config (tiers + per-coupon after base)
+ */
+export async function adminGetRewardPointsConfig() {
+  const res = await API.get("/admin/rewards/points-config/", {
+    cacheTTL: 10_000,
+    dedupe: "cancelPrevious",
+  });
+  return res?.data || res;
+}
+export async function adminUpdateRewardPointsConfig(payload = {}) {
+  const res = await API.patch("/admin/rewards/points-config/", payload);
+  return res?.data || res;
+}
+
+/**
+ * Promo Packages (Consumer + Admin)
+ */
+export async function getPromoPackages() {
+  const res = await API.get("/business/promo/packages/", {
+    cacheTTL: 10_000,
+    dedupe: "cancelPrevious",
+  });
+  return res?.data || res;
+}
+
+export async function listMyPromoPurchases(params = {}) {
+  const res = await API.get("/business/promo/purchases/", { params, dedupe: "cancelPrevious" });
+  return res?.data || res;
+}
+
+export async function createPromoPurchase({
+  package_id,
+  quantity = 1,
+  year = null,
+  month = null,
+  file = null,
+  remarks = "",
+  selected_product_id = null,
+  shipping_address = "",
+  // New Monthly flow
+  package_number = null,
+  boxes = [],
+}) {
+  const fd = new FormData();
+  fd.append("package_id", String(package_id));
+
+  // MONTHLY (boxes) takes precedence over legacy year/month
+  const hasBoxes = Array.isArray(boxes) && boxes.length > 0 && package_number != null;
+  if (hasBoxes) {
+    // quantity equals number of selected boxes
+    const q = Math.max(1, Number(boxes.length) || 1);
+    fd.append("quantity", String(q));
+    fd.append("package_number", String(package_number));
+    for (const b of boxes) {
+      try {
+        fd.append("boxes", String(parseInt(b, 10)));
+      } catch (_) {}
+    }
+  } else {
+    // Legacy path (kept for backward compatibility)
+    const qty = Math.max(1, Number(quantity) || 1);
+    fd.append("quantity", String(qty));
+    if (year != null) fd.append("year", String(year));
+    if (month != null) fd.append("month", String(month));
+  }
+
+  if (file) fd.append("payment_proof", file);
+  if (remarks) fd.append("remarks", String(remarks));
+  if (selected_product_id != null) fd.append("selected_product_id", String(selected_product_id));
+  if (shipping_address) fd.append("shipping_address", String(shipping_address));
+  const res = await API.post("/business/promo/purchases/", fd, {
+    headers: { "Content-Type": "multipart/form-data" },
+    timeout: 30000,
+  });
+  return res?.data || res;
+}
+
+// Admin promo purchases
+export async function adminListPromoPurchases(params = {}) {
+  const res = await API.get("/business/admin/promo/purchases/", { params, dedupe: "cancelPrevious" });
+  return res?.data || res;
+}
+export async function adminApprovePromoPurchase(id) {
+  const res = await API.post(`/business/admin/promo/purchases/${id}/approve/`, {});
+  return res?.data || res;
+}
+export async function adminRejectPromoPurchase(id, reason = "") {
+  const res = await API.post(`/business/admin/promo/purchases/${id}/reject/`, { reason });
+  return res?.data || res;
+}
+
+/**
+ * Rewards Points (coupon activation milestones)
+ */
+export async function getRewardPointsSummary() {
+  const res = await API.get("/business/rewards/points/", { cacheTTL: 10_000, dedupe: "cancelPrevious" });
+  return res?.data || res;
+}
+
 export { ensureFreshAccess, getAccessToken, getRefreshToken };
 export default API;

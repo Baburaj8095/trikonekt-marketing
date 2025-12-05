@@ -543,6 +543,13 @@ export default function AdminDashboard() {
               palette="lime"
             />
             <Card
+              title="Rewards Points Config"
+              value={"Tiers + After"}
+              subtitle=""
+              onClick={() => nav("/admin/rewards/points")}
+              palette="cyan"
+            />
+            <Card
               title="Trikonekt Products"
               value={(data?.market?.products ?? 0)}
               subtitle=""
@@ -555,6 +562,14 @@ export default function AdminDashboard() {
               subtitle=""
               onClick={() => nav("/admin/dashboard-cards")}
               palette="orange"
+            />
+
+            <Card
+              title="Promo Packages"
+              value={"Manage"}
+              subtitle=""
+              onClick={() => nav("/admin/dashboard/models/business/promopackage")}
+              palette="purple"
             />
 
             {/* Admin models as cards (flattened) */}

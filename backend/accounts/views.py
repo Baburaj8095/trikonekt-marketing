@@ -11,7 +11,7 @@ from rest_framework import status, serializers, parsers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum, Count
 from locations.views import _build_district_index, india_place_variants
 from locations.models import State
 from django.http import HttpResponse
@@ -565,7 +565,13 @@ def regions_by_sponsor(request):
         except Exception:
             pins_by_state = []
 
-        return Response({'states': out_states, 'pincodes': out_pincodes, 'pins_by_state': pins_by_state}, status=status.HTTP_200_OK)
+        full_name = getattr(sponsor_user, 'full_name', '') or sponsor_user.username
+        try:
+            derived_pin = out_pincodes[0] if out_pincodes else None
+        except Exception:
+            derived_pin = None
+        pincode = (getattr(sponsor_user, 'pincode', '') or '') or (derived_pin or '')
+        return Response({'states': out_states, 'pincodes': out_pincodes, 'pins_by_state': pins_by_state, 'sponsor': {'username': sponsor_user.username, 'full_name': full_name, 'pincode': pincode}}, status=status.HTTP_200_OK)
 
     if level == 'district':
         # Return distinct districts (optionally filtered by state)
@@ -616,6 +622,15 @@ def regions_by_sponsor(request):
                 # Fail silently and just return districts if anything goes wrong
                 pass
 
+        full_name = getattr(sponsor_user, 'full_name', '') or sponsor_user.username
+        pins = resp.get('pincodes') or []
+        if not pins:
+            try:
+                pins = sorted(_collect_pincodes_from_user_assignments(sponsor_user))
+            except Exception:
+                pins = []
+        pincode = (getattr(sponsor_user, 'pincode', '') or '') or (pins[0] if pins else '')
+        resp['sponsor'] = {'username': sponsor_user.username, 'full_name': full_name, 'pincode': pincode}
         return Response(resp, status=status.HTTP_200_OK)
 
     # level == 'pincode'
@@ -658,7 +673,10 @@ def regions_by_sponsor(request):
                 for _key, pset in (idx.items() if hasattr(idx, 'items') else []):
                     pins.update(pset)
 
-            return Response({'pincodes': sorted(pins)}, status=status.HTTP_200_OK)
+            pins_sorted = sorted(pins)
+            full_name = getattr(sponsor_user, 'full_name', '') or sponsor_user.username
+            pincode = (getattr(sponsor_user, 'pincode', '') or '') or (pins_sorted[0] if pins_sorted else '')
+            return Response({'pincodes': pins_sorted, 'sponsor': {'username': sponsor_user.username, 'full_name': full_name, 'pincode': pincode}}, status=status.HTTP_200_OK)
         except Exception:
             # fall back to sponsor-derived behavior below if any error
             pass
@@ -677,7 +695,9 @@ def regions_by_sponsor(request):
             derived = []
         out_pins = derived
 
-    return Response({'pincodes': out_pins}, status=status.HTTP_200_OK)
+    full_name = getattr(sponsor_user, 'full_name', '') or sponsor_user.username
+    pincode = (getattr(sponsor_user, 'pincode', '') or '') or (out_pins[0] if out_pins else '')
+    return Response({'pincodes': out_pins, 'sponsor': {'username': sponsor_user.username, 'full_name': full_name, 'pincode': pincode}}, status=status.HTTP_200_OK)
 
 
 # Simple hierarchy endpoint for audits and dashboards
@@ -1126,6 +1146,28 @@ class TeamSummaryView(APIView):
             except Exception:
                 pass
 
+        # Direct team (all direct referrals) with phone, pincode, and their direct referral counts
+        try:
+            direct_qs = (
+                CustomUser.objects
+                .filter(registered_by=user)
+                .annotate(direct_referrals=Count("registrations", distinct=True))
+                .order_by("-date_joined")
+            )
+            direct_active = direct_qs.filter(account_active=True).count()
+            direct_inactive = direct_qs.filter(account_active=False).count()
+            # Limit to reasonable number for UI; frontend can page later if needed
+            direct_team = list(
+                direct_qs.values(
+                    "id", "username", "full_name", "category", "role", "date_joined",
+                    "account_active", "phone", "pincode", "direct_referrals"
+                )[:200]
+            )
+            direct_counts = {"active": direct_active, "inactive": direct_inactive}
+        except Exception:
+            direct_team = []
+            direct_counts = {"active": 0, "inactive": 0}
+
         return Response(
             {
                 "downline": {
@@ -1142,6 +1184,8 @@ class TeamSummaryView(APIView):
                 "generation_levels_breakdown": gen_breakdown,
                 "commissions_split": comm_split,
                 "matrix_progress": matrix,
+                "direct_team": direct_team,
+                "direct_team_counts": direct_counts,
                 "recent_team": recent_team,
                 "recent_transactions": recent_tx,
             },

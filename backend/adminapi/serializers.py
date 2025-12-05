@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from accounts.models import CustomUser, WithdrawalRequest, UserKYC, WalletTransaction, SupportTicket, SupportTicketMessage
+from accounts.models import CustomUser, WithdrawalRequest, UserKYC, WalletTransaction, SupportTicket, SupportTicketMessage, AgencyRegionAssignment
 from market.models import PurchaseRequest, BannerPurchaseRequest
 from business.models import UserMatrixProgress, CommissionConfig
 from locations.models import Country, State, City
@@ -24,6 +24,8 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
     password_status = serializers.SerializerMethodField()
     password_algo = serializers.SerializerMethodField()
     password_plain = serializers.SerializerMethodField()
+    activated_ecoupon_count = serializers.SerializerMethodField()
+    last_promo_package = serializers.SerializerMethodField()
 
     class Meta:
         model = CustomUser
@@ -55,25 +57,87 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
             "kyc_verified_at",
             "kyc_status",
             "commission_level",
+            "activated_ecoupon_count",
+            "last_promo_package",
             "account_active",
         ]
 
     def get_state_name(self, obj):
         try:
-            return obj.state.name if getattr(obj, "state_id", None) else ""
+            if getattr(obj, "state_id", None):
+                return obj.state.name
+            # Fallback via prefetched agency assignments when state FK isn't set on user
+            try:
+                pref = getattr(obj, "prefetched_agency_assignments", None)
+                if pref is not None:
+                    assn = pref[0] if len(pref) > 0 else None
+                else:
+                    assn = (
+                        AgencyRegionAssignment.objects.select_related("state")
+                        .filter(user_id=getattr(obj, "id", None))
+                        .order_by("id")
+                        .first()
+                    )
+            except Exception:
+                assn = None
+            if assn and getattr(assn, "state", None):
+                return assn.state.name or ""
+            return ""
         except Exception:
             return ""
 
     def get_country_name(self, obj):
         try:
-            return obj.country.name if getattr(obj, "country_id", None) else ""
+            if getattr(obj, "country_id", None):
+                return obj.country.name
+            # Derive from user's state if present
+            try:
+                if getattr(obj, "state_id", None) and getattr(obj.state, "country_id", None):
+                    return obj.state.country.name or ""
+            except Exception:
+                pass
+            # Fallback via agency assignments
+            try:
+                pref = getattr(obj, "prefetched_agency_assignments", None)
+                if pref is not None:
+                    assn = pref[0] if len(pref) > 0 else None
+                else:
+                    assn = (
+                        AgencyRegionAssignment.objects.select_related("state__country")
+                        .filter(user_id=getattr(obj, "id", None))
+                        .order_by("id")
+                        .first()
+                    )
+            except Exception:
+                assn = None
+            if assn and getattr(assn, "state", None) and getattr(assn.state, "country_id", None):
+                return assn.state.country.name or ""
+            return ""
         except Exception:
             return ""
 
     def get_district_name(self, obj):
         try:
-            # Map "District" to City model's name (as per schema)
-            return obj.city.name if getattr(obj, "city_id", None) else ""
+            # Prefer City FK when present
+            if getattr(obj, "city_id", None):
+                return obj.city.name
+            # Fallback via agency assignments where district is stored as a string
+            try:
+                pref = getattr(obj, "prefetched_agency_assignments", None)
+                if pref is not None:
+                    assn = pref[0] if len(pref) > 0 else None
+                else:
+                    assn = (
+                        AgencyRegionAssignment.objects
+                        .filter(user_id=getattr(obj, "id", None))
+                        .order_by("id")
+                        .first()
+                    )
+            except Exception:
+                assn = None
+            if assn and getattr(assn, "district", ""):
+                return assn.district or ""
+            return ""
         except Exception:
             return ""
 
@@ -288,6 +352,72 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
         except Exception:
             return ""
 
+
+    def get_activated_ecoupon_count(self, obj):
+        """
+        Activated E‑Coupons shown in Admin Users:
+        - Physical/Lucky path: count of AGENCY_APPROVED submissions by the user
+        - E‑Coupon path: unique coupon codes either ACTIVATED (audit) or REDEEMED
+          (union of coupon_code ids to avoid double counting).
+        """
+        try:
+            ctx = getattr(self, "context", {}) or {}
+            if ctx.get("purpose") != "detail":
+                return int(getattr(obj, "activated_ecoupon_count", 0) or 0)
+            uid = getattr(obj, "id", None)
+            if not uid:
+                return 0
+            from coupons.models import CouponSubmission, AuditTrail, CouponCode
+            # Physical coupons via submission approvals
+            sub_cnt = int(
+                CouponSubmission.objects.filter(
+                    consumer_id=uid, status="AGENCY_APPROVED"
+                ).count()
+            )
+            # E‑coupon activations via explicit activation endpoint (distinct coupon_code_id)
+            act_ids = list(
+                AuditTrail.objects.filter(
+                    action="coupon_activated", actor_id=uid
+                ).values_list("coupon_code_id", flat=True).distinct()
+            )
+            # E‑coupon redemptions (owned by this user)
+            red_ids = list(
+                CouponCode.objects.filter(
+                    assigned_consumer_id=uid, status="REDEEMED"
+                ).values_list("id", flat=True)
+            )
+            # Unique set of e‑coupon codes that are activated/redeemed
+            ecodes = set([i for i in act_ids if i] + [i for i in red_ids if i])
+            return sub_cnt + len(ecodes)
+        except Exception:
+            return 0
+
+    def get_last_promo_package(self, obj):
+        try:
+            # Prefer prefetched approved purchases (to_attr="approved_promo_purchases") to avoid N+1
+            pp = None
+            try:
+                pre = getattr(obj, "approved_promo_purchases", None)
+                if isinstance(pre, list) and pre:
+                    pp = pre[0]
+            except Exception:
+                pp = None
+            if pp is None:
+                from business.models import PromoPurchase
+                pp = (
+                    PromoPurchase.objects.select_related("package")
+                    .filter(user_id=getattr(obj, "id", None), status="APPROVED")
+                    .order_by("-approved_at", "-id")
+                    .first()
+                )
+            if not pp:
+                return ""
+            pkg = getattr(pp, "package", None)
+            code = (getattr(pkg, "code", "") or "").strip()
+            name = (getattr(pkg, "name", "") or "").strip()
+            return f"{code} — {name}" if code and name else (name or code or "")
+        except Exception:
+            return ""
 
 class AdminKYCSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(source="user.id", read_only=True)

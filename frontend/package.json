@@ -10,6 +10,7 @@
     "@mui/material": "^7.3.4",
     "@mui/x-data-grid": "^8.17.0",
     "axios": "^1.12.2",
+    "dayjs": "^1.11.19",
     "http-proxy-middleware": "2.0.9",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

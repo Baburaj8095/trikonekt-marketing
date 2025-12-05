@@ -1,7 +1,7 @@
 from datetime import date
 from decimal import Decimal
 
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, Q, Sum, Prefetch
 from django.utils import timezone
 from django.core.cache import cache
 from rest_framework.views import APIView
@@ -10,11 +10,11 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from accounts.models import CustomUser, Wallet, WalletTransaction, UserKYC, WithdrawalRequest, SupportTicket, SupportTicketMessage
+from accounts.models import CustomUser, Wallet, WalletTransaction, UserKYC, WithdrawalRequest, SupportTicket, SupportTicketMessage, AgencyRegionAssignment
 from coupons.models import Coupon, CouponCode, CouponSubmission, CouponBatch
 from uploads.models import FileUpload, DashboardCard, HomeCard, LuckyDrawSubmission
 from market.models import Product, PurchaseRequest, Banner, BannerItem, BannerPurchaseRequest
-from business.models import UserMatrixProgress, AutoPoolAccount, DailyReport, CommissionConfig
+from business.models import UserMatrixProgress, AutoPoolAccount, DailyReport, CommissionConfig, PromoPurchase
 from .permissions import IsAdminOrStaff
 from .serializers import AdminUserNodeSerializer, AdminKYCSerializer, AdminWithdrawalSerializer, AdminMatrixProgressSerializer, AdminSupportTicketSerializer, AdminSupportTicketMessageSerializer, AdminUserEditSerializer, AdminAutopoolTxnSerializer, AdminAutopoolConfigSerializer
 from .dynamic import field_meta_from_serializer
@@ -323,9 +323,49 @@ class AdminUsersList(ListAPIView):
     def get_queryset(self):
         qs = (
             CustomUser.objects
-            .select_related("country", "state", "city", "wallet", "kyc")
-            .prefetch_related("matrix_progress")
-            .annotate(direct_count=Count("registrations", distinct=True))
+            .select_related("country", "state", "city", "wallet", "kyc", "registered_by")
+            .prefetch_related(
+                "matrix_progress",
+                Prefetch(
+                    "promo_purchases",
+                    queryset=PromoPurchase.objects.select_related("package")
+                    .filter(status="APPROVED")
+                    .order_by("-approved_at", "-id"),
+                    to_attr="approved_promo_purchases",
+                ),
+                Prefetch(
+                    "region_assignments",
+                    queryset=AgencyRegionAssignment.objects.select_related("state", "state__country").order_by("id"),
+                    to_attr="prefetched_agency_assignments",
+                ),
+            )
+            .annotate(
+                direct_count=Count("registrations", distinct=True),
+                activated_ecoupon_count=Count(
+                    "coupon_submissions",
+                    filter=Q(coupon_submissions__status="AGENCY_APPROVED"),
+                    distinct=True,
+                ),
+            )
+            .only(
+                # Base fields used by AdminUserNodeSerializer and filters
+                "id", "username", "full_name", "email", "role", "category",
+                "phone", "pincode", "date_joined", "is_active", "account_active",
+                "prefixed_id", "sponsor_id", "unique_id", "first_purchase_activated_at",
+                "avatar",
+                # Geo relations displayed in serializer
+                "country__id", "country__name",
+                "state__id", "state__name",
+                "city__id", "city__name",
+                # Registered by (for sponsor display)
+                "registered_by__username", "registered_by__prefixed_id",
+                # Wallet summary used in list grid
+                "wallet__main_balance", "wallet__balance",
+                # KYC status in list grid
+                "kyc__verified", "kyc__verified_at",
+                # Password metadata (status/algo only)
+                "password", "last_password_encrypted",
+            )
         )
         role = (self.request.query_params.get("role") or "").strip()
         phone = (self.request.query_params.get("phone") or "").strip()
@@ -395,8 +435,8 @@ class AdminUsersList(ListAPIView):
 
     def get_serializer_context(self):
         ctx = super().get_serializer_context()
-        # Allow decrypted last password to be included for admins in list view as well
-        ctx["purpose"] = "detail"
+        # List view context: keep response lightweight and avoid decryption and heavy work
+        ctx["purpose"] = "list"
         return ctx
 
     def list(self, request, *args, **kwargs):
@@ -416,7 +456,19 @@ class AdminUsersList(ListAPIView):
         start = (page - 1) * page_size
         end = start + page_size
         serializer = self.get_serializer(qs[start:end], many=True)
-        return Response({"count": total, "results": serializer.data}, status=200)
+        total_pages = (total + page_size - 1) // page_size
+        return Response(
+            {
+                "count": total,
+                "page": page,
+                "page_size": page_size,
+                "total_pages": total_pages,
+                "has_next": end < total,
+                "has_prev": start > 0,
+                "results": serializer.data,
+            },
+            status=200,
+        )
 
 
 class AdminUserEditMetaView(APIView):
@@ -1755,3 +1807,121 @@ class AdminMatrixCommissionConfig(APIView):
             obj = ser.save()
             return Response(AdminAutopoolConfigSerializer(obj).data, status=200)
         return Response(ser.errors, status=400)
+
+
+class AdminRewardPointsConfig(APIView):
+    """
+    GET: Return admin-configurable Reward Points schedule used by /business/rewards/points/
+         {
+           "tiers": [ { "count": 1, "points": 1000 }, ..., { "count": 5, "points": 110000 } ],
+           "after": { "base_count": 5, "per_coupon": 20000 },
+           "updated_at": "..."
+         }
+    PATCH: Update any subset of the above keys with validation.
+           - tiers: array of {count:int>=1, points:int>=0}, sorted and unique by count
+           - after.base_count: int >= max(tiers.count)
+           - after.per_coupon: int >= 0
+    """
+    permission_classes = [IsAdminOrStaff]
+
+    def _default_config(self):
+        return {
+            "tiers": [
+                {"count": 1, "points": 1000},
+                {"count": 2, "points": 10000},
+                {"count": 3, "points": 30000},
+                {"count": 4, "points": 60000},
+                {"count": 5, "points": 110000},
+            ],
+            "after": {"base_count": 5, "per_coupon": 20000},
+        }
+
+    def _serialize(self, cfg):
+        conf = dict(getattr(cfg, "reward_points_config_json", {}) or {})
+        # Fill defaults if missing/invalid
+        try:
+            tiers = conf.get("tiers") or []
+            after = conf.get("after") or {}
+            if not isinstance(tiers, list) or not tiers:
+                raise ValueError("tiers missing")
+            norm_tiers = []
+            seen = set()
+            for t in tiers:
+                c = int(t.get("count"))
+                p = int(t.get("points"))
+                if c < 1 or p < 0:
+                    raise ValueError("invalid tier")
+                if c in seen:
+                    continue
+                seen.add(c)
+                norm_tiers.append({"count": c, "points": p})
+            norm_tiers.sort(key=lambda x: x["count"])
+            base_count = int(after.get("base_count", norm_tiers[-1]["count"]))
+            per_coupon = int(after.get("per_coupon", 0))
+            if base_count < norm_tiers[-1]["count"] or per_coupon < 0:
+                raise ValueError("invalid after")
+            conf = {"tiers": norm_tiers, "after": {"base_count": base_count, "per_coupon": per_coupon}}
+        except Exception:
+            conf = self._default_config()
+        conf["updated_at"] = getattr(cfg, "updated_at", None)
+        return conf
+
+    def get(self, request):
+        cfg = CommissionConfig.get_solo()
+        return Response(self._serialize(cfg), status=200)
+
+    def patch(self, request):
+        cfg = CommissionConfig.get_solo()
+        existing = self._serialize(cfg)
+        data = request.data or {}
+
+        # Start from existing; override selectively
+        tiers_in = data.get("tiers", None)
+        after_in = data.get("after", None)
+
+        new_conf = {
+            "tiers": existing.get("tiers") or self._default_config()["tiers"],
+            "after": existing.get("after") or self._default_config()["after"],
+        }
+
+        # Validate tiers if provided
+        if tiers_in is not None:
+            if not isinstance(tiers_in, list) or not tiers_in:
+                return Response({"detail": "tiers must be a non-empty array"}, status=400)
+            try:
+                norm = []
+                seen = set()
+                for t in tiers_in:
+                    c = int(t.get("count"))
+                    p = int(t.get("points"))
+                    if c < 1 or p < 0:
+                        return Response({"detail": "each tier must have count>=1 and points>=0"}, status=400)
+                    if c in seen:
+                        return Response({"detail": f"duplicate count in tiers: {c}"}, status=400)
+                    seen.add(c)
+                    norm.append({"count": c, "points": p})
+                norm.sort(key=lambda x: x["count"])
+                new_conf["tiers"] = norm
+            except Exception:
+                return Response({"detail": "invalid tiers payload"}, status=400)
+
+        # Validate after if provided
+        if after_in is not None:
+            try:
+                base_count = int(after_in.get("base_count", new_conf["after"]["base_count"]))
+                per_coupon = int(after_in.get("per_coupon", new_conf["after"]["per_coupon"]))
+                max_tier = max(t["count"] for t in (new_conf["tiers"] or [{"count": 1}]))
+                if base_count < max_tier:
+                    return Response({"detail": f"after.base_count must be >= max tier count ({max_tier})"}, status=400)
+                if per_coupon < 0:
+                    return Response({"detail": "after.per_coupon must be >= 0"}, status=400)
+                new_conf["after"] = {"base_count": base_count, "per_coupon": per_coupon}
+            except Exception:
+                return Response({"detail": "invalid after payload"}, status=400)
+
+        cfg.reward_points_config_json = new_conf
+        try:
+            cfg.save(update_fields=["reward_points_config_json", "updated_at"])
+        except Exception:
+            cfg.save()
+        return Response(self._serialize(cfg), status=200)

@@ -137,6 +137,64 @@ export default function ModelFormDialog({
     );
   };
 
+  // Detect FK (PrimaryKeyRelatedField) via configured lookups for this route/field
+  const routeKey = React.useMemo(() => {
+    try {
+      const m = String(route || "").match(/admin\/dynamic\/([^/]+)\/([^/]+)\//);
+      return m ? `${m[1]}/${m[2]}` : "";
+    } catch {
+      return "";
+    }
+  }, [route]);
+
+  // Known FK lookups to render searchable dropdowns instead of raw text
+  const FK_LOOKUPS = React.useMemo(
+    () => ({
+      "business/promomonthlypackage": {
+        package: { route: "admin/dynamic/business/promopackage/", labelField: "name", valueField: "id" },
+      },
+      "business/promopackageproduct": {
+        package: { route: "admin/dynamic/business/promopackage/", labelField: "name", valueField: "id" },
+        product: { route: "admin/dynamic/market/product/", labelField: "name", valueField: "id" },
+      },
+    }),
+    []
+  );
+
+  const getLookupConfig = (fieldName) =>
+    (FK_LOOKUPS?.[routeKey] && FK_LOOKUPS[routeKey][fieldName]) ? FK_LOOKUPS[routeKey][fieldName] : null;
+
+  const isRelationField = (f) => {
+    const t = String(f.type || "");
+    return t === "PrimaryKeyRelatedField" || !!getLookupConfig(f.name);
+  };
+
+  // Remote options state (per-FK field)
+  const [remoteOptions, setRemoteOptions] = React.useState({});
+  const [remoteLoading, setRemoteLoading] = React.useState({});
+
+  const fetchRemoteOptions = React.useCallback(async (fieldName, query = "") => {
+    const conf = getLookupConfig(fieldName);
+    if (!conf || !conf.route) return;
+    setRemoteLoading((s) => ({ ...s, [fieldName]: true }));
+    try {
+      const params = { page: 1, page_size: 50 };
+      if (query && String(query).trim()) params.search = String(query).trim();
+      const { data } = await API.get(conf.route, { params });
+      const results = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
+      const mapped = results.map((r) => {
+        const val = r?.[conf.valueField];
+        const label = r?.[conf.labelField] || r?.code || r?.repr || r?.__str__ || String(val);
+        return { value: val, label };
+      });
+      setRemoteOptions((s) => ({ ...s, [fieldName]: mapped }));
+    } catch {
+      setRemoteOptions((s) => ({ ...s, [fieldName]: [] }));
+    } finally {
+      setRemoteLoading((s) => ({ ...s, [fieldName]: false }));
+    }
+  }, [getLookupConfig]);
+
   function inputType(f) {
     const t = String(f.type || "").toLowerCase();
     if (t.includes("password")) return "password";
@@ -153,6 +211,18 @@ export default function ModelFormDialog({
     const t = String(f.type || "").toLowerCase();
     return t.includes("text") || t.includes("json");
   }
+
+  // Helpers to coerce relation values to PK integers when possible
+  const coerceRelationValue = (f, v) => {
+    if (v === "" || v === null || v === undefined) return v;
+    if (typeof v === "object" && v) {
+      const id = v.id ?? v.value ?? v.pk;
+      if (id !== undefined && id !== null) return id;
+    }
+    const s = String(v);
+    if (/^\d+$/.test(s)) return parseInt(s, 10);
+    return v;
+  };
 
   async function submit() {
     setSaving(true);
@@ -192,6 +262,11 @@ export default function ModelFormDialog({
             }
           }
 
+          // Coerce relation PKs
+          if (isRelationField(f)) {
+            v = coerceRelationValue(f, v);
+          }
+
           if (typeof v === "boolean") {
             form.append(f.name, v ? "true" : "false");
           } else {
@@ -220,6 +295,11 @@ export default function ModelFormDialog({
               if (!Number.isNaN(n)) v = n;
             }
           }
+
+          if (isRelationField(f)) {
+            v = coerceRelationValue(f, v);
+          }
+
           payload[f.name] = v;
         }
         dataToSend = payload;
@@ -264,12 +344,13 @@ export default function ModelFormDialog({
             pt: 1,
           }}
         >
-          {formFields
+          {(formFields || [])
             .filter((f) => f.name !== "id" && f.name !== "pk")
             .map((f) => {
               const val = values[f.name];
               const label = f.label || f.name;
               const readOnly = !!f.read_only;
+              const relation = isRelationField(f);
 
               if (isBooleanField(f)) {
                 return (
@@ -325,7 +406,10 @@ export default function ModelFormDialog({
                     </span>
                   </div>
                 );
-              } else if (isChoiceField(f)) {
+              }
+
+              // If backend provides small explicit choices, use them (not for relations)
+              if (isChoiceField(f) && !relation) {
                 return (
                   <TextField
                     key={f.name}
@@ -351,6 +435,35 @@ export default function ModelFormDialog({
                 );
               }
 
+              // Render relation dropdown for FK fields
+              if (relation) {
+                return (
+                  <TextField
+                    key={f.name}
+                    select
+                    label={label}
+                    value={val ?? ""}
+                    onChange={(e) => handleChange(f.name, e.target.value)}
+                    disabled={readOnly}
+                    required={!!f.required}
+                    error={!!errors[f.name]}
+                    helperText={errors[f.name] || f.help_text || " "}
+                    size="small"
+                    SelectProps={{ onOpen: () => fetchRemoteOptions(f.name) }}
+                  >
+                    <MenuItem value="">
+                      <em>—</em>
+                    </MenuItem>
+                    {(remoteOptions[f.name] || []).map((opt) => (
+                      <MenuItem key={String(opt.value)} value={opt.value}>
+                        {opt.label}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                );
+              }
+
+              // Default input
               return (
                 <TextField
                   key={f.name}

@@ -17,17 +17,20 @@ import {
   Button,
   Collapse,
   Tabs,
-  Tab
+  Tab,
+  Chip
 } from "@mui/material";
-import API from "../api/api";
+import API, { listMyPromoPurchases } from "../api/api";
 import LOGO from "../assets/TRIKONEKT.png";
 import banner_wg from "../assets/Wealth_Galaxy.jpg";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import MenuIcon from "@mui/icons-material/Menu";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ReferAndEarn from "../components/ReferAndEarn";
 import AppHub from "./AppHub";
+import RewardPointsCard from "../components/RewardPointsCard";
 import APP_STORE from "../assets/app-store.png";
 import GOOGLE_STORE from "../assets/google-play-store.png";
 import PLAY_STORE_SCREEN from "../assets/play_store_screen.webp";
@@ -179,6 +182,114 @@ function KpiCard({ title, value, subtitle, onClick, palette = "blue" }) {
   );
 }
 
+// Modern pricing tier card for Promo Packages (Twitter/X-like styling)
+function PricingTierCard({
+  tierName,
+  price,
+  features = [],
+  highlighted = false,
+  owned = false,
+  onClick,
+}) {
+  return (
+    <Box sx={{ position: "relative" }}>
+      <Box
+        sx={{
+          p: 0.75,
+          borderRadius: 3,
+          background: highlighted
+            ? "linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%)"
+            : "linear-gradient(135deg, #e2e8f0, #e2e8f0)",
+          boxShadow: highlighted ? "0 10px 24px rgba(124,58,237,0.25)" : "0 4px 12px rgba(0,0,0,0.06)",
+        }}
+      >
+        <Box
+          sx={{
+            borderRadius: 2,
+            p: 2,
+            bgcolor: "#0f172a",
+            color: "#e5e7eb",
+            border: "1px solid",
+            borderColor: "rgba(255,255,255,0.08)",
+            minHeight: 220,
+            display: "flex",
+            flexDirection: "column",
+            gap: 1,
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+            <Typography variant="subtitle2" sx={{ letterSpacing: 0.3, fontWeight: 800, color: "#93c5fd" }}>
+              {tierName}
+            </Typography>
+            {highlighted ? (
+              <Box
+                sx={{
+                  fontSize: 11,
+                  px: 1,
+                  py: 0.5,
+                  borderRadius: 1,
+                  bgcolor: "rgba(124,58,237,0.18)",
+                  color: "#c4b5fd",
+                  fontWeight: 700,
+                }}
+              >
+                Popular
+              </Box>
+            ) : null}
+          </Box>
+
+          <Typography variant="h5" sx={{ fontWeight: 900, color: "#ffffff", mb: 1 }}>
+            {price}
+          </Typography>
+
+          <Box component="ul" sx={{ listStyle: "none", p: 0, m: 0, display: "grid", gap: 0.75 }}>
+            {features.map((f, idx) => (
+              <Box
+                component="li"
+                key={idx}
+                sx={{ display: "flex", alignItems: "center", gap: 1, color: "#cbd5e1", fontSize: 13 }}
+              >
+                <CheckCircleIcon sx={{ fontSize: 16, color: "#22c55e" }} /> {f}
+              </Box>
+            ))}
+          </Box>
+
+          <Box sx={{ mt: "auto", pt: 1 }}>
+            <Button
+              fullWidth
+              variant="contained"
+              color="primary"
+              onClick={onClick}
+              sx={{ textTransform: "none", fontWeight: 700 }}
+            >
+              Buy Now
+            </Button>
+          </Box>
+
+          {owned ? (
+            <Box
+              sx={{
+                position: "absolute",
+                top: 10,
+                right: 10,
+                fontSize: 11,
+                px: 1,
+                py: 0.5,
+                borderRadius: 1,
+                bgcolor: "#dcfce7",
+                color: "#166534",
+                fontWeight: 700,
+              }}
+            >
+              Owned
+            </Box>
+          ) : null}
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
 export default function UserDashboard({ embedded = false }) {
   const navigate = useNavigate();
   const [cards, setCards] = useState([]);
@@ -290,6 +401,12 @@ export default function UserDashboard({ embedded = false }) {
   const [ecSummaryLoading, setEcSummaryLoading] = useState(false);
   const [ecSummaryError, setEcSummaryError] = useState("");
 
+  // Promo package purchase ticks
+  const [promoPurchases, setPromoPurchases] = useState([]);
+  const [purchasedPrime150, setPurchasedPrime150] = useState(false);
+  const [purchasedPrime750, setPurchasedPrime750] = useState(false);
+  const [purchasedMonthly, setPurchasedMonthly] = useState(false);
+
   // Account activation status
   const [activation, setActivation] = useState(null);
   const [activationLoading, setActivationLoading] = useState(false);
@@ -392,6 +509,40 @@ export default function UserDashboard({ embedded = false }) {
     }
   };
 
+  const loadPromoPurchases = async () => {
+    try {
+      const res = await listMyPromoPurchases();
+      const list = Array.isArray(res) ? res : (res?.results || []);
+      setPromoPurchases(list || []);
+      const valid = (list || []).filter((pp) => {
+        const st = String(pp?.status || "").toUpperCase();
+        return st === "APPROVED";
+      });
+      let has150 = false, has750 = false, hasMonthly = false;
+      for (const pp of valid) {
+        const pkg = pp?.package || {};
+        const type = String(pkg?.type || "");
+        const name = String(pkg?.name || "").toLowerCase();
+        const code = String(pkg?.code || "").toLowerCase();
+        const price = Number(pkg?.price || 0);
+        if (type === "MONTHLY") {
+          hasMonthly = true;
+        } else if (type === "PRIME") {
+          if (Math.abs(price - 150) < 0.5 || name.includes("150") || code.includes("150")) has150 = true;
+          if (Math.abs(price - 750) < 0.5 || name.includes("750") || code.includes("750")) has750 = true;
+        }
+      }
+      setPurchasedPrime150(has150);
+      setPurchasedPrime750(has750);
+      setPurchasedMonthly(hasMonthly);
+    } catch (e) {
+      setPromoPurchases([]);
+      setPurchasedPrime150(false);
+      setPurchasedPrime750(false);
+      setPurchasedMonthly(false);
+    }
+  };
+
   useEffect(() => {
     loadWallet();
     loadCodes();
@@ -399,6 +550,7 @@ export default function UserDashboard({ embedded = false }) {
     loadWalletDirectCommission();
     loadActivationStatus();
     loadEcSummary();
+    loadPromoPurchases();
   }, []);
 
   const availableCodes = (codes || []).filter((c) => c.status === "AVAILABLE").length;
@@ -572,6 +724,74 @@ export default function UserDashboard({ embedded = false }) {
           ))}
       </Grid>
     );
+
+  const PromoPricingCards = ({ onBuy150, onBuy750, onBuyMonthly, purchased150, purchased750, purchasedMonthly }) => {
+    const Plan = ({ title, price, headerBg, features = [], onClick, purchased, cta }) => (
+      <Card sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: 3, height: '100%', overflow: 'hidden', position: 'relative' }}>
+        <Box sx={{ p: 2, background: headerBg, color: '#fff', borderBottom: '1px solid rgba(255,255,255,0.2)' }}>
+          <Typography variant="overline" sx={{ letterSpacing: 1, opacity: 0.95 }}>{title}</Typography>
+          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mt: 0.5 }}>
+            <Typography variant="h4" sx={{ fontWeight: 900 }}>{price}</Typography>
+            {purchased ? <Chip label="Active" color="success" size="small" sx={{ fontWeight: 700 }} /> : null}
+          </Box>
+        </Box>
+        <CardContent sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <Box component="ul" sx={{ m: 0, pl: 2 }}>
+            {features.map((f, i) => (
+              <li key={i} style={{ color: 'var(--mui-palette-text-secondary)' }}>{f}</li>
+            ))}
+          </Box>
+          <Button
+            fullWidth
+            variant="contained"
+            color="primary"
+            onClick={onClick}
+            sx={{ mt: 'auto', textTransform: 'none', fontWeight: 700 }}
+          >
+            {cta || 'Buy Now'}
+          </Button>
+        </CardContent>
+      </Card>
+    );
+
+    return (
+      <Grid container spacing={2}>
+        <Grid item xs={12} md={4}>
+          <Plan
+            title="Prime · Basic"
+            price="₹150"
+            headerBg="linear-gradient(135deg,#0ea5e9 0%,#6366f1 100%)"
+            features={['Prime access', 'Fast approval', 'Starter benefits']}
+            onClick={onBuy150}
+            purchased={purchased150}
+            cta="Buy Prime 150"
+          />
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Plan
+            title="Prime · Premium"
+            price="₹750"
+            headerBg="linear-gradient(135deg,#10b981 0%,#059669 100%)"
+            features={['Premium perks', 'Higher limits', 'Priority support']}
+            onClick={onBuy750}
+            purchased={purchased750}
+            cta="Buy Prime 750"
+          />
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Plan
+            title="Monthly Promo"
+            price="Current Month"
+            headerBg="linear-gradient(135deg,#a855f7 0%,#7c3aed 100%)"
+            features={['Valid for current month', 'Monthly rewards', 'Easy renewal']}
+            onClick={onBuyMonthly}
+            purchased={purchasedMonthly}
+            cta="Buy Monthly"
+          />
+        </Grid>
+      </Grid>
+    );
+  };
 
   const WealthGalaxy = () => (
     <Box sx={{ p: 3 }}>
@@ -754,66 +974,22 @@ export default function UserDashboard({ embedded = false }) {
               </Grid>
 
               {/* Secondary - 2 columns on mobile */}
-              <Grid item xs={6} sm={6} md={4} sx={{
+              {/* <Grid item xs={12} sx={{
               '@media (max-width:600px)': {
                 minWidth: 0,
                 boxSizing: 'border-box',
                 width: '100%',
               },
             }}>
-                <KpiCard
-                  title="E‑Coupons Available"
-                  value={availableCodes}
-                  subtitle={`Assigned: ${assignedCodes} • Redeemed: ${redeemedCodes}`}
-                  palette="purple"
-                  onClick={() => navigate("/user/redeem-coupon")}
+                <PromoPricingCards
+                  onBuy150={() => navigate("/user/promo-packages?pkg=prime150")}
+                  onBuy750={() => navigate("/user/promo-packages?pkg=prime750")}
+                  onBuyMonthly={() => navigate("/user/promo-packages?pkg=monthly")}
+                  purchased150={purchasedPrime150}
+                  purchased750={purchasedPrime750}
+                  purchasedMonthly={purchasedMonthly}
                 />
-              </Grid>
-              <Grid item xs={6} sm={6} md={4} sx={{
-              '@media (max-width:600px)': {
-                minWidth: 0,
-                boxSizing: 'border-box',
-                width: '100%',
-              },
-            }}>
-                <KpiCard
-                  title="Marketplace"
-                  value="Open"
-                  subtitle="Explore products"
-                  palette="blue"
-                  onClick={() => navigate("/marketplace")}
-                />
-              </Grid>
-              <Grid item xs={6} sm={6} md={4} sx={{
-              '@media (max-width:600px)': {
-                minWidth: 0,
-                boxSizing: 'border-box',
-                width: '100%',
-              },
-            }}>
-                <KpiCard
-                  title="My Orders"
-                  value="View"
-                  subtitle="Track your purchases"
-                  palette="teal"
-                  onClick={() => navigate("/marketplace/my-orders")}
-                />
-              </Grid>
-              <Grid item xs={6} sm={6} md={4} sx={{
-              '@media (max-width:600px)': {
-                minWidth: 0,
-                boxSizing: 'border-box',
-                width: '100%',
-              },
-            }}>
-                <KpiCard
-                  title="KYC"
-                  value="Start"
-                  subtitle="Complete your KYC"
-                  palette="amber"
-                  onClick={() => navigate("/user/kyc")}
-                />
-              </Grid>
+              </Grid> */}
               <Grid item xs={6} sm={6} md={4} sx={{
               '@media (max-width:600px)': {
                 minWidth: 0,
@@ -827,6 +1003,66 @@ export default function UserDashboard({ embedded = false }) {
                   subtitle="Grow your network"
                   palette="green"
                   onClick={() => navigate("/user/my-team")}
+                />
+              </Grid>
+              <Grid item xs={6} sm={6} md={4} sx={{
+              '@media (max-width:600px)': {
+                minWidth: 0,
+                boxSizing: 'border-box',
+                width: '100%',
+              },
+            }}>
+                <PricingTierCard
+                  tierName="Prime"
+                  price="₹150"
+                  features={[
+                    "Prime perks enabled",
+                    "Basic promo benefits",
+                    "Account Activate"
+                  ]}
+                  highlighted={false}
+                  owned={purchasedPrime150}
+                  onClick={() => navigate("/user/promo-packages?pkg=prime150")}
+                />
+              </Grid>
+              <Grid item xs={6} sm={6} md={4} sx={{
+              '@media (max-width:600px)': {
+                minWidth: 0,
+                boxSizing: 'border-box',
+                width: '100%',
+              },
+            }}>
+                <PricingTierCard
+                  tierName="Prime"
+                  price="₹750"
+                  features={[
+                    "Prime perks enabled",
+                    "Extended promo benefits",
+                    "Reward Points of 50k"
+                  ]}
+                  highlighted={true}
+                  owned={purchasedPrime750}
+                  onClick={() => navigate("/user/promo-packages?pkg=prime750")}
+                />
+              </Grid>
+              <Grid item xs={6} sm={6} md={4} sx={{
+              '@media (max-width:600px)': {
+                minWidth: 0,
+                boxSizing: 'border-box',
+                width: '100%',
+              },
+            }}>
+                <PricingTierCard
+                  tierName="Monthly Prime"
+                  price="Monthly"
+                  features={[
+                    "Valid for current month",
+                    "Monthly perks enabled",
+                    "Limited-time benefits"
+                  ]}
+                  highlighted={false}
+                  owned={purchasedMonthly}
+                  onClick={() => navigate("/user/promo-packages?pkg=monthly")}
                 />
               </Grid>
 
@@ -847,6 +1083,9 @@ export default function UserDashboard({ embedded = false }) {
               </Grid>
             </Grid>
 
+            <Box sx={{ mb: 2 }}>
+              <RewardPointsCard />
+            </Box>
             {/* My E‑Coupon Summary (cards) */}
             <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", mb: 2, border: "1px solid #e2e8f0" }}>
               <Box sx={{ p: 2 }}>
@@ -1241,6 +1480,16 @@ export default function UserDashboard({ embedded = false }) {
                   onClick={() => navigate("/user/my-team")}
                 />
               </Grid>
+              <Grid item xs={12}>
+                <PromoPricingCards
+                  onBuy150={() => navigate("/user/promo-packages?pkg=prime150")}
+                  onBuy750={() => navigate("/user/promo-packages?pkg=prime750")}
+                  onBuyMonthly={() => navigate("/user/promo-packages?pkg=monthly")}
+                  purchased150={purchasedPrime150}
+                  purchased750={purchasedPrime750}
+                  purchasedMonthly={purchasedMonthly}
+                />
+              </Grid>
 
               {/* Other info - full width */}
               <Grid item xs={12} sm={6} md={4}>
@@ -1270,6 +1519,9 @@ export default function UserDashboard({ embedded = false }) {
               </Grid>
             </Grid>
 
+            <Box sx={{ mb: 2 }}>
+              <RewardPointsCard />
+            </Box>
             {/* My E‑Coupon Summary (cards) */}
             <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", mb: 2, border: "1px solid #e2e8f0" }}>
               <Box sx={{ p: 2 }}>

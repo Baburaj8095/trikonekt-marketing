@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Login from "./pages/Auth/Login";
 import LuckyDraw from "./pages/LuckyDraw";
 import UserDashboard from "./pages/UserDashboard";
@@ -46,11 +46,13 @@ import AdminUploads from "./pages/admin/AdminUploads";
 import AdminPackages from "./pages/admin/AdminPackages";
 import AdminBusiness from "./pages/admin/AdminBusiness";
 import AdminReports from "./pages/admin/AdminReports";
+import AdminPromoPurchases from "./pages/admin/AdminPromoPurchases";
 import AdminDashboardCards from "./pages/admin/AdminDashboardCards";
 import AdminHomeCards from "./pages/admin/AdminHomeCards";
 import AdminLuckyDraw from "./pages/admin/AdminLuckyDraw";
 import AdminLevelCommission from "./pages/admin/AdminLevelCommission";
 import AdminMatrixCommission from "./pages/admin/AdminMatrixCommission";
+import AdminCommissionHistory from "./pages/admin/AdminCommissionHistory";
 import Profile from "./pages/Profile";
 import RoleSelect from "./pages/Auth/RoleSelect";
 import ReferAndEarnPage from "./pages/ReferAndEarn";
@@ -65,8 +67,29 @@ import Support from "./pages/Support";
 import AdminSupport from "./pages/admin/AdminSupport";
 import ImpersonateLanding from "./pages/Auth/ImpersonateLanding";
 import ECouponStore from "./pages/ECouponStore";
+import PromoPackages from "./pages/PromoPackages";
 import TrikonektProducts from "./pages/TrikonektProducts";
 import AgencyMarketplace from "./pages/agency/AgencyMarketplace";
+import AdminRewardPoints from "./pages/admin/AdminRewardPoints";
+
+function LegacyAuthEntry() {
+  const location = useLocation();
+  try {
+    const params = new URLSearchParams(location.search || "");
+    const mode = String(params.get("mode") || "").toLowerCase();
+    if (mode === "register") {
+      const role = String(params.get("role") || "user").toLowerCase();
+      const sponsor =
+        params.get("sponsor") ||
+        params.get("sponsor_id") ||
+        params.get("agencyid") ||
+        params.get("ref");
+      const qs = sponsor ? `?sponsor=${encodeURIComponent(sponsor)}` : "";
+      return <Navigate to={`/auth/register/${role}${qs}`} replace />;
+    }
+  } catch (_) {}
+  return <Login />;
+}
 
 function App() {
   return (
@@ -77,9 +100,14 @@ function App() {
         
         <Route path="/" element={<HomeScreen/>} />
         <Route path="/auth/select" element={<RoleSelect />} />
-        <Route path="/login" element={<Login />} />
+        <Route path="/login" element={<LegacyAuthEntry />} />
         <Route path="/register" element={<EnhancedLogin />} />
         <Route path="/enhanced-login" element={<EnhancedLogin />} />
+        {/* Role-scoped auth routes */}
+        <Route path="/auth/login/:role" element={<Login />} />
+        <Route path="/auth/register/:role" element={<EnhancedLogin />} />
+        <Route path="/auth/login" element={<Login />} />
+        <Route path="/auth/register" element={<EnhancedLogin />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/impersonate" element={<ImpersonateLanding />} />
         <Route path="/agency/impersonate" element={<ImpersonateLanding />} />
@@ -201,6 +229,16 @@ function App() {
             <ProtectedRoute allowedRoles={["user"]}>
               <ConsumerShell>
                 <ECouponStore />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/promo-packages"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <PromoPackages />
               </ConsumerShell>
             </ProtectedRoute>
           }
@@ -618,6 +656,16 @@ function App() {
           }
         />
         <Route
+          path="/admin/promo-purchases"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminPromoPurchases />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/products"
           element={
             <AdminProtectedRoute>
@@ -743,6 +791,26 @@ function App() {
             <AdminProtectedRoute>
               <AdminShell>
                 <AdminLevelCommission />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/commissions/history"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminCommissionHistory />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/rewards/points"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminRewardPoints />
               </AdminShell>
             </AdminProtectedRoute>
           }

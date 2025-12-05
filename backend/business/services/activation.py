@@ -124,22 +124,32 @@ def ensure_first_purchase_activation(user: CustomUser, source: Dict[str, Any]) -
       - Stamp first_purchase_activated_at
       - Enable autopool/rewards
       - Unlock agency benefits and allow self-account creation
+      - Mark account_active=True so Admin Users table and Dashboard stay in sync
     Idempotent: only applies once per user.
     """
     try:
         if getattr(user, "first_purchase_activated_at", None):
+            # Even if already stamped earlier, ensure admin-visible account flag is on
+            try:
+                if not getattr(user, "account_active", False):
+                    user.account_active = True
+                    user.save(update_fields=["account_active"])
+            except Exception:
+                pass
             return
         user.first_purchase_activated_at = timezone.now()
         user.autopool_enabled = True
         user.rewards_enabled = True
         user.is_agency_unlocked = True
         user.can_create_self_accounts = True
+        user.account_active = True
         user.save(update_fields=[
             "first_purchase_activated_at",
             "autopool_enabled",
             "rewards_enabled",
             "is_agency_unlocked",
             "can_create_self_accounts",
+            "account_active",
         ])
         # Free lucky draw coupon equivalent: increment rewards coupon progress by 1 (best-effort)
         try:

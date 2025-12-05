@@ -1,6 +1,7 @@
 from django.utils import timezone
 from django.db import transaction
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Sum, Value
+from django.db.models.functions import Coalesce
 from rest_framework import status, viewsets, mixins
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -590,6 +591,8 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         from django.db import transaction
         with transaction.atomic():
             # Try to lock rows to avoid double-pick in concurrent calls (Postgres)
+            # Precompute current allocatable inventory for this product's coupon + denomination
+            available_before = base_qs.count()
             try:
                 locking_qs = base_qs.select_for_update(skip_locked=True)
             except Exception:
@@ -2068,17 +2071,74 @@ class CommissionViewSet(mixins.ListModelMixin,
     def get_queryset(self):
         qs = super().get_queryset()
         user = self.request.user
+
         # Non-admins see only their own commissions
         if not is_admin_user(user):
             qs = qs.filter(recipient=user)
-        # Filters
-        status_in = self.request.query_params.get("status")
-        role = self.request.query_params.get("role")
+
+        qp = self.request.query_params
+
+        # Basic filters
+        status_in = qp.get("status")
+        role = qp.get("role")
         if status_in:
             qs = qs.filter(status=status_in)
         if role:
             qs = qs.filter(role=role)
-        return qs.order_by("-earned_at")
+
+        # Recipient filter (id or username)
+        recipient = qp.get("recipient") or qp.get("recipient_id") or qp.get("recipient_username")
+        if recipient:
+            try:
+                rid = int(recipient)
+                qs = qs.filter(Q(recipient_id=rid) | Q(recipient__username__iexact=str(recipient)))
+            except Exception:
+                qs = qs.filter(recipient__username__icontains=str(recipient))
+
+        # Coupon/submission filters
+        code = qp.get("code") or qp.get("coupon_code")
+        if code:
+            qs = qs.filter(Q(coupon_code__code__iexact=code) | Q(submission__coupon_code__iexact=code))
+        submission_id = qp.get("submission") or qp.get("submission_id")
+        if submission_id:
+            try:
+                qs = qs.filter(submission_id=int(submission_id))
+            except Exception:
+                qs = qs.none()
+
+        # Date range on earned_at
+        date_from = qp.get("date_from") or qp.get("from")
+        date_to = qp.get("date_to") or qp.get("to")
+        if date_from:
+            try:
+                qs = qs.filter(earned_at__gte=date_from)
+            except Exception:
+                pass
+        if date_to:
+            try:
+                qs = qs.filter(earned_at__lte=date_to)
+            except Exception:
+                pass
+
+        # Free-text search across recipient, code, submission id
+        search = (qp.get("search") or qp.get("q") or "").strip()
+        if search:
+            q = Q(recipient__username__icontains=search) | Q(submission__coupon_code__icontains=search)
+            try:
+                sid = int(search)
+                q = q | Q(id=sid) | Q(submission_id=sid) | Q(recipient_id=sid)
+            except Exception:
+                pass
+            qs = qs.filter(q)
+
+        # Ordering
+        ordering = (qp.get("ordering") or "").strip()
+        if ordering in ("earned_at", "-earned_at", "paid_at", "-paid_at", "amount", "-amount"):
+            qs = qs.order_by(ordering)
+        else:
+            qs = qs.order_by("-earned_at")
+
+        return qs
 
     @action(detail=False, methods=["get"], url_path="mine", permission_classes=[IsAuthenticated])
     def mine(self, request):
@@ -2101,6 +2161,53 @@ class CommissionViewSet(mixins.ListModelMixin,
         com.paid_at = timezone.now()
         com.save(update_fields=["status", "paid_at"])
         return Response(self.get_serializer(com).data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="summary", permission_classes=[IsAuthenticated])
+    def summary(self, request):
+        """
+        Commission KPIs for current filters. Applies same scoping/filters as list().
+        Query params: recipient, recipient_id, recipient_username, role, status, code, submission(_id), date_from/date_to, search, ordering (ignored).
+        Response:
+        {
+          "counts": { "earned": int, "paid": int, "reversed": int, "total": int },
+          "totals": { "earned": "0.00", "paid": "0.00", "reversed": "0.00", "total": "0.00" }
+        }
+        """
+        try:
+            qs = self.get_queryset()  # inherits all filters + role scoping
+            agg = qs.values("status").annotate(
+                c=Count("id"),
+                amt=Coalesce(Sum("amount"), Value(0)),
+            )
+            from decimal import Decimal
+            counts = {"earned": 0, "paid": 0, "reversed": 0, "total": 0}
+            totals = {"earned": "0.00", "paid": "0.00", "reversed": "0.00", "total": "0.00"}
+            total_amount = Decimal("0.00")
+            for row in agg:
+                st = str(row.get("status") or "").lower()
+                c = int(row.get("c") or 0)
+                amt = row.get("amt") or 0
+                try:
+                    dec = Decimal(str(amt))
+                except Exception:
+                    dec = Decimal("0.00")
+                if st in ("earned", "paid", "reversed"):
+                    counts[st] = counts.get(st, 0) + c
+                    totals[st] = f"{dec:.2f}"
+                counts["total"] += c
+                total_amount += dec
+            totals["total"] = f"{total_amount:.2f}"
+            return Response({"counts": counts, "totals": totals}, status=status.HTTP_200_OK)
+        except Exception:
+            # Return empty summary on error, do not leak internals
+            return Response(
+                {
+                    "counts": {"earned": 0, "paid": 0, "reversed": 0, "total": 0},
+                    "totals": {"earned": "0.00", "paid": "0.00", "reversed": "0.00", "total": "0.00"},
+                    "detail": "summary_error",
+                },
+                status=status.HTTP_200_OK,
+            )
 
 
 class AuditTrailViewSet(mixins.ListModelMixin,
@@ -2150,12 +2257,13 @@ class CouponActivateView(APIView):
     POST /api/v1/coupon/activate/
     Body:
       {
-        "type": "150" | "50",
+        "type": "150" | "50" | "750" | "759",
         "source": { ... optional context ... }
       }
     Effects:
       - type "150": opens FIVE_150 (L6) + THREE_150 (L15), pays direct/self bonuses
       - type "50": opens THREE_50 (L15)
+      - type "750"/"759": treated as activation event for account status (no pool distribution)
       - records all ledger via Wallet.credit inside activation services
       - stamps first_purchase_activated_at and unlocks flags (idempotent)
     """
@@ -2164,12 +2272,15 @@ class CouponActivateView(APIView):
     def post(self, request):
         t = str(request.data.get("type") or "").strip()
         source = request.data.get("source") or {}
-        if t not in ("150", "50"):
-            return Response({"detail": "type must be '150' or '50'."}, status=status.HTTP_400_BAD_REQUEST)
+        if t not in ("150", "50", "750", "759"):
+            return Response({"detail": "type must be '150', '50', '750' or '759'."}, status=status.HTTP_400_BAD_REQUEST)
         if t == "150":
             ok = activate_150_active(request.user, {"type": "coupon_150_activate", **source})
-        else:
+        elif t == "50":
             ok = activate_50(request.user, {"type": "coupon_50_activate", **source})
+        else:
+            # 750 and 759: treat as activation event for account status only
+            ok = True
         # Mark first purchase flags (safe idempotent)
         try:
             ensure_first_purchase_activation(request.user, {"type": "coupon_first_purchase", **source})
@@ -2546,7 +2657,8 @@ class ECouponOrderViewSet(mixins.CreateModelMixin,
             return Response({"detail": "Invalid role on order."}, status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
-            base_qs = CouponCode.objects.filter(
+            # First try product-scoped pool (coupon-specific)
+            specific_qs = CouponCode.objects.filter(
                 issued_channel="e_coupon",
                 coupon=order.product.coupon,
                 value=order.denomination_snapshot,
@@ -2555,15 +2667,61 @@ class ECouponOrderViewSet(mixins.CreateModelMixin,
                 assigned_employee__isnull=True,
                 assigned_consumer__isnull=True,
             )
+            available_before = specific_qs.count()
             try:
-                locking_qs = base_qs.select_for_update(skip_locked=True)
+                specific_locking = specific_qs.select_for_update(skip_locked=True)
             except Exception:
-                locking_qs = base_qs
+                specific_locking = specific_qs
 
             need = int(order.quantity or 0)
-            pick_ids = list(locking_qs.order_by("serial", "id").values_list("id", flat=True)[:need])
+            pick_ids = list(specific_locking.order_by("serial", "id").values_list("id", flat=True)[:need])
+
+            # If product pool is insufficient, fall back to global denomination pool (any coupon)
             if len(pick_ids) < need:
-                return Response({"detail": "Insufficient e‑coupon inventory for this denomination."}, status=status.HTTP_409_CONFLICT)
+                missing = need - len(pick_ids)
+                global_qs = CouponCode.objects.filter(
+                    issued_channel="e_coupon",
+                    value=order.denomination_snapshot,
+                    status="AVAILABLE",
+                    assigned_agency__isnull=True,
+                    assigned_employee__isnull=True,
+                    assigned_consumer__isnull=True,
+                ).exclude(id__in=pick_ids)
+                try:
+                    global_locking = global_qs.select_for_update(skip_locked=True)
+                except Exception:
+                    global_locking = global_qs
+                fallback_ids = list(global_locking.order_by("serial", "id").values_list("id", flat=True)[:missing])
+                pick_ids.extend(fallback_ids)
+
+            if len(pick_ids) < need:
+                # Still insufficient even after global fallback – return diagnostics for UI
+                try:
+                    global_available = CouponCode.objects.filter(
+                        issued_channel="e_coupon",
+                        value=order.denomination_snapshot,
+                        status="AVAILABLE",
+                        assigned_agency__isnull=True,
+                        assigned_employee__isnull=True,
+                        assigned_consumer__isnull=True,
+                    ).count()
+                except Exception:
+                    global_available = None
+                shortage = max(0, need - len(pick_ids))
+                return Response(
+                    {
+                        "detail": "Insufficient e\u2009coupon inventory for this denomination.",
+                        "available": int(available_before or 0),  # product coupon pool
+                        "needed": need,
+                        "available_global": (int(global_available) if global_available is not None else None),
+                        "prefill": {
+                            "coupon": getattr(getattr(order, "product", None), "coupon_id", None),
+                            "denomination": order.denomination_snapshot,
+                            "count": shortage,
+                        },
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
 
             update_kwargs = {}
             if role == "consumer":

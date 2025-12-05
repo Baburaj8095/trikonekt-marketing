@@ -29,11 +29,29 @@ import {
   assignEmployeeByCount,
 } from "../api/api";
 import normalizeMediaUrl from "../utils/media";
+import { useNavigate } from "react-router-dom";
+import {
+  FormControl,
+  FormLabel,
+  RadioGroup,
+  FormControlLabel,
+  Radio,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  Chip,
+} from "@mui/material";
 
 function ProductCard({ product, form, onChange, onSubmit, submitting, onAddToCart }) {
   const unit = Number(product?.price_per_unit || 0);
   const qty = Number(form.quantity || 0);
   const total = isFinite(unit * qty) ? unit * qty : 0;
+  const available = Number(
+    product?.available_count ?? product?.available ?? product?.stock ?? 0
+  );
+  const maxAllowed = product?.max_per_order
+    ? (available ? Math.min(Number(product.max_per_order), available) : Number(product.max_per_order))
+    : (available || undefined);
 
   return (
     <Card variant="outlined" sx={{ borderRadius: 2 }}>
@@ -53,6 +71,10 @@ function ProductCard({ product, form, onChange, onSubmit, submitting, onAddToCar
             <Typography variant="caption" color="text.secondary">Unit Price</Typography>
             <div style={{ fontWeight: 800 }}>₹{product?.price_per_unit}</div>
           </Box>
+          <Box>
+            <Typography variant="caption" color="text.secondary">Available</Typography>
+            <div style={{ fontWeight: 800 }}>{Number.isFinite(available) ? available : "—"}</div>
+          </Box>
         </Stack>
         <Grid container spacing={1.5}>
           <Grid item xs={12} sm={4}>
@@ -63,49 +85,9 @@ function ProductCard({ product, form, onChange, onSubmit, submitting, onAddToCar
               fullWidth
               value={form.quantity || ""}
               onChange={(e) => onChange(product.id, "quantity", e.target.value)}
-              inputProps={{ min: 1, max: product?.max_per_order || undefined }}
-              helperText={
-                product?.max_per_order ? `Max per order: ${product.max_per_order}` : ""
-              }
+              inputProps={{ min: 1, max: maxAllowed }}
+              helperText={`${product?.max_per_order ? `Max per order: ${product.max_per_order}. ` : ""}${Number.isFinite(available) ? `Available: ${available}` : ""}`}
             />
-          </Grid>
-          <Grid item xs={12} sm={8}>
-            <TextField
-              size="small"
-              label="UTR (optional)"
-              fullWidth
-              value={form.utr || ""}
-              onChange={(e) => onChange(product.id, "utr", e.target.value)}
-            />
-          </Grid>
-          <Grid item xs={12}>
-            <TextField
-              size="small"
-              label="Notes (optional)"
-              fullWidth
-              multiline
-              minRows={2}
-              value={form.notes || ""}
-              onChange={(e) => onChange(product.id, "notes", e.target.value)}
-            />
-          </Grid>
-          <Grid item xs={12}>
-            <Button variant="outlined" size="small" component="label">
-              {form.file ? "Change Payment Proof" : "Attach Payment Proof"}
-              <input
-                type="file"
-                hidden
-                onChange={(e) =>
-                  onChange(product.id, "file", e.target.files && e.target.files[0] ? e.target.files[0] : null)
-                }
-                accept="image/*,application/pdf"
-              />
-            </Button>
-            {form.file ? (
-              <Typography variant="caption" sx={{ ml: 1 }}>
-                {form.file.name}
-              </Typography>
-            ) : null}
           </Grid>
         </Grid>
         <Divider sx={{ my: 1.5 }} />
@@ -119,14 +101,6 @@ function ProductCard({ product, form, onChange, onSubmit, submitting, onAddToCar
       <CardActions sx={{ p: 2, pt: 0, gap: 1 }}>
         <Button
           variant="contained"
-          onClick={() => onSubmit(product.id)}
-          disabled={!!submitting || !form.quantity || Number(form.quantity) <= 0}
-          sx={{ fontWeight: 700 }}
-        >
-          {submitting ? "Submitting..." : "Place Order"}
-        </Button>
-        <Button
-          variant="outlined"
           onClick={() =>
             onAddToCart &&
             onAddToCart(
@@ -134,7 +108,7 @@ function ProductCard({ product, form, onChange, onSubmit, submitting, onAddToCar
               Math.max(1, parseInt(form.quantity || "1", 10))
             )
           }
-          disabled={!!submitting || !form.quantity || Number(form.quantity) <= 0}
+          disabled={!!submitting || !form.quantity || Number(form.quantity) <= 0 || available <= 0}
           sx={{ fontWeight: 700 }}
         >
           Add to Cart
@@ -182,6 +156,8 @@ export default function ECouponStore() {
   );
   const [cartPayment, setCartPayment] = useState({ utr: "", notes: "", file: null });
   const [checkingOut, setCheckingOut] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("MANUAL"); // MANUAL | ONLINE
+  const [qrOpen, setQrOpen] = useState(false);
 
   // Agency/Employee: assign to consumer form state
   const [consumerAssign, setConsumerAssign] = useState({ username: "", count: 1, notes: "" });
@@ -203,6 +179,7 @@ export default function ECouponStore() {
       return "consumer";
     }
   }, []);
+  const navigate = useNavigate();
 
   const loadBootstrap = async () => {
     setLoading(true);
@@ -295,7 +272,22 @@ export default function ECouponStore() {
     const q = Math.max(1, parseInt(qty || "1", 10));
     setCart((c) => {
       const cur = parseInt(c[pid] || "0", 10);
-      const next = cur + q;
+      const prod = (products || []).find((x) => String(x.id) === String(pid));
+      let next = cur + q;
+      if (prod) {
+        const availRaw = Number(prod?.available_count ?? prod?.available ?? prod?.stock ?? 0);
+        const avail = Number.isFinite(availRaw) && availRaw > 0 ? availRaw : Infinity;
+        if (Number.isFinite(avail)) {
+          next = Math.min(next, avail);
+        }
+        if (prod.max_per_order) {
+          next = Math.min(next, Number(prod.max_per_order));
+        }
+        if (next <= cur) {
+          try { alert("Requested quantity exceeds available stock or max per order."); } catch {}
+          return c;
+        }
+      }
       return { ...c, [pid]: next };
     });
     try { alert("Added to cart."); } catch {}
@@ -325,7 +317,7 @@ export default function ECouponStore() {
           product: it.product.id,
           quantity: it.qty,
           utr: String(cartPayment.utr || ""),
-          notes: String(cartPayment.notes || ""),
+          notes: String(`[${paymentMethod}] ` + (cartPayment.notes || "")),
           file: cartPayment.file || null,
         });
       }
@@ -432,27 +424,56 @@ export default function ECouponStore() {
         ) : (products || []).length === 0 ? (
           <Typography variant="body2" color="text.secondary">No products available.</Typography>
         ) : (
-          <Grid container spacing={2}>
-            {(products || []).map((p) => (
-              <Grid item xs={12} md={6} lg={4} key={p.id}>
-                <ProductCard
-                  product={p}
-                  form={forms[p.id] || { quantity: 1, utr: "", notes: "", file: null }}
-                  onChange={setForm}
-                  onSubmit={submitOrder}
-                  submitting={!!placing[p.id]}
-                  onAddToCart={(pid, qty) => addToCart(pid, qty)}
-                />
+          <>
+            {products[0] ? (
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6} lg={5}>
+                  <ProductCard
+                    product={products[0]}
+                    form={forms[products[0].id] || { quantity: 1, utr: "", notes: "", file: null }}
+                    onChange={setForm}
+                    onSubmit={submitOrder}
+                    submitting={!!placing[products[0].id]}
+                    onAddToCart={(pid, qty) => addToCart(pid, qty)}
+                  />
+                </Grid>
               </Grid>
-            ))}
-          </Grid>
+            ) : null}
+            {products.length > 1 ? (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#0f172a", mb: 1 }}>
+                  Other Products
+                </Typography>
+                <Grid container spacing={2}>
+                  {products.slice(1).map((p) => (
+                    <Grid item xs={12} sm={6} md={4} lg={3} key={p.id}>
+                      <ProductCard
+                        product={p}
+                        form={forms[p.id] || { quantity: 1, utr: "", notes: "", file: null }}
+                        onChange={setForm}
+                        onSubmit={submitOrder}
+                        submitting={!!placing[p.id]}
+                        onAddToCart={(pid, qty) => addToCart(pid, qty)}
+                      />
+                    </Grid>
+                  ))}
+                </Grid>
+              </Box>
+            ) : null}
+          </>
         )}
       </Paper>
 
       <Paper elevation={3} sx={{ p: 2, borderRadius: 2, mb: 2 }}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "#0f172a", mb: 1 }}>
-          Cart & Payment
-        </Typography>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "#0f172a" }}>
+            Cart & Payment
+          </Typography>
+          <Stack direction="row" spacing={1}>
+            <Chip size="small" label={`Items: ${cartItems.length}`} />
+            <Chip size="small" color="primary" label={`Total: ₹${cartTotal.toFixed(2)}`} />
+          </Stack>
+        </Stack>
 
         {cartItems.length === 0 ? (
           <Typography variant="body2" color="text.secondary">Your cart is empty. Add items from above.</Typography>
@@ -505,6 +526,58 @@ export default function ECouponStore() {
         <Divider sx={{ my: 2 }} />
 
         <Grid container spacing={1.5}>
+          <Grid item xs={12}>
+            <FormControl component="fieldset" size="small">
+              <FormLabel component="legend">Payment Method</FormLabel>
+              <RadioGroup
+                row
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+              >
+                <FormControlLabel value="MANUAL" control={<Radio size="small" />} label="Manual (UPI)" />
+                <FormControlLabel value="ONLINE" control={<Radio size="small" />} label="Online" />
+              </RadioGroup>
+            </FormControl>
+          </Grid>
+          {paymentMethod === "MANUAL" && payment ? (
+            <Grid item xs={12}>
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Box
+                  sx={{
+                    width: 140,
+                    height: 140,
+                    borderRadius: 2,
+                    border: "1px solid #e2e8f0",
+                    overflow: "hidden",
+                    background: "#fff",
+                  }}
+                >
+                  {payment.upi_qr_image_url ? (
+                    <img
+                      alt="UPI QR Code"
+                      src={normalizeMediaUrl(payment.upi_qr_image_url)}
+                      style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                    />
+                  ) : (
+                    <Box sx={{ p: 2, color: "text.secondary" }}>No QR</Box>
+                  )}
+                </Box>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Scan and pay via UPI, then provide UTR and optionally upload payment proof.
+                  </Typography>
+                  <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                    <Button size="small" variant="outlined" onClick={() => setQrOpen(true)}>
+                      View QR Code
+                    </Button>
+                    {payment.upi_id ? (
+                      <Chip size="small" label={`UPI: ${payment.upi_id}`} />
+                    ) : null}
+                  </Stack>
+                </Box>
+              </Stack>
+            </Grid>
+          ) : null}
           <Grid item xs={12} md={4}>
             <TextField
               size="small"
@@ -555,7 +628,7 @@ export default function ECouponStore() {
                 disabled={checkingOut || cartItems.length === 0}
                 sx={{ fontWeight: 800 }}
               >
-                {checkingOut ? "Submitting..." : "Checkout"}
+                {checkingOut ? "Submitting..." : "Submit for Approval"}
               </Button>
               <Typography variant="caption" color="text.secondary">
                 Orders are reviewed by admin. Upon approval, e‑coupon codes will be allocated to your account.
@@ -729,9 +802,14 @@ export default function ECouponStore() {
           <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "#0f172a" }}>
             My Orders
           </Typography>
-          <Button onClick={loadOrders} size="small" variant="outlined" disabled={ordersLoading}>
-            {ordersLoading ? "Refreshing..." : "Refresh"}
-          </Button>
+          <Stack direction="row" spacing={1}>
+            <Button onClick={loadOrders} size="small" variant="outlined" disabled={ordersLoading}>
+              {ordersLoading ? "Refreshing..." : "Refresh"}
+            </Button>
+            <Button onClick={() => navigate("/user/redeem-coupon")} size="small" variant="contained">
+              Go to E‑Coupons
+            </Button>
+          </Stack>
         </Stack>
         {ordersErr ? <Alert severity="error" sx={{ mb: 1 }}>{ordersErr}</Alert> : null}
         {ordersLoading ? (
@@ -778,6 +856,27 @@ export default function ECouponStore() {
           </TableContainer>
         )}
       </Paper>
+
+      <Dialog open={qrOpen} onClose={() => setQrOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>UPI QR Code</DialogTitle>
+        <DialogContent>
+          {payment && payment.upi_qr_image_url ? (
+            <Box sx={{ width: "100%", textAlign: "center" }}>
+              <img
+                alt="UPI QR Code"
+                src={normalizeMediaUrl(payment.upi_qr_image_url)}
+                style={{ width: "100%", maxHeight: 360, objectFit: "contain" }}
+              />
+              <Box sx={{ mt: 1 }}>
+                <Typography variant="body2"><strong>Payee:</strong> {payment.payee_name || "—"}</Typography>
+                <Typography variant="body2"><strong>UPI ID:</strong> {payment.upi_id || "—"}</Typography>
+              </Box>
+            </Box>
+          ) : (
+            <Alert severity="warning">No QR image available.</Alert>
+          )}
+        </DialogContent>
+      </Dialog>
     </Container>
   );
 }

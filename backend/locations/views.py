@@ -595,6 +595,65 @@ def pincodes_by_district(request):
         # Deep scan fallback for datasets wrapped in containers or with fields not accounted in index
         pins = _scan_raw_for_pincodes(district_name, state_name)
 
+    # Additional offline fallback: match PostOffice names (officename/Name) against the provided place
+    # This helps when UI passes a Taluk/City name like "Chincholi" whereas the dataset's "district" is "Kalaburagi".
+    if not pins:
+        try:
+            raw = _unwrap_records(PINCODES_OFFLINE or {})
+            st_filter = (state_name or "").strip().lower()
+
+            # Build ordered, de-duplicated variants of the provided place
+            seen = set()
+            ordered_variants = []
+            for t in (india_place_variants(district_name) or [district_name]):
+                key = (t or "").strip().lower()
+                if key and key not in seen:
+                    seen.add(key)
+                    ordered_variants.append(key)
+
+            def _state_ok(meta_state):
+                sv = (str(meta_state or "")).strip().lower()
+                return (not st_filter) or (not sv) or (sv == st_filter)
+
+            def _match_office(val: str) -> bool:
+                s = (str(val or "")).strip().lower()
+                if not s:
+                    return False
+                for v in ordered_variants:
+                    if s == v or v in s:
+                        return True
+                return False
+
+            tmp = set()
+            if isinstance(raw, dict):
+                for k, meta in raw.items():
+                    if not isinstance(meta, dict):
+                        continue
+                    if not _state_ok(meta.get("statename") or meta.get("stateName") or meta.get("STATE_NAME") or meta.get("state") or meta.get("State") or meta.get("STATE")):
+                        continue
+                    office = meta.get("officename") or meta.get("OfficeName") or meta.get("name") or meta.get("Name")
+                    if _match_office(office):
+                        p = meta.get("pincode") or meta.get("Pincode") or meta.get("PIN") or meta.get("Pin") or k
+                        pstr = "".join(c for c in str(p or "").strip() if c.isdigit())
+                        if len(pstr) == 6:
+                            tmp.add(pstr)
+            elif isinstance(raw, list):
+                for row in raw:
+                    if not isinstance(row, dict):
+                        continue
+                    if not _state_ok(row.get("statename") or row.get("stateName") or row.get("STATE_NAME") or row.get("state") or row.get("State") or row.get("STATE")):
+                        continue
+                    office = row.get("officename") or row.get("OfficeName") or row.get("name") or row.get("Name")
+                    if _match_office(office):
+                        p = row.get("pincode") or row.get("Pincode") or row.get("PIN") or row.get("Pin")
+                        pstr = "".join(c for c in str(p or "").strip() if c.isdigit())
+                        if len(pstr) == 6:
+                            tmp.add(pstr)
+            if tmp:
+                pins = tmp
+        except Exception:
+            pass
+
     if not pins:
         # Network fallback: query India Post by district variants and collect pincodes
         try:

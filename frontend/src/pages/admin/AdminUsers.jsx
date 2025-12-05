@@ -55,21 +55,39 @@ function Select({ label, value, onChange, options, style }) {
 
 export default function AdminUsers() {
   // Filters applied to server fetch
-  const [filters, setFilters] = useState({
-    role: "",
-    phone: "",
-    category: "",
-    pincode: "",
-    state: "",
-    kyc: "",
-    account_active: "",
-    activated: "",
+  const [filters, setFilters] = useState(() => {
+    // Initialize from URL so first request uses the correct filters, avoiding an initial unfiltered call
+    let activated = "";
+    let account_active = "";
+    try {
+      const qs = typeof window !== "undefined" ? (window.location.search || "") : "";
+      const params = new URLSearchParams(qs);
+      const rawActivated = (params.get("activated") || "").toLowerCase();
+      activated = ["1","true","yes","activated"].includes(rawActivated)
+        ? "1"
+        : (["0","false","no","inactive","not_activated","unactivated","notactivated"].includes(rawActivated) ? "0" : "");
+      const rawAccountActive = (params.get("account_active") || "").toLowerCase();
+      account_active = ["1","true","yes","active"].includes(rawAccountActive)
+        ? "1"
+        : (["0","false","no","inactive"].includes(rawAccountActive) ? "0" : "");
+    } catch (_) {}
+    return {
+      role: "",
+      phone: "",
+      category: "",
+      pincode: "",
+      state: "",
+      kyc: "",
+      account_active,
+      activated,
+    };
   });
   const [density, setDensity] = useState("standard");
   const [reloadKey, setReloadKey] = useState(0);
   const [editOpen, setEditOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [tempPw, setTempPw] = useState({});
+  const [apiErr, setApiErr] = useState("");
   // Packages drawer (agency-only)
   const [pkgOpen, setPkgOpen] = useState(false);
   const [pkgUser, setPkgUser] = useState(null);
@@ -112,7 +130,7 @@ export default function AdminUsers() {
       if (!row || !row.id) return;
       const res = await API.get(`/admin/users/${row.id}/`);
       const data = res?.data || row;
-      setSelected({ id: row.id, ...data });
+      setSelected({ id: row.id, ...row, ...data });
       setEditOpen(true);
     } catch {
       setSelected(row);
@@ -236,10 +254,6 @@ export default function AdminUsers() {
     });
   }, [location.search]);
 
-  // Trigger reload when activated/account_active filter changes
-  useEffect(() => {
-    setReloadKey((k) => k + 1);
-  }, [filters.activated, filters.account_active]);
 
   const roleOptions = useMemo(
     () => [
@@ -406,10 +420,86 @@ export default function AdminUsers() {
           );
         },
       },
+      {
+        field: "__commissions",
+        headerName: "Commissions",
+        minWidth: 140,
+        sortable: false,
+        filterable: false,
+        renderCell: (params) => {
+          const row = params?.row || {};
+          const r = String(row.role || "").toLowerCase();
+          const c = String(row.category || "").toLowerCase();
+          const isAgency = r === "agency" || c.startsWith("agency");
+          const isEmployee = r === "employee" || c === "employee";
+          if (!isAgency && !isEmployee) return "—";
+          const onOpen = (e) => {
+            e?.stopPropagation?.();
+            const roleParam = isAgency ? "agency" : "employee";
+            const url = `/admin/commissions/history?recipient=${encodeURIComponent(row.id)}&role=${encodeURIComponent(roleParam)}`;
+            window.location.assign(url);
+          };
+          return (
+            <button
+              type="button"
+              onClick={onOpen}
+              title="View commission history"
+              style={{
+                borderRadius: 8,
+                padding: "6px 10px",
+                background: "#16a34a",
+                color: "#fff",
+                border: "1px solid #15803d",
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 700,
+              }}
+            >
+              Commissions
+            </button>
+          );
+        },
+      },
       { field: "full_name", headerName: "Full Name", minWidth: 180, flex: 1 },
       { field: "sponsor_id", headerName: "Sponsor ID", minWidth: 160 },
       { field: "phone", headerName: "Mobile", minWidth: 140 },
       { field: "email", headerName: "Email", minWidth: 200, flex: 1 },
+      {
+        field: "activated_ecoupon_count",
+        headerName: "E‑Coupons (Activated)",
+        minWidth: 170,
+        renderCell: (params) => {
+          const n = Number(params?.row?.activated_ecoupon_count ?? 0);
+          const label = Number.isFinite(n) ? String(n) : "";
+          const active = n > 0;
+          return (
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: isMobile ? "2px 8px" : "3px 8px",
+                borderRadius: 8,
+                fontSize: isMobile ? 11 : 12,
+                fontWeight: 700,
+                lineHeight: 1,
+                backgroundColor: active ? "#0ea5e9" : "#f1f5f9",
+                border: active ? "1px solid #0284c7" : "1px solid #cbd5e1",
+                color: active ? "#ffffff" : "#0f172a",
+                minWidth: 40,
+              }}
+              title={active ? `${n} activated` : "0"}
+            >
+              {label}
+            </div>
+          );
+        },
+      },
+      {
+        field: "last_promo_package",
+        headerName: "Promo Package",
+        minWidth: 180,
+      },
       {
         field: "kyc_status",
         headerName: "KYC",
@@ -652,11 +742,25 @@ export default function AdminUsers() {
       if (search && String(search).trim()) params.search = String(search).trim();
       if (ordering) params.ordering = ordering;
 
-      const res = await API.get("/admin/users/", { params });
-      const data = res?.data;
-      const results = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
-      const count = typeof data?.count === "number" ? data.count : results.length;
-      return { results, count };
+      try {
+        const res = await API.get("/admin/users/", {
+          params,
+          dedupe: "none",
+          timeout: 12000,
+          retryAttempts: 1,
+          cacheTTL: 8000, // short-lived cache to avoid repeat hits during quick UI changes
+        });
+        const data = res?.data;
+        const results = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
+        const count = typeof data?.count === "number" ? data.count : results.length;
+        setApiErr("");
+        return { results, count };
+      } catch (e) {
+        const status = e?.response?.status;
+        const msg = e?.response?.data?.detail || e?.message || "Request failed";
+        setApiErr(`${status || ""} ${msg}`.trim());
+        return { results: [], count: 0 };
+      }
     },
     [filters, reloadKey]
   );
@@ -729,6 +833,29 @@ export default function AdminUsers() {
     </div>
   );
 
+  const editFieldsWithNames = useMemo(() => {
+    const names = {
+      country: selected?.country_name || "",
+      state: selected?.state_name || "",
+      city: selected?.district_name || "",
+    };
+    const prettify = (name) => {
+      if (name === "city") return "District/City";
+      return name.charAt(0).toUpperCase() + name.slice(1);
+    };
+    return (editFields || []).map((f) => {
+      if (f && ["country", "state", "city"].includes(f.name)) {
+        const baseLabel =
+          (f.label ? String(f.label).replace(/\s*\(ID\)\s*$/i, "") : prettify(f.name));
+        const help = names[f.name]
+          ? `Current: ${names[f.name]}`
+          : (f.help_text || "");
+        return { ...f, label: baseLabel, help_text: help };
+      }
+      return f;
+    });
+  }, [editFields, selected]);
+
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
@@ -791,6 +918,24 @@ export default function AdminUsers() {
         />
       </div>
 
+      {apiErr ? (
+        <div
+          style={{
+            margin: "8px 0",
+            padding: "8px 10px",
+            borderRadius: 8,
+            background: "#fee2e2",
+            color: "#991b1b",
+            border: "1px solid #fecaca",
+            fontSize: 13,
+            fontWeight: 600,
+          }}
+          title="API error"
+        >
+          {apiErr}
+        </div>
+      ) : null}
+
       <DataTable
         columns={columns}
         fetcher={fetcher}
@@ -800,13 +945,14 @@ export default function AdminUsers() {
         onSelectionChange={() => {}}
         columnVisibilityModel={colVis}
         onColumnVisibilityModelChange={setColVis}
+        instanceKey="admin-users"
       />
       <ModelFormDialog
         open={editOpen}
         onClose={() => setEditOpen(false)}
         route="/admin/users/"
         record={selected}
-        fields={editFields}
+        fields={editFieldsWithNames}
         onSaved={() => setReloadKey((k) => k + 1)}
         title={selected ? `Edit ${selected.username || selected.full_name || selected.id}` : "Edit User"}
       />

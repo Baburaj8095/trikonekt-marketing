@@ -71,6 +71,32 @@ export default function ModelListSimple(props) {
     setFormOpen(true);
   }
 
+  // PromoPurchase inline actions for the generic dynamic list
+  async function approveRow(row) {
+    const id = row?.id ?? row?.pk;
+    if (!id) return;
+    if (!window.confirm(`Approve purchase #${id}?`)) return;
+    try {
+      await API.post(`business/admin/promo/purchases/${id}/approve/`, {});
+      setReload((k) => k + 1);
+    } catch (e) {
+      alert(e?.response?.data?.detail || "Failed to approve");
+    }
+  }
+
+  async function rejectRow(row) {
+    const id = row?.id ?? row?.pk;
+    if (!id) return;
+    const reason = window.prompt("Enter reject reason (optional):", "");
+    if (reason === null) return;
+    try {
+      await API.post(`business/admin/promo/purchases/${id}/reject/`, { reason: reason || "" });
+      setReload((k) => k + 1);
+    } catch (e) {
+      alert(e?.response?.data?.detail || "Failed to reject");
+    }
+  }
+
   // Resolve dialog fields per model and per mode with safe fallbacks.
   function resolveFields(metaObj, isEdit) {
     if (!metaObj) return [];
@@ -108,28 +134,64 @@ export default function ModelListSimple(props) {
 
   // Build MUI DataGrid column definitions; value/resolution handled by DataTable's default getters.
   const columns = React.useMemo(() => {
+    const isPromoPurchase = (meta?.app_label === "business" && meta?.model === "promopurchase");
+
     const cols = (listDisplay || [])
       .filter((name) => name && name !== "repr")
-      .map((name) => ({
-        field: name,
-        headerName:
-          name === "__str__"
-            ? (meta?.verbose_name_singular || "Repr")
-            : String(name).replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-        // Defaults for responsiveness; DataTable will ensure minWidth/flex if unspecified
-        // minWidth: 140, flex: 1
-      }));
+      .map((name) => {
+        const base = {
+          field: name,
+          headerName:
+            name === "__str__"
+              ? (meta?.verbose_name_singular || "Repr")
+              : String(name).replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        };
 
-    // Actions column (edit)
+        // For FK user, prefer showing username (uses backend-added user_username)
+        if (name === "user") {
+          base.headerName = "Username";
+          base.renderCell = (params) => {
+            const row = params?.row || {};
+            const username = row.user_username || (row.user && row.user.username);
+            return username || row.user || "—";
+          };
+        }
+
+        return base;
+      });
+
+    // Actions column
     cols.push({
       field: "__actions",
       headerName: "Actions",
       sortable: false,
       filterable: false,
-      minWidth: 120,
+      minWidth: 180,
       renderCell: (params) => {
         const row = params?.row || {};
         if (!meta?.permissions?.change) return null;
+
+        if (isPromoPurchase && String(row.status || "").toUpperCase() === "PENDING") {
+          return (
+            <div style={{ display: "flex", gap: 6 }}>
+              <button
+                className="tk-btn"
+                onClick={() => approveRow(row)}
+                style={{ padding: "6px 10px", borderRadius: 6, background: "#059669", color: "#fff", border: 0, cursor: "pointer", fontSize: 12 }}
+              >
+                Approve
+              </button>
+              <button
+                className="tk-btn"
+                onClick={() => rejectRow(row)}
+                style={{ padding: "6px 10px", borderRadius: 6, background: "#ef4444", color: "#fff", border: 0, cursor: "pointer", fontSize: 12 }}
+              >
+                Reject
+              </button>
+            </div>
+          );
+        }
+
         return (
           <button
             className="tk-btn"

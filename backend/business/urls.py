@@ -8,6 +8,14 @@ from .views import (
     ActivationStatusView,
     AgencyPackagesMeView,
     AdminCreateAgencyPackagePaymentView,
+    # Promo packages
+    PromoPackageListView,
+    PromoPurchaseMeListCreateView,
+    AdminPromoPurchaseListView,
+    AdminPromoPurchaseApproveView,
+    AdminPromoPurchaseRejectView,
+    # Rewards points summary
+    RewardPointsSummaryView,
 )
 
 urlpatterns = [
@@ -25,4 +33,12 @@ urlpatterns = [
     # Rewards
     path('rewards/me/', RewardProgressMeView.as_view(), name='reward_progress_me'),
     path('rewards/redeem/', RewardRedeemView.as_view(), name='reward_redeem'),
+    path('rewards/points/', RewardPointsSummaryView.as_view(), name='reward_points_summary'),
+
+    # Promo Packages (Consumer + Admin)
+    path('promo/packages/', PromoPackageListView.as_view(), name='promo_packages_list'),
+    path('promo/purchases/', PromoPurchaseMeListCreateView.as_view(), name='promo_purchases_me'),
+    path('admin/promo/purchases/', AdminPromoPurchaseListView.as_view(), name='admin_promo_purchases_list'),
+    path('admin/promo/purchases/<int:pk>/approve/', AdminPromoPurchaseApproveView.as_view(), name='admin_promo_purchase_approve'),
+    path('admin/promo/purchases/<int:pk>/reject/', AdminPromoPurchaseRejectView.as_view(), name='admin_promo_purchase_reject'),
 ]

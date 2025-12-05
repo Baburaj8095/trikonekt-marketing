@@ -4,7 +4,7 @@ from django.utils import timezone
 from django.db.models import Q
 import csv
 
-from .models import BusinessRegistration, CommissionConfig, AutoPoolAccount, RewardProgress, RewardRedemption, UserMatrixProgress, ReferralJoinPayout, FranchisePayout, DailyReport, WithholdingReserve, Package, AgencyPackageAssignment, AgencyPackagePayment
+from .models import BusinessRegistration, CommissionConfig, AutoPoolAccount, RewardProgress, RewardRedemption, UserMatrixProgress, ReferralJoinPayout, FranchisePayout, DailyReport, WithholdingReserve, Package, AgencyPackageAssignment, AgencyPackagePayment, PromoPackage, PromoPurchase, PromoPackageProduct, PromoMonthlyPackage, PromoMonthlyBox
 from accounts.models import CustomUser
 
 
@@ -316,6 +316,139 @@ class AgencyPackagePaymentAdmin(admin.ModelAdmin):
     search_fields = ("assignment__agency__username", "assignment__package__code", "reference")
     raw_id_fields = ("assignment",)
     ordering = ("-paid_at", "-id")
+
+
+# ==============================
+# Consumer Promo Packages (Admin)
+# ==============================
+@admin.register(PromoPackage)
+class PromoPackageAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "type", "price", "is_active", "created_at")
+    list_filter = ("type", "is_active")
+    search_fields = ("code", "name")
+    readonly_fields = ("created_at", "updated_at")
+    fieldsets = (
+        ("Promo Package", {"fields": ("code", "name", "description", "type", "price", "is_active")}),
+        ("Payment Details", {"fields": ("payment_qr", "upi_id")}),
+        ("Audit", {"fields": ("created_at", "updated_at")}),
+    )
+    ordering = ("code",)
+
+@admin.register(PromoPackageProduct)
+class PromoPackageProductAdmin(admin.ModelAdmin):
+    list_display = ("id", "package", "product", "is_active", "display_order")
+    list_filter = ("is_active", "package")
+    search_fields = ("package__code", "product__name")
+    raw_id_fields = ("package", "product")
+    ordering = ("package", "display_order", "id")
+
+
+@admin.register(PromoMonthlyPackage)
+class PromoMonthlyPackageAdmin(admin.ModelAdmin):
+    list_display = ("id", "package", "number", "total_boxes", "is_active")
+    list_filter = ("is_active", "package")
+    search_fields = ("package__code", "package__name")
+    raw_id_fields = ("package",)
+    ordering = ("package", "number")
+
+
+@admin.register(PromoMonthlyBox)
+class PromoMonthlyBoxAdmin(admin.ModelAdmin):
+    list_display = ("id", "user", "package", "package_number", "box_number", "purchase", "created_at")
+    list_filter = ("package", "package_number")
+    search_fields = ("user__username", "package__code")
+    raw_id_fields = ("user", "package", "purchase")
+    ordering = ("-created_at", "-id")
+
+
+@admin.register(PromoPurchase)
+class PromoPurchaseAdmin(admin.ModelAdmin):
+    list_display = ("id", "user", "package", "status", "selected_product", "amount_paid", "delivery_by", "requested_at", "approved_at")
+    list_filter = ("status", "package__type", "requested_at")
+    search_fields = ("user__username", "package__code", "package__name", "selected_product__name")
+    raw_id_fields = ("user", "approved_by", "package", "selected_product")
+    readonly_fields = ("requested_at", "approved_at", "active_from", "active_to", "delivery_by")
+    list_select_related = ("user", "package", "approved_by", "selected_product")
+    ordering = ("-requested_at", "-id")
+    actions = ["approve_selected", "reject_selected"]
+
+    def approve_selected(self, request, queryset):
+        from datetime import date
+        from calendar import monthrange
+        updated = 0
+        for obj in queryset.select_related("package", "user"):
+            try:
+                if obj.status != "PENDING":
+                    continue
+                obj.status = "APPROVED"
+                obj.approved_by = request.user
+                obj.approved_at = timezone.now()
+                today = timezone.localdate()
+                if obj.package.type == "MONTHLY":
+                    # Allocate permanent paid boxes for this purchase
+                    created_boxes = 0
+                    try:
+                        from .models import PromoMonthlyBox
+                        boxes = list(getattr(obj, "boxes_json", []) or [])
+                        number = int(getattr(obj, "package_number", 1) or 1)
+                        for b in boxes:
+                            try:
+                                bn = int(b)
+                                _, created = PromoMonthlyBox.objects.get_or_create(
+                                    user=obj.user,
+                                    package=obj.package,
+                                    package_number=number,
+                                    box_number=bn,
+                                    defaults={"purchase": obj},
+                                )
+                                if created:
+                                    created_boxes += 1
+                            except Exception:
+                                continue
+                    except Exception:
+                        pass
+                    # No calendar active window for per-box flow
+                    obj.active_from = None
+                    obj.active_to = None
+                else:
+                    obj.active_from = today
+                    obj.active_to = None
+
+                fields_to_update = ["status", "approved_by", "approved_at", "active_from", "active_to"]
+                # Set delivery_by for PRIME ₹750 purchases (30 days from approval date)
+                try:
+                    from decimal import Decimal as D
+                    price = D(str(getattr(obj.package, "price", "0")))
+                    is_prime_750 = str(getattr(obj.package, "type", "")) == "PRIME" and abs(price - D("750")) <= D("0.5")
+                except Exception:
+                    is_prime_750 = False
+                if is_prime_750:
+                    from datetime import timedelta
+                    obj.delivery_by = timezone.localdate() + timedelta(days=30)
+                    fields_to_update.append("delivery_by")
+
+                obj.save(update_fields=fields_to_update)
+                updated += 1
+            except Exception:
+                continue
+        self.message_user(request, f"Approved {updated} promo purchase(s).")
+    approve_selected.short_description = "Approve selected PENDING purchases"
+
+    def reject_selected(self, request, queryset):
+        updated = 0
+        for obj in queryset.select_related("package", "user"):
+            try:
+                if obj.status != "PENDING":
+                    continue
+                obj.status = "REJECTED"
+                obj.approved_by = request.user
+                obj.approved_at = timezone.now()
+                obj.save(update_fields=["status", "approved_by", "approved_at"])
+                updated += 1
+            except Exception:
+                continue
+        self.message_user(request, f"Rejected {updated} promo purchase(s).")
+    reject_selected.short_description = "Reject selected PENDING purchases"
 
 
 # ======================

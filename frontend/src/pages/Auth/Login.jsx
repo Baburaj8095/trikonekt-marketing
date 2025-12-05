@@ -52,7 +52,7 @@ import {
 } from "@mui/icons-material";
 
 import "@fontsource/poppins";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useParams } from "react-router-dom";
 import API from "../../api/api";
 import LOGO from "../../assets/TRIKONEKT.png";
 
@@ -60,15 +60,85 @@ const Login = () => {
   // === LOGIC STATES (kept from original) ===
   const [mode, setMode] = useState("login"); // "login" | "register"
   const [role, setRole] = useState("user"); // user | agency | employee | business
+  const ALLOWED_ROLES = ["user", "agency", "employee", "business"];
+  const { role: roleParam } = useParams();
+  const lockedRole = ALLOWED_ROLES.includes(String(roleParam || "").toLowerCase())
+    ? String(roleParam).toLowerCase()
+    : null;
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
+  const [sponsorId, setSponsorId] = useState("");
+  const [agencyLevel, setAgencyLevel] = useState("");
 
   useEffect(() => {
     document.body.style.fontFamily = "'Poppins', sans-serif";
   }, []);
+
+  // If a role is locked via route param, force-select it
+  useEffect(() => {
+    if (lockedRole && role !== lockedRole) {
+      setRole(lockedRole);
+    }
+  }, [lockedRole]);
+
+  // If already authenticated:
+  // - When a role is locked via the URL, redirect ONLY if a session exists for that role.
+  // - When no role is locked (generic auth routes), redirect to the first available session.
+  // - When in Register mode, do NOT auto-redirect, even if another session exists.
+  useEffect(() => {
+    try {
+      const qMode = new URLSearchParams(location.search || "").get("mode");
+      if (mode === "register" || String(qMode).toLowerCase() === "register") return;
+      const mapLockedToNs = (r) => {
+        const rl = String(r || "").toLowerCase();
+        return ["user", "agency", "employee", "business"].includes(rl) ? rl : null;
+      };
+      const preferredNs = mapLockedToNs(lockedRole);
+      if (preferredNs) {
+        const has =
+          localStorage.getItem(`token_${preferredNs}`) ||
+          sessionStorage.getItem(`token_${preferredNs}`);
+        if (has) {
+          const to =
+            preferredNs === "admin" ? "/admin/dashboard" : `/${preferredNs}/dashboard`;
+          navigate(to, { replace: true });
+        }
+      } else {
+        const nsCandidates = ["admin", "agency", "employee", "user"];
+        const found = nsCandidates.find(
+          (ns) =>
+            localStorage.getItem(`token_${ns}`) ||
+            sessionStorage.getItem(`token_${ns}`)
+        );
+        if (found) {
+          const to = found === "admin" ? "/admin/dashboard" : `/${found}/dashboard`;
+          navigate(to, { replace: true });
+        }
+      }
+    } catch {}
+  }, [mode, lockedRole, navigate, location.search]);
+
+  // Redirect legacy /login?mode=register[&role=...] links to the role-scoped register route
+  // This avoids any admin-session auto-redirects that can occur on the generic /login page.
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(location.search || "");
+      const qMode = String(params.get("mode") || params.get("category") || "").toLowerCase();
+      if (qMode === "register") {
+        const r = String(params.get("role") || role || "user").toLowerCase();
+        const sponsor =
+          params.get("sponsor") ||
+          params.get("sponsor_id") ||
+          params.get("agencyid") ||
+          params.get("ref");
+        const qs = sponsor ? `?sponsor=${encodeURIComponent(sponsor)}` : "";
+        navigate(`/auth/register/${r}${qs}`, { replace: true });
+      }
+    } catch {}
+  }, [location.search, navigate]);
 
   // Read role and mode (aka "category") from query string to preselect UI
   useEffect(() => {
@@ -93,8 +163,34 @@ const Login = () => {
     } catch {}
   }, [location.search]);
 
+  // Auto-select Sub Franchise for agency register links with sponsor
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(location.search || "");
+      const s =
+        params.get("sponsor") ||
+        params.get("sponsor_id") ||
+        params.get("agencyid") ||
+        params.get("ref");
+      if (mode === "register" && role === "agency" && s && !agencyLevel) {
+        setAgencyLevel("sub_franchise");
+      }
+    } catch {}
+  }, [mode, role, location.search, agencyLevel]);
+
+  // Ensure Register tab on /auth/register/* routes
+  useEffect(() => {
+    try {
+      if (/\/auth\/register\//i.test(location.pathname || "")) {
+        setMode("register");
+      }
+    } catch {}
+  }, [location.pathname]);
+
+
   const handleModeChange = () => setMode(mode === "login" ? "register" : "login");
   const handleRoleChange = (_, val) => {
+    if (lockedRole) return;
     if (val) setRole(val);
   };
 
@@ -139,8 +235,6 @@ const Login = () => {
   const [geoCityName, setGeoCityName] = useState("");
   const geoRequestedRef = useRef(false);
 
-  const [sponsorId, setSponsorId] = useState("");
-  const [agencyLevel, setAgencyLevel] = useState("");
 
   // Live Sponsor validation state
   const [sponsorChecking, setSponsorChecking] = useState(false);
@@ -158,6 +252,9 @@ const Login = () => {
   const [consumerSelectedDistrict, setConsumerSelectedDistrict] = useState("");
 const [consumerDistrictPincodes, setConsumerDistrictPincodes] = useState([]);
 const [consumerPinsByState, setConsumerPinsByState] = useState([]);
+// Non-agency (Consumer/Employee/Merchant) district->pincode options via Country/State/District selects
+const [nonAgencyDistrictPincodes, setNonAgencyDistrictPincodes] = useState([]);
+const [pinByDistrictLoadingNA, setPinByDistrictLoadingNA] = useState(false);
 
   // Normalize sponsor input to avoid passing URLs or malformed strings to the API
   const normalizeSponsor = (val) => {
@@ -692,7 +789,35 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
   }, [mode, sponsorId]);
 
   // Effective pincode options for consumer/employee (intersect when both available)
-  const pincodeOptionsConsumer = useMemo(() => {
+  // Non-agency: load pincodes when State and District are selected
+  useEffect(() => {
+    if (role === "agency") {
+      setNonAgencyDistrictPincodes([]);
+      return;
+    }
+    if (!selectedState || !selectedCity) {
+      setNonAgencyDistrictPincodes([]);
+      return;
+    }
+    setPinByDistrictLoadingNA(true);
+    (async () => {
+      try {
+        const resp = await API.get("/location/pincodes/by-district/", {
+          params: { district_name: selectedCity, state_id: selectedState },
+        });
+        const pins = resp?.data?.pincodes || [];
+        setNonAgencyDistrictPincodes(pins);
+        // Clear pincode if it is no longer valid for the selected district
+        setPincode((prev) => (pins.includes(prev) ? prev : ""));
+      } catch {
+        setNonAgencyDistrictPincodes([]);
+      } finally {
+        setPinByDistrictLoadingNA(false);
+      }
+    })();
+  }, [role, selectedCity, selectedState]);
+
+const pincodeOptionsConsumer = useMemo(() => {
     return Array.isArray(sponsorConsumerPincodes) ? sponsorConsumerPincodes : [];
   }, [sponsorConsumerPincodes]);
 
@@ -751,6 +876,21 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
   const isPC = currentCategory === "agency_pincode_coordinator";
   const isPincodeCat = currentCategory === "agency_pincode";
   const isSubFranchiseCat = currentCategory === "agency_sub_franchise";
+
+  // Default Country to India for Sub Franchise and load states
+  useEffect(() => {
+    if (!isSubFranchiseCat) return;
+    if (!selectedCountry && Array.isArray(countries) && countries.length) {
+      const india = countries.find((c) => /india/i.test(c?.name || ""));
+      const defaultId = india ? String(india.id) : String(countries[0].id);
+      setSelectedCountry(defaultId);
+      if (defaultId) {
+        (async () => {
+          try { await loadStates(defaultId); } catch {}
+        })();
+      }
+    }
+  }, [isSubFranchiseCat, selectedCountry, countries]);
 
   // Region inputs and options for agency flow
   const [allStatesList, setAllStatesList] = useState([]); // [{id,name}] for SC
@@ -977,10 +1117,10 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
         setErrorMsg("Please select a State.");
         return false;
       }
-      if (!selectedDistrictAgency.trim()) {
-        setErrorMsg("Please select a District.");
-        return false;
-      }
+        if (!selectedDistrictAgency.trim()) {
+          setErrorMsg("Please select a District.");
+          return false;
+        }
       // ensure selectedDistrict is among sponsorDistricts for selectedState if provided
       if (
         sponsorDistricts.length &&
@@ -1014,14 +1154,14 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
         return false;
       }
     } else if (isPincodeCat || isSubFranchiseCat) {
-      // For Sub-Franchise, ensure State and District are chosen to list district pincodes
+      // For Sub-Franchise, ensure State and City are chosen to list city pincodes
       if (isSubFranchiseCat) {
         if (!selectedState) {
           setErrorMsg("Please select a State.");
           return false;
         }
         if (!selectedDistrictAgency.trim()) {
-          setErrorMsg("Please select a District.");
+          setErrorMsg("Please select a City.");
           return false;
         }
       }
@@ -1231,10 +1371,10 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
       return;
     }
 
-    // Location validation for non-agency registrations
+    // Location selection mandatory for non-agency registrations
     if (!AGENCY_CATEGORIES.has(category)) {
-      if (!pincode) {
-        setErrorMsg("Pincode is required");
+      if (!selectedCountry || !selectedState || !selectedCity || !pincode) {
+        setErrorMsg("Please select Country, State, District and Pincode");
         return;
       }
     }
@@ -1252,9 +1392,9 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
     // Non-agency: include location data
     if (!AGENCY_CATEGORIES.has(category)) {
       Object.assign(payload, {
-        country: null,
-        state: null,
-        city: null,
+        country: selectedCountry || null,
+        state: selectedState || null,
+        city: selectedCity || null,
         pincode,
         country_name: geoCountryName || "",
         country_code: geoCountryCode || "",
@@ -1412,29 +1552,84 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
                 ),
               }}
             />
-            <TextField
-              fullWidth
-              label="Pincode"
-              value={pincode}
-              onChange={(e) => handlePincodeChange(e.target.value)}
-              sx={{ mb: 2 }}
-              required
-            />
-            {branches.length > 0 && (
-              <Autocomplete
-                fullWidth
-                options={branches}
-                value={selectedBranch}
-                onChange={handleBranchSelect}
-                disabled={branchDisabled}
-                getOptionLabel={(option) => option?.name || ""}
-                renderInput={(params) => <TextField {...params} label="Branch" />}
-                sx={{ mb: 2 }}
-              />
-            )}
-            <TextField fullWidth label="City" value={geoCityName} disabled sx={{ mb: 2 }} />
-            <TextField fullWidth label="State" value={geoStateName} disabled sx={{ mb: 2 }} />
-            <TextField fullWidth label="Country" value={geoCountryName} disabled sx={{ mb: 2 }} />
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>Country</InputLabel>
+              <Select
+                label="Country"
+                value={selectedCountry}
+                onChange={handleCountryChange}
+                required
+              >
+                {(countries || []).map((c) => (
+                  <MenuItem key={c.id} value={String(c.id)}>
+                    {c.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>State</InputLabel>
+              <Select
+                label="State"
+                value={selectedState}
+                onChange={handleStateChange}
+                required
+                disabled={!selectedCountry}
+              >
+                <MenuItem value="">-- Select --</MenuItem>
+                {(states || []).map((s) => (
+                  <MenuItem key={s.id} value={String(s.id)}>
+                    {s.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>District</InputLabel>
+              <Select
+                label="District"
+                value={selectedCity}
+                onChange={(e) => {
+                  setSelectedCity(e.target.value);
+                  setPincode("");
+                }}
+                required
+                disabled={!selectedState}
+              >
+                <MenuItem value="">-- Select --</MenuItem>
+                {Array.from(
+                  new Set(
+                    (cities || [])
+                      .map((c) => c?.name || c?.Name || c?.city || c?.City)
+                      .filter(Boolean)
+                  )
+                ).map((name) => (
+                  <MenuItem key={name} value={name}>
+                    {name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>Pincode</InputLabel>
+              <Select
+                label="Pincode"
+                value={pincode}
+                onChange={(e) => setPincode(e.target.value)}
+                required
+                disabled={!selectedCity || pinByDistrictLoadingNA}
+              >
+                <MenuItem value="">-- Select --</MenuItem>
+                {(nonAgencyDistrictPincodes || []).map((pin) => (
+                  <MenuItem key={pin} value={pin}>
+                    {pin}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </>
         );
       case "agency":
@@ -1541,56 +1736,32 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
 
             {/* Agency-specific region UI */}
             {(sponsorId && isSC) && (
-              <>
-            <FormControl fullWidth sx={{ mb: 2 }}>
-              <InputLabel>Pincode</InputLabel>
-              <Select
-                label="Pincode"
-                value={pincode}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setPincode(v);
-                  fetchFromBackendPin(v);
-                }}
-                disabled={!selectedCity}
-              >
-                <MenuItem value="">-- Select --</MenuItem>
-                {(businessPincodes || []).map((pin) => (
-                  <MenuItem key={pin} value={pin}>{pin}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <TextField fullWidth label="City" value={geoCityName} disabled sx={{ mb: 2 }} />
-            <TextField fullWidth label="State" value={geoStateName} disabled sx={{ mb: 2 }} />
-            <TextField fullWidth label="Country" value={geoCountryName} disabled sx={{ mb: 2 }} />
-
-                <FormControl fullWidth sx={{ mb: 2 }}>
-                  <InputLabel>States (Max 2)</InputLabel>
-                  <Select
-                    multiple
-                    label="States (Max 2)"
-                    value={assignStates.map(String)}
-                    onChange={(e) => {
-                      const selected = Array.from(e.target.value || []).map((v) => String(v));
-                      setAssignStates(selected);
-                    }}
-                    renderValue={(selected) => {
-                      const names = (selected || []).map((id) => {
-                        const s = allStatesList.find((x) => String(x.id) === String(id));
-                        return s ? s.name : id;
-                      });
-                      return names.join(", ");
-                    }}
-                  >
-                    {(allStatesList || []).map((s) => (
-                      <MenuItem key={s.id} value={String(s.id)}>
-                        {s.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                  <Typography variant="caption" color="text.secondary">Select up to 2 states.</Typography>
-                </FormControl>
-              </>
+              <FormControl fullWidth sx={{ mb: 2 }}>
+                <InputLabel>States (Max 2)</InputLabel>
+                <Select
+                  multiple
+                  label="States (Max 2)"
+                  value={assignStates.map(String)}
+                  onChange={(e) => {
+                    const selected = Array.from(e.target.value || []).map((v) => String(v));
+                    setAssignStates(selected);
+                  }}
+                  renderValue={(selected) => {
+                    const names = (selected || []).map((id) => {
+                      const s = allStatesList.find((x) => String(x.id) === String(id));
+                      return s ? s.name : id;
+                    });
+                    return names.join(", ");
+                  }}
+                >
+                  {(allStatesList || []).map((s) => (
+                    <MenuItem key={s.id} value={String(s.id)}>
+                      {s.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+                <Typography variant="caption" color="text.secondary">Select up to 2 states.</Typography>
+              </FormControl>
             )}
 
             {isSubFranchiseCat && (
@@ -1619,6 +1790,7 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
                       setSelectedState(e.target.value);
                       setAssignDistricts([]);
                       setSelectedDistrictAgency("");
+                      setSelectedPincodeAgency("");
                     }}
                     disabled={!selectedCountry}
                   >
@@ -1675,11 +1847,14 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
 
             {isSubFranchiseCat && (
               <FormControl fullWidth sx={{ mb: 2 }}>
-                <InputLabel>District</InputLabel>
+                <InputLabel>City</InputLabel>
                 <Select
-                  label="District"
+                  label="City"
                   value={selectedDistrictAgency}
-                  onChange={(e) => setSelectedDistrictAgency(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedDistrictAgency(e.target.value);
+                    setSelectedPincodeAgency("");
+                  }}
                   disabled={!selectedState}
                 >
                   <MenuItem value="">-- Select --</MenuItem>
@@ -1805,29 +1980,84 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
                 ),
               }}
             />
-            <TextField
-              fullWidth
-              label="Pincode"
-              value={pincode}
-              onChange={(e) => handlePincodeChange(e.target.value)}
-              sx={{ mb: 2 }}
-              required
-            />
-            {branches.length > 0 && (
-              <Autocomplete
-                fullWidth
-                options={branches}
-                value={selectedBranch}
-                onChange={handleBranchSelect}
-                disabled={branchDisabled}
-                getOptionLabel={(option) => option?.name || ""}
-                renderInput={(params) => <TextField {...params} label="Branch" />}
-                sx={{ mb: 2 }}
-              />
-            )}
-            <TextField fullWidth label="City" value={geoCityName} disabled sx={{ mb: 2 }} />
-            <TextField fullWidth label="State" value={geoStateName} disabled sx={{ mb: 2 }} />
-            <TextField fullWidth label="Country" value={geoCountryName} disabled sx={{ mb: 2 }} />
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>Country</InputLabel>
+              <Select
+                label="Country"
+                value={selectedCountry}
+                onChange={handleCountryChange}
+                required
+              >
+                {(countries || []).map((c) => (
+                  <MenuItem key={c.id} value={String(c.id)}>
+                    {c.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>State</InputLabel>
+              <Select
+                label="State"
+                value={selectedState}
+                onChange={handleStateChange}
+                required
+                disabled={!selectedCountry}
+              >
+                <MenuItem value="">-- Select --</MenuItem>
+                {(states || []).map((s) => (
+                  <MenuItem key={s.id} value={String(s.id)}>
+                    {s.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>District</InputLabel>
+              <Select
+                label="District"
+                value={selectedCity}
+                onChange={(e) => {
+                  setSelectedCity(e.target.value);
+                  setPincode("");
+                }}
+                required
+                disabled={!selectedState}
+              >
+                <MenuItem value="">-- Select --</MenuItem>
+                {Array.from(
+                  new Set(
+                    (cities || [])
+                      .map((c) => c?.name || c?.Name || c?.city || c?.City)
+                      .filter(Boolean)
+                  )
+                ).map((name) => (
+                  <MenuItem key={name} value={name}>
+                    {name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>Pincode</InputLabel>
+              <Select
+                label="Pincode"
+                value={pincode}
+                onChange={(e) => setPincode(e.target.value)}
+                required
+                disabled={!selectedCity || pinByDistrictLoadingNA}
+              >
+                <MenuItem value="">-- Select --</MenuItem>
+                {(nonAgencyDistrictPincodes || []).map((pin) => (
+                  <MenuItem key={pin} value={pin}>
+                    {pin}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </>
         );
       case "business":
@@ -1919,29 +2149,84 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
               minRows={2}
               required
             />
-            <TextField
-              fullWidth
-              label="Pincode"
-              value={pincode}
-              onChange={(e) => handlePincodeChange(e.target.value)}
-              sx={{ mb: 2 }}
-              required
-            />
-            {branches.length > 0 && (
-              <Autocomplete
-                fullWidth
-                options={branches}
-                value={selectedBranch}
-                onChange={handleBranchSelect}
-                disabled={branchDisabled}
-                getOptionLabel={(option) => option?.name || ""}
-                renderInput={(params) => <TextField {...params} label="Branch" />}
-                sx={{ mb: 2 }}
-              />
-            )}
-            <TextField fullWidth label="City" value={geoCityName} disabled sx={{ mb: 2 }} />
-            <TextField fullWidth label="State" value={geoStateName} disabled sx={{ mb: 2 }} />
-            <TextField fullWidth label="Country" value={geoCountryName} disabled sx={{ mb: 2 }} />
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>Country</InputLabel>
+              <Select
+                label="Country"
+                value={selectedCountry}
+                onChange={handleCountryChange}
+                required
+              >
+                {(countries || []).map((c) => (
+                  <MenuItem key={c.id} value={String(c.id)}>
+                    {c.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>State</InputLabel>
+              <Select
+                label="State"
+                value={selectedState}
+                onChange={handleStateChange}
+                required
+                disabled={!selectedCountry}
+              >
+                <MenuItem value="">-- Select --</MenuItem>
+                {(states || []).map((s) => (
+                  <MenuItem key={s.id} value={String(s.id)}>
+                    {s.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>District</InputLabel>
+              <Select
+                label="District"
+                value={selectedCity}
+                onChange={(e) => {
+                  setSelectedCity(e.target.value);
+                  setPincode("");
+                }}
+                required
+                disabled={!selectedState}
+              >
+                <MenuItem value="">-- Select --</MenuItem>
+                {Array.from(
+                  new Set(
+                    (cities || [])
+                      .map((c) => c?.name || c?.Name || c?.city || c?.City)
+                      .filter(Boolean)
+                  )
+                ).map((name) => (
+                  <MenuItem key={name} value={name}>
+                    {name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>Pincode</InputLabel>
+              <Select
+                label="Pincode"
+                value={pincode}
+                onChange={(e) => setPincode(e.target.value)}
+                required
+                disabled={!selectedCity || pinByDistrictLoadingNA}
+              >
+                <MenuItem value="">-- Select --</MenuItem>
+                {(nonAgencyDistrictPincodes || []).map((pin) => (
+                  <MenuItem key={pin} value={pin}>
+                    {pin}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </>
         );
       default:
@@ -2036,7 +2321,7 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
                 },
               }}
             >
-              <ToggleButton value="user" aria-label="consumer">
+              <ToggleButton value="user" aria-label="consumer" disabled={Boolean(lockedRole && lockedRole !== "user")}>
                 <Box sx={{ display: "flex", alignItems: "center", width: "100%", justifyContent: "space-between" }}>
                   <Box sx={{ display: "flex", alignItems: "center" }}>
                     <PersonIcon sx={{ mr: 1 }} /> Consumer
@@ -2044,7 +2329,7 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
                   {role === "user" && <CheckCircleIcon color="success" fontSize="small" />}
                 </Box>
               </ToggleButton>
-              <ToggleButton value="agency" aria-label="agency">
+              <ToggleButton value="agency" aria-label="agency" disabled={Boolean(lockedRole && lockedRole !== "agency")}>
                 <Box sx={{ display: "flex", alignItems: "center", width: "100%", justifyContent: "space-between" }}>
                   <Box sx={{ display: "flex", alignItems: "center" }}>
                     <StoreIcon sx={{ mr: 1 }} /> Agency
@@ -2052,7 +2337,7 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
                   {role === "agency" && <CheckCircleIcon color="success" fontSize="small" />}
                 </Box>
               </ToggleButton>
-              <ToggleButton value="employee" aria-label="employee">
+              <ToggleButton value="employee" aria-label="employee" disabled={Boolean(lockedRole && lockedRole !== "employee")}>
                 <Box sx={{ display: "flex", alignItems: "center", width: "100%", justifyContent: "space-between" }}>
                   <Box sx={{ display: "flex", alignItems: "center" }}>
                     <WorkIcon sx={{ mr: 1 }} /> Employee
@@ -2060,7 +2345,7 @@ const [consumerPinsByState, setConsumerPinsByState] = useState([]);
                   {role === "employee" && <CheckCircleIcon color="success" fontSize="small" />}
                 </Box>
               </ToggleButton>
-              <ToggleButton value="business" aria-label="merchant">
+              <ToggleButton value="business" aria-label="merchant" disabled={Boolean(lockedRole && lockedRole !== "business")}>
                 <Box sx={{ display: "flex", alignItems: "center", width: "100%", justifyContent: "space-between" }}>
                   <Box sx={{ display: "flex", alignItems: "center" }}>
                     <BusinessIcon sx={{ mr: 1 }} /> Merchant

@@ -6,7 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.http import HttpResponse
 from django.db.models import Q
-from .models import BusinessRegistration, RewardProgress, RewardRedemption, DailyReport, AutoPoolAccount, SubscriptionActivation, Package, AgencyPackageAssignment, AgencyPackagePayment
+from .models import BusinessRegistration, RewardProgress, RewardRedemption, DailyReport, AutoPoolAccount, SubscriptionActivation, Package, AgencyPackageAssignment, AgencyPackagePayment, CommissionConfig
 from .serializers import BusinessRegistrationSerializer, DailyReportSerializer, AgencyPackageAssignmentSerializer, AgencyPackagePaymentSerializer
 
 
@@ -267,6 +267,432 @@ class DailyReportMyView(APIView):
                 pass
         ser = DailyReportSerializer(qs, many=True)
         return Response(ser.data, status=status.HTTP_200_OK)
+
+
+# ==============================
+# Consumer Promo Packages (Prime/Monthly)
+# ==============================
+from rest_framework.parsers import MultiPartParser, FormParser
+from .serializers import PromoPackageSerializer, PromoPurchaseSerializer
+from .models import PromoPackage, PromoPurchase
+
+
+class PromoPackageListView(APIView):
+    """
+    GET /api/business/promo/packages/
+    List active Promo Packages with QR/UPI details for the user to pay.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        qs = PromoPackage.objects.filter(is_active=True).order_by("type", "price", "code")
+        ser = PromoPackageSerializer(qs, many=True, context={"request": request})
+        return Response(ser.data, status=status.HTTP_200_OK)
+
+
+class PromoPurchaseMeListCreateView(APIView):
+    """
+    GET /api/business/promo/purchases/ -> list my promo purchases
+    POST /api/business/promo/purchases/ -> create a new promo purchase (multipart form with payment_proof)
+      Body (multipart/form-data):
+        - package_id (required)
+        - For MONTHLY: year, month (required; only current month allowed)
+        - payment_proof (file; image/pdf)
+        - remarks (optional)
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
+
+    def get(self, request):
+        qs = PromoPurchase.objects.filter(user=request.user).select_related("package").order_by("-requested_at", "-id")
+        ser = PromoPurchaseSerializer(qs, many=True, context={"request": request})
+        return Response(ser.data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        ser = PromoPurchaseSerializer(data=request.data, context={"request": request})
+        if ser.is_valid():
+            obj = ser.save()
+            return Response(PromoPurchaseSerializer(obj, context={"request": request}).data, status=status.HTTP_201_CREATED)
+        return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AdminPromoPurchaseListView(APIView):
+    """
+    GET /api/business/admin/promo/purchases/?status=PENDING|APPROVED|REJECTED|CANCELLED
+    Admin-only list of promo purchases (defaults to PENDING).
+    """
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        status_in = (request.query_params.get("status") or "PENDING").strip().upper()
+        valid = {"PENDING", "APPROVED", "REJECTED", "CANCELLED"}
+        qs = PromoPurchase.objects.select_related("user", "package").order_by("-requested_at", "-id")
+        if status_in in valid:
+            qs = qs.filter(status=status_in)
+        ser = PromoPurchaseSerializer(qs, many=True, context={"request": request})
+        return Response(ser.data, status=status.HTTP_200_OK)
+
+
+class AdminPromoPurchaseApproveView(APIView):
+    """
+    POST /api/business/admin/promo/purchases/<pk>/approve/
+    Approve a pending promo purchase. Sets active period:
+      - MONTHLY: calendar month (year/month on record)
+      - PRIME: active_from = today; active_to = null
+    """
+    permission_classes = [IsAdminUser]
+
+    def post(self, request, pk: int):
+        """
+        Approve a pending promo purchase, set active period, and allocate e‑coupon codes to the consumer by quantity.
+        Allocation policy:
+          - denomination: defaults to ₹150 per unit (can be extended via package->denomination mapping later)
+          - quantity: uses PromoPurchase.quantity (>=1)
+          - picks AVAILABLE e‑coupon codes with no owner and assigns to the buyer (status -> SOLD)
+        Inventory allocation is best-effort and does not block approval.
+        """
+        obj = PromoPurchase.objects.select_related("package", "user").filter(pk=pk).first()
+        if not obj:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        if obj.status != "PENDING":
+            return Response({"detail": "Only PENDING purchases can be approved."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from datetime import date
+        from calendar import monthrange
+        from decimal import Decimal as D
+
+        # Infer denomination for allocation (default ₹150)
+        try:
+            denom = D("150.00")
+        except Exception:
+            denom = None
+
+        # Compute required code count using package price:
+        # units_per_pkg = floor(package.price / denom) (min 1)
+        # total required codes = quantity * units_per_pkg
+        units_per_pkg = 1
+        try:
+            if denom is not None and getattr(obj.package, "price", None) is not None:
+                units_per_pkg = int(D(str(obj.package.price)) // denom)
+                if units_per_pkg <= 0:
+                    units_per_pkg = 1
+        except Exception:
+            units_per_pkg = 1
+
+        try:
+            qty_in = max(1, int(getattr(obj, "quantity", 1) or 1))
+        except Exception:
+            qty_in = 1
+        need = int(qty_in) * int(units_per_pkg)
+
+        # Try allocation first to avoid approving without inventory
+        allocated_ids = []
+        sample_codes = []
+        with transaction.atomic():
+            # Attempt inventory reservation if denomination is defined
+            if denom is not None:
+                try:
+                    from coupons.models import CouponCode
+                except Exception:
+                    CouponCode = None
+
+                if CouponCode is not None:
+                    base_qs = CouponCode.objects.filter(
+                        issued_channel="e_coupon",
+                        value=denom,
+                        status="AVAILABLE",
+                        assigned_agency__isnull=True,
+                        assigned_employee__isnull=True,
+                        assigned_consumer__isnull=True,
+                    )
+                    try:
+                        locking_qs = base_qs.select_for_update(skip_locked=True)
+                    except Exception:
+                        locking_qs = base_qs
+
+                    pick_ids = list(
+                        locking_qs.order_by("serial", "id").values_list("id", flat=True)[:need]
+                    )
+                    # Approve regardless of inventory; allocate best-effort.
+                    # If fewer than needed are available, allocate what we can and proceed (no 409/rollback).
+                    pass
+
+                    write_qs = CouponCode.objects.filter(id__in=pick_ids).filter(
+                        issued_channel="e_coupon",
+                        status="AVAILABLE",
+                        assigned_agency__isnull=True,
+                        assigned_employee__isnull=True,
+                        assigned_consumer__isnull=True,
+                    )
+                    affected = write_qs.update(assigned_consumer_id=obj.user_id, status="SOLD")
+                    allocated_ids = pick_ids[:affected] if affected else []
+                    try:
+                        sample_codes = list(
+                            CouponCode.objects.filter(id__in=allocated_ids).values_list("code", flat=True)[:5]
+                        )
+                    except Exception:
+                        sample_codes = []
+
+            # Set approval + allocate MONTHLY boxes (for MONTHLY), else set active window for PRIME
+            obj.status = "APPROVED"
+            obj.approved_by = request.user
+            obj.approved_at = timezone.now()
+
+            today = timezone.localdate()
+            if obj.package.type == "MONTHLY":
+                # Create permanent paid box records for selected boxes
+                created_boxes = 0
+                try:
+                    from .models import PromoMonthlyBox
+                    boxes = list(getattr(obj, "boxes_json", []) or [])
+                    number = int(getattr(obj, "package_number", 1) or 1)
+                    for b in boxes:
+                        try:
+                            bn = int(b)
+                            _, created = PromoMonthlyBox.objects.get_or_create(
+                                user=obj.user,
+                                package=obj.package,
+                                package_number=number,
+                                box_number=bn,
+                                defaults={"purchase": obj},
+                            )
+                            if created:
+                                created_boxes += 1
+                        except Exception:
+                            continue
+                except Exception:
+                    pass
+                # No calendar active window for MONTHLY per-box flow
+                obj.active_from = None
+                obj.active_to = None
+            else:
+                obj.active_from = today
+                obj.active_to = None
+
+            fields_to_update = ["status", "approved_by", "approved_at", "active_from", "active_to"]
+            # For PRIME 750 promo with a selected product, set delivery_by = approved_date + 30 days
+            try:
+                from decimal import Decimal as D
+                price = D(str(getattr(obj.package, "price", "0")))
+                is_prime_750 = str(getattr(obj.package, "type", "")) == "PRIME" and abs(price - D("750")) <= D("0.5")
+            except Exception:
+                is_prime_750 = False
+            if is_prime_750:
+                from datetime import timedelta
+                obj.delivery_by = timezone.localdate() + timedelta(days=30)
+                fields_to_update.append("delivery_by")
+
+            obj.save(update_fields=fields_to_update)
+
+            # Audit (best effort)
+            try:
+                from coupons.models import AuditTrail
+                AuditTrail.objects.create(
+                    action="promo_purchase_approved_allocated",
+                    actor=request.user,
+                    notes=f"Approved promo purchase #{obj.id}, allocated={len(allocated_ids)}",
+                    metadata={
+                        "purchase_id": obj.id,
+                        "user_id": obj.user_id,
+                        "denomination": str(denom) if denom is not None else None,
+                        "quantity": int(need),  # retained for compatibility (required codes)
+                        "quantity_units": int(qty_in),
+                        "units_per_package": int(units_per_pkg),
+                        "required_codes": int(need),
+                        "allocated": int(len(allocated_ids)),
+                        "sample_codes": sample_codes,
+                    },
+                )
+            except Exception:
+                pass
+
+        return Response(PromoPurchaseSerializer(obj, context={"request": request}).data, status=status.HTTP_200_OK)
+
+
+class AdminPromoPurchaseRejectView(APIView):
+    """
+    POST /api/business/admin/promo/purchases/<pk>/reject/
+    Body: { "reason": "optional" }
+    """
+    permission_classes = [IsAdminUser]
+
+    def post(self, request, pk: int):
+        obj = PromoPurchase.objects.select_related("package", "user").filter(pk=pk).first()
+        if not obj:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        if obj.status != "PENDING":
+            return Response({"detail": "Only PENDING purchases can be rejected."}, status=status.HTTP_400_BAD_REQUEST)
+
+        reason = str((request.data or {}).get("reason") or "").strip()
+        obj.status = "REJECTED"
+        if reason:
+            obj.remarks = ((obj.remarks or "") + (("\n" if obj.remarks else "") + f"Rejected: {reason}"))[:2000]
+        obj.approved_by = request.user
+        obj.approved_at = timezone.now()
+        obj.save(update_fields=["status", "remarks", "approved_by", "approved_at"])
+        return Response(PromoPurchaseSerializer(obj, context={"request": request}).data, status=status.HTTP_200_OK)
+
+
+# ==============================
+# Rewards Points Card (based on activated coupons)
+# ==============================
+class RewardPointsSummaryView(APIView):
+    """
+    GET /api/business/rewards/points/
+    Returns current_points computed from activated coupon count using
+    admin-defined Reward Points Configuration (tiers + after.base/per_coupon).
+    Also returns next milestone target and progress percentage towards it.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        rp, _ = RewardProgress.objects.get_or_create(user=request.user)
+        # E‑coupon activations (distinct codes activated by me)
+        try:
+            from coupons.models import AuditTrail
+            activated_ecoupons = (
+                AuditTrail.objects
+                .filter(action="coupon_activated", actor=request.user)
+                .values("coupon_code_id")
+                .distinct()
+                .count()
+            )
+        except Exception:
+            activated_ecoupons = 0
+
+        # Use actual activated count for reward points progression
+        try:
+            stored = int(rp.coupon_count or 0)
+        except Exception:
+            stored = 0
+        progress_count = max(stored, int(activated_ecoupons or 0))
+        # Best-effort: persist back if we advanced
+        if progress_count != stored:
+            try:
+                rp.coupon_count = progress_count
+                rp.save(update_fields=["coupon_count", "updated_at"])
+            except Exception:
+                pass
+        count = progress_count
+
+        # Load admin-configured rewards schedule from CommissionConfig
+        try:
+            cfg = CommissionConfig.get_solo()
+            conf_in = dict(getattr(cfg, "reward_points_config_json", {}) or {})
+        except Exception:
+            conf_in = {}
+
+        def _default_conf():
+            return {
+                "tiers": [
+                    {"count": 1, "points": 1000},
+                    {"count": 2, "points": 10000},
+                    {"count": 3, "points": 30000},
+                    {"count": 4, "points": 60000},
+                    {"count": 5, "points": 110000},
+                ],
+                "after": {"base_count": 5, "per_coupon": 20000},
+            }
+
+        def _normalize(conf):
+            try:
+                tiers = conf.get("tiers") or []
+                after = conf.get("after") or {}
+                norm = []
+                seen = set()
+                for t in tiers:
+                    c = int(t.get("count"))
+                    p = int(t.get("points"))
+                    if c < 1 or p < 0:
+                        raise ValueError("invalid tier")
+                    if c in seen:
+                        continue
+                    seen.add(c)
+                    norm.append({"count": c, "points": p})
+                if not norm:
+                    raise ValueError("empty tiers")
+                norm.sort(key=lambda x: x["count"])
+                max_tier = norm[-1]["count"]
+                base_count = int(after.get("base_count", max_tier))
+                per_coupon = int(after.get("per_coupon", 0))
+                if base_count < max_tier or per_coupon < 0:
+                    raise ValueError("invalid after")
+                return {"tiers": norm, "after": {"base_count": base_count, "per_coupon": per_coupon}}
+            except Exception:
+                return _default_conf()
+
+        conf = _normalize(conf_in)
+        tiers = conf["tiers"]
+        base_count = int(conf["after"]["base_count"])
+        per_coupon = int(conf["after"]["per_coupon"])
+
+        def _points_at(c: int) -> int:
+            if c <= 0:
+                return 0
+            # Points up to base_count come from the last tier not exceeding c
+            last_points = 0
+            for t in tiers:
+                if t["count"] <= c:
+                    last_points = t["points"]
+                else:
+                    break
+            if c <= base_count:
+                return int(last_points)
+            # Beyond base_count: linear add per_coupon for each coupon after base_count
+            # Base is points at base_count (use last tier <= base_count)
+            base_points = 0
+            for t in tiers:
+                if t["count"] <= base_count:
+                    base_points = t["points"]
+                else:
+                    break
+            extra = (c - base_count) * per_coupon
+            return int(base_points + extra)
+
+        points = _points_at(count)
+
+        # Determine next target
+        if count < base_count:
+            # next tier count strictly greater than current; fallback to base_count
+            next_target = None
+            for t in tiers:
+                if t["count"] > count:
+                    next_target = t["count"]
+                    break
+            if next_target is None:
+                next_target = base_count
+        else:
+            next_target = count + 1
+
+        next_points = _points_at(next_target)
+
+        # Progress between milestones
+        if count < base_count:
+            prev_target = 0
+            for t in tiers:
+                if t["count"] <= count:
+                    prev_target = t["count"]
+                else:
+                    break
+            span = max(1, next_target - prev_target)
+            progress_in_span = max(0, count - prev_target)
+        else:
+            prev_target = count
+            span = 1
+            progress_in_span = 0
+        progress_pct = int(min(100, round(100 * progress_in_span / span)))
+
+        return Response(
+            {
+                "activated_coupon_count": int(activated_ecoupons),
+                "progress_coupon_count": int(count),
+                "current_points": int(points),
+                "next_target_count": int(next_target),
+                "points_at_next_target": int(next_points),
+                "progress_percentage": int(progress_pct),
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 # =======================

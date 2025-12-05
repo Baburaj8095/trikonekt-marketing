@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { DataGrid } from "@mui/x-data-grid";
 
 /**
@@ -21,25 +21,47 @@ export default function DataTable({
   onSelectionChange,
   columnVisibilityModel,
   onColumnVisibilityModelChange,
+  instanceKey,
 }) {
   const [rows, setRows] = useState([]);
   const [rowCount, setRowCount] = useState(0);
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 25 });
   const [sortModel, setSortModel] = useState([]);
+  const [searchText, setSearchText] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [selection, setSelection] = useState([]);
+  const searchRef = useRef("");
+  const reqSeq = useRef(0);
+  const inflightKeyRef = useRef(null);
+  useEffect(() => { searchRef.current = search; }, [search]);
+
+  // Debounce user typing before applying the search that triggers fetch
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchText), 300);
+    return () => clearTimeout(t);
+  }, [searchText]);
 
   const load = useCallback(async () => {
+    const mySeq = (reqSeq.current += 1);
+    const ordering = sortModel[0]
+      ? `${sortModel[0].sort === "desc" ? "-" : ""}${sortModel[0].field}`
+      : undefined;
+    const key = JSON.stringify({
+      p: paginationModel.page,
+      ps: paginationModel.pageSize,
+      s: searchRef.current || "",
+      o: ordering || "",
+    });
+    // Prevent starting a duplicate identical in-flight request (avoid axios cancel noise)
+    if (inflightKeyRef.current === key) return;
+    inflightKeyRef.current = key;
     setLoading(true);
     try {
-      const ordering = sortModel[0]
-        ? `${sortModel[0].sort === "desc" ? "-" : ""}${sortModel[0].field}`
-        : undefined;
       const { results, count } = await fetcher({
         page: paginationModel.page + 1,
         pageSize: paginationModel.pageSize,
-        search,
+        search: searchRef.current,
         ordering,
       });
       // Ensure each row has an id field for DataGrid
@@ -51,21 +73,30 @@ export default function DataTable({
         // Preserve explicit row keys over containers by spreading containers first.
         return { ...fieldsObj, ...dataObj, ...r, id: fallbackId };
       });
-      setRows(normalized);
-      setRowCount(count || 0);
+      if (mySeq === reqSeq.current) {
+        setRows(normalized);
+        setRowCount(count || 0);
+      }
     } catch (e) {
       // no-op; caller should handle toasts/snacks
     } finally {
-      setLoading(false);
+      if (mySeq === reqSeq.current) {
+        setLoading(false);
+        if (inflightKeyRef.current === key) {
+          inflightKeyRef.current = null;
+        }
+      }
     }
   }, [fetcher, paginationModel, sortModel, search]);
 
   useEffect(() => {
-    // Reset to first page when search text or fetcher (filters) change
-    setPaginationModel((m) => ({ ...m, page: 0 }));
+    // On search/filter change: reset to first page; the load effect will run when 'load' changes
+    setPaginationModel((m) => (m.page !== 0 ? { ...m, page: 0 } : m));
   }, [search, fetcher]);
 
   useEffect(() => {
+    // Always load data when 'load' changes (pagination/sort/search/filters).
+    // In React StrictMode, this may run twice in development which is acceptable.
     load();
   }, [load]);
 
@@ -160,14 +191,31 @@ export default function DataTable({
     });
   }, [columns]);
 
+  const handlePaginationChange = useCallback((model) => {
+    setPaginationModel((prev) => (
+      prev.page === model.page && prev.pageSize === model.pageSize ? prev : model
+    ));
+  }, []);
+
+  const handleSortChange = useCallback((m) => {
+    setSortModel((prev) => {
+      const a = Array.isArray(prev) ? prev : [];
+      const b = Array.isArray(m) ? m : [];
+      const same =
+        a.length === b.length &&
+        ((a[0] && b[0] && a[0].field === b[0].field && a[0].sort === b[0].sort) || (!a[0] && !b[0]));
+      return same ? prev : m;
+    });
+  }, []);
+
   return (
     <div className="tk-card tk-grid" style={{ width: "100%", background: "#ffffff", borderRadius: 12, border: "1px solid #e5e7eb", overflow: "hidden", position: "relative", isolation: "isolate" }}>
       <div style={{ padding: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         {toolbar}
         <input
           placeholder="Search…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
           style={{ padding: 8, width: 280, borderRadius: 8, border: "1px solid #e5e7eb", backgroundColor: "#ffffff" }}
         />
       </div>
@@ -182,8 +230,8 @@ export default function DataTable({
         pagination
         pageSizeOptions={[10, 25, 50, 100]}
         paginationModel={paginationModel}
-        onPaginationModelChange={setPaginationModel}
-        onSortModelChange={setSortModel}
+        onPaginationModelChange={handlePaginationChange}
+        onSortModelChange={handleSortChange}
         onRowDoubleClick={(p) => onRowEdit?.(p.row)}
         disableRowSelectionOnClick
         density={density}

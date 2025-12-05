@@ -131,6 +131,10 @@ class CommissionConfig(models.Model):
     three_matrix_percents_json = models.JSONField(default=list, help_text="List of percents for 3-matrix levels (length=three_matrix_levels)")
     product_opens_prime = models.BooleanField(default=False)
     rewards_weights_json = models.JSONField(default=dict, help_text='e.g., {"prime":1,"global":1,"coupon_submission":1,"active":1,"redeem":0}')
+    reward_points_config_json = models.JSONField(
+        default=dict,
+        help_text='Admin-configurable reward points schedule: {"tiers":[{"count":1,"points":1000},...], "after":{"base_count":5,"per_coupon":20000}}'
+    )
     enable_geo_distribution_on_activation = models.BooleanField(default=False)
 
     # Trikonekt toggles and fixed-amount configs
@@ -836,3 +840,224 @@ class AgencyPackagePayment(models.Model):
 
     def __str__(self):
         return f"Pay<{self.assignment_id}> ₹{self.amount} @ {self.paid_at:%Y-%m-%d}"
+
+
+# ==============================
+# Consumer Promo Packages (Prime/Monthly)
+# ==============================
+class PromoPackage(models.Model):
+    TYPE_CHOICES = (
+        ("PRIME", "PRIME"),
+        ("MONTHLY", "MONTHLY"),
+    )
+    code = models.CharField(max_length=32, unique=True, db_index=True)
+    name = models.CharField(max_length=150)
+    description = models.TextField(blank=True)
+    type = models.CharField(max_length=16, choices=TYPE_CHOICES, default="PRIME", db_index=True)
+    price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0.01)])
+    is_active = models.BooleanField(default=True)
+
+    # Admin-seeded payment details (optional)
+    payment_qr = models.ImageField(upload_to="uploads/promo_qr/", null=True, blank=True)
+    upi_id = models.CharField(max_length=100, blank=True)
+
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["code"]
+
+    def __str__(self):
+        return f"{self.code} — {self.name} (₹{self.price}) [{self.type}]"
+
+
+class PromoPackageProduct(models.Model):
+    """
+    Mapping of PromoPackage (specifically PRIME750) to Market Products.
+    Admin can seed any number of products under the 750₹ promo.
+    """
+    package = models.ForeignKey(PromoPackage, on_delete=models.CASCADE, related_name="promo_products")
+    product = models.ForeignKey("market.Product", on_delete=models.CASCADE, related_name="promo_packages")
+    is_active = models.BooleanField(default=True)
+    display_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["display_order", "id"]
+        unique_together = (("package", "product"),)
+        indexes = [
+            models.Index(fields=["package", "is_active", "display_order"]),
+        ]
+
+    def __str__(self):
+        return f"{getattr(self.package, 'code', 'PKG')} -> {getattr(self.product, 'name', 'Product')}"
+
+class PromoMonthlyPackage(models.Model):
+    """
+    Admin-seeded Monthly package numbers (1..N) for a given PromoPackage of type MONTHLY.
+    total_boxes defaults to 12 as per requirement "1 year = 12 boxes".
+    """
+    package = models.ForeignKey(PromoPackage, on_delete=models.CASCADE, related_name="monthly_packages")
+    number = models.PositiveIntegerField(db_index=True)
+    is_active = models.BooleanField(default=True)
+    total_boxes = models.PositiveIntegerField(default=12)
+
+    class Meta:
+        ordering = ["package_id", "number"]
+        unique_together = (("package", "number"),)
+        indexes = [
+            models.Index(fields=["package", "number", "is_active"]),
+        ]
+
+    def __str__(self):
+        return f"{getattr(self.package, 'code', 'PKG')} #{self.number}"
+
+
+class PromoMonthlyBox(models.Model):
+    """
+    Records paid boxes per user for a MONTHLY PromoPackage.
+    Boxes are permanently paid per (user, package, package_number).
+    """
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="promo_monthly_boxes", db_index=True)
+    package = models.ForeignKey(PromoPackage, on_delete=models.CASCADE, related_name="promo_monthly_boxes")
+    package_number = models.PositiveIntegerField(db_index=True)
+    box_number = models.PositiveIntegerField(db_index=True)
+    purchase = models.ForeignKey("PromoPurchase", null=True, blank=True, on_delete=models.SET_NULL, related_name="monthly_boxes")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(fields=["user", "package", "package_number", "box_number"], name="uniq_monthly_box_user_pkg_num_box"),
+        ]
+        indexes = [
+            models.Index(fields=["user", "package", "package_number"]),
+            models.Index(fields=["package", "package_number", "box_number"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user_id}:{getattr(self.package, 'code', 'PKG')} #{self.package_number} [{self.box_number}]"
+
+
+class PromoPurchase(models.Model):
+    STATUS_CHOICES = (
+        ("PENDING", "PENDING"),
+        ("APPROVED", "APPROVED"),
+        ("REJECTED", "REJECTED"),
+        ("CANCELLED", "CANCELLED"),
+    )
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="promo_purchases", db_index=True)
+    package = models.ForeignKey(PromoPackage, on_delete=models.PROTECT, related_name="purchases")
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="PENDING", db_index=True)
+
+    # Quantity requested by user for this promo purchase (used to allocate e‑coupons on approval)
+    quantity = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)])
+
+    amount_paid = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0.00)], default=0)
+    payment_proof = models.FileField(upload_to="uploads/promo_proofs/", null=True, blank=True)
+
+    # PRIME750 specific: selected product and shipping/delivery metadata
+    selected_product = models.ForeignKey("market.Product", null=True, blank=True, on_delete=models.SET_NULL, related_name="selected_in_promo_purchases")
+    shipping_address = models.TextField(blank=True)
+    delivery_by = models.DateField(null=True, blank=True)
+
+    # MONTHLY boxes flow (price per box)
+    package_number = models.PositiveIntegerField(null=True, blank=True, db_index=True)
+    boxes_json = models.JSONField(default=list, blank=True, help_text="Selected box numbers for MONTHLY (1..12)")
+
+    remarks = models.TextField(blank=True)
+    requested_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    approved_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="approved_promo_purchases")
+
+    # Monthly-specific fields (required when package.type == MONTHLY)
+    year = models.PositiveIntegerField(null=True, blank=True, db_index=True)
+    month = models.PositiveIntegerField(null=True, blank=True, db_index=True)
+
+    # Active period
+    active_from = models.DateField(null=True, blank=True)
+    active_to = models.DateField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-requested_at", "-id"]
+        unique_together = (("user", "package", "year", "month"),)
+        indexes = [
+            models.Index(fields=["user", "status", "requested_at"]),
+            models.Index(fields=["user", "package"]),
+            models.Index(fields=["user", "package", "year", "month"]),
+        ]
+
+    def __str__(self):
+        pkg = getattr(self.package, "code", "pkg")
+        return f"PromoPurchase<{self.user_id}:{pkg}:{self.status}>"
+
+    def clean(self):
+        """
+        Business validations:
+        - MONTHLY: either (package_number + boxes_json) OR legacy (year + month) accepted.
+        - If boxes_json flow used, require package_number and 1..total_boxes integers; year/month not allowed.
+        - Boxes are priced per box; quantity may be inferred from len(boxes_json) at serializer layer.
+        """
+        from django.core.exceptions import ValidationError
+        today = timezone.localdate()
+
+        if self.package and self.package.type == "MONTHLY":
+            boxes = list(self.boxes_json or [])
+            number = self.package_number
+            if boxes and number:
+                # Validate boxes range and uniqueness; do not enforce "current package" at model layer
+                try:
+                    boxes_int = [int(x) for x in boxes]
+                except Exception:
+                    raise ValidationError({"boxes_json": "Boxes must be integers."})
+                if not boxes_int:
+                    raise ValidationError({"boxes_json": "Select at least one box."})
+                # Determine total boxes from seed (if present) else default 12
+                total = 12
+                try:
+                    seed = None
+                    # local import to avoid circulars during migration
+                    from .models import PromoMonthlyPackage  # type: ignore
+                    seed = PromoMonthlyPackage.objects.filter(package=self.package, number=number, is_active=True).first()
+                    if seed and int(getattr(seed, "total_boxes", 12) or 12) > 0:
+                        total = int(getattr(seed, "total_boxes", 12))
+                except Exception:
+                    total = 12
+                bad = [b for b in boxes_int if b < 1 or b > total]
+                if bad:
+                    raise ValidationError({"boxes_json": f"Invalid box numbers: {bad}. Allowed 1..{total}."})
+                # Disallow legacy fields in new flow
+                if self.year or self.month:
+                    raise ValidationError({"month": "Month/year not applicable with boxes selection."})
+            else:
+                # Legacy monthly validation (fallback for older data)
+                if not (self.year and self.month):
+                    raise ValidationError({"month": "Provide package_number + boxes OR month and year."})
+                try:
+                    m = int(self.month)
+                    y = int(self.year)
+                except Exception:
+                    raise ValidationError({"month": "Invalid year/month."})
+                if not (1 <= m <= 12):
+                    raise ValidationError({"month": "Invalid month value."})
+                if int(y) != int(today.year) or int(m) != int(today.month):
+                    raise ValidationError({"month": "Only current month purchase is allowed for Monthly Promo."})
+
+                # One per user/package per year-month
+                qs = PromoPurchase.objects.filter(user=self.user, package=self.package, year=y, month=m)
+                if self.pk:
+                    qs = qs.exclude(pk=self.pk)
+                if qs.exists():
+                    raise ValidationError("Monthly Promo already requested for this month.")
+        else:
+            # PRIME: must not have year/month set
+            if self.year or self.month:
+                raise ValidationError({"month": "Month/year not applicable for PRIME packages."})
+
+    def save(self, *args, **kwargs):
+        creating = self._state.adding
+        if creating and not self.amount_paid and self.package_id:
+            try:
+                self.amount_paid = self.package.price or 0
+            except Exception:
+                self.amount_paid = 0
+        super().save(*args, **kwargs)

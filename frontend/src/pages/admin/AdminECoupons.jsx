@@ -146,10 +146,35 @@ export default function AdminECoupons() {
     revoked: 0,
   });
   const [metricsLoading, setMetricsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
+  // Overview KPIs (Available coupons by denomination)
+  const [overviewKpis, setOverviewKpis] = useState({ v50: 0, v150: 0, v300: 0, v750: 0, v759: 0 });
+  const [overviewLoading, setOverviewLoading] = useState(false);
+  async function loadOverviewKpis() {
+    setOverviewLoading(true);
+    try {
+      const [c50, c150, c300, c750, c759] = await Promise.all([
+        fetchCount("/coupons/codes/", { status: "AVAILABLE", value: 50, issued_channel: "e_coupon" }),
+        fetchCount("/coupons/codes/", { status: "AVAILABLE", value: 150, issued_channel: "e_coupon" }),
+        fetchCount("/coupons/codes/", { status: "AVAILABLE", value: 300, issued_channel: "e_coupon" }),
+        fetchCount("/coupons/codes/", { status: "AVAILABLE", value: 750, issued_channel: "e_coupon" }),
+        fetchCount("/coupons/codes/", { status: "AVAILABLE", value: 759, issued_channel: "e_coupon" }),
+      ]);
+      setOverviewKpis({ v50: c50, v150: c150, v300: c300, v750: c750, v759: c759 });
+    } catch (_) {
+      setOverviewKpis({ v50: 0, v150: 0, v300: 0, v750: 0, v759: 0 });
+    } finally {
+      setOverviewLoading(false);
+    }
+  }
+  useEffect(() => {
+    if (activeTab === "overview") {
+      loadOverviewKpis();
+    }
+  }, [activeTab]);
 
   const [err, setErr] = useState("");
   const [bootstrapLoading, setBootstrapLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("orders");
 
   // Admin Agency Assignment Summary
   const [summary, setSummary] = useState([]);
@@ -786,13 +811,70 @@ export default function AdminECoupons() {
   const [poLoading, setPoLoading] = useState(false);
   const [orderNotes, setOrderNotes] = useState({});
   const [orderBusy, setOrderBusy] = useState({});
+  const [orderAvail, setOrderAvail] = useState({});
+  const [orderProdAvail, setOrderProdAvail] = useState({});
 
   async function loadPendingOrders() {
     setPoLoading(true);
     try {
       const res = await API.get("/coupons/store/orders/pending/", { params: { page_size: 50 } });
       const items = res?.data?.results || res?.data || [];
-      setPendingOrders(Array.isArray(items) ? items : []);
+      const orders = Array.isArray(items) ? items : [];
+      setPendingOrders(orders);
+      try {
+        const pairs = await Promise.all(
+          orders.map(async (o) => {
+            let couponId = null;
+            try {
+              const prodRes = await API.get(`/coupons/store/products/${o.product}/`);
+              couponId = prodRes?.data?.coupon || null;
+            } catch (_e) {}
+            let globalCount = 0;
+            let prodCount = 0;
+            try {
+              const params = {
+                issued_channel: "e_coupon",
+                status: "AVAILABLE",
+                page_size: 1,
+              };
+              const denom =
+                typeof o.denomination_snapshot !== "undefined" && o.denomination_snapshot !== null
+                  ? o.denomination_snapshot
+                  : null;
+              if (denom !== null) params.value = denom;
+              const invRes = await API.get("/coupons/codes/", { params });
+              globalCount =
+                typeof invRes?.data?.count === "number"
+                  ? invRes.data.count
+                  : Array.isArray(invRes?.data)
+                  ? invRes.data.length
+                  : 0;
+
+              if (couponId) {
+                const paramsProd = { ...params, coupon: couponId };
+                const invResProd = await API.get("/coupons/codes/", { params: paramsProd });
+                prodCount =
+                  typeof invResProd?.data?.count === "number"
+                    ? invResProd.data.count
+                    : Array.isArray(invResProd?.data)
+                    ? invResProd.data.length
+                    : 0;
+              }
+            } catch (_e2) {}
+            return [o.id, globalCount, prodCount];
+          })
+        );
+        const mapGlobal = {};
+        const mapProd = {};
+        for (const [id, g, p] of pairs) {
+          mapGlobal[id] = g;
+          mapProd[id] = p ?? 0;
+        }
+        setOrderAvail(mapGlobal);
+        setOrderProdAvail(mapProd);
+      } catch (_calcErr) {
+        setOrderAvail({});
+      }
     } catch (_) {
       setPendingOrders([]);
     } finally {
@@ -814,6 +896,8 @@ export default function AdminECoupons() {
         couponId = prodRes?.data?.coupon || null;
       } catch (_) {}
 
+      let availableGlobal = 0;
+      let availableProduct = 0;
       let available = 0;
       try {
         const params = {
@@ -821,26 +905,45 @@ export default function AdminECoupons() {
           status: "AVAILABLE",
           page_size: 1,
         };
-        if (couponId) params.coupon = couponId;
         const denom =
           typeof order.denomination_snapshot !== "undefined" && order.denomination_snapshot !== null
             ? order.denomination_snapshot
             : null;
         if (denom !== null) params.value = denom;
-        const invRes = await API.get("/coupons/codes/", { params });
-        available =
-          typeof invRes?.data?.count === "number"
-            ? invRes.data.count
-            : Array.isArray(invRes?.data)
-            ? invRes.data.length
+
+        // Global denom availability (for display/fallback)
+        const invResGlobal = await API.get("/coupons/codes/", { params });
+        availableGlobal =
+          typeof invResGlobal?.data?.count === "number"
+            ? invResGlobal.data.count
+            : Array.isArray(invResGlobal?.data)
+            ? invResGlobal.data.length
             : 0;
+
+        // Product-specific availability (scoped to the product's coupon), if resolvable
+        if (couponId) {
+          const paramsProd = { ...params, coupon: couponId };
+          const invResProd = await API.get("/coupons/codes/", { params: paramsProd });
+          availableProduct =
+            typeof invResProd?.data?.count === "number"
+              ? invResProd.data.count
+              : Array.isArray(invResProd?.data)
+              ? invResProd.data.length
+              : 0;
+        }
+
+        // Consider either scope sufficient; proceed if either has enough
+        available = Math.max(availableGlobal, availableProduct);
       } catch (_) {}
 
       const needed = Number(order.quantity || 0);
       if (available < needed) {
-        const shortage = Math.max(0, needed - available);
+        const shortageGlobal = Math.max(0, needed - availableGlobal);
+        const shortageProduct = Math.max(0, needed - availableProduct);
+        const shortage = couponId ? shortageProduct : shortageGlobal;
         // Prefill Create Batch form to quickly top-up inventory
         try {
+          setActiveTab("inventory");
           if (couponId) {
             setBatchForm((f) => ({
               ...f,
@@ -854,7 +957,7 @@ export default function AdminECoupons() {
           }
         } catch {}
         alert(
-          `Insufficient e‑coupon inventory for this denomination. Available: ${available}, Needed: ${needed}. Prefilled Create Batch for quick top‑up.`
+          `Insufficient inventory. Global denom: ${availableGlobal}, Product coupon: ${availableProduct}, Needed: ${needed}. Prefilled Create Batch for quick top‑up.`
         );
         return;
       }
@@ -864,7 +967,26 @@ export default function AdminECoupons() {
       await loadPendingOrders();
       alert("Order approved and codes allocated.");
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Approval failed";
+      const status = e?.response?.status;
+      const data = e?.response?.data || {};
+      const msg = data?.detail || "Approval failed";
+      if (status === 409) {
+        try {
+          const pf = data?.prefill || {};
+          setActiveTab("inventory");
+          if (pf?.coupon) {
+            setBatchForm((f) => ({
+              ...f,
+              coupon_id: String(pf.coupon),
+              denomination: String(Number(pf.denomination ?? (order?.denomination_snapshot ?? 150))),
+              count: String(Number(pf.count || order?.quantity || 0)),
+            }));
+            try {
+              document.getElementById("sec-create-batch")?.scrollIntoView({ behavior: "smooth" });
+            } catch {}
+          }
+        } catch {}
+      }
       alert(msg);
     } finally {
       setOrderBusy((m) => ({ ...m, [id]: false }));
@@ -905,6 +1027,20 @@ export default function AdminECoupons() {
       <div style={{ position: "sticky", top: 0, zIndex: 4, background: "transparent", marginBottom: 12 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", overflowX: "auto" }}>
           <button
+            onClick={() => setActiveTab("overview")}
+            style={{
+              padding: "6px 10px",
+              background: activeTab === "overview" ? "#0f172a" : "#fff",
+              color: activeTab === "overview" ? "#fff" : "#0f172a",
+              border: "1px solid #e2e8f0",
+              borderRadius: 8,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            Overview
+          </button>
+          <button
             onClick={() => setActiveTab("orders")}
             style={{
               padding: "6px 10px",
@@ -933,6 +1069,20 @@ export default function AdminECoupons() {
             Inventory
           </button>
           <button
+            onClick={() => setActiveTab("history")}
+            style={{
+              padding: "6px 10px",
+              background: activeTab === "history" ? "#0f172a" : "#fff",
+              color: activeTab === "history" ? "#fff" : "#0f172a",
+              border: "1px solid #e2e8f0",
+              borderRadius: 8,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            History
+          </button>
+          <button
             onClick={() => setActiveTab("setup")}
             style={{
               padding: "6px 10px",
@@ -944,11 +1094,100 @@ export default function AdminECoupons() {
               cursor: "pointer",
             }}
           >
-            Setup
+            Payment
           </button>
         </div>
       </div>
       {err ? <div style={{ color: "#dc2626", marginBottom: 12 }}>{err}</div> : null}
+
+      {/* Overview: Simple KPI cards and quick actions */}
+      <Section
+        id="sec-overview"
+        visible={activeTab === "overview"}
+        title="Overview"
+        extraRight={
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              onClick={() => {
+                setActiveTab("inventory");
+                try { document.getElementById("sec-create-batch")?.scrollIntoView({ behavior: "smooth" }); } catch {}
+              }}
+              style={{
+                padding: "8px 12px",
+                background: "#0f172a",
+                color: "#fff",
+                border: 0,
+                borderRadius: 8,
+                cursor: "pointer",
+                fontWeight: 700,
+              }}
+            >
+              Create
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab("inventory");
+                try { document.getElementById("sec-assign")?.scrollIntoView({ behavior: "smooth" }); } catch {}
+              }}
+              style={{
+                padding: "8px 12px",
+                background: "#0f172a",
+                color: "#fff",
+                border: 0,
+                borderRadius: 8,
+                cursor: "pointer",
+                fontWeight: 700,
+              }}
+            >
+              Assign
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab("setup");
+                try { document.getElementById("sec-payment")?.scrollIntoView({ behavior: "smooth" }); } catch {}
+              }}
+              style={{
+                padding: "8px 12px",
+                background: "#0f172a",
+                color: "#fff",
+                border: 0,
+                borderRadius: 8,
+                cursor: "pointer",
+                fontWeight: 700,
+              }}
+            >
+              Payment
+            </button>
+          </div>
+        }
+      >
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+            gap: 12,
+          }}
+        >
+          <div onClick={() => { setActiveTab("inventory"); try { document.getElementById("sec-history")?.scrollIntoView({ behavior: "smooth" }); } catch {} }} style={{ cursor: "pointer" }}>
+            <MetricCard label="Available ₹50" value={overviewLoading ? "…" : overviewKpis.v50} />
+          </div>
+          <div onClick={() => { setActiveTab("inventory"); try { document.getElementById("sec-history")?.scrollIntoView({ behavior: "smooth" }); } catch {} }} style={{ cursor: "pointer" }}>
+            <MetricCard label="Available ₹150" value={overviewLoading ? "…" : overviewKpis.v150} />
+          </div>
+          <div onClick={() => { setActiveTab("inventory"); try { document.getElementById("sec-history")?.scrollIntoView({ behavior: "smooth" }); } catch {} }} style={{ cursor: "pointer" }}>
+            <MetricCard label="Available ₹300" value={overviewLoading ? "…" : overviewKpis.v300} />
+          </div>
+          <div onClick={() => { setActiveTab("inventory"); try { document.getElementById("sec-history")?.scrollIntoView({ behavior: "smooth" }); } catch {} }} style={{ cursor: "pointer" }}>
+            <MetricCard label="Available ₹750" value={overviewLoading ? "…" : overviewKpis.v750} />
+          </div>
+          <div onClick={() => { setActiveTab("inventory"); try { document.getElementById("sec-history")?.scrollIntoView({ behavior: "smooth" }); } catch {} }} style={{ cursor: "pointer" }}>
+            <MetricCard label="Available ₹759" value={overviewLoading ? "…" : overviewKpis.v759} />
+          </div>
+        </div>
+        <div style={{ color: "#64748b", fontSize: 12, marginTop: 8 }}>
+          Tap a card to jump to Assignment History. Quick actions jump directly to Create, Assign, and Payment sections.
+        </div>
+      </Section>
 
       {/* E‑Coupon Store: Payment Config */}
       <Section
@@ -1421,6 +1660,9 @@ export default function AdminECoupons() {
                           value={note}
                           onChange={(e) => setOrderNotes((m) => ({ ...m, [o.id]: e.target.value }))}
                         />
+                        <div style={{ color: "#64748b", fontSize: 12 }}>
+                          Avail: {orderAvail[o.id] ?? "…"} (product: {orderProdAvail[o.id] ?? "…"}) / Need: {o.quantity || 0}
+                        </div>
                           <button
                           onClick={() => approveOrder(o)}
                           disabled={busy}
@@ -1582,7 +1824,9 @@ export default function AdminECoupons() {
             options={[
               { value: "50", label: "₹50" },
               { value: "150", label: "₹150" },
+              { value: "300", label: "₹300" },
               { value: "750", label: "₹750" },
+              { value: "759", label: "₹759" },
             ]}
           />
         </div>
@@ -1667,7 +1911,7 @@ export default function AdminECoupons() {
       {/* Assignment History */}
       <Section
         id="sec-history"
-        visible={activeTab === "inventory"}
+        visible={activeTab === "history"}
         title="Assignment History"
         extraRight={
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

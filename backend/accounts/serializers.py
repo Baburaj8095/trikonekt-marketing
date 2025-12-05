@@ -84,6 +84,105 @@ class RegisterSerializer(serializers.ModelSerializer):
             'role': {'required': False},
         }
 
+    def to_internal_value(self, data):
+        """
+        Make geo inputs tolerant:
+        - Accept PK integers, digit strings, dicts like {id: ...}, or plain names/codes.
+        - If a plain name is provided for country/state/city in the PK field, move it to
+          the corresponding *_name helper and drop the PK field so DRF doesn't reject it.
+        - Accept aliases: country_id/state_id/city_id and camelCase variants.
+        - Normalize pincode (digits only) and allow dicts with value/pincode.
+        """
+        d = (data or {}).copy()
+
+        def _extract_id(val):
+            if isinstance(val, dict):
+                for k in ("id", "value", "pk"):
+                    if k in val and val[k] is not None:
+                        return val[k]
+            return val
+
+        # Alias mapping (snake and camel)
+        alias_pairs = [
+            ("country", "country_id"), ("state", "state_id"), ("city", "city_id"),
+            ("country", "countryId"), ("state", "stateId"), ("city", "cityId"),
+        ]
+        for field, alias in alias_pairs:
+            if d.get(alias) is not None and d.get(field) is None:
+                d[field] = d.get(alias)
+
+        # Normalize PK-or-name values for country/state/city
+        for field in ("country", "state", "city"):
+            if field not in d:
+                continue
+            raw = _extract_id(d.get(field))
+            # If it's already an int, keep it
+            if isinstance(raw, int):
+                d[field] = raw
+                continue
+            # Digit string -> int
+            if isinstance(raw, str):
+                sval = raw.strip()
+                if sval.isdigit():
+                    d[field] = int(sval)
+                    continue
+                # Non-digit string: treat as name/code and move to helper
+                if field == "country":
+                    # Two/three-letter code treated as iso2/iso3 best-effort
+                    if 1 <= len(sval) <= 3 and sval.isalpha():
+                        d["country_code"] = sval
+                    else:
+                        d["country_name"] = sval
+                elif field == "state":
+                    d["state_name"] = sval
+                else:
+                    d["city_name"] = sval
+                d.pop(field, None)
+                continue
+            # Other types -> stringify and retry
+            sval = str(raw).strip()
+            if sval.isdigit():
+                d[field] = int(sval)
+            else:
+                if field == "country":
+                    if 1 <= len(sval) <= 3 and sval.isalpha():
+                        d["country_code"] = sval
+                    else:
+                        d["country_name"] = sval
+                elif field == "state":
+                    d["state_name"] = sval
+                else:
+                    d["city_name"] = sval
+                d.pop(field, None)
+
+        # selected_state: accept dict/id/digit string
+        if "selected_state" in d:
+            ss = _extract_id(d.get("selected_state"))
+            if isinstance(ss, str) and ss.strip().isdigit():
+                d["selected_state"] = int(ss.strip())
+            elif isinstance(ss, int):
+                d["selected_state"] = ss
+            else:
+                # If a name was placed here by mistake, move to helper and drop PK
+                try:
+                    ssv = str(ss).strip()
+                    if ssv and not ssv.isdigit():
+                        d["state_name"] = d.get("state_name") or ssv
+                        d.pop("selected_state", None)
+                except Exception:
+                    d.pop("selected_state", None)
+
+        # Normalize pincode (allow dicts and strip non-digits)
+        if "pincode" in d:
+            pin_raw = d.get("pincode")
+            if isinstance(pin_raw, dict):
+                pin_raw = pin_raw.get("value") or pin_raw.get("pincode") or pin_raw.get("PIN") or pin_raw.get("pin") or ""
+            pin_str = "".join(c for c in str(pin_raw or "").strip() if c.isdigit())
+            if pin_str:
+                d["pincode"] = pin_str
+
+        return super().to_internal_value(d)
+
     def validate(self, attrs):
         category = attrs.get('category', 'consumer') or 'consumer'
         phone = (attrs.get('phone') or '').strip()
@@ -371,6 +470,16 @@ class RegisterSerializer(serializers.ModelSerializer):
                 if not ok:
                     raise serializers.ValidationError({'selected_pincode': 'Selected pincode is not under the sponsor\'s assignment.'})
                 self._selected_pincode = sel_pin
+                # Optional: capture selected state/district if provided to populate profile fields
+                try:
+                    self._selected_state = attrs.get('selected_state') or None
+                except Exception:
+                    self._selected_state = None
+                try:
+                    sd = (attrs.get('selected_district') or '').strip()
+                    self._selected_district = sd or None
+                except Exception:
+                    self._selected_district = None
 
             elif category == 'agency_sub_franchise':
                 sel_pin = (attrs.get('selected_pincode') or '').strip()
@@ -378,9 +487,31 @@ class RegisterSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError({'selected_pincode': 'Pincode selection is required.'})
                 # Allow any valid 6-digit pincode for sub-franchise; no sponsor assignment restriction
                 self._selected_pincode = sel_pin
+                # Optionally capture selected state/district if UI provided, so profile can reflect geo immediately
+                try:
+                    self._selected_state = attrs.get('selected_state') or None
+                except Exception:
+                    self._selected_state = None
+                try:
+                    sd = (attrs.get('selected_district') or '').strip()
+                    self._selected_district = sd or None
+                except Exception:
+                    self._selected_district = None
 
         # Keep a reference for use in create()
         self._sponsor_user = sponsor_user
+
+        # Require explicit geo selection for Consumer and Employee
+        if category in ('consumer', 'employee'):
+            pin_val = (attrs.get('pincode') or '').strip()
+            if not pin_val or not pin_val.isdigit() or len(pin_val) != 6:
+                raise serializers.ValidationError({'pincode': '6-digit pincode is required.'})
+            if not attrs.get('country'):
+                raise serializers.ValidationError({'country': 'Country selection is required.'})
+            if not attrs.get('state'):
+                raise serializers.ValidationError({'state': 'State selection is required.'})
+            if not attrs.get('city'):
+                raise serializers.ValidationError({'city': 'District selection is required.'})
 
         # Enforce per-role username uniqueness (and special consumer rule)
         try:
@@ -590,6 +721,22 @@ class RegisterSerializer(serializers.ModelSerializer):
                     AgencyRegionAssignment.objects.create(
                         user=user, level='state', state=st
                     )
+                # Populate country from first assigned state if not already set
+                if not getattr(user, "country", None):
+                    try:
+                        st0 = next(iter(getattr(self, '_assign_states', [])))
+                        if st0 and getattr(st0, "country", None):
+                            user.country = st0.country
+                    except Exception:
+                        pass
+                # Set a primary state for profile visibility if not already set
+                if not getattr(user, "state", None):
+                    try:
+                        st0 = st0 if "st0" in locals() else next(iter(getattr(self, "_assign_states", [])))
+                    except Exception:
+                        st0 = None
+                    if st0:
+                        user.state = st0
 
             elif category == 'agency_state':
                 sel_state = getattr(self, '_selected_state', None)
@@ -598,6 +745,12 @@ class RegisterSerializer(serializers.ModelSerializer):
                     AgencyRegionAssignment.objects.create(
                         user=user, level='state', state=sel_state
                     )
+                    # Ensure country is populated from state
+                    if not getattr(user, "country", None):
+                        try:
+                            user.country = getattr(sel_state, "country", None)
+                        except Exception:
+                            pass
 
             elif category == 'agency_district_coordinator':
                 sel_state = getattr(self, '_selected_state', None)
@@ -607,6 +760,26 @@ class RegisterSerializer(serializers.ModelSerializer):
                     AgencyRegionAssignment.objects.create(
                         user=user, level='district', state=sel_state, district=d
                     )
+                # Populate city as first assigned district for profile (best-effort)
+                try:
+                    first_d = next(iter(getattr(self, '_assign_districts', [])))
+                except Exception:
+                    first_d = None
+                if sel_state and first_d:
+                    ci = City.objects.filter(state=sel_state, name__iexact=first_d).first() or City.objects.filter(state=sel_state, name__icontains=first_d).first()
+                    if not ci:
+                        try:
+                            ci = City.objects.create(state=sel_state, name=first_d)
+                        except Exception:
+                            ci = None
+                    if ci:
+                        user.city = ci
+                # Ensure country is populated from state
+                if sel_state and not getattr(user, "country", None):
+                    try:
+                        user.country = getattr(sel_state, "country", None)
+                    except Exception:
+                        pass
 
             elif category == 'agency_district':
                 sel_state = getattr(self, '_selected_state', None)
@@ -618,6 +791,21 @@ class RegisterSerializer(serializers.ModelSerializer):
                     AgencyRegionAssignment.objects.create(
                         user=user, level='district', state=sel_state, district=sel_district
                     )
+                    # Populate city from selected district for profile (best-effort)
+                    ci = City.objects.filter(state=sel_state, name__iexact=sel_district).first() or City.objects.filter(state=sel_state, name__icontains=sel_district).first()
+                    if not ci:
+                        try:
+                            ci = City.objects.create(state=sel_state, name=sel_district)
+                        except Exception:
+                            ci = None
+                    if ci:
+                        user.city = ci
+                # Ensure country is populated from state
+                if sel_state and not getattr(user, "country", None):
+                    try:
+                        user.country = getattr(sel_state, "country", None)
+                    except Exception:
+                        pass
 
             elif category == 'agency_pincode_coordinator':
                 sel_state = getattr(self, '_selected_state', None)
@@ -628,6 +816,27 @@ class RegisterSerializer(serializers.ModelSerializer):
                     AgencyRegionAssignment.objects.create(
                         user=user, level='pincode', state=sel_state, district=sel_district, pincode=pin
                     )
+                # Populate city from selected district and set a representative pincode on profile (best-effort)
+                if sel_state and sel_district:
+                    ci = City.objects.filter(state=sel_state, name__iexact=sel_district).first() or City.objects.filter(state=sel_state, name__icontains=sel_district).first()
+                    if not ci:
+                        try:
+                            ci = City.objects.create(state=sel_state, name=sel_district)
+                        except Exception:
+                            ci = None
+                    if ci:
+                        user.city = ci
+                if not (getattr(user, "pincode", "") or ""):
+                    try:
+                        user.pincode = next(iter(getattr(self, '_assign_pincodes', [])))
+                    except Exception:
+                        pass
+                # Ensure country is populated from state
+                if sel_state and not getattr(user, "country", None):
+                    try:
+                        user.country = getattr(sel_state, "country", None)
+                    except Exception:
+                        pass
 
             elif category == 'agency_pincode':
                 sel_pin = getattr(self, '_selected_pincode', None)
@@ -637,11 +846,97 @@ class RegisterSerializer(serializers.ModelSerializer):
                     AgencyRegionAssignment.objects.create(
                         user=user, level='pincode', pincode=sel_pin
                     )
+                # Best-effort: fill state/city/country from optional selected inputs (if provided)
+                sel_state = getattr(self, '_selected_state', None)
+                sel_district = getattr(self, '_selected_district', None)
+                if sel_state and not getattr(user, "state", None):
+                    user.state = sel_state
+                if sel_state and not getattr(user, "country", None):
+                    try:
+                        user.country = getattr(sel_state, "country", None)
+                    except Exception:
+                        pass
+                if sel_state and sel_district and not getattr(user, "city", None):
+                    ci = City.objects.filter(state=sel_state, name__iexact=sel_district).first() or City.objects.filter(state=sel_state, name__icontains=sel_district).first()
+                    if not ci:
+                        try:
+                            ci = City.objects.create(state=sel_state, name=sel_district)
+                        except Exception:
+                            ci = None
+                    if ci:
+                        user.city = ci
 
             elif category == 'agency_sub_franchise':
                 sel_pin = getattr(self, '_selected_pincode', None)
                 if sel_pin:
                     user.pincode = sel_pin
+                # Best-effort: if UI provided state/district, reflect them in profile now
+                sel_state = getattr(self, '_selected_state', None)
+                sel_district = getattr(self, '_selected_district', None)
+                if sel_state and not getattr(user, "state", None):
+                    user.state = sel_state
+                if sel_state and not getattr(user, "country", None):
+                    try:
+                        user.country = getattr(sel_state, "country", None)
+                    except Exception:
+                        pass
+                if sel_state and sel_district and not getattr(user, "city", None):
+                    ci = City.objects.filter(state=sel_state, name__iexact=sel_district).first() or City.objects.filter(state=sel_state, name__icontains=sel_district).first()
+                    if not ci:
+                        try:
+                            ci = City.objects.create(state=sel_state, name=sel_district)
+                        except Exception:
+                            ci = None
+                    if ci:
+                        user.city = ci
+
+        # Final geo backfill: if any geo fields are missing, derive from pincode (all categories incl. agency)
+        try:
+            pin_digits2 = ''.join(c for c in (getattr(user, 'pincode', '') or '') if c.isdigit())
+            if pin_digits2 and len(pin_digits2) == 6:
+                # Try offline cache first; lazy import if local var not present
+                try:
+                    meta2 = PINCODES_OFFLINE.get(pin_digits2)  # defined earlier in create(); fallback below if not
+                except Exception:
+                    try:
+                        from locations.views import PINCODES_OFFLINE as _OFFLINE
+                        meta2 = (_OFFLINE or {}).get(pin_digits2)
+                    except Exception:
+                        meta2 = None
+                meta2 = meta2 or {}
+
+                c_name = (meta2.get('country') or '').strip()
+                s_name = (meta2.get('state') or '').strip()
+                d_name = (meta2.get('district') or '').strip()
+
+                # Online fallback via India Post if offline cache lacks data
+                if not (c_name and s_name) or (not d_name):
+                    try:
+                        import requests
+                        r = requests.get(f"https://api.postalpincode.in/pincode/{pin_digits2}", timeout=10)
+                        if r.status_code == 200:
+                            arr = r.json() or []
+                            if isinstance(arr, list) and arr:
+                                entry = arr[0] or {}
+                                if entry.get("Status") == "Success":
+                                    offices = entry.get("PostOffice") or []
+                                    if offices:
+                                        first = offices[0]
+                                        c_name = c_name or (first.get("Country") or "").strip()
+                                        s_name = s_name or (first.get("State") or "").strip()
+                                        d_name = d_name or (first.get("District") or "").strip()
+                    except Exception:
+                        pass
+
+                # Apply derived fields to the user
+                if not getattr(user, "country", None) and c_name:
+                    user.country = Country.objects.filter(name__iexact=c_name).first() or Country.objects.create(name=c_name)
+                if not getattr(user, "state", None) and s_name and getattr(user, "country", None):
+                    user.state = State.objects.filter(country=user.country, name__iexact=s_name).first() or State.objects.create(name=s_name, country=user.country)
+                if not getattr(user, "city", None) and d_name and getattr(user, "state", None):
+                    user.city = City.objects.filter(state=user.state, name__iexact=d_name).first() or City.objects.create(name=d_name, state=user.state)
+        except Exception:
+            pass
 
         user.save()
         return user

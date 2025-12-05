@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import API from "../../api/api";
 import { getAdminMeta } from "../../admin-panel/api/adminMeta";
 
 export default function AdminShell({ children }) {
   const loc = useLocation();
+  const navigate = useNavigate();
 
   // Responsive flags
   const [isMobile, setIsMobile] = useState(
@@ -77,13 +78,46 @@ export default function AdminShell({ children }) {
   const [authErr, setAuthErr] = useState("");
   const [adminInfo, setAdminInfo] = useState(null);
 
+  // Ensure admin/staff auth; redirect to admin login on 401/403
+  useEffect(() => {
+    let cancelled = false;
+    setAuthErr("");
+    API.get("admin/ping/", { timeout: 8000, retryAttempts: 0, dedupe: "cancelPrevious" })
+      .then((res) => {
+        if (cancelled) return;
+        const d = res?.data || {};
+        if (!d?.is_staff && !d?.is_superuser) {
+          setAuthErr("Not authorized for admin area.");
+          try {
+            navigate("/admin/login", { replace: true, state: { from: { pathname: loc.pathname } } });
+          } catch (_) {}
+        } else {
+          setAdminInfo({ is_superuser: !!d.is_superuser, is_staff: !!d.is_staff, username: d.user });
+        }
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        const status = e?.response?.status;
+        if (status === 401 || status === 403) {
+          setAuthErr("Please sign in as an admin.");
+          try {
+            navigate("/admin/login", { replace: true, state: { from: { pathname: loc.pathname } } });
+          } catch (_) {}
+        } else {
+          // Soft network error: don't block page
+          setAuthErr("");
+        }
+      });
+    return () => { cancelled = true; };
+  }, [loc.pathname, navigate]);
+
   // Admin metrics for badges (KYC, Withdrawals) – fetch only on dashboard route
   const [metrics, setMetrics] = useState(null);
   useEffect(() => {
     let cancelled = false;
     let timer = null;
     const onDashboardRoot = loc.pathname === "/admin/dashboard";
-    if (onDashboardRoot) {
+    if (!onDashboardRoot) {
       setMetrics(null);
       return () => {};
     }
@@ -110,6 +144,12 @@ export default function AdminShell({ children }) {
   const [modelsErr, setModelsErr] = useState("");
   useEffect(() => {
     let mounted = true;
+    const needsMeta = loc.pathname.startsWith("/admin/dashboard/models");
+    if (!needsMeta) {
+      return () => {
+        mounted = false;
+      };
+    }
     getAdminMeta()
       .then((data) => {
         if (!mounted) return;
@@ -120,7 +160,7 @@ export default function AdminShell({ children }) {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [loc.pathname]);
   const modelsByApp = useMemo(() => {
     const g = {};
     const seen = new Set();
@@ -299,6 +339,13 @@ export default function AdminShell({ children }) {
       items: [
         { to: "/admin/lucky-draw", label: "Lucky Draw", icon: "ticket" },
         { to: "/admin/e-coupons", label: "E‑Coupons", icon: "ticket" },
+        // Promo packages and related admin models inside AdminShell
+        { to: "/admin/dashboard/models/business/promopackage", label: "Promo Packages", icon: "box" },
+        { to: "/admin/dashboard/models/business/promopackageproduct", label: "Promo Products (₹750)", icon: "box" },
+        { to: "/admin/dashboard/models/business/promomonthlypackage", label: "Monthly Package Numbers", icon: "box" },
+        // Optional: inspect paid boxes if needed
+        { to: "/admin/dashboard/models/business/promomonthlybox", label: "Monthly Boxes (Paid)", icon: "box" },
+        { to: "/admin/promo-purchases", label: "Promo Purchases", icon: "ticket" },
       ],
     },
     {
@@ -327,6 +374,8 @@ export default function AdminShell({ children }) {
         { to: "/admin/matrix/three", label: "3‑Matrix", icon: "matrix3" },
         { to: "/admin/commissions/matrix", label: "Matrix Commission", icon: "wallet" },
         { to: "/admin/commissions/levels", label: "Level Commission", icon: "wallet" },
+        { to: "/admin/commissions/history", label: "Commission History", icon: "wallet" },
+        { to: "/admin/rewards/points", label: "Rewards Points", icon: "chart" },
         { to: "/admin/autopool", label: "Auto Commission", icon: "pool" },
       ],
     },

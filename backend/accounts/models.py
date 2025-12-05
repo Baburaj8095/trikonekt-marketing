@@ -80,6 +80,11 @@ class CustomUser(AbstractUser):
         indexes = [
             models.Index(fields=['parent']),
             models.Index(fields=['depth']),
+            # Speed up AdminUsers list filters and ordering
+            models.Index(fields=['date_joined']),
+            models.Index(fields=['account_active', 'date_joined']),
+            models.Index(fields=['first_purchase_activated_at']),
+            models.Index(fields=['role', 'category']),
         ]
 
     def __str__(self):

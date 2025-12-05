@@ -37,6 +37,26 @@ export default function TreeReferralGalaxy({
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
+  // Extra details for self-mode genealogy: phone, pincode, status, role/category, and direct counts
+  const [detailsMap, setDetailsMap] = useState(() => new Map());
+  const [directMap, setDirectMap] = useState(() => new Map());
+
+  const putDetails = useCallback((id, d) => {
+    setDetailsMap((prev) => {
+      const next = new Map(prev);
+      next.set(id, d || {});
+      return next;
+    });
+  }, []);
+
+  const putDirect = useCallback((id, v) => {
+    setDirectMap((prev) => {
+      const next = new Map(prev);
+      next.set(id, typeof v === "number" ? v : 0);
+      return next;
+    });
+  }, []);
+
   // Admin search
   const [searchIdent, setSearchIdent] = useState(initialIdentifier || "");
   const [searchBusy, setSearchBusy] = useState(false);
@@ -135,6 +155,76 @@ export default function TreeReferralGalaxy({
       return 0;
     }
   }, [countsMap, countNodes, fetchTeamCount, isAdmin, keyFor, putCount]);
+
+  // Fetch details for current root and its first 5 children (self mode only)
+  const loadSelfAndChildrenDetails = useCallback(async (node) => {
+    if (!node || isAdmin) return;
+    const rootId = node.id;
+    try {
+      // Root details from /accounts/me/
+      try {
+        const meRes = await API.get("/accounts/me/", { cacheTTL: 5000, retryAttempts: 2 });
+        const me = meRes?.data || {};
+        putDetails(rootId, {
+          phone: me.phone,
+          pincode: me.pincode,
+          account_active: me.account_active,
+          role: me.role,
+          category: me.category,
+        });
+      } catch (e) {
+        // ignore
+      }
+
+      // Direct children list by registered_by=rootId (public fields include phone/pincode/status)
+      try {
+        const listRes = await API.get("/accounts/users/", {
+          params: { registered_by: rootId },
+          cacheTTL: 5000,
+          retryAttempts: 2,
+        });
+        const arr = Array.isArray(listRes?.data?.results)
+          ? listRes.data.results
+          : (Array.isArray(listRes?.data) ? listRes.data : []);
+        if (Array.isArray(arr)) {
+          putDirect(rootId, arr.length);
+          for (const u of arr) {
+            putDetails(u.id, {
+              phone: u.phone,
+              pincode: u.pincode,
+              account_active: u.account_active,
+              role: u.role,
+              category: u.category,
+            });
+          }
+        }
+
+        // For visible children, fetch their direct counts (registered_by=child.id)
+        const kids = Array.isArray(node.children) ? node.children.slice(0, 5) : [];
+        await Promise.all(
+          kids.map(async (k) => {
+            try {
+              const lr = await API.get("/accounts/users/", {
+                params: { registered_by: k.id },
+                cacheTTL: 5000,
+                retryAttempts: 2,
+              });
+              const a = Array.isArray(lr?.data?.results)
+                ? lr.data.results
+                : (Array.isArray(lr?.data) ? lr.data : []);
+              putDirect(k.id, Array.isArray(a) ? a.length : 0);
+            } catch {
+              // ignore
+            }
+          })
+        );
+      } catch (e) {
+        // ignore
+      }
+    } catch {
+      // ignore
+    }
+  }, [isAdmin, putDetails, putDirect]);
 
   const fetchRoot = useCallback(async ({ identifier, userId, depth = 6 }) => {
     setLoading(true);
@@ -242,6 +332,8 @@ export default function TreeReferralGalaxy({
       if (typeof onUserChange === "function") {
         try { onUserChange(resNode); } catch {}
       }
+      // Enrich with status/phone/pincode/direct counts in self-mode
+      try { await loadSelfAndChildrenDetails(resNode); } catch {}
     } catch (e) {
       setErr(e?.response?.data?.detail || e?.message || "Failed to load tree");
       setRoot(null);
@@ -379,6 +471,10 @@ export default function TreeReferralGalaxy({
   const children = useMemo(() => Array.isArray(root?.children) ? root.children.slice(0, 5) : [], [root]);
   const placeholders = Math.max(0, 5 - children.length);
 
+  // Helpers to read details/direct counts
+  const dFor = useCallback((id) => detailsMap.get(id) || {}, [detailsMap]);
+  const directOf = useCallback((id) => directMap.get(id), [directMap]);
+
   return (
     <div style={styles.container}>
       <div style={styles.header}>Genealogy</div>
@@ -442,6 +538,20 @@ export default function TreeReferralGalaxy({
               <AvatarIcon size={rootAvatar} />
               <div style={styles.cardName}>{displayName(root) || "—"}</div>
               <div style={styles.cardTR}>TR Username: {displayTR(root) || "—"}</div>
+              {typeof dFor(root.id).account_active === "boolean" ? (
+                <div style={{ marginTop: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: dFor(root.id).account_active ? "#16a34a" : "#64748b" }}>
+                    {dFor(root.id).account_active ? "Active" : "Inactive"}
+                  </span>
+                </div>
+              ) : null}
+              {dFor(root.id).phone ? (
+                <div style={styles.cardTR}>Phone: {dFor(root.id).phone}</div>
+              ) : null}
+              {dFor(root.id).pincode ? (
+                <div style={styles.cardTR}>Pincode: {dFor(root.id).pincode}</div>
+              ) : null}
+              <div style={styles.cardTeam}>Direct: {directOf(root.id) ?? "—"}</div>
               <div style={styles.cardTeam}>Team: {getCountValue(root.id) ?? "—"}</div>
             </div>
           </div>
@@ -455,6 +565,18 @@ export default function TreeReferralGalaxy({
                 <AvatarIcon size={childAvatar} />
                 <div style={{ ...styles.cardName, fontSize: 14, marginTop: 6 }}>{displayName(c) || "—"}</div>
                 <div style={{ ...styles.cardTR, fontSize: 12 }}>TR Username: {displayTR(c) || "—"}</div>
+                {typeof dFor(c.id).account_active === "boolean" ? (
+                  <div style={{ ...styles.subtle, marginTop: 4, color: dFor(c.id).account_active ? "#16a34a" : "#64748b", fontWeight: 700 }}>
+                    {dFor(c.id).account_active ? "Active" : "Inactive"}
+                  </div>
+                ) : null}
+                {dFor(c.id).phone ? (
+                  <div style={{ ...styles.cardTR, fontSize: 12 }}>Phone: {dFor(c.id).phone}</div>
+                ) : null}
+                {dFor(c.id).pincode ? (
+                  <div style={{ ...styles.cardTR, fontSize: 12 }}>Pincode: {dFor(c.id).pincode}</div>
+                ) : null}
+                <div style={{ ...styles.cardTeam, fontSize: 13 }}>Direct: {directOf(c.id) ?? "—"}</div>
                 <div style={{ ...styles.cardTeam, fontSize: 13 }}>Team: {getCountValue(c.id) ?? "—"}</div>
               </div>
             ))}

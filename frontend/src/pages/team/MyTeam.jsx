@@ -75,6 +75,23 @@ export default function MyTeam() {
   const commSplit = data?.commissions_split || {};
   const recentTeam = Array.isArray(data?.recent_team) ? data.recent_team : [];
   const recentTx = Array.isArray(data?.recent_transactions) ? data.recent_transactions : [];
+  const directTeam = Array.isArray(data?.direct_team) ? data.direct_team : [];
+  const directCounts = data?.direct_team_counts || { active: 0, inactive: 0 };
+
+  // Role breakdown within my direct referrals
+  const roleCounts = useMemo(() => {
+    const arr = Array.isArray(directTeam) ? directTeam : [];
+    let user = 0, employee = 0, agency = 0;
+    for (const m of arr) {
+      const r = String(m?.role || "").toLowerCase();
+      const c = String(m?.category || "").toLowerCase();
+      if (r === "employee" || c === "employee") employee += 1;
+      else if (r === "agency" || c.startsWith("agency")) agency += 1;
+      else user += 1;
+    }
+    return { user, employee, agency };
+  }, [directTeam]);
+
 
   const maskTRUsername = (username) => {
     if (typeof username !== "string") return username;
@@ -110,8 +127,27 @@ export default function MyTeam() {
       ) : null}
 
       <Grid container spacing={2}>
-        {/* Downline */}
-        
+        {/* Downline cards */}
+        <Grid item xs={12} md={4}>
+          <StatCard title="Direct Referrals" value={String(down?.direct ?? directTeam.length ?? 0)} />
+        </Grid>
+        <Grid item xs={6} md={4}>
+          <StatCard title="Active" value={String(directCounts.active ?? 0)} />
+        </Grid>
+        <Grid item xs={6} md={4}>
+          <StatCard title="Inactive" value={String(directCounts.inactive ?? 0)} />
+        </Grid>
+
+        {/* Role breakdown (direct referrals) */}
+        <Grid item xs={6} md={4}>
+          <StatCard title="Users" value={String(roleCounts.user ?? 0)} />
+        </Grid>
+        <Grid item xs={6} md={4}>
+          <StatCard title="Employees" value={String(roleCounts.employee ?? 0)} />
+        </Grid>
+        <Grid item xs={6} md={4}>
+          <StatCard title="Agencies" value={String(roleCounts.agency ?? 0)} />
+        </Grid>
 
         {/* Earnings Totals */}
         
@@ -176,6 +212,58 @@ export default function MyTeam() {
           </Card>
         </Grid> */}
 
+        {/* My Direct Referrals */}
+        <Grid item xs={12}>
+          <Card variant="outlined">
+            <CardContent>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                My Direct Referrals
+              </Typography>
+              <Divider sx={{ mb: 1 }} />
+              {directTeam.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  No direct referrals.
+                </Typography>
+              ) : (
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>User</TableCell>
+                      <TableCell>Phone</TableCell>
+                      <TableCell>Pincode</TableCell>
+                      <TableCell>Status</TableCell>
+                      <TableCell>Role</TableCell>
+                      <TableCell>Category</TableCell>
+                      <TableCell>Joined</TableCell>
+                      <TableCell align="right">Direct Team</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {directTeam.map((m) => (
+                      <TableRow key={m.id}>
+                        <TableCell>{maskTRUsername(m.username)}</TableCell>
+                        <TableCell>{m.phone || "-"}</TableCell>
+                        <TableCell>{m.pincode || "-"}</TableCell>
+                        <TableCell>
+                          <Chip
+                            size="small"
+                            label={m.account_active ? "Active" : "Inactive"}
+                            color={m.account_active ? "success" : "default"}
+                          />
+                        </TableCell>
+                        <TableCell>{m.role || "-"}</TableCell>
+                        <TableCell>{m.category || "-"}</TableCell>
+                        <TableCell>{m.date_joined || "-"}</TableCell>
+                        <TableCell align="right">{m.direct_referrals ?? 0}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
         {/* Geneology */}
         <Grid item xs={12}>
           <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, background: "#f8fafc", padding: 12 }}>
@@ -184,7 +272,7 @@ export default function MyTeam() {
         </Grid>
 
         {/* Recent Team & Transactions */}
-        <Grid item xs={12} md={6}>
+        {/* <Grid item xs={12} md={6}>
           <Card variant="outlined">
             <CardContent>
               <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
@@ -219,7 +307,7 @@ export default function MyTeam() {
               )}
             </CardContent>
           </Card>
-        </Grid>
+        </Grid> */}
 
         {/* <Grid item xs={12} md={6}>
           <Card variant="outlined">
