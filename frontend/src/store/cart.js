@@ -333,13 +333,13 @@ export function addPromoPackageMonthly({ pkgId, name, unitPrice = 0, package_num
  * Add a physical product to the centralized cart
  * meta includes minimal shipping data; contact details can be collected at checkout.
  */
-export function addProduct({ productId, name, unitPrice = 0, qty = 1, shipping_address = "" }) {
+export function addProduct({ productId, name, unitPrice = 0, qty = 1, shipping_address = "", image_url = "" }) {
   return addItem({
     type: "PRODUCT",
     id: productId,
     name,
     unitPrice,
     qty: Math.max(1, Number(qty) || 1),
-    meta: { shipping_address },
+    meta: { shipping_address, image_url },
   });
 }

@@ -455,6 +455,11 @@ class Wallet(models.Model):
                     # best-effort
                     pass
 
+            # Auto-apply 1k block rule after commission credits (best-effort)
+            try:
+                self._apply_auto_block_rule(w)
+            except Exception:
+                pass
             return w.balance
 
         # Default: non-commission or withholding disabled
@@ -470,6 +475,11 @@ class Wallet(models.Model):
             source_id=str(source_id) if source_id is not None else '',
             meta=meta or {}
         )
+        # Auto-apply 1k block rule after non-commission credit (best-effort)
+        try:
+            self._apply_auto_block_rule(w)
+        except Exception:
+            pass
         return w.balance
 
     @transaction.atomic
@@ -526,6 +536,184 @@ class Wallet(models.Model):
         w, _ = cls.objects.get_or_create(user=user, defaults={'balance': Decimal('0.00')})
         return w
 
+    # Auto rule: for every ₹1000 accumulated in main_balance, apply a fixed deduction pack:
+    # - ₹150 auto e‑coupon buy for self (if available; skipped if no stock)
+    # - ₹50 fixed TDS routed to company tax wallet
+    # - ₹50 direct referral bonus to the direct sponsor (registered_by) if present
+    # Debits are recorded against user's withdrawable wallet and total balance.
+    # Idempotency is ensured via coupons.AuditTrail action="auto_1k_block_applied" per applied block.
+    def _apply_auto_block_rule(self, w: "Wallet"):
+        from decimal import Decimal as D
+        try:
+            from coupons.models import AuditTrail, CouponCode
+        except Exception:
+            return  # coupons app not available; skip
+
+        # Count already-applied blocks for this user
+        try:
+            blocks_applied = int(
+                AuditTrail.objects.filter(action="auto_1k_block_applied", actor=self.user).count()
+            )
+        except Exception:
+            blocks_applied = 0
+
+        # Compute eligible blocks from main_balance
+        try:
+            main = D(str(getattr(w, "main_balance", 0) or 0))
+        except Exception:
+            main = D("0")
+        total_blocks = int(main // D("1000"))
+        to_apply = max(0, int(total_blocks) - int(blocks_applied))
+        if to_apply <= 0:
+            return
+
+        sponsor = getattr(self.user, "registered_by", None)
+
+        for i in range(to_apply):
+            block_no = int(blocks_applied) + i + 1
+            coupon_applied = False
+            coupon_code_val = None
+
+            # Try to allocate one ₹150 e‑coupon to this consumer
+            try:
+                base_qs = CouponCode.objects.filter(
+                    issued_channel="e_coupon",
+                    value=D("150.00"),
+                    status="AVAILABLE",
+                    assigned_agency__isnull=True,
+                    assigned_employee__isnull=True,
+                    assigned_consumer__isnull=True,
+                )
+                try:
+                    locking_qs = base_qs.select_for_update(skip_locked=True)
+                except Exception:
+                    locking_qs = base_qs
+                pick_ids = list(locking_qs.order_by("serial", "id").values_list("id", flat=True)[:1])
+                if pick_ids:
+                    affected = (
+                        CouponCode.objects.filter(id__in=pick_ids)
+                        .filter(
+                            issued_channel="e_coupon",
+                            status="AVAILABLE",
+                            assigned_agency__isnull=True,
+                            assigned_employee__isnull=True,
+                            assigned_consumer__isnull=True,
+                        )
+                        .update(assigned_consumer_id=self.user_id, status="SOLD")
+                    )
+                    if affected:
+                        coupon_applied = True
+                        try:
+                            cobj = CouponCode.objects.filter(id=pick_ids[0]).only("code").first()
+                            coupon_code_val = getattr(cobj, "code", None)
+                        except Exception:
+                            coupon_code_val = None
+            except Exception:
+                coupon_applied = False
+
+            tax_fixed = D("50.00")
+            sponsor_bonus = D("50.00") if sponsor else D("0.00")
+            coupon_cost = D("150.00") if coupon_applied else D("0.00")
+            total = (tax_fixed + sponsor_bonus + coupon_cost).quantize(D("0.01"))
+
+            # Debit from withdrawable + total balance (best-effort, do not go negative)
+            w.withdrawable_balance = (w.withdrawable_balance or D("0")) - total
+            w.balance = (w.balance or D("0")) - total
+            if w.withdrawable_balance < 0:
+                w.withdrawable_balance = D("0")
+            if w.balance < 0:
+                w.balance = D("0")
+            w.save(update_fields=["balance", "withdrawable_balance", "updated_at"])
+
+            # Record user-side debits
+            if coupon_applied and coupon_cost > 0:
+                WalletTransaction.objects.create(
+                    user=self.user,
+                    amount=D("-150.00"),
+                    balance_after=w.balance,
+                    type="AUTO_PURCHASE_DEBIT",
+                    source_type="AUTO_1K_BLOCK",
+                    source_id=str(block_no),
+                    meta={"reason": "AUTO_1K_BLOCK", "block_index": block_no, "coupon_code": coupon_code_val},
+                )
+            # Fixed TDS debit marker
+            WalletTransaction.objects.create(
+                user=self.user,
+                amount=D("-50.00"),
+                balance_after=w.balance,
+                type="ADJUSTMENT_DEBIT",
+                source_type="AUTO_1K_BLOCK",
+                source_id=str(block_no),
+                meta={"reason": "TDS_FIXED_AUTO", "block_index": block_no},
+            )
+            # Sponsor bonus debit marker (user-side visibility)
+            if sponsor_bonus > 0:
+                WalletTransaction.objects.create(
+                    user=self.user,
+                    amount=D("-50.00"),
+                    balance_after=w.balance,
+                    type="ADJUSTMENT_DEBIT",
+                    source_type="AUTO_1K_BLOCK",
+                    source_id=str(block_no),
+                    meta={"reason": "DIRECT_REF_BONUS_AUTO", "block_index": block_no, "to_user_id": getattr(sponsor, "id", None)},
+                )
+
+            # Credit sponsor (no withholding)
+            if sponsor and sponsor_bonus > 0:
+                try:
+                    sw = Wallet.get_or_create_for_user(sponsor)
+                    sw.credit(
+                        sponsor_bonus,
+                        tx_type="DIRECT_REF_BONUS",
+                        meta={"from_user_id": self.user.id, "from_user": getattr(self.user, "username", None), "no_withhold": True, "auto_rule": "AUTO_1K_BLOCK", "block_index": block_no},
+                        source_type="AUTO_1K_BLOCK",
+                        source_id=str(block_no),
+                    )
+                except Exception:
+                    pass
+
+            # Credit company tax wallet (no withholding)
+            try:
+                from business.models import CommissionConfig
+                cfg = CommissionConfig.get_solo()
+                company_user = getattr(cfg, "tax_company_user", None)
+            except Exception:
+                company_user = None
+            if not company_user:
+                try:
+                    company_user = CustomUser.objects.filter(category="company").first() or CustomUser.objects.filter(is_superuser=True).first()
+                except Exception:
+                    company_user = None
+            if company_user:
+                try:
+                    cw = Wallet.get_or_create_for_user(company_user)
+                    cw.credit(
+                        tax_fixed,
+                        tx_type="TAX_POOL_CREDIT",
+                        meta={"from_user_id": self.user.id, "from_user": getattr(self.user, "username", None), "no_withhold": True, "auto_rule": "AUTO_1K_BLOCK", "block_index": block_no},
+                        source_type="AUTO_1K_BLOCK",
+                        source_id=str(block_no),
+                    )
+                except Exception:
+                    pass
+
+            # Audit for idempotency
+            try:
+                AuditTrail.objects.create(
+                    action="auto_1k_block_applied",
+                    actor=self.user,
+                    notes=f"Applied auto block {block_no}",
+                    metadata={
+                        "block_index": block_no,
+                        "coupon_applied": bool(coupon_applied),
+                        "coupon_cost": str(coupon_cost),
+                        "tds_fixed": "50.00",
+                        "sponsor_bonus": str(sponsor_bonus),
+                    },
+                )
+            except Exception:
+                pass
+
 
 class WalletTransaction(models.Model):
     TYPE_CHOICES = [
@@ -556,6 +744,9 @@ class WalletTransaction(models.Model):
         # Dual-wallet support
         ('WITHDRAWABLE_CREDIT', 'Withdrawable Credit'),
         ('TAX_POOL_CREDIT', 'Tax Pool Credit'),
+        ('ECOUPON_WALLET_DEBIT', 'E-Coupon Wallet Debit'),
+        ('AUTO_PURCHASE_DEBIT', 'Auto Purchase Debit'),
+        ('PRODUCT_WALLET_CREDIT', 'Product Wallet Credit'),
     ]
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='wallet_transactions', db_index=True)
     amount = models.DecimalField(max_digits=12, decimal_places=2)

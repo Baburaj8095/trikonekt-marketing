@@ -74,7 +74,8 @@ import TrikonektProducts from "./pages/TrikonektProducts";
 import AgencyMarketplace from "./pages/agency/AgencyMarketplace";
 import AdminRewardPoints from "./pages/admin/AdminRewardPoints";
 import Cart from "./pages/Cart";
-import Checkout from "./pages/Checkout";
+import CheckoutV2 from "./pages/CheckoutV2";
+import CheckoutSuccess from "./pages/CheckoutSuccess";
 import RegisterV2 from "./pages/Auth/RegisterV2";
 import MyOrdersAll from "./pages/MyOrdersAll";
 
@@ -266,7 +267,17 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["user"]}>
               <ConsumerShell>
-                <Checkout />
+                <CheckoutV2 />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/checkout/success"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <CheckoutSuccess />
               </ConsumerShell>
             </ProtectedRoute>
           }
@@ -402,7 +413,17 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["agency"]}>
               <AgencyShell>
-                <Checkout />
+                <CheckoutV2 />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agency/checkout/success"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <CheckoutSuccess />
               </AgencyShell>
             </ProtectedRoute>
           }
@@ -532,7 +553,17 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["employee"]}>
               <EmployeeShell>
-                <Checkout />
+                <CheckoutV2 />
+              </EmployeeShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee/checkout/success"
+          element={
+            <ProtectedRoute allowedRoles={["employee"]}>
+              <EmployeeShell>
+                <CheckoutSuccess />
               </EmployeeShell>
             </ProtectedRoute>
           }

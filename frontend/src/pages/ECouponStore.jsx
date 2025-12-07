@@ -10,117 +10,62 @@ import {
   Stack,
   Alert,
   CircularProgress,
-  Table,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableBody,
-  TableContainer,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  IconButton,
+  Badge,
+  Chip,
+  useMediaQuery,
 } from "@mui/material";
-import API, {
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
+import FilterAltOutlinedIcon from "@mui/icons-material/FilterAltOutlined";
+import CloseIcon from "@mui/icons-material/Close";
+import {
   getEcouponStoreBootstrap,
   getMyEcouponOrders,
   assignConsumerByCount,
   assignEmployeeByCount,
 } from "../api/api";
 import { addEcoupon } from "../store/cart";
+import { subscribe as cartSubscribe } from "../store/cart";
 import { useNavigate } from "react-router-dom";
 
-function ProductCard({ product, form, onChange, onAddToCart, available }) {
-  const unit = Number(product?.price_per_unit || 0);
-  const qty = Number(form.quantity || 0);
-  const total = Number.isFinite(unit * qty) ? unit * qty : 0;
-  const avail = Number.isFinite(Number(available)) ? Number(available) : null;
-
-  return (
-    <Paper variant="outlined" sx={{ borderRadius: 2, p: 2 }}>
-      <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "#0f172a" }}>
-        {product?.display_title || "E‑Coupon"}
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        {product?.display_desc || ""}
-      </Typography>
-      <Stack direction="row" spacing={2} sx={{ mb: 1 }}>
-        <Box>
-          <Typography variant="caption" color="text.secondary">Denomination</Typography>
-          <div style={{ fontWeight: 800 }}>₹{product?.denomination}</div>
-        </Box>
-        <Box>
-          <Typography variant="caption" color="text.secondary">Unit Price</Typography>
-          <div style={{ fontWeight: 800 }}>₹{product?.price_per_unit}</div>
-        </Box>
-        <Box>
-          <Typography variant="caption" color="text.secondary">Available</Typography>
-          <div style={{ fontWeight: 800 }}>{Number.isFinite(avail) ? avail : "—"}</div>
-        </Box>
-      </Stack>
-      <Grid container spacing={1.5}>
-        <Grid item xs={12} sm={4}>
-          <TextField
-            size="small"
-            label="Quantity"
-            type="number"
-            fullWidth
-            value={form.quantity ?? ""}
-            onChange={(e) => onChange(product.id, "quantity", e.target.value)}
-            inputProps={{ min: 1 }}
-            helperText={`Available: ${avail != null ? avail : "—"}`}
-          />
-        </Grid>
-      </Grid>
-      <Stack direction="row" spacing={2} alignItems="center" sx={{ mt: 1.5 }}>
-        <Typography variant="body2" color="text.secondary">Total</Typography>
-        <Typography variant="h6" sx={{ fontWeight: 900, color: "#0f172a" }}>
-          ₹{total.toFixed(2)}
-        </Typography>
-      </Stack>
-      <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
-        <Button
-          variant="contained"
-          onClick={() =>
-            onAddToCart &&
-            onAddToCart(
-              product.id,
-              Math.max(1, parseInt(form.quantity || "1", 10))
-            )
-          }
-          disabled={false}
-          sx={{ fontWeight: 700 }}
-        >
-          Add to Cart
-        </Button>
-      </Stack>
-      <Alert severity="info" sx={{ mt: 1 }}>
-        Payment is done at Checkout. Use the cart to complete payment.
-      </Alert>
-    </Paper>
-  );
-}
+// New reusable components (modern ecommerce UI)
+import ECouponProductCard from "../components/ecoupon/ProductCard";
+import CartDrawer from "../components/ecoupon/CartDrawer";
+import FilterBar from "../components/ecoupon/FilterBar";
+import AssignCouponsForm from "../components/ecoupon/AssignCouponsForm";
+import OrdersList from "../components/ecoupon/OrdersList";
 
 export default function ECouponStore() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [products, setProducts] = useState([]);
 
-  const [forms, setForms] = useState({}); // productId -> { quantity }
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [orders, setOrders] = useState([]);
   const [ordersErr, setOrdersErr] = useState("");
-  
+
   const [denomFilter, setDenomFilter] = useState("all");
   const [denomOptions, setDenomOptions] = useState([]);
   const [availByDenom, setAvailByDenom] = useState({});
 
-  // Agency/Employee: assign to consumer form state
-  const [consumerAssign, setConsumerAssign] = useState({ username: "", count: 1, notes: "" });
-  const [assigningConsumer, setAssigningConsumer] = useState(false);
-  const [assignConsumerMsg, setAssignConsumerMsg] = useState("");
+  // Search + price filtering
+  const [search, setSearch] = useState("");
+  const [priceBounds, setPriceBounds] = useState([0, 0]); // [min, max]
+  const [priceRange, setPriceRange] = useState([0, 0]);
 
-  // Agency only: distribute to employee form state
-  const [empAssign, setEmpAssign] = useState({ username: "", count: 1, notes: "" });
-  const [assigningEmp, setAssigningEmp] = useState(false);
-  const [assignEmpMsg, setAssignEmpMsg] = useState("");
+  // Header cart badge + drawer
+  const [cartCount, setCartCount] = useState(0);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
+  // Filters collapsible on mobile
+  const isMdUp = useMediaQuery("(min-width:900px)");
+  const [showFilters, setShowFilters] = useState(true);
+
+  // Role context
   const roleHint = useMemo(() => {
     try {
       const p = window.location.pathname;
@@ -131,13 +76,26 @@ export default function ECouponStore() {
       return "consumer";
     }
   }, []);
-  const cartPath = useMemo(
-    () => (roleHint === "agency" ? "/agency/cart" : roleHint === "employee" ? "/employee/cart" : "/user/cart"),
-    [roleHint]
-  );
-  const navigate = useNavigate();
+  const routerNavigate = useNavigate();
 
-  const loadBootstrap = async () => {
+  // Subscribe to cart for badge
+  useEffect(() => {
+    const unsub = cartSubscribe((s) => {
+      try {
+        setCartCount(Number(s?.count || 0));
+      } catch {
+        setCartCount(0);
+      }
+    });
+    return () => {
+      try {
+        unsub && unsub();
+      } catch {}
+    };
+  }, []);
+
+  // Bootstrap: products, denominations, price bounds, availability
+  const loadStoreBootstrap = async () => {
     setLoading(true);
     setError("");
     try {
@@ -145,29 +103,31 @@ export default function ECouponStore() {
       const prods = Array.isArray(data?.products) ? data.products : [];
       setProducts(prods);
 
+      // Denomination options
       const denoms = Array.from(new Set((prods || []).map((p) => String(p.denomination)))).sort(
         (a, b) => Number(a) - Number(b)
       );
       setDenomOptions(["all", ...denoms]);
-      computeAvailabilities(denoms).catch(() => {});
 
-      // Initialize forms with sensible defaults
-      const m = {};
-      prods.forEach((p) => {
-        m[p.id] = { quantity: 1 };
-      });
-      setForms(m);
+      // Price bounds
+      const prices = (prods || []).map((p) => Number(p?.price_per_unit || 0)).filter((n) => Number.isFinite(n));
+      const minP = prices.length ? Math.min(...prices) : 0;
+      const maxP = prices.length ? Math.max(...prices) : 0;
+      setPriceBounds([minP, maxP]);
+      setPriceRange([minP, maxP]);
+
+      // Availability summary per denomination (server count)
+      await computeAvailabilities(denoms);
     } catch (e) {
       const msg = e?.response?.data?.detail || "Failed to load store.";
       setError(msg);
       setProducts([]);
-      setForms({});
     } finally {
       setLoading(false);
     }
   };
 
-  const loadOrders = async () => {
+  const loadMyOrders = async () => {
     setOrdersLoading(true);
     setOrdersErr("");
     try {
@@ -184,7 +144,9 @@ export default function ECouponStore() {
 
   async function fetchCount(params = {}) {
     try {
-      const res = await API.get("/coupons/codes/", { params: { page_size: 1, ...params } });
+      const res = await (await import("../api/api")).default.get("/coupons/codes/", {
+        params: { page_size: 1, ...params },
+      });
       const data = res?.data;
       if (typeof data?.count === "number") return data.count;
       if (Array.isArray(data)) return data.length;
@@ -209,13 +171,13 @@ export default function ECouponStore() {
   }
 
   useEffect(() => {
-    loadBootstrap();
-    loadOrders();
-  }, []);
+    setShowFilters(isMdUp); // auto-show on desktop, collapsible on mobile
+  }, [isMdUp]);
 
-  const setForm = (pid, field, value) => {
-    setForms((f) => ({ ...f, [pid]: { ...(f[pid] || {}), [field]: value } }));
-  };
+  useEffect(() => {
+    loadStoreBootstrap();
+    loadMyOrders();
+  }, []);
 
   // Cart helpers (centralized cart only)
   const addToCart = (pid, qty = 1) => {
@@ -229,299 +191,229 @@ export default function ECouponStore() {
         qty: q,
         denomination: product?.denomination ?? null,
       });
-      try { alert("Added to cart."); } catch {}
+      try {
+        alert("Added to cart.");
+      } catch {}
+      setDrawerOpen(true);
     } catch {}
   };
 
+  // Filtered view of products
+  const filtered = useMemo(() => {
+    const q = (search || "").trim().toLowerCase();
+    const [minP, maxP] = priceRange;
+    return (products || []).filter((p) => {
+      if (denomFilter !== "all" && String(p.denomination) !== String(denomFilter)) return false;
+      const price = Number(p?.price_per_unit || 0);
+      if (Number.isFinite(minP) && price < minP) return false;
+      if (Number.isFinite(maxP) && price > maxP) return false;
+      if (q) {
+        const hay = `${p?.display_title || ""} ${p?.display_desc || ""} ${p?.denomination || ""}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [products, denomFilter, search, priceRange]);
+
+  // Header: navigate to centralized checkout/cart routes from drawer
+  const handleGoCheckout = () => {
+    try {
+      const p = window.location.pathname;
+      if (p.startsWith("/agency")) routerNavigate("/agency/checkout");
+      else if (p.startsWith("/employee")) routerNavigate("/employee/checkout");
+      else routerNavigate("/user/checkout");
+    } catch {}
+  };
+
+  // Accordion: Assign handlers wired to existing APIs
+  const onAssignConsumer = async ({ username, count, notes }) => {
+    const res = await assignConsumerByCount({
+      consumer_username: username,
+      count,
+      notes: notes || "",
+    });
+    const assigned = Number(res?.assigned || 0);
+    const after = Number(res?.available_after || 0);
+    const samples = Array.isArray(res?.sample_codes) ? res.sample_codes : [];
+    return { message: `Assigned ${assigned}. Remaining in your pool: ${after}. Samples: ${samples.join(", ")}` };
+  };
+
+  const onAssignEmployee = async ({ username, count, notes }) => {
+    const res = await assignEmployeeByCount({
+      employee_username: username,
+      count,
+      notes: notes || "",
+    });
+    const assigned = Number(res?.assigned || 0);
+    const after = Number(res?.available_after || 0);
+    const samples = Array.isArray(res?.sample_codes) ? res.sample_codes : [];
+    return { message: `Assigned ${assigned} to ${username}. Remaining in agency pool: ${after}. Samples: ${samples.join(", ")}` };
+  };
+
   return (
-    <Container maxWidth="lg" sx={{ px: { xs: 0.5, md: 2 }, py: { xs: 1, md: 2 } }}>
-      <Box sx={{ mb: 2 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between">
+    <Container maxWidth="lg" sx={{ px: { xs: 1, md: 2 }, py: { xs: 1, md: 2 } }}>
+      {/* Header */}
+      <Box sx={{ mb: 1.5 }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
           <Box>
             <Typography variant="h6" sx={{ fontWeight: 900, color: "#0f172a" }}>
               E‑Coupon Store
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              Role: {roleHint}. Add products to cart. Payment is completed at Checkout.
+              Role: {roleHint}. Add items to cart and checkout via UPI QR.
             </Typography>
           </Box>
-          <Button size="small" variant="outlined" onClick={() => navigate(cartPath)}>
-            Open Centralized Cart
-          </Button>
+
+          <Stack direction="row" spacing={1} alignItems="center">
+            <IconButton
+              size="small"
+              onClick={() => setShowFilters((s) => !s)}
+              sx={{ display: { xs: "inline-flex", md: "none" } }}
+              title={showFilters ? "Hide filters" : "Show filters"}
+            >
+              {showFilters ? <CloseIcon /> : <FilterAltOutlinedIcon />}
+            </IconButton>
+            <IconButton size="small" onClick={() => setDrawerOpen(true)} title="Open cart">
+              <Badge badgeContent={cartCount} color="primary">
+                <ShoppingCartIcon />
+              </Badge>
+            </IconButton>
+          </Stack>
         </Stack>
       </Box>
 
       {error ? <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert> : null}
 
-      <Paper elevation={3} sx={{ p: 2, borderRadius: 2, mb: 2 }}>
+      {/* Filters */}
+      <Box sx={{ display: { xs: showFilters ? "block" : "none", md: "block" }, mb: 1.5 }}>
+        <FilterBar
+          denomOptions={denomOptions}
+          denomFilter={denomFilter}
+          onDenomChange={setDenomFilter}
+          search={search}
+          onSearchChange={setSearch}
+          priceRange={priceRange}
+          priceBounds={priceBounds}
+          onPriceChange={setPriceRange}
+          onRefresh={loadStoreBootstrap}
+          loading={loading}
+        />
+      </Box>
+
+      {/* Product grid */}
+      <Paper elevation={0} sx={{ p: { xs: 1, md: 2 }, borderRadius: 2, border: "1px solid", borderColor: "divider", mb: 2 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "#0f172a" }}>
-            Available Products
-          </Typography>
           <Stack direction="row" spacing={1} alignItems="center">
-            <TextField
-              size="small"
-              select
-              label="Denomination"
-              value={denomFilter}
-              onChange={(e) => setDenomFilter(e.target.value)}
-              SelectProps={{ native: true }}
-              sx={{ minWidth: 160 }}
-            >
-              {denomOptions.map((d) => (
-                <option key={d} value={d}>
-                  {d === "all" ? "All" : `₹${d}`}
-                </option>
-              ))}
-            </TextField>
-            <Button onClick={loadBootstrap} size="small" variant="outlined" disabled={loading}>
-              {loading ? "Refreshing..." : "Refresh"}
-            </Button>
+            <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "#0f172a" }}>
+              Available Products
+            </Typography>
+            <Chip size="small" label={`${filtered.length} shown`} />
           </Stack>
+          <Button onClick={loadStoreBootstrap} size="small" variant="outlined" disabled={loading}>
+            {loading ? "Refreshing..." : "Refresh"}
+          </Button>
         </Stack>
+
         {loading ? (
           <Box sx={{ py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
             <CircularProgress size={18} /> <Typography variant="body2">Loading...</Typography>
           </Box>
-        ) : (products || []).length === 0 ? (
-          <Typography variant="body2" color="text.secondary">No products available.</Typography>
+        ) : (filtered || []).length === 0 ? (
+          <Typography variant="body2" color="text.secondary">No products match the filters.</Typography>
         ) : (
-          <>
-            <Grid container spacing={2}>
-              {((products || []).filter((p) => denomFilter === "all" || String(p.denomination) === String(denomFilter))).map((p) => (
-                <Grid item xs={12} sm={6} md={4} lg={3} key={p.id}>
-                  <ProductCard
-                    product={p}
-                    form={forms[p.id] || { quantity: 1 }}
-                    onChange={setForm}
-                    onAddToCart={(pid, qty) => addToCart(pid, qty)}
-                    available={availByDenom[String(p.denomination)]}
-                  />
-                </Grid>
-              ))}
-            </Grid>
-          </>
-        )}
-      </Paper>
-
-      <Paper elevation={3} sx={{ p: 2, borderRadius: 2 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "#0f172a" }}>
-            My Orders
-          </Typography>
-          <Stack direction="row" spacing={1}>
-            <Button onClick={loadOrders} size="small" variant="outlined" disabled={ordersLoading}>
-              {ordersLoading ? "Refreshing..." : "Refresh"}
-            </Button>
-            <Button onClick={() => navigate("/user/redeem-coupon")} size="small" variant="contained">
-              Go to E‑Coupons
-            </Button>
-          </Stack>
-        </Stack>
-        {ordersErr ? <Alert severity="error" sx={{ mb: 1 }}>{ordersErr}</Alert> : null}
-        {ordersLoading ? (
-          <Box sx={{ py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
-            <CircularProgress size={18} /> <Typography variant="body2">Loading...</Typography>
-          </Box>
-        ) : (orders || []).length === 0 ? (
-          <Typography variant="body2" color="text.secondary">No orders yet.</Typography>
-        ) : (
-          <TableContainer sx={{ maxWidth: "100%", overflowX: "auto" }}>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>ID</TableCell>
-                  <TableCell>Product</TableCell>
-                  <TableCell>Denomination</TableCell>
-                  <TableCell>Qty</TableCell>
-                  <TableCell>Total</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Approved At</TableCell>
-                  <TableCell>Samples</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {(orders || []).map((o) => {
-                  const samples = Array.isArray(o.allocated_sample_codes) ? o.allocated_sample_codes : [];
-                  return (
-                    <TableRow key={o.id}>
-                      <TableCell>#{o.id}</TableCell>
-                      <TableCell>{o.product_title || o.product || ""}</TableCell>
-                      <TableCell>₹{o.denomination_snapshot}</TableCell>
-                      <TableCell>{o.quantity}</TableCell>
-                      <TableCell>₹{o.amount_total}</TableCell>
-                      <TableCell>{o.status}</TableCell>
-                      <TableCell>{o.reviewed_at ? new Date(o.reviewed_at).toLocaleString() : ""}</TableCell>
-                      <TableCell style={{ maxWidth: 240, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {samples.join(", ")}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        )}
-      </Paper>
-
-      {(roleHint === "agency" || roleHint === "employee") ? (
-        <Paper elevation={3} sx={{ p: 2, borderRadius: 2, mt: 2 }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "#0f172a", mb: 1 }}>
-            Send E‑Coupons to Consumer (by Count)
-          </Typography>
-          <Grid container spacing={1.5}>
-            <Grid item xs={12} md={4}>
-              <TextField
-                size="small"
-                label="Consumer Username"
-                fullWidth
-                value={consumerAssign.username}
-                onChange={(e) => setConsumerAssign((s) => ({ ...s, username: e.target.value }))}
-              />
-            </Grid>
-            <Grid item xs={12} md={2}>
-              <TextField
-                size="small"
-                label="Count"
-                type="number"
-                fullWidth
-                inputProps={{ min: 1 }}
-                value={consumerAssign.count}
-                onChange={(e) => setConsumerAssign((s) => ({ ...s, count: e.target.value }))}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                size="small"
-                label="Notes (optional)"
-                fullWidth
-                value={consumerAssign.notes}
-                onChange={(e) => setConsumerAssign((s) => ({ ...s, notes: e.target.value }))}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Stack direction="row" spacing={1.5} alignItems="center">
-                <Button
-                  variant="contained"
-                  onClick={async () => {
-                    setAssignConsumerMsg("");
-                    const u = (consumerAssign.username || "").trim();
-                    const c = parseInt(consumerAssign.count || "0", 10);
-                    if (!u || !c || c <= 0) {
-                      try { alert("Enter consumer username and a valid count (>0)."); } catch {}
-                      return;
-                    }
-                    try {
-                      setAssigningConsumer(true);
-                      const res = await assignConsumerByCount({
-                        consumer_username: u,
-                        count: c,
-                        notes: consumerAssign.notes || "",
-                      });
-                      const assigned = Number(res?.assigned || 0);
-                      const after = Number(res?.available_after || 0);
-                      const samples = Array.isArray(res?.sample_codes) ? res.sample_codes : [];
-                      setAssignConsumerMsg(`Assigned ${assigned}. Remaining in your pool: ${after}. Samples: ${samples.join(", ")}`);
-                      // reset count only
-                      setConsumerAssign((s) => ({ ...s, count: 1, notes: "" }));
-                    } catch (e) {
-                      const err = e?.response?.data;
-                      const msg = (typeof err === "string" ? err : (err?.detail || JSON.stringify(err || {}))) || "Assignment failed.";
-                      try { alert(msg); } catch {}
-                    } finally {
-                      setAssigningConsumer(false);
-                    }
-                  }}
-                  disabled={assigningConsumer}
-                  sx={{ fontWeight: 700 }}
-                >
-                  {assigningConsumer ? "Assigning..." : "Assign to Consumer"}
-                </Button>
-                {assignConsumerMsg ? <Typography variant="caption" color="text.secondary">{assignConsumerMsg}</Typography> : null}
-              </Stack>
-            </Grid>
+          <Grid container spacing={2}>
+            {(filtered || []).map((p) => (
+              <Grid item xs={12} sm={6} md={4} lg={3} key={p.id}>
+                <ECouponProductCard
+                  product={p}
+                  available={availByDenom[String(p.denomination)]}
+                  onAddToCart={(pid, qty) => addToCart(pid, qty)}
+                />
+              </Grid>
+            ))}
           </Grid>
-        </Paper>
+        )}
+      </Paper>
+
+      {/* Collapsible panels: Assign flows */}
+      {(roleHint === "agency" || roleHint === "employee") ? (
+        <Accordion defaultExpanded sx={{ mb: 1.5 }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "#0f172a" }}>
+              Send E‑Coupons to Consumer (by Count)
+            </Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <AssignCouponsForm
+              variant="consumer"
+              onSubmit={onAssignConsumer}
+            />
+          </AccordionDetails>
+        </Accordion>
       ) : null}
 
       {roleHint === "agency" ? (
-        <Paper elevation={3} sx={{ p: 2, borderRadius: 2, mt: 2 }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "#0f172a", mb: 1 }}>
-            Distribute to Employee (by Count)
-          </Typography>
-          <Grid container spacing={1.5}>
-            <Grid item xs={12} md={6}>
-              <TextField
-                size="small"
-                label="Employee Username"
-                fullWidth
-                value={empAssign.username}
-                onChange={(e) => setEmpAssign((s) => ({ ...s, username: e.target.value }))}
-              />
-            </Grid>
-            <Grid item xs={12} md={2}>
-              <TextField
-                size="small"
-                label="Count"
-                type="number"
-                fullWidth
-                inputProps={{ min: 1 }}
-                value={empAssign.count}
-                onChange={(e) => setEmpAssign((s) => ({ ...s, count: e.target.value }))}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField
-                size="small"
-                label="Notes (optional)"
-                fullWidth
-                value={empAssign.notes}
-                onChange={(e) => setEmpAssign((s) => ({ ...s, notes: e.target.value }))}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Stack direction="row" spacing={1.5} alignItems="center">
-                <Button
-                  variant="outlined"
-                  onClick={async () => {
-                    setAssignEmpMsg("");
-                    const u = (empAssign.username || "").trim();
-                    const c = parseInt(empAssign.count || "0", 10);
-                    if (!u || !c || c <= 0) {
-                      try { alert("Enter employee username and a valid count (>0)."); } catch {}
-                      return;
-                    }
-                    try {
-                      setAssigningEmp(true);
-                      const res = await assignEmployeeByCount({
-                        employee_username: u,
-                        count: c,
-                        notes: empAssign.notes || "",
-                      });
-                      const assigned = Number(res?.assigned || 0);
-                      const after = Number(res?.available_after || 0);
-                      const samples = Array.isArray(res?.sample_codes) ? res.sample_codes : [];
-                      setAssignEmpMsg(`Assigned ${assigned} to ${u}. Remaining in agency pool: ${after}. Samples: ${samples.join(", ")}`);
-                      setEmpAssign((s) => ({ ...s, count: 1, notes: "" }));
-                    } catch (e) {
-                      const err = e?.response?.data;
-                      const msg = (typeof err === "string" ? err : (err?.detail || JSON.stringify(err || {}))) || "Assignment failed.";
-                      try { alert(msg); } catch {}
-                    } finally {
-                      setAssigningEmp(false);
-                    }
-                  }}
-                  disabled={assigningEmp}
-                  sx={{ fontWeight: 700 }}
-                >
-                  {assigningEmp ? "Assigning..." : "Assign to Employee"}
-                </Button>
-                {assignEmpMsg ? <Typography variant="caption" color="text.secondary">{assignEmpMsg}</Typography> : null}
-              </Stack>
-            </Grid>
-          </Grid>
-        </Paper>
+        <Accordion sx={{ mb: 1.5 }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "#0f172a" }}>
+              Distribute to Employee (by Count)
+            </Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <AssignCouponsForm
+              variant="employee"
+              onSubmit={onAssignEmployee}
+            />
+          </AccordionDetails>
+        </Accordion>
       ) : null}
+
+      {/* Orders list */}
+      <Box sx={{ mt: 2 }}>
+        {ordersLoading ? (
+          <Box sx={{ py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+            <CircularProgress size={18} /> <Typography variant="body2">Loading orders...</Typography>
+          </Box>
+        ) : (
+          <OrdersList
+            orders={orders}
+            loading={ordersLoading}
+            error={ordersErr}
+            onRefresh={loadMyOrders}
+          />
+        )}
+      </Box>
+
+      {/* Cart Drawer */}
+      <CartDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        onCheckout={handleGoCheckout}
+      />
+
+      {/* Floating cart button on mobile */}
+      <Box
+        sx={{
+          position: "fixed",
+          right: 16,
+          bottom: 16,
+          display: { xs: "block", md: "none" },
+          zIndex: 1300,
+        }}
+      >
+        <Button
+          variant="contained"
+          onClick={() => setDrawerOpen(true)}
+          startIcon={
+            <Badge badgeContent={cartCount} color="secondary">
+              <ShoppingCartIcon />
+            </Badge>
+          }
+          sx={{ borderRadius: 999, boxShadow: "0 10px 24px rgba(2,132,199,0.25)" }}
+        >
+          Cart
+        </Button>
+      </Box>
     </Container>
   );
 }

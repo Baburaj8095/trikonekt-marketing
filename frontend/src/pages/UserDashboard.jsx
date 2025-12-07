@@ -1077,7 +1077,7 @@ export default function UserDashboard({ embedded = false }) {
                   features={[
                     "Prime perks enabled",
                     "Extended promo benefits",
-                    "Reward Points of 50k"
+                    "Reward Points"
                   ]}
                   highlighted={true}
                   owned={purchasedPrime750}

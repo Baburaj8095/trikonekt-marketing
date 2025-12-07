@@ -13,12 +13,18 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  IconButton,
+  Badge,
+  Chip,
+  Stack,
 } from "@mui/material";
 import { useNavigate, useLocation } from "react-router-dom";
 import API, { getPromoPackages } from "../api/api";
-import { addPromoPackagePrime } from "../store/cart";
+import { addPromoPackagePrime, addProduct, subscribe as cartSubscribe } from "../store/cart";
 import ProductGrid from "../components/market/ProductGrid";
 import QuickViewModal from "../components/market/QuickViewModal";
+import CartDrawer from "../components/ecoupon/CartDrawer";
+import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 
 export default function TrikonektProducts() {
   const navigate = useNavigate();
@@ -41,8 +47,11 @@ export default function TrikonektProducts() {
 
   // UI state for e-commerce layout
   const [sort, setSort] = useState("");
+  const [search, setSearch] = useState("");
   const [dense, setDense] = useState(true);
   const [quickView, setQuickView] = useState({ open: false, product: null });
+  const [cartCount, setCartCount] = useState(0);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   // Promo Package products
   const [promoItems, setPromoItems] = useState([]);
   const [loadingPromo, setLoadingPromo] = useState(false);
@@ -121,16 +130,137 @@ export default function TrikonektProducts() {
     // no-op
   }, []);
 
+  // Subscribe to cart to show item count badge
+  useEffect(() => {
+    const unsub = cartSubscribe((s) => {
+      try {
+        setCartCount(Number(s?.count || 0));
+      } catch {
+        setCartCount(0);
+      }
+    });
+    return () => {
+      try { unsub && unsub(); } catch {}
+    };
+  }, []);
 
 
 
+
+
+  // Derived filtered list (client-side search)
+  const filteredRows = React.useMemo(() => {
+    const q = (search || "").trim().toLowerCase();
+    if (!q) return rows || [];
+    return (rows || []).filter((p) => {
+      const hay = `${p?.name || ""} ${p?.category || ""} ${p?.city || ""} ${p?.state || ""}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [rows, search]);
+
+  // Add physical product to centralized cart (uses discount price if available)
+  const handleAddToCart = (product) => {
+    try {
+      const price = Number(product?.price || 0);
+      const discount = Number(product?.discount || 0);
+      const unit = price * (1 - (Number.isFinite(discount) ? discount : 0) / 100);
+      addProduct({
+        productId: product.id,
+        name: product?.name || "Product",
+        unitPrice: Number.isFinite(unit) ? unit : price,
+        qty: 1,
+        image_url: product?.image_url || "",
+      });
+      setSnack({ open: true, type: "success", msg: "Added to cart." });
+      setDrawerOpen(true);
+    } catch {
+      setSnack({ open: true, type: "error", msg: "Failed to add to cart." });
+    }
+  };
+
+  const handleGoCheckout = () => {
+    try {
+      const p = window.location.pathname;
+      if (p.startsWith("/agency")) navigate("/agency/checkout");
+      else if (p.startsWith("/employee")) navigate("/employee/checkout");
+      else navigate("/user/checkout");
+    } catch {}
+  };
 
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 2, md: 3 } }}>
-      <Typography variant="h5" sx={{ fontWeight: 700, mb: 2, color: "#0C2D48" }}>
-        Trikonekt Products
-      </Typography>
+      <Box sx={{ mb: 1.5 }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+          <Typography variant="h5" sx={{ fontWeight: 700, color: "#0C2D48" }}>
+            Trikonekt Products
+          </Typography>
+          <IconButton size="small" onClick={() => setDrawerOpen(true)} title="Open cart">
+            <Badge badgeContent={cartCount} color="primary">
+              <ShoppingCartIcon />
+            </Badge>
+          </IconButton>
+        </Stack>
+      </Box>
 
+
+      {/* Filters & Sorting Bar */}
+      <Box
+        sx={{
+          mb: 2,
+          p: 1.5,
+          borderRadius: 2,
+          border: "1px solid",
+          borderColor: "divider",
+          bgcolor: "#fff",
+        }}
+      >
+        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems={{ xs: "stretch", md: "center" }}>
+          <TextField
+            size="small"
+            placeholder="Search products..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            sx={{ minWidth: { xs: "100%", md: 280 } }}
+          />
+          <Stack direction="row" spacing={1} flexWrap="wrap">
+            <Chip
+              size="small"
+              label="Popular"
+              variant={sort === "rating_desc" ? "filled" : "outlined"}
+              color={sort === "rating_desc" ? "primary" : "default"}
+              onClick={() => setSort((s) => (s === "rating_desc" ? "" : "rating_desc"))}
+            />
+            <Chip
+              size="small"
+              label="Newest"
+              variant={sort === "newest" ? "filled" : "outlined"}
+              color={sort === "newest" ? "primary" : "default"}
+              onClick={() => setSort((s) => (s === "newest" ? "" : "newest"))}
+            />
+            <Chip
+              size="small"
+              label="Price Low"
+              variant={sort === "price_asc" ? "filled" : "outlined"}
+              color={sort === "price_asc" ? "primary" : "default"}
+              onClick={() => setSort((s) => (s === "price_asc" ? "" : "price_asc"))}
+            />
+            <Chip
+              size="small"
+              label="Price High"
+              variant={sort === "price_desc" ? "filled" : "outlined"}
+              color={sort === "price_desc" ? "primary" : "default"}
+              onClick={() => setSort((s) => (s === "price_desc" ? "" : "price_desc"))}
+            />
+          </Stack>
+          <Box flex={{ md: 1 }} />
+          <Stack direction="row" spacing={1}>
+            <Button size="small" variant="outlined" onClick={() => setDense((d) => !d)}>
+              {dense ? "Cozy View" : "Compact View"}
+            </Button>
+            <Button size="small" onClick={fetchProducts}>Refresh</Button>
+          </Stack>
+        </Stack>
+      </Box>
 
       {/* Promo Package Section */}
       <Box sx={{ mb: 2 }}>
@@ -215,12 +345,14 @@ export default function TrikonektProducts() {
             </Box>
           </Box>
           <ProductGrid
-            items={rows || []}
+            items={filteredRows || []}
             dense={dense}
             onSelect={(p) => {
               navigate(`${basePath}/products/${p.id}`);
             }}
             onQuickView={(p) => setQuickView({ open: true, product: p })}
+            onAddToCart={handleAddToCart}
+            showAddToCart
           />
         </>
       )}
@@ -236,6 +368,37 @@ export default function TrikonektProducts() {
           }
         }}
       />
+
+      {/* Cart Drawer */}
+      <CartDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        onCheckout={handleGoCheckout}
+      />
+
+      {/* Floating cart button on mobile */}
+      <Box
+        sx={{
+          position: "fixed",
+          right: 16,
+          bottom: 16,
+          display: { xs: "block", md: "none" },
+          zIndex: 1300,
+        }}
+      >
+        <Button
+          variant="contained"
+          onClick={() => setDrawerOpen(true)}
+          startIcon={
+            <Badge badgeContent={cartCount} color="secondary">
+              <ShoppingCartIcon />
+            </Badge>
+          }
+          sx={{ borderRadius: 999, boxShadow: "0 10px 24px rgba(2,132,199,0.25)" }}
+        >
+          Cart
+        </Button>
+      </Box>
 
       <Dialog
         open={addressDlg.open}

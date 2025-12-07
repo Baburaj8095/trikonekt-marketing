@@ -1222,16 +1222,114 @@ class WalletMe(APIView):
                 "main_balance": "0",
                 "withdrawable_balance": "0",
                 "tax_percent": tax_percent,
-                "updated_at": None
+                "updated_at": None,
+                "auto_block": {
+                    "block_size": "1000.00",
+                    "total_blocks": 0,
+                    "applied_blocks": 0,
+                    "pending_blocks": 0,
+                    "last_applied": None
+                },
+                "breakdown_per_block": {
+                    "coupon_cost": "150.00",
+                    "tds": "50.00",
+                    "direct_ref_bonus": "50.00"
+                },
+                "redeem_points": {
+                    "self": 0,
+                    "refer": 0
+                },
+                "next_block": {
+                    "completed_in_current_block": "0.00",
+                    "remaining_to_next_block": "1000.00",
+                    "progress_percent": 0
+                }
             }, status=status.HTTP_200_OK)
 
         w = Wallet.get_or_create_for_user(request.user)
+
+        # Enhanced wallet meta for UI (best-effort; all exceptions guarded)
+        try:
+            from decimal import Decimal as D
+            block_size = D("1000.00")
+            main = D(str(getattr(w, "main_balance", 0) or 0))
+            total_blocks = int(main // block_size)
+            try:
+                from coupons.models import AuditTrail
+                applied_blocks = int(
+                    AuditTrail.objects.filter(action="auto_1k_block_applied", actor=request.user).count()
+                )
+                last_obj = (
+                    AuditTrail.objects
+                    .filter(action="auto_1k_block_applied", actor=request.user)
+                    .only("id", "created_at", "metadata")
+                    .order_by("-id")
+                    .first()
+                )
+                last_applied = {
+                    "id": getattr(last_obj, "id", None),
+                    "created_at": getattr(last_obj, "created_at", None),
+                    "metadata": getattr(last_obj, "metadata", None),
+                } if last_obj else None
+            except Exception:
+                applied_blocks = 0
+                last_applied = None
+            pending_blocks = max(0, total_blocks - applied_blocks)
+            rem = main - (block_size * D(str(total_blocks)))
+            if rem < D("0"):
+                rem = D("0")
+            try:
+                progress_percent = int((rem / block_size) * D("100"))
+            except Exception:
+                progress_percent = 0
+            remaining_to_next = (block_size - rem) if block_size > rem else D("0")
+        except Exception:
+            block_size = "1000.00"
+            total_blocks = 0
+            applied_blocks = 0
+            pending_blocks = 0
+            rem = 0
+            progress_percent = 0
+            remaining_to_next = "1000.00"
+            last_applied = None
+
+        # Redeem point counters (self vs direct referrals), best-effort
+        try:
+            from coupons.models import AuditTrail
+            self_redeems = int(AuditTrail.objects.filter(action="coupon_activated", actor=request.user).count())
+            direct_ids = list(CustomUser.objects.filter(registered_by=request.user).values_list("id", flat=True))
+            refer_redeems = int(AuditTrail.objects.filter(action="coupon_activated", actor_id__in=direct_ids).count()) if direct_ids else 0
+        except Exception:
+            self_redeems = 0
+            refer_redeems = 0
+
         return Response({
             "balance": str(w.balance),                       # total (legacy)
             "main_balance": str(getattr(w, "main_balance", 0) or 0),
             "withdrawable_balance": str(getattr(w, "withdrawable_balance", 0) or 0),
             "tax_percent": tax_percent,
-            "updated_at": w.updated_at
+            "updated_at": w.updated_at,
+            "auto_block": {
+                "block_size": str(block_size),
+                "total_blocks": int(total_blocks),
+                "applied_blocks": int(applied_blocks),
+                "pending_blocks": int(pending_blocks),
+                "last_applied": last_applied
+            },
+            "breakdown_per_block": {
+                "coupon_cost": "150.00",
+                "tds": "50.00",
+                "direct_ref_bonus": "50.00"
+            },
+            "redeem_points": {
+                "self": int(self_redeems),
+                "refer": int(refer_redeems)
+            },
+            "next_block": {
+                "completed_in_current_block": str(rem),
+                "remaining_to_next_block": str(remaining_to_next),
+                "progress_percent": int(progress_percent)
+            }
         }, status=status.HTTP_200_OK)
 
 

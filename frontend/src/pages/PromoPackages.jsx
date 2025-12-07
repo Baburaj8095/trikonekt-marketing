@@ -14,13 +14,18 @@ import {
   RadioGroup,
   FormControlLabel,
   Chip,
+  Checkbox,
+  FormGroup,
+  IconButton,
 } from "@mui/material";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import dayjs from "dayjs";
-import API, { getPromoPackages, listMyPromoPurchases } from "../api/api";
+import { getPromoPackages, listMyPromoPurchases } from "../api/api";
 import RewardPointsCard from "../components/RewardPointsCard";
 import { useNavigate, useLocation } from "react-router-dom";
 import normalizeMediaUrl from "../utils/media";
 import { addPromoPackagePrime, addPromoPackageMonthly } from "../store/cart";
+import QuickViewModal from "../components/market/QuickViewModal";
 
 // If a Cloudinary URL 404s (asset not uploaded), fall back to backend /media path.
 function cloudinaryBackendFallback(url) {
@@ -36,16 +41,6 @@ function cloudinaryBackendFallback(url) {
   return "";
 }
 
-function useMediaBase() {
-  return useMemo(() => {
-    try {
-      const b = API?.defaults?.baseURL || "";
-      return b.replace(/\/api\/?$/, "");
-    } catch {
-      return "";
-    }
-  }, []);
-}
 
 function approx(a, b, eps = 0.5) {
   return Math.abs(Number(a) - Number(b)) < eps;
@@ -117,8 +112,26 @@ function SelectList({ items = [] }) {
   );
 }
 
-function PackageCard({ pkg, onAddToCart }) {
-  const MEDIA_BASE = useMediaBase();
+function getPkgImageUrl(pkg) {
+  const candidates = [
+    pkg?.image,
+    pkg?.banner,
+    pkg?.thumbnail,
+    pkg?.image_url,
+    pkg?.cover,
+  ].filter(Boolean);
+  if (!candidates.length) return "";
+  const url = String(candidates[0]);
+  // If it's a Cloudinary URL, we may fallback; else normalize relative path.
+  const fallback = cloudinaryBackendFallback(url);
+  return fallback || normalizeMediaUrl(url);
+}
+
+/**
+ * Modern ecommerce-style PackageCard
+ * - Visual only changes; business logic unchanged
+ */
+function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
   // Quantity input (buffer) for PRIME packages only
   const [qtyInput, setQtyInput] = useState("1");
 
@@ -208,263 +221,422 @@ function PackageCard({ pkg, onAddToCart }) {
       ? "#EF6C00"
       : "divider";
 
+  // price and discount visuals (if backend provides discount_price)
+  const discountPrice =
+    pkg && pkg.discount_price != null ? Number(pkg.discount_price) : null;
+  const hasDiscount =
+    typeof discountPrice === "number" &&
+    isFinite(discountPrice) &&
+    discountPrice > 0 &&
+    discountPrice < price;
+
+  const imgUrl = getPkgImageUrl(pkg);
+
   return (
     <Paper
-      elevation={1}
+      elevation={0}
+      className="rounded-xl shadow-md hover:shadow-lg transition-transform hover:-translate-y-0.5"
       sx={{
-        p: 2,
+        position: "relative",
         borderRadius: 2,
+        overflow: "hidden",
         border: "1px solid",
         borderColor: "divider",
         height: "100%",
         display: "flex",
         flexDirection: "column",
-        gap: 1.25,
-        borderLeft: 6,
-        borderLeftStyle: "solid",
-        borderLeftColor: accentColor,
-        background:
-          kind === "PRIME150"
-            ? "linear-gradient(180deg, rgba(12,45,72,0.06) 0%, rgba(12,45,72,0.02) 100%)"
-            : kind === "PRIME750"
-            ? "linear-gradient(180deg, rgba(94,53,177,0.06) 0%, rgba(94,53,177,0.02) 100%)"
-            : kind === "MONTHLY"
-            ? "linear-gradient(180deg, rgba(239,108,0,0.06) 0%, rgba(239,108,0,0.02) 100%)"
-            : "linear-gradient(180deg, rgba(0,0,0,0.02) 0%, rgba(0,0,0,0) 100%)",
+        bgcolor: "#fff",
       }}
     >
-      <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-        <Box>
-          <Typography variant="h6" sx={{ fontWeight: 800 }}>
-            {pkg.name}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            Code: {pkg.code} • Type: {pkg.type}
-          </Typography>
+      {/* Image / Quick view */}
+      <Box sx={{ position: "relative" }}>
+        <Box
+          onClick={() => typeof onOpenDetail === "function" && onOpenDetail(pkg)}
+          sx={{
+            width: "100%",
+            aspectRatio: "4 / 3",
+            bgcolor: "#f8fafc",
+            cursor: "pointer",
+            overflow: "hidden",
+          }}
+        >
+          {imgUrl ? (
+            <Box
+              component="img"
+              src={imgUrl}
+              alt={pkg?.name || "Promo Package"}
+              loading="lazy"
+              sx={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                display: "block",
+                transition: "transform 0.25s ease",
+                "&:hover": { transform: "scale(1.02)" },
+              }}
+            />
+          ) : (
+            <Box sx={{ width: "100%", height: "100%", bgcolor: "#f1f5f9" }} />
+          )}
         </Box>
-        <Box sx={{ textAlign: "right" }}>
-          <Typography variant="overline" color="text.secondary" sx={{ lineHeight: 1 }}>
-            Price
-          </Typography>
-          <Box
-            sx={{
-              display: "inline-block",
-              px: 1.5,
-              py: 0.5,
-              borderRadius: 1,
-              bgcolor: accentColor,
-              color: "#fff",
-              fontWeight: 900,
-              fontSize: 18,
-              lineHeight: 1.2,
-            }}
-          >
-            ₹{price.toLocaleString("en-IN")}
-          </Box>
-        </Box>
-      </Stack>
 
-      {pkg.description ? (
-        <Typography variant="body2" color="text.secondary">
-          {pkg.description}
-        </Typography>
-      ) : null}
-
-      <Typography variant="caption" color="text.secondary">Select</Typography>
-
-      <SelectList items={selectOptions} />
-
-      <Divider sx={{ my: 1 }} />
-
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
-        {isMonthly ? (
-          <Typography variant="caption" color="text.secondary">
-            {selectedBoxes.length ? `${selectedBoxes.length} box(es) selected` : "Tap Configure to choose boxes"}
-          </Typography>
-        ) : <span />}
-        <Button size="small" variant="text" onClick={() => setShowConfig(v => !v)} sx={{ textTransform: "none" }}>
-          {showConfig ? "Hide" : "Configure"}
-        </Button>
+        {/* Optional quick view icon */}
+        <IconButton
+          size="small"
+          onClick={() =>
+            typeof onOpenDetail === "function" && onOpenDetail(pkg)
+          }
+          sx={{
+            position: "absolute",
+            top: 8,
+            right: 8,
+            bgcolor: "rgba(255,255,255,0.9)",
+            "&:hover": { bgcolor: "rgba(255,255,255,1)" },
+          }}
+        >
+          <VisibilityOutlinedIcon fontSize="small" />
+        </IconButton>
       </Box>
 
-      {/* Configuration section - kept for functionality but visually lightweight */}
-      {showConfig ? (
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-        <Box sx={{ flex: 1, minWidth: 220 }}>
-          {!isMonthly ? (
-            <Box sx={{ mt: 1 }}>
-              <Typography variant="caption" color="text.secondary">
-                Quantity
-              </Typography>
-              <TextField
-                size="small"
-                type="number"
-                value={qtyInput}
-                onChange={(e) => setQtyInput(e.target.value)}
-                onBlur={commitQty}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    commitQty();
-                    try {
-                      e.currentTarget.blur();
-                    } catch {}
-                  }
-                }}
-                inputProps={{ min: 1 }}
-                sx={{ width: 120, mt: 0.5 }}
-              />
-            </Box>
-          ) : (
-            <Box sx={{ mt: 1 }}>
-              <Typography variant="caption" color="text.secondary">
-                Package
-              </Typography>
-              <TextField
-                select
-                size="small"
-                value={packageNumber}
-                onChange={(e) => setPackageNumber(Number(e.target.value))}
-                sx={{ width: 160, mt: 0.5 }}
-                helperText="Only the current package is enabled"
-              >
-                {availableNumbers.map((n) => (
-                  <MenuItem
-                    key={n}
-                    value={n}
-                    disabled={Number(n) !== Number(allowedNumber)}
-                  >
-                    Package #{n}
-                  </MenuItem>
-                ))}
-              </TextField>
+      {/* Content */}
+      <Box sx={{ p: 1.5, display: "flex", flexDirection: "column", gap: 1 }}>
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="flex-start"
+        >
+          <Box sx={{ pr: 1 }}>
+            <Typography
+              variant="subtitle2"
+              sx={{
+                fontWeight: 800,
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+                minHeight: 36,
+              }}
+              title={pkg?.name}
+            >
+              {pkg.name}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Code: {pkg.code} • Type: {pkg.type}
+            </Typography>
+          </Box>
 
+          <Box sx={{ textAlign: "right", minWidth: 110 }}>
+            <Typography
+              variant="overline"
+              color="text.secondary"
+              sx={{ lineHeight: 1 }}
+            >
+              Price
+            </Typography>
+            <Stack direction="row" spacing={1} alignItems="baseline" sx={{ justifyContent: "flex-end" }}>
               <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ mt: 1.25, display: "block" }}
-              >
-                Select boxes (paid boxes disabled)
-              </Typography>
-              <BoxGrid
-                total={totalBoxes}
-                purchased={purchasedBoxes}
-                selected={selectedBoxes}
-                onToggle={(b) => {
-                  if (purchasedBoxes.includes(b)) return;
-                  setSelectedBoxes((prev) => {
-                    const set = new Set(prev);
-                    if (set.has(b)) set.delete(b);
-                    else set.add(b);
-                    return Array.from(set).sort((a, b) => a - b);
-                  });
-                }}
-              />
-            </Box>
-          )}
-
-          {isPrime150 ? (
-            <Box sx={{ mt: 1.5 }}>
-              <Typography variant="caption" color="text.secondary">Select</Typography>
-              <RadioGroup
-                row
-                value={prime150Choice}
-                onChange={(e) => setPrime150Choice(e.target.value)}
-              >
-                <FormControlLabel value="EBOOK" control={<Radio size="small" />} label="E-Book" />
-                <FormControlLabel value="REDEEM" control={<Radio size="small" />} label="Redeem" />
-              </RadioGroup>
-              <Typography variant="caption" color="text.secondary">
-                Choose E‑Book to access it in your dashboard or Redeem to follow e‑coupon allocation flow with reward credit.
-              </Typography>
-            </Box>
-          ) : null}
-
-          {isPrime750 ? (
-            <Box sx={{ mt: 1.5 }}>
-              <Typography variant="caption" color="text.secondary">Select</Typography>
-              <RadioGroup
-                row
-                value={prime750Choice}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setPrime750Choice(val);
-                  if (val === "PRODUCT") {
-                    navigate(promoProductsPath);
-                  }
+                variant="body1"
+                sx={{
+                  fontWeight: 900,
+                  color: "#0f172a",
                 }}
               >
-                <FormControlLabel value="PRODUCT" control={<Radio size="small" />} label="Products" />
-                <FormControlLabel value="REDEEM" control={<Radio size="small" />} label="Redeem" />
-                <FormControlLabel value="COUPON" control={<Radio size="small" />} label="E‑Coupon" />
-              </RadioGroup>
-
-              {prime750Choice === "PRODUCT" ? (
-                <Alert severity="info" sx={{ mt: 1 }}>
-                  Redirecting to Promo Products to select an item.
-                </Alert>
-              ) : (
-                <Typography variant="caption" color="text.secondary">
-                  {prime750Choice === "REDEEM"
-                    ? "You will receive e‑coupon allocation on approval."
-                    : "You will be eligible for Lucky Draw on approval."}
+                ₹{(hasDiscount ? discountPrice : price).toLocaleString("en-IN")}
+              </Typography>
+              {hasDiscount && (
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ textDecoration: "line-through", fontWeight: 700 }}
+                >
+                  ₹{price.toLocaleString("en-IN")}
                 </Typography>
               )}
+            </Stack>
+          </Box>
+        </Stack>
+
+        {pkg.description ? (
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{
+              display: "-webkit-box",
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+              minHeight: 48,
+            }}
+          >
+            {pkg.description}
+          </Typography>
+        ) : null}
+
+        {/* Feature chips */}
+        <SelectList items={selectOptions} />
+
+        <Divider sx={{ my: 1 }} />
+
+        {/* Actions: Configure + Add to Cart */}
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          sx={{ mb: 0.5 }}
+        >
+          {isMonthly ? (
+            <Typography variant="caption" color="text.secondary">
+              {selectedBoxes.length
+                ? `${selectedBoxes.length} box(es) selected`
+                : "Tap Configure to choose boxes"}
+            </Typography>
+          ) : (
+            <span />
+          )}
+          <Button
+            size="small"
+            variant="text"
+            onClick={() => setShowConfig((v) => !v)}
+            sx={{ textTransform: "none" }}
+          >
+            {showConfig ? "Hide" : "Configure"}
+          </Button>
+        </Stack>
+
+        {/* Configuration section (unchanged logic, visually collapsed by default) */}
+        {showConfig ? (
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+            <Box sx={{ flex: 1, minWidth: 220 }}>
+              {!isMonthly ? (
+                <Box sx={{ mt: 1 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Quantity
+                  </Typography>
+                  <TextField
+                    size="small"
+                    type="number"
+                    value={qtyInput}
+                    onChange={(e) => setQtyInput(e.target.value)}
+                    onBlur={commitQty}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        commitQty();
+                        try {
+                          e.currentTarget.blur();
+                        } catch {}
+                      }
+                    }}
+                    inputProps={{ min: 1 }}
+                    sx={{ width: 120, mt: 0.5 }}
+                  />
+                </Box>
+              ) : (
+                <Box sx={{ mt: 1 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Package
+                  </Typography>
+                  <TextField
+                    select
+                    size="small"
+                    value={packageNumber}
+                    onChange={(e) => setPackageNumber(Number(e.target.value))}
+                    sx={{ width: 160, mt: 0.5 }}
+                    helperText="Only the current package is enabled"
+                  >
+                    {availableNumbers.map((n) => (
+                      <MenuItem
+                        key={n}
+                        value={n}
+                        disabled={Number(n) !== Number(allowedNumber)}
+                      >
+                        Package #{n}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ mt: 1.25, display: "block" }}
+                  >
+                    Select boxes (paid boxes disabled)
+                  </Typography>
+                  <BoxGrid
+                    total={totalBoxes}
+                    purchased={purchasedBoxes}
+                    selected={selectedBoxes}
+                    onToggle={(b) => {
+                      if (purchasedBoxes.includes(b)) return;
+                      setSelectedBoxes((prev) => {
+                        const set = new Set(prev);
+                        if (set.has(b)) set.delete(b);
+                        else set.add(b);
+                        return Array.from(set).sort((a, b) => a - b);
+                      });
+                    }}
+                  />
+                </Box>
+              )}
+
+              {isPrime150 ? (
+                <Box sx={{ mt: 1.5 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Select
+                  </Typography>
+                  <RadioGroup
+                    row
+                    value={prime150Choice}
+                    onChange={(e) => setPrime150Choice(e.target.value)}
+                  >
+                    <FormControlLabel
+                      value="EBOOK"
+                      control={<Radio size="small" />}
+                      label="E-Book"
+                    />
+                    <FormControlLabel
+                      value="REDEEM"
+                      control={<Radio size="small" />}
+                      label="Redeem"
+                    />
+                  </RadioGroup>
+                  <Typography variant="caption" color="text.secondary">
+                    Choose E‑Book to access it in your dashboard or Redeem to
+                    follow e‑coupon allocation flow with reward credit.
+                  </Typography>
+                </Box>
+              ) : null}
+
+              {isPrime750 ? (
+                <Box sx={{ mt: 1.5 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Select
+                  </Typography>
+                  <RadioGroup
+                    row
+                    value={prime750Choice}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setPrime750Choice(val);
+                      if (val === "PRODUCT") {
+                        navigate(promoProductsPath);
+                      }
+                    }}
+                  >
+                    <FormControlLabel
+                      value="PRODUCT"
+                      control={<Radio size="small" />}
+                      label="Products"
+                    />
+                    <FormControlLabel
+                      value="REDEEM"
+                      control={<Radio size="small" />}
+                      label="Redeem"
+                    />
+                    <FormControlLabel
+                      value="COUPON"
+                      control={<Radio size="small" />}
+                      label="E‑Coupon"
+                    />
+                  </RadioGroup>
+
+                  {prime750Choice === "PRODUCT" ? (
+                    <Alert severity="info" sx={{ mt: 1 }}>
+                      Redirecting to Promo Products to select an item.
+                    </Alert>
+                  ) : (
+                    <Typography variant="caption" color="text.secondary">
+                      {prime750Choice === "REDEEM"
+                        ? "You will receive e‑coupon allocation on approval."
+                        : "You will be eligible for Lucky Draw on approval."}
+                    </Typography>
+                  )}
+                </Box>
+              ) : null}
+
+              <Alert severity="info" sx={{ mt: 1 }}>
+                Payment will be done at Checkout. Add items to the central cart.
+              </Alert>
+
+              <Stack direction="row" spacing={1} sx={{ mt: 1.25 }}>
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    if (onAddToCart) {
+                      if (isMonthly) {
+                        if (!selectedBoxes || selectedBoxes.length === 0) {
+                          try {
+                            window.alert(
+                              "Please tap Configure and select at least one box."
+                            );
+                          } catch {}
+                          setShowConfig(true);
+                          return;
+                        }
+                        onAddToCart({
+                          package: pkg,
+                          package_number: packageNumber,
+                          boxes: selectedBoxes.slice(),
+                          quantity: selectedBoxes.length,
+                        });
+                      } else {
+                        const q = Math.max(
+                          1,
+                          parseInt(qtyInput || "1", 10)
+                        );
+
+                        // PRIME 750 PRODUCT flow: browse Promo Products page instead of in-card selection
+                        if (isPrime750 && prime750Choice === "PRODUCT") {
+                          try {
+                            window.alert(
+                              "Browse Promo Products to select an item."
+                            );
+                          } catch {}
+                          navigate(promoProductsPath);
+                          return;
+                        }
+
+                        onAddToCart({
+                          package: pkg,
+                          quantity: q,
+                          selected_product_id:
+                            isPrime750 && prime750Choice === "PRODUCT"
+                              ? selectedProductId
+                              : null,
+                          shipping_address:
+                            isPrime750 && prime750Choice === "PRODUCT"
+                              ? shippingAddress
+                              : "",
+                          prime150_choice: isPrime150
+                            ? prime150Choice || "EBOOK"
+                            : null,
+                          prime750_choice: isPrime750 ? prime750Choice : null,
+                        });
+                      }
+                      try {
+                        window.alert("Added to cart.");
+                      } catch {}
+                    }
+                  }}
+                  sx={{ textTransform: "none" }}
+                >
+                  Add to Cart
+                </Button>
+              </Stack>
             </Box>
-          ) : null}
-
-          <Alert severity="info" sx={{ mt: 1 }}>
-            Payment will be done at Checkout. Add items to the central cart.
-          </Alert>
-
-          <Stack direction="row" spacing={1} sx={{ mt: 1.25 }}>
-            <Button
-              variant="outlined"
-              onClick={() => {
-                if (onAddToCart) {
-                  if (isMonthly) {
-                    if (!selectedBoxes || selectedBoxes.length === 0) {
-                      try { window.alert("Please tap Configure and select at least one box."); } catch {}
-                      setShowConfig(true);
-                      return;
-                    }
-                    onAddToCart({
-                      package: pkg,
-                      package_number: packageNumber,
-                      boxes: selectedBoxes.slice(),
-                      quantity: selectedBoxes.length,
-                    });
-                  } else {
-                    const q = Math.max(1, parseInt(qtyInput || "1", 10));
-
-                    // PRIME 750 PRODUCT flow: browse Promo Products page instead of in-card selection
-                    if (isPrime750 && prime750Choice === "PRODUCT") {
-                      try { window.alert("Browse Promo Products to select an item."); } catch {}
-                      navigate(promoProductsPath);
-                      return;
-                    }
-
-                    onAddToCart({
-                      package: pkg,
-                      quantity: q,
-                      selected_product_id: isPrime750 && prime750Choice === "PRODUCT" ? selectedProductId : null,
-                      shipping_address: isPrime750 && prime750Choice === "PRODUCT" ? shippingAddress : "",
-                      prime150_choice: isPrime150 ? (prime150Choice || "EBOOK") : null,
-                      prime750_choice: isPrime750 ? prime750Choice : null,
-                    });
-                  }
-                  try {
-                    window.alert("Added to cart.");
-                  } catch {}
-                }
-              }}
-              sx={{ textTransform: "none" }}
-            >
-              Add to Cart
-            </Button>
           </Stack>
-        </Box>
-      </Stack>
-      ) : null}
+        ) : null}
+      </Box>
+      {/* Accent left border preserved subtly for plan kind */}
+      <Box
+        sx={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: "none",
+          borderLeft: "6px solid",
+          borderLeftColor: accentColor,
+          opacity: 0.15,
+        }}
+      />
     </Paper>
   );
 }
@@ -506,7 +678,7 @@ export default function PromoPackages() {
     }
   }, [location.search]);
 
-  const filteredPkgs = useMemo(() => {
+  const urlFilteredPkgs = useMemo(() => {
     const list = pkgs || [];
     if (selectedFilter === "monthly") {
       return list.filter((p) => String(p.type) === "MONTHLY");
@@ -539,6 +711,58 @@ export default function PromoPackages() {
     }
     return list.slice();
   }, [pkgs, selectedFilter]);
+
+  // UI Filters + Sorting
+  const [filterMonthly, setFilterMonthly] = useState(false);
+  const [filterPrime150, setFilterPrime150] = useState(false);
+  const [filterPrime750, setFilterPrime750] = useState(false);
+  const [sortKey, setSortKey] = useState("newest"); // newest | price-asc | price-desc
+
+  const applyCategoryFilter = useMemo(() => {
+    const anySelected = filterMonthly || filterPrime150 || filterPrime750;
+    if (!anySelected) return urlFilteredPkgs;
+    return urlFilteredPkgs.filter((p) => {
+      const type = String(p?.type || "");
+      const price = Number(p?.price || 0);
+      const name = String(p?.name || "").toLowerCase();
+      const code = String(p?.code || "").toLowerCase();
+      const isMonthly = type === "MONTHLY";
+      const isPrime150 =
+        type === "PRIME" &&
+        (Math.abs(price - 150) < 0.5 ||
+          name.includes("150") ||
+          code.includes("150"));
+      const isPrime750 =
+        type === "PRIME" &&
+        (Math.abs(price - 750) < 0.5 ||
+          name.includes("750") ||
+          code.includes("750"));
+      return (
+        (filterMonthly && isMonthly) ||
+        (filterPrime150 && isPrime150) ||
+        (filterPrime750 && isPrime750)
+      );
+    });
+  }, [urlFilteredPkgs, filterMonthly, filterPrime150, filterPrime750]);
+
+  const filteredSortedPkgs = useMemo(() => {
+    const list = applyCategoryFilter.slice();
+    if (sortKey === "price-asc") {
+      return list.sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
+    }
+    if (sortKey === "price-desc") {
+      return list.sort((a, b) => Number(b.price || 0) - Number(a.price || 0));
+    }
+    // newest: prefer created_at desc, else id desc
+    return list.sort((a, b) => {
+      const aCreated = a?.created_at ? new Date(a.created_at).getTime() : null;
+      const bCreated = b?.created_at ? new Date(b.created_at).getTime() : null;
+      if (aCreated != null && bCreated != null) return bCreated - aCreated;
+      const aId = Number(a?.id || 0);
+      const bId = Number(b?.id || 0);
+      return bId - aId;
+    });
+  }, [applyCategoryFilter, sortKey]);
 
   const loadPkgs = async () => {
     setLoading(true);
@@ -579,7 +803,7 @@ export default function PromoPackages() {
     loadPurchases();
   }, []);
 
-  // Add to centralized cart
+  // Add to centralized cart (unchanged business logic)
   const addToCart = ({
     package: pkg,
     quantity = 1,
@@ -619,6 +843,38 @@ export default function PromoPackages() {
     } catch {}
   };
 
+  // Quick view modal mapping
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [quickProduct, setQuickProduct] = useState(null);
+
+  const openQuickView = (pkg) => {
+    const price = Number(pkg?.price || 0);
+    const discountPrice =
+      pkg && pkg.discount_price != null ? Number(pkg.discount_price) : null;
+    let discountPercent = 0;
+    if (
+      typeof discountPrice === "number" &&
+      isFinite(discountPrice) &&
+      discountPrice > 0 &&
+      discountPrice < price &&
+      price > 0
+    ) {
+      discountPercent = Math.round(((price - discountPrice) / price) * 100);
+    }
+    const mapped = {
+      id: pkg?.id,
+      name: pkg?.name,
+      price,
+      discount: discountPercent, // QuickViewModal expects a percent
+      quantity: 999,
+      image_url: getPkgImageUrl(pkg),
+      description: pkg?.description || "",
+      created_by_name: "", // not applicable
+    };
+    setQuickProduct(mapped);
+    setQuickOpen(true);
+  };
+
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
       <Typography variant="h5" sx={{ fontWeight: 800, color: "#0C2D48", mb: 2 }}>
@@ -630,9 +886,10 @@ export default function PromoPackages() {
         <RewardPointsCard />
       </Box>
 
-      {/* Available Packages */}
+      {/* Available Packages - Modern Ecommerce Layout */}
       <Paper
         elevation={0}
+        className="rounded-xl shadow-md"
         sx={{
           p: { xs: 2, md: 3 },
           borderRadius: 2,
@@ -642,57 +899,134 @@ export default function PromoPackages() {
           bgcolor: "#fff",
         }}
       >
-        <Stack
-          direction="row"
-          alignItems="center"
-          justifyContent="space-between"
-          sx={{ mb: 1 }}
-        >
-          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>
-            Available Packages
-          </Typography>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Button size="small" variant="outlined" onClick={() => navigate(
-              roleHint === "agency"
-                ? "/agency/cart"
-                : roleHint === "employee"
-                ? "/employee/cart"
-                : "/user/cart"
-            )}>
-              Open Centralized Cart
-            </Button>
-            {loading ? (
-              <Typography variant="body2" color="text.secondary">
-                Loading...
-              </Typography>
-            ) : null}
-          </Stack>
-        </Stack>
-        {err ? (
-          <Alert severity="error" sx={{ mb: 1 }}>
-            {err}
-          </Alert>
-        ) : null}
+        <Stack direction={{ xs: "column", lg: "row" }} spacing={2}>
+          {/* Left filter (sidebar) */}
+          <Box
+            sx={{
+              width: { lg: 260 },
+              flexShrink: 0,
+              position: { lg: "sticky" },
+              top: { lg: 16 },
+              alignSelf: { lg: "flex-start" },
+              border: "1px solid",
+              borderColor: "divider",
+              borderRadius: 2,
+              p: 2,
+              bgcolor: "#ffffff",
+            }}
+            className="rounded-xl"
+          >
+            <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1 }}>
+              Filters
+            </Typography>
+            <Divider sx={{ mb: 1 }} />
+            <Typography variant="caption" color="text.secondary">
+              Category
+            </Typography>
+            <FormGroup sx={{ mt: 0.5 }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={filterMonthly}
+                    onChange={(e) => setFilterMonthly(e.target.checked)}
+                  />
+                }
+                label="Monthly"
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={filterPrime150}
+                    onChange={(e) => setFilterPrime150(e.target.checked)}
+                  />
+                }
+                label="Prime 150"
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={filterPrime750}
+                    onChange={(e) => setFilterPrime750(e.target.checked)}
+                  />
+                }
+                label="Prime 750"
+              />
+            </FormGroup>
+          </Box>
 
-        <Grid container spacing={2}>
-          {(filteredPkgs || []).map((pkg) => (
-            <Grid item xs={12} md={6} key={pkg.id}>
-              <PackageCard pkg={pkg} onAddToCart={addToCart} />
-            </Grid>
-          ))}
-          {!loading && (filteredPkgs || []).length === 0 ? (
-            <Grid item xs={12}>
-              <Alert severity="info">
-                No promo packages available for the selected type.
+          {/* Right content */}
+          <Box sx={{ flex: 1 }}>
+            {/* Header row: title, cart, sort */}
+            <Stack
+              direction={{ xs: "column", md: "row" }}
+              alignItems={{ xs: "flex-start", md: "center" }}
+              justifyContent="space-between"
+              spacing={1.5}
+              sx={{ mb: 2 }}
+            >
+              <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>
+                Available Packages
+              </Typography>
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ width: { xs: "100%", md: "auto" } }}>
+                <TextField
+                  select
+                  size="small"
+                  label="Sort by"
+                  value={sortKey}
+                  onChange={(e) => setSortKey(e.target.value)}
+                  sx={{ minWidth: 200 }}
+                >
+                  <MenuItem value="newest">Newest First</MenuItem>
+                  <MenuItem value="price-asc">Price: Low to High</MenuItem>
+                  <MenuItem value="price-desc">Price: High to Low</MenuItem>
+                </TextField>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => navigate(cartPath)}
+                >
+                  Open Centralized Cart
+                </Button>
+                {loading ? (
+                  <Typography variant="body2" color="text.secondary">
+                    Loading...
+                  </Typography>
+                ) : null}
+              </Stack>
+            </Stack>
+
+            {err ? (
+              <Alert severity="error" sx={{ mb: 1 }}>
+                {err}
               </Alert>
+            ) : null}
+
+            <Grid container spacing={2}>
+              {(filteredSortedPkgs || []).map((pkg) => (
+                <Grid item xs={12} sm={6} md={4} xl={3} key={pkg.id}>
+                  <PackageCard
+                    pkg={pkg}
+                    onAddToCart={addToCart}
+                    onOpenDetail={openQuickView}
+                  />
+                </Grid>
+              ))}
+              {!loading && (filteredSortedPkgs || []).length === 0 ? (
+                <Grid item xs={12}>
+                  <Alert severity="info">
+                    No promo packages available for the selected type.
+                  </Alert>
+                </Grid>
+              ) : null}
             </Grid>
-          ) : null}
-        </Grid>
+          </Box>
+        </Stack>
       </Paper>
 
-      {/* My Purchases */}
+      {/* My Purchases (kept as-is) */}
       <Paper
         elevation={0}
+        className="rounded-xl shadow-md"
         sx={{
           p: { xs: 2, md: 3 },
           borderRadius: 2,
@@ -741,6 +1075,7 @@ export default function PromoPackages() {
               <Grid item xs={12} md={6} key={pp.id}>
                 <Paper
                   elevation={0}
+                  className="rounded-xl shadow-md"
                   sx={{
                     p: 2,
                     borderRadius: 2,
@@ -850,6 +1185,14 @@ export default function PromoPackages() {
           ) : null}
         </Grid>
       </Paper>
+
+      {/* Quick View Modal */}
+      <QuickViewModal
+        open={quickOpen}
+        product={quickProduct}
+        onClose={() => setQuickOpen(false)}
+        onGoToDetails={() => setQuickOpen(false)}
+      />
     </Box>
   );
 }

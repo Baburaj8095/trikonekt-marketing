@@ -11,9 +11,11 @@ import {
   Stack,
   Tooltip,
   Rating,
+  Button,
 } from "@mui/material";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
+import ShoppingCartCheckoutIcon from "@mui/icons-material/ShoppingCartCheckout";
 import normalizeMediaUrl from "../../utils/media";
 
 /**
@@ -31,7 +33,7 @@ import normalizeMediaUrl from "../../utils/media";
  * - onQuickView?(product): optional handler for quick view modal
  * - dense?: boolean (smaller paddings)
  */
-function ProductCard({ product, onSelect, onQuickView, dense = false }) {
+function ProductCard({ product, onSelect, onQuickView, onAddToCart, showAddToCart = false, dense = false }) {
   const price = Number(product?.price || 0);
   const discount = Number(product?.discount || 0);
   const finalPrice = price * (1 - discount / 100);
@@ -73,7 +75,7 @@ function ProductCard({ product, onSelect, onQuickView, dense = false }) {
           />
         )}
 
-        {outOfStock && (
+        {outOfStock ? (
           <Chip
             label="Sold Out"
             color="default"
@@ -88,7 +90,35 @@ function ProductCard({ product, onSelect, onQuickView, dense = false }) {
               color: "#fff",
             }}
           />
+        ) : (
+          <Chip
+            label="In Stock"
+            color="success"
+            size="small"
+            sx={{
+              position: "absolute",
+              top: 8,
+              right: 40,
+              zIndex: 2,
+              fontWeight: 700,
+            }}
+          />
         )}
+
+        <IconButton
+          size="small"
+          sx={{
+            position: "absolute",
+            top: 4,
+            right: 4,
+            zIndex: 3,
+            bgcolor: "rgba(255,255,255,0.9)",
+            ":hover": { bgcolor: "rgba(255,255,255,1)" },
+          }}
+          disabled
+        >
+          <FavoriteBorderIcon fontSize="small" />
+        </IconButton>
 
         <CardActionArea onClick={handleClick} sx={{ opacity: outOfStock ? 0.85 : 1 }}>
           {product?.image_url ? (
@@ -218,6 +248,29 @@ function ProductCard({ product, onSelect, onQuickView, dense = false }) {
             </span>
           </Tooltip>
         </Stack>
+
+        {showAddToCart ? (
+          <Stack direction="row" justifyContent="flex-end" sx={{ mt: 1 }}>
+            <Tooltip title={outOfStock ? "Out of Stock" : "Add to Cart"}>
+              <span>
+                <Button
+                  size="small"
+                  variant="contained"
+                  startIcon={<ShoppingCartCheckoutIcon />}
+                  disabled={outOfStock}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (typeof onAddToCart === "function") onAddToCart(product);
+                  }}
+                  sx={{ fontWeight: 800 }}
+                >
+                  Add to Cart
+                </Button>
+              </span>
+            </Tooltip>
+          </Stack>
+        ) : null}
 
         {outOfStock && (
           <Typography

@@ -155,6 +155,30 @@ const theme = createTheme({
       },
     },
 
+    // Cards and surfaces: rounded + soft shadows for uniform ecommerce look
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          borderRadius: 12,
+          backgroundColor: "#ffffff",
+        },
+      },
+    },
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          borderRadius: 14,
+          overflow: "hidden",
+          transition: "box-shadow 200ms ease, transform 180ms ease",
+          boxShadow: "0 8px 24px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04)",
+          "&:hover": {
+            boxShadow: "0 12px 30px rgba(15,23,42,0.10), 0 3px 6px rgba(15,23,42,0.06)",
+            transform: "translateY(-2px)",
+          },
+        },
+      },
+    },
+
     // DataGrid: force clean white tables in admin
     // (requires @mui/x-data-grid)
     MuiDataGrid: {

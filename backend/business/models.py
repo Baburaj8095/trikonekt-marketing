@@ -775,6 +775,37 @@ class WithholdingReserve(models.Model):
         return f"Reserve<{self.user_id}:{self.source_type}:{self.source_id}> {self.withheld_amount}"
 
 
+class CompanyCommissionPayout(models.Model):
+    """
+    Payout rows generated from the 10% tax (company pool) distribution.
+    Linked to the TAX_POOL_CREDIT WalletTransaction created during withholding.
+    """
+    tax_tx = models.ForeignKey('accounts.WalletTransaction', on_delete=models.CASCADE, related_name='company_tax_payouts', db_index=True)
+    source_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='company_tax_sources')
+    beneficiary = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='company_tax_benefits')
+    pool_key = models.CharField(max_length=32, db_index=True)
+    role_key = models.CharField(max_length=32, db_index=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    metadata = models.JSONField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["tax_tx"]),
+            models.Index(fields=["beneficiary"]),
+            models.Index(fields=["pool_key", "role_key"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tax_tx", "beneficiary", "pool_key", "role_key"],
+                name="uniq_company_tax_payout_row",
+            )
+        ]
+
+    def __str__(self):
+        return f"Payout<{self.pool_key}:{self.role_key}> ₹{self.amount}"
+
 # ==============================
 # Packages for Agency Dashboard
 # ==============================

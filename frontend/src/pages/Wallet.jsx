@@ -6,6 +6,7 @@ import {
   Grid,
   Divider,
   Stack,
+  LinearProgress,
 } from "@mui/material";
 import { TextField, Button, Alert } from "@mui/material";
 import API from "../api/api";
@@ -60,8 +61,20 @@ export default function Wallet() {
   const [taxPercent, setTaxPercent] = useState("0");
   const [updatedAt, setUpdatedAt] = useState(null);
   const [err, setErr] = useState("");
+  const [autoBlock, setAutoBlock] = useState(null);
+  const [breakdown, setBreakdown] = useState({ coupon_cost: "150.00", tds: "50.00", direct_ref_bonus: "50.00" });
+  const [redeemPoints, setRedeemPoints] = useState({ self: 0, refer: 0 });
+  const [nextBlock, setNextBlock] = useState({ completed_in_current_block: "0.00", remaining_to_next_block: "1000.00", progress_percent: 0 });
   const [kyc, setKyc] = useState({ verified: false });
   const [windowInfo, setWindowInfo] = useState(computeWeeklyWindowLocal());
+
+  // Show Withdraw Wallet as Income minus 10% TDS (preview for UI display)
+  const computedNetPreview = useMemo(() => {
+    const gross = Number(mainBalance || 0);
+    const tdsPct = 10; // fixed 10% TDS as per requirement
+    const net = gross - (gross * tdsPct / 100);
+    return net < 0 ? 0 : net;
+  }, [mainBalance]);
 
   // Withdrawals
   const [myWithdrawals, setMyWithdrawals] = useState([]);
@@ -123,6 +136,10 @@ export default function Wallet() {
         setWithdrawableBalance(wdBal);
         setTaxPercent(tax);
         setUpdatedAt(upd);
+        setAutoBlock(w?.data?.auto_block || null);
+        setBreakdown(w?.data?.breakdown_per_block || { coupon_cost: "150.00", tds: "50.00", direct_ref_bonus: "50.00" });
+        setRedeemPoints(w?.data?.redeem_points || { self: 0, refer: 0 });
+        setNextBlock(w?.data?.next_block || { completed_in_current_block: "0.00", remaining_to_next_block: "1000.00", progress_percent: 0 });
         const wlist = Array.isArray(mw?.data) ? mw.data : mw?.data?.results || [];
         setMyWithdrawals(wlist || []);
         setKyc(kycRes?.data || { verified: false });
@@ -182,6 +199,10 @@ export default function Wallet() {
       setTaxPercent(tax);
       setUpdatedAt(upd);
       setMyWithdrawals(wlist || []);
+      setAutoBlock(w?.data?.auto_block || null);
+      setBreakdown(w?.data?.breakdown_per_block || { coupon_cost: "150.00", tds: "50.00", direct_ref_bonus: "50.00" });
+      setRedeemPoints(w?.data?.redeem_points || { self: 0, refer: 0 });
+      setNextBlock(w?.data?.next_block || { completed_in_current_block: "0.00", remaining_to_next_block: "1000.00", progress_percent: 0 });
       setWdrForm({
         amount: "",
         method: wdrForm.method,
@@ -202,27 +223,69 @@ export default function Wallet() {
         Wallet
       </Typography>
 
+      <Paper elevation={3} sx={{ p: 2, borderRadius: 2, mb: 2 }}>
+        <Typography variant="subtitle2" sx={{ color: "text.secondary" }}>
+          Redeem Point Wallet
+        </Typography>
+        <Grid container spacing={1} sx={{ mt: 1 }}>
+          <Grid item xs={6}>
+            <Paper variant="outlined" sx={{ p: 1.5, textAlign: "center", borderRadius: 2 }}>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>Self</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 800 }}>{Number(redeemPoints?.self || 0)}</Typography>
+            </Paper>
+          </Grid>
+          <Grid item xs={6}>
+            <Paper variant="outlined" sx={{ p: 1.5, textAlign: "center", borderRadius: 2 }}>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>Refer</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 800 }}>{Number(redeemPoints?.refer || 0)}</Typography>
+            </Paper>
+          </Grid>
+        </Grid>
+      </Paper>
+
       <Grid container spacing={{ xs: 2, sm: 2 }}>
         <Grid item xs={12} md={4}>
           <Paper elevation={3} sx={{ p: 2, borderRadius: 2 }}>
             <Typography variant="subtitle2" sx={{ color: "text.secondary" }}>
-              Main Wallet (Gross)
+              Income Wallet
             </Typography>
             <Typography variant="h5" sx={{ fontWeight: 800, mt: 0.5 }}>
               ₹ {fmtAmount(mainBalance)}
             </Typography>
+            {autoBlock ? (
+              <Box sx={{ mt: 1 }}>
+                <LinearProgress variant="determinate" value={Number(nextBlock?.progress_percent || 0)} />
+                <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.5 }}>
+                  Completed in current ₹1000 block: ₹ {fmtAmount(nextBlock?.completed_in_current_block || "0")}
+                  {" • "}Remaining: ₹ {fmtAmount(nextBlock?.remaining_to_next_block || "1000")}
+                </Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+                  Blocks applied: {autoBlock?.applied_blocks || 0} / {autoBlock?.total_blocks || 0} • Pending: {autoBlock?.pending_blocks || 0}
+                </Typography>
+                <Divider sx={{ my: 1 }} />
+                <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>Per ₹1000 block deductions</Typography>
+                <Stack direction="row" spacing={2} sx={{ flexWrap: "wrap" }}>
+                  <Typography variant="caption">Self coupon: ₹{fmtAmount(breakdown?.coupon_cost || "150")}</Typography>
+                  <Typography variant="caption">TDS: ₹{fmtAmount(breakdown?.tds || "50")}</Typography>
+                  <Typography variant="caption">Direct refer bonus: ₹{fmtAmount(breakdown?.direct_ref_bonus || "50")}</Typography>
+                  <Typography variant="caption" sx={{ fontWeight: 700 }}>
+                    Net to Withdraw: ₹{fmtAmount(1000 - Number(breakdown?.coupon_cost || 0) - Number(breakdown?.tds || 0) - Number(breakdown?.direct_ref_bonus || 0))}
+                  </Typography>
+                </Stack>
+              </Box>
+            ) : null}
 
             <Divider sx={{ my: 1.5 }} />
 
             <Typography variant="subtitle2" sx={{ color: "text.secondary" }}>
-              Withdrawable Wallet (Net)
+              Withdraw Wallet
             </Typography>
             <Typography variant="h5" sx={{ fontWeight: 800, mt: 0.5, color: "primary.main" }}>
-              ₹ {fmtAmount(withdrawableBalance)}
+              ₹ {fmtAmount(computedNetPreview)}
             </Typography>
 
             <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 1 }}>
-              Tax Withholding: {String(taxPercent)}%
+              Tax Withholding: 10%
             </Typography>
             <Typography variant="caption" sx={{ color: "text.secondary" }}>
               Updated: {updatedAt ? new Date(updatedAt).toLocaleString() : "-"}

@@ -1,0 +1,4 @@
+input: C:\Users\Baburaj\Downloads\TRIKONEKT Devloppers.pdf
+output: backend\logs\pdf_extracts\TRIKONEKT_Devloppers.txt
+method_used: pdfminer.six
+text_length: 0

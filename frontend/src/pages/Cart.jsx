@@ -596,7 +596,7 @@ export default function Cart() {
           </Paper>
 
           {/* Payment method (UPI) preview */}
-          {items.length > 0 ? (
+          {/* {items.length > 0 ? (
             <Paper
               elevation={0}
               sx={{
@@ -658,7 +658,7 @@ export default function Cart() {
                 <Alert severity="info">Payment configuration not available. You can still review items; try again later.</Alert>
               )}
             </Paper>
-          ) : null}
+          ) : null} */}
 
           {/* Checkout prompt */}
           <Paper elevation={0} sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, mb: 2, border: "1px solid", borderColor: "divider", bgcolor: "#fff" }}>

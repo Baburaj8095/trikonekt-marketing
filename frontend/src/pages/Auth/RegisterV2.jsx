@@ -1131,8 +1131,7 @@ const RegisterV2 = () => {
       setAssignPincodes([]);
       setSelectedPincodeAgency("");
 
-      // Navigate to login after successful registration (role-scoped)
-      navigate(`/auth/login/${role}`, { replace: true });
+      
     } catch (err) {
       const msg =
         err?.response?.data ? JSON.stringify(err.response.data) : "Registration failed!";
@@ -2059,6 +2058,15 @@ const RegisterV2 = () => {
             </DialogContent>
             <DialogActions>
               <Button onClick={() => setRegSuccessOpen(false)}>Close</Button>
+              <Button
+                variant="contained"
+                onClick={() => {
+                  setRegSuccessOpen(false);
+                  navigate(`/auth/login/${role}`, { replace: true });
+                }}
+              >
+                Go to Login
+              </Button>
             </DialogActions>
           </Dialog>
         </Paper>
