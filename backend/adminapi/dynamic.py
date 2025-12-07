@@ -238,7 +238,7 @@ def _build_admin_meta_static():
     return payload
 
 
-ADMIN_META_CACHE_KEY = "admin_meta_static_v1"
+ADMIN_META_CACHE_KEY = "admin_meta_static_v2"
 ADMIN_META_TTL = 300  # seconds
 
 @api_view(["GET"])
@@ -320,8 +320,8 @@ def _build_admin_meta_summary():
     return payload
 
 
-ADMIN_META_SUMMARY_CACHE_KEY = "admin_meta_summary_v1"
-ADMIN_META_FIELDS_CACHE_KEY_PREFIX = "admin_meta_fields_v1"
+ADMIN_META_SUMMARY_CACHE_KEY = "admin_meta_summary_v2"
+ADMIN_META_FIELDS_CACHE_KEY_PREFIX = "admin_meta_fields_v2"
 ADMIN_META_SUMMARY_TTL = 300  # 5 minutes
 ADMIN_META_FIELDS_TTL = 600   # 10 minutes
 

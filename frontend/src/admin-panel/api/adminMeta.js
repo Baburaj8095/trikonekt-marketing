@@ -17,6 +17,9 @@ import API, { ensureFreshAccess, getAccessToken } from "../../api/api";
 
 const g = (typeof window !== "undefined" ? window : globalThis);
 
+const CLIENT_META_VERSION = 2;
+if (!g.__ADMIN_META_CACHE_VER__) g.__ADMIN_META_CACHE_VER__ = 0;
+
 // Summary cache
 if (!g.__ADMIN_META_CACHE__) g.__ADMIN_META_CACHE__ = null;
 if (!g.__ADMIN_META_CACHE_TS__) g.__ADMIN_META_CACHE_TS__ = 0;
@@ -44,7 +47,7 @@ function isFresh(ts, ttl) {
 
 export async function getAdminMeta() {
   // Serve fresh cache
-  if (g.__ADMIN_META_CACHE__ && isFresh(g.__ADMIN_META_CACHE_TS__, META_TTL)) {
+  if (g.__ADMIN_META_CACHE__ && g.__ADMIN_META_CACHE_VER__ === CLIENT_META_VERSION && isFresh(g.__ADMIN_META_CACHE_TS__, META_TTL)) {
     return g.__ADMIN_META_CACHE__;
   }
   // Reuse in-flight
@@ -69,6 +72,7 @@ export async function getAdminMeta() {
     const data = await resp.json().catch(() => ({}));
     g.__ADMIN_META_CACHE__ = data || {};
     g.__ADMIN_META_CACHE_TS__ = Date.now();
+    g.__ADMIN_META_CACHE_VER__ = CLIENT_META_VERSION;
     return g.__ADMIN_META_CACHE__;
   })().finally(() => {
     g.__ADMIN_META_INFLIGHT__ = null;

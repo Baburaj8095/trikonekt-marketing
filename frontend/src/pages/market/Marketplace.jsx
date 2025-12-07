@@ -136,7 +136,11 @@ export default function Marketplace() {
       if (filters.category) params.category = filters.category;
       if (filters.name) params.name = filters.name;
       if (sort) params.sort = sort;
-      const res = await API.get("/products", { params: { ...params, _: Date.now() } });
+      const res = await API.get("/products", {
+        params: { ...params },
+        dedupe: "cancelPrevious",
+        cacheTTL: 15000
+      });
       const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
       setRows(arr);
     } catch {
@@ -155,7 +159,11 @@ export default function Marketplace() {
       if (filters.state) params.state = filters.state;
       if (filters.city) params.city = filters.city;
       if (filters.pincode) params.pincode = filters.pincode;
-      const res = await API.get("/banners", { params: { ...params, active: 1, _: Date.now() } });
+      const res = await API.get("/banners", {
+        params: { ...params, active: 1 },
+        dedupe: "cancelPrevious",
+        cacheTTL: 15000
+      });
       const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
       setBanners(arr);
     } catch {
@@ -178,27 +186,7 @@ export default function Marketplace() {
   }, [sort]);
 
   // Refresh on window focus to avoid stale stock after approvals
-  useEffect(() => {
-    const onFocus = () => {
-      fetchProducts();
-      fetchBanners();
-    };
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, []);
 
-  // Periodic refresh while there are items shown
-  useEffect(() => {
-    let timer = null;
-    if (rows && rows.length > 0) {
-      timer = setInterval(() => {
-        fetchProducts();
-      }, 5000);
-    }
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [rows.length]);
 
   const onFilterChange = (e) => {
     const { name, value } = e.target;

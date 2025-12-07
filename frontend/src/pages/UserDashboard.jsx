@@ -20,7 +20,7 @@ import {
   Tab,
   Chip
 } from "@mui/material";
-import API, { listMyPromoPurchases } from "../api/api";
+import API, { listMyPromoPurchases, getMyEBooks } from "../api/api";
 import LOGO from "../assets/TRIKONEKT.png";
 import banner_wg from "../assets/Wealth_Galaxy.jpg";
 import { useTheme } from "@mui/material/styles";
@@ -305,7 +305,7 @@ export default function UserDashboard({ embedded = false }) {
   const isLuckyDraw = location.pathname === "/user/lucky-draw";
   const isMarketplace =
     location.pathname === "/marketplace" || location.pathname.startsWith("/marketplace/");
-  const isMyOrders = location.pathname === "/marketplace/my-orders";
+  const isMyOrders = location.pathname === "/user/my-orders" || location.pathname === "/marketplace/my-orders";
   const isECoupon = location.pathname === "/user/redeem-coupon";
   const isWallet = location.pathname === "/user/wallet";
   const isKYC = location.pathname === "/user/kyc";
@@ -400,6 +400,10 @@ export default function UserDashboard({ embedded = false }) {
   const [ecSummary, setEcSummary] = useState(null);
   const [ecSummaryLoading, setEcSummaryLoading] = useState(false);
   const [ecSummaryError, setEcSummaryError] = useState("");
+  // My E‑Books
+  const [ebooks, setEbooks] = useState([]);
+  const [ebooksLoading, setEbooksLoading] = useState(false);
+  const [ebooksError, setEbooksError] = useState("");
 
   // Promo package purchase ticks
   const [promoPurchases, setPromoPurchases] = useState([]);
@@ -491,6 +495,40 @@ export default function UserDashboard({ embedded = false }) {
     }
   };
 
+  const loadMyEBooks = async () => {
+    try {
+      setEbooksLoading(true);
+      setEbooksError("");
+      const res = await getMyEBooks();
+      const raw = Array.isArray(res) ? res : (res?.results || []);
+      // Flatten API shape: EBookAccess -> { ebook: { id, title, cover_url, file_url } }
+      const flat = (raw || []).map((it) => {
+        const eb = (it && typeof it === "object" && (it.ebook || it)) || {};
+        let cu = eb.cover_url || eb.coverUrl || null;
+        let fu = eb.file_url || eb.fileUrl || null;
+        // Normalize relative URLs -> absolute, using API base without /api
+        if (cu && typeof cu === "string" && !/^https?:\/\//i.test(cu)) {
+          cu = `${MEDIA_BASE}${cu}`;
+        }
+        if (fu && typeof fu === "string" && !/^https?:\/\//i.test(fu)) {
+          fu = `${MEDIA_BASE}${fu}`;
+        }
+        return {
+          id: eb.id ?? it?.id,
+          title: eb.title || "E‑Book",
+          cover_url: cu,
+          file_url: fu,
+        };
+      });
+      setEbooks(flat || []);
+    } catch (e) {
+      setEbooks([]);
+      setEbooksError("Failed to load e‑books.");
+    } finally {
+      setEbooksLoading(false);
+    }
+  };
+
   const handleSelf50Activation = async () => {
     try {
       setActivating50(true);
@@ -550,6 +588,7 @@ export default function UserDashboard({ embedded = false }) {
     loadWalletDirectCommission();
     loadActivationStatus();
     loadEcSummary();
+    loadMyEBooks();
     loadPromoPurchases();
   }, []);
 
@@ -1086,6 +1125,54 @@ export default function UserDashboard({ embedded = false }) {
             <Box sx={{ mb: 2 }}>
               <RewardPointsCard />
             </Box>
+            {/* My E‑Books */}
+            {purchasedPrime150 && (
+              <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", mb: 2, border: "1px solid #e2e8f0" }}>
+                <Box sx={{ p: 2 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
+                    My E‑Books
+                  </Typography>
+                {ebooksLoading ? (
+                  <Typography variant="body2">Loading...</Typography>
+                ) : ebooksError ? (
+                  <Typography variant="body2" color="error">{ebooksError}</Typography>
+                ) : (ebooks && ebooks.length > 0) ? (
+                  <Grid container spacing={2}>
+                    {ebooks.map((eb) => (
+                      <Grid key={eb.id} item xs={12} sm={6} md={4}>
+                        <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", border: "1px solid #e2e8f0", borderRadius: 2, p: 1.5 }}>
+                          {eb.cover_url ? (
+                            <Box component="img" src={eb.cover_url} alt={eb.title || "E‑Book"} sx={{ width: 44, height: 60, objectFit: "cover", borderRadius: 1 }} />
+                          ) : null}
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.2, pr: 1 }}>
+                              {eb.title || "E‑Book"}
+                            </Typography>
+                            {eb.file_url ? (
+                              <Button
+                                size="small"
+                                component="a"
+                                href={eb.file_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                download
+                                variant="outlined"
+                                sx={{ mt: 0.5, textTransform: "none" }}
+                              >
+                                Open
+                              </Button>
+                            ) : null}
+                          </Box>
+                        </Box>
+                      </Grid>
+                    ))}
+                  </Grid>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">No e‑books yet.</Typography>
+                )}
+              </Box>
+            </Box>
+            )}
             {/* My E‑Coupon Summary (cards) */}
             <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", mb: 2, border: "1px solid #e2e8f0" }}>
               <Box sx={{ p: 2 }}>
@@ -1261,7 +1348,7 @@ export default function UserDashboard({ embedded = false }) {
             <ListItemButton selected={selectedMenu === "my-team"} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => { navigate("/user/my-team"); setMobileOpen(false); }}>
               <ListItemText primary="My Team" />
             </ListItemButton>
-            <ListItemButton selected={selectedMenu === "my-orders"} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => { navigate("/marketplace/my-orders"); setMobileOpen(false); }}>
+            <ListItemButton selected={selectedMenu === "my-orders"} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => { navigate("/user/my-orders"); setMobileOpen(false); }}>
               <ListItemText primary="My Orders" />
             </ListItemButton>
           </List>
@@ -1313,7 +1400,7 @@ export default function UserDashboard({ embedded = false }) {
             <ListItemButton selected={selectedMenu === "my-team"} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => navigate("/user/my-team")}>
               <ListItemText primary="My Team" />
             </ListItemButton>
-            <ListItemButton selected={selectedMenu === "my-orders"} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => navigate("/marketplace/my-orders")}>
+            <ListItemButton selected={selectedMenu === "my-orders"} sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }} onClick={() => navigate("/user/my-orders")}>
               <ListItemText primary="My Orders" />
             </ListItemButton>
           </List>
@@ -1459,7 +1546,7 @@ export default function UserDashboard({ embedded = false }) {
                   value="View"
                   subtitle="Track your purchases"
                   palette="teal"
-                  onClick={() => navigate("/marketplace/my-orders")}
+                  onClick={() => navigate("/user/my-orders")}
                 />
               </Grid>
               <Grid item xs={6} sm={6} md={4}>
@@ -1522,6 +1609,54 @@ export default function UserDashboard({ embedded = false }) {
             <Box sx={{ mb: 2 }}>
               <RewardPointsCard />
             </Box>
+            {/* My E‑Books */}
+            {purchasedPrime150 && (
+              <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", mb: 2, border: "1px solid #e2e8f0" }}>
+                <Box sx={{ p: 2 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
+                    My E‑Books
+                  </Typography>
+                {ebooksLoading ? (
+                  <Typography variant="body2">Loading...</Typography>
+                ) : ebooksError ? (
+                  <Typography variant="body2" color="error">{ebooksError}</Typography>
+                ) : (ebooks && ebooks.length > 0) ? (
+                  <Grid container spacing={2}>
+                    {ebooks.map((eb) => (
+                      <Grid key={eb.id} item xs={12} sm={6} md={4}>
+                        <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", border: "1px solid #e2e8f0", borderRadius: 2, p: 1.5 }}>
+                          {eb.cover_url ? (
+                            <Box component="img" src={eb.cover_url} alt={eb.title || "E‑Book"} sx={{ width: 44, height: 60, objectFit: "cover", borderRadius: 1 }} />
+                          ) : null}
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.2, pr: 1 }}>
+                              {eb.title || "E‑Book"}
+                            </Typography>
+                            {eb.file_url ? (
+                              <Button
+                                size="small"
+                                component="a"
+                                href={eb.file_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                download
+                                variant="outlined"
+                                sx={{ mt: 0.5, textTransform: "none" }}
+                              >
+                                Open
+                              </Button>
+                            ) : null}
+                          </Box>
+                        </Box>
+                      </Grid>
+                    ))}
+                  </Grid>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">No e‑books yet.</Typography>
+                )}
+              </Box>
+            </Box>
+            )}
             {/* My E‑Coupon Summary (cards) */}
             <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", mb: 2, border: "1px solid #e2e8f0" }}>
               <Box sx={{ p: 2 }}>

@@ -725,7 +725,7 @@ export default function AdminECoupons() {
     denomination: "150",
     price_per_unit: "",
     enable_consumer: true,
-    enable_agency: false,
+    enable_agency: true,
     enable_employee: false,
     is_active: true,
     max_per_order: "10",
@@ -783,6 +783,49 @@ export default function AdminECoupons() {
       }));
     } catch (e) {
       const msg = e?.response?.data?.detail || "Failed to create product";
+      alert(msg);
+    } finally {
+      setSpSubmitting(false);
+    }
+  }
+
+  // Quick create standard denominations (150/750/759) for the selected coupon
+  async function createStandardProducts() {
+    try {
+      if (!spForm.coupon_id) {
+        alert("Select Coupon");
+        return;
+      }
+      const couponId = parseInt(spForm.coupon_id, 10);
+      const wanted = [150, 750, 759];
+      const existing = new Set(
+        (spItems || [])
+          .filter((p) => String(p.coupon) === String(couponId))
+          .map((p) => Number(p.denomination))
+      );
+      setSpSubmitting(true);
+      for (const denom of wanted) {
+        if (existing.has(Number(denom))) continue;
+        const payload = {
+          coupon: couponId,
+          denomination: denom,
+          price_per_unit: denom,
+          enable_consumer: true,
+          enable_agency: true,
+          enable_employee: false,
+          is_active: true,
+          max_per_order: 10,
+          display_title: `E‑Coupon ₹${denom}`,
+          display_desc: "",
+        };
+        try {
+          await API.post("/coupons/store/products/", payload);
+        } catch (_) {}
+      }
+      await loadStoreProducts();
+      alert("Ensured 150/750/759 products exist for the selected coupon.");
+    } catch (e) {
+      const msg = e?.response?.data?.detail || "Failed to ensure standard products";
       alert(msg);
     } finally {
       setSpSubmitting(false);
@@ -1338,21 +1381,38 @@ export default function AdminECoupons() {
         visible={activeTab === "setup"}
         title="Store products"
         extraRight={
-          <button
-            onClick={createStoreProduct}
-            disabled={spSubmitting}
-            style={{
-              padding: "8px 12px",
-              background: "#0f172a",
-              color: "#fff",
-              border: 0,
-              borderRadius: 8,
-              cursor: spSubmitting ? "not-allowed" : "pointer",
-              fontWeight: 700,
-            }}
-          >
-            {spSubmitting ? "Saving..." : "Create"}
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={createStandardProducts}
+              disabled={spSubmitting}
+              style={{
+                padding: "8px 12px",
+                background: "#fff",
+                color: "#0f172a",
+                border: "1px solid #e2e8f0",
+                borderRadius: 8,
+                cursor: spSubmitting ? "not-allowed" : "pointer",
+                fontWeight: 700,
+              }}
+            >
+              {spSubmitting ? "Ensuring..." : "Ensure 150/750/759"}
+            </button>
+            <button
+              onClick={createStoreProduct}
+              disabled={spSubmitting}
+              style={{
+                padding: "8px 12px",
+                background: "#0f172a",
+                color: "#fff",
+                border: 0,
+                borderRadius: 8,
+                cursor: spSubmitting ? "not-allowed" : "pointer",
+                fontWeight: 700,
+              }}
+            >
+              {spSubmitting ? "Saving..." : "Create"}
+            </button>
+          </div>
         }
       >
         <div

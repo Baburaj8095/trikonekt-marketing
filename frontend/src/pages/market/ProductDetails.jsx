@@ -16,7 +16,7 @@ import {
   Alert,
 } from "@mui/material";
 import { useParams, useNavigate } from "react-router-dom";
-import API from "../../api/api";
+import API, { getEcouponStoreBootstrap } from "../../api/api";
 import normalizeMediaUrl from "../../utils/media";
 import { addProduct } from "../../store/cart";
 
@@ -27,6 +27,8 @@ export default function ProductDetails() {
   const [loading, setLoading] = useState(false);
   const [qtyInput, setQtyInput] = useState("1");
   const [snack, setSnack] = useState({ open: false, type: "success", msg: "" });
+  const [payment, setPayment] = useState(null);
+  const [payLoading, setPayLoading] = useState(false);
 
 
   const finalPrice = useMemo(() => {
@@ -36,15 +38,18 @@ export default function ProductDetails() {
   }, [data?.price, data?.discount]);
 
   const totalAmount = useMemo(() => {
-    const qty = Number(buyForm.quantity || 1);
+    const qty = Math.max(1, parseInt(qtyInput || "1", 10));
     return Number(finalPrice || 0) * qty;
-  }, [finalPrice, buyForm.quantity]);
+  }, [finalPrice, qtyInput]);
 
   const load = async () => {
     if (!id) return;
     try {
       setLoading(true);
-      const res = await API.get(`/products/${id}`, { params: { _: Date.now() } });
+      const res = await API.get(`/products/${id}`, {
+        dedupe: "cancelPrevious",
+        cacheTTL: 15000
+      });
       setData(res?.data || null);
     } catch {
       setData(null);
@@ -58,37 +63,22 @@ export default function ProductDetails() {
   }, [id]);
 
   useEffect(() => {
-    const onFocus = () => load();
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, [id]);
-
-  // Periodically refresh product details while it is still in stock,
-  // so that UI reflects approvals that consume stock in near real-time.
-  useEffect(() => {
-    let timer = null;
     let cancelled = false;
-
-    const tick = async () => {
+    (async () => {
+      setPayLoading(true);
       try {
-        const res = await API.get(`/products/${id}`, { params: { _: Date.now() } });
-        if (cancelled) return;
-        const latest = res?.data || null;
-        setData(latest);
+        const boot = await getEcouponStoreBootstrap();
+        if (!cancelled) setPayment(boot?.payment_config || null);
       } catch {
-        // ignore transient errors
+        if (!cancelled) setPayment(null);
+      } finally {
+        if (!cancelled) setPayLoading(false);
       }
-    };
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
-    if (id && Number(data?.quantity ?? 0) > 0) {
-      timer = setInterval(tick, 5000);
-    }
 
-    return () => {
-      cancelled = true;
-      if (timer) clearInterval(timer);
-    };
-  }, [id, data?.quantity]);
 
 
   // Autofill purchase form from logged-in user's details (if available) when modal opens
@@ -217,6 +207,64 @@ export default function ProductDetails() {
             <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", mt: 1 }}>
               {data.description || "No description provided."}
             </Typography>
+          </Paper>
+
+          <Paper variant="outlined" sx={{ p: 2, mt: 2, borderRadius: 2 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Pay via UPI</Typography>
+            {payLoading ? (
+              <Typography variant="body2" color="text.secondary">Loading payment method…</Typography>
+            ) : payment ? (
+              <Grid container spacing={2} sx={{ mt: 0.5 }}>
+                <Grid item xs={12} sm="auto">
+                  <Box
+                    sx={{
+                      width: 160,
+                      height: 160,
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 2,
+                      overflow: "hidden",
+                      bgcolor: "#fff",
+                    }}
+                  >
+                    {payment.upi_qr_image_url ? (
+                      <img
+                        alt="UPI QR Code"
+                        src={normalizeMediaUrl(payment.upi_qr_image_url)}
+                        style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                      />
+                    ) : (
+                      <Box sx={{ p: 2, color: "text.secondary" }}>No QR</Box>
+                    )}
+                  </Box>
+                </Grid>
+                <Grid item xs={12} sm>
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                      gap: 1,
+                    }}
+                  >
+                    <div>
+                      <Typography variant="caption" color="text.secondary">Payee</Typography>
+                      <div style={{ fontWeight: 800 }}>{payment.payee_name || "—"}</div>
+                    </div>
+                    <div>
+                      <Typography variant="caption" color="text.secondary">UPI ID</Typography>
+                      <div style={{ fontWeight: 800 }}>{payment.upi_id || "—"}</div>
+                    </div>
+                  </Box>
+                  <Box sx={{ mt: 1 }}>
+                    <Typography variant="caption" color="text.secondary">Instructions</Typography>
+                    <Box sx={{ whiteSpace: "pre-wrap" }}>
+                      {payment.instructions || "Scan the QR or pay to the UPI ID. Save the UTR and upload proof at checkout."}
+                    </Box>
+                  </Box>
+                </Grid>
+              </Grid>
+            ) : (
+              <Alert severity="info">Payment configuration not available.</Alert>
+            )}
           </Paper>
         </Grid>
       </Grid>

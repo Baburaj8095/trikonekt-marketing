@@ -220,6 +220,13 @@ export default function Checkout() {
         try {
           const kind = String(it?.meta?.kind || "").toUpperCase();
           const file = it.file || null; // expected for promo packages
+          let remarks = "";
+          try {
+            const ch = String(it?.meta?.prime150_choice || "").toUpperCase();
+            if (ch === "EBOOK" || ch === "REDEEM") {
+              remarks = `[PRIME150] choice=${ch}`;
+            }
+          } catch {}
           if (kind === "MONTHLY") {
             const package_number = it?.meta?.package_number ?? null;
             const boxes = Array.isArray(it?.meta?.boxes) ? it.meta.boxes : [];
@@ -229,19 +236,32 @@ export default function Checkout() {
               package_number,
               boxes,
               file,
+              remarks,
             });
           } else if (kind === "PRIME") {
             const selected_product_id =
               it?.meta?.selected_product_id != null
                 ? it.meta.selected_product_id
                 : null;
+            const selected_promo_product_id =
+              it?.meta?.selected_promo_product_id != null
+                ? it.meta.selected_promo_product_id
+                : null;
             const shipping_address = it?.meta?.shipping_address || "";
+            const prime150_choice =
+              it?.meta?.prime150_choice != null ? it.meta.prime150_choice : null;
+            const prime750_choice =
+              it?.meta?.prime750_choice != null ? it.meta.prime750_choice : null;
             await createPromoPurchase({
               package_id: it.id,
               quantity: Math.max(1, parseInt(it.qty || 1, 10)),
               selected_product_id,
+              selected_promo_product_id,
               shipping_address,
+              prime150_choice,
+              prime750_choice,
               file,
+              remarks,
             });
           } else {
             // Unknown promo subtype; fallback using qty+file only
@@ -249,6 +269,7 @@ export default function Checkout() {
               package_id: it.id,
               quantity: Math.max(1, parseInt(it.qty || 1, 10)),
               file,
+              remarks,
             });
           }
           results.push({ key: it.key, ok: true });
@@ -437,11 +458,16 @@ export default function Checkout() {
                           ) : (
                             <>
                               {String(it?.meta?.kind || "")}
-                              {it?.meta?.selected_product_id != null
+                              {it?.meta?.selected_promo_product_id != null
+                                ? ` • Promo Product: ${it.meta.selected_promo_product_id}`
+                                : it?.meta?.selected_product_id != null
                                 ? ` • Product: ${it.meta.selected_product_id}`
                                 : ""}
                               {it?.meta?.shipping_address
                                 ? ` • Address: ${it.meta.shipping_address}`
+                                : ""}
+                              {it?.meta?.prime750_choice
+                                ? ` • Choice: ${String(it.meta.prime750_choice)}`
                                 : ""}
                             </>
                           )}

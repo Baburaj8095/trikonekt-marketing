@@ -136,7 +136,7 @@ class CouponSubmission(models.Model):
     tr_user = models.ForeignKey(UserModel, null=True, blank=True, on_delete=models.SET_NULL, related_name="manual_tr_submissions")
     consumer_tr_username = models.CharField(max_length=64, blank=True)
     notes = models.TextField(blank=True)
-    file = models.FileField(upload_to="uploads/coupon_submissions/")
+    file = models.FileField(upload_to="uploads/coupon_submissions/", storage=RAW_STORAGE)
     status = models.CharField(max_length=20, choices=STATUS, default="SUBMITTED", db_index=True)
 
     employee_reviewer = models.ForeignKey(

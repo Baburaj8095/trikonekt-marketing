@@ -17,7 +17,7 @@ import {
   TableBody,
   TableContainer,
 } from "@mui/material";
-import {
+import API, {
   getEcouponStoreBootstrap,
   getMyEcouponOrders,
   assignConsumerByCount,
@@ -26,16 +26,11 @@ import {
 import { addEcoupon } from "../store/cart";
 import { useNavigate } from "react-router-dom";
 
-function ProductCard({ product, form, onChange, onAddToCart }) {
+function ProductCard({ product, form, onChange, onAddToCart, available }) {
   const unit = Number(product?.price_per_unit || 0);
   const qty = Number(form.quantity || 0);
   const total = Number.isFinite(unit * qty) ? unit * qty : 0;
-  const available = Number(
-    product?.available_count ?? product?.available ?? product?.stock ?? 0
-  );
-  const maxAllowed = product?.max_per_order
-    ? (available ? Math.min(Number(product.max_per_order), available) : Number(product.max_per_order))
-    : (available || undefined);
+  const avail = Number.isFinite(Number(available)) ? Number(available) : null;
 
   return (
     <Paper variant="outlined" sx={{ borderRadius: 2, p: 2 }}>
@@ -56,7 +51,7 @@ function ProductCard({ product, form, onChange, onAddToCart }) {
         </Box>
         <Box>
           <Typography variant="caption" color="text.secondary">Available</Typography>
-          <div style={{ fontWeight: 800 }}>{Number.isFinite(available) ? available : "—"}</div>
+          <div style={{ fontWeight: 800 }}>{Number.isFinite(avail) ? avail : "—"}</div>
         </Box>
       </Stack>
       <Grid container spacing={1.5}>
@@ -68,8 +63,8 @@ function ProductCard({ product, form, onChange, onAddToCart }) {
             fullWidth
             value={form.quantity ?? ""}
             onChange={(e) => onChange(product.id, "quantity", e.target.value)}
-            inputProps={{ min: 1, max: maxAllowed }}
-            helperText={`${product?.max_per_order ? `Max per order: ${product.max_per_order}. ` : ""}${Number.isFinite(available) ? `Available: ${available}` : ""}`}
+            inputProps={{ min: 1 }}
+            helperText={`Available: ${avail != null ? avail : "—"}`}
           />
         </Grid>
       </Grid>
@@ -89,7 +84,7 @@ function ProductCard({ product, form, onChange, onAddToCart }) {
               Math.max(1, parseInt(form.quantity || "1", 10))
             )
           }
-          disabled={!form.quantity || Number(form.quantity) <= 0 || available <= 0}
+          disabled={false}
           sx={{ fontWeight: 700 }}
         >
           Add to Cart
@@ -111,6 +106,10 @@ export default function ECouponStore() {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [orders, setOrders] = useState([]);
   const [ordersErr, setOrdersErr] = useState("");
+  
+  const [denomFilter, setDenomFilter] = useState("all");
+  const [denomOptions, setDenomOptions] = useState([]);
+  const [availByDenom, setAvailByDenom] = useState({});
 
   // Agency/Employee: assign to consumer form state
   const [consumerAssign, setConsumerAssign] = useState({ username: "", count: 1, notes: "" });
@@ -146,6 +145,12 @@ export default function ECouponStore() {
       const prods = Array.isArray(data?.products) ? data.products : [];
       setProducts(prods);
 
+      const denoms = Array.from(new Set((prods || []).map((p) => String(p.denomination)))).sort(
+        (a, b) => Number(a) - Number(b)
+      );
+      setDenomOptions(["all", ...denoms]);
+      computeAvailabilities(denoms).catch(() => {});
+
       // Initialize forms with sensible defaults
       const m = {};
       prods.forEach((p) => {
@@ -176,6 +181,32 @@ export default function ECouponStore() {
       setOrdersLoading(false);
     }
   };
+
+  async function fetchCount(params = {}) {
+    try {
+      const res = await API.get("/coupons/codes/", { params: { page_size: 1, ...params } });
+      const data = res?.data;
+      if (typeof data?.count === "number") return data.count;
+      if (Array.isArray(data)) return data.length;
+      return 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  async function computeAvailabilities(denoms = []) {
+    try {
+      const entries = await Promise.all(
+        (denoms || []).map(async (d) => {
+          const cnt = await fetchCount({ issued_channel: "e_coupon", status: "AVAILABLE", value: d });
+          return [String(d), cnt];
+        })
+      );
+      const map = {};
+      for (const [k, v] of entries) map[k] = v;
+      setAvailByDenom(map);
+    } catch {}
+  }
 
   useEffect(() => {
     loadBootstrap();
@@ -227,9 +258,26 @@ export default function ECouponStore() {
           <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "#0f172a" }}>
             Available Products
           </Typography>
-          <Button onClick={loadBootstrap} size="small" variant="outlined" disabled={loading}>
-            {loading ? "Refreshing..." : "Refresh"}
-          </Button>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <TextField
+              size="small"
+              select
+              label="Denomination"
+              value={denomFilter}
+              onChange={(e) => setDenomFilter(e.target.value)}
+              SelectProps={{ native: true }}
+              sx={{ minWidth: 160 }}
+            >
+              {denomOptions.map((d) => (
+                <option key={d} value={d}>
+                  {d === "all" ? "All" : `₹${d}`}
+                </option>
+              ))}
+            </TextField>
+            <Button onClick={loadBootstrap} size="small" variant="outlined" disabled={loading}>
+              {loading ? "Refreshing..." : "Refresh"}
+            </Button>
+          </Stack>
         </Stack>
         {loading ? (
           <Box sx={{ py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
@@ -240,13 +288,14 @@ export default function ECouponStore() {
         ) : (
           <>
             <Grid container spacing={2}>
-              {(products || []).map((p) => (
+              {((products || []).filter((p) => denomFilter === "all" || String(p.denomination) === String(denomFilter))).map((p) => (
                 <Grid item xs={12} sm={6} md={4} lg={3} key={p.id}>
                   <ProductCard
                     product={p}
                     form={forms[p.id] || { quantity: 1 }}
                     onChange={setForm}
                     onAddToCart={(pid, qty) => addToCart(pid, qty)}
+                    available={availByDenom[String(p.denomination)]}
                   />
                 </Grid>
               ))}

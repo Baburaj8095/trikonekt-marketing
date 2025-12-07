@@ -93,6 +93,8 @@ const Login = () => {
   // - When in Register mode, do NOT auto-redirect, even if another session exists.
   useEffect(() => {
     try {
+      const pathNow = location.pathname || "";
+      if (/^\/(auth\/login|login)(\/|$)/i.test(pathNow)) return;
       const qMode = new URLSearchParams(location.search || "").get("mode");
       if (mode === "register" || String(qMode).toLowerCase() === "register") return;
       const mapLockedToNs = (r) => {

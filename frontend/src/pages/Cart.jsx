@@ -595,6 +595,71 @@ export default function Cart() {
             ) : null}
           </Paper>
 
+          {/* Payment method (UPI) preview */}
+          {items.length > 0 ? (
+            <Paper
+              elevation={0}
+              sx={{
+                p: { xs: 2, md: 3 },
+                borderRadius: 2,
+                mb: 2,
+                border: "1px solid",
+                borderColor: "divider",
+                bgcolor: "#fff",
+              }}
+            >
+              <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
+                Payment Method (UPI)
+              </Typography>
+              {payment ? (
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md="auto">
+                    <Box
+                      sx={{
+                        width: 160,
+                        height: 160,
+                        borderRadius: 2,
+                        border: "1px solid #e2e8f0",
+                        overflow: "hidden",
+                        background: "#fff",
+                      }}
+                    >
+                      {payment.upi_qr_image_url ? (
+                        <img
+                          alt="UPI QR Code"
+                          src={normalizeMediaUrl(payment.upi_qr_image_url)}
+                          style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                        />
+                      ) : (
+                        <Box sx={{ p: 2, color: "text.secondary" }}>No QR image uploaded.</Box>
+                      )}
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} md>
+                    <Grid container spacing={1}>
+                      <Grid item xs={12} sm={6} md={4}>
+                        <Typography variant="caption" color="text.secondary">Payee</Typography>
+                        <div style={{ fontWeight: 800 }}>{payment.payee_name || "—"}</div>
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={4}>
+                        <Typography variant="caption" color="text.secondary">UPI ID</Typography>
+                        <div style={{ fontWeight: 800 }}>{payment.upi_id || "—"}</div>
+                      </Grid>
+                      <Grid item xs={12}>
+                        <Typography variant="caption" color="text.secondary">Instructions</Typography>
+                        <Box sx={{ whiteSpace: "pre-wrap" }}>
+                          {payment.instructions || "Scan the QR or pay to the UPI ID. You can upload proof and enter UTR at Checkout."}
+                        </Box>
+                      </Grid>
+                    </Grid>
+                  </Grid>
+                </Grid>
+              ) : (
+                <Alert severity="info">Payment configuration not available. You can still review items; try again later.</Alert>
+              )}
+            </Paper>
+          ) : null}
+
           {/* Checkout prompt */}
           <Paper elevation={0} sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, mb: 2, border: "1px solid", borderColor: "divider", bgcolor: "#fff" }}>
             <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>

@@ -352,7 +352,7 @@ class AgencyPackageAssignmentSerializer(serializers.ModelSerializer):
 # ==============================
 # Consumer Promo Packages (Prime/Monthly)
 # ==============================
-from .models import PromoPackage, PromoPurchase, PromoPackageProduct
+from .models import PromoPackage, PromoPurchase, PromoPackageProduct, PromoEBook, EBookAccess, PromoProduct
 
 
 class PromoPackageSerializer(serializers.ModelSerializer):
@@ -401,6 +401,7 @@ class PromoPackageSerializer(serializers.ModelSerializer):
                 "name": getattr(p, "name", None),
                 "price": str(getattr(p, "price", "")),
                 "image_url": img,
+                "package_id": getattr(obj, "id", None),
             })
         return out
 
@@ -476,6 +477,10 @@ class PromoPurchaseSerializer(serializers.ModelSerializer):
     selected_product_id = serializers.PrimaryKeyRelatedField(
         queryset=Product.objects.all(), write_only=True, required=False, allow_null=True, source="selected_product"
     )
+    # New: decoupled promo products (separate from market products)
+    selected_promo_product_id = serializers.PrimaryKeyRelatedField(
+        queryset=PromoProduct.objects.all(), write_only=True, required=False, allow_null=True, source="selected_promo_product"
+    )
     selected_product_name = serializers.SerializerMethodField(read_only=True)
     shipping_address = serializers.CharField(required=False, allow_blank=True)
     # MONTHLY: accept package_number + boxes[] (list of ints) from client; boxes are priced per box
@@ -498,14 +503,16 @@ class PromoPurchaseSerializer(serializers.ModelSerializer):
             return None
 
     def get_selected_product_name(self, obj):
+        # Prefer decoupled promo product name; fallback to legacy market product name
+        try:
+            pp = getattr(obj, "selected_promo_product", None)
+            if pp:
+                return getattr(pp, "name", None)
+        except Exception:
+            pass
         try:
             p = getattr(obj, "selected_product", None)
             return getattr(p, "name", None)
-        except Exception:
-            return None
-        try:
-            u = getattr(obj, "user", None)
-            return getattr(u, "username", None)
         except Exception:
             return None
 
@@ -518,6 +525,8 @@ class PromoPurchaseSerializer(serializers.ModelSerializer):
             "package",
             "package_id",
             "quantity",
+            "prime150_choice",
+            "prime750_choice",
             "status",
             "amount_paid",
             "payment_proof",
@@ -528,6 +537,7 @@ class PromoPurchaseSerializer(serializers.ModelSerializer):
             "selected_product_name",
             "delivery_by",
             "shipping_address",
+            "selected_promo_product_id",
             "selected_product_id",
             # MONTHLY box flow
             "package_number",
@@ -703,18 +713,44 @@ class PromoPurchaseSerializer(serializers.ModelSerializer):
             if attrs.get("year") or attrs.get("month"):
                 raise serializers.ValidationError({"month": "Month/year not applicable for PRIME packages."})
 
-            # PRIME 750 flow: ensure selected_product (if provided) belongs to this package mapping.
             from decimal import Decimal as D
-            sp = attrs.get("selected_product") or getattr(self.instance, "selected_product", None)
+            sp_promo = attrs.get("selected_promo_product") or getattr(self.instance, "selected_promo_product", None)
+            sp_legacy = attrs.get("selected_product") or getattr(self.instance, "selected_product", None)
             price = D(str(getattr(pkg, "price", "0")))
             is_prime_750 = str(getattr(pkg, "type", "")) == "PRIME" and abs(price - D("750")) <= D("0.5")
+            is_prime_150 = str(getattr(pkg, "type", "")) == "PRIME" and abs(price - D("150")) <= D("0.5")
+
+            # PRIME 150 flow: require explicit choice
+            if is_prime_150:
+                # Default to EBOOK if not provided (convenience for clients that omit this)
+                choice_raw = attrs.get("prime150_choice") or getattr(self.instance, "prime150_choice", "") or "EBOOK"
+                choice = str(choice_raw or "EBOOK").strip().upper()
+                if choice not in {"EBOOK", "REDEEM"}:
+                    raise serializers.ValidationError({"prime150_choice": "Select EBOOK or REDEEM."})
+                attrs["prime150_choice"] = choice
+
+            # PRIME 750 flow: PRODUCT | REDEEM | COUPON
             if is_prime_750:
-                # If admin requires selection, enforce presence
-                if sp is None:
-                    raise serializers.ValidationError({"selected_product_id": "Please select a product for ₹750 promo."})
-                ok = PromoPackageProduct.objects.filter(package=pkg, product=sp, is_active=True).exists()
-                if not ok:
-                    raise serializers.ValidationError({"selected_product_id": "Selected product is not available for this promo package."})
+                choice_raw = attrs.get("prime750_choice") or getattr(self.instance, "prime750_choice", "") or "PRODUCT"
+                choice = str(choice_raw).strip().upper()
+                if choice not in {"PRODUCT", "REDEEM", "COUPON"}:
+                    choice = "PRODUCT"
+                attrs["prime750_choice"] = choice
+
+                if choice == "PRODUCT":
+                    # Require decoupled PromoProduct going forward
+                    if sp_promo is None:
+                        # Backward compatibility error message references new field
+                        raise serializers.ValidationError({"selected_promo_product_id": "Please select a promo product for ₹750 promo."})
+                    ok = PromoPackageProduct.objects.filter(package=pkg, product=sp_promo, is_active=True).exists()
+                    if not ok:
+                        raise serializers.ValidationError({"selected_promo_product_id": "Selected promo product is not available for this promo package."})
+                    ship = (attrs.get("shipping_address") or getattr(self.instance, "shipping_address", "") or "").strip()
+                    if not ship:
+                        raise serializers.ValidationError({"shipping_address": "Shipping address is required for product delivery."})
+                else:
+                    # REDEEM/COUPON do not require a product selection or shipping
+                    pass
 
         return attrs
 
@@ -764,3 +800,44 @@ class PromoPurchaseSerializer(serializers.ModelSerializer):
             pass
 
         return pp
+
+
+class PromoEBookSerializer(serializers.ModelSerializer):
+    cover_url = serializers.SerializerMethodField()
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PromoEBook
+        fields = ["id", "title", "description", "cover_url", "file_url", "created_at"]
+
+    def _abs(self, request, url):
+        if not url:
+            return url
+        try:
+            return request.build_absolute_uri(url) if request and not str(url).startswith("http") else url
+        except Exception:
+            return url
+
+    def get_cover_url(self, obj):
+        request = self.context.get("request") if hasattr(self, "context") else None
+        try:
+            url = obj.cover.url if obj.cover else None
+        except Exception:
+            url = None
+        return self._abs(request, url)
+
+    def get_file_url(self, obj):
+        request = self.context.get("request") if hasattr(self, "context") else None
+        try:
+            url = obj.file.url if obj.file else None
+        except Exception:
+            url = None
+        return self._abs(request, url)
+
+
+class EBookAccessSerializer(serializers.ModelSerializer):
+    ebook = PromoEBookSerializer(read_only=True)
+
+    class Meta:
+        model = EBookAccess
+        fields = ["id", "ebook", "granted_at"]

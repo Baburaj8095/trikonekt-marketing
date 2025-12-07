@@ -9,9 +9,14 @@ import {
   CircularProgress,
   Snackbar,
   Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 import { useNavigate, useLocation } from "react-router-dom";
-import API from "../api/api";
+import API, { getPromoPackages } from "../api/api";
+import { addPromoPackagePrime } from "../store/cart";
 import ProductGrid from "../components/market/ProductGrid";
 import QuickViewModal from "../components/market/QuickViewModal";
 
@@ -38,6 +43,10 @@ export default function TrikonektProducts() {
   const [sort, setSort] = useState("");
   const [dense, setDense] = useState(true);
   const [quickView, setQuickView] = useState({ open: false, product: null });
+  // Promo Package products
+  const [promoItems, setPromoItems] = useState([]);
+  const [loadingPromo, setLoadingPromo] = useState(false);
+  const [addressDlg, setAddressDlg] = useState({ open: false, pkgId: null, product: null, address: "" });
 
 
 
@@ -58,9 +67,48 @@ export default function TrikonektProducts() {
     }
   };
 
+  const fetchPromoProducts = async () => {
+    try {
+      setLoadingPromo(true);
+      const pkgs = await getPromoPackages();
+      const list = Array.isArray(pkgs) ? pkgs : pkgs?.results || [];
+      const items = [];
+      for (const pkg of list) {
+        if (Array.isArray(pkg?.promo_products)) {
+          for (const p of pkg.promo_products) {
+            items.push({
+              id: p.id,
+              name: p.name,
+              price: Number(p.price || 0),
+              image_url: p.image_url,
+              package_id: p.package_id || pkg.id,
+              package_name: pkg.name,
+              package_price: Number(pkg.price || 0),
+              _promo: true,
+            });
+          }
+        }
+      }
+      const seen = new Set();
+      const unique = [];
+      for (const it of items) {
+        const key = it.id || `${it.name}-${it.image_url}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        unique.push(it);
+      }
+      setPromoItems(unique);
+    } catch {
+      setPromoItems([]);
+    } finally {
+      setLoadingPromo(false);
+    }
+  };
+
   // Initial load
   useEffect(() => {
     fetchProducts();
+    fetchPromoProducts();
   }, []);
 
   // Apply sorting automatically when changed
@@ -83,6 +131,38 @@ export default function TrikonektProducts() {
         Trikonekt Products
       </Typography>
 
+
+      {/* Promo Package Section */}
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
+          Promo Package
+        </Typography>
+        {loadingPromo ? (
+          <Box sx={{ py: 2, display: "flex", alignItems: "center", gap: 1 }}>
+            <CircularProgress size={20} /> <Typography variant="body2">Loading promo items...</Typography>
+          </Box>
+        ) : (
+          <ProductGrid
+            items={promoItems || []}
+            dense={dense}
+            emptyMessage="No promo package products available."
+            onSelect={(p) => {
+              if (p && p._promo) {
+                setAddressDlg({ open: true, pkgId: p.package_id || null, product: p, address: "" });
+              } else if (p?.id) {
+                navigate(`${basePath}/products/${p.id}`);
+              }
+            }}
+            onQuickView={(p) => {
+              if (p && p._promo) {
+                setAddressDlg({ open: true, pkgId: p.package_id || null, product: p, address: "" });
+              } else {
+                setQuickView({ open: true, product: p });
+              }
+            }}
+          />
+        )}
+      </Box>
 
       {/* Products Section */}
       {loading ? (
@@ -156,6 +236,62 @@ export default function TrikonektProducts() {
           }
         }}
       />
+
+      <Dialog
+        open={addressDlg.open}
+        onClose={() => setAddressDlg({ open: false, pkgId: null, product: null, address: "" })}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Select shipping address</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            {addressDlg.product ? `Product: ${addressDlg.product.name}` : ""}
+          </Typography>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Shipping Address"
+            fullWidth
+            multiline
+            minRows={3}
+            value={addressDlg.address}
+            onChange={(e) => setAddressDlg((s) => ({ ...s, address: e.target.value }))}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAddressDlg({ open: false, pkgId: null, product: null, address: "" })}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              const addr = String(addressDlg.address || "").trim();
+              if (!addr) {
+                setSnack({ open: true, type: "error", msg: "Enter shipping address" });
+                return;
+              }
+              try {
+                addPromoPackagePrime({
+                  pkgId: addressDlg.pkgId,
+                  name: addressDlg.product?.package_name || "Prime 750 Product",
+                  unitPrice: Number(addressDlg.product?.package_price || 0),
+                  qty: 1,
+                  selected_promo_product_id: addressDlg.product?.id ?? null,
+                  shipping_address: addr,
+                  prime750_choice: "PRODUCT",
+                });
+                setSnack({ open: true, type: "success", msg: "Added to cart." });
+                setAddressDlg({ open: false, pkgId: null, product: null, address: "" });
+              } catch (e) {
+                setSnack({ open: true, type: "error", msg: "Failed to add to cart." });
+              }
+            }}
+          >
+            Add to Cart
+          </Button>
+        </DialogActions>
+      </Dialog>
       <Snackbar
         open={snack.open}
         autoHideDuration={3000}

@@ -98,6 +98,12 @@ export default function LuckyDraw({ embedded = false }) {
 
   const [luckyEnabled, setLuckyEnabled] = useState(true);
 
+  // Spin draw (user) state
+  const [spinInfo, setSpinInfo] = useState(null); // { active, draw, attempted, result, is_winner }
+  const [spinLoading, setSpinLoading] = useState(false);
+  const [spinErr, setSpinErr] = useState("");
+  const [attempting, setAttempting] = useState(false);
+
   // Prefill pincode from logged-in profile if empty
   useEffect(() => {
     try {
@@ -170,6 +176,53 @@ export default function LuckyDraw({ embedded = false }) {
       active = false;
     };
   }, []);
+
+  // Spin: fetch active or upcoming spin draw
+  const fetchSpinInfo = async () => {
+    try {
+      setSpinLoading(true);
+      setSpinErr("");
+      const res = await API.get("/uploads/spin/active/");
+      setSpinInfo(res?.data || null);
+    } catch (e) {
+      setSpinInfo(null);
+      setSpinErr(e?.response?.data?.detail || "Failed to load Spin draw");
+    } finally {
+      setSpinLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let timer = null;
+    fetchSpinInfo();
+    // Poll every 30s to update window/status
+    timer = setInterval(fetchSpinInfo, 30000);
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+    // eslint-disable-next-line
+  }, []);
+
+  const attemptSpin = async () => {
+    const drawId = spinInfo?.draw?.id;
+    if (!drawId) return;
+    try {
+      setAttempting(true);
+      const res = await API.post(`/uploads/spin/${drawId}/attempt/`, {});
+      const data = res?.data || {};
+      setSpinInfo((old) => ({
+        ...(old || {}),
+        attempted: true,
+        result: data?.result || "LOSE",
+        attemptPayload: data?.payload || null,
+      }));
+    } catch (e) {
+      const msg = e?.response?.data?.detail || "Spin failed";
+      setSpinErr(msg);
+    } finally {
+      setAttempting(false);
+    }
+  };
 
   // Human readable status and "pending with" indicator
   const statusMeta = (status) => {
@@ -299,6 +352,81 @@ export default function LuckyDraw({ embedded = false }) {
   // Main content (shared for embedded and standalone)
   const MainContent = (
     <Container maxWidth="sm" sx={{ px: 0, ml: 0, mr: "auto" }}>
+      {/* Spin Lucky Draw */}
+      <Paper
+        elevation={3}
+        sx={{
+          p: { xs: 2, md: 3 },
+          borderRadius: 3,
+          backgroundColor: "#fff",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+          mb: 3,
+        }}
+      >
+        <Typography variant="h5" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>
+          Spin Lucky Draw
+        </Typography>
+        {spinErr ? (
+          <Alert severity="error" sx={{ mb: 2 }}>{spinErr}</Alert>
+        ) : null}
+        {spinLoading ? (
+          <Typography variant="body2">Loading...</Typography>
+        ) : !spinInfo || !spinInfo.draw ? (
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            No active or upcoming spin at the moment.
+          </Typography>
+        ) : (
+          <Box>
+            <Typography variant="body2" sx={{ mb: 1, color: "text.secondary" }}>
+              {spinInfo.draw.title ? <strong>{spinInfo.draw.title}</strong> : null} • Window:&nbsp;
+              {spinInfo.draw.start_at ? new Date(spinInfo.draw.start_at).toLocaleString() : "-"} —{" "}
+              {spinInfo.draw.end_at ? new Date(spinInfo.draw.end_at).toLocaleString() : "-"} • Status: {spinInfo.draw.status}
+            </Typography>
+
+            {spinInfo.draw.status === "LIVE" ? (
+              <Box>
+                {spinInfo.attempted ? (
+                  <Alert severity={spinInfo.result === "WIN" ? "success" : "info"} sx={{ mb: 1 }}>
+                    {spinInfo.result === "WIN" ? "Congratulations! You won." : "Better luck next time."}
+                  </Alert>
+                ) : null}
+                {!spinInfo.attempted ? (
+                  <Button
+                    variant="contained"
+                    onClick={attemptSpin}
+                    disabled={attempting}
+                    sx={{
+                      backgroundColor: "#145DA0",
+                      fontWeight: 600,
+                      borderRadius: 2,
+                      "&:hover": { backgroundColor: "#0C4B82" },
+                    }}
+                  >
+                    {attempting ? "Spinning..." : (spinInfo.is_winner ? "Spin to Claim" : "Spin")}
+                  </Button>
+                ) : null}
+
+                {spinInfo.attemptPayload ? (
+                  <Box sx={{ mt: 1, p: 1, border: "1px solid #eee", borderRadius: 1, backgroundColor: "#fafafa" }}>
+                    {spinInfo.attemptPayload.prize_title ? (
+                      <Typography variant="body2"><strong>Prize:</strong> {spinInfo.attemptPayload.prize_title}</Typography>
+                    ) : null}
+                    {spinInfo.attemptPayload.prize_description ? (
+                      <Typography variant="body2">{spinInfo.attemptPayload.prize_description}</Typography>
+                    ) : null}
+                    {spinInfo.attemptPayload.prize_value ? (
+                      <Typography variant="body2">Value: ₹{spinInfo.attemptPayload.prize_value}</Typography>
+                    ) : null}
+                  </Box>
+                ) : null}
+              </Box>
+            ) : (
+              <Alert severity="info">Spin will open soon. Please check back during the window.</Alert>
+            )}
+          </Box>
+        )}
+      </Paper>
+
       {/* Lucky Draw Section */}
       <Paper
         elevation={3}

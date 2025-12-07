@@ -118,7 +118,11 @@ export default function AgencyMarketplace() {
       if (filters.state) params.state = filters.state;
       if (filters.city) params.city = filters.city;
       if (filters.pincode) params.pincode = filters.pincode;
-      const res = await API.get("/banners", { params: { ...params, active: 1, _: Date.now() } });
+      const res = await API.get("/banners", {
+        params: { ...params, active: 1 },
+        dedupe: "cancelPrevious",
+        cacheTTL: 15000
+      });
       const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
       setBanners(arr);
     } catch {
@@ -133,12 +137,6 @@ export default function AgencyMarketplace() {
     fetchBanners();
   }, []);
 
-  // Refresh on window focus
-  useEffect(() => {
-    const onFocus = () => fetchBanners();
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, []);
 
   const onFilterChange = (e) => {
     const { name, value } = e.target;

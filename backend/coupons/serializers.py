@@ -94,8 +94,8 @@ class CouponCodeSerializer(serializers.ModelSerializer):
     issued_by_username = serializers.SerializerMethodField(read_only=True)
     state_label = serializers.SerializerMethodField(read_only=True)
     display_status = serializers.SerializerMethodField(read_only=True)
-    can_activate = serializers.SerializerMethodField(read_only=True)
-    can_transfer = serializers.SerializerMethodField(read_only=True)
+    can_activate = serializers.SerializerMethodField(method_name="compute_can_activate", read_only=True)
+    can_transfer = serializers.SerializerMethodField(method_name="compute_can_transfer", read_only=True)
 
     class Meta:
         model = CouponCode
@@ -160,24 +160,27 @@ class CouponCodeSerializer(serializers.ModelSerializer):
             return obj.status
 
     def get_display_status(self, obj):
-        # User-friendly status for consumer dashboard:
-        # - When consumer owns the code (SOLD), show "PENDING" until activated
-        # - If activation audit exists by the same consumer, show "ACTIVATED"
-        # - If redeemed, show "REDEEMED"
-        # - If this user has transferred this code away, show "TRANSFERRED"
+        # Optimized: use precomputed audit id sets when provided in context
+        # Fallback to DB checks only if sets are absent (keeps compatibility for other endpoints).
         try:
             request = self.context.get("request")
             user = getattr(request, "user", None) if request else None
             st = (obj.status or "").upper()
+
+            act_set = self.context.get("activated_ids_set")
+            tr_set = self.context.get("transferred_ids_set")
+
+            # If current user initiated a transfer of this code, show TRANSFERRED
+            if isinstance(tr_set, set) and obj.id in tr_set:
+                return "TRANSFERRED"
+
             if user and getattr(user, "id", None):
-                from .models import AuditTrail  # local import to avoid circular in some tools
-                # If current user initiated a transfer of this code, show TRANSFERRED regardless of current ownership
-                did_transfer = AuditTrail.objects.filter(action="consumer_transfer", actor=user, coupon_code=obj).exists()
-                if did_transfer:
-                    return "TRANSFERRED"
-                # For owned codes, show pending/activated/redeemed
                 if obj.assigned_consumer_id == user.id:
-                    activated = AuditTrail.objects.filter(action="coupon_activated", actor=user, coupon_code=obj).exists()
+                    if isinstance(act_set, set):
+                        activated = obj.id in act_set
+                    else:
+                        from .models import AuditTrail
+                        activated = AuditTrail.objects.filter(action="coupon_activated", actor=user, coupon_code=obj).exists()
                     if activated:
                         return "ACTIVATED"
                     if st == "SOLD":
@@ -188,8 +191,9 @@ class CouponCodeSerializer(serializers.ModelSerializer):
         except Exception:
             return obj.status
 
-    def get_can_activate(self, obj):
+    def compute_can_activate(self, obj):
         # Consumer can activate only if they own it, it's not redeemed, not already activated, and not transferred by them
+        # Uses precomputed audit id sets from context when available.
         try:
             request = self.context.get("request")
             user = getattr(request, "user", None) if request else None
@@ -198,15 +202,29 @@ class CouponCodeSerializer(serializers.ModelSerializer):
             st = (obj.status or "").upper()
             if st == "REDEEMED":
                 return False
-            from .models import AuditTrail
-            activated = AuditTrail.objects.filter(action="coupon_activated", actor=user, coupon_code=obj).exists()
-            did_transfer = AuditTrail.objects.filter(action="consumer_transfer", actor=user, coupon_code=obj).exists()
+
+            act_set = self.context.get("activated_ids_set")
+            tr_set = self.context.get("transferred_ids_set")
+
+            if isinstance(act_set, set):
+                activated = obj.id in act_set
+            else:
+                from .models import AuditTrail
+                activated = AuditTrail.objects.filter(action="coupon_activated", actor=user, coupon_code=obj).exists()
+
+            if isinstance(tr_set, set):
+                did_transfer = obj.id in tr_set
+            else:
+                from .models import AuditTrail
+                did_transfer = AuditTrail.objects.filter(action="consumer_transfer", actor=user, coupon_code=obj).exists()
+
             return (not activated) and (not did_transfer)
         except Exception:
             return False
 
-    def get_can_transfer(self, obj):
+    def compute_can_transfer(self, obj):
         # Consumer can transfer only if they own it, it's not redeemed, and not activated or previously transferred by them
+        # Uses precomputed audit id sets from context when available.
         try:
             request = self.context.get("request")
             user = getattr(request, "user", None) if request else None
@@ -215,9 +233,22 @@ class CouponCodeSerializer(serializers.ModelSerializer):
             st = (obj.status or "").upper()
             if st == "REDEEMED":
                 return False
-            from .models import AuditTrail
-            activated = AuditTrail.objects.filter(action="coupon_activated", actor=user, coupon_code=obj).exists()
-            did_transfer = AuditTrail.objects.filter(action="consumer_transfer", actor=user, coupon_code=obj).exists()
+
+            act_set = self.context.get("activated_ids_set")
+            tr_set = self.context.get("transferred_ids_set")
+
+            if isinstance(act_set, set):
+                activated = obj.id in act_set
+            else:
+                from .models import AuditTrail
+                activated = AuditTrail.objects.filter(action="coupon_activated", actor=user, coupon_code=obj).exists()
+
+            if isinstance(tr_set, set):
+                did_transfer = obj.id in tr_set
+            else:
+                from .models import AuditTrail
+                did_transfer = AuditTrail.objects.filter(action="consumer_transfer", actor=user, coupon_code=obj).exists()
+
             return (not activated) and (not did_transfer)
         except Exception:
             return False

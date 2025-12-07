@@ -6,8 +6,24 @@ from django.db import transaction
 from django.utils import timezone
 from django.http import HttpResponse
 from django.db.models import Q
-from .models import BusinessRegistration, RewardProgress, RewardRedemption, DailyReport, AutoPoolAccount, SubscriptionActivation, Package, AgencyPackageAssignment, AgencyPackagePayment, CommissionConfig
-from .serializers import BusinessRegistrationSerializer, DailyReportSerializer, AgencyPackageAssignmentSerializer, AgencyPackagePaymentSerializer
+from .models import (
+    BusinessRegistration,
+    RewardProgress,
+    RewardRedemption,
+    DailyReport,
+    AutoPoolAccount,
+    SubscriptionActivation,
+    Package,
+    AgencyPackageAssignment,
+    AgencyPackagePayment,
+    CommissionConfig,
+)
+from .serializers import (
+    BusinessRegistrationSerializer,
+    DailyReportSerializer,
+    AgencyPackageAssignmentSerializer,
+    AgencyPackagePaymentSerializer,
+)
 
 
 class BusinessRegistrationCreateView(generics.CreateAPIView):
@@ -107,6 +123,26 @@ class RewardProgressMeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
+        # Inactive accounts: rewards progress should be zero
+        try:
+            if not bool(getattr(request.user, "account_active", False)):
+                thresholds = {
+                    "resort_trip": 600,
+                    "mobile_fund": 600,
+                    "bike_fund": 1500,
+                    "thailand_trip": 2800,
+                }
+                elig = {k: {"eligible": False, "threshold": v, "next_needed": v} for k, v in thresholds.items()}
+                return Response(
+                    {
+                        "coupon_count": 0,
+                        "eligibility": elig,
+                    },
+                    status=status.HTTP_200_OK,
+                )
+        except Exception:
+            # best-effort guard; fall through to normal computation if any error
+            pass
         rp, _ = RewardProgress.objects.get_or_create(user=request.user)
         thresholds = {
             "resort_trip": 600,
@@ -273,8 +309,13 @@ class DailyReportMyView(APIView):
 # Consumer Promo Packages (Prime/Monthly)
 # ==============================
 from rest_framework.parsers import MultiPartParser, FormParser
-from .serializers import PromoPackageSerializer, PromoPurchaseSerializer
-from .models import PromoPackage, PromoPurchase
+from .serializers import (
+    PromoPackageSerializer,
+    PromoPurchaseSerializer,
+    PromoEBookSerializer,
+    EBookAccessSerializer,
+)
+from .models import PromoPackage, PromoPurchase, EBookAccess
 
 
 class PromoPackageListView(APIView):
@@ -337,19 +378,18 @@ class AdminPromoPurchaseApproveView(APIView):
     """
     POST /api/business/admin/promo/purchases/<pk>/approve/
     Approve a pending promo purchase. Sets active period:
-      - MONTHLY: calendar month (year/month on record)
+      - MONTHLY: calendar month (year/month on record) or per-box access (no active window)
       - PRIME: active_from = today; active_to = null
     """
     permission_classes = [IsAdminUser]
 
     def post(self, request, pk: int):
         """
-        Approve a pending promo purchase, set active period, and allocate e‑coupon codes to the consumer by quantity.
-        Allocation policy:
-          - denomination: defaults to ₹150 per unit (can be extended via package->denomination mapping later)
-          - quantity: uses PromoPurchase.quantity (>=1)
-          - picks AVAILABLE e‑coupon codes with no owner and assigns to the buyer (status -> SOLD)
-        Inventory allocation is best-effort and does not block approval.
+        Approve a pending promo purchase, set active period, and allocate benefits:
+          - Default: allocate e‑coupon codes based on price/₹150 denomination
+          - PRIME 150: grant e‑book access (visible to all ₹150 buyers)
+          - MONTHLY: persist paid boxes
+        Allocation is best-effort and does not block approval.
         """
         obj = PromoPurchase.objects.select_related("package", "user").filter(pk=pk).first()
         if not obj:
@@ -357,8 +397,6 @@ class AdminPromoPurchaseApproveView(APIView):
         if obj.status != "PENDING":
             return Response({"detail": "Only PENDING purchases can be approved."}, status=status.HTTP_400_BAD_REQUEST)
 
-        from datetime import date
-        from calendar import monthrange
         from decimal import Decimal as D
 
         # Infer denomination for allocation (default ₹150)
@@ -385,12 +423,26 @@ class AdminPromoPurchaseApproveView(APIView):
             qty_in = 1
         need = int(qty_in) * int(units_per_pkg)
 
-        # Try allocation first to avoid approving without inventory
+        # Determine PRIME choices
+        try:
+            price = D(str(getattr(obj.package, "price", "0") or "0"))
+        except Exception:
+            price = D("0")
+        is_prime_150 = str(getattr(obj.package, "type", "")) == "PRIME" and abs(price - D("150")) <= D("0.5")
+        ebook_choice = str(getattr(obj, "prime150_choice", "") or "").strip().upper() == "EBOOK"
+        is_prime_750 = str(getattr(obj.package, "type", "")) == "PRIME" and abs(price - D("750")) <= D("0.5")
+        prime750_choice = str(getattr(obj, "prime750_choice", "") or "").strip().upper()
+        # Skip allocation for PRIME150(EBOOK) or PRIME750(PRODUCT/COUPON); allow for PRIME750(REDEEM)
+        skip_allocation = (is_prime_150 and ebook_choice) or (is_prime_750 and prime750_choice in ("PRODUCT", "COUPON"))
+
+        # Try allocation (or e‑book grant) before setting approval
         allocated_ids = []
         sample_codes = []
+        ebooks_granted = 0
+
         with transaction.atomic():
-            # Attempt inventory reservation if denomination is defined
-            if denom is not None:
+            # Allocate e‑coupon codes unless PRIME150(EBOOK) or PRIME750(PRODUCT/COUPON)
+            if denom is not None and not skip_allocation:
                 try:
                     from coupons.models import CouponCode
                 except Exception:
@@ -410,12 +462,7 @@ class AdminPromoPurchaseApproveView(APIView):
                     except Exception:
                         locking_qs = base_qs
 
-                    pick_ids = list(
-                        locking_qs.order_by("serial", "id").values_list("id", flat=True)[:need]
-                    )
-                    # Approve regardless of inventory; allocate best-effort.
-                    # If fewer than needed are available, allocate what we can and proceed (no 409/rollback).
-                    pass
+                    pick_ids = list(locking_qs.order_by("serial", "id").values_list("id", flat=True)[:need])
 
                     write_qs = CouponCode.objects.filter(id__in=pick_ids).filter(
                         issued_channel="e_coupon",
@@ -433,7 +480,35 @@ class AdminPromoPurchaseApproveView(APIView):
                     except Exception:
                         sample_codes = []
 
-            # Set approval + allocate MONTHLY boxes (for MONTHLY), else set active window for PRIME
+            # PRIME150: grant e‑book access mapped to the package (visible to all ₹150 buyers)
+            # If no explicit mapping exists, fall back to granting the most recent active e‑book.
+            if is_prime_150:
+                try:
+                    from .models import PromoPackageEBook, EBookAccess, PromoEBook
+                    maps = list(
+                        PromoPackageEBook.objects.filter(package=obj.package, is_active=True)
+                        .select_related("ebook")
+                    )
+                    # Fallback: if admin hasn't configured mappings, grant the latest active e‑book
+                    if not maps:
+                        fallback = list(PromoEBook.objects.filter(is_active=True).order_by("-created_at")[:1])
+                        for eb in fallback:
+                            try:
+                                EBookAccess.objects.get_or_create(user=obj.user, ebook=eb)
+                                ebooks_granted += 1
+                            except Exception:
+                                continue
+                    else:
+                        for m in maps:
+                            try:
+                                EBookAccess.objects.get_or_create(user=obj.user, ebook=m.ebook)
+                                ebooks_granted += 1
+                            except Exception:
+                                continue
+                except Exception:
+                    ebooks_granted = 0
+
+            # Mark approved and set active window
             obj.status = "APPROVED"
             obj.approved_by = request.user
             obj.approved_at = timezone.now()
@@ -441,7 +516,6 @@ class AdminPromoPurchaseApproveView(APIView):
             today = timezone.localdate()
             if obj.package.type == "MONTHLY":
                 # Create permanent paid box records for selected boxes
-                created_boxes = 0
                 try:
                     from .models import PromoMonthlyBox
                     boxes = list(getattr(obj, "boxes_json", []) or [])
@@ -449,15 +523,13 @@ class AdminPromoPurchaseApproveView(APIView):
                     for b in boxes:
                         try:
                             bn = int(b)
-                            _, created = PromoMonthlyBox.objects.get_or_create(
+                            PromoMonthlyBox.objects.get_or_create(
                                 user=obj.user,
                                 package=obj.package,
                                 package_number=number,
                                 box_number=bn,
                                 defaults={"purchase": obj},
                             )
-                            if created:
-                                created_boxes += 1
                         except Exception:
                             continue
                 except Exception:
@@ -472,9 +544,9 @@ class AdminPromoPurchaseApproveView(APIView):
             fields_to_update = ["status", "approved_by", "approved_at", "active_from", "active_to"]
             # For PRIME 750 promo with a selected product, set delivery_by = approved_date + 30 days
             try:
-                from decimal import Decimal as D
-                price = D(str(getattr(obj.package, "price", "0")))
-                is_prime_750 = str(getattr(obj.package, "type", "")) == "PRIME" and abs(price - D("750")) <= D("0.5")
+                from decimal import Decimal as D2
+                price2 = D2(str(getattr(obj.package, "price", "0")))
+                is_prime_750 = str(getattr(obj.package, "type", "")) == "PRIME" and abs(price2 - D2("750")) <= D2("0.5")
             except Exception:
                 is_prime_750 = False
             if is_prime_750:
@@ -483,6 +555,54 @@ class AdminPromoPurchaseApproveView(APIView):
                 fields_to_update.append("delivery_by")
 
             obj.save(update_fields=fields_to_update)
+
+            # Activate account on any promo package approval (e.g., 150, 750, 759)
+            try:
+                from decimal import Decimal as D3
+                from .services.activation import activate_150_active, activate_50, ensure_first_purchase_activation
+                pkg_price = D3(str(getattr(obj.package, "price", "0") or "0"))
+                src = {"type": "promo_purchase", "id": obj.id}
+                # Open 150 Active if price >= 150 (idempotent)
+                if pkg_price >= D3("150"):
+                    try:
+                        activate_150_active(obj.user, src)
+                    except Exception:
+                        pass
+                # Open 50 pool if price >= 50 (idempotent)
+                if pkg_price >= D3("50"):
+                    try:
+                        activate_50(obj.user, src, package_code="GLOBAL_50")
+                    except Exception:
+                        pass
+                # Ensure account_active and first purchase flags are stamped (idempotent)
+                try:
+                    ensure_first_purchase_activation(obj.user, src)
+                except Exception:
+                    pass
+                # Hard-stamp account_active to guarantee visibility in admin lists (best-effort)
+                try:
+                    if not bool(getattr(obj.user, "account_active", False)):
+                        obj.user.account_active = True
+                        obj.user.save(update_fields=["account_active"])
+                except Exception:
+                    pass
+            except Exception:
+                # best-effort: do not block approval if activation fails
+                pass
+
+            # Lucky Draw eligibility for PRIME 750 COUPON choice (one token per unit)
+            try:
+                if is_prime_750 and str(prime750_choice).upper() == "COUPON":
+                    from uploads.models import LuckyDrawEligibility
+                    tokens = 1
+                    try:
+                        tokens = max(1, int(qty_in))
+                    except Exception:
+                        tokens = 1
+                    LuckyDrawEligibility.objects.create(user=obj.user, purchase=obj, tokens=tokens)
+            except Exception:
+                # best-effort: do not block approval if eligibility creation fails
+                pass
 
             # Audit (best effort)
             try:
@@ -495,12 +615,15 @@ class AdminPromoPurchaseApproveView(APIView):
                         "purchase_id": obj.id,
                         "user_id": obj.user_id,
                         "denomination": str(denom) if denom is not None else None,
-                        "quantity": int(need),  # retained for compatibility (required codes)
+                        "quantity": int(need),
                         "quantity_units": int(qty_in),
                         "units_per_package": int(units_per_pkg),
                         "required_codes": int(need),
                         "allocated": int(len(allocated_ids)),
                         "sample_codes": sample_codes,
+                        "prime150_choice": getattr(obj, "prime150_choice", None),
+                        "prime750_choice": getattr(obj, "prime750_choice", None),
+                        "ebooks_granted": int(ebooks_granted),
                     },
                 )
             except Exception:
@@ -533,6 +656,19 @@ class AdminPromoPurchaseRejectView(APIView):
         return Response(PromoPurchaseSerializer(obj, context={"request": request}).data, status=status.HTTP_200_OK)
 
 
+class EBookMyListView(APIView):
+    """
+    GET /api/business/ebooks/mine/
+    List of e‑books granted to the current user via PRIME 150 (E‑BOOK) approvals.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        qs = EBookAccess.objects.select_related("ebook").filter(user=request.user).order_by("-granted_at", "-id")
+        ser = EBookAccessSerializer(qs, many=True, context={"request": request})
+        return Response(ser.data, status=status.HTTP_200_OK)
+
+
 # ==============================
 # Rewards Points Card (based on activated coupons)
 # ==============================
@@ -546,6 +682,22 @@ class RewardPointsSummaryView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
+        # Inactive accounts: reward points should be zero
+        try:
+            if not bool(getattr(request.user, "account_active", False)):
+                return Response(
+                    {
+                        "activated_coupon_count": 0,
+                        "progress_coupon_count": 0,
+                        "current_points": 0,
+                        "next_target_count": 1,
+                        "points_at_next_target": 0,
+                        "progress_percentage": 0,
+                    },
+                    status=status.HTTP_200_OK,
+                )
+        except Exception:
+            pass
         rp, _ = RewardProgress.objects.get_or_create(user=request.user)
         # E‑coupon activations (distinct codes activated by me)
         try:

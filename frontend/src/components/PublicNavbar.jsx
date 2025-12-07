@@ -31,7 +31,7 @@ export default function PublicNavbar() {
             color="inherit"
             variant="outlined"
             sx={{ fontWeight: 600, textTransform: "none", borderColor: "rgba(255,255,255,0.7)" }}
-            onClick={() => navigate("/auth/select")}
+            onClick={() => navigate("/auth/register-v2")}
           >
             Register
           </Button>

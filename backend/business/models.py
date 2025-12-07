@@ -2,6 +2,15 @@ from django.db import models
 from django.conf import settings
 from django.utils import timezone
 
+# Optional Cloudinary raw/media storage for business app (ebooks, proofs)
+try:
+    from cloudinary_storage.storage import RawMediaCloudinaryStorage, MediaCloudinaryStorage
+    RAW_STORAGE = RawMediaCloudinaryStorage()
+    MEDIA_STORAGE = MediaCloudinaryStorage()
+except Exception:
+    RAW_STORAGE = None
+    MEDIA_STORAGE = None
+
 
 class BusinessRegistration(models.Model):
     STATUS_PENDING = 'pending'
@@ -871,13 +880,33 @@ class PromoPackage(models.Model):
         return f"{self.code} — {self.name} (₹{self.price}) [{self.type}]"
 
 
+class PromoProduct(models.Model):
+    """
+    Dedicated Promo Product decoupled from Market products.
+    Admin can upload/manage these separately for promo packages.
+    """
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0.01)])
+    image = models.ImageField(upload_to="uploads/promo_products/", null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return self.name
+
+
 class PromoPackageProduct(models.Model):
     """
     Mapping of PromoPackage (specifically PRIME750) to Market Products.
     Admin can seed any number of products under the 750₹ promo.
     """
     package = models.ForeignKey(PromoPackage, on_delete=models.CASCADE, related_name="promo_products")
-    product = models.ForeignKey("market.Product", on_delete=models.CASCADE, related_name="promo_packages")
+    product = models.ForeignKey("PromoProduct", on_delete=models.CASCADE, related_name="promo_packages")
     is_active = models.BooleanField(default=True)
     display_order = models.PositiveIntegerField(default=0)
 
@@ -938,6 +967,54 @@ class PromoMonthlyBox(models.Model):
         return f"{self.user_id}:{getattr(self.package, 'code', 'PKG')} #{self.package_number} [{self.box_number}]"
 
 
+class PromoEBook(models.Model):
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    file = models.FileField(upload_to="uploads/ebooks/", storage=RAW_STORAGE)
+    cover = models.ImageField(upload_to="uploads/ebooks/covers/", null=True, blank=True, storage=MEDIA_STORAGE)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.title
+
+
+class PromoPackageEBook(models.Model):
+    """
+    Map PromoPackage (e.g., PRIME 150) to one or more E‑Books that the buyer should receive when choosing EBOOK.
+    """
+    package = models.ForeignKey(PromoPackage, on_delete=models.CASCADE, related_name="ebooks")
+    ebook = models.ForeignKey(PromoEBook, on_delete=models.CASCADE, related_name="packages")
+    is_active = models.BooleanField(default=True)
+    display_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        unique_together = (("package", "ebook"),)
+        ordering = ["package_id", "display_order", "id"]
+
+    def __str__(self):
+        return f"{getattr(self.package, 'code', 'PKG')} → {getattr(self.ebook, 'title', 'E‑Book')}"
+
+
+class EBookAccess(models.Model):
+    """
+    Grants a user access to an E‑Book. Created on approval when prime150_choice == 'EBOOK'.
+    """
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="ebook_accesses", db_index=True)
+    ebook = models.ForeignKey(PromoEBook, on_delete=models.CASCADE, related_name="accesses")
+    granted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = (("user", "ebook"),)
+        ordering = ["-granted_at", "-id"]
+
+    def __str__(self):
+        return f"{self.user_id} → {getattr(self.ebook, 'title', 'E‑Book')}"
+
+
 class PromoPurchase(models.Model):
     STATUS_CHOICES = (
         ("PENDING", "PENDING"),
@@ -951,12 +1028,18 @@ class PromoPurchase(models.Model):
 
     # Quantity requested by user for this promo purchase (used to allocate e‑coupons on approval)
     quantity = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)])
+    # For PRIME 150 purchases, capture user's choice: EBOOK or REDEEM (blank for other packages)
+    prime150_choice = models.CharField(max_length=16, blank=True, default="", db_index=True, help_text="For PRIME 150: EBOOK or REDEEM")
+    # For PRIME 750 purchases, capture user's choice: PRODUCT or REDEEM or COUPON
+    prime750_choice = models.CharField(max_length=16, blank=True, default="", db_index=True, help_text="For PRIME 750: PRODUCT or REDEEM or COUPON")
 
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0.00)], default=0)
-    payment_proof = models.FileField(upload_to="uploads/promo_proofs/", null=True, blank=True)
+    payment_proof = models.FileField(upload_to="uploads/promo_proofs/", null=True, blank=True, storage=RAW_STORAGE)
 
     # PRIME750 specific: selected product and shipping/delivery metadata
+    # Deprecated: selected_product kept for backward compatibility (was market.Product)
     selected_product = models.ForeignKey("market.Product", null=True, blank=True, on_delete=models.SET_NULL, related_name="selected_in_promo_purchases")
+    selected_promo_product = models.ForeignKey("PromoProduct", null=True, blank=True, on_delete=models.SET_NULL, related_name="selected_in_promo_purchases")
     shipping_address = models.TextField(blank=True)
     delivery_by = models.DateField(null=True, blank=True)
 

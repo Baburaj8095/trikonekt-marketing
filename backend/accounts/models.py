@@ -360,6 +360,14 @@ class Wallet(models.Model):
         - COMMISSION_CREDIT: withhold cfg.tax_percent to company wallet, add gross to main, net to withdrawable.
         - Other credits: add to main (no withholding), do not change withdrawable unless explicitly done elsewhere.
         """
+        # Enforce: No wallet credits for inactive accounts (except admin adjustments)
+        try:
+            if not bool(getattr(self.user, "account_active", False)) and tx_type not in {"ADJUSTMENT_CREDIT", "ADJUSTMENT_DEBIT"}:
+                # Skip creating any credit transactions for inactive users
+                return self.balance
+        except Exception:
+            # best-effort guard; if any error evaluating active flag, continue normal flow
+            pass
         from decimal import Decimal as D
         # Lock this wallet row
         w = Wallet.objects.select_for_update().get(pk=self.pk)

@@ -67,6 +67,8 @@ class LuckyDrawSubmission(models.Model):
         ("TRE_REJECTED", "TRE Rejected"),
         ("AGENCY_APPROVED", "Agency Approved"),
         ("AGENCY_REJECTED", "Agency Rejected"),
+        ("ADMIN_APPROVED", "Admin Approved"),
+        ("ADMIN_REJECTED", "Admin Rejected"),
     )
     assigned_tre = models.ForeignKey(
         CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name="assigned_lucky_draws"
@@ -85,6 +87,12 @@ class LuckyDrawSubmission(models.Model):
     agency_reviewed_at = models.DateTimeField(null=True, blank=True)
     agency_comment = models.TextField(blank=True)
 
+    admin_reviewer = models.ForeignKey(
+        CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name="admin_lucky_reviews"
+    )
+    admin_reviewed_at = models.DateTimeField(null=True, blank=True)
+    admin_comment = models.TextField(blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     def mark_tre_review(self, reviewer: CustomUser, approved: bool, comment: str = ""):
@@ -100,6 +108,13 @@ class LuckyDrawSubmission(models.Model):
         self.agency_reviewed_at = timezone.now()
         self.agency_comment = comment or ""
         self.status = "AGENCY_APPROVED" if approved else "AGENCY_REJECTED"
+
+    def mark_admin_review(self, reviewer: CustomUser, approved: bool, comment: str = ""):
+        from django.utils import timezone
+        self.admin_reviewer = reviewer
+        self.admin_reviewed_at = timezone.now()
+        self.admin_comment = comment or ""
+        self.status = "ADMIN_APPROVED" if approved else "ADMIN_REJECTED"
 
     def __str__(self):
         return f"{self.username or 'anon'} - {self.sl_number}"
@@ -189,3 +204,164 @@ class AgencyCouponQuota(models.Model):
     def __str__(self):
         who = getattr(self.agency, "username", "agency")
         return f"{who} quota {self.quota}"
+
+
+class LuckyDrawEligibility(models.Model):
+    """
+    Per-user Lucky Draw eligibility earned from approved PRIME 750 purchases with choice=COUPON.
+    tokens: number of entries earned
+    consumed: number of entries consumed (future use; not auto-consumed yet)
+    """
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="lucky_draw_eligibilities", db_index=True)
+    purchase = models.ForeignKey("business.PromoPurchase", on_delete=models.SET_NULL, null=True, blank=True, related_name="lucky_draw_eligibility")
+    tokens = models.PositiveIntegerField(default=1)
+    consumed = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at", "-id"]
+        indexes = [
+            models.Index(fields=["user"]),
+        ]
+
+    def remaining(self) -> int:
+        try:
+            rem = int(self.tokens or 0) - int(self.consumed or 0)
+            return rem if rem > 0 else 0
+        except Exception:
+            return 0
+
+    def __str__(self):
+        return f"Eligibility<{self.user_id}> +{self.tokens} -{self.consumed}"
+
+
+# ==============================
+# Spin-based Lucky Draw (admin-picked winners)
+# ==============================
+class LuckySpinDraw(models.Model):
+    """
+    Admin-configured spin window. Spin UI is enabled only between start_at and end_at.
+    Winners are fully admin-selected; non-winners always see a losing result.
+    """
+    STATUS_CHOICES = (
+        ("DRAFT", "DRAFT"),
+        ("SCHEDULED", "SCHEDULED"),
+        ("LOCKED", "LOCKED"),   # config frozen; ready for window
+        ("LIVE", "LIVE"),       # within window
+        ("ENDED", "ENDED"),     # past end_at
+        ("CANCELLED", "CANCELLED"),
+    )
+    title = models.CharField(max_length=200, blank=True, default="")
+    start_at = models.DateTimeField(db_index=True)
+    end_at = models.DateTimeField(db_index=True)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="DRAFT", db_index=True)
+    timezone = models.CharField(max_length=64, default="Asia/Kolkata")
+    locked = models.BooleanField(default=False, help_text="Freeze config and winners before going live")
+    created_by = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.SET_NULL, related_name="created_spin_draws")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-start_at", "-id"]
+
+    def __str__(self):
+        return f"SpinDraw<{self.id}> {self.title or ''} [{self.start_at} - {self.end_at}] {self.status}"
+
+    @property
+    def is_active_window(self) -> bool:
+        from django.utils import timezone
+        now = timezone.now()
+        return bool(self.locked and self.start_at <= now <= self.end_at)
+
+    def auto_refresh_status(self, save: bool = False):
+        """
+        Soft status management to aid UI. Does not enforce scheduling beyond hints.
+        """
+        from django.utils import timezone
+        now = timezone.now()
+        new = self.status
+        if self.locked and self.start_at <= now <= self.end_at:
+            new = "LIVE"
+        elif now > self.end_at:
+            new = "ENDED"
+        elif self.locked:
+            new = "SCHEDULED"
+        else:
+            new = "DRAFT"
+        if new != self.status:
+            self.status = new
+            if save:
+                try:
+                    self.save(update_fields=["status"])
+                except Exception:
+                    pass
+
+
+class LuckySpinWinner(models.Model):
+    """
+    Admin-selected winners for a draw, with optional prize payload.
+    """
+    PRIZE_TYPE_CHOICES = (
+        ("INFO", "Informational"),
+        ("WALLET", "Wallet Credit"),
+        ("COUPON", "Coupon"),
+    )
+    draw = models.ForeignKey(LuckySpinDraw, on_delete=models.CASCADE, related_name="winners", db_index=True)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="spin_wins", db_index=True)
+    # Snapshot fields for display/audit
+    username = models.CharField(max_length=150, blank=True, default="")
+    prize_title = models.CharField(max_length=200, blank=True, default="")
+    prize_description = models.TextField(blank=True, default="")
+    prize_type = models.CharField(max_length=16, choices=PRIZE_TYPE_CHOICES, default="INFO")
+    prize_value = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    prize_meta = models.JSONField(null=True, blank=True)
+    is_claimed = models.BooleanField(default=False)
+    claimed_at = models.DateTimeField(null=True, blank=True)
+    claim_source = models.CharField(max_length=32, blank=True, default="")  # e.g., SPIN, ADMIN
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+        unique_together = (("draw", "user"),)
+        indexes = [
+            models.Index(fields=["draw", "user"]),
+        ]
+
+    def __str__(self):
+        return f"SpinWinner<{getattr(self.user, 'username', self.user_id)} @ {self.draw_id}>"
+
+    def mark_claimed(self, source: str = "SPIN"):
+        from django.utils import timezone
+        if not self.is_claimed:
+            self.is_claimed = True
+            self.claimed_at = timezone.now()
+            self.claim_source = source or "SPIN"
+            try:
+                self.save(update_fields=["is_claimed", "claimed_at", "claim_source"])
+            except Exception:
+                pass
+
+
+class LuckySpinAttempt(models.Model):
+    """
+    A user's spin attempt for a draw. Enforce one attempt per (user, draw).
+    """
+    RESULT_CHOICES = (("WIN", "WIN"), ("LOSE", "LOSE"))
+    draw = models.ForeignKey(LuckySpinDraw, on_delete=models.CASCADE, related_name="attempts", db_index=True)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="spin_attempts", db_index=True)
+    result = models.CharField(max_length=8, choices=RESULT_CHOICES)
+    payload = models.JSONField(null=True, blank=True)
+    spun_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-spun_at", "-id"]
+        unique_together = (("draw", "user"),)
+        indexes = [
+            models.Index(fields=["draw", "user"]),
+            models.Index(fields=["user", "spun_at"]),
+        ]
+
+    def __str__(self):
+        return f"SpinAttempt<{getattr(self.user, 'username', self.user_id)} {self.result} @ {self.draw_id}>"

@@ -1201,7 +1201,13 @@ class WalletMe(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        w = Wallet.get_or_create_for_user(request.user)
+        # If account is inactive, always show zero balances
+        inactive = False
+        try:
+            inactive = not bool(getattr(request.user, "account_active", False))
+        except Exception:
+            inactive = False
+
         # Lazy import to avoid circulars and to read current tax config
         try:
             from business.models import CommissionConfig
@@ -1209,6 +1215,17 @@ class WalletMe(APIView):
             tax_percent = str(getattr(cfg, "tax_percent", 10))
         except Exception:
             tax_percent = "10"
+
+        if inactive:
+            return Response({
+                "balance": "0",
+                "main_balance": "0",
+                "withdrawable_balance": "0",
+                "tax_percent": tax_percent,
+                "updated_at": None
+            }, status=status.HTTP_200_OK)
+
+        w = Wallet.get_or_create_for_user(request.user)
         return Response({
             "balance": str(w.balance),                       # total (legacy)
             "main_balance": str(getattr(w, "main_balance", 0) or 0),

@@ -145,6 +145,7 @@ const RegisterV2 = () => {
   const [selectedCountry, setSelectedCountry] = useState("");
   const [selectedState, setSelectedState] = useState("");
   const [selectedCity, setSelectedCity] = useState("");
+  const [selectedCityId, setSelectedCityId] = useState("");
   const [pincode, setPincode] = useState("");
 
   // Geo assist
@@ -331,6 +332,7 @@ const RegisterV2 = () => {
     setSelectedCountry(value);
     setSelectedState("");
     setSelectedCity("");
+    setSelectedCityId("");
     setStates([]);
     setCities([]);
     setPincode("");
@@ -340,6 +342,7 @@ const RegisterV2 = () => {
     const value = e.target.value;
     setSelectedState(value);
     setSelectedCity("");
+    setSelectedCityId("");
     setCities([]);
     setPincode("");
     if (value) loadCities(value);
@@ -384,7 +387,9 @@ const RegisterV2 = () => {
           // Country
           if (Array.isArray(countries) && countries.length) {
             const matchCountry = countries.find(
-              (c) => String(c?.name || "").toLowerCase() === String(detectedCountry || "").toLowerCase()
+              (c) =>
+                String(c?.name || "").trim().toLowerCase() ===
+                String(detectedCountry || "").trim().toLowerCase()
             );
             if (matchCountry) {
               const id = String(matchCountry.id);
@@ -396,14 +401,18 @@ const RegisterV2 = () => {
           if (detectedState) {
             const st = (prevStates) =>
               (prevStates || []).find(
-                (s) => String(s?.name || "").toLowerCase() === String(detectedState).toLowerCase()
+                (s) =>
+                  String(s?.name || "").trim().toLowerCase() ===
+                  String(detectedState).trim().toLowerCase()
               );
             const match = st(states);
             if (!match) {
               // wait small time for states to load
               setTimeout(() => {
                 const s2 = (states || []).find(
-                  (s) => String(s?.name || "").toLowerCase() === String(detectedState).toLowerCase()
+                  (s) =>
+                    String(s?.name || "").trim().toLowerCase() ===
+                    String(detectedState).trim().toLowerCase()
                 );
                 if (s2) {
                   const sid = String(s2.id);
@@ -463,8 +472,12 @@ const RegisterV2 = () => {
           )
         );
         setNonAgencyDistrictPincodes(pins);
-        // Keep valid selection
-        setPincode((prev) => (pins.includes(prev) ? prev : (pins[0] || "")));
+        // Keep valid selection and avoid overriding an already valid 6-digit pin
+        setPincode((prev) => {
+          const prevNorm = String(prev || "").replace(/\D/g, "").slice(0, 6);
+          if (/^\d{6}$/.test(prevNorm) && pins.includes(prevNorm)) return prevNorm;
+          return pins[0] || prevNorm || "";
+        });
       } catch {
         setNonAgencyDistrictPincodes([]);
       } finally {
@@ -479,7 +492,9 @@ const RegisterV2 = () => {
     if (selectedCountry) return;
     const name = String(geoCountryName || "").toLowerCase();
     if (!name || !Array.isArray(countries) || !countries.length) return;
-    const match = countries.find((c) => String(c?.name || "").toLowerCase() === name);
+    const match = countries.find(
+      (c) => String(c?.name || "").trim().toLowerCase() === name.trim().toLowerCase()
+    );
     if (match) {
       const id = String(match.id);
       setSelectedCountry(id);
@@ -493,7 +508,9 @@ const RegisterV2 = () => {
     if (!selectedCountry || selectedState) return;
     const name = String(geoStateName || "").toLowerCase();
     if (!name || !Array.isArray(states) || !states.length) return;
-    const match = states.find((s) => String(s?.name || "").toLowerCase() === name);
+    const match = states.find(
+      (s) => String(s?.name || "").trim().toLowerCase() === name.trim().toLowerCase()
+    );
     if (match) {
       const id = String(match.id);
       setSelectedState(id);
@@ -505,14 +522,62 @@ const RegisterV2 = () => {
   useEffect(() => {
     if (isAgency) return;
     if (!selectedState || selectedCity) return;
-    const name = String(geoCityName || "").toLowerCase();
-    if (!name || !Array.isArray(cities) || !cities.length) return;
-    const match = cities.find((c) => {
-      const nm = String(c?.name || c?.Name || c?.city || c?.City || "").toLowerCase();
-      return nm === name;
-    });
-    const nm = match?.name || match?.Name || match?.city || match?.City;
-    if (nm) setSelectedCity(nm);
+    const input = String(geoCityName || "");
+    if (!input || !Array.isArray(cities) || !cities.length) return;
+    const norm = (v) => String(v || "").trim().toLowerCase();
+    const variants = (s) => {
+      const b = norm(s);
+      const map = {
+        "bengaluru": ["bangalore"],
+        "bengaluru urban": ["bangalore urban"],
+        "bengaluru rural": ["bangalore rural"],
+        "mysuru": ["mysore"],
+        "shivamogga": ["shimoga"],
+        "tumakuru": ["tumkur"],
+        "chikkamagaluru": ["chikmagalur"],
+        "belagavi": ["belgaum"],
+        "vijayapura": ["bijapur"],
+        "ballari": ["bellary"],
+        "kalaburagi": ["gulbarga", "kalaburgi"],
+        "kalaburgi": ["kalaburagi", "gulbarga"],
+      };
+      const set = new Set([b]);
+      for (const [k, arr] of Object.entries(map)) {
+        if (b === k || arr.includes(b)) {
+          set.add(k);
+          for (const x of arr) set.add(x);
+        }
+      }
+      return Array.from(set);
+    };
+    const cityList = (cities || [])
+      .map((c) => c?.name || c?.Name || c?.city || c?.City)
+      .filter(Boolean);
+    const nlist = cityList.map((n) => ({ raw: n, key: norm(n) }));
+    const vset = new Set(variants(input));
+    let chosen = null;
+    // exact match on any variant
+    for (const item of nlist) {
+      if (vset.has(item.key)) {
+        chosen = item.raw;
+        break;
+      }
+    }
+    // fallback: substring contains
+    if (!chosen) {
+      const base = norm(input);
+      chosen = nlist.find((it) => it.key.includes(base))?.raw || null;
+    }
+  if (chosen) {
+    setSelectedCity(chosen);
+    try {
+      const m = (cities || []).find((c) => {
+        const nm = String(c?.name || c?.Name || c?.city || c?.City || "").trim().toLowerCase();
+        return nm === norm(chosen);
+      });
+      setSelectedCityId(m && m.id != null ? String(m.id) : "");
+    } catch {}
+  }
   }, [isAgency, selectedState, geoCityName, cities, selectedCity]); // eslint-disable-line
 
   // Auto-lookup pincode -> infer district/state/country (non-agency incl. business)
@@ -933,6 +998,34 @@ const RegisterV2 = () => {
       }
     }
 
+    // Resolve cityId strictly as a numeric PK before building payload
+    let cityId = selectedCityId && /^\d+$/.test(String(selectedCityId)) ? Number(selectedCityId) : null;
+    try {
+      if (!cityId) {
+        const pinNorm = String(pincode || "").replace(/\D/g, "");
+        if (pinNorm.length === 6) {
+          const pinResp = await API.get(`/location/pincode/${pinNorm}/`);
+          const pb = pinResp?.data || {};
+          if (pb?.city_id) {
+            cityId = Number(pb.city_id);
+          }
+        }
+      }
+      if (!cityId && selectedState && selectedCity) {
+        const cResp = await API.get("/location/cities/", { params: { state: selectedState } });
+        const rows = Array.isArray(cResp?.data) ? cResp.data : cResp?.data?.results || [];
+        const norm = (v) => String(v || "").trim().toLowerCase();
+        const match = rows.find((c) => {
+          const nm = c?.name || c?.Name || c?.city || c?.City;
+          return norm(nm) === norm(selectedCity);
+        });
+        if (match) {
+          const idCandidate = match.id ?? match.city_id ?? match.pk;
+          if (idCandidate != null) cityId = Number(idCandidate);
+        }
+      }
+    } catch {}
+
     // Build payload
     const payload = {
       password: formData.password,
@@ -947,7 +1040,7 @@ const RegisterV2 = () => {
       Object.assign(payload, {
         country: selectedCountry || null,
         state: selectedState || null,
-        city: selectedCity || null,
+        city: cityId ?? (selectedCityId && /^\d+$/.test(String(selectedCityId)) ? Number(selectedCityId) : null),
         pincode,
         country_name: geoCountryName || "",
         state_name: geoStateName || "",
@@ -987,7 +1080,7 @@ const RegisterV2 = () => {
           sponsor_id: sponsorId || "",
           country: selectedCountry || null,
           state: selectedState || null,
-          city: selectedCity || null,
+          city: cityId ?? (selectedCityId && /^\d+$/.test(String(selectedCityId)) ? Number(selectedCityId) : null),
           pincode,
           country_name: geoCountryName || "",
           state_name: geoStateName || "",
@@ -1143,7 +1236,15 @@ const RegisterV2 = () => {
                 label="District"
                 value={selectedCity}
                 onChange={(e) => {
-                  setSelectedCity(e.target.value);
+                  const name = e.target.value;
+                  setSelectedCity(name);
+                  try {
+                    const norm = (v) => String(v || "").trim().toLowerCase();
+                    const m = (cities || []).find(
+                      (c) => norm(c?.name || c?.Name || c?.city || c?.City) === norm(name)
+                    );
+                    setSelectedCityId(m ? String(m.id) : "");
+                  } catch {}
                   setPincode("");
                 }}
                 required
@@ -1332,7 +1433,15 @@ const RegisterV2 = () => {
                 label="District"
                 value={selectedCity}
                 onChange={(e) => {
-                  setSelectedCity(e.target.value);
+                  const name = e.target.value;
+                  setSelectedCity(name);
+                  try {
+                    const norm = (v) => String(v || "").trim().toLowerCase();
+                    const m = (cities || []).find(
+                      (c) => norm(c?.name || c?.Name || c?.city || c?.City) === norm(name)
+                    );
+                    setSelectedCityId(m ? String(m.id) : "");
+                  } catch {}
                   setPincode("");
                 }}
                 required

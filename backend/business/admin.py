@@ -4,7 +4,7 @@ from django.utils import timezone
 from django.db.models import Q
 import csv
 
-from .models import BusinessRegistration, CommissionConfig, AutoPoolAccount, RewardProgress, RewardRedemption, UserMatrixProgress, ReferralJoinPayout, FranchisePayout, DailyReport, WithholdingReserve, Package, AgencyPackageAssignment, AgencyPackagePayment, PromoPackage, PromoPurchase, PromoPackageProduct, PromoMonthlyPackage, PromoMonthlyBox
+from .models import BusinessRegistration, CommissionConfig, AutoPoolAccount, RewardProgress, RewardRedemption, UserMatrixProgress, ReferralJoinPayout, FranchisePayout, DailyReport, WithholdingReserve, Package, AgencyPackageAssignment, AgencyPackagePayment, PromoPackage, PromoProduct, PromoPurchase, PromoPackageProduct, PromoMonthlyPackage, PromoMonthlyBox, PromoEBook, PromoPackageEBook, EBookAccess
 from accounts.models import CustomUser
 
 
@@ -334,6 +334,14 @@ class PromoPackageAdmin(admin.ModelAdmin):
     )
     ordering = ("code",)
 
+@admin.register(PromoProduct)
+class PromoProductAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "price", "is_active", "created_at")
+    list_filter = ("is_active",)
+    search_fields = ("name",)
+    ordering = ("-created_at", "-id")
+
+
 @admin.register(PromoPackageProduct)
 class PromoPackageProductAdmin(admin.ModelAdmin):
     list_display = ("id", "package", "product", "is_active", "display_order")
@@ -359,6 +367,37 @@ class PromoMonthlyBoxAdmin(admin.ModelAdmin):
     search_fields = ("user__username", "package__code")
     raw_id_fields = ("user", "package", "purchase")
     ordering = ("-created_at", "-id")
+
+
+@admin.register(PromoEBook)
+class PromoEBookAdmin(admin.ModelAdmin):
+    list_display = ("id", "title", "is_active", "created_at")
+    list_filter = ("is_active",)
+    search_fields = ("title",)
+    readonly_fields = ("created_at",)
+    ordering = ("-created_at", "-id")
+    fieldsets = (
+        ("E-Book", {"fields": ("title", "description", "file", "cover", "is_active")}),
+        ("Audit", {"fields": ("created_at",)}),
+    )
+
+
+@admin.register(PromoPackageEBook)
+class PromoPackageEBookAdmin(admin.ModelAdmin):
+    list_display = ("id", "package", "ebook", "is_active", "display_order")
+    list_filter = ("is_active", "package")
+    search_fields = ("package__code", "ebook__title")
+    raw_id_fields = ("package", "ebook")
+    ordering = ("package", "display_order", "id")
+
+
+@admin.register(EBookAccess)
+class EBookAccessAdmin(admin.ModelAdmin):
+    list_display = ("id", "user", "ebook", "granted_at")
+    search_fields = ("user__username", "ebook__title")
+    raw_id_fields = ("user", "ebook")
+    ordering = ("-granted_at", "-id")
+    readonly_fields = ("granted_at",)
 
 
 @admin.register(PromoPurchase)

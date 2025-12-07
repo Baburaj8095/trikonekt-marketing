@@ -208,13 +208,41 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     def mine_consumer(self, request):
         """
         Consumer: list my e-coupon codes (ownership via assigned_consumer)
+        Performance optimized:
+          - restrict to issued_channel='e_coupon'
+          - single pass to fetch activation/transfer audits for current page
+          - pass precomputed sets to serializer to avoid per-row queries
         """
         if not is_consumer_user(request.user):
             return Response({"detail": "Only consumers can view their codes."}, status=status.HTTP_403_FORBIDDEN)
-        qs = CouponCode.objects.filter(assigned_consumer=request.user).order_by("-created_at")
+
+        qs = (CouponCode.objects
+              .filter(assigned_consumer=request.user, issued_channel="e_coupon")
+              .select_related("coupon", "assigned_employee", "assigned_agency", "issued_by", "batch")
+              .order_by("-created_at"))
+
         page = self.paginate_queryset(qs)
-        ser = self.get_serializer(page if page is not None else qs, many=True)
-        return self.get_paginated_response(ser.data) if page is not None else Response(ser.data)
+        objs = list(page if page is not None else qs)
+        ids = [o.id for o in objs]
+
+        from .models import AuditTrail
+        activated_set = set(
+            AuditTrail.objects.filter(
+                action="coupon_activated", actor=request.user, coupon_code_id__in=ids
+            ).values_list("coupon_code_id", flat=True)
+        )
+        transferred_set = set(
+            AuditTrail.objects.filter(
+                action="consumer_transfer", actor=request.user, coupon_code_id__in=ids
+            ).values_list("coupon_code_id", flat=True)
+        )
+
+        ctx = self.get_serializer_context()
+        ctx.update({"activated_ids_set": activated_set, "transferred_ids_set": transferred_set})
+        ser = self.get_serializer(objs, many=True, context=ctx)
+        if page is not None:
+            return self.get_paginated_response(ser.data)
+        return Response(ser.data)
 
     @action(detail=False, methods=["get"], url_path="consumer-summary", permission_classes=[IsAuthenticated])
     def consumer_summary(self, request):
@@ -2289,7 +2317,7 @@ class CouponActivateView(APIView):
         # Record activation audit for e-coupons (no approval flow) - idempotent per user+code
         try:
             code_str = str(source.get("code") or "").strip()
-            ch = str(source.get("channel") or "")
+            ch = str(source.get("channel") or "").replace("-", "_").lower()
             if code_str and ch == "e_coupon":
                 code_obj = CouponCode.objects.filter(code=code_str).first()
                 if code_obj and code_obj.assigned_consumer_id == request.user.id:
@@ -2307,7 +2335,7 @@ class CouponActivateView(APIView):
         # E-coupon activation commission distribution
         try:
             code_str = str(source.get("code") or "").strip()
-            ch = str(source.get("channel") or "")
+            ch = str(source.get("channel") or "").replace("-", "_").lower()
             if code_str and ch == "e_coupon":
                 code_obj = CouponCode.objects.filter(code=code_str).select_related("assigned_employee", "assigned_agency").first()
                 if code_obj and code_obj.assigned_consumer_id == request.user.id:
@@ -2379,7 +2407,7 @@ class CouponRedeemView(APIView):
         # Mark code redeemed and audit for e-coupons (no approval flow)
         try:
             code_str = str(source.get("code") or "").strip()
-            ch = str(source.get("channel") or "")
+            ch = str(source.get("channel") or "").replace("-", "_").lower()
             if code_str and ch == "e_coupon":
                 code_obj = CouponCode.objects.filter(code=code_str).first()
                 if code_obj and code_obj.assigned_consumer_id == request.user.id and code_obj.status != "REDEEMED":

@@ -43,7 +43,7 @@ export default function ConsumerShell({ children }) {
     { to: "/user/lucky-draw", label: "Manual Lucky Coupon", icon: "ticket" },
     { to: "/trikonekt-products", label: "Trikonekt Products", icon: "box" },
     { to: "/agency-marketplace", label: "Agency Marketplace", icon: "box" },
-    { to: "/marketplace/my-orders", label: "My Orders", icon: "orders" },
+    { to: "/user/my-orders", label: "My Orders", icon: "orders" },
     
     { to: "/user/history", label: "History", icon: "orders" },
     { to: "/user/kyc", label: "KYC", icon: "shield" },

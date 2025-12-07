@@ -321,6 +321,7 @@ export default function AdminShell({ children }) {
         { to: "/admin/products", label: "Products", icon: "box" },
         { to: "/admin/banners", label: "Banners", icon: "image" },
         { to: "/admin/orders", label: "Orders", icon: "orders" },
+        { to: "/admin/payments", label: "Payments", icon: "wallet" },
         { to: "/admin/uploads", label: "Uploads", icon: "upload" },
       ],
     },
@@ -341,6 +342,9 @@ export default function AdminShell({ children }) {
         { to: "/admin/e-coupons", label: "E‑Coupons", icon: "ticket" },
         // Promo packages and related admin models inside AdminShell
         { to: "/admin/dashboard/models/business/promopackage", label: "Promo Packages", icon: "box" },
+        { to: "/admin/dashboard/models/business/promoebook", label: "Promo E‑Books (Library)", icon: "box" },
+        { to: "/admin/dashboard/models/business/promopackageebook", label: "Package → E‑Books Mapping", icon: "box" },
+        { to: "/admin/promo-package-products", label: "Upload Promo Products (₹750)", icon: "upload" },
         { to: "/admin/dashboard/models/business/promopackageproduct", label: "Promo Products (₹750)", icon: "box" },
         { to: "/admin/dashboard/models/business/promomonthlypackage", label: "Monthly Package Numbers", icon: "box" },
         // Optional: inspect paid boxes if needed

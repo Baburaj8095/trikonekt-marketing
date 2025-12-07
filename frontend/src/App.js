@@ -39,6 +39,7 @@ import AdminMatrixFive from "./pages/admin/AdminMatrixFive";
 import AdminMatrixThree from "./pages/admin/AdminMatrixThree";
 import AdminAutopool from "./pages/admin/AdminAutopool";
 import AdminECoupons from "./pages/admin/AdminECoupons";
+import AdminPayments from "./pages/admin/AdminPayments";
 import AdminProducts from "./pages/admin/AdminProducts";
 import AdminBanners from "./pages/admin/AdminBanners";
 import AdminOrders from "./pages/admin/AdminOrders";
@@ -47,6 +48,7 @@ import AdminPackages from "./pages/admin/AdminPackages";
 import AdminBusiness from "./pages/admin/AdminBusiness";
 import AdminReports from "./pages/admin/AdminReports";
 import AdminPromoPurchases from "./pages/admin/AdminPromoPurchases";
+import AdminPromoPackageProducts from "./pages/admin/AdminPromoPackageProducts";
 import AdminDashboardCards from "./pages/admin/AdminDashboardCards";
 import AdminHomeCards from "./pages/admin/AdminHomeCards";
 import AdminLuckyDraw from "./pages/admin/AdminLuckyDraw";
@@ -74,6 +76,7 @@ import AdminRewardPoints from "./pages/admin/AdminRewardPoints";
 import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
 import RegisterV2 from "./pages/Auth/RegisterV2";
+import MyOrdersAll from "./pages/MyOrdersAll";
 
 function LegacyAuthEntry() {
   const location = useLocation();
@@ -264,6 +267,16 @@ function App() {
             <ProtectedRoute allowedRoles={["user"]}>
               <ConsumerShell>
                 <Checkout />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/my-orders"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <MyOrdersAll />
               </ConsumerShell>
             </ProtectedRoute>
           }
@@ -721,11 +734,31 @@ function App() {
           }
         />
         <Route
+          path="/admin/payments"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminPayments />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/promo-purchases"
           element={
             <AdminProtectedRoute>
               <AdminShell>
                 <AdminPromoPurchases />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/promo-package-products"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminPromoPackageProducts />
               </AdminShell>
             </AdminProtectedRoute>
           }

@@ -289,14 +289,31 @@ export function addEcoupon({ productId, title = "E‑Coupon", unitPrice = 0, qty
   });
 }
 
-export function addPromoPackagePrime({ pkgId, name, unitPrice = 0, qty = 1, selected_product_id = null, shipping_address = "" }) {
+export function addPromoPackagePrime({
+  pkgId,
+  name,
+  unitPrice = 0,
+  qty = 1,
+  selected_product_id = null, // legacy (market.Product)
+  selected_promo_product_id = null, // new (business.PromoProduct)
+  shipping_address = "",
+  prime150_choice = null,
+  prime750_choice = null,
+}) {
   return addItem({
     type: "PROMO_PACKAGE",
     id: pkgId,
     name,
     unitPrice,
     qty,
-    meta: { kind: "PRIME", selected_product_id, shipping_address },
+    meta: {
+      kind: "PRIME",
+      selected_product_id,
+      selected_promo_product_id,
+      shipping_address,
+      prime150_choice,
+      prime750_choice,
+    },
   });
 }
 

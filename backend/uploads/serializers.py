@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import FileUpload, DashboardCard, LuckyDrawSubmission, JobApplication, HomeCard, LuckyCouponAssignment
+from .models import FileUpload, DashboardCard, LuckyDrawSubmission, JobApplication, HomeCard, LuckyCouponAssignment, LuckySpinDraw, LuckySpinWinner, LuckySpinAttempt
 from django.conf import settings
 try:
     from cloudinary_storage.storage import MediaCloudinaryStorage
@@ -125,6 +125,9 @@ class LuckyDrawSubmissionSerializer(serializers.ModelSerializer):
             "agency_reviewer",
             "agency_reviewed_at",
             "agency_comment",
+            "admin_reviewer",
+            "admin_reviewed_at",
+            "admin_comment",
             # Derived user location for convenience
             "user_city",
             "user_state",
@@ -143,6 +146,8 @@ class LuckyDrawSubmissionSerializer(serializers.ModelSerializer):
             "tre_reviewed_at",
             "agency_reviewer",
             "agency_reviewed_at",
+            "admin_reviewer",
+            "admin_reviewed_at",
         ]
 
     def validate_image(self, value):
@@ -238,3 +243,59 @@ class LuckyCouponAssignmentSerializer(serializers.ModelSerializer):
             return rem if rem > 0 else 0
         except Exception:
             return 0
+
+
+# ==============================
+# Spin-based Lucky Draw Serializers
+# ==============================
+class LuckySpinWinnerSerializer(serializers.ModelSerializer):
+    # convenience: snapshot username and allow admin to see it
+    class Meta:
+        model = LuckySpinWinner
+        fields = [
+            "id",
+            "user",
+            "username",
+            "prize_title",
+            "prize_description",
+            "prize_type",
+            "prize_value",
+            "prize_meta",
+            "is_claimed",
+            "claimed_at",
+            "claim_source",
+            "created_at",
+        ]
+        read_only_fields = ["username", "is_claimed", "claimed_at", "claim_source", "created_at"]
+
+
+class LuckySpinDrawSerializer(serializers.ModelSerializer):
+    winners = LuckySpinWinnerSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = LuckySpinDraw
+        fields = [
+            "id",
+            "title",
+            "start_at",
+            "end_at",
+            "status",
+            "timezone",
+            "locked",
+            "created_by",
+            "created_at",
+            "updated_at",
+            "winners",
+        ]
+        read_only_fields = ["status", "locked", "created_by", "created_at", "updated_at"]
+
+
+class LuckySpinAttemptSerializer(serializers.ModelSerializer):
+    username = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LuckySpinAttempt
+        fields = ["id", "draw", "user", "username", "result", "payload", "spun_at"]
+
+    def get_username(self, obj):
+        return getattr(getattr(obj, "user", None), "username", "") or ""

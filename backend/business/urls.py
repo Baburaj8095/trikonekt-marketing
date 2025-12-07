@@ -16,6 +16,8 @@ from .views import (
     AdminPromoPurchaseRejectView,
     # Rewards points summary
     RewardPointsSummaryView,
+    # E‑Books
+    EBookMyListView,
 )
 
 urlpatterns = [
@@ -34,6 +36,8 @@ urlpatterns = [
     path('rewards/me/', RewardProgressMeView.as_view(), name='reward_progress_me'),
     path('rewards/redeem/', RewardRedeemView.as_view(), name='reward_redeem'),
     path('rewards/points/', RewardPointsSummaryView.as_view(), name='reward_points_summary'),
+    # E‑Books library (mine)
+    path('ebooks/mine/', EBookMyListView.as_view(), name='ebooks_my_list'),
 
     # Promo Packages (Consumer + Admin)
     path('promo/packages/', PromoPackageListView.as_view(), name='promo_packages_list'),

@@ -3,8 +3,8 @@ from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.views import APIView
 from django.db.models import Q, Sum
-from accounts.models import CustomUser
-from .models import FileUpload, DashboardCard, LuckyDrawSubmission, JobApplication, HomeCard, LuckyCouponAssignment, AgencyCouponQuota
+from accounts.models import CustomUser, Wallet, WalletTransaction
+from .models import FileUpload, DashboardCard, LuckyDrawSubmission, JobApplication, HomeCard, LuckyCouponAssignment, AgencyCouponQuota, LuckyDrawEligibility, LuckySpinDraw, LuckySpinWinner, LuckySpinAttempt
 from .serializers import (
     FileUploadSerializer,
     DashboardCardSerializer,
@@ -12,6 +12,9 @@ from .serializers import (
     JobApplicationSerializer,
     HomeCardSerializer,
     LuckyCouponAssignmentSerializer,
+    LuckySpinDrawSerializer,
+    LuckySpinWinnerSerializer,
+    LuckySpinAttemptSerializer,
 )
 from coupons.models import CouponSubmission as RedeemSubmission, Coupon
 from django.utils import timezone
@@ -36,6 +39,35 @@ def _normalize_media_relpath(name: str) -> str:
     if p.startswith("media\\"):
         return p[6:]
     return p
+
+
+def _resolve_trsf_sponsor(user):
+    """
+    Ascend the registered_by chain to find the first Agency Sub-Franchise (TRSF) sponsor.
+    Returns a CustomUser or None.
+    """
+    try:
+        cur = user
+    except Exception:
+        return None
+    seen = set()
+    while cur is not None:
+        parent = getattr(cur, "registered_by", None)
+        if not parent or getattr(parent, "id", None) in seen:
+            break
+        seen.add(getattr(parent, "id", None))
+        try:
+            cat = (getattr(parent, "category", "") or "").lower()
+            prefix = (getattr(parent, "prefix_code", "") or "").upper()
+            role = (getattr(parent, "role", "") or "").lower()
+        except Exception:
+            cat = ""
+            prefix = ""
+            role = ""
+        if cat == "agency_sub_franchise" or prefix == "TRSF" or (role == "agency" and cat.startswith("agency_sub_franchise")):
+            return parent
+        cur = parent
+    return None
 
 class StorageInfoView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -718,6 +750,92 @@ class LuckyDrawAgencyRejectView(generics.GenericAPIView):
         return Response(self.get_serializer(obj).data)
 
 
+class LuckyDrawAdminApproveView(generics.GenericAPIView):
+    serializer_class = LuckyDrawSubmissionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            obj = LuckyDrawSubmission.objects.get(pk=pk)
+        except LuckyDrawSubmission.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        user = request.user
+        if not getattr(user, "is_staff", False):
+            return Response({"detail": "Not permitted."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Idempotent: if already admin approved, return as-is
+        if obj.status == "ADMIN_APPROVED":
+            return Response(self.get_serializer(obj).data)
+
+        # Policy: allow admin approval primarily after agency has approved; optionally accept TRE-approved too
+        if obj.status not in {"AGENCY_APPROVED", "TRE_APPROVED"}:
+            return Response({"detail": f"Invalid state {obj.status}."}, status=status.HTTP_400_BAD_REQUEST)
+
+        comment = request.data.get("comment", "")
+        obj.mark_admin_review(user, approved=True, comment=comment)
+        obj.save(update_fields=["admin_reviewer", "admin_reviewed_at", "admin_comment", "status"])
+
+        # Commission: Rs. 15 to TRSF (Agency Sub-Franchise) sponsor in the consumer's upline, idempotent
+        try:
+            consumer = obj.user
+            sponsor_trsf = _resolve_trsf_sponsor(consumer) if consumer else None
+            if sponsor_trsf:
+                exists = WalletTransaction.objects.filter(
+                    user=sponsor_trsf,
+                    type="FRANCHISE_INCOME",
+                    source_type="LUCKY_DRAW_ADMIN",
+                    source_id=str(obj.id),
+                ).exists()
+                if not exists:
+                    from decimal import Decimal as D
+                    w = Wallet.get_or_create_for_user(sponsor_trsf)
+                    w.credit(
+                        D("15.00"),
+                        tx_type="FRANCHISE_INCOME",
+                        meta={
+                            "from_user": getattr(consumer, "username", None),
+                            "lucky_draw_id": obj.id,
+                            "note": "Admin approved Lucky Draw commission to TRSF",
+                        },
+                        source_type="LUCKY_DRAW_ADMIN",
+                        source_id=str(obj.id),
+                    )
+        except Exception:
+            # best-effort; do not fail approval
+            pass
+
+        return Response(self.get_serializer(obj).data)
+
+
+class LuckyDrawAdminRejectView(generics.GenericAPIView):
+    serializer_class = LuckyDrawSubmissionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            obj = LuckyDrawSubmission.objects.get(pk=pk)
+        except LuckyDrawSubmission.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        user = request.user
+        if not getattr(user, "is_staff", False):
+            return Response({"detail": "Not permitted."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Idempotent: if already admin rejected, return as-is
+        if obj.status == "ADMIN_REJECTED":
+            return Response(self.get_serializer(obj).data)
+
+        if obj.status not in {"AGENCY_APPROVED", "TRE_APPROVED", "SUBMITTED", "TRE_REJECTED", "AGENCY_REJECTED"}:
+            # Allow admin to reject any non-final state for safety
+            pass
+
+        comment = request.data.get("comment", "")
+        obj.mark_admin_review(user, approved=False, comment=comment)
+        obj.save(update_fields=["admin_reviewer", "admin_reviewed_at", "admin_comment", "status"])
+        return Response(self.get_serializer(obj).data)
+
+
 class AgencyQuotaView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -757,6 +875,44 @@ class AgencyQuotaView(APIView):
         })
 
 
+class LuckyDrawEligibilityMeView(APIView):
+    """
+    GET /uploads/lucky-draw/eligibility/
+    Returns total Lucky Draw eligibility tokens earned from PRIME 750 (COUPON) approvals.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        qs = LuckyDrawEligibility.objects.filter(user=user)
+        try:
+            total = sum(int(getattr(e, "tokens", 0) or 0) for e in qs)
+        except Exception:
+            total = 0
+        try:
+            consumed = sum(int(getattr(e, "consumed", 0) or 0) for e in qs)
+        except Exception:
+            consumed = 0
+        remaining = max(0, int(total) - int(consumed))
+        entries = []
+        for e in qs:
+            entries.append({
+                "id": e.id,
+                "purchase_id": getattr(getattr(e, "purchase", None), "id", None),
+                "tokens": int(getattr(e, "tokens", 0) or 0),
+                "consumed": int(getattr(e, "consumed", 0) or 0),
+                "remaining": int(e.remaining()),
+                "created_at": getattr(e, "created_at", None),
+                "updated_at": getattr(e, "updated_at", None),
+            })
+        return Response({
+            "total_tokens": int(total),
+            "consumed": int(consumed),
+            "remaining": int(remaining),
+            "entries": entries,
+        }, status=status.HTTP_200_OK)
+
+
 class JobApplicationView(generics.ListCreateAPIView):
     serializer_class = JobApplicationSerializer
     permission_classes = [permissions.AllowAny]
@@ -788,3 +944,269 @@ class JobApplicationView(generics.ListCreateAPIView):
         else:
             # Allow unauthenticated submissions in development; user will be null
             serializer.save(user=None)
+
+
+# ==============================
+# Spin-based Lucky Draw (Admin + User)
+# ==============================
+class LuckySpinDrawListCreateView(generics.ListCreateAPIView):
+    """
+    Admin: list and create spin draws.
+    """
+    serializer_class = LuckySpinDrawSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if not getattr(user, "is_staff", False):
+            raise PermissionDenied("Not permitted.")
+        return LuckySpinDraw.objects.all().order_by("-start_at", "-id")
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        if not getattr(user, "is_staff", False):
+            raise PermissionDenied("Not permitted.")
+        start_at = self.request.data.get("start_at")
+        end_at = self.request.data.get("end_at")
+        if not start_at or not end_at:
+            raise ValidationError({"detail": "start_at and end_at are required."})
+        if str(start_at) >= str(end_at):
+            raise ValidationError({"detail": "start_at must be before end_at."})
+        serializer.save(created_by=user, locked=False)
+
+
+class LuckySpinDrawDetailView(generics.RetrieveUpdateAPIView):
+    """
+    Admin: retrieve/update a draw. Prevent updates once locked or ended.
+    """
+    serializer_class = LuckySpinDrawSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    queryset = LuckySpinDraw.objects.all()
+
+    def update(self, request, *args, **kwargs):
+        user = request.user
+        if not getattr(user, "is_staff", False):
+            raise PermissionDenied("Not permitted.")
+        instance = self.get_object()
+        # Block updates when locked or ended
+        instance.auto_refresh_status(save=True)
+        if instance.locked or instance.status in {"LIVE", "ENDED"}:
+            raise ValidationError({"detail": f"Cannot modify a {instance.status.lower()} draw."})
+        # Basic validation: start_at < end_at (if provided)
+        start_at = request.data.get("start_at")
+        end_at = request.data.get("end_at")
+        if start_at and end_at and str(start_at) >= str(end_at):
+            raise ValidationError({"detail": "start_at must be before end_at."})
+        return super().update(request, *args, **kwargs)
+
+
+class LuckySpinDrawLockView(generics.GenericAPIView):
+    """
+    Admin: lock a draw (freeze winners). Requires 1..10 winners.
+    """
+    serializer_class = LuckySpinDrawSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    queryset = LuckySpinDraw.objects.all()
+
+    def post(self, request, pk):
+        user = request.user
+        if not getattr(user, "is_staff", False):
+            return Response({"detail": "Not permitted."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            draw = LuckySpinDraw.objects.get(pk=pk)
+        except LuckySpinDraw.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        draw.auto_refresh_status(save=True)
+        if draw.locked:
+            return Response(self.get_serializer(draw).data)
+        winners_count = draw.winners.count()
+        if winners_count < 1 or winners_count > 10:
+            return Response({"detail": "Winners must be between 1 and 10 to lock."}, status=status.HTTP_400_BAD_REQUEST)
+        draw.locked = True
+        draw.auto_refresh_status(save=False)
+        draw.save(update_fields=["locked", "status"])
+        return Response(self.get_serializer(draw).data)
+
+
+class LuckySpinDrawUnlockView(generics.GenericAPIView):
+    """
+    Admin: unlock a draw (only if not LIVE or ENDED).
+    """
+    serializer_class = LuckySpinDrawSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    queryset = LuckySpinDraw.objects.all()
+
+    def post(self, request, pk):
+        user = request.user
+        if not getattr(user, "is_staff", False):
+            return Response({"detail": "Not permitted."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            draw = LuckySpinDraw.objects.get(pk=pk)
+        except LuckySpinDraw.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        draw.auto_refresh_status(save=True)
+        if draw.status in {"LIVE", "ENDED"}:
+            return Response({"detail": f"Cannot unlock a {draw.status.lower()} draw."}, status=status.HTTP_400_BAD_REQUEST)
+        draw.locked = False
+        draw.status = "DRAFT"
+        draw.save(update_fields=["locked", "status"])
+        return Response(self.get_serializer(draw).data)
+
+
+class LuckySpinWinnerCreateView(generics.GenericAPIView):
+    """
+    Admin: add a winner to a draw (max 10). Only when not locked.
+    """
+    serializer_class = LuckySpinWinnerSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        user = request.user
+        if not getattr(user, "is_staff", False):
+            return Response({"detail": "Not permitted."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            draw = LuckySpinDraw.objects.get(pk=pk)
+        except LuckySpinDraw.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        draw.auto_refresh_status(save=True)
+        if draw.locked:
+            return Response({"detail": "Draw is locked. Cannot add winners."}, status=status.HTTP_400_BAD_REQUEST)
+        if draw.winners.count() >= 10:
+            return Response({"detail": "Maximum 10 winners allowed."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            uid = int(request.data.get("user"))
+        except Exception:
+            return Response({"user": ["Valid user id is required."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        target = CustomUser.objects.filter(id=uid).first()
+        if not target:
+            return Response({"user": ["User not found."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Enforce uniqueness (draw, user)
+        exists = LuckySpinWinner.objects.filter(draw=draw, user=target).exists()
+        if exists:
+            return Response({"user": ["Already added as winner."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        prize_title = request.data.get("prize_title", "") or ""
+        prize_description = request.data.get("prize_description", "") or ""
+        prize_type = request.data.get("prize_type", "INFO")
+        prize_value = request.data.get("prize_value", None)
+        prize_meta = request.data.get("prize_meta", None)
+
+        winner = LuckySpinWinner.objects.create(
+            draw=draw,
+            user=target,
+            username=getattr(target, "username", "") or "",
+            prize_title=prize_title,
+            prize_description=prize_description,
+            prize_type=prize_type,
+            prize_value=prize_value,
+            prize_meta=prize_meta,
+        )
+        return Response(self.get_serializer(winner).data, status=status.HTTP_201_CREATED)
+
+
+class LuckySpinWinnerDeleteView(generics.DestroyAPIView):
+    """
+    Admin: remove a winner (only when draw not locked).
+    """
+    serializer_class = LuckySpinWinnerSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    queryset = LuckySpinWinner.objects.select_related("draw", "user")
+
+    def destroy(self, request, *args, **kwargs):
+        obj = self.get_object()
+        user = request.user
+        if not getattr(user, "is_staff", False):
+            return Response({"detail": "Not permitted."}, status=status.HTTP_403_FORBIDDEN)
+        if getattr(getattr(obj, "draw", None), "locked", False):
+            return Response({"detail": "Draw is locked. Cannot remove winner."}, status=status.HTTP_400_BAD_REQUEST)
+        return super().destroy(request, *args, **kwargs)
+
+
+class LuckySpinActiveView(APIView):
+    """
+    Public/User: get current LIVE draw (or next scheduled) and my status.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        now = timezone.now()
+        draw = (
+            LuckySpinDraw.objects.filter(locked=True, start_at__lte=now, end_at__gte=now).order_by("start_at").first()
+            or LuckySpinDraw.objects.filter(locked=True, start_at__gt=now).order_by("start_at").first()
+        )
+        if not draw:
+            return Response({"active": False, "draw": None})
+
+        # Refresh status hint for clients
+        draw.auto_refresh_status(save=True)
+        data = LuckySpinDrawSerializer(draw, context={"request": request}).data
+
+        user = getattr(request, "user", None)
+        is_auth = getattr(user, "is_authenticated", False)
+        attempted = False
+        result = None
+        is_winner = False
+
+        if is_auth:
+            is_winner = LuckySpinWinner.objects.filter(draw=draw, user=user).exists()
+            att = LuckySpinAttempt.objects.filter(draw=draw, user=user).first()
+            if att:
+                attempted = True
+                result = att.result
+
+        return Response({
+            "active": True,
+            "draw": data,
+            "attempted": attempted,
+            "result": result,
+            "is_winner": is_winner,
+        })
+
+
+class LuckySpinAttemptView(generics.GenericAPIView):
+    """
+    User: attempt a spin for a given draw id. Allowed only during active window.
+    """
+    serializer_class = LuckySpinAttemptSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        user = request.user
+        try:
+            draw = LuckySpinDraw.objects.get(pk=pk)
+        except LuckySpinDraw.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        draw.auto_refresh_status(save=True)
+        if not draw.is_active_window:
+            return Response({"detail": "Spin not active."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # One attempt per (user, draw)
+        existing = LuckySpinAttempt.objects.filter(draw=draw, user=user).first()
+        if existing:
+            ser = self.get_serializer(existing)
+            return Response(ser.data, status=status.HTTP_200_OK)
+
+        win_obj = LuckySpinWinner.objects.filter(draw=draw, user=user).first()
+        if win_obj:
+            payload = {
+                "prize_title": win_obj.prize_title,
+                "prize_description": win_obj.prize_description,
+                "prize_type": win_obj.prize_type,
+                "prize_value": str(getattr(win_obj, "prize_value", "") or ""),
+                "prize_meta": getattr(win_obj, "prize_meta", None),
+            }
+            attempt = LuckySpinAttempt.objects.create(draw=draw, user=user, result="WIN", payload=payload)
+            try:
+                win_obj.mark_claimed(source="SPIN")
+            except Exception:
+                pass
+        else:
+            attempt = LuckySpinAttempt.objects.create(draw=draw, user=user, result="LOSE", payload={"message": "Better luck next time!"})
+
+        ser = self.get_serializer(attempt)
+        return Response(ser.data, status=status.HTTP_201_CREATED)

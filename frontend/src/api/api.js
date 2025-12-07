@@ -709,7 +709,12 @@ export async function createPromoPurchase({
   file = null,
   remarks = "",
   selected_product_id = null,
+  selected_promo_product_id = null,
   shipping_address = "",
+  // For PRIME 150 user choice
+  prime150_choice = "EBOOK",
+  // For PRIME 750 user choice
+  prime750_choice = "PRODUCT",
   // New Monthly flow
   package_number = null,
   boxes = [],
@@ -740,7 +745,14 @@ export async function createPromoPurchase({
   if (file) fd.append("payment_proof", file);
   if (remarks) fd.append("remarks", String(remarks));
   if (selected_product_id != null) fd.append("selected_product_id", String(selected_product_id));
+  if (selected_promo_product_id != null) fd.append("selected_promo_product_id", String(selected_promo_product_id));
   if (shipping_address) fd.append("shipping_address", String(shipping_address));
+  if (prime150_choice != null && String(prime150_choice).trim() !== "") {
+    fd.append("prime150_choice", String(prime150_choice).toUpperCase());
+  }
+  if (prime750_choice != null && String(prime750_choice).trim() !== "") {
+    fd.append("prime750_choice", String(prime750_choice).toUpperCase());
+  }
   const res = await API.post("/business/promo/purchases/", fd, {
     headers: { "Content-Type": "multipart/form-data" },
     timeout: 30000,
@@ -776,6 +788,11 @@ export async function createProductPurchaseRequest(payload = {}) {
  */
 export async function getRewardPointsSummary() {
   const res = await API.get("/business/rewards/points/", { cacheTTL: 10_000, dedupe: "cancelPrevious" });
+  return res?.data || res;
+}
+
+export async function getMyEBooks() {
+  const res = await API.get("/business/ebooks/mine/", { cacheTTL: 10000, dedupe: "cancelPrevious" });
   return res?.data || res;
 }
 
