@@ -1681,6 +1681,213 @@ class AdminAutopoolTransactionList(ListAPIView):
         return Response({"count": total, "results": serializer.data}, status=200)
 
 
+class AdminMatrixAccountsList(APIView):
+    """
+    Admin: List AutoPoolAccount entries (matrix accounts) with filters.
+    Query params:
+      - pool: FIVE_150 | THREE_150 | THREE_50
+      - user: id or username/full_name/phone contains
+      - source_type: string (e.g., ECOUPON)
+      - source_id: string (e.g., coupon id)
+      - date_from, date_to: created_at (date)
+      - ordering: -created_at (default) | created_at | level | -level | position | -position
+      - page (default 1), page_size (default 25, max 200)
+    """
+    permission_classes = [IsAdminOrStaff]
+
+    def get(self, request):
+        try:
+            page = int(request.query_params.get("page") or 1)
+        except Exception:
+            page = 1
+        try:
+            page_size = int(request.query_params.get("page_size") or 25)
+        except Exception:
+            page_size = 25
+        page = max(1, page)
+        page_size = max(1, min(page_size, 200))
+
+        pool = (request.query_params.get("pool") or "").strip().upper()
+        user_q = (request.query_params.get("user") or "").strip()
+        source_type = (request.query_params.get("source_type") or "").strip()
+        source_id = (request.query_params.get("source_id") or "").strip()
+        date_from = (request.query_params.get("date_from") or "").strip()
+        date_to = (request.query_params.get("date_to") or "").strip()
+        ordering = (request.query_params.get("ordering") or "-created_at").strip()
+
+        qs = (AutoPoolAccount.objects
+              .select_related("owner", "parent_account", "parent_account__owner")
+              .all())
+
+        if pool in ("FIVE_150", "THREE_150", "THREE_50"):
+            qs = qs.filter(pool_type=pool)
+
+        if user_q:
+            if user_q.isdigit():
+                qs = qs.filter(Q(owner_id=int(user_q)) | Q(owner__username__icontains=user_q))
+            else:
+                qs = qs.filter(
+                    Q(owner__username__icontains=user_q)
+                    | Q(owner__full_name__icontains=user_q)
+                    | Q(owner__phone__icontains=user_q)
+                )
+
+        if source_type:
+            qs = qs.filter(source_type=source_type)
+        if source_id:
+            qs = qs.filter(source_id=source_id)
+
+        if date_from:
+            qs = qs.filter(created_at__date__gte=date_from)
+        if date_to:
+            qs = qs.filter(created_at__date__lte=date_to)
+
+        allowed_order = {"created_at", "-created_at", "level", "-level", "position", "-position", "id", "-id"}
+        if ordering not in allowed_order:
+            ordering = "-created_at"
+        qs = qs.order_by(ordering)
+
+        total = qs.count()
+        start = (page - 1) * page_size
+        end = start + page_size
+        items = qs[start:end]
+
+        results = []
+        for a in items:
+            parent_owner = None
+            try:
+                po = getattr(a.parent_account, "owner", None)
+                parent_owner = {
+                    "id": getattr(po, "id", None),
+                    "username": getattr(po, "username", None),
+                } if po else None
+            except Exception:
+                parent_owner = None
+
+            results.append({
+                "id": a.id,
+                "pool_type": a.pool_type,
+                "owner_id": a.owner_id,
+                "username": getattr(a.owner, "username", None),
+                "parent_account_id": a.parent_account_id,
+                "parent_owner": parent_owner,
+                "level": a.level,
+                "position": a.position,
+                "source_type": a.source_type or "",
+                "source_id": a.source_id or "",
+                "created_at": a.created_at,
+            })
+
+        return Response({"count": total, "page": page, "page_size": page_size, "results": results}, status=200)
+
+
+class AdminMatrixAccountStats(APIView):
+    """
+    Admin: Level-wise and total commission stats for a matrix account (by account_id)
+           or by (pool + source_type + source_id) tuple.
+    Query params:
+      - account_id: int
+        OR
+      - pool: FIVE_150 | THREE_150 | THREE_50
+      - source_type: string
+      - source_id: string
+    Response:
+      {
+        "pool": "...",
+        "source_type": "...",
+        "source_id": "...",
+        "tx_count": 10,
+        "total_amount": "123.45",
+        "per_level": {
+          "1": { "count": 5, "amount": "50.00" },
+          ...
+        },
+        "account": { ... }  // when account_id provided
+      }
+    """
+    permission_classes = [IsAdminOrStaff]
+
+    def get(self, request):
+        account_id = (request.query_params.get("account_id") or "").strip()
+        pool = (request.query_params.get("pool") or "").strip().upper()
+        src_type = (request.query_params.get("source_type") or "").strip()
+        src_id = (request.query_params.get("source_id") or "").strip()
+
+        account_info = None
+        if account_id:
+            try:
+                acc = AutoPoolAccount.objects.select_related("owner", "parent_account", "parent_account__owner").get(pk=int(account_id))
+            except Exception:
+                return Response({"detail": "account not found"}, status=404)
+            pool = acc.pool_type
+            src_type = acc.source_type or ""
+            src_id = acc.source_id or ""
+            account_info = {
+                "id": acc.id,
+                "pool_type": acc.pool_type,
+                "owner_id": acc.owner_id,
+                "username": getattr(acc.owner, "username", None),
+                "parent_account_id": acc.parent_account_id,
+                "level": acc.level,
+                "position": acc.position,
+                "source_type": src_type,
+                "source_id": src_id,
+                "created_at": acc.created_at,
+            }
+
+        if not (pool and src_type and src_id):
+            return Response({"detail": "Provide account_id or (pool + source_type + source_id)."}, status=400)
+
+        if pool == "FIVE_150":
+            tx_types = ("AUTOPOOL_BONUS_FIVE",)
+        elif pool in ("THREE_150", "THREE_50"):
+            tx_types = ("AUTOPOOL_BONUS_THREE",)
+        else:
+            return Response({"detail": "Invalid pool"}, status=400)
+
+        qs = (WalletTransaction.objects
+              .select_related("user")
+              .filter(type__in=tx_types, source_type=src_type, source_id=str(src_id))
+              .order_by("id"))
+
+        from decimal import Decimal as D
+        total_amount = D("0.00")
+        per_level = {}
+        tx_count = 0
+
+        for t in qs:
+            tx_count += 1
+            amt = D(str(getattr(t, "amount", "0") or "0"))
+            total_amount += amt
+            meta = getattr(t, "meta", {}) or {}
+            try:
+                lvl = int(meta.get("level_index") or 0)
+            except Exception:
+                lvl = 0
+            key = str(lvl)
+            row = per_level.get(key) or {"count": 0, "amount": D("0.00")}
+            row["count"] += 1
+            row["amount"] = row["amount"] + amt
+            per_level[key] = row
+
+        # Format amounts to strings
+        per_level_out = {}
+        for k, v in per_level.items():
+            per_level_out[k] = {"count": v["count"], "amount": f'{D(v["amount"]):.2f}'}
+
+        payload = {
+            "pool": pool,
+            "source_type": src_type,
+            "source_id": str(src_id),
+            "tx_count": tx_count,
+            "total_amount": f'{D(total_amount):.2f}',
+            "per_level": dict(sorted(per_level_out.items(), key=lambda x: int(x[0]) if str(x[0]).isdigit() else 9999)),
+        }
+        if account_info:
+            payload["account"] = account_info
+        return Response(payload, status=200)
+
+
 class AdminWithdrawalRejectView(APIView):
     """
     Reject a pending withdrawal without wallet mutation.

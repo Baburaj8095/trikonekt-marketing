@@ -189,7 +189,7 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
     150 'Active' path:
       - Direct sponsor bonus ₹2 (DIRECT_REF_BONUS)
       - Self bonus ₹1 (SELF_BONUS_ACTIVE)
-      - Open 5-matrix (L6) and 3-matrix (L15) pools and distribute per config percents
+      - Open 5-matrix (L6) and 3-matrix (L15) pools and distribute per config percents / fixed amounts
       - Idempotent via SubscriptionActivation
     Returns True if newly activated, False if already existed.
     """
@@ -237,6 +237,24 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
             source_id=src_id,
         )
 
+    # Skip matrix/account creation/distribution if already distributed for this source (e.g., per‑coupon)
+    try:
+        from coupons.models import AuditTrail, CouponCode
+        skip_matrix_parts = False
+        if src_id:
+            code_obj = CouponCode.objects.filter(pk=str(src_id)).first()
+            if (code_obj and AuditTrail.objects.filter(action="coupon_matrix_distributed", coupon_code=code_obj).exists()) or AuditTrail.objects.filter(action="coupon_matrix_distributed", metadata__source_id=str(src_id)).exists():
+                skip_matrix_parts = True
+    except Exception:
+        skip_matrix_parts = False
+
+    if skip_matrix_parts:
+        try:
+            ensure_first_purchase_activation(user, source)
+        except Exception:
+            pass
+        return created
+
     # Create 5-matrix and 3-matrix pool entries
     try:
         AutoPoolAccount.create_five_150_for_user(user, amount=base150)
@@ -247,18 +265,39 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
     except Exception:
         pass
 
-    # Distribute 5-matrix (L6)
+    # Distribute 5-matrix (L6) with fixed-amount override support
     five_levels = int(getattr(cfg, "five_matrix_levels", 6) or 6)
-    five_percents = _as_percents(getattr(cfg, "five_matrix_percents_json", []) or [], five_levels)
     upline6 = _resolve_upline(user, depth=five_levels)
-    _distribute_levels(
-        upline6,
-        base_amount=base150,
-        percents=five_percents,
-        tx_type="AUTOPOOL_BONUS_FIVE",
-        meta={"source": "FIVE_MATRIX_150", "source_type": src_type, "source_id": src_id},
-        pool_type="FIVE_150",
-    )
+    fixed_amounts5 = list(getattr(cfg, "five_matrix_amounts_json", []) or [])
+    if fixed_amounts5:
+        for idx, recipient in enumerate(upline6):
+            if idx >= len(fixed_amounts5):
+                break
+            amt = _q2(fixed_amounts5[idx] or 0)
+            if amt <= 0:
+                continue
+            # Skip matrix payout for agency/employee recipients
+            if _is_agency_or_employee(recipient):
+                continue
+            meta = {
+                "source": "FIVE_MATRIX_150_FIXED",
+                "source_type": src_type,
+                "source_id": src_id,
+                "level_index": idx + 1,
+                "fixed": True,
+            }
+            _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_FIVE", meta=meta, source_type=src_type, source_id=src_id)
+            _update_matrix_progress(recipient, pool_type="FIVE_150", level=idx + 1, amount=amt)
+    else:
+        five_percents = _as_percents(getattr(cfg, "five_matrix_percents_json", []) or [], five_levels)
+        _distribute_levels(
+            upline6,
+            base_amount=base150,
+            percents=five_percents,
+            tx_type="AUTOPOOL_BONUS_FIVE",
+            meta={"source": "FIVE_MATRIX_150", "source_type": src_type, "source_id": src_id},
+            pool_type="FIVE_150",
+        )
 
     # Distribute 3-matrix (L15)
     three_levels = int(getattr(cfg, "three_matrix_levels", 15) or 15)
@@ -423,5 +462,153 @@ def product_purchase_activations(user: CustomUser, source: Dict[str, Any]) -> No
     # Mark first purchase activation + unlocks (idempotent)
     try:
         ensure_first_purchase_activation(user, source)
+    except Exception:
+        pass
+
+
+@transaction.atomic
+def open_matrix_accounts_for_coupon(user: CustomUser, coupon_id: int | str, amount_150: Decimal | None = None, distribute: bool = True, trigger: str = "promo_purchase") -> None:
+    """
+    Ensure per-coupon AutoPoolAccount entries exist (FIVE_150 + THREE_150),
+    tagged with source_type='ECOUPON' and source_id=str(coupon_id).
+    If distribute=True, perform per-level commission payouts per pool with meta including coupon id and trigger.
+    Idempotent per (user, pool, source).
+    """
+    cfg = CommissionConfig.get_solo()
+    src_type = "ECOUPON"
+    src_id = str(coupon_id or "")
+    base150 = _q2(amount_150 if amount_150 is not None else (cfg.prime_activation_amount or 150))
+
+    # Idempotent account creation: FIVE_150
+    try:
+        exists5 = AutoPoolAccount.objects.filter(
+            owner=user, pool_type="FIVE_150", status="ACTIVE", source_type=src_type, source_id=src_id
+        ).exists()
+        if not exists5:
+            AutoPoolAccount.place_in_five_pool(user, "FIVE_150", base150, source_type=src_type, source_id=src_id)
+    except Exception:
+        pass
+
+    # Idempotent account creation: THREE_150
+    try:
+        exists3 = AutoPoolAccount.objects.filter(
+            owner=user, pool_type="THREE_150", status="ACTIVE", source_type=src_type, source_id=src_id
+        ).exists()
+        if not exists3:
+            AutoPoolAccount.place_in_three_pool(user, "THREE_150", base150, source_type=src_type, source_id=src_id)
+    except Exception:
+        pass
+
+    # If distribution already recorded for this coupon, only audit creation and exit
+    try:
+        from coupons.models import AuditTrail, CouponCode
+        cobj = CouponCode.objects.filter(pk=str(coupon_id)).first()
+        already_distributed = False
+        if cobj and AuditTrail.objects.filter(action="coupon_matrix_distributed", coupon_code=cobj).exists():
+            already_distributed = True
+        elif AuditTrail.objects.filter(action="coupon_matrix_distributed", metadata__source_id=src_id).exists():
+            already_distributed = True
+        if already_distributed:
+            try:
+                AuditTrail.objects.create(
+                    action="coupon_matrix_created",
+                    actor=user,
+                    coupon_code=cobj if cobj else None,
+                    notes=f"Matrix accounts already distributed earlier for coupon {src_id}",
+                    metadata={"source_type": src_type, "source_id": src_id, "trigger": trigger},
+                )
+            except Exception:
+                pass
+            return
+    except Exception:
+        pass
+
+    if not distribute or base150 <= 0:
+        # Still audit creation best-effort
+        try:
+            from coupons.models import AuditTrail, CouponCode
+            cobj = CouponCode.objects.filter(pk=str(coupon_id)).first()
+            AuditTrail.objects.create(
+                action="coupon_matrix_created",
+                actor=user,
+                coupon_code=cobj if cobj else None,
+                notes=f"Matrix accounts created for coupon {src_id}",
+                metadata={"source_type": src_type, "source_id": src_id, "trigger": trigger},
+            )
+        except Exception:
+            pass
+        return
+
+    # Distribute 5-matrix (support fixed-amount overrides)
+    try:
+        five_levels = int(getattr(cfg, "five_matrix_levels", 6) or 6)
+        upline6 = _resolve_upline(user, depth=five_levels)
+        fixed5 = list(getattr(cfg, "five_matrix_amounts_json", []) or [])
+        if fixed5:
+            for idx, recipient in enumerate(upline6):
+                if idx >= len(fixed5):
+                    break
+                amt = _q2(fixed5[idx] or 0)
+                if amt <= 0:
+                    continue
+                if _is_agency_or_employee(recipient):
+                    continue
+                meta = {"source": "FIVE_MATRIX_COUPON_FIXED", "source_type": src_type, "source_id": src_id, "level_index": idx + 1, "fixed": True, "trigger": trigger}
+                _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_FIVE", meta=meta, source_type=src_type, source_id=src_id)
+                _update_matrix_progress(recipient, pool_type="FIVE_150", level=idx + 1, amount=amt)
+        else:
+            five_percents = _as_percents(getattr(cfg, "five_matrix_percents_json", []) or [], five_levels)
+            _distribute_levels(
+                upline6,
+                base_amount=base150,
+                percents=five_percents,
+                tx_type="AUTOPOOL_BONUS_FIVE",
+                meta={"source": "FIVE_MATRIX_COUPON", "source_type": src_type, "source_id": src_id, "trigger": trigger},
+                pool_type="FIVE_150",
+            )
+    except Exception:
+        pass
+
+    # Distribute 3-matrix (support fixed-amount overrides)
+    try:
+        three_levels = int(getattr(cfg, "three_matrix_levels", 15) or 15)
+        upline15 = _resolve_upline(user, depth=three_levels)
+        fixed3 = list(getattr(cfg, "three_matrix_amounts_json", []) or [])
+        if fixed3:
+            for idx, recipient in enumerate(upline15):
+                if idx >= len(fixed3):
+                    break
+                amt = _q2(fixed3[idx] or 0)
+                if amt <= 0:
+                    continue
+                if _is_agency_or_employee(recipient):
+                    continue
+                meta = {"source": "THREE_MATRIX_COUPON_FIXED", "source_type": src_type, "source_id": src_id, "level_index": idx + 1, "fixed": True, "trigger": trigger}
+                _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_THREE", meta=meta, source_type=src_type, source_id=src_id)
+                _update_matrix_progress(recipient, pool_type="THREE_150", level=idx + 1, amount=amt)
+        else:
+            three_percents = _as_percents(getattr(cfg, "three_matrix_percents_json", []) or [], three_levels)
+            _distribute_levels(
+                upline15,
+                base_amount=base150,
+                percents=three_percents,
+                tx_type="AUTOPOOL_BONUS_THREE",
+                meta={"source": "THREE_MATRIX_COUPON", "source_type": src_type, "source_id": src_id, "trigger": trigger},
+                pool_type="THREE_150",
+            )
+    except Exception:
+        pass
+
+    # Audit (best-effort)
+    try:
+        from coupons.models import AuditTrail, CouponCode
+        cobj = CouponCode.objects.filter(pk=str(coupon_id)).first()
+        AuditTrail.objects.create(
+            action="coupon_matrix_distributed",
+            actor=user,
+            coupon_code=cobj if cobj else None,
+            notes=f"Matrix accounts created and distributed for coupon {src_id}",
+            metadata={"source_type": src_type, "source_id": src_id, "trigger": trigger},
+        )
     except Exception:
         pass

@@ -210,7 +210,7 @@ export default function SimpleTable({
               placeholder="Search…"
               value={search}
               onChange={(e) => onSearch?.(e.target.value)}
-              style={{ padding: 8, width: 280, borderRadius: 8, border: "1px solid #e5e7eb", backgroundColor: "#ffffff" }}
+              style={{ padding: 8, width: "min(280px, 100%)", borderRadius: 8, border: "1px solid #e5e7eb", backgroundColor: "#ffffff" }}
             />
           </div>
         </div>

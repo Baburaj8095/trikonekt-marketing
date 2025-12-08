@@ -209,14 +209,14 @@ export default function DataTable({
   }, []);
 
   return (
-    <div className="tk-card tk-grid" style={{ width: "100%", background: "#ffffff", borderRadius: 12, border: "1px solid #e5e7eb", overflow: "hidden", position: "relative", isolation: "isolate" }}>
+    <div className="tk-card tk-grid" style={{ width: "100%", background: "#ffffff", borderRadius: 12, border: "1px solid #e5e7eb", overflowX: "auto", overflowY: "hidden", position: "relative", isolation: "isolate" }}>
       <div style={{ padding: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         {toolbar}
         <input
           placeholder="Search…"
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
-          style={{ padding: 8, width: 280, borderRadius: 8, border: "1px solid #e5e7eb", backgroundColor: "#ffffff" }}
+          style={{ padding: 8, width: "min(280px, 100%)", borderRadius: 8, border: "1px solid #e5e7eb", backgroundColor: "#ffffff" }}
         />
       </div>
       <DataGrid

@@ -167,7 +167,8 @@ export default function AdminPromoPurchases() {
         style={{
           border: "1px solid #e2e8f0",
           borderRadius: 10,
-          overflow: "hidden",
+          overflowX: "auto",
+          overflowY: "hidden",
           background: "#fff",
         }}
       >
@@ -182,6 +183,7 @@ export default function AdminPromoPurchases() {
             borderBottom: "1px solid #e2e8f0",
             fontWeight: 700,
             color: "#0f172a",
+            minWidth: 980,
           }}
         >
           <div>ID</div>
@@ -212,6 +214,7 @@ export default function AdminPromoPurchases() {
                   padding: "10px",
                   borderBottom: "1px solid #e2e8f0",
                   alignItems: "center",
+                  minWidth: 980,
                 }}
               >
                 <div>#{r.id}</div>

@@ -33,6 +33,9 @@ from .views import (
     AdminLevelCommissionSeedView,
     AdminMatrixCommissionConfig,
     AdminRewardPointsConfig,
+    # New matrix admin endpoints
+    AdminMatrixAccountsList,
+    AdminMatrixAccountStats,
 )
 from .dynamic import router as dynamic_router, admin_meta as dynamic_admin_meta, admin_meta_summary, admin_meta_fields
 
@@ -67,6 +70,8 @@ urlpatterns = [
     path("matrix/progress/", AdminMatrixProgressList.as_view()),
     path("matrix/tree/", AdminMatrixTree.as_view()),
     path("matrix/tree5/", AdminMatrix5Tree.as_view()),
+    path("matrix/accounts/", AdminMatrixAccountsList.as_view()),
+    path("matrix/account-stats/", AdminMatrixAccountStats.as_view()),
     path("autopool/summary/", AdminAutopoolSummary.as_view()),
     path("autopool/transactions/", AdminAutopoolTransactionList.as_view()),
     # Master Level Commission (Direct + L1..L5)

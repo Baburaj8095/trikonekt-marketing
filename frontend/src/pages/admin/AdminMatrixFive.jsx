@@ -85,6 +85,22 @@ export default function AdminMatrixFive() {
   const [treeLoading, setTreeLoading] = useState(false);
   const [treeErr, setTreeErr] = useState("");
 
+  // 5-Matrix commission table state
+  const [tx, setTx] = useState([]);
+  const [txLoading, setTxLoading] = useState(false);
+  const [txErr, setTxErr] = useState("");
+
+  // Matrix Accounts browser (FIVE_150) + Stats
+  const [accFilters, setAccFilters] = useState({ user: "", sourceId: "", pageSize: 25 });
+  const [accRows, setAccRows] = useState([]);
+  const [accLoading, setAccLoading] = useState(false);
+  const [accErr, setAccErr] = useState("");
+
+  const [statsSourceId, setStatsSourceId] = useState("");
+  const [stats, setStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsErr, setStatsErr] = useState("");
+
   function setF(key, val) {
     setFilters((f) => ({ ...f, [key]: val }));
   }
@@ -148,10 +164,33 @@ export default function AdminMatrixFive() {
     } catch (e) {
       setTreeErr(e?.response?.data?.detail || "Failed to load tree");
       setTree(null);
-    } finally {
+  } finally {
       setTreeLoading(false);
     }
   }
+
+  async function fetchFiveTx() {
+    setTxErr("");
+    setTx([]);
+    setTxLoading(true);
+    try {
+      const res = await API.get("/admin/autopool/transactions/", {
+        params: { types: "AUTOPOOL_BONUS_FIVE", ordering: "-created_at", page_size: 100, page: 1 },
+        dedupe: "cancelPrevious",
+      });
+      const items = res?.data?.results || res?.data || [];
+      setTx(Array.isArray(items) ? items : []);
+    } catch (e) {
+      setTxErr(e?.response?.data?.detail || "Failed to load commission rows");
+      setTx([]);
+    } finally {
+      setTxLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchFiveTx();
+  }, []);
 
   const orderingOptions = useMemo(
     () => [
@@ -249,7 +288,7 @@ export default function AdminMatrixFive() {
       </div>
 
       {/* Progress Table */}
-      <div
+      {/* <div
         style={{
           border: "1px solid #e2e8f0",
           borderRadius: 10,
@@ -310,7 +349,7 @@ export default function AdminMatrixFive() {
             <div style={{ padding: 12, color: "#64748b" }}>No results</div>
           ) : null}
         </div>
-      </div>
+      </div> */}
 
       {/* Tree Viewer */}
       <div style={{ marginTop: 24 }}>
@@ -376,6 +415,309 @@ export default function AdminMatrixFive() {
           )}
         </div>
       </div>
+
+      {/* 5‑Matrix Commission Table */}
+      <div style={{ marginTop: 24 }}>
+        <h3 style={{ margin: "12px 0 8px 0", color: "#0f172a" }}>5‑Matrix Commission</h3>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
+          <button
+            onClick={fetchFiveTx}
+            disabled={txLoading}
+            style={{
+              padding: "10px 12px",
+              background: "#0f172a",
+              color: "#fff",
+              border: 0,
+              borderRadius: 8,
+              cursor: txLoading ? "not-allowed" : "pointer",
+            }}
+          >
+            {txLoading ? "Loading..." : "Refresh"}
+          </button>
+          {txErr ? <span style={{ color: "#dc2626" }}>{txErr}</span> : null}
+        </div>
+        <div
+          style={{
+            border: "1px solid #e2e8f0",
+            borderRadius: 10,
+            overflow: "hidden",
+            background: "#fff",
+          }}
+        >
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "80px 220px 180px 180px 220px 180px 220px 140px",
+              gap: 8,
+              padding: "10px",
+              background: "#f8fafc",
+              borderBottom: "1px solid #e2e8f0",
+              fontWeight: 700,
+              color: "#0f172a",
+            }}
+          >
+            <div>Sr.No</div>
+            <div>Tr Username</div>
+            <div>Sponsor. Id</div>
+            <div>Transaction Amount</div>
+            <div>Autopool-phase-1 Income</div>
+            <div>Payable Amt</div>
+            <div>Gen. Date</div>
+            <div>which level</div>
+          </div>
+          <div>
+            {tx.map((row, idx) => (
+              <div
+                key={row.id || idx}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "80px 220px 180px 180px 220px 180px 220px 140px",
+                  gap: 8,
+                  padding: "10px",
+                  borderBottom: "1px solid #e2e8f0",
+                  alignItems: "center",
+                }}
+              >
+                <div>{idx + 1}</div>
+                <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {row.username} {row.prefixed_id ? <span style={{ color: "#64748b" }}>({row.prefixed_id})</span> : null}
+                </div>
+                <div>{row.sponsor_id || "—"}</div>
+                <div>₹{Number(row.amount || 0).toFixed(2)}</div>
+                <div>₹{Number(row.amount || 0).toFixed(2)}</div>
+                <div>₹{Number(row.net_amount || row.amount || 0).toFixed(2)}</div>
+                <div>{row.created_at || "—"}</div>
+                <div>{row.level_index != null ? row.level_index : "—"}</div>
+              </div>
+            ))}
+            {!txLoading && tx.length === 0 ? (
+              <div style={{ padding: 12, color: "#64748b" }}>No commission rows</div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      {/* Matrix Accounts (FIVE_150) */}
+      <div style={{ marginTop: 24 }}>
+        <h3 style={{ margin: "12px 0 8px 0", color: "#0f172a" }}>FIVE_150 Accounts</h3>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+            gap: 12,
+            marginBottom: 12,
+          }}
+        >
+          <TextInput
+            label="Owner (id/username/name/phone)"
+            value={accFilters.user}
+            onChange={(v) => setAccFilters((f) => ({ ...f, user: v }))}
+            placeholder="search owner"
+          />
+          <TextInput
+            label="Source ID (Coupon ID)"
+            value={accFilters.sourceId}
+            onChange={(v) => setAccFilters((f) => ({ ...f, sourceId: v }))}
+            placeholder="coupon id e.g. 123"
+          />
+          <TextInput
+            label="Page Size"
+            type="number"
+            value={accFilters.pageSize}
+            onChange={(v) => {
+              const n = parseInt(v || "25", 10);
+              setAccFilters((f) => ({ ...f, pageSize: isNaN(n) ? 25 : Math.max(1, Math.min(n, 200)) }));
+            }}
+            placeholder="25"
+          />
+        </div>
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <button
+            onClick={async () => {
+              setAccErr("");
+              setAccRows([]);
+              setAccLoading(true);
+              try {
+                const params = {
+                  pool: "FIVE_150",
+                  page_size: accFilters.pageSize || 25,
+                  ordering: "-created_at",
+                };
+                if (accFilters.user && accFilters.user.trim()) params.user = accFilters.user.trim();
+                if (accFilters.sourceId && accFilters.sourceId.trim()) {
+                  params.source_type = "ECOUPON";
+                  params.source_id = accFilters.sourceId.trim();
+                }
+                const res = await API.get("/admin/matrix/accounts/", { params, dedupe: "cancelPrevious" });
+                const items = res?.data?.results || res?.data || [];
+                setAccRows(Array.isArray(items) ? items : []);
+              } catch (e) {
+                setAccErr(e?.response?.data?.detail || "Failed to load accounts");
+                setAccRows([]);
+              } finally {
+                setAccLoading(false);
+              }
+            }}
+            disabled={accLoading}
+            style={{
+              padding: "10px 12px",
+              background: "#0f172a",
+              color: "#fff",
+              border: 0,
+              borderRadius: 8,
+              cursor: accLoading ? "not-allowed" : "pointer",
+            }}
+          >
+            {accLoading ? "Loading..." : "Load Accounts"}
+          </button>
+          {accErr ? <div style={{ color: "#dc2626" }}>{accErr}</div> : null}
+        </div>
+
+        <div
+          style={{
+            border: "1px solid #e2e8f0",
+            borderRadius: 10,
+            overflow: "hidden",
+            background: "#fff",
+          }}
+        >
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "80px 180px 180px 100px 80px 140px 160px 200px",
+              gap: 8,
+              padding: "10px",
+              background: "#f8fafc",
+              borderBottom: "1px solid #e2e8f0",
+              fontWeight: 700,
+              color: "#0f172a",
+            }}
+          >
+            <div>ID</div>
+            <div>Owner</div>
+            <div>Parent Owner</div>
+            <div>Level</div>
+            <div>Pos</div>
+            <div>Source</div>
+            <div>Source ID</div>
+            <div>Created</div>
+          </div>
+          <div>
+            {accRows.map((a) => (
+              <div
+                key={a.id}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "80px 180px 180px 100px 80px 140px 160px 200px",
+                  gap: 8,
+                  padding: "10px",
+                  borderBottom: "1px solid #e2e8f0",
+                  alignItems: "center",
+                }}
+              >
+                <div>{a.id}</div>
+                <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {a.username} <span style={{ color: "#64748b" }}>#{a.owner_id}</span>
+                </div>
+                <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {a.parent_owner?.username ? `${a.parent_owner.username} #${a.parent_owner.id}` : "—"}
+                </div>
+                <div>{a.level ?? "—"}</div>
+                <div>{a.position ?? "—"}</div>
+                <div>{a.source_type || "—"}</div>
+                <div>{a.source_id || "—"}</div>
+                <div>{a.created_at || "—"}</div>
+              </div>
+            ))}
+            {!accLoading && accRows.length === 0 ? (
+              <div style={{ padding: 12, color: "#64748b" }}>No accounts</div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      {/* Level-wise Commission Stats (by Coupon ID) */}
+      <div style={{ marginTop: 24 }}>
+        <h3 style={{ margin: "12px 0 8px 0", color: "#0f172a" }}>Level-wise Commission Stats</h3>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
+          <input
+            value={statsSourceId}
+            onChange={(e) => setStatsSourceId(e.target.value)}
+            placeholder="Enter Coupon ID (source_id)"
+            style={{
+              padding: "10px 12px",
+              minWidth: 320,
+              borderRadius: 8,
+              border: "1px solid #e2e8f0",
+              outline: "none",
+              background: "#fff",
+            }}
+          />
+          <button
+            onClick={async () => {
+              setStatsErr("");
+              setStats(null);
+              const sid = (statsSourceId || "").trim();
+              if (!sid) {
+                setStatsErr("Enter coupon id");
+                return;
+              }
+              setStatsLoading(true);
+              try {
+                const res = await API.get("/admin/matrix/account-stats/", {
+                  params: { pool: "FIVE_150", source_type: "ECOUPON", source_id: sid },
+                  dedupe: "cancelPrevious",
+                });
+                setStats(res?.data || null);
+              } catch (e) {
+                setStatsErr(e?.response?.data?.detail || "Failed to load stats");
+                setStats(null);
+              } finally {
+                setStatsLoading(false);
+              }
+            }}
+            disabled={statsLoading}
+            style={{
+              padding: "10px 12px",
+              background: "#0f172a",
+              color: "#fff",
+              border: 0,
+              borderRadius: 8,
+              cursor: statsLoading ? "not-allowed" : "pointer",
+            }}
+          >
+            {statsLoading ? "Loading..." : "Load Stats"}
+          </button>
+          {statsErr ? <span style={{ color: "#dc2626" }}>{statsErr}</span> : null}
+        </div>
+
+        <div
+          style={{
+            border: "1px solid #e2e8f0",
+            borderRadius: 10,
+            overflow: "hidden",
+            background: "#fff",
+          }}
+        >
+          {!stats ? (
+            <div style={{ padding: 12, color: "#64748b" }}>
+              Enter a coupon id and load to view level-wise and total commission credited from FIVE_150.
+            </div>
+          ) : (
+            <div style={{ padding: 12 }}>
+              <div style={{ marginBottom: 8, color: "#0f172a", fontWeight: 700 }}>
+                Total Transactions: {stats.tx_count} • Total Amount: ₹{Number(stats.total_amount || 0).toFixed(2)}
+              </div>
+              <div style={{ fontSize: 12, color: "#334155" }}>
+                {stats.per_level ? JSON.stringify(stats.per_level) : "—"}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
     </div>
   );
 }

@@ -2300,6 +2300,16 @@ class CouponActivateView(APIView):
     def post(self, request):
         t = str(request.data.get("type") or "").strip()
         source = request.data.get("source") or {}
+        # Normalize source for e-coupon activations: attach CouponCode.id for traceability
+        try:
+            code_str = str(source.get("code") or "").strip()
+            ch = str(source.get("channel") or "").replace("-", "_").lower()
+            if code_str and ch == "e_coupon":
+                code_obj = CouponCode.objects.filter(code=code_str).first()
+                if code_obj and code_obj.assigned_consumer_id == request.user.id:
+                    source["id"] = code_obj.id
+        except Exception:
+            pass
         if t not in ("150", "50", "750", "759"):
             return Response({"detail": "type must be '150', '50', '750' or '759'."}, status=status.HTTP_400_BAD_REQUEST)
         if t == "150":
@@ -2768,6 +2778,42 @@ class ECouponOrderViewSet(mixins.CreateModelMixin,
             )
             affected = write_qs.update(**update_kwargs)
             sample_codes = list(CouponCode.objects.filter(id__in=pick_ids).values_list("code", flat=True)[:5])
+
+            # Create and distribute matrix accounts per coupon for consumer orders (N coupons -> N accounts)
+            try:
+                if role == "consumer" and affected:
+                    from decimal import Decimal as D
+                    from business.services.activation import open_matrix_accounts_for_coupon, activate_50
+                    assigned_codes = list(
+                        CouponCode.objects
+                        .filter(id__in=pick_ids, assigned_consumer=order.buyer)
+                        .only("id", "value", "code")
+                        .order_by("id")
+                    )
+                    for c in assigned_codes:
+                        try:
+                            val = D(str(getattr(c, "value", "0") or 0))
+                        except Exception:
+                            continue
+                        if val == D("150"):
+                            # Five + Three matrix with per-level distribution, idempotent per code
+                            try:
+                                open_matrix_accounts_for_coupon(order.buyer, c.id, amount_150=D("150.00"), distribute=True, trigger="ecoupon_order")
+                            except Exception:
+                                continue
+                        elif val == D("50"):
+                            # Per-code 50 activation opens THREE_50 and distributes level-wise, idempotent per code
+                            try:
+                                activate_50(
+                                    order.buyer,
+                                    {"type": "ECOUPON_ORDER_50", "id": c.id, "code": getattr(c, "code", ""), "channel": "e_coupon"},
+                                    package_code="ECOUPON_ORDER_50",
+                                )
+                            except Exception:
+                                continue
+            except Exception:
+                # Best-effort; do not block order approval
+                pass
 
             order.status = "APPROVED"
             order.reviewer = request.user

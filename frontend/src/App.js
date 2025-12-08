@@ -725,6 +725,16 @@ function App() {
           }
         />
         <Route
+          path="/admin/matrix"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <Navigate to="/admin/matrix/five" replace />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/matrix/five"
           element={
             <AdminProtectedRoute>

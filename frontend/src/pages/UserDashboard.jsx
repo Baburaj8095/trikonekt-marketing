@@ -611,6 +611,8 @@ export default function UserDashboard({ embedded = false }) {
   const accountActive = Boolean(activation?.active);
   const accountStatusStr = activationLoading ? "..." : accountActive ? "Active" : "Inactive";
   const accountPalette = accountActive ? "green" : "red";
+  const matrix5Count = activationLoading ? "..." : (activation?.five_matrix_count ?? 0);
+  const matrix3Count = activationLoading ? "..." : (activation?.three_matrix_count ?? 0);
 
   const loadReferralCount = async () => {
     try {
@@ -1009,6 +1011,34 @@ export default function UserDashboard({ embedded = false }) {
                   value={`₹${walletDirectReferralTotal.toFixed(2)}`}
                   subtitle="Wallet earnings from direct referrals"
                   palette="green"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4} sx={{
+              '@media (max-width:600px)': {
+                minWidth: 0,
+                boxSizing: 'border-box',
+                width: '100%',
+              },
+            }}>
+                <KpiCard
+                  title="5‑Matrix Self Accounts"
+                  value={matrix5Count}
+                  subtitle="Your active 5‑matrix entries"
+                  palette="blue"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4} sx={{
+              '@media (max-width:600px)': {
+                minWidth: 0,
+                boxSizing: 'border-box',
+                width: '100%',
+              },
+            }}>
+                <KpiCard
+                  title="3‑Matrix Self Accounts"
+                  value={matrix3Count}
+                  subtitle="Your active 3‑matrix entries"
+                  palette="purple"
                 />
               </Grid>
 
@@ -1518,6 +1548,22 @@ export default function UserDashboard({ embedded = false }) {
                   value={`₹${walletDirectReferralTotal.toFixed(2)}`}
                   subtitle="Wallet earnings from direct referrals"
                   palette="green"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <KpiCard
+                  title="5‑Matrix Self Accounts"
+                  value={matrix5Count}
+                  subtitle="Your active 5‑matrix entries"
+                  palette="blue"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <KpiCard
+                  title="3‑Matrix Self Accounts"
+                  value={matrix3Count}
+                  subtitle="Your active 3‑matrix entries"
+                  palette="purple"
                 />
               </Grid>
 

@@ -82,8 +82,48 @@ class ActivationStatusView(APIView):
         five_count = five_qs.count()
         three_count = three_qs.count()
 
-        five_active = five_count > 0
-        three_active = three_count > 0
+        # Derive counts from actually activated ₹150 e‑coupons OWNED by this user (strict)
+        activated_150 = 0
+        try:
+            from coupons.models import AuditTrail
+            activated_150 = (
+                AuditTrail.objects
+                .filter(
+                    action="coupon_activated",
+                    actor=user,
+                    coupon_code__value=150,
+                    coupon_code__assigned_consumer=user,
+                    coupon_code__issued_channel="e_coupon",
+                )
+                .values("coupon_code_id")
+                .distinct()
+                .count()
+            )
+        except Exception:
+            activated_150 = 0
+
+        # Active counts by pool, separated for 3-matrix types
+        try:
+            three_150_count = AutoPoolAccount.objects.filter(owner=user, status="ACTIVE", pool_type="THREE_150").count()
+        except Exception:
+            three_150_count = 0
+        try:
+            three_50_count = AutoPoolAccount.objects.filter(owner=user, status="ACTIVE", pool_type="THREE_50").count()
+        except Exception:
+            three_50_count = 0
+
+        # Response counts: strictly cap by actually activated ₹150 coupons (distinct)
+        try:
+            five_resp = min(int(five_count or 0), int(activated_150 or 0))
+        except Exception:
+            five_resp = int(activated_150 or 0)
+        try:
+            three150_resp = min(int(three_150_count or 0), int(activated_150 or 0))
+        except Exception:
+            three150_resp = int(activated_150 or 0)
+
+        five_active = (five_resp > 0)
+        three_active = (three150_resp > 0)
         active = five_active and three_active
 
         # Activation counts by denomination via SubscriptionActivation
@@ -91,6 +131,7 @@ class ActivationStatusView(APIView):
         count_50 = SubscriptionActivation.objects.filter(
             user=user, package__in=["GLOBAL_50", "SELF_50", "PRODUCT_GLOBAL_50"]
         ).count()
+
 
         # Activation timestamps (best-effort)
         from django.db.models import Min, Max
@@ -105,8 +146,9 @@ class ActivationStatusView(APIView):
                 "active": bool(active),
                 "five_matrix_active": bool(five_active),
                 "three_matrix_active": bool(three_active),
-                "five_matrix_count": int(five_count),
-                "three_matrix_count": int(three_count),
+                "five_matrix_count": int(five_resp),
+                "three_matrix_count": int(three150_resp),
+                "three_matrix_50_count": int(three_50_count),
                 "count_150": int(count_150),
                 "count_50": int(count_50),
                 "activated_at": activated_at,
@@ -440,6 +482,7 @@ class AdminPromoPurchaseApproveView(APIView):
         sample_codes = []
         ebooks_granted = 0
 
+        per_coupon_activation_done = False
         with transaction.atomic():
             # Allocate e‑coupon codes unless PRIME150(EBOOK) or PRIME750(PRODUCT/COUPON)
             if denom is not None and not skip_allocation:
@@ -508,6 +551,21 @@ class AdminPromoPurchaseApproveView(APIView):
                 except Exception:
                     ebooks_granted = 0
 
+            # Per-coupon matrix accounts + distribution (N coupons -> N accounts in FIVE_150 and THREE_150)
+            try:
+                if is_prime_150 and not skip_allocation and allocated_ids:
+                    from business.services.activation import open_matrix_accounts_for_coupon
+                    from decimal import Decimal as D4
+                    for cid in allocated_ids:
+                        try:
+                            open_matrix_accounts_for_coupon(obj.user, cid, amount_150=D4("150.00"), distribute=True, trigger="promo_purchase")
+                        except Exception:
+                            continue
+                    per_coupon_activation_done = True
+            except Exception:
+                per_coupon_activation_done = per_coupon_activation_done or False
+                # best-effort
+
             # Mark approved and set active window
             obj.status = "APPROVED"
             obj.approved_by = request.user
@@ -563,7 +621,7 @@ class AdminPromoPurchaseApproveView(APIView):
                 pkg_price = D3(str(getattr(obj.package, "price", "0") or "0"))
                 src = {"type": "promo_purchase", "id": obj.id}
                 # Open 150 Active if price >= 150 (idempotent)
-                if pkg_price >= D3("150"):
+                if pkg_price >= D3("150") and not per_coupon_activation_done:
                     try:
                         activate_150_active(obj.user, src)
                     except Exception:

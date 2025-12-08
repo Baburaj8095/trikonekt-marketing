@@ -88,6 +88,22 @@ export default function AdminMatrixThree() {
   const [treeLoading, setTreeLoading] = useState(false);
   const [treeErr, setTreeErr] = useState("");
 
+  // Accounts browser + Stats for 3‑matrix
+  const [accFilters, setAccFilters] = useState({ user: "", sourceId: "", pageSize: 25 });
+  const [accRows, setAccRows] = useState([]);
+  const [accLoading, setAccLoading] = useState(false);
+  const [accErr, setAccErr] = useState("");
+
+  const [statsSourceId, setStatsSourceId] = useState("");
+  const [stats, setStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsErr, setStatsErr] = useState("");
+
+  // 3‑Matrix transactions table (AUTOPOOL_BONUS_THREE)
+  const [txRows, setTxRows] = useState([]);
+  const [txLoading, setTxLoading] = useState(false);
+  const [txErr, setTxErr] = useState("");
+
   function setF(key, val) {
     setFilters((f) => ({ ...f, [key]: val }));
   }
@@ -115,6 +131,29 @@ export default function AdminMatrixThree() {
 
   useEffect(() => {
     fetchProgress();
+  }, [pool]);
+
+  async function loadTx() {
+    setTxErr("");
+    setTxRows([]);
+    setTxLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("types", "AUTOPOOL_BONUS_THREE");
+      params.set("page_size", "50");
+      params.set("ordering", "-created_at");
+      const res = await API.get(`/admin/autopool/transactions/?${params.toString()}`, { dedupe: "cancelPrevious" });
+      setTxRows(res?.data?.results || []);
+    } catch (e) {
+      setTxErr(e?.response?.data?.detail || "Failed to load 3‑matrix transactions");
+      setTxRows([]);
+    } finally {
+      setTxLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadTx();
   }, [pool]);
 
   async function resolveRootId(identifier) {
@@ -333,6 +372,65 @@ export default function AdminMatrixThree() {
         </div>
       </div>
 
+      {/* 3‑Matrix Transactions */}
+      <div style={{ marginTop: 24 }}>
+        <h3 style={{ margin: "12px 0 8px 0", color: "#0f172a" }}>3‑Matrix Transactions</h3>
+        <div
+          style={{
+            border: "1px solid #e2e8f0",
+            borderRadius: 10,
+            overflow: "hidden",
+            background: "#fff",
+          }}
+        >
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ background: "#f8fafc" }}>
+                  <th style={{ padding: 8, textAlign: "left", fontSize: 12, color: "#334155", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>Sr.No</th>
+                  <th style={{ padding: 8, textAlign: "left", fontSize: 12, color: "#334155", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>Tr Username</th>
+                  <th style={{ padding: 8, textAlign: "left", fontSize: 12, color: "#334155", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>Sponsor. Id</th>
+                  <th style={{ padding: 8, textAlign: "right", fontSize: 12, color: "#334155", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>Transaction Amount</th>
+                  <th style={{ padding: 8, textAlign: "right", fontSize: 12, color: "#334155", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>Autopool-phase-1 Income</th>
+                  <th style={{ padding: 8, textAlign: "right", fontSize: 12, color: "#334155", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>Payable Amt</th>
+                </tr>
+              </thead>
+              <tbody>
+                {txLoading ? (
+                  <tr>
+                    <td colSpan="6" style={{ textAlign: "center", color: "#64748b", padding: 12, fontSize: 12 }}>Loading...</td>
+                  </tr>
+                ) : txErr ? (
+                  <tr>
+                    <td colSpan="6" style={{ textAlign: "center", color: "#dc2626", padding: 12, fontSize: 12 }}>{txErr}</td>
+                  </tr>
+                ) : txRows.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" style={{ textAlign: "center", color: "#64748b", padding: 12, fontSize: 12 }}>No transactions</td>
+                  </tr>
+                ) : (
+                  txRows.map((t, i) => {
+                    const amount = Number(t?.amount ?? 0);
+                    const net = t?.net_amount != null ? Number(t.net_amount) : amount;
+                    const phase1Income = t?.level_index === 1 ? net : 0;
+                    return (
+                      <tr key={t.id}>
+                        <td style={{ padding: 8, fontSize: 12, color: "#0f172a", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>{i + 1}</td>
+                        <td style={{ padding: 8, fontSize: 12, color: "#0f172a", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>{t?.username || ""}</td>
+                        <td style={{ padding: 8, fontSize: 12, color: "#0f172a", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>{t?.sponsor_id || ""}</td>
+                        <td style={{ padding: 8, fontSize: 12, color: "#0f172a", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap", textAlign: "right" }}>₹{amount.toFixed(2)}</td>
+                        <td style={{ padding: 8, fontSize: 12, color: "#0f172a", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap", textAlign: "right" }}>{phase1Income ? `₹${phase1Income.toFixed(2)}` : "—"}</td>
+                        <td style={{ padding: 8, fontSize: 12, color: "#0f172a", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap", textAlign: "right" }}>₹{net.toFixed(2)}</td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       {/* Tree Viewer */}
       <div style={{ marginTop: 24 }}>
         <h3 style={{ margin: "12px 0 8px 0", color: "#0f172a" }}>Hierarchy Viewer</h3>
@@ -397,6 +495,228 @@ export default function AdminMatrixThree() {
           )}
         </div>
       </div>
+
+      {/* Matrix Accounts ({pool}) */}
+      <div style={{ marginTop: 24 }}>
+        <h3 style={{ margin: "12px 0 8px 0", color: "#0f172a" }}>{pool} Accounts</h3>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+            gap: 12,
+            marginBottom: 12,
+          }}
+        >
+          <TextInput
+            label="Owner (id/username/name/phone)"
+            value={accFilters.user}
+            onChange={(v) => setAccFilters((f) => ({ ...f, user: v }))}
+            placeholder="search owner"
+          />
+          <TextInput
+            label="Source ID (Coupon ID)"
+            value={accFilters.sourceId}
+            onChange={(v) => setAccFilters((f) => ({ ...f, sourceId: v }))}
+            placeholder="coupon id e.g. 123"
+          />
+          <TextInput
+            label="Page Size"
+            type="number"
+            value={accFilters.pageSize}
+            onChange={(v) => {
+              const n = parseInt(v || "25", 10);
+              setAccFilters((f) => ({ ...f, pageSize: isNaN(n) ? 25 : Math.max(1, Math.min(n, 200)) }));
+            }}
+            placeholder="25"
+          />
+        </div>
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <button
+            onClick={async () => {
+              setAccErr("");
+              setAccRows([]);
+              setAccLoading(true);
+              try {
+                const params = {
+                  pool,
+                  page_size: accFilters.pageSize || 25,
+                  ordering: "-created_at",
+                };
+                if (accFilters.user && accFilters.user.trim()) params.user = accFilters.user.trim();
+                if (accFilters.sourceId && accFilters.sourceId.trim()) {
+                  params.source_type = "ECOUPON";
+                  params.source_id = accFilters.sourceId.trim();
+                }
+                const res = await API.get("/admin/matrix/accounts/", { params, dedupe: "cancelPrevious" });
+                const items = res?.data?.results || res?.data || [];
+                setAccRows(Array.isArray(items) ? items : []);
+              } catch (e) {
+                setAccErr(e?.response?.data?.detail || "Failed to load accounts");
+                setAccRows([]);
+              } finally {
+                setAccLoading(false);
+              }
+            }}
+            disabled={accLoading}
+            style={{
+              padding: "10px 12px",
+              background: "#0f172a",
+              color: "#fff",
+              border: 0,
+              borderRadius: 8,
+              cursor: accLoading ? "not-allowed" : "pointer",
+            }}
+          >
+            {accLoading ? "Loading..." : "Load Accounts"}
+          </button>
+          {accErr ? <div style={{ color: "#dc2626" }}>{accErr}</div> : null}
+        </div>
+
+        <div
+          style={{
+            border: "1px solid #e2e8f0",
+            borderRadius: 10,
+            overflow: "hidden",
+            background: "#fff",
+          }}
+        >
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "80px 180px 180px 100px 80px 140px 160px 200px",
+              gap: 8,
+              padding: "10px",
+              background: "#f8fafc",
+              borderBottom: "1px solid #e2e8f0",
+              fontWeight: 700,
+              color: "#0f172a",
+            }}
+          >
+            <div>ID</div>
+            <div>Owner</div>
+            <div>Parent Owner</div>
+            <div>Level</div>
+            <div>Pos</div>
+            <div>Source</div>
+            <div>Source ID</div>
+            <div>Created</div>
+          </div>
+          <div>
+            {accRows.map((a) => (
+              <div
+                key={a.id}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "80px 180px 180px 100px 80px 140px 160px 200px",
+                  gap: 8,
+                  padding: "10px",
+                  borderBottom: "1px solid #e2e8f0",
+                  alignItems: "center",
+                }}
+              >
+                <div>{a.id}</div>
+                <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {a.username} <span style={{ color: "#64748b" }}>#{a.owner_id}</span>
+                </div>
+                <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {a.parent_owner?.username ? `${a.parent_owner.username} #${a.parent_owner.id}` : "—"}
+                </div>
+                <div>{a.level ?? "—"}</div>
+                <div>{a.position ?? "—"}</div>
+                <div>{a.source_type || "—"}</div>
+                <div>{a.source_id || "—"}</div>
+                <div>{a.created_at || "—"}</div>
+              </div>
+            ))}
+            {!accLoading && accRows.length === 0 ? (
+              <div style={{ padding: 12, color: "#64748b" }}>No accounts</div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      {/* Level-wise Commission Stats (by Coupon ID) */}
+      <div style={{ marginTop: 24 }}>
+        <h3 style={{ margin: "12px 0 8px 0", color: "#0f172a" }}>Level-wise Commission Stats</h3>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
+          <input
+            value={statsSourceId}
+            onChange={(e) => setStatsSourceId(e.target.value)}
+            placeholder="Enter Coupon ID (source_id)"
+            style={{
+              padding: "10px 12px",
+              minWidth: 320,
+              borderRadius: 8,
+              border: "1px solid #e2e8f0",
+              outline: "none",
+              background: "#fff",
+            }}
+          />
+          <button
+            onClick={async () => {
+              setStatsErr("");
+              setStats(null);
+              const sid = (statsSourceId || "").trim();
+              if (!sid) {
+                setStatsErr("Enter coupon id");
+                return;
+              }
+              setStatsLoading(true);
+              try {
+                const res = await API.get("/admin/matrix/account-stats/", {
+                  params: { pool, source_type: "ECOUPON", source_id: sid },
+                  dedupe: "cancelPrevious",
+                });
+                setStats(res?.data || null);
+              } catch (e) {
+                setStatsErr(e?.response?.data?.detail || "Failed to load stats");
+                setStats(null);
+              } finally {
+                setStatsLoading(false);
+              }
+            }}
+            disabled={statsLoading}
+            style={{
+              padding: "10px 12px",
+              background: "#0f172a",
+              color: "#fff",
+              border: 0,
+              borderRadius: 8,
+              cursor: statsLoading ? "not-allowed" : "pointer",
+            }}
+          >
+            {statsLoading ? "Loading..." : "Load Stats"}
+          </button>
+          {statsErr ? <span style={{ color: "#dc2626" }}>{statsErr}</span> : null}
+        </div>
+
+        <div
+          style={{
+            border: "1px solid #e2e8f0",
+            borderRadius: 10,
+            overflow: "hidden",
+            background: "#fff",
+          }}
+        >
+          {!stats ? (
+            <div style={{ padding: 12, color: "#64748b" }}>
+              Enter a coupon id and load to view level-wise and total commission credited from {pool}.
+            </div>
+          ) : (
+            <div style={{ padding: 12 }}>
+              <div style={{ marginBottom: 8, color: "#0f172a", fontWeight: 700 }}>
+                Total Transactions: {stats.tx_count} • Total Amount: ₹{Number(stats.total_amount || 0).toFixed(2)}
+              </div>
+              <div style={{ fontSize: 12, color: "#334155" }}>
+                {stats.per_level ? JSON.stringify(stats.per_level) : "—"}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
     </div>
   );
 }

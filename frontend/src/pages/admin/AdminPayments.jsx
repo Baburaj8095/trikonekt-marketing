@@ -258,6 +258,7 @@ export default function AdminPayments() {
                   borderRadius: 8,
                   padding: 8,
                   background: "#fff",
+                  flexWrap: "wrap",
                 }}
               >
                 <div
@@ -286,7 +287,7 @@ export default function AdminPayments() {
                   <div style={{ color: "#64748b", fontSize: 12 }}>{c.payee_name || "—"}</div>
                   <div style={{ color: "#64748b", fontSize: 12 }}>{c.upi_id || ""}</div>
                 </div>
-                <div style={{ color: "#64748b", fontSize: 12, maxWidth: 360, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                <div style={{ color: "#64748b", fontSize: 12, maxWidth: "100%", whiteSpace: "normal", wordBreak: "break-word", overflow: "visible", textOverflow: "clip", flex: "1 1 240px" }}>
                   {c.instructions || "—"}
                 </div>
                 <div style={{ color: c.is_active ? "#16a34a" : "#64748b", fontWeight: 700, marginLeft: 8 }}>

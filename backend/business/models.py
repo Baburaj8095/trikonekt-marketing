@@ -212,6 +212,11 @@ class AutoPoolAccount(models.Model):
     entry_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("150.00"))
     pool_type = models.CharField(max_length=16, choices=POOL_TYPE_CHOICES, default="THREE_150", db_index=True)
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="ACTIVE", db_index=True)
+    # Sibling position under parent (1-based). Null for root accounts.
+    position = models.PositiveSmallIntegerField(null=True, blank=True, db_index=True)
+    # Provenance for idempotent creation and reporting (e.g., ECOUPON_ORDER, PROMO_PURCHASE)
+    source_type = models.CharField(max_length=32, blank=True, default="", db_index=True)
+    source_id = models.CharField(max_length=64, blank=True, default="", db_index=True)
     parent_account = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="children")
     level = models.PositiveIntegerField(default=1, db_index=True)  # optional metadata for hierarchy traversal
     created_at = models.DateTimeField(auto_now_add=True)
@@ -221,6 +226,14 @@ class AutoPoolAccount(models.Model):
         indexes = [
             models.Index(fields=["username_key", "status"]),
             models.Index(fields=["pool_type", "status"]),
+            models.Index(fields=["parent_account", "pool_type", "position"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["parent_account", "pool_type", "position"],
+                name="uniq_autopool_sibling_position",
+                condition=models.Q(parent_account__isnull=False),
+            )
         ]
 
     def __str__(self):
@@ -243,46 +256,22 @@ class AutoPoolAccount(models.Model):
         )
 
     @classmethod
-    def create_five_150_for_user(cls, user, amount: Decimal | None = None):
+    def create_five_150_for_user(cls, user, amount: Decimal | None = None, source_type: str = "", source_id: str = ""):
         from decimal import Decimal as D
         amt = D(amount) if amount is not None else D("150.00")
-        return cls.objects.create(
-            owner=user,
-            username_key=getattr(user, "username", "") or "",
-            entry_amount=amt,
-            pool_type="FIVE_150",
-            status="ACTIVE",
-            parent_account=None,
-            level=1,
-        )
+        return cls.place_in_five_pool(user, "FIVE_150", amt, source_type=source_type, source_id=source_id)
 
     @classmethod
     def create_three_150_for_user(cls, user, amount: Decimal | None = None):
         from decimal import Decimal as D
         amt = D(amount) if amount is not None else D("150.00")
-        return cls.objects.create(
-            owner=user,
-            username_key=getattr(user, "username", "") or "",
-            entry_amount=amt,
-            pool_type="THREE_150",
-            status="ACTIVE",
-            parent_account=None,
-            level=1,
-        )
+        return cls.place_in_three_pool(user, "THREE_150", amt)
 
     @classmethod
     def create_three_50_for_user(cls, user, amount: Decimal | None = None):
         from decimal import Decimal as D
         amt = D(amount) if amount is not None else D("50.00")
-        return cls.objects.create(
-            owner=user,
-            username_key=getattr(user, "username", "") or "",
-            entry_amount=amt,
-            pool_type="THREE_50",
-            status="ACTIVE",
-            parent_account=None,
-            level=1,
-        )
+        return cls.place_in_three_pool(user, "THREE_50", amt)
 
     # ---------- 3-Matrix placement helpers ----------
     @classmethod
@@ -301,56 +290,250 @@ class AutoPoolAccount(models.Model):
         return None
 
     @classmethod
-    def place_in_three_pool(cls, user, pool_type: str, amount: Decimal):
+    def _base_self_account(cls, user, pool_type: str):
         """
-        Place the user's pool account under the upline's first account for the same pool using 3-wide BFS spillover.
-        If no upline has an active account for this pool, create a root-level account (no parent).
+        Oldest ACTIVE self account for this owner in the given pool (acts as the main/root for clustering).
+        """
+        try:
+            return cls.objects.filter(owner=user, pool_type=pool_type, status="ACTIVE").order_by("id").first()
+        except Exception:
+            return None
+
+    @classmethod
+    def _next_username_key(cls, user, pool_type: str, sep: str = "-") -> str:
+        """
+        Deterministic display label:
+          - First self account per (user, pool_type): base username (no suffix)
+          - Subsequent accounts: base-2, base-3, ...
+        """
+        base = (getattr(user, "username", "") or "")
+        try:
+            count = cls.objects.filter(owner=user, pool_type=pool_type, status="ACTIVE").count()
+        except Exception:
+            count = 0
+        idx = int(count) + 1
+        return base if idx == 1 else f"{base}{sep}{idx}"
+
+    @classmethod
+    def place_in_three_pool(cls, user, pool_type: str, amount: Decimal, source_type: str = "", source_id: str = ""):
+        """
+        Preferred behavior:
+          - If user already has a base self account in this pool, place new self-accounts under that subtree (3-wide BFS).
+          - Else, fall back to upline BFS placement (legacy), which becomes the base.
         """
         from collections import deque
         from decimal import Decimal as D
+        from django.db import transaction as _tx
         amt = D(amount or 0)
-        root_acc = cls._first_upline_account(user, pool_type)
 
-        # If no upline account exists, create a root account
-        if not root_acc:
-            return cls.objects.create(
-                owner=user,
-                username_key=getattr(user, "username", "") or "",
-                entry_amount=amt,
-                pool_type=pool_type,
-                status="ACTIVE",
-                parent_account=None,
-                level=1,
-            )
+        with _tx.atomic():
+            base_self = cls._base_self_account(user, pool_type)
+            uname = cls._next_username_key(user, pool_type)
 
-        # BFS to find first account with <3 children in same pool
-        q = deque([root_acc])
-        while q:
-            node = q.popleft()
-            child_qs = cls.objects.filter(parent_account=node, pool_type=pool_type, status="ACTIVE").order_by("id")
-            if child_qs.count() < 3:
+            # If base exists, BFS within the user's own subtree (cluster under main)
+            if base_self:
+                q = deque([base_self])
+                while q:
+                    node = q.popleft()
+                    child_qs = cls.objects.filter(parent_account=node, pool_type=pool_type, status="ACTIVE").order_by("id")
+                    cnt = child_qs.count()
+                    if cnt < 3:
+                        return cls.objects.create(
+                            owner=user,
+                            username_key=uname,
+                            entry_amount=amt,
+                            pool_type=pool_type,
+                            status="ACTIVE",
+                            parent_account=node,
+                            level=(getattr(node, "level", 0) or 0) + 1,
+                            position=(cnt + 1),
+                            source_type=source_type or "",
+                            source_id=source_id or "",
+                        )
+                    for ch in child_qs:
+                        q.append(ch)
+
+                # Fallback: attach directly under base_self if traversal exhausted
+                child_qs2 = cls.objects.filter(parent_account=base_self, pool_type=pool_type, status="ACTIVE").order_by("id")
+                pos = child_qs2.count() + 1
                 return cls.objects.create(
                     owner=user,
-                    username_key=getattr(user, "username", "") or "",
+                    username_key=uname,
                     entry_amount=amt,
                     pool_type=pool_type,
                     status="ACTIVE",
-                    parent_account=node,
-                    level=(getattr(node, "level", 0) or 0) + 1,
+                    parent_account=base_self,
+                    level=(getattr(base_self, "level", 0) or 0) + 1,
+                    position=pos,
+                    source_type=source_type or "",
+                    source_id=source_id or "",
                 )
-            for ch in child_qs:
-                q.append(ch)
 
-        # Fallback: attach under root_acc
-        return cls.objects.create(
-            owner=user,
-            username_key=getattr(user, "username", "") or "",
-            entry_amount=amt,
-            pool_type=pool_type,
-            status="ACTIVE",
-            parent_account=root_acc,
-            level=(getattr(root_acc, "level", 0) or 0) + 1,
-        )
+            # No base exists yet: legacy placement under first upline account with capacity
+            root_acc = cls._first_upline_account(user, pool_type)
+
+            # If no upline account exists, create a root account (this becomes the base)
+            if not root_acc:
+                return cls.objects.create(
+                    owner=user,
+                    username_key=uname,
+                    entry_amount=amt,
+                    pool_type=pool_type,
+                    status="ACTIVE",
+                    parent_account=None,
+                    level=1,
+                    position=None,
+                    source_type=source_type or "",
+                    source_id=source_id or "",
+                )
+
+            # BFS to find first account with <3 children in same pool
+            q = deque([root_acc])
+            while q:
+                node = q.popleft()
+                child_qs = cls.objects.filter(parent_account=node, pool_type=pool_type, status="ACTIVE").order_by("id")
+                cnt = child_qs.count()
+                if cnt < 3:
+                    return cls.objects.create(
+                        owner=user,
+                        username_key=uname,
+                        entry_amount=amt,
+                        pool_type=pool_type,
+                        status="ACTIVE",
+                        parent_account=node,
+                        level=(getattr(node, "level", 0) or 0) + 1,
+                        position=(cnt + 1),
+                        source_type=source_type or "",
+                        source_id=source_id or "",
+                    )
+                for ch in child_qs:
+                    q.append(ch)
+
+            # Fallback: attach under root_acc
+            child_qs2 = cls.objects.filter(parent_account=root_acc, pool_type=pool_type, status="ACTIVE").order_by("id")
+            pos = child_qs2.count() + 1
+            return cls.objects.create(
+                owner=user,
+                username_key=uname,
+                entry_amount=amt,
+                pool_type=pool_type,
+                status="ACTIVE",
+                parent_account=root_acc,
+                level=(getattr(root_acc, "level", 0) or 0) + 1,
+                position=pos,
+                source_type=source_type or "",
+                source_id=source_id or "",
+            )
+
+    @classmethod
+    def place_in_five_pool(cls, user, pool_type: str, amount: Decimal, source_type: str = "", source_id: str = ""):
+        """
+        Preferred behavior:
+          - If user already has a base self account in this pool, place new self-accounts under that subtree (5-wide BFS).
+          - Else, fall back to upline BFS placement (legacy), which becomes the base.
+        """
+        from collections import deque
+        from decimal import Decimal as D
+        from django.db import transaction as _tx
+        amt = D(amount or 0)
+
+        with _tx.atomic():
+            base_self = cls._base_self_account(user, pool_type)
+            uname = cls._next_username_key(user, pool_type)
+
+            # If base exists, BFS within the user's own subtree (cluster under main)
+            if base_self:
+                q = deque([base_self])
+                while q:
+                    node = q.popleft()
+                    child_qs = cls.objects.filter(parent_account=node, pool_type=pool_type, status="ACTIVE").order_by("id")
+                    cnt = child_qs.count()
+                    if cnt < 5:
+                        return cls.objects.create(
+                            owner=user,
+                            username_key=uname,
+                            entry_amount=amt,
+                            pool_type=pool_type,
+                            status="ACTIVE",
+                            parent_account=node,
+                            level=(getattr(node, "level", 0) or 0) + 1,
+                            position=(cnt + 1),
+                            source_type=source_type or "",
+                            source_id=source_id or "",
+                        )
+                    for ch in child_qs:
+                        q.append(ch)
+
+                # Fallback: attach directly under base_self if traversal exhausted
+                child_qs2 = cls.objects.filter(parent_account=base_self, pool_type=pool_type, status="ACTIVE").order_by("id")
+                pos = child_qs2.count() + 1
+                return cls.objects.create(
+                    owner=user,
+                    username_key=uname,
+                    entry_amount=amt,
+                    pool_type=pool_type,
+                    status="ACTIVE",
+                    parent_account=base_self,
+                    level=(getattr(base_self, "level", 0) or 0) + 1,
+                    position=pos,
+                    source_type=source_type or "",
+                    source_id=source_id or "",
+                )
+
+            # No base exists yet: legacy placement under first upline account with capacity
+            root_acc = cls._first_upline_account(user, pool_type)
+
+            # Root-level when no upline account exists
+            if not root_acc:
+                return cls.objects.create(
+                    owner=user,
+                    username_key=uname,
+                    entry_amount=amt,
+                    pool_type=pool_type,
+                    status="ACTIVE",
+                    parent_account=None,
+                    level=1,
+                    position=None,
+                    source_type=source_type or "",
+                    source_id=source_id or "",
+                )
+
+            q = deque([root_acc])
+            while q:
+                node = q.popleft()
+                child_qs = cls.objects.filter(parent_account=node, pool_type=pool_type, status="ACTIVE").order_by("id")
+                cnt = child_qs.count()
+                if cnt < 5:
+                    return cls.objects.create(
+                        owner=user,
+                        username_key=uname,
+                        entry_amount=amt,
+                        pool_type=pool_type,
+                        status="ACTIVE",
+                        parent_account=node,
+                        level=(getattr(node, "level", 0) or 0) + 1,
+                        position=(cnt + 1),
+                        source_type=source_type or "",
+                        source_id=source_id or "",
+                    )
+                for ch in child_qs:
+                    q.append(ch)
+
+            # Fallback under root (shouldn't happen with BFS)
+            child_qs2 = cls.objects.filter(parent_account=root_acc, pool_type=pool_type, status="ACTIVE").order_by("id")
+            pos = child_qs2.count() + 1
+            return cls.objects.create(
+                owner=user,
+                username_key=uname,
+                entry_amount=amt,
+                pool_type=pool_type,
+                status="ACTIVE",
+                parent_account=root_acc,
+                level=(getattr(root_acc, "level", 0) or 0) + 1,
+                position=pos,
+                source_type=source_type or "",
+                source_id=source_id or "",
+            )
 
     @classmethod
     def place_three_150_for_user(cls, user, amount: Decimal | None = None):
