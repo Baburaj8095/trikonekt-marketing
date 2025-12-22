@@ -175,12 +175,11 @@ export default function AdminShell({ children }) {
 
   // Route active detection
   function isRouteActive(to) {
-    if (to === "/admin/matrix/five" || to === "/admin/matrix/three") {
-      return loc.pathname.startsWith("/admin/matrix");
-    }
+    // Keep models index active for nested routes
     if (to === "/admin/dashboard/models") {
       return loc.pathname.startsWith("/admin/dashboard/models");
     }
+    // Default: active if exact or nested under this specific link
     return loc.pathname === to || loc.pathname.startsWith(to + "/");
   }
 
@@ -320,9 +319,10 @@ export default function AdminShell({ children }) {
         { to: "/admin/packages", label: "Packages", icon: "box" },
         { to: "/admin/products", label: "Products", icon: "box" },
         { to: "/admin/banners", label: "Banners", icon: "image" },
-        { to: "/admin/orders", label: "Orders", icon: "orders" },
+        // { to: "/admin/orders", label: "Orders", icon: "orders" },
         { to: "/admin/payments", label: "Payments", icon: "wallet" },
-        { to: "/admin/uploads", label: "Uploads", icon: "upload" },
+        { to: "/admin/agency-prime-requests", label: "Agency Prime Requests", icon: "wallet" },
+        // { to: "/admin/uploads", label: "Uploads", icon: "upload" },
       ],
     },
     {
@@ -346,10 +346,23 @@ export default function AdminShell({ children }) {
         { to: "/admin/dashboard/models/business/promopackageebook", label: "Package → E‑Books Mapping", icon: "box" },
         { to: "/admin/promo-package-products", label: "Upload Promo Products (₹750)", icon: "upload" },
         { to: "/admin/dashboard/models/business/promopackageproduct", label: "Promo Products (₹750)", icon: "box" },
-        { to: "/admin/dashboard/models/business/promomonthlypackage", label: "Monthly Package Numbers", icon: "box" },
+        { to: "/admin/dashboard/models/business/promomonthlypackage", label: "Season Numbers", icon: "box" },
         // Optional: inspect paid boxes if needed
-        { to: "/admin/dashboard/models/business/promomonthlybox", label: "Monthly Boxes (Paid)", icon: "box" },
+        { to: "/admin/dashboard/models/business/promomonthlybox", label: "Season Boxes (Paid)", icon: "box" },
         { to: "/admin/promo-purchases", label: "Promo Purchases", icon: "ticket" },
+      ],
+    },
+    {
+      key: "tri",
+      label: "TRI Apps",
+      items: [
+        { to: "/admin/tri/tri-holidays", label: "Manage TRI Holidays", icon: "box" },
+        { to: "/admin/tri/tri-ev", label: "Manage TRI EV Vehicles", icon: "box" },
+        { to: "/admin/tri/tri-furniture", label: "Manage TRI Furniture", icon: "box" },
+        { to: "/admin/tri/tri-electronics", label: "Manage TRI Electronics", icon: "box" },
+        { to: "/admin/tri/tri-properties", label: "Manage TRI Properties", icon: "box" },
+        { to: "/admin/tri/tri-saving", label: "Manage TRI Saving", icon: "box" },
+        { to: "/admin/tri/tri-local-store", label: "Manage Local Store", icon: "box" },
       ],
     },
     {
@@ -378,9 +391,17 @@ export default function AdminShell({ children }) {
         { to: "/admin/matrix/three", label: "3‑Matrix", icon: "matrix3" },
         { to: "/admin/commissions/matrix", label: "Matrix Commission", icon: "wallet" },
         { to: "/admin/commissions/levels", label: "Level Commission", icon: "wallet" },
+        { to: "/admin/commissions/distribute", label: "Commission Distribute", icon: "wallet" },
         { to: "/admin/commissions/history", label: "Commission History", icon: "wallet" },
         { to: "/admin/rewards/points", label: "Rewards Points", icon: "chart" },
         { to: "/admin/autopool", label: "Auto Commission", icon: "pool" },
+      ],
+    },
+    {
+      key: "engagement",
+      label: "Engagement",
+      items: [
+        { to: "/admin/notifications", label: "Notifications", icon: "ticket" }
       ],
     },
     {

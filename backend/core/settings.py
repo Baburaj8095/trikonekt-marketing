@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     'market',
     'adminapi',
     'core',
+    'notifications',
 ]
 
 MIDDLEWARE = [
@@ -117,8 +118,8 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': False,
     'BLACKLIST_AFTER_ROTATION': False,
     'UPDATE_LAST_LOGIN': False,
-    # 'ALGORITHM': 'HS256',
-    # 'AUTH_HEADER_TYPES': ('Bearer',),
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'LEEWAY': 60,  # absorb up to 60s clock drift to avoid false token_not_valid
 }
 
 # CORS configuration
@@ -185,3 +186,7 @@ CSRF_COOKIE_SECURE = True
 SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '0'))
 SECURE_HSTS_INCLUDE_SUBDOMAINS = os.environ.get('SECURE_HSTS_INCLUDE_SUBDOMAINS', 'False').lower() in ('1', 'true', 'yes')
 SECURE_HSTS_PRELOAD = os.environ.get('SECURE_HSTS_PRELOAD', 'False').lower() in ('1', 'true', 'yes')
+
+# Feature flags (disabled by default to avoid impacting existing functionality)
+NOTIFICATIONS_ENABLED = os.environ.get('NOTIFICATIONS_ENABLED', 'False').lower() in ('1', 'true', 'yes')
+NOTIFICATIONS_PUSH_ENABLED = os.environ.get('NOTIFICATIONS_PUSH_ENABLED', 'False').lower() in ('1', 'true', 'yes')

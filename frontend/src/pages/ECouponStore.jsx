@@ -38,6 +38,7 @@ import CartDrawer from "../components/ecoupon/CartDrawer";
 import FilterBar from "../components/ecoupon/FilterBar";
 import AssignCouponsForm from "../components/ecoupon/AssignCouponsForm";
 import OrdersList from "../components/ecoupon/OrdersList";
+import ClubHeader from "../components/ecoupon/ClubHeader";
 
 export default function ECouponStore() {
   const [loading, setLoading] = useState(true);
@@ -51,6 +52,12 @@ export default function ECouponStore() {
   const [denomFilter, setDenomFilter] = useState("all");
   const [denomOptions, setDenomOptions] = useState([]);
   const [availByDenom, setAvailByDenom] = useState({});
+
+  // Normalize denomination to a stable string key, e.g., 150.00 -> "150"
+  function denomKey(v) {
+    const n = Number(v);
+    return Number.isFinite(n) ? String(n) : String(v);
+  }
 
   // Search + price filtering
   const [search, setSearch] = useState("");
@@ -103,8 +110,13 @@ export default function ECouponStore() {
       const prods = Array.isArray(data?.products) ? data.products : [];
       setProducts(prods);
 
-      // Denomination options
-      const denoms = Array.from(new Set((prods || []).map((p) => String(p.denomination)))).sort(
+      // Denomination options (normalized keys, e.g., 150.00 -> "150")
+      const baseDenoms = Array.from(
+        new Set((prods || []).map((p) => denomKey(p.denomination)))
+      );
+      // Ensure agency/employee Assign forms always include standard denominations based on admin-issued codes
+      const DEFAULT_DENOMS = ["150", "750", "759"];
+      const denoms = Array.from(new Set([...DEFAULT_DENOMS, ...baseDenoms])).sort(
         (a, b) => Number(a) - Number(b)
       );
       setDenomOptions(["all", ...denoms]);
@@ -144,8 +156,16 @@ export default function ECouponStore() {
 
   async function fetchCount(params = {}) {
     try {
+      // Normalize denomination "value" to a numeric form so 150.00 -> 150
+      const norm = { page_size: 1, ...params };
+      if (norm.value != null) {
+        const n = Number(norm.value);
+        if (Number.isFinite(n)) {
+          norm.value = Number.isInteger(n) ? n : n; // keep number, strip trailing zeros implicitly
+        }
+      }
       const res = await (await import("../api/api")).default.get("/coupons/codes/", {
-        params: { page_size: 1, ...params },
+        params: norm,
       });
       const data = res?.data;
       if (typeof data?.count === "number") return data.count;
@@ -158,6 +178,7 @@ export default function ECouponStore() {
 
   async function computeAvailabilities(denoms = []) {
     try {
+      // Show GLOBAL availability for store: codes that are AVAILABLE and not assigned/sold/redeemed
       const entries = await Promise.all(
         (denoms || []).map(async (d) => {
           const cnt = await fetchCount({ issued_channel: "e_coupon", status: "AVAILABLE", value: d });
@@ -203,7 +224,7 @@ export default function ECouponStore() {
     const q = (search || "").trim().toLowerCase();
     const [minP, maxP] = priceRange;
     return (products || []).filter((p) => {
-      if (denomFilter !== "all" && String(p.denomination) !== String(denomFilter)) return false;
+      if (denomFilter !== "all" && denomKey(p.denomination) !== String(denomFilter)) return false;
       const price = Number(p?.price_per_unit || 0);
       if (Number.isFinite(minP) && price < minP) return false;
       if (Number.isFinite(maxP) && price > maxP) return false;
@@ -226,32 +247,45 @@ export default function ECouponStore() {
   };
 
   // Accordion: Assign handlers wired to existing APIs
-  const onAssignConsumer = async ({ username, count, notes }) => {
-    const res = await assignConsumerByCount({
+  const onAssignConsumer = async ({ username, count, notes, value }) => {
+    const body = {
       consumer_username: username,
       count,
       notes: notes || "",
-    });
+    };
+    if (value != null && value !== "") {
+      const n = Number(value);
+      if (Number.isFinite(n) && n > 0) body.value = n;
+    }
+    const res = await assignConsumerByCount(body);
     const assigned = Number(res?.assigned || 0);
     const after = Number(res?.available_after || 0);
     const samples = Array.isArray(res?.sample_codes) ? res.sample_codes : [];
-    return { message: `Assigned ${assigned}. Remaining in your pool: ${after}. Samples: ${samples.join(", ")}` };
+    try { await computeAvailabilities(denomOptions.filter((d) => d !== "all")); } catch {}
+    return { message: `Assigned ${assigned}${body.value ? ` (₹${body.value})` : ""}. Remaining in your pool: ${after}. Samples: ${samples.join(", ")}` };
   };
 
-  const onAssignEmployee = async ({ username, count, notes }) => {
-    const res = await assignEmployeeByCount({
+  const onAssignEmployee = async ({ username, count, notes, value }) => {
+    const body = {
       employee_username: username,
       count,
       notes: notes || "",
-    });
+    };
+    if (value != null && value !== "") {
+      const n = Number(value);
+      if (Number.isFinite(n) && n > 0) body.value = n;
+    }
+    const res = await assignEmployeeByCount(body);
     const assigned = Number(res?.assigned || 0);
     const after = Number(res?.available_after || 0);
     const samples = Array.isArray(res?.sample_codes) ? res.sample_codes : [];
-    return { message: `Assigned ${assigned} to ${username}. Remaining in agency pool: ${after}. Samples: ${samples.join(", ")}` };
+    try { await computeAvailabilities(denomOptions.filter((d) => d !== "all")); } catch {}
+    return { message: `Assigned ${assigned}${body.value ? ` (₹${body.value})` : ""} to ${username}. Remaining in agency pool: ${after}. Samples: ${samples.join(", ")}` };
   };
 
   return (
     <Container maxWidth="lg" sx={{ px: { xs: 1, md: 2 }, py: { xs: 1, md: 2 } }}>
+      <ClubHeader />
       {/* Header */}
       <Box sx={{ mb: 1.5 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
@@ -326,7 +360,7 @@ export default function ECouponStore() {
               <Grid item xs={12} sm={6} md={4} lg={3} key={p.id}>
                 <ECouponProductCard
                   product={p}
-                  available={availByDenom[String(p.denomination)]}
+                  available={availByDenom[denomKey(p.denomination)]}
                   onAddToCart={(pid, qty) => addToCart(pid, qty)}
                 />
               </Grid>
@@ -347,6 +381,9 @@ export default function ECouponStore() {
             <AssignCouponsForm
               variant="consumer"
               onSubmit={onAssignConsumer}
+              denomOptions={denomOptions.filter((d) => d !== "all")}
+              availByDenom={availByDenom}
+              hideZeroDenoms={false}
             />
           </AccordionDetails>
         </Accordion>
@@ -363,6 +400,9 @@ export default function ECouponStore() {
             <AssignCouponsForm
               variant="employee"
               onSubmit={onAssignEmployee}
+              denomOptions={denomOptions.filter((d) => d !== "all")}
+              availByDenom={availByDenom}
+              hideZeroDenoms={false}
             />
           </AccordionDetails>
         </Accordion>

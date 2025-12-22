@@ -1,0 +1,86 @@
+Wallets — Simple English Summary (from the Earning Wallet screen)
+
+What this page is about
+- This screen shows everything related to your earnings, your withdrawable money, your rewards, and the rules for making a withdrawal.
+- It also shows your Prime/Monthly status and the progress of the “auto ₹1000” rule.
+
+Main balances you will see
+1) Income Wallet
+   - This is your total earnings before tax (gross).
+   - It grows when you get commissions like direct refer, matrix income, franchise/geo income, etc.
+   - The number is shown as: ₹ [Income Wallet].
+
+2) Withdrawable Wallet
+   - This is the part you can actually take out to your bank (net).
+   - It mainly grows through the “auto ₹1000” rule described below.
+   - The page shows “Net to Withdraw per ₹1000 block” so you know how much you will get when the block completes.
+
+Taxes (10% TDS idea)
+- The system uses a 10% tax idea for commissions. This is already considered when earnings are credited, so you don’t get taxed again at withdrawal.
+- On the page, some previews also assume 10% tax for quick understanding.
+
+Auto ₹1000 rule (how your withdrawable grows)
+- For every full ₹1000 you earn in your Income Wallet, one block is applied:
+  - ₹150 tries to buy you one self e‑coupon (if stock is available).
+  - ₹50 goes to company (tax/maintenance).
+  - ₹50 goes to your direct sponsor as a bonus.
+  - The balance (₹1000 − ₹150 − ₹50 − ₹50 = ₹750) is added to your Withdrawable Wallet.
+- The page shows:
+  - How much of the current ₹1000 block is completed,
+  - How much is remaining,
+  - How many blocks are applied, and how many are pending,
+  - The per‑block breakdown and your “Net to Withdraw”.
+
+Prime and Monthly status
+- The page tells you if your Prime packages are active (like 150/750) and whether the Monthly package is active.
+- It also shows the date when they got activated.
+
+Reward Points
+- You see your total Reward Points.
+- “Reward Redeemed Points” shows how many points are considered spent compared to your total earnings.
+- Points can be used on selected items where points are allowed.
+
+Your incomes shown on the cards
+- Today Earning: How much you earned today.
+- Direct Refer Commission: Earnings from people you directly referred.
+- Matrix Level Income: Earnings that come from matrix levels (team structure).
+- Global TRI income and Global Turnover income: Additional global style earnings.
+- Direct Refer Withdraw Commission / Withdrawal Benefit: Any small extras tied to withdrawals and referrals.
+- Self coupon benefits (Activated coupon): Count of your self activations.
+- Monthly self coupon benefits (Activated coupon): Count of your monthly activations.
+
+Withdrawals — how and when you can request
+- KYC must be verified first.
+- You need at least ₹500 in your Withdrawable Wallet to enable the withdrawal button.
+- Withdrawals are allowed only on Sundays between 6:00 PM and 11:59 PM (IST).
+- Only one request is allowed per Sunday window.
+- Per request cap is ₹750 (you can request up to ₹750 each time).
+- The method is Bank (UPI is disabled on this screen).
+- Your bank details come from your KYC information.
+- After you submit a request, the balances refresh on the screen.
+
+Helpful progress and limits shown
+- A “Withdrawal Limit” tile shows how much you have earned inside the current ₹1000 block and confirms the block size (₹1000).
+- A progress bar shows how close you are to completing the current block.
+
+Other quick notes
+- The page also keeps track of your past withdrawal requests this week. If you already requested in this Sunday window, you cannot request again in the same window.
+- The page regularly refreshes the Sunday window timer (so it opens and closes at the right time).
+
+Simple definitions in one place
+- Income Wallet = Gross earnings (before tax).
+- Withdrawable Wallet = Net money you can take out (mainly grows every time a ₹1000 block completes).
+- Auto ₹1000 rule = Every ₹1000 of earnings converts into: ₹150 self coupon (if available) + ₹50 company + ₹50 sponsor + ₹750 to your withdrawable.
+- KYC = Your bank/KYC details must be verified before you can withdraw.
+- Sunday window = You can request a withdrawal only on Sunday 6:00 PM–11:59 PM, once per Sunday.
+
+What you should look at first on the page
+- Income Wallet (how much you have earned in total).
+- The current block progress (how close you are to moving money to the Withdrawable Wallet).
+- Withdrawable Wallet availability and Sunday window status (to know if you can withdraw now).
+- Reward Points total (if you plan to use points on eligible purchases).
+
+In short
+- You earn into Income Wallet (gross).
+- The auto ₹1000 rule moves money to your Withdrawable Wallet (net).
+- You can withdraw only on Sunday evening, once per window, min ₹500, max ₹750 per request, KYC required.

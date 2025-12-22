@@ -8,6 +8,7 @@ from .token_serializers import CustomTokenObtainPairSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, serializers, parsers
+from rest_framework.exceptions import NotFound
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
@@ -1247,6 +1248,11 @@ class WalletMe(APIView):
             }, status=status.HTTP_200_OK)
 
         w = Wallet.get_or_create_for_user(request.user)
+        # Auto-apply any pending ₹1000 blocks on wallet fetch (idempotent via AuditTrail)
+        try:
+            w._apply_auto_block_rule(w)
+        except Exception:
+            pass
 
         # Enhanced wallet meta for UI (best-effort; all exceptions guarded)
         try:
@@ -1303,6 +1309,120 @@ class WalletMe(APIView):
             self_redeems = 0
             refer_redeems = 0
 
+        # ===== Wallet summary extras for Consumer Wallet UI (best-effort; guarded) =====
+        try:
+            from django.utils import timezone as _tz
+            today = _tz.localdate()
+            tx_all = WalletTransaction.objects.filter(user=request.user)
+
+            def _sum_t(qs):
+                val = qs.aggregate(total=Sum("amount"))["total"] or 0
+                return str(val)
+
+            direct_ref_total = _sum_t(tx_all.filter(type="DIRECT_REF_BONUS"))
+            matrix_five_total = _sum_t(tx_all.filter(type="AUTOPOOL_BONUS_FIVE"))
+            matrix_three_total = _sum_t(tx_all.filter(type="AUTOPOOL_BONUS_THREE"))
+            matrix_total = _sum_t(tx_all.filter(type__in=["LEVEL_BONUS", "AUTOPOOL_BONUS_THREE", "AUTOPOOL_BONUS_FIVE"]))
+            global_tri_total = _sum_t(tx_all.filter(type="GLOBAL_ROYALTY"))
+            global_turnover_total = _sum_t(tx_all.filter(type="GLOBAL_ACTIVATION_CREDIT"))
+            from decimal import Decimal as D
+            withdrawal_benefit_total = _sum_t(tx_all.filter(type="LIFETIME_WITHDRAWAL_BONUS"))
+            commission_total = _sum_t(tx_all.filter(type="COMMISSION_CREDIT"))
+            franchise_total = _sum_t(tx_all.filter(type="FRANCHISE_INCOME"))
+            direct_ref_withdraw_commission_total = _sum_t(
+                tx_all.filter(type="DIRECT_REF_BONUS").filter(Q(meta__auto_rule="AUTO_1K_BLOCK") | Q(source_type="AUTO_1K_BLOCK"))
+            )
+            # Level-only bonus = matrix_total - (five + three)
+            try:
+                level_bonus_total = str(
+                    (D(str(matrix_total)) - D(str(matrix_five_total)) - D(str(matrix_three_total))).quantize(D("0.01"))
+                )
+            except Exception:
+                level_bonus_total = "0"
+            # Today earning: sum of positive credits across ALL income sources (exclude debits/withholding)
+            today_earning = _sum_t(
+                tx_all.filter(
+                    created_at__date=today,
+                    amount__gt=0,
+                    type__in=[
+                        "DIRECT_REF_BONUS",
+                        "LEVEL_BONUS",
+                        "AUTOPOOL_BONUS_FIVE",
+                        "AUTOPOOL_BONUS_THREE",
+                        "GLOBAL_ROYALTY",
+                        "GLOBAL_ACTIVATION_CREDIT",
+                        "COMMISSION_CREDIT",
+                        "FRANCHISE_INCOME",
+                        "LIFETIME_WITHDRAWAL_BONUS",
+                    ],
+                )
+            )
+            # All earnings (gross without TDS): sum of positive credits across all earning types
+            earn_types = [
+                "DIRECT_REF_BONUS",
+                "LEVEL_BONUS",
+                "AUTOPOOL_BONUS_FIVE",
+                "AUTOPOOL_BONUS_THREE",
+                "GLOBAL_ROYALTY",
+                "GLOBAL_ACTIVATION_CREDIT",
+                "COMMISSION_CREDIT",
+                "FRANCHISE_INCOME",
+                "LIFETIME_WITHDRAWAL_BONUS",
+                "REWARD_CREDIT",
+                "REDEEM_ECOUPON_CREDIT",
+                "SELF_BONUS_ACTIVE",
+            ]
+            all_earnings_total = _sum_t(tx_all.filter(amount__gt=0, type__in=earn_types))
+        except Exception:
+            direct_ref_total = "0"
+            matrix_five_total = "0"
+            matrix_three_total = "0"
+            matrix_total = "0"
+            global_tri_total = "0"
+            global_turnover_total = "0"
+            withdrawal_benefit_total = "0"
+            commission_total = "0"
+            franchise_total = "0"
+            level_bonus_total = "0"
+            today_earning = "0"
+            direct_ref_withdraw_commission_total = "0"
+            all_earnings_total = "0"
+
+        # Prime and Monthly activity snapshot
+        try:
+            from business.models import PromoPurchase, PromoMonthlyBox
+            prime_active_count = PromoPurchase.objects.filter(user=request.user, package__type="PRIME", status="APPROVED").count()
+            last_prime = PromoPurchase.objects.filter(user=request.user, package__type="PRIME", status="APPROVED").order_by("-approved_at").first()
+            last_prime_date = getattr(last_prime, "approved_at", None)
+            monthly_active_count = PromoMonthlyBox.objects.filter(user=request.user).count()
+        except Exception:
+            prime_active_count = 0
+            last_prime_date = None
+            monthly_active_count = 0
+
+        # Spin & Win eligibility
+        try:
+            from uploads.models import LuckySpinDraw, LuckySpinAttempt
+            now = timezone.now()
+            draw = LuckySpinDraw.objects.filter(locked=True, start_at__lte=now, end_at__gte=now).order_by("start_at").first()
+            spin_eligible = False
+            if draw:
+                att = LuckySpinAttempt.objects.filter(draw=draw, user=request.user).first()
+                spin_eligible = False if att else True
+        except Exception:
+            spin_eligible = False
+
+        # Coupon activity summary
+        try:
+            from django.utils import timezone as _tz2
+            from coupons.models import AuditTrail as _AT
+            self_activated = int(_AT.objects.filter(action="coupon_activated", actor=request.user).count())
+            month_start = _tz2.now().replace(day=1).date()
+            monthly_self_benefit = int(WalletTransaction.objects.filter(user=request.user, type="SELF_BONUS_ACTIVE", created_at__date__gte=month_start).count())
+        except Exception:
+            self_activated = 0
+            monthly_self_benefit = 0
+
         return Response({
             "balance": str(w.balance),                       # total (legacy)
             "main_balance": str(getattr(w, "main_balance", 0) or 0),
@@ -1329,6 +1449,40 @@ class WalletMe(APIView):
                 "completed_in_current_block": str(rem),
                 "remaining_to_next_block": str(remaining_to_next),
                 "progress_percent": int(progress_percent)
+            },
+            # Sketch-driven wallet summary extensions
+            "prime": {
+                "activeCount": int(prime_active_count),
+                "monthlyActiveCount": int(monthly_active_count),
+                "lastActiveDate": last_prime_date,
+            },
+            "today": {
+                "earning": str(today_earning),
+                "spinEligible": bool(spin_eligible),
+            },
+            "income": {
+                "directReferral": str(direct_ref_total),
+                "matrixFive": str(matrix_five_total),
+                "matrixThree": str(matrix_three_total),
+                "levelBonus": str(level_bonus_total),
+                "commission": str(commission_total),
+                "franchise": str(franchise_total),
+                "directRefWithdrawCommission": str(direct_ref_withdraw_commission_total),
+                "withdrawalBenefit": str(withdrawal_benefit_total),
+                "matrixLevel": str(matrix_total),
+                "globalTri": str(global_tri_total),
+                "globalTurnover": str(global_turnover_total),
+            },
+            "coupons": {
+                "selfActivated": int(self_activated),
+                "monthlySelfBenefitActivated": int(monthly_self_benefit),
+                "monthlyActivated": int(monthly_active_count),
+            },
+            "totals": {
+                "allEarnings": str(all_earnings_total)
+            },
+            "limits": {
+                "minWithdraw": 500
             }
         }, status=status.HTTP_200_OK)
 
@@ -1392,14 +1546,39 @@ class WalletTransactionSerializer(serializers.ModelSerializer):
         return getattr(u, "pincode", None)
 
 
+class LenientWalletTxnPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+    def paginate_queryset(self, queryset, request, view=None):
+        try:
+            return super().paginate_queryset(queryset, request, view)
+        except NotFound:
+            # When requested page is out of range, return empty page instead of 404
+            self.request = request
+            try:
+                self.count = queryset.count()
+            except Exception:
+                self.count = 0
+            self.page = None
+            return []
+
+    def get_paginated_response(self, data):
+        if getattr(self, "page", None) is None:
+            return Response({
+                "count": int(getattr(self, "count", 0) or 0),
+                "next": None,
+                "previous": None,
+                "results": data,
+            })
+        return super().get_paginated_response(data)
+
+
 class WalletTransactionsList(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = WalletTransactionSerializer
-    pagination_class = type(
-        "WalletTxnPagination",
-        (PageNumberPagination,),
-        {"page_size": 10, "page_size_query_param": "page_size", "max_page_size": 100},
-    )
+    pagination_class = LenientWalletTxnPagination
 
     def get_queryset(self):
         qs = WalletTransaction.objects.filter(user=self.request.user).order_by("-created_at")

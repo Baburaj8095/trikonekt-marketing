@@ -68,6 +68,9 @@ export default function History() {
   const [hasMore, setHasMore] = useState(true);
   const containerRef = useRef(null);
   const sentinelRef = useRef(null);
+  const pagesFetchedRef = useRef(new Set());
+  const ioLockRef = useRef(false);
+  const endReachedRef = useRef(false);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -75,25 +78,54 @@ export default function History() {
   async function fetchTransactions(page = 0, pageSize = txPageSize) {
     try {
       setErr("");
+      // prevent duplicate page fetches
+      if (page === 0) {
+        try { pagesFetchedRef.current.clear(); } catch (_) {}
+        try { endReachedRef.current = false; } catch (_) {}
+      }
+      if (pagesFetchedRef.current.has(page)) {
+        return;
+      }
+      pagesFetchedRef.current.add(page);
       if (page === 0) setTxLoading(true);
       else setLoadingMore(true);
       const res = await API.get("/accounts/wallet/me/transactions/", {
         params: { page: page + 1, page_size: pageSize },
+        dedupe: "cancelPrevious",
       });
       const data = res?.data || {};
       const list = Array.isArray(data) ? data : data?.results || [];
       const count = typeof data?.count === "number" ? data.count : undefined;
       let newLength = 0;
       setTxs((prev) => {
+        const prevLen = (prev || []).length;
         const merged = page === 0 ? list : [...prev, ...list];
-        newLength = merged.length;
-        return merged;
+        const seen = new Set();
+        const uniq = [];
+        for (const t of merged) {
+          const key = t && t.id != null ? `id:${t.id}` : JSON.stringify([t?.created_at, t?.type, t?.amount, t?.balance_after]);
+          if (!seen.has(key)) {
+            seen.add(key);
+            uniq.push(t);
+          }
+        }
+        newLength = uniq.length;
+        if (page > 0 && newLength === prevLen) {
+          try { endReachedRef.current = true; } catch (_) {}
+        }
+        return uniq;
       });
       setTxCount(typeof count === "number" ? count : newLength);
-      setHasMore(typeof count === "number" ? newLength < count : list.length === pageSize);
+      const nextHasMore = (typeof count === "number") ? newLength < count : (list.length === pageSize && list.length > 0);
+      setHasMore(nextHasMore);
+      if (!nextHasMore) {
+        try { endReachedRef.current = true; } catch (_) {}
+      }
     } catch (e) {
       if (page === 0) setTxs([]);
       setErr("Failed to load transactions.");
+      try { endReachedRef.current = true; } catch (_) {}
+      setHasMore(false);
     } finally {
       if (page === 0) setTxLoading(false);
       else setLoadingMore(false);
@@ -108,11 +140,19 @@ export default function History() {
     const root = containerRef.current || null;
     const observer = new IntersectionObserver((entries) => {
       const first = entries[0];
-      if (first.isIntersecting && !txLoading && !loadingMore && hasMore) {
-        const nextPage = txPage + 1;
-        setTxPage(nextPage);
-        fetchTransactions(nextPage, txPageSize);
+      if (!first.isIntersecting) return;
+      if (endReachedRef.current) return;
+      if (ioLockRef.current) return;
+      if (txLoading || loadingMore || !hasMore) return;
+      const nextPage = txPage + 1;
+      if (pagesFetchedRef.current && pagesFetchedRef.current.has(nextPage)) {
+        return;
       }
+      ioLockRef.current = true;
+      setTxPage(nextPage);
+      fetchTransactions(nextPage, txPageSize).finally(() => {
+        ioLockRef.current = false;
+      });
     }, { root, rootMargin: "200px 0px 200px 0px", threshold: 0 });
     const sent = sentinelRef.current;
     if (sent) observer.observe(sent);

@@ -22,10 +22,15 @@ import {
   RadioGroup,
   FormControlLabel,
   Radio,
+  Slider,
   Stepper,
   Step,
   StepLabel,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from "@mui/material";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { useNavigate } from "react-router-dom";
 import normalizeMediaUrl from "../utils/media";
 import {
@@ -33,6 +38,8 @@ import {
   createEcouponOrder,
   createPromoPurchase,
   createProductPurchaseRequest,
+  getRewardPointsSummary,
+  agencyCreatePaymentRequest,
 } from "../api/api";
 import {
   subscribe as subscribeCart,
@@ -121,11 +128,12 @@ export default function CheckoutV2() {
   const total = Number(cart.total || 0);
 
   const grouped = useMemo(() => {
-    const out = { ECOUPON: [], PROMO_PACKAGE: [], PRODUCT: [], OTHERS: [] };
+    const out = { ECOUPON: [], PROMO_PACKAGE: [], AGENCY_PACKAGE: [], PRODUCT: [], OTHERS: [] };
     for (const it of items) {
       const t = String(it.type || "").toUpperCase();
       if (t === "ECOUPON") out.ECOUPON.push(it);
       else if (t === "PROMO_PACKAGE") out.PROMO_PACKAGE.push(it);
+      else if (t === "AGENCY_PACKAGE") out.AGENCY_PACKAGE.push(it);
       else if (t === "PRODUCT") out.PRODUCT.push(it);
       else out.OTHERS.push(it);
     }
@@ -196,6 +204,63 @@ export default function CheckoutV2() {
 
   // Product payment method
   const [productPayMethod, setProductPayMethod] = useState("wallet");
+  // Default address + apply-to-all
+  const [defaultAddress, setDefaultAddress] = useState("");
+  // Coupon UI (voucher/promo)
+  const [couponCode, setCouponCode] = useState("");
+  const [couponApplied, setCouponApplied] = useState("");
+
+  // Reward points summary + order reward cap and chosen redeem amount
+  const [rewardSummary, setRewardSummary] = useState({ available: 0 });
+  const orderRewardCap = useMemo(() => {
+    try {
+      // Cap across PRODUCT lines having a >0 per-product reward percent
+      let cap = 0;
+      for (const it of grouped.PRODUCT) {
+        const unit = Number(it.unitPrice || 0);
+        const qty = Math.max(1, parseInt(it.qty || 1, 10));
+        const pct = Math.max(0, Number(it?.meta?.max_reward_pct || 0));
+        if (pct <= 0) continue;
+        const lineCap = (unit * qty * pct) / 100;
+        if (isFinite(lineCap) && lineCap > 0) cap += lineCap;
+      }
+      return Math.max(0, cap);
+    } catch {
+      return 0;
+    }
+  }, [grouped.PRODUCT]);
+  const [redeemUse, setRedeemUse] = useState(0);
+  const availablePoints = Number(rewardSummary?.available || rewardSummary?.current_points || 0);
+  const redeemMax = Math.max(0, Math.min(availablePoints, orderRewardCap));
+
+  // Load reward summary once
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await getRewardPointsSummary();
+        if (!alive) return;
+        const pts = Number(res?.current_points || 0);
+        setRewardSummary({ ...res, available: isFinite(pts) ? pts : 0 });
+      } catch {
+        if (!alive) return;
+        setRewardSummary({ available: 0 });
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Keep chosen redeem within bounds; if bounds shrink below current, clamp it.
+  useEffect(() => {
+    setRedeemUse((prev) => {
+      const n = Number(prev || 0);
+      if (!isFinite(n) || n < 0) return 0;
+      if (n > redeemMax) return redeemMax;
+      return n;
+    });
+  }, [redeemMax]);
 
   const handleUpdateQty = (key, qty) => {
     try {
@@ -424,18 +489,17 @@ export default function CheckoutV2() {
         }
       }
 
-      // 3) Submit PRODUCT items
-      for (const it of grouped.PRODUCT) {
+      // 2b) Submit AGENCY PACKAGE payment requests (go to admin approval)
+      for (const it of grouped.AGENCY_PACKAGE) {
         try {
-          const addr = String(it?.meta?.shipping_address || "").trim();
-          await createProductPurchaseRequest({
-            product: it.id,
-            quantity: Math.max(1, parseInt(it.qty || 1, 10)),
-            consumer_name: contact.name,
-            consumer_email: contact.email,
-            consumer_phone: contact.phone,
-            consumer_address: addr,
-            payment_method: productPayMethod,
+          const unit = Number(it.unitPrice || 0);
+          const qty = Math.max(1, parseInt(it.qty || 1, 10));
+          const amount = unit * qty;
+          await agencyCreatePaymentRequest(it.id, {
+            amount,
+            method: "UPI",
+            utr: String(it?.meta?.reference || ""),
+            // No proof upload here; agencies can attach on Prime Approval page
           });
           results.push({ key: it.key, ok: true });
         } catch (e) {
@@ -445,8 +509,55 @@ export default function CheckoutV2() {
             msg:
               e?.response?.data?.detail ||
               e?.message ||
-              "Failed to submit product request.",
+              "Failed to create agency package payment request.",
           });
+        }
+      }
+
+      // 3) Submit PRODUCT items (allocate reward points across lines up to per-line cap and chosen total)
+      {
+        // Remaining redeem budget (₹) across all eligible product lines
+        let remainingRedeem = Math.max(0, Math.min(Number(redeemUse || 0), Number(redeemMax || 0)));
+        for (const it of grouped.PRODUCT) {
+          try {
+            const addr = String(it?.meta?.shipping_address || "").trim();
+            const unit = Number(it.unitPrice || 0);
+            const qty = Math.max(1, parseInt(it.qty || 1, 10));
+            const isTri = !!(it?.meta?.tri);
+            const maxPct = Math.max(0, Number(it?.meta?.max_reward_pct || 0));
+            const lineCap = maxPct > 0 ? Math.max(0, (unit * qty * maxPct) / 100) : 0;
+
+            // Allocate redeem for this line from remaining budget
+            let lineRedeem = 0;
+            if (remainingRedeem > 0 && lineCap > 0) {
+              lineRedeem = Math.min(remainingRedeem, lineCap);
+              // Round to 2 decimals
+              lineRedeem = Math.round(lineRedeem * 100) / 100;
+              remainingRedeem = Math.max(0, Math.round((remainingRedeem - lineRedeem) * 100) / 100);
+            }
+
+            await createProductPurchaseRequest({
+              product: it.id,
+              quantity: qty,
+              consumer_name: contact.name,
+              consumer_email: contact.email,
+              consumer_phone: contact.phone,
+              consumer_address: addr,
+              payment_method: productPayMethod,
+              // New: optional reward discount for this line (₹)
+              reward_discount_amount: lineRedeem,
+            });
+            results.push({ key: it.key, ok: true });
+          } catch (e) {
+            results.push({
+              key: it.key,
+              ok: false,
+              msg:
+                e?.response?.data?.detail ||
+                e?.message ||
+                "Failed to submit product request.",
+            });
+          }
         }
       }
 
@@ -507,7 +618,148 @@ export default function CheckoutV2() {
           <Typography variant="body2" sx={{ mb: 1 }}>
             Provide shipping address for each product.
           </Typography>
-          <TableContainer sx={{ maxWidth: "100%", overflowX: "auto", mb: 2 }}>
+
+          {/* Delivery Address (default) */}
+          <Paper variant="outlined" sx={{ p: 1.25, borderRadius: 1.5, mb: 1.25 }}>
+            <Stack direction="row" alignItems="flex-start" spacing={1.25}>
+              <Box
+                sx={{
+                  width: 48,
+                  height: 48,
+                  border: "1px dashed",
+                  borderColor: "divider",
+                  borderRadius: 1.25,
+                  bgcolor: "#f8fafc",
+                  flexShrink: 0,
+                }}
+              />
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
+                  Delivery Address
+                </Typography>
+                <TextField
+                  size="small"
+                  fullWidth
+                  multiline
+                  minRows={2}
+                  placeholder="Enter delivery address"
+                  value={defaultAddress}
+                  onChange={(e) => setDefaultAddress(e.target.value)}
+                />
+                <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => {
+                      const addr = String(defaultAddress || "").trim();
+                      if (!addr) return;
+                      try {
+                        (grouped.PRODUCT || []).forEach((it) =>
+                          handleSetMeta(it.key, { shipping_address: addr })
+                        );
+                      } catch {}
+                    }}
+                  >
+                    Apply to all
+                  </Button>
+                </Stack>
+              </Box>
+            </Stack>
+          </Paper>
+
+          {/* Mobile-first product list cards */}
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+            Shopping List
+          </Typography>
+          <Stack spacing={1.25} sx={{ mb: 2, display: { xs: "flex", md: "none" } }}>
+            {grouped.PRODUCT.map((it) => {
+              const qty = Math.max(1, parseInt(it.qty || 1, 10));
+              const img = it?.meta?.image_url ? normalizeMediaUrl(it.meta.image_url) : null;
+              return (
+                <Paper
+                  key={it.key}
+                  variant="outlined"
+                  sx={{
+                    p: 1.25,
+                    borderRadius: 1.5,
+                  }}
+                >
+                  <Stack direction="row" spacing={1.25} alignItems="flex-start">
+                    <Box
+                      sx={{
+                        width: 64,
+                        height: 64,
+                        flexShrink: 0,
+                        borderRadius: 1.25,
+                        overflow: "hidden",
+                        bgcolor: "#f1f5f9",
+                        border: "1px solid",
+                        borderColor: "divider",
+                      }}
+                    >
+                      {img ? (
+                        <img
+                          src={img}
+                          alt={it.name}
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                      ) : (
+                        <Box sx={{ width: "100%", height: "100%", display: "grid", placeItems: "center", color: "text.disabled", fontSize: 12 }}>
+                          No Image
+                        </Box>
+                      )}
+                    </Box>
+
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Stack direction="row" alignItems="center" justifyContent="space-between">
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.2 }} noWrap>
+                          {it.name}
+                        </Typography>
+                        <Chip
+                          size="small"
+                          color="primary"
+                          label={`₹${(Number(it.unitPrice || 0) * qty).toLocaleString("en-IN")}`}
+                          sx={{ fontWeight: 700 }}
+                        />
+                      </Stack>
+
+                      <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+                        <Button size="small" variant="outlined" onClick={() => handleUpdateQty(it.key, Math.max(1, qty - 1))} sx={{ minWidth: 32, p: 0 }}>
+                          −
+                        </Button>
+                        <TextField
+                          size="small"
+                          type="number"
+                          value={qty}
+                          onChange={(e) => handleUpdateQty(it.key, e.target.value)}
+                          inputProps={{ min: 1, style: { textAlign: "center", width: 56 } }}
+                        />
+                        <Button size="small" variant="outlined" onClick={() => handleUpdateQty(it.key, qty + 1)} sx={{ minWidth: 32, p: 0 }}>
+                          +
+                        </Button>
+                        <Box sx={{ flex: 1 }} />
+                        <Button size="small" color="error" onClick={() => handleRemove(it.key)}>Remove</Button>
+                      </Stack>
+
+                      <TextField
+                        size="small"
+                        fullWidth
+                        multiline
+                        minRows={2}
+                        sx={{ mt: 1 }}
+                        placeholder="Enter delivery address"
+                        value={it?.meta?.shipping_address || ""}
+                        onChange={(e) => handleSetMeta(it.key, { shipping_address: e.target.value })}
+                      />
+                    </Box>
+                  </Stack>
+                </Paper>
+              );
+            })}
+          </Stack>
+
+          {/* Desktop table fallback */}
+          <TableContainer sx={{ maxWidth: "100%", overflowX: "auto", mb: 2, display: { xs: "none", md: "block" } }}>
             <Table size="small">
               <TableHead>
                 <TableRow>
@@ -523,14 +775,23 @@ export default function CheckoutV2() {
                   return (
                     <TableRow key={it.key}>
                       <TableCell>{it.name}</TableCell>
-                      <TableCell style={{ maxWidth: 120 }}>
-                        <TextField
-                          size="small"
-                          type="number"
-                          inputProps={{ min: 1 }}
-                          value={qty}
-                          onChange={(e) => handleUpdateQty(it.key, e.target.value)}
-                        />
+                      <TableCell style={{ maxWidth: 140 }}>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Button size="small" variant="outlined" onClick={() => handleUpdateQty(it.key, Math.max(1, qty - 1))} sx={{ minWidth: 28, p: 0 }}>
+                            −
+                          </Button>
+                          <TextField
+                            size="small"
+                            type="number"
+                            inputProps={{ min: 1 }}
+                            value={qty}
+                            onChange={(e) => handleUpdateQty(it.key, e.target.value)}
+                            sx={{ maxWidth: 80 }}
+                          />
+                          <Button size="small" variant="outlined" onClick={() => handleUpdateQty(it.key, qty + 1)} sx={{ minWidth: 28, p: 0 }}>
+                            +
+                          </Button>
+                        </Stack>
                       </TableCell>
                       <TableCell>
                         <TextField
@@ -668,6 +929,64 @@ export default function CheckoutV2() {
           <Typography variant="body2">Loading payment config...</Typography>
         </Box>
       ) : null}
+
+      {/* Shopping options (placeholder for shipping selection) */}
+      <Accordion defaultExpanded sx={{ mb: 1 }}>
+        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+            Shipping Options
+          </Typography>
+        </AccordionSummary>
+        <AccordionDetails>
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Box sx={{ width: 24, height: 24, borderRadius: 0.5, bgcolor: "#fff", border: "1px solid", borderColor: "divider" }} />
+              <Typography variant="body2">Standard Delivery</Typography>
+            </Stack>
+            <Typography variant="body2">₹0</Typography>
+          </Stack>
+        </AccordionDetails>
+      </Accordion>
+
+      {/* Voucher & Promo */}
+      <Accordion defaultExpanded sx={{ mb: 1 }}>
+        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+            Voucher and Promo
+          </Typography>
+        </AccordionSummary>
+        <AccordionDetails>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
+            <TextField
+              size="small"
+              label="Coupon code"
+              value={couponCode}
+              onChange={(e) => setCouponCode(e.target.value)}
+              sx={{ flex: 1 }}
+            />
+            <Button
+              size="small"
+              variant="contained"
+              onClick={() => setCouponApplied((couponCode || "").trim())}
+              disabled={!String(couponCode || "").trim()}
+            >
+              Apply
+            </Button>
+            {couponApplied ? (
+              <Chip size="small" color="success" label="Applied" onDelete={() => setCouponApplied("")} />
+            ) : null}
+          </Stack>
+        </AccordionDetails>
+      </Accordion>
+
+      {/* Payment Method */}
+      <Accordion defaultExpanded sx={{ mb: 1 }}>
+        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+            Payment Method
+          </Typography>
+        </AccordionSummary>
+        <AccordionDetails>
 
       <FormControl component="fieldset" size="small" sx={{ mb: 1 }}>
         <FormLabel component="legend">Payment Method</FormLabel>
@@ -808,6 +1127,16 @@ export default function CheckoutV2() {
         </Grid>
       </Grid>
 
+      {/* Trust signals */}
+      <Stack direction="row" spacing={1} sx={{ mt: 1, mb: 1 }}>
+        <Chip size="small" label="SSL Secure" />
+        <Chip size="small" label="UPI / QR" />
+        <Chip size="small" label="Refund on Failure" />
+      </Stack>
+
+      </AccordionDetails>
+      </Accordion>
+
       <Stack direction="row" spacing={1} justifyContent="space-between">
         <Button variant="outlined" onClick={goBack}>
           Back
@@ -817,7 +1146,7 @@ export default function CheckoutV2() {
           onClick={goNext}
           sx={{ textTransform: "none", fontWeight: 800 }}
         >
-          Submit Payment for Verification
+          Next
         </Button>
       </Stack>
     </Paper>
@@ -937,25 +1266,95 @@ export default function CheckoutV2() {
       <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
         Order Summary
       </Typography>
+
+      {/* Basic totals */}
       <Stack spacing={0.75}>
         <Stack direction="row" justifyContent="space-between">
           <Typography variant="body2" color="text.secondary">Items</Typography>
           <Typography variant="body2">{items.length}</Typography>
         </Stack>
         <Stack direction="row" justifyContent="space-between">
-          <Typography variant="body2" color="text.secondary">Subtotal</Typography>
+          <Typography variant="body2" color="text.secondary">Sub Total</Typography>
           <Typography variant="body2">₹{Number(total).toLocaleString("en-IN")}</Typography>
         </Stack>
         <Stack direction="row" justifyContent="space-between">
-          <Typography variant="body2" color="text.secondary">Tax</Typography>
+          <Typography variant="body2" color="text.secondary">Shipping</Typography>
           <Typography variant="body2">₹0</Typography>
         </Stack>
-        <Divider sx={{ my: 0.5 }} />
-        <Stack direction="row" justifyContent="space-between">
-          <Typography variant="body2" sx={{ fontWeight: 800 }}>Total</Typography>
-          <Typography variant="body2" sx={{ fontWeight: 800 }}>₹{Number(total).toLocaleString("en-IN")}</Typography>
-        </Stack>
       </Stack>
+
+      {/* Reward points discount */}
+      {grouped.PRODUCT.length > 0 ? (
+        <>
+          <Divider sx={{ my: 1 }} />
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            Discount: Reward Points
+          </Typography>
+
+          <Stack spacing={1} sx={{ mb: 1 }}>
+            <Stack direction="row" justifyContent="space-between">
+              <Typography variant="caption" color="text.secondary">Available</Typography>
+              <Typography variant="caption">₹{Number(availablePoints).toLocaleString("en-IN")}</Typography>
+            </Stack>
+            <Stack direction="row" justifyContent="space-between">
+              <Typography variant="caption" color="text.secondary">Max this order</Typography>
+              <Typography variant="caption">₹{Number(redeemMax).toLocaleString("en-IN")}</Typography>
+            </Stack>
+
+            <Slider
+              size="small"
+              value={Math.min(Number(redeemUse || 0), Number(redeemMax || 0))}
+              min={0}
+              max={Math.max(0, Math.floor(Number(redeemMax || 0) * 100) / 100)}
+              step={1}
+              onChange={(_, v) => {
+                const val = Array.isArray(v) ? v[0] : Number(v || 0);
+                if (!isFinite(val) || val < 0) return setRedeemUse(0);
+                if (val > redeemMax) return setRedeemUse(redeemMax);
+                setRedeemUse(val);
+              }}
+            />
+
+            <TextField
+              size="small"
+              type="number"
+              label="Redeem (₹)"
+              value={redeemUse}
+              inputProps={{ min: 0, max: Math.max(0, Math.floor(redeemMax * 100) / 100), step: "1" }}
+              onChange={(e) => {
+                const v = Number(e.target.value || 0);
+                if (!isFinite(v) || v < 0) return setRedeemUse(0);
+                if (v > redeemMax) return setRedeemUse(redeemMax);
+                setRedeemUse(v);
+              }}
+              fullWidth
+            />
+
+            <Stack direction="row" spacing={1}>
+              <Button size="small" variant="outlined" onClick={() => setRedeemUse(redeemMax)}>
+                Apply Max
+              </Button>
+              <Button size="small" onClick={() => setRedeemUse(0)}>
+                Reset
+              </Button>
+            </Stack>
+          </Stack>
+
+          <Stack direction="row" justifyContent="space-between">
+            <Typography variant="body2" color="success.main">Reward Discount</Typography>
+            <Typography variant="body2" color="success.main">-₹{Number(redeemUse).toLocaleString("en-IN")}</Typography>
+          </Stack>
+        </>
+      ) : null}
+
+      <Divider sx={{ my: 0.5 }} />
+      <Stack direction="row" justifyContent="space-between" sx={{ alignItems: "center" }}>
+        <Typography variant="body2" sx={{ fontWeight: 800 }}>Total</Typography>
+        <Typography variant="h6" sx={{ fontWeight: 800 }}>
+          ₹{Math.max(0, Number(total) - Number(redeemUse)).toLocaleString("en-IN")}
+        </Typography>
+      </Stack>
+
       <Divider sx={{ my: 1 }} />
       <Typography variant="caption" color="text.secondary">
         Payments are reviewed by admin. Upon approval, allocations will be made to your account.
@@ -984,7 +1383,7 @@ export default function CheckoutV2() {
         </Stack>
       </Stack>
 
-      <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 2 }}>
+      <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 2, display: { xs: "none", sm: "flex" } }}>
         {steps.map((label) => (
           <Step key={label}>
             <StepLabel>{label}</StepLabel>
@@ -1031,6 +1430,36 @@ export default function CheckoutV2() {
           </Grid>
         </Grid>
       )}
+
+      {/* Sticky mobile CTA */}
+      <Box
+        sx={{
+          position: { xs: "sticky", md: "static" },
+          bottom: 0,
+          p: 1.5,
+          bgcolor: "#fff",
+          borderTop: "1px solid",
+          borderColor: "divider",
+          zIndex: 10,
+          display: { xs: "block", md: "none" },
+        }}
+      >
+        <Stack direction="row" spacing={1}>
+          {activeStep > 0 && (
+            <Button fullWidth variant="outlined" onClick={goBack}>
+              Back
+            </Button>
+          )}
+          <Button
+            fullWidth
+            variant="contained"
+            onClick={activeStep === 2 ? checkout : goNext}
+            disabled={checkingOut || items.length === 0}
+          >
+            {activeStep === 2 ? "Pay Now" : "Next"}
+          </Button>
+        </Stack>
+      </Box>
 
       <Paper
         elevation={0}

@@ -20,6 +20,8 @@ from .models import (
     ECouponPaymentConfig,
     ECouponProduct,
     ECouponOrder,
+    LuckyDrawEligibility,
+    record_lucky_draw_eligibility_for_code,
 )
 from .serializers import (
     CouponSerializer,
@@ -160,15 +162,32 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     def get_queryset(self):
         user = self.request.user
         qs = super().get_queryset()
-        # Employee: see only codes assigned to me
+        qp = self.request.query_params
+        # Employee: if status=AVAILABLE, show global unassigned AVAILABLE pool; otherwise only codes assigned to this employee
         if is_employee_user(user):
-            return qs.filter(assigned_employee=user)
-        # Agency: see only codes assigned to my agency
-        if is_agency_user(user):
-            qs = qs.filter(assigned_agency=user)
-        coupon_id = self.request.query_params.get("coupon")
-        status_in = self.request.query_params.get("status")
-        batch_id = self.request.query_params.get("batch")
+            status_in_flag = (qp.get("status") or "").upper()
+            if status_in_flag == "AVAILABLE":
+                qs = qs.filter(
+                    assigned_agency__isnull=True,
+                    assigned_employee__isnull=True,
+                    assigned_consumer__isnull=True,
+                )
+            else:
+                qs = qs.filter(assigned_employee=user)
+        # Agency: if status=AVAILABLE, show global unassigned AVAILABLE pool; otherwise only codes assigned to this agency
+        elif is_agency_user(user):
+            status_in_flag = (qp.get("status") or "").upper()
+            if status_in_flag == "AVAILABLE":
+                qs = qs.filter(
+                    assigned_agency__isnull=True,
+                    assigned_employee__isnull=True,
+                    assigned_consumer__isnull=True,
+                )
+            else:
+                qs = qs.filter(assigned_agency=user)
+        coupon_id = qp.get("coupon")
+        status_in = qp.get("status")
+        batch_id = qp.get("batch")
         if coupon_id:
             qs = qs.filter(coupon_id=coupon_id)
         if batch_id:
@@ -252,24 +271,25 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
           - redeemed: codes assigned to me with status REDEEMED
           - activated: number of activation audits by me
           - transferred: number of transfers initiated by me
+          - by_value: same metrics broken down per denomination (e.g. 50/150/759)
         """
         if not is_consumer_user(request.user):
             return Response({"detail": "Only consumers can access."}, status=status.HTTP_403_FORBIDDEN)
 
-        # Base counts by assignment to this consumer
-        assigned_qs = CouponCode.objects.filter(assigned_consumer=request.user)
+        # Restrict to e‑coupons owned by this consumer
+        assigned_qs = CouponCode.objects.filter(assigned_consumer=request.user, issued_channel="e_coupon")
+
+        # Overall counts (status based)
         try:
-            available_assigned = assigned_qs.filter(status="SOLD").count()
+            sold_assigned = assigned_qs.filter(status="SOLD").count()
         except Exception:
-            available_assigned = 0
+            sold_assigned = 0
         try:
             redeemed_assigned = assigned_qs.filter(status="REDEEMED").count()
         except Exception:
             redeemed_assigned = 0
 
-        # Audits for actions taken by this consumer (distinct by coupon to avoid double counting)
-        activated_count = 0
-        transferred_count = 0
+        # Audits (actor scoped)
         try:
             activated_count = (AuditTrail.objects
                                .filter(action="coupon_activated", actor=request.user)
@@ -277,22 +297,69 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
                                .distinct()
                                .count())
         except Exception:
-            pass
+            activated_count = 0
         try:
             transferred_count = AuditTrail.objects.filter(action="consumer_transfer", actor=request.user).count()
         except Exception:
-            pass
+            transferred_count = 0
 
-        # Available excludes those already activated
-        available_final = available_assigned - activated_count
-        if available_final < 0:
-            available_final = 0
+        # Overall "available" = SOLD minus my activations (cannot go negative)
+        available_overall = sold_assigned - activated_count
+        if available_overall < 0:
+            available_overall = 0
+
+        # Denomination-wise breakdown
+        by_value = {}
+        try:
+            # Base counts per value and status (SOLD / REDEEMED)
+            rows = (assigned_qs.values("value", "status")
+                            .annotate(c=Count("id")))
+            for r in rows:
+                v = str(r.get("value"))
+                st = (r.get("status") or "").upper()
+                ent = by_value.get(v) or {"available": 0, "redeemed": 0, "activated": 0, "transferred": 0}
+                if st == "SOLD":
+                    ent["available"] += int(r.get("c") or 0)
+                elif st == "REDEEMED":
+                    ent["redeemed"] += int(r.get("c") or 0)
+                by_value[v] = ent
+
+            # Activations by this consumer grouped by value
+            act_rows = (AuditTrail.objects
+                        .filter(action="coupon_activated", actor=request.user)
+                        .values("coupon_code__value")
+                        .annotate(c=Count("id")))
+            for r in act_rows:
+                v = str(r.get("coupon_code__value"))
+                ent = by_value.get(v) or {"available": 0, "redeemed": 0, "activated": 0, "transferred": 0}
+                ent["activated"] += int(r.get("c") or 0)
+                by_value[v] = ent
+
+            # Transfers initiated by this consumer grouped by value
+            tr_rows = (AuditTrail.objects
+                       .filter(action="consumer_transfer", actor=request.user)
+                       .values("coupon_code__value")
+                       .annotate(c=Count("id")))
+            for r in tr_rows:
+                v = str(r.get("coupon_code__value"))
+                ent = by_value.get(v) or {"available": 0, "redeemed": 0, "activated": 0, "transferred": 0}
+                ent["transferred"] += int(r.get("c") or 0)
+                by_value[v] = ent
+
+            # Adjust available per value by subtracting activations (cannot go negative)
+            for v, ent in list(by_value.items()):
+                avail = int(ent.get("available") or 0) - int(ent.get("activated") or 0)
+                ent["available"] = avail if avail > 0 else 0
+                by_value[v] = ent
+        except Exception:
+            by_value = {}
 
         summary = {
-            "available": available_final,
+            "available": available_overall,
             "redeemed": redeemed_assigned,
             "activated": activated_count,
             "transferred": transferred_count,
+            "by_value": by_value,
         }
         return Response(summary, status=status.HTTP_200_OK)
 
@@ -435,6 +502,12 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
                 metadata={"consumer_username": consumer.username},
             )
 
+            # Mark first-time eligibility for Spin & Win (150/759)
+            try:
+                record_lucky_draw_eligibility_for_code(code)
+            except Exception:
+                pass
+
         data = CouponCodeSerializer(code).data
         return Response(data, status=status.HTTP_201_CREATED)
 
@@ -562,6 +635,15 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
             count = 0
         batch_id = request.data.get("batch")
         notes = (request.data.get("notes") or "").strip()
+        # Optional denomination filter for targeted assignment (e.g., 759 or 150)
+        value_param = request.data.get("value") or request.data.get("denomination") or request.data.get("amount")
+        code_value = None
+        if value_param is not None:
+            try:
+                from decimal import Decimal, InvalidOperation
+                code_value = Decimal(str(value_param))
+            except (InvalidOperation, TypeError, ValueError):
+                code_value = None
 
         if not consumer_username or count <= 0:
             return Response({"detail": "consumer_username and positive count are required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -603,6 +685,8 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
             )
         if batch_id:
             base_qs = base_qs.filter(batch_id=batch_id)
+        if code_value is not None:
+            base_qs = base_qs.filter(value=code_value)
 
         available_before = base_qs.count()
         if available_before <= 0:
@@ -685,6 +769,13 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
             .values_list("code", flat=True)[:5]
         )
 
+        # Record eligibility for Spin & Win (idempotent) for codes assigned in this call
+        try:
+            for c in CouponCode.objects.filter(id__in=pick_ids, assigned_consumer=consumer).only("id", "value", "assigned_consumer", "coupon"):
+                record_lucky_draw_eligibility_for_code(c)
+        except Exception:
+            pass
+
         return Response(
             {
                 "available_before": available_before,
@@ -722,6 +813,15 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
             cnt = 0
         batch_id = request.data.get("batch")
         notes = (request.data.get("notes") or "").strip()
+        # Optional denomination filter for targeted assignment (e.g., 759 or 150)
+        value_param = request.data.get("value") or request.data.get("denomination") or request.data.get("amount")
+        code_value = None
+        if value_param is not None:
+            try:
+                from decimal import Decimal, InvalidOperation
+                code_value = Decimal(str(value_param))
+            except (InvalidOperation, TypeError, ValueError):
+                code_value = None
 
         if cnt <= 0:
             return Response({"detail": "Positive count is required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -750,6 +850,8 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         )
         if batch_id:
             base_qs = base_qs.filter(batch_id=batch_id)
+        if code_value is not None:
+            base_qs = base_qs.filter(value=code_value)
 
         available_before = base_qs.count()
         if available_before <= 0:
@@ -900,7 +1002,8 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
 
         # Reference lists (lean payloads)
         coupons = list(Coupon.objects.only("id", "title", "campaign").order_by("-created_at").values("id", "title", "campaign"))
-        batches_qs = CouponBatch.objects.only("id", "prefix", "serial_start", "serial_end", "created_at").order_by("-created_at")
+        # Include coupon_id so frontend can filter batches per Season/Coupon (e.g., "Season 1")
+        batches_qs = CouponBatch.objects.only("id", "coupon_id", "prefix", "serial_start", "serial_end", "created_at").order_by("-created_at")
         batches = []
         for b in batches_qs:
             total = None
@@ -911,6 +1014,7 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
                 total = None
             batches.append({
                 "id": b.id,
+                "coupon": b.coupon_id,
                 "prefix": b.prefix,
                 "serial_start": b.serial_start,
                 "serial_end": b.serial_end,
@@ -920,11 +1024,15 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
 
         agencies = list(
             CustomUser.objects.filter(Q(role="agency") | Q(category__startswith="agency"))
-            .only("id", "username").order_by("id").values("id", "username")
+            .only("id", "username", "full_name", "pincode", "category")
+            .order_by("id")
+            .values("id", "username", "full_name", "pincode", "category")
         )
         employees = list(
             CustomUser.objects.filter(Q(role="employee") | Q(category="employee"))
-            .only("id", "username").order_by("id").values("id", "username")
+            .only("id", "username", "full_name")
+            .order_by("id")
+            .values("id", "username", "full_name")
         )
 
         default_batch_id = batches[0]["id"] if batches else None
@@ -2272,6 +2380,98 @@ class AuditTrailViewSet(mixins.ListModelMixin,
         return qs.order_by("-created_at")
 
 
+class LuckyDrawEligibilityViewSet(viewsets.GenericViewSet):
+    """
+    Admin endpoints for Season-wise Lucky Draw eligibility reporting.
+    """
+    permission_classes = [IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
+
+    def get_queryset(self):
+        return LuckyDrawEligibility.objects.none()
+
+    @action(detail=False, methods=["get"], url_path="seasons", permission_classes=[IsAuthenticated])
+    def seasons(self, request):
+        # Admin only
+        if not is_admin_user(request.user):
+            return Response({"detail": "Only admin can access."}, status=status.HTTP_403_FORBIDDEN)
+        q = (request.query_params.get("q") or "").strip()
+        season_q = Q(code__istartswith="season") | Q(title__istartswith="season") | Q(campaign__istartswith="season")
+        qs = Coupon.objects.filter(season_q).order_by("-created_at")
+        if q:
+            qs = qs.filter(Q(title__icontains=q) | Q(code__icontains=q) | Q(campaign__icontains=q))
+        items = list(qs.values("id", "title", "code", "campaign", "valid_from", "valid_to", "created_at"))
+        return Response({"results": items}, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="participants", permission_classes=[IsAuthenticated])
+    def participants(self, request):
+        """
+        Query params:
+          - coupon: Coupon (Season/Coupon master) id [required]
+          - eligible_only: 1/0 (default 0)
+          - search: username/phone contains (optional)
+        Response: paginated list with has_150, has_759, eligible flags and first timestamps.
+        """
+        if not is_admin_user(request.user):
+            return Response({"detail": "Only admin can access."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            coupon_id = int(request.query_params.get("coupon"))
+        except Exception:
+            return Response({"coupon": ["coupon query param is required (int)."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        eligible_only = str(request.query_params.get("eligible_only") or "0").lower() in ("1", "true", "yes")
+        search = (request.query_params.get("search") or "").strip().lower()
+
+        rows = LuckyDrawEligibility.objects.filter(coupon_id=coupon_id).values("user_id", "value", "created_at")
+        user_ids = sorted(list({r["user_id"] for r in rows}))
+        user_map = {}
+        for u in CustomUser.objects.filter(id__in=user_ids).only("id", "username", "phone", "pincode"):
+            user_map[u.id] = {"username": u.username, "phone": getattr(u, "phone", "") or "", "pincode": getattr(u, "pincode", "") or ""}
+
+        from decimal import Decimal as D
+        by_user = {}
+        for r in rows:
+            uid = r["user_id"]; created = r["created_at"]
+            try:
+                v = D(str(r["value"]))
+            except Exception:
+                v = D("0")
+            ent = by_user.get(uid) or {
+                "user_id": uid,
+                "username": user_map.get(uid, {}).get("username"),
+                "phone": user_map.get(uid, {}).get("phone"),
+                "pincode": user_map.get(uid, {}).get("pincode"),
+                "has_150": False,
+                "has_759": False,
+                "created_at_150": None,
+                "created_at_759": None,
+            }
+            if v == D("150"):
+                ent["has_150"] = True
+                ent["created_at_150"] = created if (ent["created_at_150"] is None or created < ent["created_at_150"]) else ent["created_at_150"]
+            elif v in (D("759"), D("750")):
+                ent["has_759"] = True
+                ent["created_at_759"] = created if (ent["created_at_759"] is None or created < ent["created_at_759"]) else ent["created_at_759"]
+            by_user[uid] = ent
+
+        out = []
+        for ent in by_user.values():
+            ent["eligible"] = bool(ent["has_150"] and ent["has_759"])
+            if eligible_only and not ent["eligible"]:
+                continue
+            if search:
+                uname = (ent.get("username") or "").lower()
+                phone = str(ent.get("phone") or "").lower()
+                if (search not in uname) and (search not in phone):
+                    continue
+            out.append(ent)
+
+        page = self.paginate_queryset(out)
+        if page is not None:
+            return self.get_paginated_response(page)
+        return Response({"results": out}, status=status.HTTP_200_OK)
+
+
 # ===========================
 # Public v1 Coupon Endpoints
 # ===========================
@@ -2349,45 +2549,83 @@ class CouponActivateView(APIView):
             if code_str and ch == "e_coupon":
                 code_obj = CouponCode.objects.filter(code=code_str).select_related("assigned_employee", "assigned_agency").first()
                 if code_obj and code_obj.assigned_consumer_id == request.user.id:
-                    # Idempotency guard: award only once per code
-                    if not AuditTrail.objects.filter(action="ecoupon_commission_awarded", coupon_code=code_obj).exists():
-                        from accounts.models import Wallet
-                        from decimal import Decimal
-                        awards = []
-                        # Employee assigned path: 15 to employee, 15 to agency/sub-franchise
-                        if code_obj.assigned_employee_id:
-                            if code_obj.assigned_employee:
-                                awards.append(("employee", code_obj.assigned_employee, Decimal("15.00")))
-                            if code_obj.assigned_agency:
-                                awards.append(("agency", code_obj.assigned_agency, Decimal("15.00")))
-                        # Agency direct path: 30 to agency
-                        elif code_obj.assigned_agency_id:
-                            if code_obj.assigned_agency:
-                                awards.append(("agency", code_obj.assigned_agency, Decimal("30.00")))
-                        # Credit wallets
-                        for role, user_obj, amt in awards:
+                    # Special handling for Monthly 759 activations: sponsor + L1..L5 + agency split
+                    try:
+                        from decimal import Decimal as D
+                        val = D(str(getattr(code_obj, "value", "0") or 0))
+                    except Exception:
+                        val = None
+                    if val == D("759"):
+                        # Idempotent per code
+                        if not AuditTrail.objects.filter(action="monthly_759_distributed", coupon_code=code_obj).exists():
+                            # Determine if this is the consumer's first 759 activation (exclude this code itself)
+                            prev_exists = AuditTrail.objects.filter(
+                                action="coupon_activated",
+                                actor=request.user,
+                                coupon_code__value=D("759")
+                            ).exclude(coupon_code_id=code_obj.id).exists()
                             try:
-                                w = Wallet.get_or_create_for_user(user_obj)
-                                w.credit(
-                                    amt,
-                                    tx_type="COMMISSION_CREDIT",
-                                    meta={"role": role, "source": "ECOUPON_ACTIVATION", "code": code_obj.code},
-                                    source_type="ECOUPON_COMMISSION",
-                                    source_id=str(code_obj.id),
+                                from business.services.monthly import distribute_monthly_759_payouts
+                                distribute_monthly_759_payouts(
+                                    request.user,
+                                    is_first_month=(not prev_exists),
+                                    source={"type": "ECOUPON_759", "id": code_obj.id, "code": code_obj.code},
                                 )
                             except Exception:
                                 pass
-                        # Audit award summary
-                        try:
-                            AuditTrail.objects.create(
-                                action="ecoupon_commission_awarded",
-                                actor=request.user,
-                                coupon_code=code_obj,
-                                notes="Activation commission split",
-                                metadata={"awards": [{"role": r, "user": getattr(u, "username", None), "amount": str(a)} for (r, u, a) in awards]},
-                            )
-                        except Exception:
-                            pass
+                            # Stamp audit so we don't double-pay for this code
+                            try:
+                                AuditTrail.objects.create(
+                                    action="monthly_759_distributed",
+                                    actor=request.user,
+                                    coupon_code=code_obj,
+                                    notes="Monthly 759 commission distribution applied",
+                                    metadata={"first_month": bool(not prev_exists)},
+                                )
+                            except Exception:
+                                pass
+                        # Skip generic 15/30 path for 759 as monthly plan handles distribution
+                    else:
+                        # Default e‑coupon activation commissions for other denominations
+                        # Idempotency guard: award only once per code
+                        if not AuditTrail.objects.filter(action="ecoupon_commission_awarded", coupon_code=code_obj).exists():
+                            from accounts.models import Wallet
+                            from decimal import Decimal
+                            awards = []
+                            # Employee assigned path: 15 to employee, 15 to agency/sub-franchise
+                            if code_obj.assigned_employee_id:
+                                if code_obj.assigned_employee:
+                                    awards.append(("employee", code_obj.assigned_employee, Decimal("15.00")))
+                                if code_obj.assigned_agency:
+                                    awards.append(("agency", code_obj.assigned_agency, Decimal("15.00")))
+                            # Agency direct path: 30 to agency
+                            elif code_obj.assigned_agency_id:
+                                if code_obj.assigned_agency:
+                                    awards.append(("agency", code_obj.assigned_agency, Decimal("30.00")))
+                            # Credit wallets
+                            for role, user_obj, amt in awards:
+                                try:
+                                    w = Wallet.get_or_create_for_user(user_obj)
+                                    w.credit(
+                                        amt,
+                                        tx_type="COMMISSION_CREDIT",
+                                        meta={"role": role, "source": "ECOUPON_ACTIVATION", "code": code_obj.code},
+                                        source_type="ECOUPON_COMMISSION",
+                                        source_id=str(code_obj.id),
+                                    )
+                                except Exception:
+                                    pass
+                            # Audit award summary
+                            try:
+                                AuditTrail.objects.create(
+                                    action="ecoupon_commission_awarded",
+                                    actor=request.user,
+                                    coupon_code=code_obj,
+                                    notes="Activation commission split",
+                                    metadata={"awards": [{"role": r, "user": getattr(u, "username", None), "amount": str(a)} for (r, u, a) in awards]},
+                                )
+                            except Exception:
+                                pass
         except Exception:
             pass
 
@@ -2795,6 +3033,11 @@ class ECouponOrderViewSet(mixins.CreateModelMixin,
                             val = D(str(getattr(c, "value", "0") or 0))
                         except Exception:
                             continue
+                        # Mark first-time eligibility for Spin & Win (150/759)
+                        try:
+                            record_lucky_draw_eligibility_for_code(c)
+                        except Exception:
+                            pass
                         if val == D("150"):
                             # Five + Three matrix with per-level distribution, idempotent per code
                             try:

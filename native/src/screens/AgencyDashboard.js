@@ -3,8 +3,10 @@ import { View, Text, ScrollView, StyleSheet, Pressable, Alert } from 'react-nati
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import API from '../api/api';
 
-export default function AgencyDashboard() {
+export default function AgencyDashboard({ navigation }) {
   const [me, setMe] = useState(null);
+  const [primeStatus, setPrimeStatus] = useState('non-prime');
+  const isSubFranchise = String(me?.category || '').toLowerCase() === 'agency_sub_franchise';
 
   useEffect(() => {
     (async () => {
@@ -22,7 +24,34 @@ export default function AgencyDashboard() {
       } catch (e) {}
     })();
   }, []);
-
+  
+  useEffect(() => {
+    async function loadStatus() {
+      try {
+        const isSF = String(me?.category || '').toLowerCase() === 'agency_sub_franchise';
+        if (!isSF) return;
+        const token = await AsyncStorage.getItem('token');
+        if (!token) return;
+        const resp = await API.get('business/agency-packages/', { headers: { Authorization: `Bearer ${token}` } });
+        const arr = Array.isArray(resp?.data) ? resp.data : resp?.data?.results || [];
+        const statuses = (arr || []).map(a => String(a.status || '').toLowerCase());
+        if (statuses.includes('active')) setPrimeStatus('active');
+        else if (statuses.includes('partial')) setPrimeStatus('partial');
+        else setPrimeStatus('non-prime');
+      } catch (e) {
+        // Fallback to local flag set by PrimePackageScreen (UI-only)
+        try {
+          const raw = await AsyncStorage.getItem('agency_prime_status');
+          if (raw) {
+            const s = (JSON.parse(raw)?.status || '').toLowerCase();
+            if (s === 'active' || s === 'partial' || s === 'non-prime') setPrimeStatus(s);
+          }
+        } catch {}
+      }
+    }
+    loadStatus();
+  }, [me]);
+  
   function onAction(name) {
     Alert.alert('Not implemented', `${name} is coming soon in the native app.`);
   }
@@ -36,6 +65,13 @@ export default function AgencyDashboard() {
         <Pressable style={styles.card} onPress={() => onAction('Marketplace')}>
           <Text style={styles.cardTitle}>Marketplace</Text>
           <Text style={styles.cardDesc}>Agency marketplace</Text>
+        </Pressable>
+
+        <Pressable style={styles.card} onPress={() => navigation?.navigate('AgencyPrimePackage')}>
+          <Text style={styles.cardTitle}>Prime Package Buy</Text>
+          <Text style={styles.cardDesc}>
+            Prime Package Buy with Agency Prime Package agency user can buy can prime package of agency selecting 6k bigomegantic bed for more details see agency prime package
+          </Text>
         </Pressable>
 
         <Pressable style={styles.card} onPress={() => onAction('Products')}>
@@ -62,6 +98,7 @@ export default function AgencyDashboard() {
           <Text style={styles.cardTitle}>Reports</Text>
           <Text style={styles.cardDesc}>Daily/summary reports</Text>
         </Pressable>
+
       </View>
     </ScrollView>
   );

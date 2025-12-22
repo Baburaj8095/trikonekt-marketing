@@ -15,7 +15,7 @@ import {
   Chip,
   Stack,
 } from "@mui/material";
-import { getMyEcouponOrders, listMyPromoPurchases } from "../api/api";
+import { getMyEcouponOrders, listMyPromoPurchases, listMyProductPurchaseRequests, getPurchaseInvoiceUrl } from "../api/api";
 import normalizeMediaUrl from "../utils/media";
 function dateToStr(d) {
   try {
@@ -81,6 +81,10 @@ export default function MyOrdersAll() {
   const [promo, setPromo] = useState([]);
   const [promoLoading, setPromoLoading] = useState(false);
 
+  // Product purchase requests (Marketplace orders placed by me)
+  const [prOrders, setPrOrders] = useState([]);
+  const [prLoading, setPrLoading] = useState(false);
+
   async function loadEcOrders() {
     setEcLoading(true);
     try {
@@ -107,9 +111,23 @@ export default function MyOrdersAll() {
     }
   }
 
+  async function loadPrOrders() {
+    setPrLoading(true);
+    try {
+      const res = await listMyProductPurchaseRequests({ page_size: 100 });
+      const list = Array.isArray(res) ? res : res?.results || [];
+      setPrOrders(list || []);
+    } catch (e) {
+      setPrOrders([]);
+    } finally {
+      setPrLoading(false);
+    }
+  }
+
   useEffect(() => {
     loadEcOrders();
     loadPromo();
+    loadPrOrders();
   }, []);
 
   return (
@@ -128,6 +146,7 @@ export default function MyOrdersAll() {
         >
           <Tab label="E‑Coupons" value="ecoupons" />
           <Tab label="Promo Purchases" value="promo" />
+          <Tab label="Products" value="products" />
           <Tab label="Marketplace" value="market" />
         </Tabs>
       </Stack>
@@ -232,6 +251,76 @@ export default function MyOrdersAll() {
                       </TableRow>
                     );
                   })
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Section>
+      ) : null}
+
+      {tab === "products" ? (
+        <Section
+          title="Product Purchase Requests"
+          actions={
+            <Button size="small" variant="outlined" onClick={loadPrOrders} disabled={prLoading}>
+              {prLoading ? "Refreshing..." : "Refresh"}
+            </Button>
+          }
+        >
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Placed</TableCell>
+                  <TableCell>Product</TableCell>
+                  <TableCell>Qty</TableCell>
+                  <TableCell>Payment</TableCell>
+                  <TableCell>Reward Discount</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Invoice</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {(prOrders || []).length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7}>
+                      <Typography variant="body2" color="text.secondary">
+                        No product purchase requests yet.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  (prOrders || []).map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell>{dateToStr(r.created_at)}</TableCell>
+                      <TableCell>{r.product_name || r.product || "-"}</TableCell>
+                      <TableCell>{r.quantity || "-"}</TableCell>
+                      <TableCell>{String(r.payment_method || "-").toUpperCase()}</TableCell>
+                      <TableCell>
+                        {r.reward_discount_amount != null
+                          ? `₹${Number(r.reward_discount_amount).toLocaleString("en-IN")}`
+                          : "-"}
+                      </TableCell>
+                      <TableCell><StatusChip status={r.status} /></TableCell>
+                      <TableCell>
+                        {String(r.status || "").toUpperCase() === "APPROVED" ? (
+                          <Button
+                            size="small"
+                            onClick={() => {
+                              try {
+                                const url = getPurchaseInvoiceUrl(r.id);
+                                window.open(url, "_blank");
+                              } catch (_) {}
+                            }}
+                          >
+                            Download
+                          </Button>
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
                 )}
               </TableBody>
             </Table>

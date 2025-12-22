@@ -4,7 +4,7 @@ from django.utils import timezone
 from django.db.models import Q
 import csv
 
-from .models import BusinessRegistration, CommissionConfig, AutoPoolAccount, RewardProgress, RewardRedemption, UserMatrixProgress, ReferralJoinPayout, FranchisePayout, DailyReport, WithholdingReserve, Package, AgencyPackageAssignment, AgencyPackagePayment, PromoPackage, PromoProduct, PromoPurchase, PromoPackageProduct, PromoMonthlyPackage, PromoMonthlyBox, PromoEBook, PromoPackageEBook, EBookAccess
+from .models import BusinessRegistration, CommissionConfig, AutoPoolAccount, RewardProgress, RewardRedemption, UserMatrixProgress, ReferralJoinPayout, FranchisePayout, DailyReport, WithholdingReserve, Package, AgencyPackageAssignment, AgencyPackagePayment, PromoPackage, PromoProduct, PromoPurchase, PromoPackageProduct, PromoMonthlyPackage, PromoMonthlyBox, PromoEBook, PromoPackageEBook, EBookAccess, TriApp, TriAppProduct
 from accounts.models import CustomUser
 
 
@@ -488,6 +488,40 @@ class PromoPurchaseAdmin(admin.ModelAdmin):
                 continue
         self.message_user(request, f"Rejected {updated} promo purchase(s).")
     reject_selected.short_description = "Reject selected PENDING purchases"
+
+
+# ==============================
+# TRI Apps (Admin)
+# ==============================
+class TriAppProductInline(admin.TabularInline):
+    model = TriAppProduct
+    extra = 0
+    fields = ("name", "price", "currency", "image", "is_active", "display_order")
+    ordering = ("display_order", "id")
+
+
+@admin.register(TriApp)
+class TriAppAdmin(admin.ModelAdmin):
+    list_display = ("slug", "name", "is_active", "allow_price", "allow_add_to_cart", "allow_payment", "updated_at")
+    list_filter = ("is_active", "allow_price", "allow_add_to_cart", "allow_payment")
+    search_fields = ("slug", "name", "description")
+    readonly_fields = ("created_at", "updated_at")
+    fieldsets = (
+        ("TRI App", {"fields": ("slug", "name", "description", "is_active")}),
+        ("Capabilities", {"fields": ("allow_price", "allow_add_to_cart", "allow_payment")}),
+        ("Media", {"fields": ("banner_image",)}),
+        ("Audit", {"fields": ("created_at", "updated_at")}),
+    )
+    inlines = [TriAppProductInline]
+
+
+@admin.register(TriAppProduct)
+class TriAppProductAdmin(admin.ModelAdmin):
+    list_display = ("id", "app", "name", "price", "currency", "is_active", "display_order", "updated_at")
+    list_filter = ("app", "is_active")
+    search_fields = ("name", "app__slug", "app__name")
+    raw_id_fields = ("app",)
+    ordering = ("app", "display_order", "id")
 
 
 # ======================

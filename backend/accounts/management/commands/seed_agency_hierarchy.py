@@ -267,13 +267,22 @@ class Command(BaseCommand):
             d1_city = _ensure_city(state, d1)
 
         # Planned usernames (deterministic)
-        uname_sc = f"TRSC_{st_slug}"
-        uname_state = f"TRS_{st_slug}"
-        uname_dc = f"TRDC_{d1_slug}"
-        uname_district = f"TRD_{d1_slug}"
-        uname_pc = f"TRPC_{d1_slug}"
-        uname_p = f"TRP_{pincodes[0]}"
-        uname_sf = f"TRSF_{pincodes[0]}"
+        # Enforce username PREFIX + phone pattern (phone derived from first pincode deterministically)
+        phone_sc = f"9{pincodes[0]}001"
+        phone_state = f"9{pincodes[0]}002"
+        phone_dc = f"9{pincodes[0]}003"
+        phone_district = f"9{pincodes[0]}004"
+        phone_pc = f"9{pincodes[0]}005"
+        phone_p = f"9{pincodes[0]}006"
+        phone_sf = f"9{pincodes[0]}007"
+
+        uname_sc = f"TRSC{phone_sc}"
+        uname_state = f"TRST{phone_state}"
+        uname_dc = f"TRDC{phone_dc}"
+        uname_district = f"TRDT{phone_district}"
+        uname_pc = f"TRPC{phone_pc}"
+        uname_p = f"TRPN{phone_p}"
+        uname_sf = f"TRSF{phone_sf}"
 
         created_users = []
 
@@ -304,9 +313,9 @@ class Command(BaseCommand):
                 category="agency_state_coordinator",
                 sponsor_user=root,
                 password=password,
-                email=f"{uname_sc}@example.com",
+                email="TRSC9999990001@example.com",
                 full_name="State Coordinator",
-                phone="9999990001",
+                phone=phone_sc,
                 country=india,
                 state=state,
                 city=d1_city,
@@ -321,9 +330,9 @@ class Command(BaseCommand):
                 category="agency_state",
                 sponsor_user=sc,
                 password=password,
-                email=f"{uname_state}@example.com",
+                email="TRST9999990002@example.com",
                 full_name="Agency State",
-                phone="9999990002",
+                phone=phone_state,
                 country=india,
                 state=state,
                 city=d1_city,
@@ -338,9 +347,9 @@ class Command(BaseCommand):
                 category="agency_district_coordinator",
                 sponsor_user=st_user,
                 password=password,
-                email=f"{uname_dc}@example.com",
+                email="TRDC9999990003@example.com",
                 full_name="District Coordinator",
-                phone="9999990003",
+                phone=phone_dc,
                 country=india,
                 state=state,
                 city=d1_city,
@@ -356,9 +365,9 @@ class Command(BaseCommand):
                 category="agency_district",
                 sponsor_user=dc,
                 password=password,
-                email=f"{uname_district}@example.com",
+                email="TRDT9999990004@example.com",
                 full_name="Agency District",
-                phone="9999990004",
+                phone=phone_district,
                 country=india,
                 state=state,
                 city=d1_city,
@@ -373,9 +382,9 @@ class Command(BaseCommand):
                 category="agency_pincode_coordinator",
                 sponsor_user=ad,
                 password=password,
-                email=f"{uname_pc}@example.com",
+                email="TRPC9999990005@example.com",
                 full_name="Pincode Coordinator",
-                phone="9999990005",
+                phone=phone_pc,
                 country=india,
                 state=state,
                 city=d1_city,
@@ -391,9 +400,9 @@ class Command(BaseCommand):
                 category="agency_pincode",
                 sponsor_user=pc,
                 password=password,
-                email=f"{uname_p}@example.com",
+                email="TRPN9999990006@example.com",
                 full_name="Agency Pincode",
-                phone="9999990006",
+                phone=phone_p,
                 country=india,
                 state=state,
                 city=d1_city,
@@ -408,9 +417,9 @@ class Command(BaseCommand):
                 category="agency_sub_franchise",
                 sponsor_user=p_user,
                 password=password,
-                email=f"{uname_sf}@example.com",
+                email="TRSF9999990007@example.com",
                 full_name="Sub Franchise",
-                phone="9999990007",
+                phone=phone_sf,
                 country=india,
                 state=state,
                 city=d1_city,

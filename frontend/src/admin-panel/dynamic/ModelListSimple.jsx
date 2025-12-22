@@ -38,6 +38,7 @@ export default function ModelListSimple(props) {
   const [reload, setReload] = React.useState(0);
 
   const [density, setDensity] = React.useState(readInitialString("density", "standard"));
+  const [selected, setSelected] = React.useState([]);
 
   React.useEffect(() => {
     try { localStorage.setItem(`${storageKeyBase}.density`, String(density)); } catch (_) {}
@@ -90,10 +91,38 @@ export default function ModelListSimple(props) {
     const reason = window.prompt("Enter reject reason (optional):", "");
     if (reason === null) return;
     try {
-      await API.post(`business/admin/promo/purchases/${id}/reject/`, { reason: reason || "" });
+      await API.post(`business/admin/promo/purchases/${id}/reject/`, { reason });
       setReload((k) => k + 1);
     } catch (e) {
       alert(e?.response?.data?.detail || "Failed to reject");
+    }
+  }
+
+  // Notifications templates: dispatch actions
+  const isTemplateList = (meta?.app_label === "notifications" && meta?.model === "notificationeventtemplate");
+
+  async function dispatchRow(row) {
+    const id = row?.id ?? row?.pk;
+    if (!id) return;
+    try {
+      await API.post(`notifications/admin/templates/${id}/dispatch/`, {});
+      alert(`Queued dispatch for template #${id}`);
+      setReload((k) => k + 1);
+    } catch (e) {
+      alert(e?.response?.data?.detail || "Failed to dispatch");
+    }
+  }
+
+  async function dispatchSelected() {
+    const ids = Array.isArray(selected) ? selected : [];
+    if (!ids.length) return;
+    if (!window.confirm(`Dispatch ${ids.length} template(s)?`)) return;
+    try {
+      await API.post(`notifications/admin/templates/bulk-dispatch/`, { ids });
+      alert(`Queued ${ids.length} template(s)`);
+      setReload((k) => k + 1);
+    } catch (e) {
+      alert(e?.response?.data?.detail || "Failed to bulk dispatch");
     }
   }
 
@@ -135,6 +164,7 @@ export default function ModelListSimple(props) {
   // Build MUI DataGrid column definitions; value/resolution handled by DataTable's default getters.
   const columns = React.useMemo(() => {
     const isPromoPurchase = (meta?.app_label === "business" && meta?.model === "promopurchase");
+    const isTemplateList = (meta?.app_label === "notifications" && meta?.model === "notificationeventtemplate");
 
     const cols = (listDisplay || [])
       .filter((name) => name && name !== "repr")
@@ -170,6 +200,27 @@ export default function ModelListSimple(props) {
       renderCell: (params) => {
         const row = params?.row || {};
         if (!meta?.permissions?.change) return null;
+
+        if (isTemplateList) {
+          return (
+            <div style={{ display: "flex", gap: 6 }}>
+              <button
+                className="tk-btn"
+                onClick={() => dispatchRow(row)}
+                style={{ padding: "6px 10px", borderRadius: 6, background: "#2563eb", color: "#fff", border: 0, cursor: "pointer", fontSize: 12 }}
+              >
+                Dispatch
+              </button>
+              <button
+                className="tk-btn"
+                onClick={() => setEditRow(row)}
+                style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #e5e7eb", cursor: "pointer", fontSize: 12 }}
+              >
+                Edit
+              </button>
+            </div>
+          );
+        }
 
         if (isPromoPurchase && String(row.status || "").toUpperCase() === "PENDING") {
           return (
@@ -234,6 +285,24 @@ export default function ModelListSimple(props) {
       >
         Create
       </button>
+
+      {isTemplateList && (
+        <button
+          className="tk-btn"
+          onClick={dispatchSelected}
+          disabled={!selected?.length}
+          style={{
+            padding: "8px 12px",
+            borderRadius: 8,
+            border: "1px solid #93c5fd",
+            background: selected?.length ? "#eff6ff" : "#fff",
+            color: selected?.length ? "#1d4ed8" : "#64748b",
+            fontWeight: 800,
+          }}
+        >
+          Dispatch Selected
+        </button>
+      )}
 
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <label style={{ fontSize: 12, color: "#64748b" }}>Density</label>
@@ -307,7 +376,7 @@ export default function ModelListSimple(props) {
         density={density}
         toolbar={toolbar}
         checkboxSelection={true}
-        onSelectionChange={() => {}}
+        onSelectionChange={(ids) => setSelected(ids)}
       />
 
       <ModelFormDialog

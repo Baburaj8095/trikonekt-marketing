@@ -1,0 +1,158 @@
+Commission & Rewards Flow — Simple English Guide
+
+Purpose
+This note explains, in plain language, how money and points are shared in the system. It covers:
+- TDS/Company deduction (10%)
+- Direct sponsor and upline sharing
+- Local agency (geo) sharing
+- Auto ₹1000 rule
+- Withdrawals and the sponsor bonus on withdrawals
+- Fixed direct/level amounts on join/activation
+- Reward Points (team milestones)
+- Matrix (3‑wide and 5‑wide) placement and earnings
+- Who can change the numbers
+No technical terms are used; only how it works for people involved.
+
+
+1) When money is added to someone’s wallet (a “commission”)
+- This happens after activities like coupon approvals, auto‑pool/matrix earnings, level bonuses, franchise/geo earnings, etc.
+- Whenever such a commission is given to a person, two things occur:
+  a) A small part is kept aside for the company as TDS/Tax (10% by default).
+  b) The rest becomes available for that person to withdraw.
+
+
+2) The 10% TDS / Company deduction
+- From every commission payment, 10% goes to the company’s pool as tax (by default).
+- The remaining 90% is the person’s “take‑home” amount that they can withdraw.
+- The company can change this 10% number whenever needed.
+
+
+3) Sharing to your sponsor and your higher levels (upline)
+- The system can also share a small percentage of a commission with people above you.
+- There are five levels above you called L1 to L5.
+  Typical default sharing from a commission (example values):
+  - L1: 2%
+  - L2: 1%
+  - L3: 1%
+  - L4: 0.5%
+  - L5: 0.5%
+- These numbers can be changed by the company at any time.
+
+
+4) Sharing to local agency roles (geo sharing)
+- A part of a commission can also be shared with agency roles based on where the earning person lives (their pincode/state).
+- The roles are:
+  - Sub‑Franchise (at pincode)
+  - Pincode
+  - Pincode Coordinator
+  - District
+  - District Coordinator
+  - State
+  - State Coordinator
+  - Employee (closest relevant employee)
+  - Royalty (company/owner side)
+- Typical default ideas (company can change them):
+  - Sub‑Franchise ~15%
+  - Pincode ~4%
+  - Pincode Coord ~2%
+  - District ~1%
+  - District Coord ~1%
+  - State ~1%
+  - State Coord ~1%
+  - Employee ~2%
+  - Royalty ~10%
+- If a role is not available for a location, that share is simply skipped.
+
+
+5) Auto ₹1000 rule (happens automatically as you earn)
+- As your total earnings grow, for every full ₹1000 collected in your wallet’s main balance, one “auto pack” is applied:
+  - The system tries to give you one ₹150 e‑coupon for yourself (if stock is available).
+  - The company receives ₹50 (tax/maintenance).
+  - Your direct sponsor receives ₹50 as a thank‑you.
+  - You get the remaining ₹750 added to the amount you can withdraw.
+- If the ₹150 coupon is not available at that moment, the system still does the other parts.
+- This rule repeats for every full ₹1000 you earn (₹2000 = two packs, and so on).
+
+
+6) Direct referral on join/activation (fixed rupee amounts)
+- When someone joins/activates under you, the system can give fixed rupee amounts to you (Direct) and your upline levels.
+- Typical defaults:
+  - Direct: ₹15
+  - L1: ₹2
+  - L2: ₹1
+  - L3: ₹1
+  - L4: ₹0.5
+  - L5: ₹0.5
+- These are not percentages; they are fixed rupees. The company can change these anytime.
+
+
+7) Withdrawals (when you take money out)
+- You request a withdrawal of your available amount.
+- After approval, that amount is paid to you.
+- Additionally, your direct sponsor gets a small “lifetime” bonus on your withdrawal (default 3% of what you withdrew).
+- No extra tax is cut at withdrawal time because the tax was already taken when you originally earned the commissions.
+
+
+8) Reward Points (team milestones)
+- Apart from money, the system also gives Reward Points when your team reaches certain coupon milestones.
+- Example default rewards (company can change these):
+  - After 1 coupon: 1,000 points
+  - After 2 coupons: 10,000 points
+  - After 3 coupons: 30,000 points
+  - After 4 coupons: 60,000 points
+  - After 5 coupons: 110,000 points
+  - After that, every extra coupon: 20,000 points each
+- These points can be used on selected products/services where points are allowed.
+
+
+9) Matrix (3‑wide and 5‑wide)
+- The system builds two kinds of team trees for consumers:
+  - 3‑wide matrix (up to many levels)
+  - 5‑wide matrix (up to 6 levels by default)
+- New accounts for you first try to sit under your own existing matrix branch (to keep your cluster together).
+- If that is not possible, they sit under your upline’s open spot.
+- Earnings from these matrix placements flow as commissions, and then the normal sharing and 10% tax rule apply.
+- The company can set:
+  - How many levels the matrix pays
+  - Either fixed rupee amounts per level or percentages per level
+
+
+10) Company pool and transparency
+- The company pool (the 10% TDS part) is recorded clearly.
+- From time to time, the company may distribute that pool internally or keep it for operations.
+- All people’s earnings and the company pool entries are recorded so they can be reviewed.
+
+
+11) Who can change the numbers
+- The company can change:
+  - The 10% tax/TDS number and the company user who receives it
+  - The sponsor/upline (L1..L5) percentages
+  - The geo/agency percentages
+  - The fixed rupee amounts for direct and levels on join/activation
+  - Reward Points milestones and “points per extra coupon”
+  - Matrix level counts and per‑level payouts
+- If the company changes values, new earnings use the new values going forward.
+
+
+12) Quick examples
+
+A. Example commission of ₹100 to a person
+- 10% to company = ₹10
+- Person’s available to withdraw ≈ ₹90
+- If this commission also includes sharing to upline/agency roles, those people get their parts too (and each of them also has 10% deducted from their own share). The system does this automatically.
+
+B. Example withdrawal of ₹1,000 by you
+- You receive ₹1,000 (assuming you had that much available).
+- Your direct sponsor gets 3% of ₹1,000 = ₹30 as a lifetime withdrawal bonus.
+
+C. Example auto ₹1000 rule
+- When you cross ₹1,000 earned:
+  - One ₹150 coupon for you (if in stock),
+  - ₹50 to company,
+  - ₹50 to your sponsor,
+  - ₹750 gets added to your withdrawable amount.
+
+Important notes
+- Percentages and fixed rupee amounts shown here are typical defaults. The company can update them whenever needed.
+- If a particular role (like “Pincode Coordinator”) does not exist for your area, that role’s share is simply skipped.
+- Withdrawals do not cut extra tax because the tax was already deducted when you earned the commission.

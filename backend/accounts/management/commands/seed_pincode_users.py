@@ -200,7 +200,8 @@ class Command(BaseCommand):
             pc = _find_pc_for_pin(pin, district_name=district_name)
             pc_name = pc.username if pc else "(none)"
 
-            uname = f"TRP_{pin}"
+            phone = f"9{pin}000"
+            uname = f"TRPN{phone}"
             if dry_run:
                 summary.append({"username": uname, "pin": pin, "sponsor": pc_name})
                 continue
@@ -213,7 +214,7 @@ class Command(BaseCommand):
                 sponsor_user=pc,
                 email=f"{uname}@example.com",
                 full_name=f"Agency Pincode {pin}",
-                phone=f"99999{pin[-5:]}",
+                phone=phone,
                 country=india,
                 state=state,
                 city=city,

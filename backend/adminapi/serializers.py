@@ -610,6 +610,32 @@ class AdminAutopoolTxnSerializer(serializers.ModelSerializer):
             return None
 
 
+class AdminCompanyTaxPayoutSerializer(serializers.ModelSerializer):
+    tax_tx_id = serializers.IntegerField(source="tax_tx.id", read_only=True)
+    source_user_id = serializers.IntegerField(source="source_user.id", read_only=True)
+    source_username = serializers.CharField(source="source_user.username", read_only=True)
+    beneficiary_id = serializers.IntegerField(source="beneficiary.id", read_only=True)
+    beneficiary_username = serializers.CharField(source="beneficiary.username", read_only=True)
+    beneficiary_category = serializers.CharField(source="beneficiary.category", read_only=True)
+
+    class Meta:
+        model = __import__("business.models", fromlist=["CompanyCommissionPayout"]).CompanyCommissionPayout  # late import to avoid circular at load time
+        fields = [
+            "id",
+            "tax_tx_id",
+            "source_user_id",
+            "source_username",
+            "beneficiary_id",
+            "beneficiary_username",
+            "beneficiary_category",
+            "pool_key",
+            "role_key",
+            "amount",
+            "metadata",
+            "created_at",
+        ]
+
+
 class AdminUserEditSerializer(serializers.ModelSerializer):
     """
     Admin-side editable fields for a user. Primary keys for geo fields.

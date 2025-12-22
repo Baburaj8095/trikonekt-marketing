@@ -345,6 +345,67 @@ class AuditTrail(models.Model):
         return f"[{self.action}] {ref}"
 
 
+class LuckyDrawEligibility(models.Model):
+    """
+    Records a user's first-time purchase eligibility for Spin & Win against a Season (Coupon master).
+    One row per (user, denomination). Denomination examples: 150.00, 750.00, 759.00
+    """
+    user = models.ForeignKey(UserModel, on_delete=models.PROTECT, related_name="season_lucky_draw_eligibilities")
+    coupon = models.ForeignKey(Coupon, on_delete=models.PROTECT, related_name="lucky_draw_eligibilities")  # Season/Coupon master
+    code = models.ForeignKey("CouponCode", on_delete=models.SET_NULL, null=True, blank=True, related_name="lucky_draw_eligibilities")
+    value = models.DecimalField(max_digits=8, decimal_places=2)
+    source = models.JSONField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            # Unique per user, per Season (Coupon master), per denomination
+            models.UniqueConstraint(fields=["user", "coupon", "value"], name="uniq_lucky_first_purchase_per_value_per_season"),
+        ]
+        indexes = [
+            models.Index(fields=["user"]),
+            models.Index(fields=["coupon"]),
+            models.Index(fields=["value"]),
+        ]
+
+    def __str__(self):
+        return f"Eligible: {getattr(self.user, 'username', self.user_id)} ₹{self.value} @ {getattr(self.coupon, 'title', self.coupon_id)}"
+
+
+def record_lucky_draw_eligibility_for_code(code: "CouponCode"):
+    """
+    Idempotently record LuckyDrawEligibility when a code of denomination 150/750/759
+    is first-time assigned to a consumer.
+    """
+    try:
+        if not code or not getattr(code, "assigned_consumer_id", None):
+            return
+        from decimal import Decimal
+        val = Decimal(str(getattr(code, "value", "0") or 0))
+        # Consider 150 and 759 (and 750 for compatibility) as eligible denominations
+        if val not in (Decimal("150"), Decimal("750"), Decimal("759")):
+            return
+        from django.db import transaction
+        with transaction.atomic():
+            exists = LuckyDrawEligibility.objects.filter(user_id=code.assigned_consumer_id, coupon_id=code.coupon_id, value=val).exists()
+            if exists:
+                return
+            LuckyDrawEligibility.objects.create(
+                user_id=code.assigned_consumer_id,
+                coupon_id=code.coupon_id,
+                code=code,
+                value=val,
+                source={
+                    "type": "code_assigned",
+                    "code": getattr(code, "code", None),
+                    "channel": getattr(code, "issued_channel", None),
+                },
+            )
+    except Exception:
+        # non-blocking
+        pass
+
 # Signals for side-effects on approvals
 from django.db.models.signals import post_save
 from django.dispatch import receiver

@@ -62,19 +62,20 @@ function Select({ label, value, onChange, options, style }) {
 }
 
 function CreateProductDialog({ open, onClose, onCreated }) {
-  const [form, setForm] = useState({
-    name: "",
-    description: "",
-    category: "",
-    price: "",
-    quantity: "",
-    discount: "",
-    country: "",
-    state: "",
-    city: "",
-    pincode: "",
-    image: null,
-  });
+    const [form, setForm] = useState({
+      name: "",
+      description: "",
+      category: "",
+      price: "",
+      quantity: "",
+      discount: "",
+      max_reward_redeem_percent: "",
+      country: "",
+      state: "",
+      city: "",
+      pincode: "",
+      image: null,
+    });
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
   const [snack, setSnack] = useState({ open: false, type: "success", msg: "" });
@@ -91,6 +92,7 @@ function CreateProductDialog({ open, onClose, onCreated }) {
       price: "",
       quantity: "",
       discount: "",
+      max_reward_redeem_percent: "",
       country: "",
       state: "",
       city: "",
@@ -117,6 +119,7 @@ function CreateProductDialog({ open, onClose, onCreated }) {
       if (form.price !== "") fd.append("price", String(Number(form.price)));
       if (form.quantity !== "") fd.append("quantity", String(parseInt(form.quantity || "0", 10)));
       if (form.discount !== "") fd.append("discount", String(Number(form.discount)));
+      if (form.max_reward_redeem_percent !== "") fd.append("max_reward_redeem_percent", String(Number(form.max_reward_redeem_percent)));
       fd.append("country", form.country);
       fd.append("state", form.state);
       fd.append("city", form.city);
@@ -205,6 +208,16 @@ function CreateProductDialog({ open, onClose, onCreated }) {
               inputProps={{ step: "0.01", min: "0", max: "100" }}
               error={!!errors.discount}
               helperText={errors.discount || " "}
+            />
+            <TextField
+              label="Max Reward Redeem %"
+              value={form.max_reward_redeem_percent}
+              onChange={(e) => onChange("max_reward_redeem_percent", e.target.value)}
+              size="small"
+              type="number"
+              inputProps={{ step: "0.01", min: "0", max: "100" }}
+              error={!!errors.max_reward_redeem_percent}
+              helperText={errors.max_reward_redeem_percent || " "}
             />
             <TextField
               label="Country"
@@ -345,6 +358,15 @@ export default function AdminProducts() {
         }
       },
       { field: "quantity", headerName: "Quantity", minWidth: 100 },
+      {
+        field: "max_reward_redeem_percent",
+        headerName: "Max Redeem %",
+        minWidth: 140,
+        renderCell: (params) => {
+          const v = Number(params?.row?.max_reward_redeem_percent || 0);
+          return `${v.toFixed(2)}%`;
+        }
+      },
       {
         field: "active",
         headerName: "Status",

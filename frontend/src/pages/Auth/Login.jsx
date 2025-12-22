@@ -1255,8 +1255,12 @@ const pincodeOptionsConsumer = useMemo(() => {
 
         if (!tokenRole) throw new Error("Token missing role claim");
 
+        // Determine effective app namespace from token role/category
+        const roleEffective =
+          payload?.role_effective ||
+          (String(payload?.category || "").toLowerCase() === "business" ? "business" : tokenRole);
 
-        const ns = (payload?.is_staff || payload?.is_superuser) ? "admin" : (tokenRole || "user");
+        const ns = (payload?.is_staff || payload?.is_superuser) ? "admin" : (roleEffective || tokenRole || "user");
         const store = remember ? localStorage : sessionStorage;
 
         // Clean legacy non-namespaced keys to avoid cross-role collisions
@@ -1273,7 +1277,7 @@ const pincodeOptionsConsumer = useMemo(() => {
 
         store.setItem(`token_${ns}`, access);
         if (refreshTok) store.setItem(`refresh_${ns}`, refreshTok);
-        if (tokenRole) store.setItem(`role_${ns}`, tokenRole);
+        store.setItem(`role_${ns}`, roleEffective || tokenRole || "user");
 
         try {
           // Use the freshly issued access token explicitly here to avoid namespace mixups
@@ -1304,7 +1308,7 @@ const pincodeOptionsConsumer = useMemo(() => {
         if (payload?.is_staff || payload?.is_superuser) {
           navigate("/admin/dashboard", { replace: true });
         } else {
-          navigate(`/${tokenRole || "user"}/dashboard`, { replace: true });
+          navigate(`/${roleEffective || tokenRole || "user"}/dashboard`, { replace: true });
         }
     } catch (err) {
       console.error(err);

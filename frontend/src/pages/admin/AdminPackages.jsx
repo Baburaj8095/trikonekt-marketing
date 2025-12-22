@@ -99,6 +99,20 @@ export default function AdminPackages() {
     setPayOpen(true);
   };
 
+  // Quick action: prefill remaining amount and open the modal to approve full payment
+  const openPayFull = (assignmentId, title, remaining) => {
+    setPayErr("");
+    const amt = Number(remaining || 0);
+    setPayForm({
+      assignmentId,
+      amount: String(Number.isFinite(amt) && amt > 0 ? amt : ""),
+      reference: "",
+      notes: "Approve full payment",
+      title,
+    });
+    setPayOpen(true);
+  };
+
   const submitPay = async () => {
     setPayErr("");
     const amt = Number(payForm.amount);
@@ -259,21 +273,38 @@ export default function AdminPackages() {
                     <div style={{ fontSize: 12, fontWeight: 700 }}>
                       Renewal: {typeof p.months_remaining === "number" ? `${p.months_remaining} month${p.months_remaining === 1 ? "" : "s"} remaining` : "—"}
                     </div>
-                    <button
-                      onClick={() => openPay(p.id, title)}
-                      style={{
-                        padding: "6px 10px",
-                        borderRadius: 8,
-                        border: "1px solid #1d4ed8",
-                        background: "#2563eb",
-                        color: "#fff",
-                        fontWeight: 800,
-                        cursor: "pointer",
-                      }}
-                      title="Record a payment for this package"
-                    >
-                      Add Payment
-                    </button>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button
+                        onClick={() => openPay(p.id, title)}
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 8,
+                          border: "1px solid #1d4ed8",
+                          background: "#2563eb",
+                          color: "#fff",
+                          fontWeight: 800,
+                          cursor: "pointer",
+                        }}
+                        title="Record a payment for this package"
+                      >
+                        Add Payment
+                      </button>
+                      <button
+                        onClick={() => openPayFull(p.id, title, p.remaining_amount)}
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 8,
+                          border: "1px solid #10b981",
+                          background: "#10b981",
+                          color: "#fff",
+                          fontWeight: 800,
+                          cursor: "pointer",
+                        }}
+                        title="Approve remaining amount to mark fully paid"
+                      >
+                        Approve Full Payment
+                      </button>
+                    </div>
                   </div>
                 </div>
               );

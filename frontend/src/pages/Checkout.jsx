@@ -30,6 +30,7 @@ import {
   createEcouponOrder,
   createPromoPurchase,
   createProductPurchaseRequest,
+  getRewardPointsSummary,
 } from "../api/api";
 import {
   subscribe as subscribeCart,
@@ -160,6 +161,58 @@ export default function Checkout() {
   // Product payment method
   const [productPayMethod, setProductPayMethod] = useState("wallet");
 
+  // Reward points summary + order reward cap and chosen redeem amount
+  const [rewardSummary, setRewardSummary] = useState({ available: 0 });
+  const orderRewardCap = useMemo(() => {
+    try {
+      // Cap across PRODUCT lines having a >0 per-product reward percent
+      let cap = 0;
+      for (const it of grouped.PRODUCT) {
+        const unit = Number(it.unitPrice || 0);
+        const qty = Math.max(1, parseInt(it.qty || 1, 10));
+        const pct = Math.max(0, Number(it?.meta?.max_reward_pct || 0));
+        if (pct <= 0) continue;
+        const lineCap = (unit * qty * pct) / 100;
+        if (isFinite(lineCap) && lineCap > 0) cap += lineCap;
+      }
+      return Math.max(0, cap);
+    } catch {
+      return 0;
+    }
+  }, [grouped.PRODUCT]);
+  const [redeemUse, setRedeemUse] = useState(0);
+  const availablePoints = Number(rewardSummary?.available || rewardSummary?.current_points || 0);
+  const redeemMax = Math.max(0, Math.min(availablePoints, orderRewardCap));
+
+  // Load reward summary once
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await getRewardPointsSummary();
+        if (!alive) return;
+        const pts = Number(res?.current_points || 0);
+        setRewardSummary({ ...res, available: isFinite(pts) ? pts : 0 });
+      } catch {
+        if (!alive) return;
+        setRewardSummary({ available: 0 });
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Keep chosen redeem within bounds; if bounds shrink below current, clamp it.
+  useEffect(() => {
+    setRedeemUse((prev) => {
+      const n = Number(prev || 0);
+      if (!isFinite(n) || n < 0) return 0;
+      if (n > redeemMax) return redeemMax;
+      return n;
+    });
+  }, [redeemMax]);
+
   const checkout = async () => {
     if (!items.length) {
       try {
@@ -285,29 +338,49 @@ export default function Checkout() {
         }
       }
 
-      // 3) Submit PRODUCT items
-      for (const it of grouped.PRODUCT) {
-        try {
-          const addr = String(it?.meta?.shipping_address || "").trim();
-          await createProductPurchaseRequest({
-            product: it.id,
-            quantity: Math.max(1, parseInt(it.qty || 1, 10)),
-            consumer_name: contact.name,
-            consumer_email: contact.email,
-            consumer_phone: contact.phone,
-            consumer_address: addr,
-            payment_method: productPayMethod,
-          });
-          results.push({ key: it.key, ok: true });
-        } catch (e) {
-          results.push({
-            key: it.key,
-            ok: false,
-            msg:
-              e?.response?.data?.detail ||
-              e?.message ||
-              "Failed to submit product request.",
-          });
+      // 3) Submit PRODUCT items (allocate redeem across TRI lines up to per-line cap and chosen total)
+      {
+        // Remaining redeem budget (₹) across all TRI product lines
+        let remainingRedeem = Math.max(0, Math.min(Number(redeemUse || 0), Number(redeemMax || 0)));
+        for (const it of grouped.PRODUCT) {
+          try {
+            const addr = String(it?.meta?.shipping_address || "").trim();
+            const unit = Number(it.unitPrice || 0);
+            const qty = Math.max(1, parseInt(it.qty || 1, 10));
+            const isTri = !!(it?.meta?.tri);
+            const maxPct = Math.max(0, Number(it?.meta?.max_reward_pct || 0));
+            const lineCap = maxPct > 0 ? Math.max(0, (unit * qty * maxPct) / 100) : 0;
+            // Allocate redeem for this line from remaining budget
+            let lineRedeem = 0;
+            if (remainingRedeem > 0 && lineCap > 0) {
+              lineRedeem = Math.min(remainingRedeem, lineCap);
+              // Round to 2 decimals
+              lineRedeem = Math.round(lineRedeem * 100) / 100;
+              remainingRedeem = Math.max(0, Math.round((remainingRedeem - lineRedeem) * 100) / 100);
+            }
+
+            await createProductPurchaseRequest({
+              product: it.id,
+              quantity: qty,
+              consumer_name: contact.name,
+              consumer_email: contact.email,
+              consumer_phone: contact.phone,
+              consumer_address: addr,
+              payment_method: productPayMethod,
+              // New: optional reward discount for this line (₹)
+              reward_discount_amount: lineRedeem,
+            });
+            results.push({ key: it.key, ok: true });
+          } catch (e) {
+            results.push({
+              key: it.key,
+              ok: false,
+              msg:
+                e?.response?.data?.detail ||
+                e?.message ||
+                "Failed to submit product request.",
+            });
+          }
         }
       }
 
@@ -449,7 +522,7 @@ export default function Checkout() {
                           {String(it?.meta?.kind || "").toUpperCase() ===
                           "MONTHLY" ? (
                             <>
-                              Package #{it?.meta?.package_number ?? "-"}
+                              Season #{it?.meta?.package_number ?? "-"}
                               {" • "}Boxes:{" "}
                               {Array.isArray(it?.meta?.boxes)
                                 ? it.meta.boxes.join(", ")
@@ -493,6 +566,13 @@ export default function Checkout() {
                               handleSetMeta(it.key, { shipping_address: e.target.value })
                             }
                           />
+                          <div style={{ marginTop: 4 }}>
+                            Max reward: {Math.max(0, Number(it?.meta?.max_reward_pct || 0))}% • Line cap: ₹
+                            {Math.max(
+                              0,
+                              (unit * qty * Math.max(0, Number(it?.meta?.max_reward_pct || 0))) / 100
+                            ).toFixed(2)}
+                          </div>
                         </div>
                       ) : null;
 
@@ -799,6 +879,73 @@ export default function Checkout() {
                   </Alert>
                 ) : null}
               </>
+            ) : null}
+
+            {/* Reward points redeem (TRI products only) */}
+            {grouped.PRODUCT.length > 0 ? (
+              <Box
+                sx={{
+                  mt: 1,
+                  mb: 1.5,
+                  p: 1.5,
+                  borderRadius: 1.5,
+                  border: "1px dashed",
+                  borderColor: "divider",
+                  bgcolor: "#fafafa",
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  Redeem Reward Points (applies to eligible products; capped per product %)
+                </Typography>
+                <Grid container spacing={1.5} alignItems="center">
+                  <Grid item xs={12} sm={4}>
+                    <Typography variant="caption" color="text.secondary">Available</Typography>
+                    <div style={{ fontWeight: 800 }}>₹{Number(availablePoints).toLocaleString("en-IN")}</div>
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <Typography variant="caption" color="text.secondary">Max this order (cap)</Typography>
+                    <div style={{ fontWeight: 800 }}>₹{Number(orderRewardCap).toLocaleString("en-IN")}</div>
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <TextField
+                      size="small"
+                      label={`Redeem amount (₹, max ₹${Number(redeemMax).toLocaleString("en-IN")})`}
+                      type="number"
+                      inputProps={{ min: 0, max: Math.max(0, Math.floor(redeemMax * 100) / 100), step: "0.50" }}
+                      value={redeemUse}
+                      onChange={(e) => {
+                        const v = Number(e.target.value || 0);
+                        if (!isFinite(v) || v < 0) return setRedeemUse(0);
+                        if (v > redeemMax) return setRedeemUse(redeemMax);
+                        setRedeemUse(v);
+                      }}
+                      fullWidth
+                    />
+                  </Grid>
+                </Grid>
+                <Stack direction={{ xs: "row" }} spacing={1} sx={{ mt: 1 }}>
+                  <Button size="small" variant="outlined" onClick={() => setRedeemUse(redeemMax)}>
+                    Apply Reward Coupon
+                  </Button>
+                  <Button size="small" onClick={() => setRedeemUse(0)}>
+                    Remove
+                  </Button>
+                </Stack>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mt: 1 }}>
+                  <Chip size="small" label={`Subtotal: ₹${Number(total).toLocaleString("en-IN")}`} />
+                  <Chip size="small" color="success" label={`Reward discount: -₹${Number(redeemUse).toLocaleString("en-IN")}`} />
+                  <Chip
+                    size="small"
+                    color="primary"
+                    label={`Payable: ₹${Math.max(0, Number(total) - Number(redeemUse)).toLocaleString("en-IN")}`}
+                  />
+                </Stack>
+                {redeemUse > 0 && productPayMethod === "cash" ? (
+                  <Typography variant="caption" color="text.secondary">
+                    Note: For cash method, discount will be recorded with your request; no wallet debit is performed online.
+                  </Typography>
+                ) : null}
+              </Box>
             ) : null}
 
             <Divider sx={{ my: 1.5 }} />

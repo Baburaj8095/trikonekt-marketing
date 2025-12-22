@@ -17,6 +17,7 @@ class CustomUser(AbstractUser):
         ('consumer', 'Consumer (General User)'),
         ('employee', 'Employee'),
         ('business', 'Business'),
+        ('merchant', 'Merchant'),
         ('company', 'Company'),
         ('agency_state_coordinator', 'Agency State Coordinator'),
         ('agency_state', 'Agency State'),
@@ -95,6 +96,7 @@ class CustomUser(AbstractUser):
         'consumer': 'TR',
         'employee': 'TREP',
         'business': 'TRBS',
+        'merchant': 'TRME',
         'company': 'TR',
         'agency_state_coordinator': 'TRSC',
         'agency_state': 'TRST',
@@ -155,14 +157,11 @@ class CustomUser(AbstractUser):
             self.sponsor_id = self.prefixed_id or self.username or ""
 
         # Initialize account_active default on creation:
-        # - Agencies, Employees, and Business start Active by default
+        # - Agencies start INACTIVE by default (activate after first AgencyPackagePayment)
+        # - Business/Merchant remain Active by default
         if getattr(self._state, "adding", False):
             try:
-                # Default Active:
-                # - All agencies (role=agency or category startswith 'agency')
-                # - All business (merchant) accounts
-                # Employees and Consumers start Inactive by default
-                if (self.role in ("agency",)) or (self.category == "business" or str(self.category).startswith("agency")):
+                if self.category in ("business", "merchant"):
                     self.account_active = True
             except Exception:
                 # best-effort
@@ -616,14 +615,26 @@ class Wallet(models.Model):
             coupon_cost = D("150.00") if coupon_applied else D("0.00")
             total = (tax_fixed + sponsor_bonus + coupon_cost).quantize(D("0.01"))
 
-            # Debit from withdrawable + total balance (best-effort, do not go negative)
-            w.withdrawable_balance = (w.withdrawable_balance or D("0")) - total
+            # Credit net to withdrawable and debit total deductions from overall balance
+            net_block = (D("1000.00") - total).quantize(D("0.01"))
+            # Increase withdrawable by net (reclassification; do not touch main_balance)
+            w.withdrawable_balance = (w.withdrawable_balance or D("0")) + net_block
+            # Reduce overall balance by deductions that leave the user's wallet
             w.balance = (w.balance or D("0")) - total
-            if w.withdrawable_balance < 0:
-                w.withdrawable_balance = D("0")
             if w.balance < 0:
                 w.balance = D("0")
             w.save(update_fields=["balance", "withdrawable_balance", "updated_at"])
+            # Record withdrawable credit transaction for visibility (no change to balance)
+            if net_block > 0:
+                WalletTransaction.objects.create(
+                    user=self.user,
+                    amount=net_block,
+                    balance_after=w.balance,
+                    type="WITHDRAWABLE_CREDIT",
+                    source_type="AUTO_1K_BLOCK",
+                    source_id=str(block_no),
+                    meta={"ledger": "WITHDRAWAL", "auto_rule": "AUTO_1K_BLOCK", "block_index": block_no},
+                )
 
             # Record user-side debits
             if coupon_applied and coupon_cost > 0:
@@ -768,6 +779,232 @@ class WalletTransaction(models.Model):
         return f"{self.user.username} {self.type} {self.amount} -> {self.balance_after}"
 
 
+# ======================
+# Reward Points Ledger
+# ======================
+
+class RewardPointsAccount(models.Model):
+    """
+    Independent reward points balance (not the money wallet).
+    Points can be earned and redeemed; redemption can be reserved via RewardPointsHold
+    and is finally deducted on order approval.
+    """
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name="reward_points_account")
+    balance_points = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["user"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"RPA<{getattr(self.user, 'username', 'user')}> {self.balance_points} pts"
+
+    @classmethod
+    def get_or_create_for_user(cls, user: CustomUser) -> "RewardPointsAccount":
+        acc, _ = cls.objects.get_or_create(user=user, defaults={"balance_points": Decimal("0.00")})
+        return acc
+
+    @classmethod
+    def point_value_in_inr(cls) -> Decimal:
+        """
+        Conversion rate: 1 point => ₹1.00 (configurable later via CommissionConfig).
+        """
+        return Decimal("1.00")
+
+    @classmethod
+    def get_available_points(cls, user: CustomUser) -> Decimal:
+        from decimal import Decimal as D
+        acc = cls.get_or_create_for_user(user)
+        # Sum of pending holds
+        pending = RewardPointsHold.objects.filter(user=user, status=RewardPointsHold.STATUS_PENDING).aggregate(
+            s=models.Sum("points")
+        )["s"] or D("0.00")
+        avail = (acc.balance_points or D("0.00")) - pending
+        if avail < D("0.00"):
+            avail = D("0.00")
+        return avail.quantize(D("0.01"))
+
+    @classmethod
+    def get_available_value_in_inr(cls, user: CustomUser) -> Decimal:
+        from decimal import Decimal as D
+        pts = cls.get_available_points(user)
+        rate = cls.point_value_in_inr()
+        return (pts * rate).quantize(D("0.01"))
+
+    @classmethod
+    @transaction.atomic
+    def reserve_value(cls, user: CustomUser, value_in_inr: Decimal, *, source_type: str, source_id: str, meta: dict | None = None) -> "RewardPointsHold":
+        """
+        Reserve (hold) reward points for a purchase equal to the given ₹ value.
+        Raises ValidationError if insufficient available points.
+        """
+        from decimal import Decimal as D
+        rate = cls.point_value_in_inr()
+        val = D(str(value_in_inr or "0"))
+        if val <= D("0"):
+            raise ValidationError("Reserve value must be positive.")
+        need_points = (val / rate).quantize(D("0.01"))
+        acc = cls.get_or_create_for_user(user)
+        # Lock account row
+        acc = RewardPointsAccount.objects.select_for_update().get(pk=acc.pk)
+        available = cls.get_available_points(user)
+        if available < need_points:
+            raise ValidationError("Insufficient reward points to reserve.")
+        hold = RewardPointsHold.objects.create(
+            user=user,
+            points=need_points,
+            status=RewardPointsHold.STATUS_PENDING,
+            source_type=source_type or "",
+            source_id=str(source_id or ""),
+            metadata={**(meta or {}), "reserved_value": str(val), "rate": str(rate)},
+        )
+        return hold
+
+    @classmethod
+    @transaction.atomic
+    def commit_hold(cls, hold: "RewardPointsHold", *, commit_points: Decimal | None = None, meta: dict | None = None):
+        """
+        Convert a pending hold into a final redemption by deducting points from the account.
+        If commit_points is provided and smaller than hold.points, only that many points are redeemed;
+        the remainder becomes available automatically because the hold will no longer be pending.
+        """
+        from decimal import Decimal as D
+        if not hold or hold.status != RewardPointsHold.STATUS_PENDING:
+            raise ValidationError("Hold is not pending.")
+        pts = D(str(commit_points if commit_points is not None else hold.points))
+        if pts <= D("0"):
+            # Nothing to commit; just release the hold
+            hold.status = RewardPointsHold.STATUS_RELEASED
+            hold.save(update_fields=["status", "updated_at"])
+            return
+        if pts > hold.points:
+            pts = hold.points
+
+        acc = RewardPointsAccount.get_or_create_for_user(hold.user)
+        # Lock account row
+        acc = RewardPointsAccount.objects.select_for_update().get(pk=acc.pk)
+        if (acc.balance_points or D("0.00")) < pts:
+            raise ValidationError("Insufficient reward points to commit.")
+        acc.balance_points = (acc.balance_points or D("0.00")) - pts
+        acc.save(update_fields=["balance_points", "updated_at"])
+
+        RewardPointsTransaction.objects.create(
+            user=hold.user,
+            points=pts * D("-1"),
+            type=RewardPointsTransaction.TYPE_REDEEM,
+            meta=meta or {},
+        )
+        # Mark hold completed (store committed info)
+        md = hold.metadata or {}
+        md["committed_points"] = str(pts)
+        hold.metadata = md
+        hold.status = RewardPointsHold.STATUS_COMPLETED
+        hold.save(update_fields=["metadata", "status", "updated_at"])
+
+    @classmethod
+    @transaction.atomic
+    def release_hold(cls, hold: "RewardPointsHold"):
+        if not hold or hold.status != RewardPointsHold.STATUS_PENDING:
+            return
+        hold.status = RewardPointsHold.STATUS_RELEASED
+        hold.save(update_fields=["status", "updated_at"])
+
+    @classmethod
+    @transaction.atomic
+    def credit_points(cls, user: CustomUser, points: Decimal, *, reason: str = "EARN", meta: dict | None = None):
+        """
+        Credit (earn) reward points to the user's account.
+        """
+        from decimal import Decimal as D
+        pts = D(str(points or "0"))
+        if pts <= D("0"):
+            raise ValidationError("Credit points must be positive.")
+        acc = cls.get_or_create_for_user(user)
+        acc = RewardPointsAccount.objects.select_for_update().get(pk=acc.pk)
+        acc.balance_points = (acc.balance_points or D("0.00")) + pts
+        acc.save(update_fields=["balance_points", "updated_at"])
+        RewardPointsTransaction.objects.create(
+            user=user,
+            points=pts,
+            type=RewardPointsTransaction.TYPE_EARN,
+            meta=meta or {"reason": reason},
+        )
+
+
+class RewardPointsTransaction(models.Model):
+    TYPE_EARN = "EARN"
+    TYPE_REDEEM = "REDEEM"
+    TYPE_ADJUST = "ADJUST"
+    TYPE_CHOICES = [
+        (TYPE_EARN, "Earn"),
+        (TYPE_REDEEM, "Redeem"),
+        (TYPE_ADJUST, "Adjust"),
+    ]
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="reward_points_transactions", db_index=True)
+    points = models.DecimalField(max_digits=12, decimal_places=2)
+    type = models.CharField(max_length=16, choices=TYPE_CHOICES, db_index=True)
+    meta = models.JSONField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "type"]),
+            models.Index(fields=["created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"RPT<{getattr(self.user, 'username', 'user')}> {self.type} {self.points} pts"
+
+
+class RewardPointsHold(models.Model):
+    STATUS_PENDING = "PENDING"
+    STATUS_COMPLETED = "COMPLETED"
+    STATUS_RELEASED = "RELEASED"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_COMPLETED, "Completed"),
+        (STATUS_RELEASED, "Released"),
+    ]
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="reward_points_holds", db_index=True)
+    points = models.DecimalField(max_digits=12, decimal_places=2)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+    source_type = models.CharField(max_length=64, blank=True, default="")
+    source_id = models.CharField(max_length=64, blank=True, default="")
+    metadata = models.JSONField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "status"]),
+            models.Index(fields=["source_type", "source_id"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"Hold<{getattr(self.user, 'username', 'user')}> {self.points} pts [{self.status}]"
+
+
+@receiver(post_save, sender=CustomUser)
+def create_reward_account_for_new_user(sender, instance: CustomUser, created: bool, **kwargs):
+    if created:
+        def _create_rpa():
+            try:
+                RewardPointsAccount.objects.get_or_create(user=instance, defaults={"balance_points": Decimal("0.00")})
+            except Exception:
+                # Do not block user creation
+                pass
+        try:
+            transaction.on_commit(_create_rpa)
+        except Exception:
+            # Fallback when on_commit is unavailable (e.g., autocommit)
+            _create_rpa()
+
+
 class UserKYC(models.Model):
     """
     Consumer KYC details for withdrawals and payouts.
@@ -776,6 +1013,8 @@ class UserKYC(models.Model):
     bank_name = models.CharField(max_length=150, blank=True)
     bank_account_number = models.CharField(max_length=50, blank=True)
     ifsc_code = models.CharField(max_length=20, blank=True)
+    # Optional: link to user's DigiLocker document or Aadhaar proof
+    aadhaar_digilocker_url = models.CharField(max_length=255, blank=True)
     verified = models.BooleanField(default=False, db_index=True)
     verified_by = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.SET_NULL, related_name="kyc_verified_set")
     verified_at = models.DateTimeField(null=True, blank=True)
@@ -882,11 +1121,17 @@ class WithdrawalRequest(models.Model):
 @receiver(post_save, sender=CustomUser)
 def create_wallet_for_new_user(sender, instance: CustomUser, created: bool, **kwargs):
     if created:
+        def _create_wallet():
+            try:
+                Wallet.objects.get_or_create(user=instance, defaults={'balance': Decimal('0.00')})
+            except Exception:
+                # Avoid blocking user creation if wallet init fails
+                pass
         try:
-            Wallet.objects.get_or_create(user=instance, defaults={'balance': Decimal('0.00')})
+            transaction.on_commit(_create_wallet)
         except Exception:
-            # Avoid blocking user creation if wallet init fails
-            pass
+            # Fallback when on_commit is unavailable (e.g., autocommit)
+            _create_wallet()
 
 
 @receiver(post_save, sender=CustomUser)
@@ -912,6 +1157,24 @@ def handle_new_user_post_save(sender, instance: CustomUser, created: bool, **kwa
     # DEFERRED: No franchise payouts on registration.
     # Franchise payouts will be triggered on first activation inside ensure_first_purchase_activation.
 
+
+class UserNominee(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="nominees", db_index=True)
+    name = models.CharField(max_length=150)
+    relationship = models.CharField(max_length=50, blank=True)
+    phone = models.CharField(max_length=20, blank=True)
+    share_percent = models.PositiveSmallIntegerField(default=0)  # 0..100
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at", "-id"]
+        indexes = [
+            models.Index(fields=["user"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"Nominee<{self.user.username}: {self.name} ({self.share_percent}%)>"
 
 class SupportTicket(models.Model):
     TYPE_CHOICES = [

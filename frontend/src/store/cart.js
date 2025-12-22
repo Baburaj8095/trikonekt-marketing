@@ -276,6 +276,17 @@ export function setItemMeta(key, partial = {}) {
   setState(next);
 }
 
+/** Update a line's unit price (useful for part payment on Agency Packages) */
+export function setItemUnitPrice(key, unitPrice) {
+  ensureLoaded();
+  const p = asNumber(unitPrice, 0);
+  const v = Math.max(1, Number.isFinite(p) ? p : 1); // enforce minimum ₹1
+  const next = (state.items || []).map((x) =>
+    x.key === key ? { ...x, unitPrice: v } : x
+  );
+  setState(next);
+}
+
 /** Convenience helpers to add mapped item types */
 
 export function addEcoupon({ productId, title = "E‑Coupon", unitPrice = 0, qty = 1, denomination = null }) {
@@ -333,13 +344,55 @@ export function addPromoPackageMonthly({ pkgId, name, unitPrice = 0, package_num
  * Add a physical product to the centralized cart
  * meta includes minimal shipping data; contact details can be collected at checkout.
  */
-export function addProduct({ productId, name, unitPrice = 0, qty = 1, shipping_address = "", image_url = "" }) {
+export function addProduct({
+  productId,
+  name,
+  unitPrice = 0,
+  qty = 1,
+  shipping_address = "",
+  image_url = "",
+  // TRI App extras (optional; ignored for normal marketplace products)
+  tri = false,
+  max_reward_pct = 0,
+  tri_app_slug = "",
+}) {
   return addItem({
     type: "PRODUCT",
     id: productId,
     name,
     unitPrice,
     qty: Math.max(1, Number(qty) || 1),
-    meta: { shipping_address, image_url },
+    meta: {
+      shipping_address,
+      image_url,
+      // Pass through TRI metadata so checkout can compute reward discounts
+      tri: !!tri,
+      max_reward_pct: Number(max_reward_pct || 0),
+      tri_app_slug: tri_app_slug || "",
+    },
+  });
+}
+
+/**
+ * Agency Prime Package (agency-side cart)
+ * By default, unitPrice should be the package amount, but you can also
+ * add a line for the remaining amount only (from AgencyPrimeApproval page).
+ * Reference and notes are stored in meta and sent during checkout.
+ */
+export function addAgencyPackage({
+  pkgId,
+  name,
+  unitPrice = 0,
+  qty = 1,
+  reference = null,
+  notes = null,
+}) {
+  return addItem({
+    type: "AGENCY_PACKAGE",
+    id: pkgId,
+    name,
+    unitPrice,
+    qty: Math.max(1, Number(qty) || 1),
+    meta: { reference, notes },
   });
 }

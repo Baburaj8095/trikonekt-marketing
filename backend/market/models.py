@@ -24,6 +24,8 @@ class Product(models.Model):
     quantity = models.PositiveIntegerField(default=0)
     # discount represented as percentage (e.g., 10.00 for 10%)
     discount = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    # Max percentage of unit selling price that can be redeemed via reward points (0..100)
+    max_reward_redeem_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
 
     image = models.ImageField(upload_to='products/', null=True, blank=True, storage=MEDIA_STORAGE)
 
@@ -65,6 +67,10 @@ class PurchaseRequest(models.Model):
     consumer_address = models.TextField()
 
     quantity = models.PositiveIntegerField(default=1)
+    # Optional: reward points based discount (₹) applied to this request (client-computed, server-clamped on approval)
+    reward_discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    # If a reward discount is requested, we reserve points via RewardPointsHold and link it here for approval/release
+    reward_points_hold = models.ForeignKey('accounts.RewardPointsHold', null=True, blank=True, on_delete=models.SET_NULL, related_name='purchase_requests')
     # payment: 'wallet' (debit consumer wallet) or 'cash' (handled offline)
     PAYMENT_WALLET = 'wallet'
     PAYMENT_CASH = 'cash'
@@ -209,3 +215,105 @@ class BannerPurchaseRequest(models.Model):
             return f"BPR#{self.pk} - {self.banner_item.name} x {self.quantity} ({self.status})"
         except Exception:
             return f"BPR#{self.pk} ({self.status})"
+
+
+# =====================
+# Merchant Shops
+# =====================
+
+class MerchantShop(models.Model):
+    """
+    Merchant Shop entity (one per merchant). Publicly listed in Merchant Marketplace.
+    """
+    owner = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='merchant_shop'
+    )
+    name = models.CharField(max_length=255)
+    mobile = models.CharField(max_length=20)
+    address = models.TextField(blank=True, default="")
+    image = models.ImageField(upload_to='merchant/shops/', null=True, blank=True, storage=MEDIA_STORAGE)
+
+    # Simple location filters (align with Product/Banner)
+    country = models.CharField(max_length=64, db_index=True)
+    state = models.CharField(max_length=64, db_index=True)
+    city = models.CharField(max_length=128, db_index=True)
+    pincode = models.CharField(max_length=10, db_index=True)
+
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['is_active']),
+            models.Index(fields=['country', 'state', 'city']),
+            models.Index(fields=['pincode']),
+        ]
+
+    def __str__(self) -> str:
+        return f"Shop<{self.name}> by {getattr(self.owner, 'username', 'user')}"
+
+
+class MerchantProfile(models.Model):
+    """
+    Merchant profile (1:1 with User).
+    """
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='merchant_profile'
+    )
+    business_name = models.CharField(max_length=255, blank=True, default="")
+    mobile_number = models.CharField(max_length=20, blank=True, default="")
+    is_verified = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['is_verified']),
+        ]
+
+    def __str__(self) -> str:
+        return f"MerchantProfile<{getattr(self.user, 'username', 'user')}>"
+
+
+class Shop(models.Model):
+    """
+    Merchant Shop (multi-shop support).
+    Publicly listed when status=ACTIVE. Supports proximity (lat/lng).
+    """
+    STATUS_PENDING = 'PENDING'
+    STATUS_ACTIVE = 'ACTIVE'
+    STATUS_REJECTED = 'REJECTED'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_ACTIVE, 'Active'),
+        (STATUS_REJECTED, 'Rejected'),
+    ]
+
+    merchant = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='shops'
+    )
+    shop_name = models.CharField(max_length=255)
+    address = models.TextField(blank=True, default="")
+    city = models.CharField(max_length=128, db_index=True)
+
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, db_index=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, db_index=True)
+
+    contact_number = models.CharField(max_length=20, blank=True, default="")
+    shop_image = models.ImageField(upload_to='merchant/shops/', null=True, blank=True, storage=MEDIA_STORAGE)
+
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['merchant', 'status']),
+            models.Index(fields=['status', 'created_at']),
+            models.Index(fields=['city']),
+        ]
+
+    def __str__(self) -> str:
+        return f"Shop<{self.shop_name}> by {getattr(self.merchant, 'username', 'user')}"

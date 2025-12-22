@@ -188,6 +188,254 @@ class CommissionConfig(models.Model):
             return obj
         return cls.objects.create()
 
+    # ----------------------
+    # Master config getters
+    # ----------------------
+    from decimal import Decimal as _D
+
+    def _m(self) -> dict:
+        try:
+            return dict(self.master_commission_json or {})
+        except Exception:
+            return {}
+
+    def get_tax_percent(self) -> _D:
+        m = self._m()
+        try:
+            v = m.get("tax", {}).get("percent", None)
+            if v is None:
+                return self._D(str(self.tax_percent or "10.00"))
+            return self._D(str(v))
+        except Exception:
+            return self._D("10.00")
+
+    def get_company_user(self):
+        # Prefer explicit config; else fallback to stored relation; else best-effort resolve
+        u = getattr(self, "tax_company_user", None)
+        if u:
+            return u
+        try:
+            from accounts.models import CustomUser
+            return CustomUser.objects.filter(category="company").first() or CustomUser.objects.filter(is_superuser=True).first()
+        except Exception:
+            return None
+
+    def get_withdrawal_sponsor_percent(self) -> _D:
+        m = self._m()
+        try:
+            v = m.get("withdrawal", {}).get("sponsor_percent", None)
+            if v is None:
+                # default behavior earlier: 3%
+                return self._D("3.00")
+            return self._D(str(v))
+        except Exception:
+            return self._D("3.00")
+
+    def get_auto_block_config(self) -> dict:
+        """
+        Returns:
+          {
+            "block_size": Decimal,      # default 1000.00
+            "coupon_cost": Decimal,     # default 150.00
+            "tds_fixed": Decimal,       # default 50.00
+            "sponsor_bonus": Decimal,   # default 50.00
+            "enable_coupon": bool       # default True
+          }
+        """
+        m = self._m()
+        ab = dict(m.get("auto_block", {}) or {})
+        try:
+            block_size = self._D(str(ab.get("block_size", "1000.00")))
+            coupon_cost = self._D(str(ab.get("coupon_cost", "150.00")))
+            tds_fixed = self._D(str(ab.get("tds_fixed", "50.00")))
+            sponsor_bonus = self._D(str(ab.get("sponsor_bonus", "50.00")))
+            enable_coupon = bool(ab.get("enable_coupon", True))
+            return {
+                "block_size": block_size,
+                "coupon_cost": coupon_cost,
+                "tds_fixed": tds_fixed,
+                "sponsor_bonus": sponsor_bonus,
+                "enable_coupon": enable_coupon,
+            }
+        except Exception:
+            return {
+                "block_size": self._D("1000.00"),
+                "coupon_cost": self._D("150.00"),
+                "tds_fixed": self._D("50.00"),
+                "sponsor_bonus": self._D("50.00"),
+                "enable_coupon": True,
+            }
+
+    def get_referral_join_config(self) -> dict:
+        """
+        Returns direct and L1..L5 fixed amounts for referral join payouts.
+        { "direct": D, "levels": [D,D,D,D,D] }
+        """
+        m = self._m()
+        rj = dict(m.get("referral_join", {}) or {})
+        try:
+            direct = self._D(str(rj.get("direct", "")))
+            levels = [self._D(str(x)) for x in (rj.get("levels") or [])]
+        except Exception:
+            direct = None
+            levels = []
+        # Fallback to legacy typed JSON on model if master missing
+        if direct is None:
+            try:
+                direct = self._D(str((self.referral_join_fixed_json or {}).get("direct", "0")))
+            except Exception:
+                direct = self._D("0.00")
+        if not levels:
+            try:
+                rjf = dict(self.referral_join_fixed_json or {})
+                levels = [
+                    self._D(str(rjf.get("l1", "0"))),
+                    self._D(str(rjf.get("l2", "0"))),
+                    self._D(str(rjf.get("l3", "0"))),
+                    self._D(str(rjf.get("l4", "0"))),
+                    self._D(str(rjf.get("l5", "0"))),
+                ]
+            except Exception:
+                levels = [self._D("0") for _ in range(5)]
+        return {"direct": direct, "levels": levels[:5]}
+
+    def get_level_percents(self) -> list[_D]:
+        """
+        L1..L5 percents for hierarchical commission (COMMISSION_CREDIT).
+        Prefers master_commission_json["upline"] or falls back to l1_percent..l5_percent fields.
+        """
+        m = self._m()
+        upline = dict(m.get("upline", {}) or {})
+        try:
+            arr = [
+                self._D(str(upline.get("l1", ""))),
+                self._D(str(upline.get("l2", ""))),
+                self._D(str(upline.get("l3", ""))),
+                self._D(str(upline.get("l4", ""))),
+                self._D(str(upline.get("l5", ""))),
+            ]
+        except Exception:
+            arr = []
+        if not any(arr):
+            arr = [
+                self._D(str(self.l1_percent or "0")),
+                self._D(str(self.l2_percent or "0")),
+                self._D(str(self.l3_percent or "0")),
+                self._D(str(self.l4_percent or "0")),
+                self._D(str(self.l5_percent or "0")),
+            ]
+        return arr
+
+    def get_geo_percents(self) -> dict:
+        """
+        Returns geo role percents as a dict. Keys:
+          sub_franchise, pincode, pincode_coord, district, district_coord, state, state_coord, employee, royalty
+        """
+        m = self._m()
+        g = dict(m.get("geo", {}) or {})
+        out = {}
+        def _get(k, fallback):
+            try:
+                return self._D(str(g.get(k, ""))) if k in g else self._D(str(fallback))
+            except Exception:
+                return self._D("0")
+        out["sub_franchise"] = _get("sub_franchise", self.sub_franchise_percent or 0)
+        out["pincode"] = _get("pincode", self.pincode_percent or 0)
+        out["pincode_coord"] = _get("pincode_coord", self.pincode_coord_percent or 0)
+        out["district"] = _get("district", self.district_percent or 0)
+        out["district_coord"] = _get("district_coord", self.district_coord_percent or 0)
+        out["state"] = _get("state", self.state_percent or 0)
+        out["state_coord"] = _get("state_coord", self.state_coord_percent or 0)
+        out["employee"] = _get("employee", self.employee_percent or 0)
+        out["royalty"] = _get("royalty", self.royalty_percent or 0)
+        return out
+
+    def get_matrix_three_levels(self) -> int:
+        m = self._m()
+        try:
+            v = int(m.get("matrix_three", {}).get("levels", "") or 0)
+            return v if v > 0 else int(self.three_matrix_levels or 15)
+        except Exception:
+            return int(self.three_matrix_levels or 15)
+
+    def get_matrix_three_fixed_amounts(self) -> list[_D]:
+        m = self._m()
+        arr = m.get("matrix_three", {}).get("fixed_amounts", [])
+        if arr:
+            try:
+                return [self._D(str(x)) for x in arr]
+            except Exception:
+                return []
+        try:
+            return [self._D(str(x)) for x in (self.three_matrix_amounts_json or [])]
+        except Exception:
+            return []
+
+    def get_matrix_three_percents(self) -> list[_D]:
+        m = self._m()
+        arr = m.get("matrix_three", {}).get("percents", [])
+        if arr:
+            try:
+                return [self._D(str(x)) for x in arr]
+            except Exception:
+                return []
+        try:
+            return [self._D(str(x)) for x in (self.three_matrix_percents_json or [])]
+        except Exception:
+            return []
+
+    def get_matrix_five_levels(self) -> int:
+        m = self._m()
+        try:
+            v = int(m.get("matrix_five", {}).get("levels", "") or 0)
+            return v if v > 0 else int(self.five_matrix_levels or 6)
+        except Exception:
+            return int(self.five_matrix_levels or 6)
+
+    def get_matrix_five_fixed_amounts(self) -> list[_D]:
+        m = self._m()
+        arr = m.get("matrix_five", {}).get("fixed_amounts", [])
+        if arr:
+            try:
+                return [self._D(str(x)) for x in arr]
+            except Exception:
+                return []
+        try:
+            return [self._D(str(x)) for x in (self.five_matrix_amounts_json or [])]
+        except Exception:
+            return []
+
+    def get_matrix_five_percents(self) -> list[_D]:
+        m = self._m()
+        arr = m.get("matrix_five", {}).get("percents", [])
+        if arr:
+            try:
+                return [self._D(str(x)) for x in arr]
+            except Exception:
+                return []
+        # No legacy typed percents for five matrix; return empty if not provided
+        return []
+
+    def get_active_150_direct_bonus(self) -> _D:
+        m = self._m()
+        try:
+            v = m.get("active_150", {}).get("direct_bonus", None)
+            if v is None:
+                return self._D(str(self.active_direct_bonus_amount or "0"))
+            return self._D(str(v))
+        except Exception:
+            return self._D(str(self.active_direct_bonus_amount or "0"))
+
+    def get_active_150_self_bonus(self) -> _D:
+        m = self._m()
+        try:
+            v = m.get("active_150", {}).get("self_bonus", None)
+            if v is None:
+                return self._D(str(self.active_self_bonus_amount or "0"))
+            return self._D(str(v))
+        except Exception:
+            return self._D(str(self.active_self_bonus_amount or "0"))
+
 
 class AutoPoolAccount(models.Model):
     """
@@ -1003,6 +1251,9 @@ class Package(models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0)])
     is_active = models.BooleanField(default=True)
     is_default = models.BooleanField(default=False, help_text="If true, auto-assign to every agency by default")
+    # Optional payment details shown to agency for self-payment
+    payment_qr = models.ImageField(upload_to="uploads/agency_package_qr/", null=True, blank=True, storage=MEDIA_STORAGE)
+    upi_id = models.CharField(max_length=100, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -1063,6 +1314,49 @@ class AgencyPackagePayment(models.Model):
 
     def __str__(self):
         return f"Pay<{self.assignment_id}> ₹{self.amount} @ {self.paid_at:%Y-%m-%d}"
+
+
+class AgencyPackagePaymentRequest(models.Model):
+    """
+    Agency-submitted payment request for an AgencyPackageAssignment.
+    Admin reviews and on approval a real AgencyPackagePayment is recorded.
+    """
+    STATUS_CHOICES = (
+        ("PENDING", "PENDING"),
+        ("APPROVED", "APPROVED"),
+        ("REJECTED", "REJECTED"),
+    )
+    assignment = models.ForeignKey(AgencyPackageAssignment, on_delete=models.CASCADE, related_name="payment_requests")
+    agency = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="agency_package_payment_requests", db_index=True)
+    package = models.ForeignKey(Package, on_delete=models.CASCADE, related_name="agency_payment_requests")
+    amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0.01)])
+    method = models.CharField(max_length=16, default="UPI", db_index=True)
+    utr = models.CharField(max_length=100, blank=True, default="", help_text="UPI Reference/UTR")
+    payment_proof = models.FileField(upload_to="uploads/agency_package_proofs/", null=True, blank=True, storage=RAW_STORAGE)
+    notes = models.TextField(blank=True)
+
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="PENDING", db_index=True)
+    admin_notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    approved_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="approved_agency_package_payment_requests")
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["status", "created_at"]),
+            models.Index(fields=["agency", "status"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["assignment"],
+                condition=models.Q(status="PENDING"),
+                name="uniq_pending_request_per_assignment",
+            )
+        ]
+
+    def __str__(self):
+        return f"Req<{self.assignment_id}> ₹{self.amount} {self.status}"
 
 
 # ==============================
@@ -1358,3 +1652,85 @@ class PromoPurchase(models.Model):
             except Exception:
                 self.amount_paid = 0
         super().save(*args, **kwargs)
+
+
+# ==============================
+# TRI Apps (Holidays, EV, etc.) — Admin-managed catalogs
+# ==============================
+class TriApp(models.Model):
+    """
+    Admin-configurable TRI App surface (e.g., Holidays, EV Vehicles, Furniture, etc.).
+    Flags control UI capabilities for price visibility, add-to-cart and payment.
+    """
+    slug = models.SlugField(max_length=60, unique=True, db_index=True, help_text="URL key e.g., tri-holidays, tri-ev")
+    name = models.CharField(max_length=150)
+    description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+
+    # UI capability toggles (admin-controlled)
+    allow_price = models.BooleanField(default=False, help_text="If false, hide product prices to users.")
+    allow_add_to_cart = models.BooleanField(default=False, help_text="If false, disable Add to Cart buttons.")
+    allow_payment = models.BooleanField(default=False, help_text="If false, disable Checkout/Payment flows.")
+
+    banner_image = models.ImageField(upload_to="uploads/tri_apps/banners/", null=True, blank=True, storage=MEDIA_STORAGE)
+
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["slug"]
+        verbose_name = "TRI App"
+        verbose_name_plural = "TRI Apps"
+
+    def __str__(self):
+        return f"{self.slug} — {self.name}"
+
+
+class TriAppProduct(models.Model):
+    """
+    Products under a TRI App. Images are uploadable via admin and shown on user UI.
+    Price/add-to-cart/payment are governed by TriApp flags.
+    """
+    app = models.ForeignKey(TriApp, on_delete=models.CASCADE, related_name="products", db_index=True)
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)], default=0)
+    # Admin-configured max percent of line total that can be paid using reward points at checkout.
+    # Example: 3.00 means up to 3% of (price * qty) can be redeemed from user's reward points.
+    max_reward_points_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0, help_text="Max % of line total redeemable via reward points")
+    currency = models.CharField(max_length=8, default="INR")
+    image = models.ImageField(upload_to="uploads/tri_apps/products/", null=True, blank=True, storage=MEDIA_STORAGE)
+    is_active = models.BooleanField(default=True)
+    display_order = models.PositiveIntegerField(default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["app_id", "display_order", "id"]
+        indexes = [
+            models.Index(fields=["app", "is_active", "display_order"]),
+        ]
+
+    def __str__(self):
+        return f"{getattr(self.app, 'slug', 'app')} → {self.name}"
+
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+
+@receiver(post_save, sender=AgencyPackagePayment)
+def activate_agency_on_any_payment(sender, instance: AgencyPackagePayment, created: bool, **kwargs):
+    # Activate agency account on first recorded package payment (>= ₹0.01)
+    if not created:
+        return
+    try:
+        if getattr(instance, "amount", None) and instance.amount > Decimal("0.00"):
+            assignment = instance.assignment
+            agency = getattr(assignment, "agency", None)
+            if agency and not getattr(agency, "account_active", False):
+                agency.account_active = True
+                agency.save(update_fields=["account_active"])
+    except Exception:
+        # best-effort; do not block payment save
+        pass

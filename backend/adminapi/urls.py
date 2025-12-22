@@ -6,6 +6,7 @@ from .views import (
     AdminUserTreeChildren,
     AdminUsersList,
     AdminUserDetail,
+    AdminUsersExportXLSX,
     AdminUserImpersonateView,
     AdminUserSetTempPasswordView,
     AdminUserWalletAdjustView,
@@ -36,6 +37,8 @@ from .views import (
     # New matrix admin endpoints
     AdminMatrixAccountsList,
     AdminMatrixAccountStats,
+    AdminMasterCommissionConfig,
+    AdminWithdrawalDistributionPreviewView,
 )
 from .dynamic import router as dynamic_router, admin_meta as dynamic_admin_meta, admin_meta_summary, admin_meta_fields
 
@@ -46,6 +49,7 @@ urlpatterns = [
     path("users/tree/default-root/", AdminUserTreeDefaultRoot.as_view()),
     path("users/tree/children/", AdminUserTreeChildren.as_view()),
     path("users/", AdminUsersList.as_view()),
+    path("users/export-xlsx", AdminUsersExportXLSX.as_view()),
     path("users/edit-meta/", AdminUserEditMetaView.as_view()),
     path("users/<int:pk>/", AdminUserDetail.as_view()),
     path("users/<int:pk>/impersonate/", AdminUserImpersonateView.as_view()),
@@ -65,6 +69,7 @@ urlpatterns = [
     path("withdrawals/", AdminWithdrawalList.as_view()),
     path("withdrawals/<int:pk>/approve/", AdminWithdrawalApproveView.as_view()),
     path("withdrawals/<int:pk>/reject/", AdminWithdrawalRejectView.as_view()),
+    path("withdrawals/distribution-preview/", AdminWithdrawalDistributionPreviewView.as_view()),
 
     # Matrix & Autopool
     path("matrix/progress/", AdminMatrixProgressList.as_view()),
@@ -79,6 +84,7 @@ urlpatterns = [
     path("commission/levels/seed/", AdminLevelCommissionSeedView.as_view()),
     # Matrix commission configuration (5-matrix and 3-matrix)
     path("commission/matrix/", AdminMatrixCommissionConfig.as_view()),
+    path("commission/master/", AdminMasterCommissionConfig.as_view()),
     # Rewards Points (admin configurable schedule)
     path("rewards/points-config/", AdminRewardPointsConfig.as_view()),
 

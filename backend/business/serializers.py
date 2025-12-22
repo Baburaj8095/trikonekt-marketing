@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import BusinessRegistration, DailyReport
+from .models import BusinessRegistration, DailyReport, TriApp, TriAppProduct
 from locations.models import Country, State, City
 
 
@@ -244,12 +244,14 @@ class DailyReportSerializer(serializers.ModelSerializer):
 # ==============================
 # Packages: Serializers
 # ==============================
-from .models import Package, AgencyPackageAssignment, AgencyPackagePayment
+from .models import Package, AgencyPackageAssignment, AgencyPackagePayment, AgencyPackagePaymentRequest
 from decimal import Decimal
 from django.utils import timezone
 
 
 class PackageSerializer(serializers.ModelSerializer):
+    payment_qr_url = serializers.SerializerMethodField()
+
     class Meta:
         model = Package
         fields = [
@@ -259,9 +261,25 @@ class PackageSerializer(serializers.ModelSerializer):
             "description",
             "amount",
             "is_active",
+            "payment_qr_url",
+            "upi_id",
             "created_at",
             "updated_at",
         ]
+
+    def get_payment_qr_url(self, obj):
+        try:
+            f = getattr(obj, "payment_qr", None)
+            url = f.url if f else None
+        except Exception:
+            url = None
+        request = self.context.get("request") if hasattr(self, "context") else None
+        if not url:
+            return None
+        try:
+            return request.build_absolute_uri(url) if request and not str(url).startswith("http") else url
+        except Exception:
+            return url
 
 
 class AgencyPackagePaymentSerializer(serializers.ModelSerializer):
@@ -269,6 +287,67 @@ class AgencyPackagePaymentSerializer(serializers.ModelSerializer):
         model = AgencyPackagePayment
         fields = ["id", "amount", "paid_at", "reference", "notes", "assignment"]
         read_only_fields = ["id", "paid_at"]
+
+
+class AgencyPackagePaymentRequestSerializer(serializers.ModelSerializer):
+    package = PackageSerializer(read_only=True)
+    assignment_id = serializers.IntegerField(source="assignment.id", read_only=True)
+    agency_id = serializers.IntegerField(source="agency.id", read_only=True)
+    agency_username = serializers.SerializerMethodField()
+    payment_proof_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AgencyPackagePaymentRequest
+        fields = [
+            "id",
+            "assignment_id",
+            "package",
+            "agency_id",
+            "agency_username",
+            "amount",
+            "method",
+            "utr",
+            "payment_proof_url",
+            "notes",
+            "status",
+            "admin_notes",
+            "created_at",
+            "approved_at",
+            "approved_by",
+        ]
+        read_only_fields = [
+            "id",
+            "assignment_id",
+            "package",
+            "agency_id",
+            "agency_username",
+            "status",
+            "admin_notes",
+            "created_at",
+            "approved_at",
+            "approved_by",
+        ]
+
+    def get_agency_username(self, obj):
+        try:
+            u = getattr(obj, "agency", None)
+            return getattr(u, "username", None)
+        except Exception:
+            return None
+
+    def get_payment_proof_url(self, obj):
+        try:
+            f = getattr(obj, "payment_proof", None)
+            url = f.url if f else None
+        except Exception:
+            url = None
+        request = self.context.get("request") if hasattr(self, "context") else None
+        if not url:
+            return None
+        try:
+            return request.build_absolute_uri(url) if request and not str(url).startswith("http") else url
+        except Exception:
+            return url
 
 
 class AgencyPackageAssignmentSerializer(serializers.ModelSerializer):
@@ -427,7 +506,26 @@ class PromoPackageSerializer(serializers.ModelSerializer):
 
             # Admin seeded numbers (optional)
             seeds = list(PromoMonthlyPackage.objects.filter(package=obj, is_active=True).order_by("number"))
-            available_numbers = [s.number for s in seeds] if seeds else [1]
+            # If no monthly seeds present, fallback to Admin E‑Coupon Seasons (Coupon with code/title/campaign starting with "Season")
+            available_numbers = [s.number for s in seeds] if seeds else None
+            if not seeds:
+                try:
+                    from coupons.models import Coupon
+                    from django.db.models import Q as _Q
+                    import re as _re
+                    nums = []
+                    season_q = _Q(code__istartswith="season") | _Q(title__istartswith="season") | _Q(campaign__istartswith="season")
+                    for c in Coupon.objects.filter(season_q).only("code", "title", "campaign").order_by("id"):
+                        s = str(getattr(c, "campaign", "") or getattr(c, "title", "") or getattr(c, "code", ""))
+                        m = _re.search(r"(\d+)", s)
+                        if m:
+                            try:
+                                nums.append(int(m.group(1)))
+                            except Exception:
+                                pass
+                    available_numbers = sorted(set(nums)) if nums else [1]
+                except Exception:
+                    available_numbers = [1]
 
             def total_for(num):
                 if seeds:
@@ -449,6 +547,14 @@ class PromoPackageSerializer(serializers.ModelSerializer):
                 if current is None and seeds:
                     # All seeded numbers completed
                     current = int(seeds[-1].number)
+            elif available_numbers:
+                for n in available_numbers:
+                    paid = PromoMonthlyBox.objects.filter(user=user, package=obj, package_number=n).count()
+                    if int(paid) < int(total_for(n)):
+                        current = int(n)
+                        break
+                if current is None:
+                    current = int(available_numbers[-1])
             else:
                 # No seeds -> default to #1 with 12 boxes
                 current = 1
@@ -671,7 +777,36 @@ class PromoPurchaseSerializer(serializers.ModelSerializer):
                         if allowed is None:
                             allowed = int(seeds[-1].number)
                     else:
-                        allowed = 1
+                        # Fallback to Admin E‑Coupon Seasons when no monthly seeds found
+                        try:
+                            from coupons.models import Coupon
+                            from django.db.models import Q as _Q
+                            import re as _re
+                            season_qs = Coupon.objects.filter(
+                                _Q(code__istartswith="season") | _Q(title__istartswith="season") | _Q(campaign__istartswith="season")
+                            )
+                            nums = []
+                            for c in season_qs.only("code", "title", "campaign").order_by("id"):
+                                s = str(getattr(c, "campaign", "") or getattr(c, "title", "") or getattr(c, "code", ""))
+                                m = _re.search(r"(\d+)", s)
+                                if m:
+                                    try:
+                                        nums.append(int(m.group(1)))
+                                    except Exception:
+                                        pass
+                            season_numbers = sorted(set(nums))
+                        except Exception:
+                            season_numbers = []
+                        if season_numbers:
+                            for n in season_numbers:
+                                paid = PromoMonthlyBox.objects.filter(user=user, package=pkg, package_number=n).count()
+                                if int(paid) < int(total_for(n)):
+                                    allowed = int(n)
+                                    break
+                            if allowed is None:
+                                allowed = int(season_numbers[-1])
+                        else:
+                            allowed = 1
                     if int(number) != int(allowed):
                         raise serializers.ValidationError({"package_number": f"Complete previous package first. Allowed package_number is {allowed}."})
 
@@ -841,3 +976,79 @@ class EBookAccessSerializer(serializers.ModelSerializer):
     class Meta:
         model = EBookAccess
         fields = ["id", "ebook", "granted_at"]
+
+
+# ==============================
+# TRI Apps (Holidays, EV, etc.) — Serializers
+# ==============================
+class TriAppProductSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TriAppProduct
+        fields = [
+            "id",
+            "name",
+            "description",
+            "price",
+            "max_reward_points_percent",
+            "currency",
+            "image_url",
+            "is_active",
+            "display_order",
+        ]
+
+    def get_image_url(self, obj):
+        try:
+            f = getattr(obj, "image", None)
+            url = f.url if f else None
+        except Exception:
+            url = None
+        request = self.context.get("request") if hasattr(self, "context") else None
+        if not url:
+            return None
+        try:
+            return request.build_absolute_uri(url) if request and not str(url).startswith("http") else url
+        except Exception:
+            return url
+
+
+class TriAppSerializer(serializers.ModelSerializer):
+    banner_url = serializers.SerializerMethodField()
+    products = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TriApp
+        fields = [
+            "id",
+            "slug",
+            "name",
+            "description",
+            "is_active",
+            "allow_price",
+            "allow_add_to_cart",
+            "allow_payment",
+            "banner_url",
+            "products",
+        ]
+
+    def get_banner_url(self, obj):
+        try:
+            f = getattr(obj, "banner_image", None)
+            url = f.url if f else None
+        except Exception:
+            url = None
+        request = self.context.get("request") if hasattr(self, "context") else None
+        if not url:
+            return None
+        try:
+            return request.build_absolute_uri(url) if request and not str(url).startswith("http") else url
+        except Exception:
+            return url
+
+    def get_products(self, obj):
+        try:
+            qs = obj.products.filter(is_active=True).order_by("display_order", "id")
+        except Exception:
+            qs = []
+        return TriAppProductSerializer(qs, many=True, context=self.context).data

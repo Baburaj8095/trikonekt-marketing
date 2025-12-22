@@ -108,7 +108,7 @@ const Login = () => {
           navigate(to, { replace: true });
         }
       } else {
-        const nsCandidates = ["admin", "agency", "employee", "user"];
+        const nsCandidates = ["admin", "agency", "employee", "business", "user"];
         const found = nsCandidates.find(
           (ns) =>
             localStorage.getItem(`token_${ns}`) ||
@@ -1093,10 +1093,11 @@ const Login = () => {
 
 
         // Namespaced session per role; staff -> admin namespace
-        const ns = (payload?.is_staff || payload?.is_superuser) ? "admin" : (tokenRole || "user");
+        const roleEffective = payload?.role_effective || ((String(payload?.category || "").toLowerCase() === "business") ? "business" : tokenRole);
+        const ns = (payload?.is_staff || payload?.is_superuser) ? "admin" : (roleEffective || tokenRole || "user");
         localStorage.setItem(`token_${ns}`, access);
         if (refreshTok) localStorage.setItem(`refresh_${ns}`, refreshTok);
-        if (tokenRole) localStorage.setItem(`role_${ns}`, tokenRole);
+        localStorage.setItem(`role_${ns}`, roleEffective || tokenRole || "user");
         // Clean legacy non-namespaced keys to avoid cross-role collisions
         try {
           localStorage.removeItem("token");
@@ -1130,7 +1131,7 @@ const Login = () => {
         if (payload?.is_staff || payload?.is_superuser) {
           navigate("/admin/dashboard", { replace: true });
         } else {
-          navigate(`/${tokenRole || "user"}/dashboard`, { replace: true });
+          navigate(`/${roleEffective || tokenRole || "user"}/dashboard`, { replace: true });
         }
       } catch (err) {
         console.error(err);
@@ -1291,6 +1292,27 @@ const Login = () => {
 
     try {
       if (category === "business") {
+        // Step 1: Create the Business user account (so login is enabled)
+        const submittedPassword = formData.password;
+        const userResp = await API.post("/accounts/register/", {
+          password: formData.password,
+          email: formData.email || "",
+          full_name: formData.full_name || "",
+          phone: formData.phone || "",
+          sponsor_id: normalizeSponsor(sponsorId) || "",
+          category: "business",
+          country: selectedCountry || null,
+          state: selectedState || null,
+          city: selectedCity || null,
+          pincode,
+          country_name: geoCountryName || "",
+          country_code: geoCountryCode || "",
+          state_name: geoStateName || "",
+          city_name: geoCityName || "",
+        });
+        const uname = userResp?.data?.username || "(generated)";
+
+        // Step 2: Submit business details for admin review (best‑effort; non‑blocking)
         const brPayload = {
           full_name: formData.full_name || "",
           email: formData.email || "",
@@ -1298,7 +1320,7 @@ const Login = () => {
           business_name: formData.business_name || "",
           business_category: formData.business_category || "",
           address: formData.address || "",
-          sponsor_id: sponsorId || "",
+          sponsor_id: normalizeSponsor(sponsorId) || "",
           country: selectedCountry || null,
           state: selectedState || null,
           city: selectedCity || null,
@@ -1308,10 +1330,20 @@ const Login = () => {
           state_name: geoStateName || "",
           city_name: geoCityName || "",
         };
-        await API.post("/business/register/", brPayload);
-        setSuccessMsg("Business registration submitted successfully. Admin will review and forward it to the concerned agency. Business login is disabled.");
+        try {
+          await API.post("/business/register/", brPayload);
+        } catch (_) {
+          // ignore failure; account is already created
+        }
+
+        // Step 3: Show success dialog and switch to Login with username prefilled
+        setSuccessMsg(`Welcome to Trikonekt!\nUsername: ${uname}\nPassword: ${submittedPassword}`);
+        setRegSuccessText({ username: uname, password: submittedPassword });
+        setRegSuccessOpen(true);
+
+        setMode("login");
         setFormData({
-          username: "",
+          username: uname,
           password: "",
           email: "",
           full_name: "",
@@ -2335,6 +2367,15 @@ const Login = () => {
             </DialogContent>
             <DialogActions>
               <Button onClick={() => setRegSuccessOpen(false)}>Close</Button>
+              <Button
+                variant="contained"
+                onClick={() => {
+                  setRegSuccessOpen(false);
+                  navigate(`/auth/login/${role}`, { replace: true });
+                }}
+              >
+                Go to Login
+              </Button>
             </DialogActions>
           </Dialog>
 

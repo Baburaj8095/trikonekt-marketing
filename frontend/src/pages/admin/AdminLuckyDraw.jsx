@@ -80,6 +80,16 @@ export default function AdminLuckyDraw() {
     status: "",
   });
 
+  // Season Lucky Draw Eligibility state
+  const [seasons, setSeasons] = useState([]);
+  const [seasonsLoading, setSeasonsLoading] = useState(false);
+  const [seasonsErr, setSeasonsErr] = useState("");
+  const [seasonId, setSeasonId] = useState("");
+  const [eligLoading, setEligLoading] = useState(false);
+  const [eligErr, setEligErr] = useState("");
+  const [eligRows, setEligRows] = useState([]);
+  const [eligFilters, setEligFilters] = useState({ eligible_only: true, search: "" });
+
   function setF(key, val) {
     setFilters((f) => ({ ...f, [key]: val }));
   }
@@ -224,11 +234,61 @@ export default function AdminLuckyDraw() {
     }
   }
 
+  // Seasons (Coupon masters) – code/title/campaign starting with "season"
+  async function fetchSeasons(q = "") {
+    try {
+      setSeasonsLoading(true);
+      setSeasonsErr("");
+      const res = await API.get("/coupons/lucky-draw/seasons/", { params: { q } });
+      const items = res?.data?.results || res?.data || [];
+      setSeasons(Array.isArray(items) ? items : []);
+      if (!seasonId && items && items.length) {
+        setSeasonId(String(items[0].id));
+      }
+    } catch (e) {
+      setSeasons([]);
+      setSeasonsErr(e?.response?.data?.detail || "Failed to load Seasons");
+    } finally {
+      setSeasonsLoading(false);
+    }
+  }
+
+  async function fetchEligibility() {
+    if (!seasonId) {
+      setEligRows([]);
+      return;
+    }
+    try {
+      setEligLoading(true);
+      setEligErr("");
+      const params = {
+        coupon: seasonId,
+        eligible_only: eligFilters.eligible_only ? 1 : 0,
+      };
+      const s = String(eligFilters.search || "").trim();
+      if (s) params.search = s;
+      const res = await API.get("/coupons/lucky-draw/participants/", { params });
+      const items = res?.data?.results || res?.data || [];
+      setEligRows(Array.isArray(items) ? items : []);
+    } catch (e) {
+      setEligRows([]);
+      setEligErr(e?.response?.data?.detail || "Failed to load participants");
+    } finally {
+      setEligLoading(false);
+    }
+  }
+
   useEffect(() => {
     fetchRows();
     fetchSpins();
+    fetchSeasons();
     // eslint-disable-next-line
   }, []);
+
+  useEffect(() => {
+    fetchEligibility();
+    // eslint-disable-next-line
+  }, [seasonId, eligFilters]);
 
   const statusOptions = [
     { value: "", label: "Any" },
@@ -485,6 +545,147 @@ export default function AdminLuckyDraw() {
               </div>
             ))
           )}
+        </div>
+      </div>
+
+      {/* Season Eligibility (Spin & Win) */}
+      <div style={{ marginBottom: 16 }}>
+        <h2 style={{ margin: 0, color: "#0f172a" }}>Season Eligibility (Spin & Win)</h2>
+        <div style={{ color: "#64748b", fontSize: 13 }}>
+          List of users eligible to participate in the Lucky Draw for a Season (Coupon master). Users are eligible when they have first-time purchases of both ₹150 and ₹759 within a Season.
+        </div>
+      </div>
+
+      <div
+        style={{
+          border: "1px solid #e2e8f0",
+          borderRadius: 10,
+          overflow: "hidden",
+          background: "#fff",
+          marginBottom: 24,
+        }}
+      >
+        <div style={{ padding: 12, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
+          <Select
+            label="Season (Coupon Master)"
+            value={seasonId}
+            onChange={(v) => setSeasonId(v)}
+            options={(seasons || []).map((s) => ({
+              value: String(s.id),
+              label: s.title || s.code || `#${s.id}`,
+            }))}
+          />
+          <TextInput
+            label="Search User"
+            value={eligFilters.search}
+            onChange={(v) => setEligFilters((f) => ({ ...f, search: v }))}
+            placeholder="username / phone"
+          />
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label style={{ fontSize: 12, color: "#64748b" }}>Eligible Only</label>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", border: "1px solid #e2e8f0", borderRadius: 8 }}>
+              <input
+                type="checkbox"
+                checked={!!eligFilters.eligible_only}
+                onChange={(e) => setEligFilters((f) => ({ ...f, eligible_only: !!e.target.checked }))}
+              />
+              <span style={{ fontSize: 13, color: "#334155" }}>Show only users who have both ₹150 and ₹759</span>
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "flex-end" }}>
+            <button
+              onClick={fetchEligibility}
+              disabled={eligLoading}
+              style={{
+                padding: "10px 12px",
+                background: "#0f172a",
+                color: "#fff",
+                border: 0,
+                borderRadius: 8,
+                cursor: eligLoading ? "not-allowed" : "pointer",
+                width: "100%",
+              }}
+            >
+              {eligLoading ? "Loading..." : "Refresh"}
+            </button>
+          </div>
+        </div>
+        {(seasonsErr || eligErr) ? (
+          <div style={{ color: "#dc2626", padding: 12, borderTop: "1px solid #e2e8f0" }}>
+            {seasonsErr || eligErr}
+          </div>
+        ) : null}
+
+        <div style={{ padding: 10 }}>
+          <div
+            style={{
+              minWidth: 900,
+              display: "grid",
+              gridTemplateColumns: "180px 120px 120px 80px 80px 90px 180px 180px",
+              gap: 8,
+              padding: "10px",
+              background: "#f8fafc",
+              border: "1px solid #e2e8f0",
+              borderRadius: 8,
+              fontWeight: 700,
+              color: "#0f172a",
+            }}
+          >
+            <div>User</div>
+            <div>Phone</div>
+            <div>Pincode</div>
+            <div>₹150</div>
+            <div>₹759</div>
+            <div>Eligible</div>
+            <div>First ₹150 At</div>
+            <div>First ₹759 At</div>
+          </div>
+          <div>
+            {eligLoading ? (
+              <div style={{ padding: 12, color: "#64748b" }}>Loading...</div>
+            ) : (eligRows || []).length === 0 ? (
+              <div style={{ padding: 12, color: "#64748b" }}>No participants found.</div>
+            ) : (
+              eligRows.map((u, idx) => (
+                <div
+                  key={`${u.user_id}-${idx}`}
+                  style={{
+                    minWidth: 900,
+                    display: "grid",
+                    gridTemplateColumns: "180px 120px 120px 80px 80px 90px 180px 180px",
+                    gap: 8,
+                    padding: "10px",
+                    borderBottom: "1px solid #e2e8f0",
+                    alignItems: "center",
+                  }}
+                >
+                  <div title={u.username || ""} style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {u.username || `User #${u.user_id}`}
+                  </div>
+                  <div>{u.phone || "—"}</div>
+                  <div>{u.pincode || "—"}</div>
+                  <div>{u.has_150 ? "Yes" : "No"}</div>
+                  <div>{u.has_759 ? "Yes" : "No"}</div>
+                  <div>
+                    <span
+                      style={{
+                        padding: "2px 8px",
+                        borderRadius: 999,
+                        fontSize: 12,
+                        color: u.eligible ? "#065f46" : "#0f172a",
+                        background: u.eligible ? "#d1fae5" : "#f1f5f9",
+                        border: u.eligible ? "1px solid #10b98130" : "1px solid #e2e8f0",
+                      }}
+                    >
+                      {u.eligible ? "YES" : "NO"}
+                    </span>
+                  </div>
+                  <div>{humanDate(u.created_at_150)}</div>
+                  <div>{humanDate(u.created_at_759)}</div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
 

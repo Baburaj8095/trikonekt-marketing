@@ -30,6 +30,7 @@ import {
   createEcouponOrder,
   createPromoPurchase,
   createProductPurchaseRequest,
+  agencyCreatePaymentRequest,
 } from "../api/api";
 import {
   subscribe as subscribeCart,
@@ -40,6 +41,7 @@ import {
   clearCart as cartClear,
   setItemFile as cartSetItemFile,
   setItemMeta as cartSetItemMeta,
+  setItemUnitPrice as cartSetItemUnitPrice,
 } from "../store/cart";
 
 /**
@@ -104,11 +106,12 @@ export default function Cart() {
   const total = Number(cart.total || 0);
 
   const grouped = useMemo(() => {
-    const out = { ECOUPON: [], PROMO_PACKAGE: [], PRODUCT: [], OTHERS: [] };
+    const out = { ECOUPON: [], PROMO_PACKAGE: [], AGENCY_PACKAGE: [], PRODUCT: [], OTHERS: [] };
     for (const it of items) {
       const t = String(it.type || "").toUpperCase();
       if (t === "ECOUPON") out.ECOUPON.push(it);
       else if (t === "PROMO_PACKAGE") out.PROMO_PACKAGE.push(it);
+      else if (t === "AGENCY_PACKAGE") out.AGENCY_PACKAGE.push(it);
       else if (t === "PRODUCT") out.PRODUCT.push(it);
       else out.OTHERS.push(it);
     }
@@ -172,7 +175,16 @@ export default function Cart() {
     } catch {}
   };
 
+  const handleSetUnitPrice = (key, price) => {
+    try {
+      cartSetItemUnitPrice(key, price);
+    } catch {}
+  };
+
   const [checkingOut, setCheckingOut] = useState(false);
+  // Mobile cart UI helpers
+  const [couponCode, setCouponCode] = useState("");
+  const [couponApplied, setCouponApplied] = useState("");
 
   // Contact details for product requests (prefilled from logged-in user if available)
   const storedUser = useMemo(() => {
@@ -295,6 +307,31 @@ export default function Cart() {
               e?.response?.data?.detail ||
               e?.message ||
               "Failed to submit promo package.",
+          });
+        }
+      }
+
+      // 2b) Submit AGENCY PACKAGE payment requests (go to admin approval)
+      for (const it of grouped.AGENCY_PACKAGE) {
+        try {
+          const unit = Number(it.unitPrice || 0);
+          const qty = Math.max(1, parseInt(it.qty || 1, 10));
+          const amount = unit * qty;
+          await agencyCreatePaymentRequest(it.id, {
+            amount,
+            method: "UPI",
+            utr: String(it?.meta?.reference || ""),
+            // payment_proof not collected in Cart; agencies can upload from Prime Approval page
+          });
+          results.push({ key: it.key, ok: true });
+        } catch (e) {
+          results.push({
+            key: it.key,
+            ok: false,
+            msg:
+              e?.response?.data?.detail ||
+              e?.message ||
+              "Failed to create agency package payment request.",
           });
         }
       }
@@ -439,7 +476,173 @@ export default function Cart() {
             >
               Items
             </Typography>
-            <TableContainer sx={{ maxWidth: "100%", overflowX: "auto" }}>
+
+            {/* Mobile-first product list cards (all item types) */}
+            <Stack spacing={1.25} sx={{ mb: 1.5, display: { xs: "flex", md: "none" } }}>
+              {items.map((it) => {
+                const unit = Number(it.unitPrice || 0);
+                const qty = Math.max(1, parseInt(it.qty || 1, 10));
+                const subtotal = unit * qty;
+                const t = String(it.type || "").toUpperCase();
+                const img = it?.meta?.image_url ? normalizeMediaUrl(it.meta.image_url) : null;
+
+                return (
+                  <Paper key={it.key} variant="outlined" sx={{ p: 1.25, borderRadius: 1.5 }}>
+                    <Stack direction="row" spacing={1.25} alignItems="flex-start">
+                      <Box
+                        sx={{
+                          width: 64,
+                          height: 64,
+                          flexShrink: 0,
+                          borderRadius: 1.25,
+                          overflow: "hidden",
+                          bgcolor: "#f1f5f9",
+                          border: "1px solid",
+                          borderColor: "divider",
+                        }}
+                      >
+                        {img ? (
+                          <img
+                            src={img}
+                            alt={it.name}
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          />
+                        ) : (
+                          <Box sx={{ width: "100%", height: "100%", display: "grid", placeItems: "center", color: "text.disabled", fontSize: 12 }}>
+                            No Image
+                          </Box>
+                        )}
+                      </Box>
+
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+                          {it.name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          ₹{unit.toLocaleString("en-IN")}
+                        </Typography>
+
+                        {t === "PROMO_PACKAGE" ? (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                            {String(it?.meta?.kind || "")}
+                          </Typography>
+                        ) : null}
+                        {t === "ECOUPON" ? (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                            Denomination:{" "}
+                            {it?.meta?.denomination != null ? `₹${it.meta.denomination}` : "—"}
+                          </Typography>
+                        ) : null}
+                        {t === "PRODUCT" ? (
+                          <TextField
+                            size="small"
+                            fullWidth
+                            multiline
+                            minRows={2}
+                            sx={{ mt: 1 }}
+                            placeholder="Enter delivery address"
+                            value={it?.meta?.shipping_address || ""}
+                            onChange={(e) =>
+                              handleSetMeta(it.key, { shipping_address: e.target.value })
+                            }
+                          />
+                        ) : t === "AGENCY_PACKAGE" ? (
+                          <>
+                            <TextField
+                              size="small"
+                              fullWidth
+                              type="number"
+                              label="Amount (₹)"
+                              sx={{ mt: 1 }}
+                              placeholder="Enter amount"
+                              value={it?.unitPrice ?? ""}
+                              inputProps={{ min: 1, step: "1" }}
+                              onChange={(e) => handleSetUnitPrice(it.key, e.target.value)}
+                            />
+                            <TextField
+                              size="small"
+                              fullWidth
+                              label="Reference"
+                              sx={{ mt: 1 }}
+                              placeholder="Reference (optional)"
+                              value={it?.meta?.reference || ""}
+                              onChange={(e) => handleSetMeta(it.key, { reference: e.target.value })}
+                            />
+                            <TextField
+                              size="small"
+                              fullWidth
+                              multiline
+                              minRows={2}
+                              sx={{ mt: 1 }}
+                              label="Notes"
+                              placeholder="Notes (optional)"
+                              value={it?.meta?.notes || ""}
+                              onChange={(e) => handleSetMeta(it.key, { notes: e.target.value })}
+                            />
+                          </>
+                        ) : null}
+
+                        <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => handleUpdateQty(it.key, Math.max(1, qty - 1))}
+                            sx={{ minWidth: 32, p: 0 }}
+                          >
+                            −
+                          </Button>
+                          <TextField
+                            size="small"
+                            type="number"
+                            value={qty}
+                            onChange={(e) => handleUpdateQty(it.key, e.target.value)}
+                            inputProps={{ min: 1, style: { textAlign: "center", width: 56 } }}
+                          />
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => handleUpdateQty(it.key, qty + 1)}
+                            sx={{ minWidth: 32, p: 0 }}
+                          >
+                            +
+                          </Button>
+                          <Box sx={{ flex: 1 }} />
+                          {t === "PROMO_PACKAGE" ? (
+                            <Button size="small" variant="outlined" component="label">
+                              {it.file ? "Change Proof" : "Attach Proof"}
+                              <input
+                                type="file"
+                                hidden
+                                accept="image/*,application/pdf"
+                                onChange={(e) =>
+                                  handleSetFile(
+                                    it.key,
+                                    e.target.files && e.target.files[0] ? e.target.files[0] : null
+                                  )
+                                }
+                              />
+                            </Button>
+                          ) : null}
+                          <Button size="small" color="error" onClick={() => handleRemove(it.key)}>
+                            Remove
+                          </Button>
+                        </Stack>
+
+                        <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.5 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Subtotal
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                            ₹{Number(subtotal).toLocaleString("en-IN")}
+                          </Typography>
+                        </Stack>
+                      </Box>
+                    </Stack>
+                  </Paper>
+                );
+              })}
+            </Stack>
+            <TableContainer sx={{ maxWidth: "100%", overflowX: "auto", display: { xs: "none", md: "block" } }}>
               <Table size="small">
                 <TableHead>
                   <TableRow>
@@ -464,7 +667,7 @@ export default function Cart() {
                           {String(it?.meta?.kind || "").toUpperCase() ===
                           "MONTHLY" ? (
                             <>
-                              Package #{it?.meta?.package_number ?? "-"}
+                              Season #{it?.meta?.package_number ?? "-"}
                               {" • "}Boxes:{" "}
                               {Array.isArray(it?.meta?.boxes)
                                 ? it.meta.boxes.join(", ")
@@ -503,6 +706,45 @@ export default function Cart() {
                               handleSetMeta(it.key, { shipping_address: e.target.value })
                             }
                           />
+                        </div>
+                      ) : t === "AGENCY_PACKAGE" ? (
+                        <div style={{ fontSize: 12, color: "#475569" }}>
+                          <Grid container spacing={1}>
+                            <Grid item xs={12} md={6}>
+                              <TextField
+                                size="small"
+                                fullWidth
+                                type="number"
+                                label="Amount (₹)"
+                                placeholder="Enter amount"
+                                value={it?.unitPrice ?? ""}
+                                inputProps={{ min: 1, step: "1" }}
+                                onChange={(e) => handleSetUnitPrice(it.key, e.target.value)}
+                              />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                              <TextField
+                                size="small"
+                                fullWidth
+                                label="Reference"
+                                placeholder="Reference (optional)"
+                                value={it?.meta?.reference || ""}
+                                onChange={(e) => handleSetMeta(it.key, { reference: e.target.value })}
+                              />
+                            </Grid>
+                            <Grid item xs={12}>
+                              <TextField
+                                size="small"
+                                fullWidth
+                                multiline
+                                minRows={2}
+                                label="Notes"
+                                placeholder="Notes (optional)"
+                                value={it?.meta?.notes || ""}
+                                onChange={(e) => handleSetMeta(it.key, { notes: e.target.value })}
+                              />
+                            </Grid>
+                          </Grid>
                         </div>
                       ) : null;
 
@@ -585,6 +827,32 @@ export default function Cart() {
               </Table>
             </TableContainer>
 
+            {/* Coupon input (UI placeholder) */}
+            <Box sx={{ mt: 1, display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+              <TextField
+                size="small"
+                label="Coupon code"
+                value={couponCode}
+                onChange={(e) => setCouponCode(e.target.value)}
+              />
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => setCouponApplied(couponCode.trim())}
+                disabled={!couponCode.trim()}
+              >
+                Apply Coupon
+              </Button>
+              {couponApplied ? (
+                <Chip
+                  size="small"
+                  color="success"
+                  label={`Applied: ${couponApplied}`}
+                  onDelete={() => setCouponApplied("")}
+                />
+              ) : null}
+            </Box>
+
             {promoMissingFiles.length > 0 ? (
               <Alert severity="warning" sx={{ mt: 1 }}>
                 Some Promo Package items do not have a payment proof attached:
@@ -661,7 +929,7 @@ export default function Cart() {
           ) : null} */}
 
           {/* Checkout prompt */}
-          <Paper elevation={0} sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, mb: 2, border: "1px solid", borderColor: "divider", bgcolor: "#fff" }}>
+          <Paper elevation={0} sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, mb: 2, border: "1px solid", borderColor: "divider", bgcolor: "#fff", position: { xs: "sticky", md: "static" }, bottom: 0, zIndex: 5 }}>
             <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
               Next Step
             </Typography>

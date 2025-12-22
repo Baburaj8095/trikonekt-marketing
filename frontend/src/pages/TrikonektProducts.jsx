@@ -170,6 +170,10 @@ export default function TrikonektProducts() {
         unitPrice: Number.isFinite(unit) ? unit : price,
         qty: 1,
         image_url: product?.image_url || "",
+        // Mark Trikonekt products as TRI with admin-configured max redeem %
+        tri: true,
+        max_reward_pct: Number(product?.max_reward_redeem_percent || 0),
+        tri_app_slug: "trikonekt",
       });
       setSnack({ open: true, type: "success", msg: "Added to cart." });
       setDrawerOpen(true);
@@ -263,7 +267,7 @@ export default function TrikonektProducts() {
       </Box>
 
       {/* Promo Package Section */}
-      <Box sx={{ mb: 2 }}>
+      {/* <Box sx={{ mb: 2 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
           Promo Package
         </Typography>
@@ -292,7 +296,7 @@ export default function TrikonektProducts() {
             }}
           />
         )}
-      </Box>
+      </Box> */}
 
       {/* Products Section */}
       {loading ? (

@@ -188,16 +188,13 @@ class RegisterSerializer(serializers.ModelSerializer):
         phone = (attrs.get('phone') or '').strip()
         sponsor = (attrs.get('sponsor_id') or '').strip()
 
-        # Phone required for all non-business registrations; allow same phone for multiple accounts (different prefixes)
-        if category != 'business':
-            if not phone:
-                raise serializers.ValidationError({'phone': 'Phone number is required.'})
-            phone_digits = ''.join(c for c in phone if c.isdigit())
-            if not phone_digits or len(phone_digits) != 10:
-                raise serializers.ValidationError({'phone': 'Enter a valid 10-digit phone number.'})
+        # Phone required for all registrations; allow same phone for multiple accounts (different prefixes)
+        if not phone:
+            raise serializers.ValidationError({'phone': 'Phone number is required.'})
+        phone_digits = ''.join(c for c in phone if c.isdigit())
+        if not phone_digits or len(phone_digits) != 10:
+            raise serializers.ValidationError({'phone': 'Enter a valid 10-digit phone number.'})
 
-        if category == 'business':
-            raise serializers.ValidationError({'category': 'Business registration has moved. Use /api/business/register/.'})
 
         # Sponsor required: accept username, prefixed_id (with/without dash), phone digits, or unique_id
         if not sponsor:
@@ -1008,6 +1005,7 @@ class UserKYCSerializer(serializers.ModelSerializer):
             "bank_name",
             "bank_account_number",
             "ifsc_code",
+            "aadhaar_digilocker_url",
             "verified",
             "verified_at",
             "kyc_reopen_allowed",
@@ -1036,7 +1034,7 @@ class UserKYCSerializer(serializers.ModelSerializer):
             })
 
         # Perform updates
-        for f in ("bank_name", "bank_account_number", "ifsc_code"):
+        for f in ("bank_name", "bank_account_number", "ifsc_code", "aadhaar_digilocker_url"):
             if f in validated_data:
                 setattr(instance, f, validated_data[f])
 
@@ -1156,9 +1154,10 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
         """
         Create a withdrawal request with the following business rules:
         - KYC must be verified
-        - Wallet balance must be >= ₹500 (enable threshold) AND >= requested amount
-        - Only one request allowed within each Wednesday 7PM-9PM (IST) window
-        - Requests can only be made on Wednesday between 19:00 and 21:00 IST
+        - Withdrawable balance must be >= ₹500 (enable threshold)
+        - Per request cap is ₹750 (or current withdrawable balance, whichever is lower)
+        - Only one request allowed within each Sunday 6:00 PM–11:59 PM (IST) window
+        - Requests can only be made on Sunday between 18:00 and 23:59 IST
         """
         from decimal import Decimal
         from datetime import datetime, time, timedelta, timezone as dt_timezone
@@ -1196,65 +1195,63 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
         # Wallet balance must be >= 500 and >= requested amount
         w = Wallet.get_or_create_for_user(user)
         try:
-            bal = Decimal(w.balance or 0)
+            wd = Decimal(w.withdrawable_balance or 0)
         except Exception:
-            bal = Decimal("0")
-        if bal < Decimal("500"):
-            short = (Decimal("500") - bal)
+            wd = Decimal("0")
+        if wd < Decimal("500"):
+            short = (Decimal("500") - wd)
             raise serializers.ValidationError({
-                "detail": "Minimum balance ₹500 required to enable withdrawals.",
+                "detail": "Minimum withdrawable balance ₹500 required to enable withdrawals.",
                 "code": "INSUFFICIENT_MIN_BALANCE",
                 "short_by": str(short.quantize(Decimal("0.01"))),
             })
-        if amount > bal:
-            raise serializers.ValidationError({"detail": "Insufficient wallet balance.", "code": "INSUFFICIENT_BALANCE"})
+        per_tx_cap = Decimal("750.00")
+        max_now = wd if wd < per_tx_cap else per_tx_cap
+        if amount > max_now:
+            raise serializers.ValidationError({
+                "detail": f"Max per request is ₹{per_tx_cap.quantize(Decimal('0.00'))}. Available to withdraw now: ₹{max_now.quantize(Decimal('0.00'))}.",
+                "code": "AMOUNT_EXCEEDS_CAP_OR_BALANCE",
+            })
 
         # Enforce Wednesday 7PM-9PM IST window
         IST = ZoneInfo("Asia/Kolkata")
         now_local = timezone.now().astimezone(IST)
 
-        # Compute this week's Wednesday date
-        # weekday: Mon=0 ... Wed=2
-        days_from_wed = now_local.weekday() - 2  # positive if after Wed, negative if before
-        wed_date = now_local.date() - timedelta(days=days_from_wed)
+        # Compute this week's Sunday date (Mon=0..Sun=6)
+        days_since_sun = (now_local.weekday() + 1) % 7
+        sun_date = now_local.date() - timedelta(days=days_since_sun)
 
-        window_start_local = datetime.combine(wed_date, time(19, 0), IST)
-        window_end_local = datetime.combine(wed_date, time(21, 0), IST)
+        window_start_local = datetime.combine(sun_date, time(18, 0), IST)  # 6:00 PM IST
+        window_end_local = datetime.combine(sun_date, time(23, 59, 59), IST)  # 11:59 PM IST
 
         # Determine current/next window info
         if now_local < window_start_local:
-            # Not yet opened this week
             next_window_start_local = window_start_local
-        elif now_local >= window_end_local:
-            # Window is over; next week's Wednesday
-            next_wed_date = wed_date + timedelta(days=7)
-            next_window_start_local = datetime.combine(next_wed_date, time(19, 0), IST)
+        elif now_local > window_end_local:
+            next_window_start_local = datetime.combine(sun_date + timedelta(days=7), time(18, 0), IST)
         else:
-            # We are inside the window
             next_window_start_local = window_start_local
 
-        if not (window_start_local <= now_local < window_end_local):
+        if not (window_start_local <= now_local <= window_end_local):
             raise serializers.ValidationError({
-                "detail": "Withdrawals can be requested only on Wednesday between 7:00 PM and 9:00 PM (IST).",
+                "detail": "Withdrawals can be requested only on Sunday between 6:00 PM and 11:59 PM (IST).",
                 "code": "WINDOW_CLOSED",
                 "next_window_at": next_window_start_local.astimezone(dt_timezone.utc).isoformat(),
                 "next_window_at_ist": next_window_start_local.isoformat(),
             })
 
-        # Limit to 1 request per weekly window (this Wednesday 19:00-21:00 IST)
+        # Limit to 1 request per weekly window (this Sunday 18:00–23:59 IST)
         window_start_utc = window_start_local.astimezone(dt_timezone.utc)
         window_end_utc = window_end_local.astimezone(dt_timezone.utc)
         exists_in_window = WithdrawalRequest.objects.filter(
             user=user,
             requested_at__gte=window_start_utc,
-            requested_at__lt=window_end_utc,
+            requested_at__lte=window_end_utc,
         ).exclude(status="rejected").exists()
         if exists_in_window:
-            # Next allowed window is next week's Wednesday
-            next_wed_date = wed_date + timedelta(days=7)
-            next_window_start_local = datetime.combine(next_wed_date, time(19, 0), IST)
+            next_window_start_local = datetime.combine(sun_date + timedelta(days=7), time(18, 0), IST)
             raise serializers.ValidationError({
-                "detail": "Only one withdrawal request is allowed per week.",
+                "detail": "Only one withdrawal request is allowed per weekly window.",
                 "code": "WEEKLY_LIMIT_REACHED",
                 "next_window_at": next_window_start_local.astimezone(dt_timezone.utc).isoformat(),
                 "next_window_at_ist": next_window_start_local.isoformat(),

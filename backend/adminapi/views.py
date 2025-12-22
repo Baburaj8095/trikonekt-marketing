@@ -9,6 +9,7 @@ from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.http import HttpResponse
 
 from accounts.models import CustomUser, Wallet, WalletTransaction, UserKYC, WithdrawalRequest, SupportTicket, SupportTicketMessage, AgencyRegionAssignment
 from coupons.models import Coupon, CouponCode, CouponSubmission, CouponBatch
@@ -471,6 +472,104 @@ class AdminUsersList(ListAPIView):
         )
 
 
+class AdminUsersExportXLSX(APIView):
+    """
+    Export Admin Users grid to XLSX with full details.
+    - Applies the same filters as AdminUsersList (via query params).
+    - Excludes usernames in the "9000000" series by default.
+      Pass include_9000000=1 to include them.
+    """
+    permission_classes = [IsAdminOrStaff]
+
+    def get(self, request):
+        # Lazy import so server still boots if openpyxl is missing
+        try:
+            import openpyxl
+            from openpyxl.utils import get_column_letter
+        except Exception:
+            return Response({"detail": "openpyxl is not installed on the server"}, status=400)
+
+        # Reuse list view queryset with current filters
+        view = AdminUsersList()
+        view.request = request
+        qs = view.get_queryset()
+
+        # Exclude usernames that are in 9000000 series by default
+        # (covers usernames that start with or contain 9000000, e.g. test seeds)
+        include_9m = str(request.query_params.get("include_9000000") or "").lower() in ("1", "true", "yes")
+        if not include_9m:
+            qs = qs.exclude(Q(username__startswith="9000000") | Q(username__icontains="9000000"))
+
+        # Serialize with 'detail' purpose to compute richer fields (e.g., kyc, wallet summary)
+        ser = AdminUserNodeSerializer(qs, many=True, context={"request": request, "purpose": "detail"})
+        items = ser.data
+
+        # Column order mirrors Admin Users grid (plus a few essentials)
+        headers = [
+            "id", "username", "full_name", "email", "role", "category", "phone",
+            "sponsor_id", "pincode", "district_name", "state_name", "country_name",
+            "kyc_status", "kyc_verified", "kyc_verified_at",
+            "commission_level", "activated_ecoupon_count", "last_promo_package",
+            "wallet_balance", "wallet_status", "direct_count", "has_children",
+            "account_active", "is_active", "date_joined",
+        ]
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Users"
+        ws.append(headers)
+
+        for obj in items:
+            ws.append([
+                obj.get("id"),
+                obj.get("username") or "",
+                obj.get("full_name") or "",
+                obj.get("email") or "",
+                obj.get("role") or "",
+                obj.get("category") or "",
+                obj.get("phone") or "",
+                obj.get("sponsor_id") or "",
+                obj.get("pincode") or "",
+                obj.get("district_name") or "",
+                obj.get("state_name") or "",
+                obj.get("country_name") or "",
+                obj.get("kyc_status") or "",
+                bool(obj.get("kyc_verified")) if obj.get("kyc_verified") is not None else "",
+                obj.get("kyc_verified_at") or "",
+                obj.get("commission_level") or 0,
+                obj.get("activated_ecoupon_count") or 0,
+                obj.get("last_promo_package") or "",
+                obj.get("wallet_balance") if obj.get("wallet_balance") not in (None, "") else "",
+                obj.get("wallet_status") or "",
+                obj.get("direct_count") or 0,
+                bool(obj.get("has_children")) if obj.get("has_children") is not None else "",
+                bool(obj.get("account_active")) if obj.get("account_active") is not None else "",
+                bool(obj.get("is_active")) if obj.get("is_active") is not None else "",
+                obj.get("date_joined") or "",
+            ])
+
+        # Auto-size columns
+        for col_idx, header in enumerate(headers, start=1):
+            max_len = len(str(header))
+            for row in ws.iter_rows(min_row=2, min_col=col_idx, max_col=col_idx):
+                val = "" if row[0].value is None else str(row[0].value)
+                if len(val) > max_len:
+                    max_len = len(val)
+            ws.column_dimensions[get_column_letter(col_idx)].width = min(max_len + 2, 60)
+
+        from io import BytesIO
+        bio = BytesIO()
+        wb.save(bio)
+        bio.seek(0)
+
+        filename = f"admin_users_{timezone.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        resp = HttpResponse(
+            bio.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return resp
+
 class AdminUserEditMetaView(APIView):
     """
     Return dynamic field metadata for Admin user edit dialog based on AdminUserEditSerializer.
@@ -538,6 +637,28 @@ class AdminUserDetail(APIView):
             obj = serializer.save()
             return Response(AdminUserEditSerializer(obj).data, status=200)
         return Response(serializer.errors, status=400)
+
+    def delete(self, request, pk: int):
+        """
+        Permanently delete a user. Guards:
+          - Cannot delete self
+          - Cannot delete superuser
+        Returns 204 No Content on success.
+        """
+        user = CustomUser.objects.filter(pk=pk).first()
+        if not user:
+            return Response({"detail": "Not found"}, status=404)
+        # Prevent accidental self-delete
+        if getattr(request.user, "id", None) == user.id:
+            return Response({"detail": "You cannot delete your own admin account."}, status=400)
+        # Prevent deleting superusers
+        if getattr(user, "is_superuser", False):
+            return Response({"detail": "Cannot delete a superuser."}, status=400)
+        try:
+            user.delete()
+            return Response(status=204)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=400)
 
 
 class AdminUserImpersonateView(APIView):
@@ -1907,6 +2028,49 @@ class AdminWithdrawalRejectView(APIView):
         return Response(AdminWithdrawalSerializer(obj).data, status=200)
 
 
+class AdminWithdrawalDistributionPreviewView(APIView):
+    """
+    Preview Direct Refer Withdraw Commission distribution for a given user and amount.
+    Query params:
+      - user_id: int (preferred)
+      - user or username: str (optional alternative)
+      - amount: number (required)
+    Response: same schema as business.services.withdrawals.compute_withdraw_distribution(...)
+    """
+    permission_classes = [IsAdminOrStaff]
+
+    def get(self, request):
+        user_id = (request.query_params.get("user_id") or "").strip()
+        user_q = (request.query_params.get("user") or request.query_params.get("username") or "").strip()
+        amount = request.query_params.get("amount")
+        if amount is None or str(amount).strip() == "":
+            return Response({"detail": "amount is required"}, status=400)
+
+        user = None
+        if user_id and str(user_id).isdigit():
+            user = CustomUser.objects.filter(id=int(user_id)).first()
+
+        if not user and user_q:
+            # Try by username, then prefixed sponsor id, then phone digits
+            u = CustomUser.objects.filter(username__iexact=user_q).first()
+            if not u:
+                u = CustomUser.objects.filter(prefixed_id__iexact=user_q).first()
+            if not u:
+                digits = "".join(ch for ch in str(user_q) if ch.isdigit())
+                if digits:
+                    u = CustomUser.objects.filter(phone__iexact=digits).first()
+            user = u
+
+        if not user:
+            return Response({"detail": "user not found"}, status=404)
+
+        try:
+            from business.services.withdrawals import compute_withdraw_distribution
+            data = compute_withdraw_distribution(user, amount)
+            return Response(data, status=200)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=400)
+
 # ================================
 # Master Level Commission (L0..L5)
 # ================================
@@ -2015,6 +2179,157 @@ class AdminMatrixCommissionConfig(APIView):
             return Response(AdminAutopoolConfigSerializer(obj).data, status=200)
         return Response(ser.errors, status=400)
 
+
+class AdminMasterCommissionConfig(APIView):
+    """
+    GET: Current Master Commission configuration used across flows (withdrawals sponsor %, tax %, company user).
+         {
+           "tax": { "percent": 10.0 },
+           "withdrawal": { "sponsor_percent": 3.0 },
+           "company_user": { "id": 1, "username": "company" } | null,
+           "upline": { "l1": 2, "l2": 1, "l3": 1, "l4": 0.5, "l5": 0.5 },         // optional convenience
+           "geo": { "sub_franchise": 15, "pincode": 4, ... },                      // optional convenience
+           "updated_at": "..."
+         }
+    PATCH: Update any subset:
+         {
+           "tax": { "percent": 10 },
+           "tax_company_user_id": 1,
+           "withdrawal": { "sponsor_percent": 3 },
+           "upline": { "l1": 2, "l2": 1, "l3": 1, "l4": 0.5, "l5": 0.5 },
+           "geo": { "sub_franchise": 15, "pincode": 4, ... }
+         }
+    """
+    permission_classes = [IsAdminOrStaff]
+
+    def _float(self, v):
+        from decimal import Decimal as D
+        try:
+            return float(D(str(v)))
+        except Exception:
+            try:
+                return float(v)
+            except Exception:
+                return 0.0
+
+    def get(self, request):
+        cfg = CommissionConfig.get_solo()
+        cu = cfg.get_company_user()
+        upline_list = cfg.get_level_percents()
+        try:
+            upline = {
+                "l1": self._float(upline_list[0]) if len(upline_list) > 0 else 0.0,
+                "l2": self._float(upline_list[1]) if len(upline_list) > 1 else 0.0,
+                "l3": self._float(upline_list[2]) if len(upline_list) > 2 else 0.0,
+                "l4": self._float(upline_list[3]) if len(upline_list) > 3 else 0.0,
+                "l5": self._float(upline_list[4]) if len(upline_list) > 4 else 0.0,
+            }
+        except Exception:
+            upline = {"l1": 0, "l2": 0, "l3": 0, "l4": 0, "l5": 0}
+        geo_raw = cfg.get_geo_percents()
+        geo = {k: self._float(v) for k, v in (geo_raw.items() if isinstance(geo_raw, dict) else [])}
+        payload = {
+            "tax": {"percent": self._float(cfg.get_tax_percent())},
+            "withdrawal": {"sponsor_percent": self._float(cfg.get_withdrawal_sponsor_percent())},
+            "company_user": ({"id": getattr(cu, "id", None), "username": getattr(cu, "username", None)} if cu else None),
+            "upline": upline,
+            "geo": geo,
+            "updated_at": getattr(cfg, "updated_at", None),
+        }
+        return Response(payload, status=200)
+
+    def patch(self, request):
+        from decimal import Decimal as D
+        data = request.data or {}
+        cfg = CommissionConfig.get_solo()
+        # Start from existing master json
+        master = dict(getattr(cfg, "master_commission_json", {}) or {})
+
+        # tax.percent
+        tax = data.get("tax")
+        if isinstance(tax, dict) and "percent" in tax:
+            try:
+                p = D(str(tax.get("percent")))
+                if p < 0:
+                    return Response({"detail": "tax.percent must be >= 0"}, status=400)
+                t = dict(master.get("tax") or {})
+                t["percent"] = float(p)
+                master["tax"] = t
+            except Exception:
+                return Response({"detail": "tax.percent must be a number"}, status=400)
+
+        # tax_company_user_id (relation field on model)
+        if "tax_company_user_id" in data:
+            try:
+                tid = int(data.get("tax_company_user_id") or 0)
+            except Exception:
+                return Response({"detail": "tax_company_user_id must be integer id"}, status=400)
+            if tid > 0:
+                from accounts.models import CustomUser
+                user = CustomUser.objects.filter(id=tid).first()
+                if not user:
+                    return Response({"detail": "tax_company_user_id not found"}, status=400)
+                cfg.tax_company_user = user
+            else:
+                cfg.tax_company_user = None  # allow clearing
+
+        # withdrawal.sponsor_percent
+        wd = data.get("withdrawal")
+        if isinstance(wd, dict) and "sponsor_percent" in wd:
+            try:
+                sp = D(str(wd.get("sponsor_percent")))
+                if sp < 0:
+                    return Response({"detail": "withdrawal.sponsor_percent must be >= 0"}, status=400)
+                w = dict(master.get("withdrawal") or {})
+                w["sponsor_percent"] = float(sp)
+                master["withdrawal"] = w
+            except Exception:
+                return Response({"detail": "withdrawal.sponsor_percent must be a number"}, status=400)
+
+        # upline l1..l5 (optional convenience; stored under master.upline)
+        up = data.get("upline")
+        if isinstance(up, dict):
+            u = dict(master.get("upline") or {})
+            for k in ("l1", "l2", "l3", "l4", "l5"):
+                if k in up:
+                    try:
+                        val = D(str(up.get(k)))
+                        if val < 0:
+                            return Response({"detail": f"upline.{k} must be >= 0"}, status=400)
+                        u[k] = float(val)
+                    except Exception:
+                        return Response({"detail": f"upline.{k} must be a number"}, status=400)
+            master["upline"] = u
+
+        # geo percents (optional convenience)
+        geo = data.get("geo")
+        if isinstance(geo, dict):
+            g_cur = dict(master.get("geo") or {})
+            allowed = {"sub_franchise", "pincode", "pincode_coord", "district", "district_coord", "state", "state_coord", "employee", "royalty"}
+            for k, v in geo.items():
+                if k not in allowed:
+                    continue
+                try:
+                    vv = D(str(v))
+                    if vv < 0:
+                        return Response({"detail": f"geo.{k} must be >= 0"}, status=400)
+                    g_cur[k] = float(vv)
+                except Exception:
+                    return Response({"detail": f"geo.{k} must be a number"}, status=400)
+            master["geo"] = g_cur
+
+        # Persist
+        cfg.master_commission_json = master
+        try:
+            if "tax_company_user_id" in data:
+                cfg.save(update_fields=["master_commission_json", "tax_company_user", "updated_at"])
+            else:
+                cfg.save(update_fields=["master_commission_json", "updated_at"])
+        except Exception:
+            cfg.save()
+
+        # Return fresh GET payload
+        return self.get(request)
 
 class AdminRewardPointsConfig(APIView):
     """

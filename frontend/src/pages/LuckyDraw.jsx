@@ -24,6 +24,7 @@ import useMediaQuery from "@mui/material/useMediaQuery";
 import MenuIcon from "@mui/icons-material/Menu";
 import API from "../api/api";
 import LOGO from "../assets/TRIKONEKT.png";
+import ClubHeader from "../components/ecoupon/ClubHeader";
 
 const drawerWidth = 220;
 
@@ -352,6 +353,7 @@ export default function LuckyDraw({ embedded = false }) {
   // Main content (shared for embedded and standalone)
   const MainContent = (
     <Container maxWidth="sm" sx={{ px: 0, ml: 0, mr: "auto" }}>
+      {embedded ? <ClubHeader /> : null}
       {/* Spin Lucky Draw */}
       <Paper
         elevation={3}

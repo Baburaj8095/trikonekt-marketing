@@ -24,11 +24,12 @@ import {
   useMediaQuery,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
+import { CheckCircle, Cancel } from "@mui/icons-material";
+import { Link as RouterLink } from "react-router-dom";
 import API from "../api/api";
 import RewardsTargetCard from "../components/RewardsTargetCard";
 import TreeReferralGalaxy from "../components/TreeReferralGalaxy";
 import ReferAndEarn from "../components/ReferAndEarn";
-import { CheckCircle, Cancel } from "@mui/icons-material";
 
 export default function AgencyDashboard() {
   // Nav identity (for filtering employees by agency pincode)
@@ -65,10 +66,6 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
   const [ecSummaryLoading, setEcSummaryLoading] = useState(false);
   const [ecSummaryError, setEcSummaryError] = useState("");
 
-  // Packages assigned to this agency
-  const [packages, setPackages] = useState([]);
-  const [packagesLoading, setPackagesLoading] = useState(false);
-  const [packagesError, setPackagesError] = useState("");
 
   // Agency E‑Coupon codes (history)
   const [agencyCodes, setAgencyCodes] = useState([]);
@@ -84,6 +81,14 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
   const [walletLoading, setWalletLoading] = useState(false);
   const [walletError, setWalletError] = useState("");
   const [me, setMe] = useState(null);
+  // Agency Packages (assigned) — used for non-subfranchise; also for computing subfranchise status
+  const [packages, setPackages] = useState([]);
+  const [packagesLoading, setPackagesLoading] = useState(false);
+  const [packagesError, setPackagesError] = useState("");
+  const isSubFranchise = useMemo(
+    () => String(storedUser?.category || "").toLowerCase() === "agency_sub_franchise",
+    [storedUser]
+  );
 
   const loadLuckyHistory = async () => {
     try {
@@ -177,17 +182,7 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
     }
   };
   
-  // Load my own profile (to show Agency account status)
-  const loadMe = async () => {
-    try {
-      const res = await API.get("/accounts/me/");
-      setMe(res?.data || null);
-    } catch (e) {
-      setMe(null);
-    }
-  };
-  
-  // Load assigned packages for Agency Dashboard cards
+  // Load assigned packages for Agency Dashboard cards / status
   const loadAgencyPackages = async () => {
     try {
       setPackagesLoading(true);
@@ -201,12 +196,23 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
         (typeof e?.response?.data === "string" ? e.response.data : "") ||
         e?.message ||
         "Failed to load packages.";
-      setPackagesError(msg);
+      setPackagesError(String(msg));
       setPackages([]);
     } finally {
       setPackagesLoading(false);
     }
   };
+
+  // Load my own profile (to show Agency account status)
+  const loadMe = async () => {
+    try {
+      const res = await API.get("/accounts/me/");
+      setMe(res?.data || null);
+    } catch (e) {
+      setMe(null);
+    }
+  };
+  
 
   // Load agency's own E‑Coupon codes (assigned_agency = me)
   const loadAgencyCodes = async () => {
@@ -393,11 +399,10 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
     //loadWallet();
     loadEcSummary();
     loadMe();
-  }, []);
-
-  useEffect(() => {
+    // Always load packages to compute status; render differs by role
     loadAgencyPackages();
   }, []);
+
 
 
   function MyTreeNode({ node, depth = 0 }) {
@@ -432,6 +437,12 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
   }, [activeTab]);
 
 
+  const visiblePackages = React.useMemo(() => (packages || []).filter((p) => {
+    const s = String(p?.status || "").toLowerCase();
+    return s === "active" || s === "partial";
+  }), [packages]);
+
+
   return (
     <Container maxWidth="lg" sx={{ px: 0 }}>
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2, flexWrap: "wrap", gap: 1 }}>
@@ -442,11 +453,52 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
           Pincode: {agencyPincode || "-"}
         </Typography>
       </Box>
-      {me && (
+      
+      {isSubFranchise && !packagesLoading && (!visiblePackages || visiblePackages.length === 0) && (
+        <Box sx={{ mb: 2 }}>
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2,
+                  borderRadius: 3,
+                  background: "linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%)",
+                  border: "1px solid #bae6fd",
+                }}
+              >
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, flexWrap: "wrap" }}>
+                  <Box sx={{ flex: 1, minWidth: 220 }}>
+                    <Typography variant="subtitle2" color="text.secondary" sx={{ letterSpacing: 1.5 }}>
+                      SUB‑FRANCHISE
+                    </Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 900 }}>
+                      Join Agency Prime Package
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Click Buy Now to view packages and submit your request.
+                    </Typography>
+                  </Box>
+                  <Button
+                    variant="contained"
+                    component={RouterLink}
+                    to="/agency/prime-package"
+                    sx={{ fontWeight: 800, borderRadius: 2 }}
+                  >
+                    Buy Now
+                  </Button>
+                </Box>
+              </Paper>
+            </Grid>
+          </Grid>
+        </Box>
+      )}
+
+      {/* {me && (
         <Alert severity={me.account_active ? "success" : "warning"} sx={{ mb: 2 }}>
           Account status: <b>{me.account_active ? "Active" : "Inactive"}</b>
         </Alert>
-      )}
+      )} */}
 
       {/* <Box sx={{ mb: 2 }}> 
         <ReferAndEarn title="Refer & Earn" sponsorUsername={sponsorUsername} />
@@ -455,100 +507,6 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
         </Typography>
       </Box> */}
 
-      {/* Assigned Package Cards */}
-      <Box sx={{ mb: 2 }}>
-        {packagesLoading ? (
-          <Box sx={{ py: 2, display: "flex", alignItems: "center", gap: 1 }}>
-            <CircularProgress size={20} /> <Typography variant="body2">Loading packages...</Typography>
-          </Box>
-        ) : packagesError ? (
-          <Alert severity="error">{packagesError}</Alert>
-        ) : (packages || []).length > 0 ? (
-          <Grid container spacing={2} alignItems="stretch" sx={{
-                      '@media (max-width:600px)': {
-                        minWidth: 0,
-                        boxSizing: 'border-box',
-                        width: "100%",
-                        margin: "auto",
-                      },
-                    }}>
-            {(packages || []).map((p) => {
-              const status = String(p.status || "").toLowerCase();
-              const isInactive = status === "inactive";
-              const isPartial = status === "partial";
-              const isActive = status === "active";
-              const bg =
-                isInactive
-                  ? "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)"
-                  : isPartial
-                  ? "linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)"
-                  : "linear-gradient(135deg, #10b981 0%, #059669 100%)";
-              const color = isInactive ? "#fff" : "#0f172a";
-              return (
-                <Grid item xs={12} md={4} key={p.id} sx={{
-                      '@media (max-width:600px)': {
-                        minWidth: 0,
-                        boxSizing: 'border-box',
-                        width: "100%",
-                        margin: "auto",
-                      },
-                    }}>
-                  <Box sx={{ p: 2, borderRadius: 2, background: bg, color, boxShadow: "0 8px 18px rgba(0,0,0,0.15)", border: "1px solid rgba(0,0,0,0.05)", height: "100%", display: "flex", flexDirection: "column", flex: 1 }}>
-                    <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
-                        {p?.package?.name || p?.package?.code || "Package"}
-                      </Typography>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                        {(isActive || isPartial) ? (
-                          <CheckCircle fontSize="small" sx={{ color: isPartial ? "#065f46" : "#065f46" }} />
-                        ) : (
-                          <Cancel fontSize="small" sx={{ color: "#fff" }} />
-                        )}
-                        <Typography variant="caption" sx={{ fontWeight: 700 }}>
-                          {isInactive ? "Inactive" : isPartial ? "Partial" : "Active"}
-                        </Typography>
-                      </Box>
-                    </Stack>
-                    <Grid container spacing={1} sx={{ mt: 1 }}>
-                      <Grid item xs={4}>
-                        <Box sx={{ p: 1, borderRadius: 1, background: "rgba(255,255,255,0.15)", color: "#111827" }}>
-                          <Typography variant="caption" sx={{ opacity: 0.9, color: isInactive ? "#f1f5f9" : "#0f172a" }}>Amount</Typography>
-                          <Typography variant="subtitle1" sx={{ fontWeight: 900, color: isInactive ? "#fff" : "#0f172a" }}>
-                            ₹{p.total_amount || "0.00"}
-                          </Typography>
-                        </Box>
-                      </Grid>
-                      <Grid item xs={4}>
-                        <Box sx={{ p: 1, borderRadius: 1, background: "rgba(255,255,255,0.15)", color: "#111827" }}>
-                          <Typography variant="caption" sx={{ opacity: 0.9, color: isInactive ? "#f1f5f9" : "#0f172a" }}>Paid</Typography>
-                          <Typography variant="subtitle1" sx={{ fontWeight: 900, color: isInactive ? "#fff" : "#0f172a" }}>
-                            ₹{p.paid_amount || "0.00"}
-                          </Typography>
-                        </Box>
-                      </Grid>
-                      <Grid item xs={4}>
-                        <Box sx={{ p: 1, borderRadius: 1, background: "rgba(255,255,255,0.15)", color: "#111827" }}>
-                          <Typography variant="caption" sx={{ opacity: 0.9, color: isInactive ? "#f1f5f9" : "#0f172a" }}>Remaining</Typography>
-                          <Typography variant="subtitle1" sx={{ fontWeight: 900, color: isInactive ? "#fff" : "#0f172a" }}>
-                            ₹{p.remaining_amount || "0.00"}
-                          </Typography>
-                        </Box>
-                      </Grid>
-                    </Grid>
-                    <Box sx={{ mt: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <Typography variant="caption" sx={{ fontWeight: 700 }}>
-                        Renewal: {typeof p.months_remaining === "number" ? `${p.months_remaining} month${p.months_remaining === 1 ? "" : "s"} remaining` : "—"}
-                      </Typography>
-                    </Box>
-                  </Box>
-                </Grid>
-              );
-            })}
-          </Grid>
-        ) : (
-          <Alert severity="info">No package assigned yet.</Alert>
-        )}
-      </Box>
 
       {/* Overview Cards */}
       <Box sx={{ mb: 2 }}>
@@ -647,6 +605,104 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
             </Grid>
           </Grid>
         ) : null}
+      </Box>
+
+      {/* Prime Package Buy (only for Sub‑franchise) or Assigned Packages (others) */}
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>
+          My Packages
+        </Typography>
+        {packagesLoading ? (
+          <Box sx={{ py: 2, display: "flex", alignItems: "center", gap: 1 }}>
+            <CircularProgress size={20} />{" "}
+            <Typography variant="body2">Loading packages...</Typography>
+          </Box>
+        ) : packagesError ? (
+          <Alert severity="error">{packagesError}</Alert>
+        ) : (visiblePackages || []).length > 0 ? (
+          <Grid container spacing={2} alignItems="stretch">
+            {(visiblePackages || []).map((p) => {
+              const status = String(p.status || "").toLowerCase();
+              const isInactive = status === "inactive";
+              const isPartial = status === "partial";
+              const isActive = status === "active";
+              const bg =
+                isInactive
+                  ? "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)"
+                  : isPartial
+                  ? "linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)"
+                  : "linear-gradient(135deg, #10b981 0%, #059669 100%)";
+              const fg = isInactive ? "#fff" : "#0f172a";
+              return (
+                <Grid item xs={12} md={4} key={p.id}>
+                  <Box
+                    sx={{
+                      p: 2,
+                      borderRadius: 2,
+                      background: bg,
+                      color: fg,
+                      boxShadow: "0 8px 18px rgba(0,0,0,0.15)",
+                      border: "1px solid rgba(0,0,0,0.05)",
+                      height: "100%",
+                      display: "flex",
+                      flexDirection: "column",
+                    }}
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+                        {p?.package?.name || p?.package?.code || "Package"}
+                      </Typography>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                        {(isActive || isPartial) ? (
+                          <CheckCircle fontSize="small" sx={{ color: isPartial ? "#065f46" : "#065f46" }} />
+                        ) : (
+                          <Cancel fontSize="small" sx={{ color: "#fff" }} />
+                        )}
+                        <Typography variant="caption" sx={{ fontWeight: 700 }}>
+                          {isInactive ? "Inactive" : isPartial ? "Partial" : "Active"}
+                        </Typography>
+                      </Box>
+                    </Box>
+                    <Grid container spacing={1}>
+                      <Grid item xs={4}>
+                        <Box sx={{ p: 1, borderRadius: 1, background: "rgba(255,255,255,0.15)" }}>
+                          <Typography variant="caption" sx={{ opacity: 0.9, color: fg }}>
+                            Amount
+                          </Typography>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 900, color: fg }}>
+                            ₹{p.total_amount || "0.00"}
+                          </Typography>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={4}>
+                        <Box sx={{ p: 1, borderRadius: 1, background: "rgba(255,255,255,0.15)" }}>
+                          <Typography variant="caption" sx={{ opacity: 0.9, color: fg }}>
+                            Paid
+                          </Typography>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 900, color: fg }}>
+                            ₹{p.paid_amount || "0.00"}
+                          </Typography>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={4}>
+                        <Box sx={{ p: 1, borderRadius: 1, background: "rgba(255,255,255,0.15)" }}>
+                          <Typography variant="caption" sx={{ opacity: 0.9, color: fg }}>
+                            Remaining
+                          </Typography>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 900, color: fg }}>
+                            ₹{p.remaining_amount || "0.00"}
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    </Grid>
+                  </Box>
+                </Grid>
+              );
+            })}
+          </Grid>
+        ) : (
+          <Alert severity="info">No active package yet.</Alert>
+        )}
       </Box>
 
       {/* <Stack direction="row" spacing={1} sx={{ mb: 2 }}>

@@ -1,0 +1,8 @@
+[
+{
+  "model": "business.promopackage",
+  "pk": 1,
+  "fields": {
+    "code": "PRIME150",
+    "name": "Prime Promo 150",
+    "description": 

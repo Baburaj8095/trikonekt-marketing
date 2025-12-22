@@ -1069,54 +1069,58 @@ const RegisterV2 = () => {
     }
 
     try {
+      const submittedPassword = formData.password;
       if (category === "business") {
-        const brPayload = {
-          full_name: formData.full_name || "",
-          email: formData.email || "",
-          phone: formData.phone || "",
-          business_name: formData.business_name || "",
-          business_category: formData.business_category || "",
-          address: formData.address || "",
-          sponsor_id: sponsorId || "",
-          country: selectedCountry || null,
-          state: selectedState || null,
-          city: cityId ?? (selectedCityId && /^\d+$/.test(String(selectedCityId)) ? Number(selectedCityId) : null),
-          pincode,
-          country_name: geoCountryName || "",
-          state_name: geoStateName || "",
-          city_name: geoCityName || "",
-        };
-        await API.post("/business/register/", brPayload);
-        setSuccessMsg("Business registration submitted successfully. Admin will review and forward it to the concerned agency. Business login is disabled.");
-        // Reset fields
-        setFormData({
-          password: "",
-          email: "",
-          full_name: "",
-          phone: "",
-          business_name: "",
-          business_category: "",
-          address: "",
-        });
+        // 1) Create login-enabled Business user via Accounts API (same flow as agency/consumer)
+        const resp = await API.post("/accounts/register/", payload);
+        const data = resp?.data || {};
+        const uname = data.username || "(generated)";
+
+        // 2) Fire-and-forget: also persist business profile for admin workflow
+        (async () => {
+          try {
+            const brPayload = {
+              full_name: formData.full_name || "",
+              email: formData.email || "",
+              phone: formData.phone || "",
+              business_name: formData.business_name || "",
+              business_category: formData.business_category || "",
+              address: formData.address || "",
+              sponsor_id: sponsorId || "",
+              country: selectedCountry || null,
+              state: selectedState || null,
+              city: cityId ?? (selectedCityId && /^\d+$/.test(String(selectedCityId)) ? Number(selectedCityId) : null),
+              pincode,
+              country_name: geoCountryName || "",
+              state_name: geoStateName || "",
+              city_name: geoCityName || "",
+            };
+            await API.post("/business/register/", brPayload);
+          } catch (_) {}
+        })();
+
+        // Success dialog like Agency/Consumer
+        setSuccessMsg(`Welcome to Trikonekt!\nUsername: ${uname}\nPassword: ${submittedPassword}`);
+        setRegSuccessText({ username: uname, password: submittedPassword });
+        setRegSuccessOpen(true);
       } else {
-        const submittedPassword = formData.password;
         const resp = await API.post("/accounts/register/", payload);
         const data = resp?.data || {};
         const uname = data.username || "(generated)";
         setSuccessMsg(`Welcome to Trikonekt!\nUsername: ${uname}\nPassword: ${submittedPassword}`);
         setRegSuccessText({ username: uname, password: submittedPassword });
         setRegSuccessOpen(true);
-        // Prefill username into login later; here only reset form inputs
-        setFormData({
-          password: "",
-          email: "",
-          full_name: "",
-          phone: "",
-          business_name: "",
-          business_category: "",
-          address: "",
-        });
       }
+      // Reset fields (common)
+      setFormData({
+        password: "",
+        email: "",
+        full_name: "",
+        phone: "",
+        business_name: "",
+        business_category: "",
+        address: "",
+      });
       setConfirmPassword("");
       setSelectedCountry("");
       setSelectedState("");

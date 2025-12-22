@@ -133,56 +133,72 @@ export default function AppHub() {
         {apps.map((app, index) => (
           <Grid
             item
-            xs={3.5}
+            xs={4}
             sm={2.4}
+            md={2}
             key={index}
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              textAlign: "center",
-            }}
+            sx={{ display: "flex", justifyContent: "center" }}
           >
-            <Tooltip title={app.name} arrow>
-              <IconButton
-                onClick={() => handleAppClick(app)}
-                sx={{
-                  width: 65,
-                  height: 65,
-                  borderRadius: "50%",
-                  backgroundColor: "#fff",
-                  boxShadow: 3,
-                  p: 1.5,
-                  transition: "transform 0.2s",
-                  "&:hover": { transform: "scale(1.05)" },
-                }}
-              >
-                <Box
-                  component="img"
-                  src={app.icon}
-                  alt={app.name}
-                  sx={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "contain",
-                  }}
-                  onError={(e) => {
-                    e.target.src = "https://cdn-icons-png.flaticon.com/512/5968/5968705.png"; // fallback icon
-                  }}
-                />
-              </IconButton>
-            </Tooltip>
-            <Typography
-              variant="caption"
+            <Box
+              role="button"
+              tabIndex={0}
+              onClick={() => handleAppClick(app)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  handleAppClick(app);
+                }
+              }}
               sx={{
-                mt: 1,
-                color: "text.primary",
-                fontWeight: 500,
-                fontSize: { xs: "0.75rem", sm: "0.8rem" },
+                width: { xs: 110, sm: 120, md: 130 },
+                height: { xs: 120, sm: 130, md: 140 },
+                borderRadius: 2,
+                border: "1px solid",
+                borderColor: "divider",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: "#fff",
+                boxShadow: 1,
+                cursor: "pointer",
+                userSelect: "none",
+                transition: "transform 120ms ease, box-shadow 120ms ease",
+                "&:hover": { transform: { sm: "translateY(-2px)" }, boxShadow: 4 },
               }}
             >
-              {app.name}
-            </Typography>
+              <Box
+                component="img"
+                src={app.icon}
+                alt={app.name}
+                sx={{
+                  width: 56,
+                  height: 56,
+                  objectFit: "contain",
+                }}
+                onError={(e) => {
+                  e.currentTarget.src = "https://cdn-icons-png.flaticon.com/512/5968/5968705.png";
+                }}
+              />
+              <Typography
+                variant="caption"
+                sx={{
+                  mt: 1,
+                  px: 1,
+                  color: "text.primary",
+                  fontWeight: 600,
+                  textAlign: "center",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                  lineHeight: 1.2,
+                  fontSize: { xs: "0.75rem", sm: "0.8rem" },
+                }}
+              >
+                {app.name}
+              </Typography>
+            </Box>
           </Grid>
         ))}
       </Grid>

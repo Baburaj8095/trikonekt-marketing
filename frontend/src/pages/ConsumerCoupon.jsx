@@ -20,11 +20,15 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Tabs,
+  Tab,
   Chip,
 } from "@mui/material";
 import API from "../api/api";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import ClubHeader from "../components/ecoupon/ClubHeader";
+import ECouponStore from "./ECouponStore";
 
 const CHANNELS = [
   { value: "e_coupon", label: "E-Coupon" },
@@ -95,6 +99,8 @@ export default function ConsumerCoupon() {
     error: "",
     submitting: false,
   });
+
+  const [activeTab, setActiveTab] = useState("summary");
 
   // Transfer dialog (consumer -> consumer)
   const [transferDialog, setTransferDialog] = useState({
@@ -302,7 +308,9 @@ export default function ConsumerCoupon() {
     if (!code?.id) return;
     const codeId = code.id;
     const denom = Number(code?.value) || 150;
-    const t = denom <= 50 ? "50" : "150";
+    let t = "150";
+    if (denom <= 50) t = "50";
+    else if (Math.abs(denom - 759) < 0.01 || Math.abs(denom - 750) < 0.01) t = "759";
     try {
       setActivateCodeBusy((m) => ({ ...m, [codeId]: true }));
       const src = {
@@ -464,14 +472,134 @@ export default function ConsumerCoupon() {
 
   return (
     <Container maxWidth="md" sx={{ px: { xs: 0, md: 2 }, py: { xs: 1, md: 2 } }}>
+      <ClubHeader />
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2, flexWrap: "wrap", gap: 1 }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>
-          Coupon Actions
+          My E‑Coupons
         </Typography>
         <Typography variant="caption" color="text.secondary">
           {displayName}
         </Typography>
       </Box>
+
+      <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", mb: 2, border: "1px solid #e2e8f0" }}>
+        <Tabs
+          value={activeTab}
+          onChange={(e, val) => setActiveTab(val)}
+          variant="scrollable"
+          allowScrollButtonsMobile
+          textColor="primary"
+          indicatorColor="primary"
+        >
+          <Tab label="E‑Coupon Store" value="store" />
+          <Tab label="Manual Lucky Coupon" value="manual" />
+          <Tab label="Coupon Summary" value="summary" />
+        </Tabs>
+      </Box>
+
+      {activeTab === "store" ? (
+        <Box sx={{ mb: 2 }}>
+          <ECouponStore />
+        </Box>
+      ) : null}
+
+      {activeTab === "manual" ? (
+        <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mb: 2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
+            Manual Lucky Coupon
+          </Typography>
+          <Box component="form" onSubmit={submitManual}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Coupon Code"
+                  value={manual.coupon_code}
+                  onChange={(e) => onManualChange("coupon_code", e.target.value)}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="TR Username"
+                    value={manual.tr_username}
+                    onChange={(e) => onManualChange("tr_username", e.target.value)}
+                    onBlur={resolveTR}
+                    required
+                  />
+                  <Button variant="outlined" size="small" onClick={resolveTR} disabled={manual.resolving}>
+                    {manual.resolving ? "Checking..." : "Check"}
+                  </Button>
+                </Stack>
+              </Grid>
+              {manual.error ? (
+                <Grid item xs={12}>
+                  <Alert severity="error">{manual.error}</Alert>
+                </Grid>
+              ) : null}
+              {manual.resolved ? (
+                <Grid item xs={12}>
+                  <Box sx={{ p: 1, border: "1px solid #eee", borderRadius: 1 }}>
+                    <Typography variant="body2"><strong>Username:</strong> {manual.resolved.username}</Typography>
+                    <Typography variant="body2"><strong>Name:</strong> {manual.resolved.full_name || "-"}</Typography>
+                    <Typography variant="body2"><strong>Pincode:</strong> {manual.resolved.pincode || "-"}</Typography>
+                  </Box>
+                </Grid>
+              ) : null}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Consumer TR Username"
+                  value={manual.consumer_tr_username}
+                  onChange={(e) => onManualChange("consumer_tr_username", e.target.value)}
+                  helperText="Your username will be sent as Consumer TR."
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Button
+                  component="label"
+                  variant="outlined"
+                  size="small"
+                >
+                  {manual.file ? "Change File" : "Attach File (optional)"}
+                  <input
+                    type="file"
+                    hidden
+                    onChange={(e) => onManualChange("file", e.target.files && e.target.files[0] ? e.target.files[0] : null)}
+                    accept="image/*,application/pdf"
+                  />
+                </Button>
+                {manual.file ? (
+                  <Typography variant="caption" sx={{ ml: 1 }}>{manual.file.name}</Typography>
+                ) : null}
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Notes (optional)"
+                  value={manual.notes}
+                  onChange={(e) => onManualChange("notes", e.target.value)}
+                  multiline
+                  minRows={2}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <Stack direction="row" spacing={1} justifyContent="flex-end">
+                  <Button type="submit" variant="contained" disabled={manual.submitting} sx={{ backgroundColor: "#145DA0", "&:hover": { backgroundColor: "#0C4B82" } }}>
+                    {manual.submitting ? "Submitting..." : "Submit"}
+                  </Button>
+                </Stack>
+              </Grid>
+            </Grid>
+          </Box>
+        </Paper>
+      ) : null}
 
       {walletMsg ? <Alert severity="success" sx={{ mb: 2 }}>{walletMsg}</Alert> : null}
 
@@ -685,6 +813,8 @@ export default function ConsumerCoupon() {
         </Box>
       </Paper> */}
 
+      {activeTab === "summary" && (
+        <>
       {/* My E-Coupon Summary */}
       <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mb: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
@@ -695,6 +825,7 @@ export default function ConsumerCoupon() {
         ) : errorSummary ? (
           <Alert severity="error">{errorSummary}</Alert>
         ) : mySummary ? (
+          <>
           <Grid container spacing={2} sx={{
            
             '@media (max-width:600px)': {
@@ -756,6 +887,29 @@ export default function ConsumerCoupon() {
               </Box>
             </Grid>
           </Grid>
+          {mySummary.by_value ? (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#0C2D48", mb: 1 }}>
+                By Denomination
+              </Typography>
+              <Grid container spacing={2}>
+                {Object.entries(mySummary.by_value).map(([v, ent]) => (
+                  <Grid item xs={12} sm={6} md={4} key={v}>
+                    <Box sx={{ p: 2, borderRadius: 2, border: "1px solid #e2e8f0", bgcolor: "#fff" }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>₹{v}</Typography>
+                      <Stack direction="row" spacing={1} flexWrap="wrap">
+                        <Chip size="small" label={`Avail ${ent.available ?? 0}`} color="primary" variant="outlined" />
+                        <Chip size="small" label={`Act ${ent.activated ?? 0}`} color="success" variant="outlined" />
+                        <Chip size="small" label={`Red ${ent.redeemed ?? 0}`} color="error" variant="outlined" />
+                        <Chip size="small" label={`Trans ${ent.transferred ?? 0}`} color="info" variant="outlined" />
+                      </Stack>
+                    </Box>
+                  </Grid>
+                ))}
+              </Grid>
+            </Box>
+          ) : null}
+          </>
         ) : (
           <Typography variant="body2" color="text.secondary">No data.</Typography>
         )}
@@ -961,6 +1115,8 @@ export default function ConsumerCoupon() {
           </>
         )}
       </Paper>
+        </>
+      )}
 
       {/* <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>

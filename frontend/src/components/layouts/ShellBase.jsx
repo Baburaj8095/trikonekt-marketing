@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import NotificationsBell from "../NotificationsBell";
 
 /**
  * ShellBase
@@ -21,6 +22,7 @@ export default function ShellBase({
   isActive,
   onLogout,
   footerText,
+  rightHeaderContent,
   children,
 }) {
   const loc = useLocation();
@@ -33,6 +35,8 @@ export default function ShellBase({
   const [sidebarOpen, setSidebarOpen] = useState(
     typeof window !== "undefined" ? window.innerWidth >= 1024 : true
   );
+  // Collapsible sections state (e.g. "My E‑Coupon Club")
+  const [openSections, setOpenSections] = useState({});
 
   useEffect(() => {
     function onResize() {
@@ -175,6 +179,12 @@ export default function ShellBase({
             <polyline points="14 2 14 8 20 8" />
           </svg>
         );
+      case "star":
+        return (
+          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polygon points="12 2 15 8.5 22 9.5 17 14 18.5 21 12 17.5 5.5 21 7 14 2 9.5 9 8.5" />
+          </svg>
+        );
       default:
         return null;
     }
@@ -195,6 +205,7 @@ export default function ShellBase({
           textDecoration: "none",
           background: active ? "rgba(14,165,233,0.12)" : "transparent",
           border: active ? "1px solid rgba(14,165,233,0.35)" : "1px solid transparent",
+          cursor: "pointer"
         }}
         onClick={() => {
           if (isMobile) setSidebarOpen(false);
@@ -254,8 +265,12 @@ export default function ShellBase({
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
               <span style={{ fontWeight: 900, color: "#0f172a", fontSize: 18 }}>{title}</span>
               <span style={{ color: "#64748b", fontSize: 12 }}>Dashboard</span>
-            </div>
           </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {rightHeaderContent ? <div>{rightHeaderContent}</div> : null}
+            <NotificationsBell />
+          </div>
+        </div>
         </div>
       ) : null}
 
@@ -301,9 +316,126 @@ export default function ShellBase({
                 {title} Menu
               </div>
 
-              {menu.map((it) => (
-                <NavLink key={it.to} to={it.to} label={it.label} icon={it.icon} />
-              ))}
+              {(() => {
+                const nodes = [];
+                for (let i = 0; i < menu.length; i++) {
+                  const it = menu[i];
+                  // Start of a section group
+                  if (it?.type === "section" || it?.section) {
+                    const label = it.label || it.section;
+                    const to = it.to;
+                    const secIcon = it.icon;
+                    // Collect children until next section (optional grouping)
+                    const groupChildren = it?.groupChildren !== false;
+                    const children = [];
+                    let j = i + 1;
+                    if (groupChildren) {
+                      for (; j < menu.length; j++) {
+                        const nxt = menu[j];
+                        if (nxt?.type === "section" || nxt?.section) break;
+                        children.push(nxt);
+                      }
+                      i = j - 1; // advance outer loop when grouping
+                    }
+
+                    const anyActive = children.some((c) => c?.to && activeCheck(c.to, loc));
+                    const collapsible = it?.collapsible !== false ? true : false;
+                    const open = collapsible ? ((openSections[label] ?? true) || anyActive) : true;
+
+                    nodes.push(
+                      <div key={`secwrap-${label}-${i}`} style={{ marginTop: 6 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            padding: "10px 8px",
+                            borderRadius: 8,
+                            color: "#cbd5e1",
+                            background: anyActive ? "rgba(14,165,233,0.08)" : "transparent",
+                            border: "1px solid",
+                            borderColor: anyActive ? "rgba(14,165,233,0.25)" : "transparent",
+                          }}
+                        >
+                          {to ? (
+                            <Link
+                              to={to}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                color: "inherit",
+                                textDecoration: "none",
+                                flex: 1,
+                                cursor: "pointer"
+                              }}
+                              onClick={() => {
+                                if (isMobile) setSidebarOpen(false);
+                              }}
+                              aria-label={`${label} section`}
+                              aria-expanded={open ? "true" : "false"}
+                            >
+                              {secIcon ? <Icon name={secIcon} active={anyActive} /> : null}
+                              <span style={{ fontWeight: 800, fontSize: 12, textTransform: "uppercase", letterSpacing: 0.6 }}>
+                                {label}
+                              </span>
+                            </Link>
+                          ) : (
+                            <>
+                              {secIcon ? <Icon name={secIcon} active={anyActive} /> : null}
+                              <span style={{ fontWeight: 800, fontSize: 12, textTransform: "uppercase", letterSpacing: 0.6 }}>
+                                {label}
+                              </span>
+                            </>
+                          )}
+                          {collapsible && children.length ? (
+                            <button
+                              aria-label={`Toggle ${label}`}
+                              onClick={() => setOpenSections((s) => ({ ...s, [label]: !open }))}
+                              style={{
+                                marginLeft: "auto",
+                                background: "transparent",
+                                border: "none",
+                                color: "#94a3b8",
+                                cursor: "pointer",
+                                fontSize: 14,
+                                lineHeight: 1,
+                              }}
+                            >
+                              {open ? "▾" : "▸"}
+                            </button>
+                          ) : null}
+                        </div>
+
+                        {open ? (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 6, paddingLeft: 8 }}>
+                            {children.map((c, cidx) => (
+                              <NavLink
+                                key={c.to || c.label || `c${cidx}`}
+                                to={c.to}
+                                label={c.label}
+                                icon={c.icon}
+                              />
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                    continue;
+                  }
+
+                  // Regular link
+                  nodes.push(
+                    <NavLink
+                      key={it.to || it.label || i}
+                      to={it.to}
+                      label={it.label}
+                      icon={it.icon}
+                    />
+                  );
+                }
+                return nodes;
+              })()}
 
               <div style={{ marginTop: 8, borderTop: "1px solid #0b1220" }} />
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "8px 4px" }}>
@@ -342,6 +474,12 @@ export default function ShellBase({
           }}
         >
           <div style={{ width: "100%", margin: "0 auto", maxWidth: 1400 }}>
+            {!isMobile ? (
+              <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                {rightHeaderContent ? <div>{rightHeaderContent}</div> : null}
+                <NotificationsBell />
+              </div>
+            ) : null}
             {children}
           </div>
         </main>

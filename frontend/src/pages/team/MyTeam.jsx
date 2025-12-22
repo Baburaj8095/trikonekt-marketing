@@ -14,6 +14,8 @@ import {
   TableRow,
   TableCell,
   TableBody,
+  Tabs,
+  Tab,
 } from "@mui/material";
 
 function StatCard({ title, value, subtitle }) {
@@ -39,20 +41,66 @@ function StatCard({ title, value, subtitle }) {
 export default function MyTeam() {
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
+  const initialTab = () => {
+    try {
+      const r =
+        localStorage.getItem("role") ||
+        sessionStorage.getItem("role") ||
+        localStorage.getItem("role_user") ||
+        sessionStorage.getItem("role_user") ||
+        "";
+      return String(r).toLowerCase() === "user" ? "direct" : "consumer";
+    } catch {
+      return "consumer";
+    }
+  };
+  const [tab, setTab] = useState(initialTab); // "consumer" | "agency" | "employee" | "merchant" | "levels" | "tree"
 
   const role = useMemo(() => {
     try {
-      return localStorage.getItem("role") || sessionStorage.getItem("role") || "";
+      // Keep legacy keys for backward compatibility
+      return (
+        localStorage.getItem("role") ||
+        sessionStorage.getItem("role") ||
+        localStorage.getItem("role_user") ||
+        sessionStorage.getItem("role_user") ||
+        ""
+      );
     } catch {
       return "";
     }
   }, []);
 
+  // Show limited tabs for user dashboard (My Direct, My Level Team, Tree)
+  const isUser = String(role).toLowerCase() === "user";
+
+  // Build tabs list based on role and derive selected index/key to avoid invalid value warnings
+  const tabsList = isUser
+    ? [
+        { key: "direct", label: "My Direct" },
+        { key: "levels", label: "My Level Team" },
+        { key: "tree", label: "Tree" },
+      ]
+    : [
+        { key: "consumer", label: "My Consumer Direct" },
+        { key: "agency", label: "My Agency Direct" },
+        { key: "employee", label: "My Employee Direct" },
+        { key: "merchant", label: "My Merchant Direct" },
+        { key: "levels", label: "My Level Team" },
+        { key: "tree", label: "Tree" },
+      ];
+  const selectedIndex = Math.max(0, tabsList.findIndex((t) => t.key === tab));
+  const tabsValue = tabsList[selectedIndex]?.key || tabsList[0].key;
+
+
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        const res = await API.get("/accounts/team/summary/", { cacheTTL: 10000, retryAttempts: 2 });
+        const res = await API.get("/accounts/team/summary/", {
+          cacheTTL: 10000,
+          retryAttempts: 2,
+        });
         if (!mounted) return;
         setData(res?.data || {});
         setErr("");
@@ -66,22 +114,18 @@ export default function MyTeam() {
     };
   }, []);
 
-
   const down = data?.downline || {};
   const levels = down?.levels || {};
-  const totals = data?.totals || {};
-  const matrix = Array.isArray(data?.matrix_progress) ? data.matrix_progress : [];
   const genBreakdown = data?.generation_levels_breakdown || {};
-  const commSplit = data?.commissions_split || {};
-  const recentTeam = Array.isArray(data?.recent_team) ? data.recent_team : [];
-  const recentTx = Array.isArray(data?.recent_transactions) ? data.recent_transactions : [];
   const directTeam = Array.isArray(data?.direct_team) ? data.direct_team : [];
   const directCounts = data?.direct_team_counts || { active: 0, inactive: 0 };
 
   // Role breakdown within my direct referrals
   const roleCounts = useMemo(() => {
     const arr = Array.isArray(directTeam) ? directTeam : [];
-    let user = 0, employee = 0, agency = 0;
+    let user = 0,
+      employee = 0,
+      agency = 0;
     for (const m of arr) {
       const r = String(m?.role || "").toLowerCase();
       const c = String(m?.category || "").toLowerCase();
@@ -92,6 +136,45 @@ export default function MyTeam() {
     return { user, employee, agency };
   }, [directTeam]);
 
+  // Filter current direct team by active tab
+  const currentDirectTeam = useMemo(() => {
+    const arr = Array.isArray(directTeam) ? directTeam : [];
+    const cat = (x) => String(x?.category || "").toLowerCase();
+    const roleOf = (x) => String(x?.role || "").toLowerCase();
+    if (tabsValue === "consumer") return arr.filter((m) => cat(m) === "consumer" || roleOf(m) === "user");
+    if (tabsValue === "agency") return arr.filter((m) => roleOf(m) === "agency" || cat(m).startsWith("agency"));
+    if (tabsValue === "employee") return arr.filter((m) => roleOf(m) === "employee" || cat(m) === "employee");
+    if (tabsValue === "merchant") return arr.filter((m) => roleOf(m) === "business" || cat(m) === "merchant");
+    return arr;
+  }, [directTeam, tabsValue]);
+
+  // Level rows: merge counts from downline.levels and generation_levels_breakdown
+  const levelRows = useMemo(() => {
+    const keys = new Set([
+      ...Object.keys(levels || {}),
+      ...Object.keys(genBreakdown || {}),
+    ]);
+    const numericKeys = Array.from(keys)
+      .map((k) => parseInt(k, 10))
+      .filter((n) => !Number.isNaN(n))
+      .sort((a, b) => a - b);
+    return numericKeys.map((lvl) => {
+      const k = String(lvl);
+      const gb = genBreakdown?.[k] || {};
+      const total =
+        typeof levels?.[k] === "number"
+          ? levels[k]
+          : typeof gb.count === "number"
+          ? gb.count
+          : (gb.active || 0) + (gb.inactive || 0);
+      return {
+        level: lvl,
+        total: Math.max(0, total || 0),
+        active: Math.max(0, gb.active || 0),
+        inactive: Math.max(0, gb.inactive || 0),
+      };
+    });
+  }, [levels, genBreakdown]);
 
   const maskTRUsername = (username) => {
     if (typeof username !== "string") return username;
@@ -110,14 +193,12 @@ export default function MyTeam() {
     <Box sx={{ p: { xs: 0, md: 0 } }}>
       <Box sx={{ mb: 2 }}>
         <Typography variant="h5" sx={{ fontWeight: 700 }}>
-          My Team
+          Genealogy
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          View downline counts, earnings by category, matrix progress and recent activity.
+          View My Directs, Level chart and Tree.
         </Typography>
-        {role ? (
-          <Chip size="small" label={`Role: ${role}`} sx={{ mt: 1 }} />
-        ) : null}
+        {role ? <Chip size="small" label={`Role: ${role}`} sx={{ mt: 1 }} /> : null}
       </Box>
 
       {err ? (
@@ -126,230 +207,210 @@ export default function MyTeam() {
         </Typography>
       ) : null}
 
-      <Grid container spacing={2}>
-        {/* Downline cards */}
-        <Grid item xs={12} md={4}>
-          <StatCard title="Direct Referrals" value={String(down?.direct ?? directTeam.length ?? 0)} />
-        </Grid>
-        <Grid item xs={6} md={4}>
-          <StatCard title="Active" value={String(directCounts.active ?? 0)} />
-        </Grid>
-        <Grid item xs={6} md={4}>
-          <StatCard title="Inactive" value={String(directCounts.inactive ?? 0)} />
-        </Grid>
+      {/* Top tabs */}
+      <Box
+        sx={{
+          border: "1px solid #e2e8f0",
+          borderRadius: 2,
+          bgcolor: "#fff",
+          mb: 2,
+        }}
+      >
+        <Tabs
+          value={selectedIndex}
+          onChange={(e, idx) => setTab(tabsList[idx]?.key || tabsList[0].key)}
+          variant="scrollable"
+          allowScrollButtonsMobile
+          textColor="primary"
+          indicatorColor="primary"
+        >
+          {tabsList.map((t) => (
+            <Tab key={t.key} label={t.label} />
+          ))}
+        </Tabs>
+      </Box>
 
-        {/* Role breakdown (direct referrals) */}
-        <Grid item xs={6} md={4}>
-          <StatCard title="Users" value={String(roleCounts.user ?? 0)} />
-        </Grid>
-        <Grid item xs={6} md={4}>
-          <StatCard title="Employees" value={String(roleCounts.employee ?? 0)} />
-        </Grid>
-        <Grid item xs={6} md={4}>
-          <StatCard title="Agencies" value={String(roleCounts.agency ?? 0)} />
-        </Grid>
+      {/* My Directs (filtered by tab) */}
+      {["consumer","agency","employee","merchant","direct"].includes(tabsValue) ? (
+        <Box>
+          <Grid container spacing={2} sx={{ mb: 1 }}>
+            {/* Downline cards */}
+            <Grid item xs={12} md={4}>
+              <StatCard
+                title="Direct Referrals"
+                value={String(currentDirectTeam.length ?? 0)}
+              />
+            </Grid>
+            <Grid item xs={6} md={4}>
+              <StatCard title="Active" value={String(directCounts.active ?? 0)} />
+            </Grid>
+            <Grid item xs={6} md={4}>
+              <StatCard
+                title="Inactive"
+                value={String(directCounts.inactive ?? 0)}
+              />
+            </Grid>
 
-        {/* Earnings Totals */}
-        
+            {/* Role breakdown (direct referrals) */}
+            <Grid item xs={6} md={4}>
+              <StatCard title="Users" value={String(roleCounts.user ?? 0)} />
+            </Grid>
+            <Grid item xs={6} md={4}>
+              <StatCard
+                title="Employees"
+                value={String(roleCounts.employee ?? 0)}
+              />
+            </Grid>
+            <Grid item xs={6} md={4}>
+              <StatCard
+                title="Agencies"
+                value={String(roleCounts.agency ?? 0)}
+              />
+            </Grid>
+          </Grid>
 
-        {/* Matrix Progress */}
-        {/* <Grid item xs={12}>
-          <Card variant="outlined">
-            <CardContent>
-              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                Matrix Progress
-              </Typography>
-              <Divider sx={{ mb: 2 }} />
-              {matrix.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">
-                  No matrix progress yet.
-                </Typography>
-              ) : (
-                <Grid container spacing={2}>
-                  {matrix.map((m, idx) => (
-                    <Grid item xs={12} md={6} key={idx}>
-                      <Card variant="outlined">
-                        <CardContent>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                            {m.pool_type}
-                          </Typography>
-                          <Stack direction="row" spacing={2} sx={{ mt: 1, mb: 1 }}>
-                            <Chip size="small" label={`Total Earned: ₹${m.total_earned}`} />
-                            <Chip size="small" label={`Level Reached: ${m.level_reached}`} />
-                          </Stack>
-                          <Typography variant="caption" color="text.secondary">
-                            Updated: {m.updated_at}
-                          </Typography>
-
-                          <Box sx={{ mt: 2 }}>
-                            <Typography variant="subtitle2">Per Level Counts</Typography>
-                            <Table size="small">
-                              <TableHead>
-                                <TableRow>
-                                  <TableCell>Level</TableCell>
-                                  <TableCell align="right">Count</TableCell>
-                                  <TableCell align="right">Earned (₹)</TableCell>
-                                </TableRow>
-                              </TableHead>
-                              <TableBody>
-                                {Object.keys(m.per_level_counts || {}).sort((a, b) => parseInt(a) - parseInt(b)).map((levelKey) => (
-                                  <TableRow key={levelKey}>
-                                    <TableCell>{levelKey}</TableCell>
-                                    <TableCell align="right">{m.per_level_counts[levelKey]}</TableCell>
-                                    <TableCell align="right">{(m.per_level_earned || {})[levelKey] || "0"}</TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </Box>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                  ))}
-                </Grid>
-              )}
-            </CardContent>
-          </Card>
-        </Grid> */}
-
-        {/* My Direct Referrals */}
-        <Grid item xs={12}>
           <Card variant="outlined">
             <CardContent>
               <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
                 My Direct Referrals
               </Typography>
               <Divider sx={{ mb: 1 }} />
-              {directTeam.length === 0 ? (
+              {currentDirectTeam.length === 0 ? (
                 <Typography variant="body2" color="text.secondary">
                   No direct referrals.
                 </Typography>
               ) : (
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>User</TableCell>
-                      <TableCell>Phone</TableCell>
-                      <TableCell>Pincode</TableCell>
-                      <TableCell>Status</TableCell>
-                      <TableCell>Role</TableCell>
-                      <TableCell>Category</TableCell>
-                      <TableCell>Joined</TableCell>
-                      <TableCell align="right">Direct Team</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {directTeam.map((m) => (
-                      <TableRow key={m.id}>
-                        <TableCell>{maskTRUsername(m.username)}</TableCell>
-                        <TableCell>{m.phone || "-"}</TableCell>
-                        <TableCell>{m.pincode || "-"}</TableCell>
-                        <TableCell>
-                          <Chip
-                            size="small"
-                            label={m.account_active ? "Active" : "Inactive"}
-                            color={m.account_active ? "success" : "default"}
-                          />
-                        </TableCell>
-                        <TableCell>{m.role || "-"}</TableCell>
-                        <TableCell>{m.category || "-"}</TableCell>
-                        <TableCell>{m.date_joined || "-"}</TableCell>
-                        <TableCell align="right">{m.direct_referrals ?? 0}</TableCell>
+                <Box sx={{ width: "100%", overflowX: "auto" }}>
+                  <Table size="small" sx={{ minWidth: 720 }}>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>User</TableCell>
+                        <TableCell>Phone</TableCell>
+                        <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Pincode</TableCell>
+                        <TableCell>Status</TableCell>
+                        <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Role</TableCell>
+                        <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Category</TableCell>
+                        <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Joined</TableCell>
+                        <TableCell align="right">Direct Team</TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHead>
+                    <TableBody>
+                      {currentDirectTeam.map((m) => (
+                        <TableRow key={m.id}>
+                          <TableCell>{maskTRUsername(m.username)}</TableCell>
+                          <TableCell>{m.phone || "-"}</TableCell>
+                          <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{m.pincode || "-"}</TableCell>
+                          <TableCell>
+                            <Chip
+                              size="small"
+                              label={m.account_active ? "Active" : "Inactive"}
+                              color={m.account_active ? "success" : "default"}
+                            />
+                          </TableCell>
+                          <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{m.role || "-"}</TableCell>
+                          <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{m.category || "-"}</TableCell>
+                          <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{m.date_joined || "-"}</TableCell>
+                          <TableCell align="right">{m.direct_referrals ?? 0}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Box>
               )}
             </CardContent>
           </Card>
-        </Grid>
+        </Box>
+      ) : null}
 
-        {/* Geneology */}
-        <Grid item xs={12}>
-          <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, background: "#f8fafc", padding: 12 }}>
+      {/* My Level Chart */}
+      {tabsValue === "levels" ? (
+        <Card variant="outlined">
+          <CardContent>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+              My Level Team
+            </Typography>
+            <Divider sx={{ mb: 1 }} />
+            {levelRows.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No level distribution available yet.
+              </Typography>
+            ) : (
+              <Box sx={{ width: "100%", overflowX: "auto" }}>
+                <Table size="small" sx={{ minWidth: 560 }}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Level</TableCell>
+                      <TableCell align="right">Total</TableCell>
+                      <TableCell align="right">Active</TableCell>
+                      <TableCell align="right">Inactive</TableCell>
+                      <TableCell>Distribution</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {levelRows.map((r) => {
+                    const total = Math.max(1, r.total || 0);
+                    const activePct = Math.min(100, Math.round((r.active / total) * 100));
+                    const inactivePct = Math.min(
+                      100,
+                      Math.max(0, 100 - activePct)
+                    );
+                    return (
+                      <TableRow key={r.level}>
+                        <TableCell>{r.level}</TableCell>
+                        <TableCell align="right">{r.total}</TableCell>
+                        <TableCell align="right">{r.active}</TableCell>
+                        <TableCell align="right">{r.inactive}</TableCell>
+                        <TableCell>
+                          <Box
+                            sx={{
+                              width: 220,
+                              height: 10,
+                              borderRadius: 5,
+                              overflow: "hidden",
+                              display: "flex",
+                              bgcolor: "#e2e8f0",
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                width: `${activePct}%`,
+                                bgcolor: "#16a34a",
+                              }}
+                            />
+                            <Box
+                              sx={{
+                                width: `${inactivePct}%`,
+                                bgcolor: "#94a3b8",
+                              }}
+                            />
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </Box>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* Tree */}
+      {tabsValue === "tree" ? (
+        <Box sx={{ mt: 2 }}>
+          <div
+            style={{
+              border: "1px solid #e2e8f0",
+              borderRadius: 10,
+              background: "#f8fafc",
+              padding: 12,
+            }}
+          >
             <TreeReferralGalaxy mode="self" />
           </div>
-        </Grid>
-
-        {/* Recent Team & Transactions */}
-        {/* <Grid item xs={12} md={6}>
-          <Card variant="outlined">
-            <CardContent>
-              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                Recent Team Members
-              </Typography>
-              <Divider sx={{ mb: 1 }} />
-              {recentTeam.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">
-                  No recent members.
-                </Typography>
-              ) : (
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>User</TableCell>
-                      <TableCell>Category</TableCell>
-                      <TableCell>Role</TableCell>
-                      <TableCell>Joined</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {recentTeam.map((r) => (
-                      <TableRow key={r.id}>
-                        <TableCell>{maskTRUsername(r.username)}</TableCell>
-                        <TableCell>{r.category}</TableCell>
-                        <TableCell>{r.role}</TableCell>
-                        <TableCell>{r.date_joined}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </Grid> */}
-
-        {/* <Grid item xs={12} md={6}>
-          <Card variant="outlined">
-            <CardContent>
-              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                Recent Reward Transactions
-              </Typography>
-              <Divider sx={{ mb: 1 }} />
-              {recentTx.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">
-                  No recent transactions.
-                </Typography>
-              ) : (
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Type</TableCell>
-                      <TableCell align="right">Amount (₹)</TableCell>
-                      <TableCell>Source</TableCell>
-                      <TableCell>Created</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {recentTx.map((t) => (
-                      <TableRow key={t.id}>
-                        <TableCell>{t.type}</TableCell>
-                        <TableCell align="right">{t.amount}</TableCell>
-                        <TableCell>
-                          <Typography variant="caption" display="block">
-                            {t.source_type || "-"}:{t.source_id || "-"}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>{t.created_at}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </Grid> */}
-      </Grid>
+        </Box>
+      ) : null}
     </Box>
   );
 }

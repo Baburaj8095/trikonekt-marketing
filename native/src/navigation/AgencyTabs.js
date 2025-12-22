@@ -2,11 +2,23 @@ import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import AgencyDashboard from '../screens/AgencyDashboard';
 import AgencyProductsScreen from '../screens/agency/ProductsScreen';
+import AgencyPrimePackageScreen from '../screens/agency/PrimePackageScreen';
 
 const Tab = createBottomTabNavigator();
+const HomeStack = createNativeStackNavigator();
+
+function HomeStackScreen() {
+  return (
+    <HomeStack.Navigator screenOptions={{ headerShown: false }}>
+      <HomeStack.Screen name="AgencyDashboard" component={AgencyDashboard} />
+      <HomeStack.Screen name="AgencyPrimePackage" component={AgencyPrimePackageScreen} />
+    </HomeStack.Navigator>
+  );
+}
 
 function Placeholder({ title, desc }) {
   return (
@@ -88,7 +100,7 @@ export default function AgencyTabs() {
     >
       <Tab.Screen
         name="Home"
-        component={AgencyDashboard}
+        component={HomeStackScreen}
         options={({ navigation }) => ({
           headerRight: () => <LogoutButton navigation={navigation} />,
           title: 'Agency',

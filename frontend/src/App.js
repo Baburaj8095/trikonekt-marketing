@@ -40,6 +40,7 @@ import AdminMatrixThree from "./pages/admin/AdminMatrixThree";
 import AdminAutopool from "./pages/admin/AdminAutopool";
 import AdminECoupons from "./pages/admin/AdminECoupons";
 import AdminPayments from "./pages/admin/AdminPayments";
+import AdminAgencyPrimeRequests from "./pages/admin/AdminAgencyPrimeRequests";
 import AdminProducts from "./pages/admin/AdminProducts";
 import AdminBanners from "./pages/admin/AdminBanners";
 import AdminOrders from "./pages/admin/AdminOrders";
@@ -55,6 +56,7 @@ import AdminLuckyDraw from "./pages/admin/AdminLuckyDraw";
 import AdminLevelCommission from "./pages/admin/AdminLevelCommission";
 import AdminMatrixCommission from "./pages/admin/AdminMatrixCommission";
 import AdminCommissionHistory from "./pages/admin/AdminCommissionHistory";
+import AdminCommissionDistribute from "./pages/admin/AdminCommissionDistribute";
 import Profile from "./pages/Profile";
 import RoleSelect from "./pages/Auth/RoleSelect";
 import ReferAndEarnPage from "./pages/ReferAndEarn";
@@ -67,9 +69,11 @@ import UsersPage from "./admin-panel/examples/UsersPage";
 import ProductPage from "./admin-panel/examples/ProductPage";
 import Support from "./pages/Support";
 import AdminSupport from "./pages/admin/AdminSupport";
+import AdminNotifications from "./pages/admin/AdminNotifications";
 import ImpersonateLanding from "./pages/Auth/ImpersonateLanding";
 import ECouponStore from "./pages/ECouponStore";
 import PromoPackages from "./pages/PromoPackages";
+import PromoProducts from "./pages/PromoProducts";
 import TrikonektProducts from "./pages/TrikonektProducts";
 import AgencyMarketplace from "./pages/agency/AgencyMarketplace";
 import AdminRewardPoints from "./pages/admin/AdminRewardPoints";
@@ -78,6 +82,20 @@ import CheckoutV2 from "./pages/CheckoutV2";
 import CheckoutSuccess from "./pages/CheckoutSuccess";
 import RegisterV2 from "./pages/Auth/RegisterV2";
 import MyOrdersAll from "./pages/MyOrdersAll";
+import TriAppPage from "./pages/TriAppPage";
+import AdminTriAppManage from "./pages/admin/AdminTriAppManage";
+import BusinessShell from "./components/layouts/BusinessShell";
+import BusinessDashboard from "./pages/business/BusinessDashboard";
+import BusinessProfile from "./pages/business/BusinessProfile";
+import BusinessShops from "./pages/business/BusinessShops";
+import MerchantShops from "./pages/market/MerchantShops";
+import MerchantShopDetail from "./pages/market/MerchantShopDetail";
+import AgencyCoupons from "./pages/agency/AgencyCoupons";
+import AgencyPrimePackage from "./pages/agency/AgencyPrimePackage";
+import AgencyPrimeApproval from "./pages/agency/AgencyPrimeApproval";
+import AgencyWallet from "./pages/agency/AgencyWallet";
+import UserDashboardV2 from "./pages/UserDashboardV2";
+import UserDashboard2Shell from "./pages/v2/UserDashboard2Shell";
 
 function LegacyAuthEntry() {
   const location = useLocation();
@@ -132,6 +150,16 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        <Route
+          path="/user/dashboard2"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <UserDashboard2Shell />
+            </ProtectedRoute>
+          }
+        />
+
         <Route
           path="/user/lucky-draw"
           element={
@@ -253,6 +281,16 @@ function App() {
           }
         />
         <Route
+          path="/user/promo-products"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <PromoProducts />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/user/cart"
           element={
             <ProtectedRoute allowedRoles={["user"]}>
@@ -288,6 +326,28 @@ function App() {
             <ProtectedRoute allowedRoles={["user"]}>
               <ConsumerShell>
                 <MyOrdersAll />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        {/* Special TRI app: tri-local-store -> Merchant Shops listing */}
+        <Route
+          path="/user/tri/tri-local-store"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <MerchantShops />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        {/* Generic TRI apps by slug */}
+        <Route
+          path="/user/tri/:slug"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <TriAppPage />
               </ConsumerShell>
             </ProtectedRoute>
           }
@@ -353,7 +413,7 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["agency"]}>
               <AgencyShell>
-                <Wallet />
+                <AgencyWallet />
               </AgencyShell>
             </ProtectedRoute>
           }
@@ -374,6 +434,36 @@ function App() {
             <ProtectedRoute allowedRoles={["agency"]}>
               <AgencyShell>
                 <AgencyReferAndEarn />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agency/coupons"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <AgencyCoupons />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agency/prime-package"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <AgencyPrimePackage />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agency/prime-approval"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <AgencyPrimeApproval />
               </AgencyShell>
             </ProtectedRoute>
           }
@@ -580,6 +670,7 @@ function App() {
           }
         />
         {/* Trikonekt Products (Public + Consumer) */}
+        <Route path="/promo-products" element={<ConsumerShell><PromoProducts /></ConsumerShell>} />
         <Route path="/trikonekt-products" element={<ConsumerShell><TrikonektProducts /></ConsumerShell>} />
         <Route path="/trikonekt-products/products/:id" element={<ConsumerShell><ProductDetails /></ConsumerShell>} />
         {/* Agency Marketplace visible to consumers */}
@@ -607,6 +698,16 @@ function App() {
             <ProtectedRoute allowedRoles={["agency"]}>
               <AgencyShell>
                 <TrikonektProducts />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agency/promo-products"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <PromoProducts />
               </AgencyShell>
             </ProtectedRoute>
           }
@@ -658,6 +759,16 @@ function App() {
             <ProtectedRoute allowedRoles={["employee"]}>
               <EmployeeShell>
                 <TrikonektProducts />
+              </EmployeeShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee/promo-products"
+          element={
+            <ProtectedRoute allowedRoles={["employee"]}>
+              <EmployeeShell>
+                <PromoProducts />
               </EmployeeShell>
             </ProtectedRoute>
           }
@@ -785,6 +896,16 @@ function App() {
           }
         />
         <Route
+          path="/admin/agency-prime-requests"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminAgencyPrimeRequests />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/promo-purchases"
           element={
             <AdminProtectedRoute>
@@ -885,6 +1006,16 @@ function App() {
           }
         />
         <Route
+          path="/admin/notifications"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminNotifications />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/dashboard-cards"
           element={
             <AdminProtectedRoute>
@@ -935,6 +1066,16 @@ function App() {
           }
         />
         <Route
+          path="/admin/commissions/distribute"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminCommissionDistribute />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/commissions/history"
           element={
             <AdminProtectedRoute>
@@ -950,6 +1091,16 @@ function App() {
             <AdminProtectedRoute>
               <AdminShell>
                 <AdminRewardPoints />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/tri/:slug"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminTriAppManage />
               </AdminShell>
             </AdminProtectedRoute>
           }
@@ -995,6 +1146,52 @@ function App() {
             </AdminProtectedRoute>
           }
         />
+        {/* Business (Merchant) Routes */}
+        <Route
+          path="/business/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={["business"]}>
+              <BusinessShell>
+                <BusinessDashboard />
+              </BusinessShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/business/profile"
+          element={
+            <ProtectedRoute allowedRoles={["business"]}>
+              <BusinessShell>
+                <BusinessProfile />
+              </BusinessShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/business/shops"
+          element={
+            <ProtectedRoute allowedRoles={["business"]}>
+              <BusinessShell>
+                <BusinessShops />
+              </BusinessShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/business/support"
+          element={
+            <ProtectedRoute allowedRoles={["business"]}>
+              <BusinessShell>
+                <Support />
+              </BusinessShell>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Merchant Marketplace (Public) */}
+        <Route path="/merchant-marketplace" element={<ConsumerShell><MerchantShops /></ConsumerShell>} />
+        <Route path="/merchant-marketplace/shops/:id" element={<ConsumerShell><MerchantShopDetail /></ConsumerShell>} />
+
         {/* Catch-all route for unknown paths */}
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

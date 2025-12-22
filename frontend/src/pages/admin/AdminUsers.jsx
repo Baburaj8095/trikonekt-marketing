@@ -88,6 +88,7 @@ export default function AdminUsers() {
   const [selected, setSelected] = useState(null);
   const [tempPw, setTempPw] = useState({});
   const [apiErr, setApiErr] = useState("");
+  const [exporting, setExporting] = useState(false);
   // Packages drawer (agency-only)
   const [pkgOpen, setPkgOpen] = useState(false);
   const [pkgUser, setPkgUser] = useState(null);
@@ -673,14 +674,27 @@ export default function AdminUsers() {
         renderCell: (params) => {
           const row = params?.row || {};
           const active = !!row.account_active;
+          const r = String(row.role || "").toLowerCase();
+          const c = String(row.category || "").toLowerCase();
+          const isAgency = r === "agency" || c.startsWith("agency");
+
           const onToggle = async (e) => {
             e?.stopPropagation?.();
+            if (!row?.id) return;
+            if (isAgency) {
+              // For agencies, activation is driven by package payment.
+              // Open Packages panel to record payment instead of manual toggle.
+              setPkgUser({ id: row.id, username: row.username, full_name: row.full_name });
+              setPkgOpen(true);
+              return;
+            }
             try {
-              if (!row?.id) return;
               await API.patch(`/admin/users/${row.id}/`, { account_active: !active });
               setReloadKey((k) => k + 1);
             } catch (_) {}
           };
+
+          const disabled = isAgency;
           const trackStyle = {
             width: 44,
             height: isMobile ? 18 : 22,
@@ -688,10 +702,11 @@ export default function AdminUsers() {
             display: "inline-flex",
             alignItems: "center",
             padding: 2,
-            backgroundColor: active ? "#16a34a" : "#ef4444",
-            border: active ? "1px solid #15803d" : "1px solid #b91c1c",
-            cursor: "pointer",
-            transition: "background-color 120ms ease, border-color 120ms ease",
+            backgroundColor: disabled ? (active ? "#6ee7b7" : "#cbd5e1") : (active ? "#16a34a" : "#ef4444"),
+            border: disabled ? "1px solid #94a3b8" : (active ? "1px solid #15803d" : "1px solid #b91c1c"),
+            cursor: disabled ? "not-allowed" : "pointer",
+            opacity: disabled ? 0.8 : 1,
+            transition: "background-color 120ms ease, border-color 120ms ease, opacity 120ms ease",
           };
           const knobStyle = {
             width: isMobile ? 12 : 16,
@@ -701,14 +716,19 @@ export default function AdminUsers() {
             transform: active ? `translateX(${isMobile ? 22 : 24}px)` : "translateX(0px)",
             transition: "transform 120ms ease",
           };
+          const title = isAgency
+            ? (active ? "Active (set by package payment). Click to manage Packages." : "Inactive. Activate via Packages (record payment).")
+            : (active ? "Active" : "Inactive");
+
           return (
             <div
               role="switch"
               aria-checked={active}
+              aria-disabled={disabled}
               tabIndex={0}
               onClick={onToggle}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(e); } }}
-              title={active ? "Active" : "Inactive"}
+              onKeyDown={(e) => { if (!disabled && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onToggle(e); } }}
+              title={title}
               style={trackStyle}
             >
               <div style={knobStyle} />
@@ -725,8 +745,50 @@ export default function AdminUsers() {
           try { return new Date(v).toLocaleString(); } catch (_) { return String(v); }
         },
       },
+      {
+        field: "__delete",
+        headerName: "Delete",
+        minWidth: 120,
+        sortable: false,
+        filterable: false,
+        renderCell: (params) => {
+          const row = params?.row || {};
+          const onDelete = async (e) => {
+            e?.stopPropagation?.();
+            try {
+              if (!row?.id) return;
+              const ok = window.confirm("Delete this user permanently?");
+              if (!ok) return;
+              await API.delete(`/admin/users/${row.id}/`);
+              setReloadKey((k) => k + 1);
+            } catch (e) {
+              const msg = e?.response?.data?.detail || e?.message || "Delete failed";
+              window.alert(String(msg));
+            }
+          };
+          return (
+            <button
+              type="button"
+              onClick={onDelete}
+              title="Delete user"
+              style={{
+                borderRadius: 8,
+                padding: "6px 10px",
+                background: "#ef4444",
+                color: "#fff",
+                border: "1px solid #b91c1c",
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 700,
+              }}
+            >
+              Delete
+            </button>
+          );
+        },
+      },
     ],
-    [openEdit, setReloadKey, tempPw, isMobile]
+    [openEdit, setReloadKey, tempPw, isMobile, setPkgOpen, setPkgUser]
   );
 
   // Server-side fetcher for DataTable
@@ -764,6 +826,148 @@ export default function AdminUsers() {
     },
     [filters, reloadKey]
   );
+
+  const handleExport = async () => {
+    setExporting(true);
+    const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    const params = {};
+    Object.entries(filters).forEach(([k, v]) => {
+      if (v !== null && v !== undefined && String(v).trim() !== "") {
+        params[k] = v;
+      }
+    });
+
+    // Try backend export endpoint first (if available), otherwise fall back to client-side CSV export
+    try {
+      const res = await API.get("/admin/users/export/", {
+        params: { ...params, format: "xlsx" },
+        responseType: "blob",
+        timeout: 60000,
+        dedupe: "none",
+        retryAttempts: 0,
+      });
+      const blob = new Blob([res?.data || res], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `admin-users-${ts}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      return;
+    } catch (e) {
+      // Fall back to client-side Excel (.xls) export by paging through the list API
+      try {
+        const pageSize = 500;
+        let page = 1;
+        let all = [];
+        let total = null;
+
+        // Fetch all pages with current filters (no table search term available here)
+        while (true) {
+          const pageParams = { ...params, page, page_size: pageSize };
+          const resp = await API.get("/admin/users/", {
+            params: pageParams,
+            dedupe: "none",
+            retryAttempts: 1,
+            timeout: 30000,
+          });
+          const data = resp?.data;
+          const results = Array.isArray(data?.results)
+            ? data.results
+            : Array.isArray(data)
+            ? data
+            : [];
+          const count = typeof data?.count === "number" ? data.count : results.length;
+          if (total == null) total = count;
+          if (!results.length) break;
+          all = all.concat(results);
+          if (all.length >= total) break;
+          page += 1;
+        }
+
+        if (!all.length) {
+          window.alert("No data to export for current filters.");
+          return;
+        }
+
+        // Build Excel-compatible HTML table (.xls)
+        const cols = [
+          ["ID", (r) => r.id ?? r.pk ?? ""],
+          ["Username", (r) => r.username ?? ""],
+          ["Full Name", (r) => r.full_name ?? ""],
+          ["Phone", (r) => r.phone ?? ""],
+          ["Email", (r) => r.email ?? ""],
+          ["Role", (r) => r.role ?? ""],
+          ["Category", (r) => r.category ?? ""],
+          ["KYC Status", (r) => (r.kyc_verified ? "Verified" : (r.kyc_status || "Pending"))],
+          ["KYC Verified At", (r) => r.kyc_verified_at ?? ""],
+          ["E‑Coupons Activated", (r) => r.activated_ecoupon_count ?? ""],
+          ["Promo Package", (r) => r.last_promo_package ?? ""],
+          ["Sponsor ID", (r) => r.sponsor_id ?? ""],
+          ["Pincode", (r) => r.pincode ?? ""],
+          ["District", (r) => r.district_name ?? ""],
+          ["State", (r) => r.state_name ?? ""],
+          ["Country", (r) => r.country_name ?? ""],
+          ["Commission Level", (r) => r.commission_level ?? ""],
+          ["Wallet Balance", (r) => r.wallet_balance ?? ""],
+          ["Wallet Status", (r) => r.wallet_status ?? ""],
+          ["Account Active", (r) => (r.account_active ? "Active" : "Inactive")],
+          ["Date Joined", (r) => r.date_joined ?? ""],
+        ];
+
+        const escapeHtml = (val) => {
+          if (val === null || val === undefined) return "";
+          return String(val)
+            .replace(/&/g, "&")
+            .replace(/</g, "<")
+            .replace(/>/g, ">");
+        };
+
+        const headerCells = cols
+          .map((c) => `<th style="border:1px solid #999;padding:4px;background:#eef2ff">${escapeHtml(c[0])}</th>`)
+          .join("");
+        const rowsHtml = all
+          .map((r) => {
+            const cells = cols
+              .map(([, getter]) => `<td style="border:1px solid #999;padding:4px">${escapeHtml(getter(r))}</td>`)
+              .join("");
+            return `<tr>${cells}</tr>`;
+          })
+          .join("");
+
+        const html = `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body>
+  <table border="1" cellspacing="0" cellpadding="0">
+    <thead><tr>${headerCells}</tr></thead>
+    <tbody>${rowsHtml}</tbody>
+  </table>
+</body>
+</html>`;
+
+        const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `admin-users-${ts}.xls`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        return;
+      } catch (err) {
+        const msg = err?.response?.data?.detail || err?.message || "Export failed";
+        window.alert(String(msg));
+      }
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const toolbar = (
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
@@ -816,6 +1020,22 @@ export default function AdminUsers() {
           </button>
         </div>
       </div>
+      <button
+        onClick={handleExport}
+        disabled={exporting}
+        style={{
+          padding: "8px 12px",
+          borderRadius: 8,
+          border: "1px solid #1d4ed8",
+          background: exporting ? "#93c5fd" : "#2563eb",
+          color: "#fff",
+          cursor: exporting ? "not-allowed" : "pointer",
+          fontWeight: 700,
+        }}
+        title="Download Excel of all users"
+      >
+        {exporting ? "Exporting..." : "Export Excel"}
+      </button>
       <button
         onClick={() => setReloadKey((k) => k + 1)}
         style={{

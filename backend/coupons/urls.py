@@ -12,6 +12,7 @@ from .views import (
     ECouponPaymentConfigViewSet,
     ECouponProductViewSet,
     ECouponOrderViewSet,
+    LuckyDrawEligibilityViewSet,
 )
 
 router = DefaultRouter()
@@ -25,6 +26,7 @@ router.register(r'audits', AuditTrailViewSet, basename='audit')
 router.register(r'store/payment-configs', ECouponPaymentConfigViewSet, basename='ecoupon-payment-config')
 router.register(r'store/products', ECouponProductViewSet, basename='ecoupon-product')
 router.register(r'store/orders', ECouponOrderViewSet, basename='ecoupon-order')
+router.register(r'lucky-draw', LuckyDrawEligibilityViewSet, basename='lucky-draw')
 
 urlpatterns = [
     path('', include(router.urls)),

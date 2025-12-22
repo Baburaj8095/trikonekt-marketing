@@ -100,32 +100,107 @@ function MetricCard({ label, value }) {
 }
 
 export default function AdminECoupons() {
-  // Master lists
+  // Master lists (bootstrap)
   const [coupons, setCoupons] = useState([]);
   const [batches, setBatches] = useState([]);
   const [agencies, setAgencies] = useState([]);
   const [employees, setEmployees] = useState([]);
 
-  // Create Coupon form
-  const [couponForm, setCouponForm] = useState({
-    title: "Lucky E-Coupon",
-    description: "",
-    campaign: "LDGR",
-    valid_from: "",
-    valid_to: "",
-  });
-  const [createCouponLoading, setCreateCouponLoading] = useState(false);
+  // Tabs
+  const [activeTab, setActiveTab] = useState("create"); // create | orders | inventory | history | settings
 
-  // Create Batch form (E-Coupon)
-  const [batchForm, setBatchForm] = useState({
-    coupon_id: "",
-    prefix: "LDGR",
-    count: "500",
-    denomination: "150",
-  });
-  const [createBatchLoading, setCreateBatchLoading] = useState(false);
+  // Generic errors
+  const [err, setErr] = useState("");
+  const [bootstrapLoading, setBootstrapLoading] = useState(false);
 
-  // Assign-to-Agency/Employee form (count based only)
+  // =========================
+  // CREATE (Season-first UX)
+  // =========================
+  const [season, setSeason] = useState({ number: "1", from: "", to: "" });
+  const [seasonCouponId, setSeasonCouponId] = useState("");
+  const [seasonEnsuring, setSeasonEnsuring] = useState(false);
+
+  // Generate (two denominations)
+  const [gen150, setGen150] = useState({ count: "", prefix: "S1-150", loading: false });
+  const [gen759, setGen759] = useState({ count: "", prefix: "S1-759", loading: false });
+
+  // Season-batch helpers
+  const [batchDenomCache, setBatchDenomCache] = useState({}); // { [batchId]: 150|759|... }
+  const [seasonAvail, setSeasonAvail] = useState({ "150": 0, "759": 0 });
+  const [batchAvail, setBatchAvail] = useState({}); // { [batchId]: available }
+
+  // Season assignment (by denomination)
+  const [seasonAssign, setSeasonAssign] = useState({
+    denom: "150",
+    batchId: "",
+    targetType: "agency",
+    targetAgencyId: "",
+    targetUsername: "",
+    resolvedTargetId: "",
+    count: "",
+    loading: false,
+  });
+
+  // Season KPIs
+  const [seasonKpi, setSeasonKpi] = useState({
+    denom: "150",
+    values: { available: 0, assigned_agency: 0, assigned_employee: 0, sold: 0, redeemed: 0, revoked: 0 },
+    loading: false,
+  });
+
+  // Agency history (Season)
+  const [agencyHist, setAgencyHist] = useState({
+    username: "",
+    userId: "",
+    denom: "all",
+    from: "",
+    to: "",
+    snapshot: { available: 0, assigned_agency: 0, assigned_employee: 0, sold: 0, redeemed: 0, revoked: 0, total: 0, byDenom: { "150": 0, "759": 0 } },
+    rows: [],
+    loading: false,
+    error: "",
+  });
+
+  const seasonLabel = (n) => `Season ${String(n || "").trim() || "1"}`;
+
+  function findSeasonCouponIdByNumber(num, couponsList) {
+    const label = `Season ${String(num || "1")}`;
+    const lowered = label.toLowerCase();
+    const found = (couponsList || []).find(
+      (c) =>
+        String(c?.code || "").toLowerCase() === lowered ||
+        String(c?.campaign || "").toLowerCase() === lowered ||
+        String(c?.title || "").toLowerCase() === lowered
+    );
+    return found ? String(found.id) : "";
+  }
+
+  useEffect(() => {
+    const n = String(season.number || "").trim() || "1";
+    setGen150((g) => ({ ...g, prefix: `S${n}-150` }));
+    setGen759((g) => ({ ...g, prefix: `S${n}-759` }));
+  }, [season.number]);
+
+  // Auto-detect Season coupon so Season batches show up in Assign dropdown
+  useEffect(() => {
+    const id = findSeasonCouponIdByNumber(season.number, coupons);
+    if (id && id !== seasonCouponId) {
+      setSeasonCouponId(id);
+    }
+  }, [coupons, season.number]);
+
+  // Warm denomination cache and availability for the selected Season
+  useEffect(() => {
+    if (!seasonCouponId) return;
+    (async () => {
+      await preloadSeasonBatchDenoms(Number(seasonCouponId));
+      await refreshSeasonAvailability(Number(seasonCouponId));
+    })();
+  }, [seasonCouponId, batches]);
+
+  // =========================
+  // INVENTORY/ASSIGN/HISTORY (existing constructs retained)
+  // =========================
   const [assignForm, setAssignForm] = useState({
     batch_id: "",
     assignee_type: "agency",
@@ -135,7 +210,6 @@ export default function AdminECoupons() {
   });
   const [assignLoading, setAssignLoading] = useState(false);
 
-  // Metrics selection and values
   const [selectedBatch, setSelectedBatch] = useState("");
   const [metrics, setMetrics] = useState({
     available: 0,
@@ -146,54 +220,6 @@ export default function AdminECoupons() {
     revoked: 0,
   });
   const [metricsLoading, setMetricsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("overview");
-  // Overview KPIs (Available coupons by denomination)
-  const [overviewKpis, setOverviewKpis] = useState({ v50: 0, v150: 0, v300: 0, v750: 0, v759: 0 });
-  const [overviewLoading, setOverviewLoading] = useState(false);
-  async function loadOverviewKpis() {
-    setOverviewLoading(true);
-    try {
-      const [c50, c150, c300, c750, c759] = await Promise.all([
-        fetchCount("/coupons/codes/", { status: "AVAILABLE", value: 50, issued_channel: "e_coupon" }),
-        fetchCount("/coupons/codes/", { status: "AVAILABLE", value: 150, issued_channel: "e_coupon" }),
-        fetchCount("/coupons/codes/", { status: "AVAILABLE", value: 300, issued_channel: "e_coupon" }),
-        fetchCount("/coupons/codes/", { status: "AVAILABLE", value: 750, issued_channel: "e_coupon" }),
-        fetchCount("/coupons/codes/", { status: "AVAILABLE", value: 759, issued_channel: "e_coupon" }),
-      ]);
-      setOverviewKpis({ v50: c50, v150: c150, v300: c300, v750: c750, v759: c759 });
-    } catch (_) {
-      setOverviewKpis({ v50: 0, v150: 0, v300: 0, v750: 0, v759: 0 });
-    } finally {
-      setOverviewLoading(false);
-    }
-  }
-  useEffect(() => {
-    if (activeTab === "overview") {
-      loadOverviewKpis();
-    }
-  }, [activeTab]);
-
-  const [err, setErr] = useState("");
-  const [bootstrapLoading, setBootstrapLoading] = useState(false);
-
-  // Admin Agency Assignment Summary
-  const [summary, setSummary] = useState([]);
-  const [summaryLoading, setSummaryLoading] = useState(false);
-  const [summaryError, setSummaryError] = useState("");
-  const [summaryFrom, setSummaryFrom] = useState("");
-  const [summaryTo, setSummaryTo] = useState("");
-
-  async function loadAgencySummary() {
-    setSummaryLoading(true);
-    setSummaryError("");
-    try {
-      await loadDashboard(true);
-    } catch (e) {
-      setSummaryError("Failed to load agency summary");
-    } finally {
-      setSummaryLoading(false);
-    }
-  }
 
   // Assignment history (list)
   const [assignments, setAssignments] = useState([]);
@@ -209,110 +235,614 @@ export default function AdminECoupons() {
     to: "",
   });
 
-  function setCouponField(k, v) {
-    setCouponForm((f) => ({ ...f, [k]: v }));
-  }
-  function setBatchField(k, v) {
-    setBatchForm((f) => ({ ...f, [k]: v }));
-  }
-  function setAssignField(k, v) {
-    setAssignForm((f) => ({ ...f, [k]: v }));
-  }
+  // Admin Agency Assignment Summary (existing)
+  const [summary, setSummary] = useState([]);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState("");
+  const [summaryFrom, setSummaryFrom] = useState("");
+  const [summaryTo, setSummaryTo] = useState("");
 
-  async function loadCoupons() {
-    try {
-      const res = await API.get("/coupons/coupons/", { params: { page_size: 100 } });
-      const items = res?.data?.results || res?.data || [];
-      setCoupons(Array.isArray(items) ? items : []);
-      if (!batchForm.coupon_id) {
-        const first = (Array.isArray(items) ? items : [])[0];
-        if (first) setBatchForm((f) => ({ ...f, coupon_id: String(first.id) }));
-      }
-    } catch (_) {}
-  }
+  // Store: Payment Configs
+  const [pcItems, setPcItems] = useState([]);
+  const [pcLoading, setPcLoading] = useState(false);
+  const [pcForm, setPcForm] = useState({
+    title: "",
+    upi_id: "",
+    payee_name: "",
+    instructions: "",
+    file: null,
+  });
+  const [pcSubmitting, setPcSubmitting] = useState(false);
 
-  async function loadBatches() {
-    try {
-      const res = await API.get("/coupons/batches/", { params: { page_size: 100 } });
-      const items = res?.data?.results || res?.data || [];
-      setBatches(Array.isArray(items) ? items : []);
-      if (!assignForm.batch_id && items?.length) {
-        setAssignForm((f) => ({ ...f, batch_id: String(items[0].id) }));
-      }
-      if (!selectedBatch && items?.length) {
-        setSelectedBatch(String(items[0].id));
-      }
-    } catch (_) {}
-  }
+  // Store: Products
+  const [spItems, setSpItems] = useState([]);
+  const [spLoading, setSpLoading] = useState(false);
+  const [spSubmitting, setSpSubmitting] = useState(false);
+  const [spForm, setSpForm] = useState({
+    coupon_id: "",
+    denomination: "150",
+    price_per_unit: "",
+    enable_consumer: true,
+    enable_agency: true,
+    enable_employee: false,
+    is_active: true,
+    max_per_order: "10",
+    display_title: "E‑Coupon",
+    display_desc: "",
+  });
 
-  async function loadEmployees() {
-    try {
-      const res = await API.get("/admin/users/", { params: { role: "employee", page_size: 200 } });
-      const items = res?.data?.results || res?.data || [];
-      setEmployees(Array.isArray(items) ? items : []);
-    } catch (_) {}
-  }
+  // Pending Orders (Admin)
+  const [pendingOrders, setPendingOrders] = useState([]);
+  const [poLoading, setPoLoading] = useState(false);
+  const [orderNotes, setOrderNotes] = useState({});
+  const [orderBusy, setOrderBusy] = useState({});
+  const [orderAvail, setOrderAvail] = useState({});
+  const [orderProdAvail, setOrderProdAvail] = useState({});
 
-  async function loadAgencies() {
-    try {
-      const res = await API.get("/admin/users/", { params: { role: "agency", page_size: 200 } });
-      const items = res?.data?.results || res?.data || [];
-      setAgencies(Array.isArray(items) ? items : []);
-    } catch (_) {}
-  }
-
-  async function createCoupon() {
-    setCreateCouponLoading(true);
+  // =========================
+  // Bootstrap (reference lists + default dashboard)
+  // =========================
+  async function loadBootstrap() {
+    setBootstrapLoading(true);
     setErr("");
     try {
+      const res = await API.get("/coupons/codes/admin-ecoupons-bootstrap/", {
+        params: { page: assignPage, page_size: assignPageSize },
+      });
+      const d = res?.data || {};
+      setCoupons(Array.isArray(d.coupons) ? d.coupons : []);
+      setBatches(Array.isArray(d.batches) ? d.batches : []);
+      setAgencies(Array.isArray(d.agencies) ? d.agencies : []);
+      setEmployees(Array.isArray(d.employees) ? d.employees : []);
+
+      const defId = d.default_batch_id ? String(d.default_batch_id) : "";
+      setSelectedBatch((prev) => prev || defId);
+      if (!assignForm.batch_id && defId) {
+        setAssignForm((f) => ({ ...f, batch_id: defId }));
+      }
+
+      if (d.metrics) setMetrics(d.metrics);
+      if (d.assignments) {
+        const rows = Array.isArray(d.assignments.results) ? d.assignments.results : [];
+        setAssignments(rows);
+        const total =
+          typeof d.assignments.count === "number" ? d.assignments.count : rows.length;
+        setAssignTotal(total);
+      }
+    } catch (e) {
+      setErr("Failed to load bootstrap data");
+    } finally {
+      setBootstrapLoading(false);
+    }
+  }
+  useEffect(() => {
+    loadBootstrap();
+  }, []); // eslint-disable-line
+
+  // =========================
+  // Helpers (generic)
+  // =========================
+  async function fetchCount(url, params = {}) {
+    try {
+      const res = await API.get(url, { params: { page_size: 1, ...params } });
+      const c =
+        typeof res?.data?.count === "number"
+          ? res.data.count
+          : Array.isArray(res?.data)
+          ? res.data.length
+          : 0;
+      return c || 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  // Dashboard reloads (existing)
+  async function loadDashboard(includeSummary = false) {
+    setMetricsLoading(true);
+    setAssignListLoading(true);
+    if (includeSummary) setSummaryLoading(true);
+    try {
       const payload = {
-        code: (couponForm.campaign || couponForm.title || "LDGR").trim(),
-        title: couponForm.title,
-        description: couponForm.description,
-        campaign: couponForm.campaign,
-        valid_from: couponForm.valid_from || null,
-        valid_to: couponForm.valid_to || null,
+        batch: selectedBatch ? parseInt(selectedBatch, 10) : null,
+        assign: {
+          role: assignFilters.role || "",
+          assignee_id: assignFilters.assignee_id ? parseInt(assignFilters.assignee_id, 10) : null,
+          page: assignPage,
+          page_size: assignPageSize,
+        },
+        include_summary: !!includeSummary,
+        summary: { date_from: summaryFrom || "", date_to: summaryTo || "" },
+      };
+      const res = await API.post("/coupons/codes/admin-ecoupons-dashboard/", payload);
+      const d = res?.data || {};
+
+      if (d.metrics) setMetrics(d.metrics);
+
+      if (d.assignments) {
+        const rows = Array.isArray(d.assignments.results) ? d.assignments.results : [];
+        const q = String(assignFilters.search || "").toLowerCase();
+        const filtered = q
+          ? rows.filter((x) =>
+              String(x.assignee_name || "").toLowerCase().includes(q) ||
+              String(x.batch_display || "").toLowerCase().includes(q) ||
+              String(x.assigned_by || "").toLowerCase().includes(q)
+            )
+          : rows;
+        setAssignments(filtered);
+        const total =
+          typeof d.assignments.count === "number" ? d.assignments.count : filtered.length;
+        setAssignTotal(total);
+      }
+
+      if (includeSummary) {
+        const items = d?.summary?.results || [];
+        setSummary(Array.isArray(items) ? items : []);
+        setSummaryError("");
+      }
+    } catch (e) {
+      setErr("Failed to load dashboard");
+      if (includeSummary) setSummaryError("Failed to load agency summary");
+    } finally {
+      setMetricsLoading(false);
+      setAssignListLoading(false);
+      if (includeSummary) setSummaryLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!selectedBatch) return;
+    loadDashboard(false);
+  }, [selectedBatch]);
+
+  useEffect(() => {
+    if (!selectedBatch) return;
+    loadDashboard(false);
+  }, [selectedBatch, assignPage, assignPageSize, assignFilters]);
+
+  // Options from reference lists
+  const couponOptions = useMemo(
+    () => coupons.map((c) => ({ value: String(c.id), label: `${c.title} (id:${c.id})` })),
+    [coupons]
+  );
+
+  const batchOptionsAll = useMemo(
+    () =>
+      batches.map((b) => {
+        const count =
+          b.total ||
+          b.count ||
+          (typeof b.serial_start === "number" && typeof b.serial_end === "number"
+            ? b.serial_end - b.serial_start + 1
+            : null);
+        return {
+          value: String(b.id),
+          label: `#${b.id} ${b.prefix}${count ? ` (${count} codes)` : ""}`,
+          coupon_id: b.coupon,
+        };
+      }),
+    [batches]
+  );
+
+  const agencyOptions = useMemo(
+    () =>
+      agencies.map((u) => {
+        const isSub = String(u?.category || "").toLowerCase().startsWith("agency") && String(u?.category || "").toLowerCase().includes("sub");
+        return { value: String(u.id), label: `${u.username} #${u.id}${isSub ? " [sub‑franchise]" : ""}` };
+      }),
+    [agencies]
+  );
+  const employeeOptions = useMemo(
+    () => employees.map((u) => ({ value: String(u.id), label: `${u.username} #${u.id}` })),
+    [employees]
+  );
+  // Preloaded agencies dropdown with name and pincode
+  const agencyOptionsFull = useMemo(
+    () =>
+      agencies.map((u) => {
+        const isSub =
+          String(u?.category || "").toLowerCase().startsWith("agency") &&
+          String(u?.category || "").toLowerCase().includes("sub");
+        const name = String(u?.full_name || "").trim() || u.username;
+        const pin = String(u?.pincode || "").trim();
+        const pinPart = pin ? ` • PIN ${pin}` : "";
+        return {
+          value: String(u.id),
+          label: `${name} (${u.username})${pinPart}${isSub ? " [sub‑franchise]" : ""}`,
+        };
+      }),
+    [agencies]
+  );
+
+  // ==========================================
+  // CREATE tab: ensure Season + create batches
+  // ==========================================
+  const selectedSeasonCoupon = useMemo(() => {
+    const id = Number(seasonCouponId || 0);
+    return id ? coupons.find((c) => Number(c.id) === id) : null;
+  }, [seasonCouponId, coupons]);
+
+  const seasonBatches = useMemo(() => {
+    const id = Number(seasonCouponId || 0);
+    return id ? batches.filter((b) => Number(b.coupon) === id) : [];
+  }, [seasonCouponId, batches]);
+
+  const seasonBatchOptions = useMemo(() => {
+    return seasonBatches.map((b) => {
+      const count =
+        b.total ||
+        b.count ||
+        (typeof b.serial_start === "number" && typeof b.serial_end === "number"
+          ? b.serial_end - b.serial_start + 1
+          : null);
+      return {
+        value: String(b.id),
+        label: `#${b.id} ${b.prefix}${count ? ` (${count} codes)` : ""}`,
+      };
+    });
+  }, [seasonBatches]);
+
+  const seasonBatchOptionsByDenom = useMemo(() => {
+    // use cache to filter; may include unknown yet (those will appear once cache warms)
+    return (denom) =>
+      seasonBatches
+        .filter((b) => {
+          const d = batchDenomCache[String(b.id)];
+          return d ? String(d) === String(denom) : true; // show until known
+        })
+        .map((b) => {
+          const count =
+            b.total ||
+            b.count ||
+            (typeof b.serial_start === "number" && typeof b.serial_end === "number"
+              ? b.serial_end - b.serial_start + 1
+              : null);
+          const d = batchDenomCache[String(b.id)];
+          return {
+            value: String(b.id),
+            label: `#${b.id} ${b.prefix}${d ? ` • ₹${d}` : ""}${count ? ` (${count} codes)` : ""}`,
+          };
+        });
+  }, [seasonBatches, batchDenomCache]);
+
+  function toIsoLocal(val) {
+    try {
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? null : d.toISOString();
+    } catch {
+      return null;
+    }
+  }
+
+  async function ensureSeasonCoupon() {
+    const n = String(season.number || "").trim() || "1";
+    const label = seasonLabel(n);
+    setSeasonEnsuring(true);
+    setErr("");
+    try {
+      // Try to find existing
+      const found =
+        coupons.find(
+          (c) =>
+            String(c.code || "").toLowerCase() === label.toLowerCase() ||
+            String(c.campaign || "").toLowerCase() === label.toLowerCase() ||
+            String(c.title || "").toLowerCase() === label.toLowerCase()
+        ) || null;
+      if (found) {
+        setSeasonCouponId(String(found.id));
+        await preloadSeasonBatchDenoms(found.id);
+        await refreshSeasonAvailability(found.id);
+        return;
+      }
+      // Create new
+      const payload = {
+        code: label,
+        title: label,
+        description: "",
+        campaign: label,
+        valid_from: season.from ? toIsoLocal(season.from) : null,
+        valid_to: season.to ? toIsoLocal(season.to) : null,
       };
       const res = await API.post("/coupons/coupons/", payload);
-      await loadCoupons();
-      alert(`Coupon created: ${res?.data?.title || "OK"}`);
+      const id = res?.data?.id;
+      await loadBootstrap();
+      if (id) setSeasonCouponId(String(id));
+      await preloadSeasonBatchDenoms(id);
+      await refreshSeasonAvailability(id);
+      alert(`Season ensured: ${label}`);
     } catch (e) {
-      setErr(e?.response?.data?.detail || "Failed to create coupon");
+      const msg = e?.response?.data?.detail || "Failed to ensure Season coupon";
+      setErr(msg);
+      alert(msg);
     } finally {
-      setCreateCouponLoading(false);
+      setSeasonEnsuring(false);
     }
   }
 
-  async function createBatch() {
-    setCreateBatchLoading(true);
-    setErr("");
+  async function createSeasonBatch(denom, count, prefix) {
+    if (!seasonCouponId) {
+      alert("Ensure Season first");
+      return;
+    }
+    const value = Number(denom);
+    const cnt = Number(count || 0);
+    if (!cnt || cnt <= 0) {
+      alert("Enter a valid count (>0)");
+      return;
+    }
+    const payload = {
+      coupon: Number(seasonCouponId),
+      prefix: String(prefix || "").trim() || `S${season.number}-${value}`,
+      count: cnt,
+      value,
+    };
     try {
-      if (!batchForm.coupon_id) {
-        alert("Select coupon");
-        setCreateBatchLoading(false);
-        return;
-      }
-      const payload = {
-        coupon: parseInt(batchForm.coupon_id, 10),
-        prefix: (batchForm.prefix || "LDGR").trim() || "LDGR",
-        count: parseInt(batchForm.count || "0", 10),
-        value: parseInt(batchForm.denomination || "150", 10),
-      };
-      if (!payload.count || payload.count <= 0) {
-        alert("Enter a valid Count (>0)");
-        setCreateBatchLoading(false);
-        return;
-      }
+      if (value === 150) setGen150((g) => ({ ...g, loading: true }));
+      if (value === 759) setGen759((g) => ({ ...g, loading: true }));
       await API.post("/coupons/batches/create-ecoupons/", payload);
       await loadBootstrap();
-      alert("E-Coupon batch created");
+      await preloadSeasonBatchDenoms(Number(seasonCouponId));
+      await refreshSeasonAvailability(Number(seasonCouponId));
+      alert(`Created ${cnt} codes (₹${value}) for ${seasonLabel(season.number)}`);
     } catch (e) {
-      setErr(e?.response?.data?.detail || "Failed to create batch");
+      const msg = e?.response?.data?.detail || "Failed to create batch";
+      alert(msg);
     } finally {
-      setCreateBatchLoading(false);
+      if (value === 150) setGen150((g) => ({ ...g, loading: false }));
+      if (value === 759) setGen759((g) => ({ ...g, loading: false }));
     }
   }
 
+  async function createBothBatches() {
+    if (!seasonCouponId) {
+      alert("Ensure Season first");
+      return;
+    }
+    await createSeasonBatch(150, gen150.count, gen150.prefix);
+    await createSeasonBatch(759, gen759.count, gen759.prefix);
+  }
+
+  async function getBatchDenomination(batchId) {
+    const key = String(batchId);
+    if (batchDenomCache[key]) return batchDenomCache[key];
+    try {
+      const res = await API.get("/coupons/codes/", { params: { batch: batchId, page_size: 1 } });
+      const item =
+        (Array.isArray(res?.data?.results) ? res.data.results[0] : null) ||
+        (Array.isArray(res?.data) ? res.data[0] : null) ||
+        null;
+      const val = item && item.value ? Number(item.value) : null;
+      if (val) {
+        setBatchDenomCache((m) => ({ ...m, [key]: val }));
+        return val;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  async function preloadSeasonBatchDenoms(couponId) {
+    const list = batches.filter((b) => Number(b.coupon) === Number(couponId));
+    await Promise.all(
+      list.map(async (b) => {
+        if (!batchDenomCache[String(b.id)]) {
+          await getBatchDenomination(b.id);
+        }
+      })
+    );
+  }
+
+  async function refreshSeasonAvailability(couponId) {
+    try {
+      const [a150, a759] = await Promise.all([
+        fetchCount("/coupons/codes/", { issued_channel: "e_coupon", coupon: Number(couponId), value: 150, status: "AVAILABLE" }),
+        fetchCount("/coupons/codes/", { issued_channel: "e_coupon", coupon: Number(couponId), value: 759, status: "AVAILABLE" }),
+      ]);
+      setSeasonAvail({ "150": a150, "759": a759 });
+    } catch {
+      setSeasonAvail({ "150": 0, "759": 0 });
+    }
+  }
+
+  async function refreshBatchAvailability(batchId) {
+    if (!batchId) return;
+    try {
+      const c = await fetchCount("/coupons/codes/", { batch: Number(batchId), status: "AVAILABLE" });
+      setBatchAvail((m) => ({ ...m, [String(batchId)]: c }));
+    } catch {
+      setBatchAvail((m) => ({ ...m, [String(batchId)]: 0 }));
+    }
+  }
+
+  async function resolveUsername(username) {
+    const u = String(username || "").trim();
+    if (!u) return null;
+    try {
+      const res = await API.get("/coupons/codes/resolve-user/", { params: { username: u } });
+      return res?.data || null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function assignSeasonByCount() {
+    if (!seasonCouponId) {
+      alert("Ensure Season first");
+      return;
+    }
+    setSeasonAssign((s) => ({ ...s, loading: true }));
+    try {
+      const { denom, batchId, targetType, targetUsername, targetAgencyId, count } = seasonAssign;
+      if (!batchId) {
+        alert("Pick a batch");
+        setSeasonAssign((s) => ({ ...s, loading: false }));
+        return;
+      }
+      const cnt = Number(count || 0);
+      if (!cnt || cnt <= 0) {
+        alert("Enter a valid Count (>0)");
+        setSeasonAssign((s) => ({ ...s, loading: false }));
+        return;
+      }
+      let targetId = seasonAssign.resolvedTargetId;
+      if (targetType === "agency") {
+        targetId = targetAgencyId || targetId;
+        if (!targetId) {
+          alert("Select agency");
+          setSeasonAssign((s) => ({ ...s, loading: false }));
+          return;
+        }
+      } else {
+        if (!targetId) {
+          const info = await resolveUsername(targetUsername);
+          if (!info || !info.id) {
+            alert("Invalid username");
+            setSeasonAssign((s) => ({ ...s, loading: false }));
+            return;
+          }
+          targetId = info.id;
+        }
+      }
+      const idNum = Number(targetId);
+      const bid = Number(batchId);
+      let url = "", payload = {};
+      if (targetType === "agency") {
+        url = `/coupons/batches/${bid}/assign-agency-count/`;
+        payload = { agency_id: idNum, count: cnt };
+      } else {
+        url = `/coupons/batches/${bid}/admin-assign-employee-count/`;
+        payload = { employee_id: idNum, count: cnt };
+      }
+      await API.post(url, payload);
+      await loadBootstrap();
+      await refreshSeasonAvailability(seasonCouponId);
+      await refreshBatchAvailability(bid);
+      alert("Assigned successfully");
+    } catch (e) {
+      const msg = e?.response?.data?.detail || "Failed to assign";
+      alert(msg);
+    } finally {
+      setSeasonAssign((s) => ({ ...s, loading: false }));
+    }
+  }
+
+  async function loadSeasonKpis() {
+    if (!seasonCouponId) return;
+    setSeasonKpi((k) => ({ ...k, loading: true }));
+    try {
+      const d = seasonKpi.denom;
+      const filters = { coupon: Number(seasonCouponId), issued_channel: "e_coupon" };
+      if (d !== "all") filters.value = Number(d);
+      const [available, assigned_agency, assigned_employee, sold, redeemed, revoked] = await Promise.all([
+        fetchCount("/coupons/codes/", { ...filters, status: "AVAILABLE" }),
+        fetchCount("/coupons/codes/", { ...filters, status: "ASSIGNED_AGENCY" }),
+        fetchCount("/coupons/codes/", { ...filters, status: "ASSIGNED_EMPLOYEE" }),
+        fetchCount("/coupons/codes/", { ...filters, status: "SOLD" }),
+        fetchCount("/coupons/codes/", { ...filters, status: "REDEEMED" }),
+        fetchCount("/coupons/codes/", { ...filters, status: "REVOKED" }),
+      ]);
+      setSeasonKpi((k) => ({
+        ...k,
+        values: { available, assigned_agency, assigned_employee, sold, redeemed, revoked },
+      }));
+    } catch {
+      setSeasonKpi((k) => ({
+        ...k,
+        values: { available: 0, assigned_agency: 0, assigned_employee: 0, sold: 0, redeemed: 0, revoked: 0 },
+      }));
+    } finally {
+      setSeasonKpi((k) => ({ ...k, loading: false }));
+    }
+  }
+
+  async function searchAgencyHistory() {
+    if (!seasonCouponId) {
+      alert("Ensure Season first");
+      return;
+    }
+    setAgencyHist((s) => ({ ...s, loading: true, error: "" }));
+    try {
+      const id = sTrim(agencyHist.username) ? await (async () => {
+        const u = await resolveUsername(agencyHist.username);
+        return u?.id || "";
+      })() : agencyHist.userId;
+
+      if (!id) {
+        setAgencyHist((s) => ({ ...s, loading: false, error: "Invalid agency username" }));
+        return;
+      }
+
+      // Season batches and denom cache
+      await preloadSeasonBatchDenoms(seasonCouponId);
+
+      // Snapshot totals by agency across season batches (merge admin-agency-assignment-summary per batch)
+      const list = [...seasonBatches];
+      const acc = { AVAILABLE: 0, ASSIGNED_AGENCY: 0, ASSIGNED_EMPLOYEE: 0, SOLD: 0, REDEEMED: 0, REVOKED: 0 };
+      const byDenom = { "150": 0, "759": 0 };
+      for (const b of list) {
+        const resp = await API.get("/coupons/codes/admin-agency-assignment-summary/", { params: { batch: b.id } });
+        const rows = Array.isArray(resp?.data?.results) ? resp.data.results : [];
+        const me = rows.find((r) => Number(r.agency_id) === Number(id));
+        if (me) {
+          Object.keys(acc).forEach((k) => (acc[k] += Number(me.counts?.[k] || 0)));
+          // denom + total assigned (include all statuses as "owned + progressed")
+          const d = batchDenomCache[String(b.id)];
+          if (d && (d === 150 || d === 759)) {
+            byDenom[String(d)] += Number(me.total || 0);
+          }
+        }
+      }
+      const snap = {
+        available: acc.AVAILABLE,
+        assigned_agency: acc.ASSIGNED_AGENCY,
+        assigned_employee: acc.ASSIGNED_EMPLOYEE,
+        sold: acc.SOLD,
+        redeemed: acc.REDEEMED,
+        revoked: acc.REVOKED,
+        total: acc.AVAILABLE + acc.ASSIGNED_AGENCY + acc.ASSIGNED_EMPLOYEE + acc.SOLD + acc.REDEEMED + acc.REVOKED,
+        byDenom,
+      };
+
+      // Full history rows for this agency within Season:
+      // Use admin-ecoupons-dashboard for each batch with assignee_id
+      const rowsMerged = [];
+      for (const b of list) {
+        const payload = {
+          batch: Number(b.id),
+          assign: { role: "agency", assignee_id: Number(id), page: 1, page_size: 1000 },
+        };
+        const res = await API.post("/coupons/codes/admin-ecoupons-dashboard/", payload);
+        const items = Array.isArray(res?.data?.assignments?.results) ? res.data.assignments.results : [];
+        for (const r of items) {
+          rowsMerged.push({
+            ...r,
+            denom: batchDenomCache[String(b.id)] || null,
+          });
+        }
+      }
+
+      // Optional filters
+      const denomFilter = agencyHist.denom;
+      let rows = rowsMerged;
+      if (denomFilter !== "all") {
+        rows = rows.filter((r) => String(r.denom || "") === String(denomFilter));
+      }
+
+      // Sort desc by date
+      rows.sort((a, b) => new Date(b.assigned_at || b.created_at || 0) - new Date(a.assigned_at || a.created_at || 0));
+
+      setAgencyHist((s) => ({ ...s, userId: String(id), snapshot: snap, rows, loading: false }));
+    } catch (e) {
+      setAgencyHist((s) => ({ ...s, loading: false, error: "Failed to load agency history" }));
+    }
+  }
+
+  function sTrim(x) {
+    return String(x || "").trim();
+  }
+
+  // =========================
+  // INVENTORY: assign & metrics (existing)
+  // =========================
   async function assignECoupons() {
     setAssignLoading(true);
     setErr("");
@@ -359,133 +889,19 @@ export default function AdminECoupons() {
     }
   }
 
-  async function loadAssignments() {
-    setAssignListLoading(true);
+  async function loadAgencySummary() {
+    setSummaryLoading(true);
+    setSummaryError("");
     try {
-      const bid = selectedBatch || assignForm.batch_id || "";
-      const params = {
-        page: assignPage,
-        page_size: assignPageSize,
-        batch: bid || undefined,
-      };
-      const res = await API.get("/coupons/audits/", { params });
-      const items = res?.data?.results || res?.data || [];
-      const rows = (Array.isArray(items) ? items : [])
-        .filter((r) => {
-          const a = r.action || "";
-          return (
-            a === "assigned_to_agency" ||
-            a === "assigned_to_agency_by_count" ||
-            a === "assigned_to_employee" ||
-            a === "bulk_assigned_to_employees" ||
-            a === "bulk_assigned_to_agencies" ||
-            a === "agency_assigned_to_employee_by_count" ||
-            a === "admin_assigned_to_employee_by_count"
-          );
-        })
-        .flatMap((r) => {
-          const action = r.action || "";
-          const meta = r.metadata || {};
-          const batch_id = r.batch || r.batch_id || null;
-          const by = r.actor_username || "";
-          const at = r.created_at || "";
-          if (action === "bulk_assigned_to_employees" && Array.isArray(meta.assignments)) {
-            return meta.assignments.map((it) => ({
-              id: `${action}-${batch_id}-${it.employee_id}-${at}`,
-              role: "employee",
-              assignee_id: it.employee_id,
-              assignee_name: `Employee #${it.employee_id}`,
-              serial_start: null,
-              serial_end: null,
-              count: it.count,
-              batch_display: batch_id ? `#${batch_id}` : "",
-              assigned_by: by,
-              assigned_at: at,
-            }));
-          }
-          let role = action.includes("employee") ? "employee" : "agency";
-          let assignee_id = role === "employee" ? (meta.employee_id || null) : (meta.agency_id || null);
-          let assignee_name =
-            assignee_id
-              ? `${role === "employee" ? "Employee" : "Agency"} #${assignee_id}`
-              : (r.notes || "").replace(/^.* to /, "").trim();
-
-          let start = null, end = null, count = null;
-          if (Array.isArray(meta.serial_range) && meta.serial_range.length === 2) {
-            start = meta.serial_range[0];
-            end = meta.serial_range[1];
-            if (Number.isFinite(start) && Number.isFinite(end)) {
-              count = end - start + 1;
-            }
-          }
-          if (meta.count && !count) count = meta.count;
-          if (meta.total_assigned && !count) count = meta.total_assigned;
-
-          return [
-            {
-              id: `${action}-${batch_id}-${assignee_id || ""}-${at}`,
-              role,
-              assignee_id,
-              assignee_name,
-              serial_start: start,
-              serial_end: end,
-              count,
-              batch_display: batch_id ? `#${batch_id}` : "",
-              assigned_by: by,
-              assigned_at: at,
-            },
-          ];
-        });
-
-      // Client-side filters
-      let filtered = rows;
-      if (assignFilters.role) {
-        filtered = filtered.filter((x) => x.role === assignFilters.role);
-      }
-      if (assignFilters.assignee_id) {
-        filtered = filtered.filter((x) => String(x.assignee_id || "") === String(assignFilters.assignee_id));
-      }
-      if (assignFilters.search) {
-        const q = String(assignFilters.search).toLowerCase();
-        filtered = filtered.filter(
-          (x) =>
-            String(x.assignee_name || "").toLowerCase().includes(q) ||
-            String(x.batch_display || "").toLowerCase().includes(q) ||
-            String(x.assigned_by || "").toLowerCase().includes(q)
-        );
-      }
-
-      setAssignments(filtered);
-      const total =
-        typeof res?.data?.count === "number"
-          ? res.data.count
-          : Array.isArray(items)
-          ? items.length
-          : filtered.length;
-      setAssignTotal(total);
-    } catch (_) {
-      setAssignments([]);
-      setAssignTotal(0);
+      await loadDashboard(true);
+    } catch (e) {
+      setSummaryError("Failed to load agency summary");
     } finally {
-      setAssignListLoading(false);
+      setSummaryLoading(false);
     }
   }
 
-  async function fetchCount(url, params = {}) {
-    try {
-      const res = await API.get(url, { params: { page_size: 1, ...params } });
-      const c =
-        typeof res?.data?.count === "number"
-          ? res.data.count
-          : Array.isArray(res?.data)
-          ? res.data.length
-          : 0;
-      return c || 0;
-    } catch {
-      return 0;
-    }
-  }
-
+  // Metrics (existing)
   async function loadMetrics() {
     setMetricsLoading(true);
     try {
@@ -516,159 +932,9 @@ export default function AdminECoupons() {
     }
   }
 
-  // Consolidated loaders
-  async function loadBootstrap() {
-    setBootstrapLoading(true);
-    setErr("");
-    try {
-      const res = await API.get("/coupons/codes/admin-ecoupons-bootstrap/", {
-        params: { page: assignPage, page_size: assignPageSize },
-      });
-      const d = res?.data || {};
-      setCoupons(Array.isArray(d.coupons) ? d.coupons : []);
-      setBatches(Array.isArray(d.batches) ? d.batches : []);
-      setAgencies(Array.isArray(d.agencies) ? d.agencies : []);
-      setEmployees(Array.isArray(d.employees) ? d.employees : []);
-
-      const defId = d.default_batch_id ? String(d.default_batch_id) : "";
-      setSelectedBatch((prev) => prev || defId);
-      if (!assignForm.batch_id && defId) {
-        setAssignForm((f) => ({ ...f, batch_id: defId }));
-      }
-
-      if (d.metrics) setMetrics(d.metrics);
-      if (d.assignments) {
-        const rows = Array.isArray(d.assignments.results) ? d.assignments.results : [];
-        setAssignments(rows);
-        const total =
-          typeof d.assignments.count === "number"
-            ? d.assignments.count
-            : rows.length;
-        setAssignTotal(total);
-      }
-    } catch (e) {
-      setErr("Failed to load bootstrap data");
-    } finally {
-      setBootstrapLoading(false);
-    }
-  }
-
-  async function loadDashboard(includeSummary = false) {
-    setMetricsLoading(true);
-    setAssignListLoading(true);
-    if (includeSummary) setSummaryLoading(true);
-    try {
-      const payload = {
-        batch: selectedBatch ? parseInt(selectedBatch, 10) : null,
-        assign: {
-          role: assignFilters.role || "",
-          assignee_id: assignFilters.assignee_id ? parseInt(assignFilters.assignee_id, 10) : null,
-          page: assignPage,
-          page_size: assignPageSize,
-        },
-        include_summary: !!includeSummary,
-        summary: { date_from: summaryFrom || "", date_to: summaryTo || "" },
-      };
-      const res = await API.post("/coupons/codes/admin-ecoupons-dashboard/", payload);
-      const d = res?.data || {};
-
-      if (d.metrics) setMetrics(d.metrics);
-
-      if (d.assignments) {
-        const rows = Array.isArray(d.assignments.results) ? d.assignments.results : [];
-        const q = String(assignFilters.search || "").toLowerCase();
-        const filtered = q
-          ? rows.filter((x) =>
-              String(x.assignee_name || "").toLowerCase().includes(q) ||
-              String(x.batch_display || "").toLowerCase().includes(q) ||
-              String(x.assigned_by || "").toLowerCase().includes(q)
-            )
-          : rows;
-        setAssignments(filtered);
-        const total =
-          typeof d.assignments.count === "number"
-            ? d.assignments.count
-            : filtered.length;
-        setAssignTotal(total);
-      }
-
-      if (includeSummary) {
-        const items = d?.summary?.results || [];
-        setSummary(Array.isArray(items) ? items : []);
-        setSummaryError("");
-      }
-    } catch (e) {
-      setErr("Failed to load dashboard");
-      if (includeSummary) setSummaryError("Failed to load agency summary");
-    } finally {
-      setMetricsLoading(false);
-      setAssignListLoading(false);
-      if (includeSummary) setSummaryLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    loadBootstrap();
-  }, []);
-
-  useEffect(() => {
-    if (!selectedBatch) return;
-    loadDashboard(false);
-  }, [selectedBatch]);
-
-  useEffect(() => {
-    if (!selectedBatch) return;
-    loadDashboard(false);
-  }, [selectedBatch, assignPage, assignPageSize, assignFilters]);
-
-  // Options
-  const couponOptions = useMemo(
-    () => coupons.map((c) => ({ value: String(c.id), label: `${c.title} (id:${c.id})` })),
-    [coupons]
-  );
-
-  const batchOptions = useMemo(
-    () =>
-      batches.map((b) => {
-        const count =
-          b.total ||
-          b.count ||
-          (typeof b.serial_start === "number" && typeof b.serial_end === "number"
-            ? b.serial_end - b.serial_start + 1
-            : null);
-        return {
-          value: String(b.id),
-          label: `#${b.id} ${b.prefix}${count ? ` (${count} codes)` : ""}`,
-        };
-      }),
-    [batches]
-  );
-
-  const agencyOptions = useMemo(
-    () => agencies.map((u) => ({ value: String(u.id), label: `${u.username} #${u.id}` })),
-    [agencies]
-  );
-  const employeeOptions = useMemo(
-    () => employees.map((u) => ({ value: String(u.id), label: `${u.username} #${u.id}` })),
-    [employees]
-  );
-
   // =========================
-  // E‑Coupon Store Management
+  // STORE: Payment Configs
   // =========================
-
-  // Payment Configs
-  const [pcItems, setPcItems] = useState([]);
-  const [pcLoading, setPcLoading] = useState(false);
-  const [pcForm, setPcForm] = useState({
-    title: "",
-    upi_id: "",
-    payee_name: "",
-    instructions: "",
-    file: null,
-  });
-  const [pcSubmitting, setPcSubmitting] = useState(false);
-
   async function loadPaymentConfigs() {
     setPcLoading(true);
     try {
@@ -716,23 +982,9 @@ export default function AdminECoupons() {
     }
   }
 
-  // Store Products
-  const [spItems, setSpItems] = useState([]);
-  const [spLoading, setSpLoading] = useState(false);
-  const [spSubmitting, setSpSubmitting] = useState(false);
-  const [spForm, setSpForm] = useState({
-    coupon_id: "",
-    denomination: "150",
-    price_per_unit: "",
-    enable_consumer: true,
-    enable_agency: true,
-    enable_employee: false,
-    is_active: true,
-    max_per_order: "10",
-    display_title: "E‑Coupon",
-    display_desc: "",
-  });
-
+  // =========================
+  // STORE: Products
+  // =========================
   async function loadStoreProducts() {
     setSpLoading(true);
     try {
@@ -789,7 +1041,6 @@ export default function AdminECoupons() {
     }
   }
 
-  // Quick create standard denominations (150/750/759) for the selected coupon
   async function createStandardProducts() {
     try {
       if (!spForm.coupon_id) {
@@ -849,14 +1100,9 @@ export default function AdminECoupons() {
     }
   }, [coupons]); // eslint-disable-line
 
-  // Pending Orders (Admin)
-  const [pendingOrders, setPendingOrders] = useState([]);
-  const [poLoading, setPoLoading] = useState(false);
-  const [orderNotes, setOrderNotes] = useState({});
-  const [orderBusy, setOrderBusy] = useState({});
-  const [orderAvail, setOrderAvail] = useState({});
-  const [orderProdAvail, setOrderProdAvail] = useState({});
-
+  // =========================
+  // STORE: Pending Orders
+  // =========================
   async function loadPendingOrders() {
     setPoLoading(true);
     try {
@@ -954,7 +1200,6 @@ export default function AdminECoupons() {
             : null;
         if (denom !== null) params.value = denom;
 
-        // Global denom availability (for display/fallback)
         const invResGlobal = await API.get("/coupons/codes/", { params });
         availableGlobal =
           typeof invResGlobal?.data?.count === "number"
@@ -963,7 +1208,6 @@ export default function AdminECoupons() {
             ? invResGlobal.data.length
             : 0;
 
-        // Product-specific availability (scoped to the product's coupon), if resolvable
         if (couponId) {
           const paramsProd = { ...params, coupon: couponId };
           const invResProd = await API.get("/coupons/codes/", { params: paramsProd });
@@ -975,7 +1219,6 @@ export default function AdminECoupons() {
               : 0;
         }
 
-        // Consider either scope sufficient; proceed if either has enough
         available = Math.max(availableGlobal, availableProduct);
       } catch (_) {}
 
@@ -984,23 +1227,14 @@ export default function AdminECoupons() {
         const shortageGlobal = Math.max(0, needed - availableGlobal);
         const shortageProduct = Math.max(0, needed - availableProduct);
         const shortage = couponId ? shortageProduct : shortageGlobal;
-        // Prefill Create Batch form to quickly top-up inventory
         try {
           setActiveTab("inventory");
           if (couponId) {
-            setBatchForm((f) => ({
-              ...f,
-              coupon_id: String(couponId),
-              denomination: String(Number(order.denomination_snapshot || 150)),
-              count: String(shortage || needed || 0),
-            }));
-            try {
-              document.getElementById("sec-create-batch")?.scrollIntoView({ behavior: "smooth" });
-            } catch {}
+            setSpForm((f) => ({ ...f, coupon_id: String(couponId) }));
           }
         } catch {}
         alert(
-          `Insufficient inventory. Global denom: ${availableGlobal}, Product coupon: ${availableProduct}, Needed: ${needed}. Prefilled Create Batch for quick top‑up.`
+          `Insufficient inventory. Global denom: ${availableGlobal}, Product coupon: ${availableProduct}, Needed: ${needed}.`
         );
         return;
       }
@@ -1013,23 +1247,6 @@ export default function AdminECoupons() {
       const status = e?.response?.status;
       const data = e?.response?.data || {};
       const msg = data?.detail || "Approval failed";
-      if (status === 409) {
-        try {
-          const pf = data?.prefill || {};
-          setActiveTab("inventory");
-          if (pf?.coupon) {
-            setBatchForm((f) => ({
-              ...f,
-              coupon_id: String(pf.coupon),
-              denomination: String(Number(pf.denomination ?? (order?.denomination_snapshot ?? 150))),
-              count: String(Number(pf.count || order?.quantity || 0)),
-            }));
-            try {
-              document.getElementById("sec-create-batch")?.scrollIntoView({ behavior: "smooth" });
-            } catch {}
-          }
-        } catch {}
-      }
       alert(msg);
     } finally {
       setOrderBusy((m) => ({ ...m, [id]: false }));
@@ -1058,30 +1275,33 @@ export default function AdminECoupons() {
     loadPendingOrders();
   }, []); // eslint-disable-line
 
+  // =========================
+  // UI
+  // =========================
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: 0, color: "#0f172a" }}>E-Coupons</h2>
+        <h2 style={{ margin: 0, color: "#0f172a" }}>E‑Coupons</h2>
         <div style={{ color: "#64748b", fontSize: 13 }}>
-          Create random e-coupon batches (Prefix + 7-char alphanumeric), assign by count to agencies or employees, manage e-coupon store and view redemption metrics.
+          Season-first creation. Create Season batches (₹150/₹759), assign by count to agencies/employees, manage store and view metrics.
         </div>
       </div>
 
       <div style={{ position: "sticky", top: 0, zIndex: 4, background: "transparent", marginBottom: 12 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", overflowX: "auto" }}>
           <button
-            onClick={() => setActiveTab("overview")}
+            onClick={() => setActiveTab("create")}
             style={{
               padding: "6px 10px",
-              background: activeTab === "overview" ? "#0f172a" : "#fff",
-              color: activeTab === "overview" ? "#fff" : "#0f172a",
+              background: activeTab === "create" ? "#0f172a" : "#fff",
+              color: activeTab === "create" ? "#fff" : "#0f172a",
               border: "1px solid #e2e8f0",
               borderRadius: 8,
               fontWeight: 700,
               cursor: "pointer",
             }}
           >
-            Overview
+            Create
           </button>
           <button
             onClick={() => setActiveTab("orders")}
@@ -1126,80 +1346,362 @@ export default function AdminECoupons() {
             History
           </button>
           <button
-            onClick={() => setActiveTab("setup")}
+            onClick={() => setActiveTab("settings")}
             style={{
               padding: "6px 10px",
-              background: activeTab === "setup" ? "#0f172a" : "#fff",
-              color: activeTab === "setup" ? "#fff" : "#0f172a",
+              background: activeTab === "settings" ? "#0f172a" : "#fff",
+              color: activeTab === "settings" ? "#fff" : "#0f172a",
               border: "1px solid #e2e8f0",
               borderRadius: 8,
               fontWeight: 700,
               cursor: "pointer",
             }}
           >
-            Payment
+            Settings
           </button>
         </div>
       </div>
+
       {err ? <div style={{ color: "#dc2626", marginBottom: 12 }}>{err}</div> : null}
 
-      {/* Overview: Simple KPI cards and quick actions */}
+      {/* CREATE TAB */}
       <Section
-        id="sec-overview"
-        visible={activeTab === "overview"}
-        title="Overview"
+        id="sec-season"
+        visible={activeTab === "create"}
+        title="Season"
         extraRight={
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button
+            onClick={ensureSeasonCoupon}
+            disabled={seasonEnsuring}
+            style={{
+              padding: "8px 12px",
+              background: "#0f172a",
+              color: "#fff",
+              border: 0,
+              borderRadius: 8,
+              cursor: seasonEnsuring ? "not-allowed" : "pointer",
+              fontWeight: 700,
+            }}
+          >
+            {seasonEnsuring ? "Ensuring..." : "Ensure Season"}
+          </button>
+        }
+      >
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+            gap: 12,
+          }}
+        >
+          <TextInput
+            label="Season Number"
+            type="number"
+            value={season.number}
+            onChange={(v) => setSeason((s) => ({ ...s, number: v }))}
+            placeholder="e.g., 1"
+          />
+          <TextInput
+            label="Valid From"
+            type="datetime-local"
+            value={season.from}
+            onChange={(v) => setSeason((s) => ({ ...s, from: v }))}
+          />
+          <TextInput
+            label="Valid To"
+            type="datetime-local"
+            value={season.to}
+            onChange={(v) => setSeason((s) => ({ ...s, to: v }))}
+          />
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label style={{ fontSize: 12, color: "#64748b" }}>Ledger/Code/Campaign</label>
+            <div style={{ padding: "10px 12px", border: "1px solid #e2e8f0", borderRadius: 8, background: "#f8fafc" }}>
+              {seasonLabel(season.number)}
+            </div>
+          </div>
+        </div>
+        {seasonCouponId ? (
+          <div style={{ color: "#16a34a", fontSize: 12, marginTop: 8 }}>
+            Season ensured: {seasonLabel(season.number)} (coupon #{seasonCouponId})
+          </div>
+        ) : (
+          <div style={{ color: "#64748b", fontSize: 12, marginTop: 8 }}>
+            Ensure Season to enable batch generation and assignment.
+          </div>
+        )}
+      </Section>
+
+      <Section
+        id="sec-generate"
+        visible={activeTab === "create"}
+        title="Generate Season Batches (random codes)"
+        extraRight={
+          <button
+            onClick={createBothBatches}
+            disabled={
+              !(
+                seasonCouponId &&
+                Number(gen150.count || 0) > 0 &&
+                Number(gen759.count || 0) > 0
+              )
+            }
+            style={{
+              padding: "8px 12px",
+              background: "#0f172a",
+              color: "#fff",
+              border: 0,
+              borderRadius: 8,
+              cursor:
+                seasonCouponId &&
+                Number(gen150.count || 0) > 0 &&
+                Number(gen759.count || 0) > 0
+                  ? "pointer"
+                  : "not-allowed",
+              fontWeight: 700,
+            }}
+          >
+            Generate Both
+          </button>
+        }
+      >
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+            gap: 12,
+          }}
+        >
+          <div
+            style={{
+              border: "1px solid #e2e8f0",
+              borderRadius: 10,
+              padding: 12,
+              background: "#fff",
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+            }}
+          >
+            <div style={{ fontWeight: 700, color: "#0f172a" }}>₹150</div>
+            <TextInput
+              label="Count"
+              type="number"
+              value={gen150.count}
+              onChange={(v) => setGen150((s) => ({ ...s, count: v }))}
+              placeholder="e.g., 500"
+            />
+            <TextInput
+              label="Prefix"
+              value={gen150.prefix}
+              onChange={(v) => setGen150((s) => ({ ...s, prefix: v }))}
+              placeholder="e.g., S1-150"
+            />
             <button
-              onClick={() => {
-                setActiveTab("inventory");
-                try { document.getElementById("sec-create-batch")?.scrollIntoView({ behavior: "smooth" }); } catch {}
-              }}
+              onClick={() => createSeasonBatch(150, gen150.count, gen150.prefix)}
+              disabled={!seasonCouponId || gen150.loading}
               style={{
                 padding: "8px 12px",
                 background: "#0f172a",
                 color: "#fff",
                 border: 0,
                 borderRadius: 8,
-                cursor: "pointer",
+                cursor: !seasonCouponId || gen150.loading ? "not-allowed" : "pointer",
                 fontWeight: 700,
               }}
             >
-              Create
+              {gen150.loading ? "Creating..." : "Generate 150"}
             </button>
+          </div>
+
+          <div
+            style={{
+              border: "1px solid #e2e8f0",
+              borderRadius: 10,
+              padding: 12,
+              background: "#fff",
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+            }}
+          >
+            <div style={{ fontWeight: 700, color: "#0f172a" }}>₹759</div>
+            <TextInput
+              label="Count"
+              type="number"
+              value={gen759.count}
+              onChange={(v) => setGen759((s) => ({ ...s, count: v }))}
+              placeholder="e.g., 500"
+            />
+            <TextInput
+              label="Prefix"
+              value={gen759.prefix}
+              onChange={(v) => setGen759((s) => ({ ...s, prefix: v }))}
+              placeholder="e.g., S1-759"
+            />
             <button
-              onClick={() => {
-                setActiveTab("inventory");
-                try { document.getElementById("sec-assign")?.scrollIntoView({ behavior: "smooth" }); } catch {}
-              }}
+              onClick={() => createSeasonBatch(759, gen759.count, gen759.prefix)}
+              disabled={!seasonCouponId || gen759.loading}
               style={{
                 padding: "8px 12px",
                 background: "#0f172a",
                 color: "#fff",
                 border: 0,
                 borderRadius: 8,
-                cursor: "pointer",
+                cursor: !seasonCouponId || gen759.loading ? "not-allowed" : "pointer",
                 fontWeight: 700,
               }}
             >
-              Assign
+              {gen759.loading ? "Creating..." : "Generate 759"}
             </button>
+          </div>
+        </div>
+
+        <div style={{ color: "#64748b", fontSize: 12, marginTop: 8 }}>
+          Codes will be generated as prefix + 7 random uppercase alphanumerics (e.g., S1-150X7K9A2B).
+        </div>
+      </Section>
+
+      <Section
+        id="sec-assign-season"
+        visible={activeTab === "create"}
+        title="Assign (Season by denomination)"
+        extraRight={
+          <button
+            onClick={assignSeasonByCount}
+            disabled={seasonAssign.loading}
+            style={{
+              padding: "8px 12px",
+              background: "#0f172a",
+              color: "#fff",
+              border: 0,
+              borderRadius: 8,
+              cursor: seasonAssign.loading ? "not-allowed" : "pointer",
+              fontWeight: 700,
+            }}
+          >
+            {seasonAssign.loading ? "Assigning..." : "Assign"}
+          </button>
+        }
+      >
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+            gap: 12,
+          }}
+        >
+          <Select
+            label="Denomination"
+            value={seasonAssign.denom}
+            onChange={(v) => {
+              setSeasonAssign((s) => ({ ...s, denom: v, batchId: "" }));
+            }}
+            options={[
+              { value: "150", label: "₹150" },
+              { value: "759", label: "₹759" },
+            ]}
+          />
+          <Select
+            label="Batch (Season)"
+            value={seasonAssign.batchId}
+            onChange={(v) => {
+              setSeasonAssign((s) => ({ ...s, batchId: v }));
+              refreshBatchAvailability(v);
+            }}
+            options={[
+              { value: "", label: "Select..." },
+              ...(seasonBatchOptionsByDenom ? seasonBatchOptionsByDenom(seasonAssign.denom) : []),
+            ]}
+          />
+          <Select
+            label="Assign To"
+            value={seasonAssign.targetType}
+            onChange={(v) =>
+              setSeasonAssign((s) => ({
+                ...s,
+                targetType: v,
+                targetAgencyId: "",
+                targetUsername: "",
+                resolvedTargetId: "",
+              }))
+            }
+            options={[
+              { value: "agency", label: "Agency / Sub‑franchise" },
+              { value: "employee", label: "Employee (Admin direct)" },
+            ]}
+          />
+          {seasonAssign.targetType === "agency" ? (
+            <Select
+              label="Target Agency"
+              value={seasonAssign.targetAgencyId}
+              onChange={(v) =>
+                setSeasonAssign((s) => ({
+                  ...s,
+                  targetAgencyId: v,
+                  targetUsername: "",
+                  resolvedTargetId: "",
+                }))
+              }
+              options={[{ value: "", label: "Select..." }, ...(agencyOptionsFull || [])]}
+            />
+          ) : (
+            <TextInput
+              label="Target Username"
+              value={seasonAssign.targetUsername}
+              onChange={(v) => setSeasonAssign((s) => ({ ...s, targetUsername: v, resolvedTargetId: "" }))}
+              placeholder="employee username"
+            />
+          )}
+          <TextInput
+            label="Count"
+            type="number"
+            value={seasonAssign.count}
+            onChange={(v) => setSeasonAssign((s) => ({ ...s, count: v }))}
+            placeholder="e.g., 100"
+          />
+        </div>
+        <div style={{ display: "flex", gap: 12, marginTop: 10, flexWrap: "wrap", color: "#64748b", fontSize: 12 }}>
+          <div>Season Available ₹150: {seasonAvail["150"]}</div>
+          <div>Season Available ₹759: {seasonAvail["759"]}</div>
+          {seasonAssign.batchId ? (
+            <div>
+              Batch Available: {batchAvail[String(seasonAssign.batchId)] ?? "…"}
+            </div>
+          ) : null}
+        </div>
+      </Section>
+
+      <Section
+        id="sec-season-kpi"
+        visible={activeTab === "create"}
+        title="Season KPIs"
+        extraRight={
+          <div style={{ display: "flex", gap: 8, alignItems: "end" }}>
+            <Select
+              label="Denomination"
+              value={seasonKpi.denom}
+              onChange={(v) => setSeasonKpi((k) => ({ ...k, denom: v }))}
+              options={[
+                { value: "all", label: "All" },
+                { value: "150", label: "₹150" },
+                { value: "759", label: "₹759" },
+              ]}
+            />
             <button
-              onClick={() => {
-                setActiveTab("setup");
-                try { document.getElementById("sec-payment")?.scrollIntoView({ behavior: "smooth" }); } catch {}
-              }}
+              onClick={loadSeasonKpis}
+              disabled={seasonKpi.loading || !seasonCouponId}
               style={{
                 padding: "8px 12px",
                 background: "#0f172a",
                 color: "#fff",
                 border: 0,
                 borderRadius: 8,
-                cursor: "pointer",
+                cursor: seasonKpi.loading || !seasonCouponId ? "not-allowed" : "pointer",
                 fontWeight: 700,
+                height: 40,
               }}
             >
-              Payment
+              {seasonKpi.loading ? "Refreshing..." : "Refresh"}
             </button>
           </div>
         }
@@ -1211,31 +1713,148 @@ export default function AdminECoupons() {
             gap: 12,
           }}
         >
-          <div onClick={() => { setActiveTab("inventory"); try { document.getElementById("sec-history")?.scrollIntoView({ behavior: "smooth" }); } catch {} }} style={{ cursor: "pointer" }}>
-            <MetricCard label="Available ₹50" value={overviewLoading ? "…" : overviewKpis.v50} />
-          </div>
-          <div onClick={() => { setActiveTab("inventory"); try { document.getElementById("sec-history")?.scrollIntoView({ behavior: "smooth" }); } catch {} }} style={{ cursor: "pointer" }}>
-            <MetricCard label="Available ₹150" value={overviewLoading ? "…" : overviewKpis.v150} />
-          </div>
-          <div onClick={() => { setActiveTab("inventory"); try { document.getElementById("sec-history")?.scrollIntoView({ behavior: "smooth" }); } catch {} }} style={{ cursor: "pointer" }}>
-            <MetricCard label="Available ₹300" value={overviewLoading ? "…" : overviewKpis.v300} />
-          </div>
-          <div onClick={() => { setActiveTab("inventory"); try { document.getElementById("sec-history")?.scrollIntoView({ behavior: "smooth" }); } catch {} }} style={{ cursor: "pointer" }}>
-            <MetricCard label="Available ₹750" value={overviewLoading ? "…" : overviewKpis.v750} />
-          </div>
-          <div onClick={() => { setActiveTab("inventory"); try { document.getElementById("sec-history")?.scrollIntoView({ behavior: "smooth" }); } catch {} }} style={{ cursor: "pointer" }}>
-            <MetricCard label="Available ₹759" value={overviewLoading ? "…" : overviewKpis.v759} />
-          </div>
-        </div>
-        <div style={{ color: "#64748b", fontSize: 12, marginTop: 8 }}>
-          Tap a card to jump to Assignment History. Quick actions jump directly to Create, Assign, and Payment sections.
+          <MetricCard label="Available" value={seasonKpi.values.available} />
+          <MetricCard label="Assigned to Agencies" value={seasonKpi.values.assigned_agency} />
+          <MetricCard label="Assigned to Employees" value={seasonKpi.values.assigned_employee} />
+          <MetricCard label="Sold (Distributed)" value={seasonKpi.values.sold} />
+          <MetricCard label="Redeemed (Approved)" value={seasonKpi.values.redeemed} />
+          <MetricCard label="Revoked" value={seasonKpi.values.revoked} />
         </div>
       </Section>
 
-      {/* E‑Coupon Store: Payment Config */}
+      <Section
+        id="sec-agency-history-season"
+        visible={activeTab === "create"}
+        title="Agency history (Season)"
+        extraRight={
+          <button
+            onClick={searchAgencyHistory}
+            disabled={agencyHist.loading || !seasonCouponId}
+            style={{
+              padding: "8px 12px",
+              background: "#0f172a",
+              color: "#fff",
+              border: 0,
+              borderRadius: 8,
+              cursor: agencyHist.loading || !seasonCouponId ? "not-allowed" : "pointer",
+              fontWeight: 700,
+            }}
+          >
+            {agencyHist.loading ? "Searching..." : "Search"}
+          </button>
+        }
+      >
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+            gap: 12,
+          }}
+        >
+          <TextInput
+            label="Agency Username"
+            value={agencyHist.username}
+            onChange={(v) => setAgencyHist((s) => ({ ...s, username: v }))}
+            placeholder="agency username"
+          />
+          <Select
+            label="Denomination"
+            value={agencyHist.denom}
+            onChange={(v) => setAgencyHist((s) => ({ ...s, denom: v }))}
+            options={[
+              { value: "all", label: "All" },
+              { value: "150", label: "₹150" },
+              { value: "759", label: "₹759" },
+            ]}
+          />
+          <TextInput
+            label="From (optional)"
+            type="datetime-local"
+            value={agencyHist.from}
+            onChange={(v) => setAgencyHist((s) => ({ ...s, from: v }))}
+          />
+          <TextInput
+            label="To (optional)"
+            type="datetime-local"
+            value={agencyHist.to}
+            onChange={(v) => setAgencyHist((s) => ({ ...s, to: v }))}
+          />
+        </div>
+        {agencyHist.error ? <div style={{ color: "#dc2626", marginTop: 8 }}>{agencyHist.error}</div> : null}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+            gap: 12,
+            marginTop: 12,
+          }}
+        >
+          <MetricCard label="Available" value={agencyHist.snapshot.available} />
+          <MetricCard label="Assigned to Agencies" value={agencyHist.snapshot.assigned_agency} />
+          <MetricCard label="Assigned to Employees" value={agencyHist.snapshot.assigned_employee} />
+          <MetricCard label="Sold (Distributed)" value={agencyHist.snapshot.sold} />
+          <MetricCard label="Redeemed" value={agencyHist.snapshot.redeemed} />
+          <MetricCard label="Revoked" value={agencyHist.snapshot.revoked} />
+          <MetricCard label="Total (Season)" value={agencyHist.snapshot.total} />
+          <MetricCard label="Total ₹150" value={agencyHist.snapshot.byDenom["150"]} />
+          <MetricCard label="Total ₹759" value={agencyHist.snapshot.byDenom["759"]} />
+        </div>
+
+        <div style={{ marginTop: 12, border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden", background: "#fff" }}>
+          <div style={{ overflowX: "auto" }}>
+            <div
+              style={{
+                minWidth: 1000,
+                display: "grid",
+                gridTemplateColumns: "120px 120px 120px 120px 1fr 200px",
+                gap: 8,
+                padding: "10px",
+                background: "#f8fafc",
+                borderBottom: "1px solid #e2e8f0",
+                fontWeight: 700,
+                color: "#0f172a",
+              }}
+            >
+              <div>Denom</div>
+              <div>Batch</div>
+              <div>Count</div>
+              <div>Role</div>
+              <div>Assigned By</div>
+              <div>Assigned At</div>
+            </div>
+            <div>
+              {(agencyHist.rows || []).map((r, idx) => (
+                <div
+                  key={r.id || idx}
+                  style={{
+                    minWidth: 1000,
+                    display: "grid",
+                    gridTemplateColumns: "120px 120px 120px 120px 1fr 200px",
+                    gap: 8,
+                    padding: "10px",
+                    borderBottom: "1px solid #e2e8f0",
+                  }}
+                >
+                  <div>₹{r.denom || "—"}</div>
+                  <div>{r.batch_display || "—"}</div>
+                  <div>{r.count ?? "—"}</div>
+                  <div style={{ textTransform: "capitalize" }}>{r.role || "—"}</div>
+                  <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.assigned_by || "—"}</div>
+                  <div>{r.assigned_at ? new Date(r.assigned_at).toLocaleString() : "—"}</div>
+                </div>
+              ))}
+              {!agencyHist.loading && (!agencyHist.rows || agencyHist.rows.length === 0) ? (
+                <div style={{ padding: 12, color: "#64748b" }}>No records</div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      {/* SETTINGS TAB (Payment + Store products, concise) */}
       <Section
         id="sec-payment"
-        visible={activeTab === "setup"}
+        visible={activeTab === "settings"}
         title="Payment settings"
         extraRight={
           <button
@@ -1295,90 +1914,31 @@ export default function AdminECoupons() {
                 setPcForm((f) => ({ ...f, file: e.target.files && e.target.files[0] ? e.target.files[0] : null }))
               }
             />
-            {pcForm.file ? <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{pcForm.file.name}</div> : null}
           </div>
         </div>
-        <div style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>Existing Configs</div>
-          {pcLoading ? (
-            <div style={{ color: "#64748b" }}>Loading...</div>
-          ) : (pcItems || []).length === 0 ? (
-            <div style={{ color: "#64748b" }}>No configs</div>
-          ) : (
-            <div style={{ display: "grid", gap: 8 }}>
-              {(pcItems || []).map((c) => (
-                <div
-                  key={c.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    border: "1px solid #e2e8f0",
-                    borderRadius: 8,
-                    padding: 8,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 68,
-                      height: 68,
-                      borderRadius: 8,
-                      border: "1px solid #e2e8f0",
-                      background: "#fff",
-                      overflow: "hidden",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {c.upi_qr_image_url ? (
-                      <img
-                        alt="QR"
-                        src={normalizeMediaUrl(c.upi_qr_image_url)}
-                        style={{ width: "100%", height: "100%", objectFit: "contain" }}
-                      />
-                    ) : (
-                      <div style={{ fontSize: 10, color: "#64748b", padding: 4, textAlign: "center" }}>No QR</div>
-                    )}
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 220 }}>
-                    <div style={{ fontWeight: 700 }}>{c.title || `#${c.id}`}</div>
-                    <div style={{ color: "#64748b", fontSize: 12 }}>{c.payee_name || "—"}</div>
-                    <div style={{ color: "#64748b", fontSize: 12 }}>{c.upi_id || ""}</div>
-                  </div>
-                  <div style={{ color: "#64748b", fontSize: 12, maxWidth: 360, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {c.instructions || "—"}
-                  </div>
-                  <div style={{ color: c.is_active ? "#16a34a" : "#64748b", fontWeight: 700, marginLeft: 8 }}>
-                    {c.is_active ? "ACTIVE" : "INACTIVE"}
-                  </div>
-                  <div style={{ marginLeft: "auto" }}>
-                    {!c.is_active ? (
-                      <button
-                        onClick={() => setActivePc(c.id)}
-                        style={{
-                          padding: "6px 10px",
-                          background: "#0f172a",
-                          color: "#fff",
-                          border: 0,
-                          borderRadius: 8,
-                          cursor: "pointer",
-                          fontWeight: 700,
-                        }}
-                      >
-                        Set Active
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+        <div style={{ marginTop: 10 }}>
+          <button
+            onClick={loadPaymentConfigs}
+            style={{
+              padding: "6px 10px",
+              background: "#fff",
+              color: "#0f172a",
+              border: "1px solid #e2e8f0",
+              borderRadius: 8,
+              cursor: "pointer",
+            }}
+          >
+            Refresh List
+          </button>
+          <div style={{ marginTop: 8, color: "#64748b", fontSize: 12 }}>
+            Loaded configs: {(pcItems || []).length}
+          </div>
         </div>
       </Section>
 
-      {/* E‑Coupon Store: Products */}
       <Section
         id="sec-products"
-        visible={activeTab === "setup"}
+        visible={activeTab === "settings"}
         title="Store products"
         extraRight={
           <div style={{ display: "flex", gap: 8 }}>
@@ -1496,135 +2056,9 @@ export default function AdminECoupons() {
             </label>
           </div>
         </div>
-
-        <div style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>Existing Products</div>
-          {spLoading ? (
-            <div style={{ color: "#64748b" }}>Loading...</div>
-          ) : (spItems || []).length === 0 ? (
-            <div style={{ color: "#64748b" }}>No products</div>
-          ) : (
-            <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden", background: "#fff" }}>
-              <div style={{ overflowX: "auto" }}>
-                <div
-                  style={{
-                    minWidth: 1000,
-                    display: "grid",
-                    gridTemplateColumns: "60px 1fr 100px 100px 120px 240px 120px 140px",
-                    gap: 8,
-                    padding: "10px",
-                    background: "#f8fafc",
-                    borderBottom: "1px solid #e2e8f0",
-                    fontWeight: 700,
-                    color: "#0f172a",
-                  }}
-                >
-                  <div>ID</div>
-                  <div>Title</div>
-                  <div>Denom</div>
-                  <div>Price</div>
-                  <div>Visibility</div>
-                  <div>Description</div>
-                  <div>Status</div>
-                  <div>Actions</div>
-                </div>
-                <div>
-                  {(spItems || []).map((p) => {
-                    const vis = [
-                      p.enable_consumer ? "Consumer" : null,
-                      p.enable_agency ? "Agency" : null,
-                      p.enable_employee ? "Employee" : null,
-                    ]
-                      .filter(Boolean)
-                      .join(", ") || "—";
-                    return (
-                      <div
-                        key={p.id}
-                        style={{
-                          minWidth: 1000,
-                          display: "grid",
-                          gridTemplateColumns: "60px 1fr 100px 100px 120px 240px 120px 140px",
-                          gap: 8,
-                          padding: "10px",
-                          borderBottom: "1px solid #e2e8f0",
-                        }}
-                      >
-                        <div>#{p.id}</div>
-                        <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {p.display_title || p.coupon_title || "—"}
-                        </div>
-                        <div>₹{p.denomination}</div>
-                        <div>₹{p.price_per_unit}</div>
-                        <div>{vis}</div>
-                        <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{p.display_desc || "—"}</div>
-                        <div style={{ color: p.is_active ? "#16a34a" : "#64748b", fontWeight: 700 }}>
-                          {p.is_active ? "ACTIVE" : "INACTIVE"}
-                        </div>
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          <button
-                            onClick={() => patchProduct(p.id, { is_active: !p.is_active })}
-                            style={{
-                              padding: "6px 10px",
-                              background: "#fff",
-                              color: "#0f172a",
-                              border: "1px solid #e2e8f0",
-                              borderRadius: 8,
-                              cursor: "pointer",
-                            }}
-                          >
-                            {p.is_active ? "Deactivate" : "Activate"}
-                          </button>
-                          <button
-                            onClick={() => patchProduct(p.id, { enable_consumer: !p.enable_consumer })}
-                            style={{
-                              padding: "6px 10px",
-                              background: "#fff",
-                              color: "#0f172a",
-                              border: "1px solid #e2e8f0",
-                              borderRadius: 8,
-                              cursor: "pointer",
-                            }}
-                          >
-                            {p.enable_consumer ? "Hide Consumer" : "Show Consumer"}
-                          </button>
-                          <button
-                            onClick={() => patchProduct(p.id, { enable_agency: !p.enable_agency })}
-                            style={{
-                              padding: "6px 10px",
-                              background: "#fff",
-                              color: "#0f172a",
-                              border: "1px solid #e2e8f0",
-                              borderRadius: 8,
-                              cursor: "pointer",
-                            }}
-                          >
-                            {p.enable_agency ? "Hide Agency" : "Show Agency"}
-                          </button>
-                          <button
-                            onClick={() => patchProduct(p.id, { enable_employee: !p.enable_employee })}
-                            style={{
-                              padding: "6px 10px",
-                              background: "#fff",
-                              color: "#0f172a",
-                              border: "1px solid #e2e8f0",
-                              borderRadius: 8,
-                              cursor: "pointer",
-                            }}
-                          >
-                            {p.enable_employee ? "Hide Employee" : "Show Employee"}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
       </Section>
 
-      {/* Pending E‑Coupon Orders */}
+      {/* ORDERS */}
       <Section
         id="sec-orders"
         visible={activeTab === "orders"}
@@ -1656,9 +2090,9 @@ export default function AdminECoupons() {
             <div style={{ overflowX: "auto" }}>
               <div
                 style={{
-                  minWidth: 1200,
+                  minWidth: 1100,
                   display: "grid",
-                  gridTemplateColumns: "80px 160px 100px 80px 100px 160px 160px 240px 220px",
+                  gridTemplateColumns: "80px 160px 100px 80px 120px 180px 220px",
                   gap: 8,
                   padding: "10px",
                   background: "#f8fafc",
@@ -1673,22 +2107,19 @@ export default function AdminECoupons() {
                 <div>Qty</div>
                 <div>Total</div>
                 <div>Product</div>
-                <div>UTR</div>
-                <div>Proof</div>
                 <div>Actions</div>
               </div>
               <div>
                 {(pendingOrders || []).map((o) => {
                   const busy = !!orderBusy[o.id];
                   const note = orderNotes[o.id] || "";
-                  const proofUrl = o.payment_proof_file || "";
                   return (
                     <div
                       key={o.id}
                       style={{
-                        minWidth: 1200,
+                        minWidth: 1100,
                         display: "grid",
-                        gridTemplateColumns: "80px 160px 100px 80px 100px 160px 160px 240px 220px",
+                        gridTemplateColumns: "80px 160px 100px 80px 120px 180px 220px",
                         gap: 8,
                         padding: "10px",
                         borderBottom: "1px solid #e2e8f0",
@@ -1703,27 +2134,14 @@ export default function AdminECoupons() {
                       <div>{o.quantity || 0}</div>
                       <div>₹{o.amount_total || 0}</div>
                       <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{o.product_title || "—"}</div>
-                      <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{o.utr || "—"}</div>
-                      <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {proofUrl ? (
-                          <a href={normalizeMediaUrl(proofUrl)} target="_blank" rel="noreferrer">
-                            View Proof
-                          </a>
-                        ) : (
-                          <span style={{ color: "#64748b" }}>No file</span>
-                        )}
-                      </div>
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                         <input
                           style={{ padding: 8, border: "1px solid #e2e8f0", borderRadius: 8, minWidth: 160 }}
                           placeholder="Review note"
                           value={note}
                           onChange={(e) => setOrderNotes((m) => ({ ...m, [o.id]: e.target.value }))}
                         />
-                        <div style={{ color: "#64748b", fontSize: 12 }}>
-                          Avail: {orderAvail[o.id] ?? "…"} (product: {orderProdAvail[o.id] ?? "…"}) / Need: {o.quantity || 0}
-                        </div>
-                          <button
+                        <button
                           onClick={() => approveOrder(o)}
                           disabled={busy}
                           style={{
@@ -1763,469 +2181,7 @@ export default function AdminECoupons() {
         )}
       </Section>
 
-      {/* Create Coupon */}
-      <Section
-        id="sec-create-coupon"
-        visible={activeTab === "setup"}
-        title="Create Coupon (master)"
-        extraRight={
-          <button
-            onClick={createCoupon}
-            disabled={createCouponLoading}
-            style={{
-              padding: "8px 12px",
-              background: "#0f172a",
-              color: "#fff",
-              border: 0,
-              borderRadius: 8,
-              cursor: createCouponLoading ? "not-allowed" : "pointer",
-              fontWeight: 700,
-            }}
-          >
-            {createCouponLoading ? "Creating..." : "Create"}
-          </button>
-        }
-      >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-            gap: 12,
-          }}
-        >
-          <TextInput
-            label="Title"
-            value={couponForm.title}
-            onChange={(v) => setCouponField("title", v)}
-            placeholder="e.g., Lucky E-Coupon"
-          />
-          <TextInput
-            label="Campaign"
-            value={couponForm.campaign}
-            onChange={(v) => setCouponField("campaign", v)}
-            placeholder="e.g., LDGR"
-          />
-          <TextInput
-            label="Valid From"
-            type="datetime-local"
-            value={couponForm.valid_from}
-            onChange={(v) => setCouponField("valid_from", v)}
-          />
-          <TextInput
-            label="Valid To"
-            type="datetime-local"
-            value={couponForm.valid_to}
-            onChange={(v) => setCouponField("valid_to", v)}
-          />
-          <div style={{ gridColumn: "1 / -1" }}>
-            <TextInput
-              label="Description"
-              value={couponForm.description}
-              onChange={(v) => setCouponField("description", v)}
-              placeholder="Optional"
-            />
-          </div>
-        </div>
-      </Section>
-
-      {/* Create E-Coupon Batch */}
-      <Section
-        id="sec-create-batch"
-        visible={activeTab === "inventory"}
-        title="Top‑up inventory (random codes)"
-        extraRight={
-          <button
-            onClick={createBatch}
-            disabled={createBatchLoading}
-            style={{
-              padding: "8px 12px",
-              background: "#0f172a",
-              color: "#fff",
-              border: 0,
-              borderRadius: 8,
-              cursor: createBatchLoading ? "not-allowed" : "pointer",
-              fontWeight: 700,
-            }}
-          >
-            {createBatchLoading ? "Creating..." : "Create Batch"}
-          </button>
-        }
-      >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-            gap: 12,
-          }}
-        >
-          <Select
-            label="Coupon"
-            value={batchForm.coupon_id}
-            onChange={(v) => setBatchField("coupon_id", v)}
-            options={[{ value: "", label: "Select..." }, ...couponOptions]}
-          />
-          <TextInput
-            label="Prefix"
-            value={batchForm.prefix}
-            onChange={(v) => setBatchField("prefix", v)}
-            placeholder="LDGR"
-          />
-          <TextInput
-            label="Count"
-            type="number"
-            value={batchForm.count}
-            onChange={(v) => setBatchField("count", v)}
-            placeholder="500"
-          />
-          <Select
-            label="Denomination"
-            value={batchForm.denomination}
-            onChange={(v) => setBatchField("denomination", v)}
-            options={[
-              { value: "50", label: "₹50" },
-              { value: "150", label: "₹150" },
-              { value: "300", label: "₹300" },
-              { value: "750", label: "₹750" },
-              { value: "759", label: "₹759" },
-            ]}
-          />
-        </div>
-        <div style={{ color: "#64748b", fontSize: 12, marginTop: 8 }}>
-          Codes will be generated as {(batchForm.prefix || "LDGR")} + 7 random uppercase alphanumerics (e.g., {`${(batchForm.prefix || "LDGR")}X7K9A2B`}).
-        </div>
-      </Section>
-
-      {/* Assign to Agency/Employee */}
-      <Section
-        id="sec-assign"
-        visible={activeTab === "inventory"}
-        title="Assign E-Coupons (Count-based)"
-        extraRight={
-          <button
-            onClick={assignECoupons}
-            disabled={assignLoading}
-            style={{
-              padding: "8px 12px",
-              background: "#0f172a",
-              color: "#fff",
-              border: 0,
-              borderRadius: 8,
-              cursor: assignLoading ? "not-allowed" : "pointer",
-              fontWeight: 700,
-            }}
-          >
-            {assignLoading ? "Assigning..." : "Assign"}
-          </button>
-        }
-      >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-            gap: 12,
-          }}
-        >
-          <Select
-            label="Batch"
-            value={assignForm.batch_id}
-            onChange={(v) => setAssignField("batch_id", v)}
-            options={[{ value: "", label: "Select..." }, ...batchOptions]}
-          />
-          <Select
-            label="Assign To"
-            value={assignForm.assignee_type}
-            onChange={(v) => setAssignField("assignee_type", v)}
-            options={[
-              { value: "agency", label: "Agency" },
-              { value: "employee", label: "Employee (Admin direct)" },
-            ]}
-          />
-          {assignForm.assignee_type === "agency" ? (
-            <Select
-              label="Agency"
-              value={assignForm.agency_id}
-              onChange={(v) => setAssignField("agency_id", v)}
-              options={[{ value: "", label: "Select..." }, ...agencyOptions]}
-            />
-          ) : (
-            <Select
-              label="Employee"
-              value={assignForm.employee_id}
-              onChange={(v) => setAssignField("employee_id", v)}
-              options={[{ value: "", label: "Select..." }, ...employeeOptions]}
-            />
-          )}
-          <TextInput
-            label="Count"
-            value={assignForm.count}
-            onChange={(v) => setAssignField("count", v)}
-            placeholder="e.g., 100"
-            type="number"
-          />
-        </div>
-        <div style={{ color: "#64748b", fontSize: 12, marginTop: 8 }}>
-          Assigns the given number of unassigned random codes from the selected batch. Assigned codes will be unique and cannot be re-assigned by other agencies.
-        </div>
-      </Section>
-
-      {/* Assignment History */}
-      <Section
-        id="sec-history"
-        visible={activeTab === "history"}
-        title="Assignment History"
-        extraRight={
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button
-              onClick={() => loadDashboard(false)}
-              disabled={assignListLoading}
-              style={{
-                padding: "8px 12px",
-                background: "#0f172a",
-                color: "#fff",
-                border: 0,
-                borderRadius: 8,
-                cursor: assignListLoading ? "not-allowed" : "pointer",
-                fontWeight: 700,
-                height: 40,
-              }}
-            >
-              {assignListLoading ? "Refreshing..." : "Refresh"}
-            </button>
-          </div>
-        }
-      >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-            gap: 12,
-          }}
-        >
-          <Select
-            label="Role"
-            value={assignFilters.role}
-            onChange={(v) => {
-              setAssignFilters((f) => ({ ...f, role: v, assignee_id: "" }));
-              setAssignPage(1);
-            }}
-            options={[
-              { value: "", label: "Any role" },
-              { value: "agency", label: "Agency" },
-              { value: "employee", label: "Employee" },
-            ]}
-          />
-          {assignFilters.role === "employee" ? (
-            <Select
-              label="Employee"
-              value={assignFilters.assignee_id}
-              onChange={(v) => {
-                setAssignFilters((f) => ({ ...f, assignee_id: v }));
-                setAssignPage(1);
-              }}
-              options={[{ value: "", label: "Any" }, ...employeeOptions]}
-            />
-          ) : (
-            <Select
-              label="Agency"
-              value={assignFilters.assignee_id}
-              onChange={(v) => {
-                setAssignFilters((f) => ({ ...f, assignee_id: v }));
-                setAssignPage(1);
-              }}
-              options={[{ value: "", label: "Any" }, ...agencyOptions]}
-            />
-          )}
-          <TextInput
-            label="Search"
-            value={assignFilters.search}
-            onChange={(v) => setAssignFilters((f) => ({ ...f, search: v }))}
-            placeholder="assignee/code/batch"
-          />
-          <TextInput
-            label="From"
-            type="datetime-local"
-            value={assignFilters.from}
-            onChange={(v) => setAssignFilters((f) => ({ ...f, from: v }))}
-            placeholder="from"
-          />
-          <TextInput
-            label="To"
-            type="datetime-local"
-            value={assignFilters.to}
-            onChange={(v) => setAssignFilters((f) => ({ ...f, to: v }))}
-            placeholder="to"
-          />
-        </div>
-
-        <div style={{ display: "flex", gap: 8, marginTop: 10, marginBottom: 10, flexWrap: "wrap" }}>
-          <button
-            onClick={() => {
-              setAssignPage(1);
-              loadDashboard(false);
-            }}
-            disabled={assignListLoading}
-            style={{
-              padding: "8px 12px",
-              background: "#0f172a",
-              color: "#fff",
-              border: 0,
-              borderRadius: 8,
-              cursor: assignListLoading ? "not-allowed" : "pointer",
-              fontWeight: 700,
-            }}
-          >
-            Apply Filters
-          </button>
-          <button
-            onClick={() => {
-              setAssignFilters({ role: "", assignee_id: "", search: "", from: "", to: "" });
-              setAssignPage(1);
-            }}
-            disabled={assignListLoading}
-            style={{
-              padding: "8px 12px",
-              background: "#fff",
-              color: "#0f172a",
-              border: "1px solid #e2e8f0",
-              borderRadius: 8,
-              cursor: assignListLoading ? "not-allowed" : "pointer",
-            }}
-          >
-            Reset
-          </button>
-          <div style={{ color: "#64748b", marginLeft: "auto" }}>{assignTotal} records</div>
-        </div>
-
-        <div
-          style={{
-            border: "1px solid #e2e8f0",
-            borderRadius: 10,
-            overflow: "hidden",
-            background: "#fff",
-          }}
-        >
-          <div style={{ overflowX: "auto" }}>
-            <div
-              style={{
-                minWidth: 1000,
-                display: "grid",
-                gridTemplateColumns: "120px 1fr 180px 120px 120px 1fr 200px",
-                gap: 8,
-                padding: "10px",
-                background: "#f8fafc",
-                borderBottom: "1px solid #e2e8f0",
-                fontWeight: 700,
-                color: "#0f172a",
-              }}
-            >
-              <div>Role</div>
-              <div>Assignee</div>
-              <div>Range/Info</div>
-              <div>Count</div>
-              <div>Batch</div>
-              <div>Assigned By</div>
-              <div>Assigned At</div>
-            </div>
-            <div>
-              {(assignments || []).map((a) => {
-                const role = a.role || (a.agency_id ? "agency" : a.employee_id ? "employee" : "");
-                const assignee =
-                  a.assignee_name ||
-                  (a.assignee && (a.assignee.username || a.assignee.name)) ||
-                  a.agency_name ||
-                  a.employee_name ||
-                  (a.agency && (a.agency.username || a.agency.name)) ||
-                  (a.employee && (a.employee.username || a.employee.name)) ||
-                  `#${a.assignee_id || a.agency_id || a.employee_id || ""}`;
-                const start = a.serial_start ?? a.start ?? a.range_start;
-                const end = a.serial_end ?? a.end ?? a.range_end;
-                const count =
-                  a.count ??
-                  (typeof start === "number" && typeof end === "number" ? end - start + 1 : "");
-                const info =
-                  typeof start === "number" && typeof end === "number"
-                    ? `${start} - ${end}`
-                    : "Random codes";
-                const batch =
-                  a.batch_display || (a.batch && `#${a.batch.id}`) || (a.batch_id ? `#${a.batch_id}` : "");
-                const by =
-                  a.assigned_by_name ||
-                  (a.assigned_by && (a.assigned_by.username || a.assigned_by.name)) ||
-                  (typeof a.assigned_by === "string" ? a.assigned_by : "");
-                const at = a.assigned_at || a.created_at || a.created || "";
-                return (
-                  <div
-                    key={a.id || `${role}-${assignee}-${start}-${end}-${Math.random()}`}
-                    style={{
-                      minWidth: 1000,
-                      display: "grid",
-                      gridTemplateColumns: "120px 1fr 180px 120px 120px 1fr 200px",
-                      gap: 8,
-                      padding: "10px",
-                      borderBottom: "1px solid #e2e8f0",
-                    }}
-                  >
-                    <div style={{ textTransform: "capitalize" }}>{role || "—"}</div>
-                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{assignee || "—"}</div>
-                    <div>{info}</div>
-                    <div>{count ?? "—"}</div>
-                    <div>{batch || "—"}</div>
-                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{by || "—"}</div>
-                    <div>{at ? new Date(at).toLocaleString() : "—"}</div>
-                  </div>
-                );
-              })}
-              {!assignListLoading && (!assignments || assignments.length === 0) ? (
-                <div style={{ padding: 12, color: "#64748b" }}>No assignments found</div>
-              ) : null}
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 10, flexWrap: "wrap" }}>
-          <button
-            onClick={() => setAssignPage((p) => Math.max(1, p - 1))}
-            disabled={assignPage <= 1 || assignListLoading}
-            style={{
-              padding: "6px 10px",
-              background: "#fff",
-              color: "#0f172a",
-              border: "1px solid #e2e8f0",
-              borderRadius: 8,
-              cursor: assignPage <= 1 || assignListLoading ? "not-allowed" : "pointer",
-            }}
-          >
-            Prev
-          </button>
-          <div style={{ color: "#64748b" }}>
-            Page {assignPage} / {Math.max(1, Math.ceil(assignTotal / assignPageSize) || 1)}
-          </div>
-          <button
-            onClick={() => {
-              const maxPage = Math.max(1, Math.ceil(assignTotal / assignPageSize) || 1);
-              setAssignPage((p) => Math.min(maxPage, p + 1));
-            }}
-            disabled={
-              assignPage >= Math.max(1, Math.ceil(assignTotal / assignPageSize) || 1) || assignListLoading
-            }
-            style={{
-              padding: "6px 10px",
-              background: "#fff",
-              color: "#0f172a",
-              border: "1px solid #e2e8f0",
-              borderRadius: 8,
-              cursor:
-                assignPage >= Math.max(1, Math.ceil(assignTotal / assignPageSize) || 1) || assignListLoading
-                  ? "not-allowed"
-                  : "pointer",
-            }}
-          >
-            Next
-          </button>
-        </div>
-      </Section>
-
-      {/* Metrics */}
+      {/* INVENTORY (minimal summary) */}
       <Section
         id="sec-metrics"
         visible={activeTab === "inventory"}
@@ -2236,7 +2192,7 @@ export default function AdminECoupons() {
               label="Batch"
               value={selectedBatch}
               onChange={setSelectedBatch}
-              options={[{ value: "", label: "Select..." }, ...batchOptions]}
+              options={[{ value: "", label: "Select..." }, ...batchOptionsAll]}
             />
             <button
               onClick={() => loadDashboard(false)}
@@ -2272,70 +2228,38 @@ export default function AdminECoupons() {
           <MetricCard label="Redeemed (Approved)" value={metrics.redeemed} />
           <MetricCard label="Revoked" value={metrics.revoked} />
         </div>
-        <div style={{ color: "#64748b", fontSize: 12, marginTop: 8 }}>
-          Notes: Redemption counts are computed per selected batch using CouponCode status.
-        </div>
       </Section>
 
-      {/* Admin: Agency Assignment Summary */}
+      {/* HISTORY (simple view) */}
       <Section
-        id="sec-agency-summary"
-        visible={activeTab === "inventory"}
-        title="Agency Assignment Summary"
+        id="sec-history"
+        visible={activeTab === "history"}
+        title="Assignment History"
         extraRight={
-          <div style={{ display: "flex", alignItems: "end", gap: 8 }}>
-            <TextInput
-              label="From"
-              type="datetime-local"
-              value={summaryFrom}
-              onChange={setSummaryFrom}
-              placeholder="from"
-              style={{ minWidth: 220 }}
-            />
-            <TextInput
-              label="To"
-              type="datetime-local"
-              value={summaryTo}
-              onChange={setSummaryTo}
-              placeholder="to"
-              style={{ minWidth: 220 }}
-            />
-            <button
-              onClick={loadAgencySummary}
-              disabled={summaryLoading}
-              style={{
-                padding: "8px 12px",
-                background: "#0f172a",
-                color: "#fff",
-                border: 0,
-                borderRadius: 8,
-                cursor: summaryLoading ? "not-allowed" : "pointer",
-                fontWeight: 700,
-                height: 40,
-                alignSelf: "end",
-              }}
-            >
-              {summaryLoading ? "Refreshing..." : "Refresh"}
-            </button>
-          </div>
+          <button
+            onClick={() => loadDashboard(false)}
+            disabled={assignListLoading}
+            style={{
+              padding: "8px 12px",
+              background: "#0f172a",
+              color: "#fff",
+              border: 0,
+              borderRadius: 8,
+              cursor: assignListLoading ? "not-allowed" : "pointer",
+              fontWeight: 700,
+            }}
+          >
+            {assignListLoading ? "Refreshing..." : "Refresh"}
+          </button>
         }
       >
-        {summaryError ? <div style={{ color: "#dc2626", marginBottom: 10 }}>{summaryError}</div> : null}
-        <div
-          style={{
-            border: "1px solid #e2e8f0",
-            borderRadius: 10,
-            overflow: "hidden",
-            background: "#fff",
-          }}
-        >
+        <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden", background: "#fff" }}>
           <div style={{ overflowX: "auto" }}>
             <div
               style={{
-                minWidth: 1200,
+                minWidth: 1000,
                 display: "grid",
-                gridTemplateColumns:
-                  "180px 220px 120px 140px 140px 120px 120px 140px 120px 120px 120px",
+                gridTemplateColumns: "120px 1fr 160px 120px 160px 200px",
                 gap: 8,
                 padding: "10px",
                 background: "#f8fafc",
@@ -2344,54 +2268,56 @@ export default function AdminECoupons() {
                 color: "#0f172a",
               }}
             >
-              <div>Username</div>
-              <div>Full Name</div>
-              <div>Pincode</div>
-              <div>City</div>
-              <div>State</div>
-              <div>Available</div>
-              <div>Assigned</div>
-              <div>Assigned Emp</div>
-              <div>Sold</div>
-              <div>Redeemed</div>
-              <div>Total</div>
+              <div>Role</div>
+              <div>Assignee</div>
+              <div>Info</div>
+              <div>Count</div>
+              <div>Batch</div>
+              <div>Assigned At</div>
             </div>
             <div>
-              {(summary || []).map((row, idx) => {
-                const counts = row.counts || {};
+              {(assignments || []).map((a, idx) => {
+                const role = a.role || (a.agency_id ? "agency" : a.employee_id ? "employee" : "");
+                const assignee =
+                  a.assignee_name ||
+                  a.agency_name ||
+                  a.employee_name ||
+                  `#${a.assignee_id || a.agency_id || a.employee_id || ""}`;
+                const start = a.serial_start ?? a.start ?? a.range_start;
+                const end = a.serial_end ?? a.end ?? a.range_end;
+                const count =
+                  a.count ??
+                  (typeof start === "number" && typeof end === "number" ? end - start + 1 : "");
+                const info =
+                  typeof start === "number" && typeof end === "number"
+                    ? `${start} - ${end}`
+                    : "Random codes";
+                const batch =
+                  a.batch_display || (a.batch && `#${a.batch.id}`) || (a.batch_id ? `#${a.batch_id}` : "");
+                const at = a.assigned_at || a.created_at || a.created || "";
                 return (
                   <div
-                    key={row.agency_id || idx}
+                    key={a.id || idx}
                     style={{
-                      minWidth: 1200,
+                      minWidth: 1000,
                       display: "grid",
-                      gridTemplateColumns:
-                        "180px 220px 120px 140px 140px 120px 120px 140px 120px 120px 120px",
+                      gridTemplateColumns: "120px 1fr 160px 120px 160px 200px",
                       gap: 8,
                       padding: "10px",
                       borderBottom: "1px solid #e2e8f0",
                     }}
                   >
-                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {row.username || "—"}
-                    </div>
-                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {row.full_name || "—"}
-                    </div>
-                    <div>{row.pincode || "—"}</div>
-                    <div>{row.city || "—"}</div>
-                    <div>{row.state || "—"}</div>
-                    <div>{counts.AVAILABLE ?? 0}</div>
-                    <div>{counts.ASSIGNED_AGENCY ?? 0}</div>
-                    <div>{counts.ASSIGNED_EMPLOYEE ?? 0}</div>
-                    <div>{counts.SOLD ?? 0}</div>
-                    <div>{counts.REDEEMED ?? 0}</div>
-                    <div>{row.total ?? 0}</div>
+                    <div style={{ textTransform: "capitalize" }}>{role || "—"}</div>
+                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{assignee || "—"}</div>
+                    <div>{info}</div>
+                    <div>{count ?? "—"}</div>
+                    <div>{batch || "—"}</div>
+                    <div>{at ? new Date(at).toLocaleString() : "—"}</div>
                   </div>
                 );
               })}
-              {!summaryLoading && (!summary || summary.length === 0) ? (
-                <div style={{ padding: 12, color: "#64748b" }}>No data</div>
+              {!assignListLoading && (!assignments || assignments.length === 0) ? (
+                <div style={{ padding: 12, color: "#64748b" }}>No assignments found</div>
               ) : null}
             </div>
           </div>

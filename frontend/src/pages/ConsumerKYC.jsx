@@ -35,6 +35,7 @@ export default function ConsumerKYC() {
     bank_name: "",
     bank_account_number: "",
     ifsc_code: "",
+    aadhaar_digilocker_url: "",
   });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -77,6 +78,7 @@ export default function ConsumerKYC() {
         bank_name: data.bank_name || "",
         bank_account_number: data.bank_account_number || "",
         ifsc_code: data.ifsc_code || "",
+        aadhaar_digilocker_url: data.aadhaar_digilocker_url || "",
       });
       setMeta({
         verified: Boolean(data.verified),
@@ -110,6 +112,7 @@ export default function ConsumerKYC() {
         bank_name: String(form.bank_name || "").trim(),
         bank_account_number: String(form.bank_account_number || "").trim(),
         ifsc_code: String(form.ifsc_code || "").trim().toUpperCase(),
+        aadhaar_digilocker_url: String(form.aadhaar_digilocker_url || "").trim(),
       };
       const res = await API.put("/accounts/kyc/me/", payload);
       const data = res?.data || {};
@@ -199,6 +202,18 @@ export default function ConsumerKYC() {
                 inputProps={{ style: { textTransform: "uppercase" }, maxLength: 11 }}
                 helperText="Example: HDFC0001234"
                 required
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                size="small"
+                name="aadhaar_digilocker_url"
+                label="Aadhaar DigiLocker URL (optional)"
+                value={form.aadhaar_digilocker_url}
+                onChange={onChange}
+                placeholder="https://digilocker.gov.in/..."
+                helperText="Paste your DigiLocker share link or Aadhaar proof URL (optional)"
               />
             </Grid>
             <Grid item xs={12}>

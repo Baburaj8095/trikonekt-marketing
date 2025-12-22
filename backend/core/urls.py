@@ -30,6 +30,7 @@ urlpatterns = [
     path('api/v1/reports/submit/', DailyReportSubmitView.as_view()),
     path('api/v1/reports/my-reports/', DailyReportMyView.as_view()),
     path('api/v1/reports/all/', DailyReportAllView.as_view()),
+    path('api/notifications/', include('notifications.urls')),
 ]
 
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

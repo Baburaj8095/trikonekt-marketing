@@ -36,7 +36,7 @@ export default function EmployeeShell({ children }) {
 
     // Dashboard tabs via query param
     { to: "/employee/dashboard?tab=lucky_draw_history", label: "Lucky Draw Submission", icon: "ticket" },
-    { to: "/employee/dashboard?tab=my_team", label: "My Team", icon: "tree" },
+    { to: "/employee/dashboard?tab=my_team", label: "Genealogy", icon: "tree" },
     { to: "/employee/dashboard?tab=refer_earn", label: "Refer & Earn", icon: "upload" },
     { to: "/employee/dashboard?tab=rewards", label: "Rewards", icon: "chart" },
     { to: "/employee/dashboard?tab=e_coupons", label: "My E‑Coupons", icon: "ticket" },

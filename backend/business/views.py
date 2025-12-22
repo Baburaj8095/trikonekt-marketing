@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from django.db import transaction
 from django.utils import timezone
 from django.http import HttpResponse
-from django.db.models import Q
+from django.db.models import Q, Sum
 from .models import (
     BusinessRegistration,
     RewardProgress,
@@ -17,12 +17,15 @@ from .models import (
     AgencyPackageAssignment,
     AgencyPackagePayment,
     CommissionConfig,
+    TriApp,
+    AgencyPackagePaymentRequest,
 )
 from .serializers import (
     BusinessRegistrationSerializer,
     DailyReportSerializer,
     AgencyPackageAssignmentSerializer,
     AgencyPackagePaymentSerializer,
+    AgencyPackagePaymentRequestSerializer,
 )
 
 
@@ -356,8 +359,10 @@ from .serializers import (
     PromoPurchaseSerializer,
     PromoEBookSerializer,
     EBookAccessSerializer,
+    TriAppSerializer,
 )
-from .models import PromoPackage, PromoPurchase, EBookAccess
+from .models import PromoPackage, PromoPurchase, EBookAccess, TriApp
+from .services.withdrawals import compute_withdraw_distribution, apply_withdraw_distribution
 
 
 class PromoPackageListView(APIView):
@@ -576,6 +581,8 @@ class AdminPromoPurchaseApproveView(APIView):
                 # Create permanent paid box records for selected boxes
                 try:
                     from .models import PromoMonthlyBox
+                    # Count existing paid boxes BEFORE creating new ones to detect first month
+                    prev_count = PromoMonthlyBox.objects.filter(user=obj.user, package=obj.package).count()
                     boxes = list(getattr(obj, "boxes_json", []) or [])
                     number = int(getattr(obj, "package_number", 1) or 1)
                     for b in boxes:
@@ -590,6 +597,22 @@ class AdminPromoPurchaseApproveView(APIView):
                             )
                         except Exception:
                             continue
+                    # Monthly 759 payouts (best-effort). First purchased box gets the first-month direct bonus.
+                    try:
+                        from business.services.monthly import distribute_monthly_759_payouts
+                        for idx, b in enumerate(boxes):
+                            try:
+                                bn = int(b)
+                            except Exception:
+                                bn = None
+                            is_first = bool(prev_count == 0 and idx == 0)
+                            distribute_monthly_759_payouts(
+                                obj.user,
+                                is_first_month=is_first,
+                                source={"type": "MONTHLY_759", "id": f"{obj.id}:{number}:{bn}"},
+                            )
+                    except Exception:
+                        pass
                 except Exception:
                     pass
                 # No calendar active window for MONTHLY per-box flow
@@ -751,6 +774,7 @@ class RewardPointsSummaryView(APIView):
                         "next_target_count": 1,
                         "points_at_next_target": 0,
                         "progress_percentage": 0,
+                        "available": 0,
                     },
                     status=status.HTTP_200_OK,
                 )
@@ -891,6 +915,12 @@ class RewardPointsSummaryView(APIView):
             span = 1
             progress_in_span = 0
         progress_pct = int(min(100, round(100 * progress_in_span / span)))
+        # Available reward points value in ₹ (after holds)
+        try:
+            from accounts.models import RewardPointsAccount
+            avail = float(RewardPointsAccount.get_available_value_in_inr(request.user))
+        except Exception:
+            avail = 0.0
 
         return Response(
             {
@@ -900,6 +930,7 @@ class RewardPointsSummaryView(APIView):
                 "next_target_count": int(next_target),
                 "points_at_next_target": int(next_points),
                 "progress_percentage": int(progress_pct),
+                "available": float(avail),
             },
             status=status.HTTP_200_OK,
         )
@@ -908,6 +939,69 @@ class RewardPointsSummaryView(APIView):
 # =======================
 # Packages: Agency + Admin
 # =======================
+
+class AgencyPackageCatalogView(APIView):
+    """
+    GET /api/business/agency-packages/catalog/
+    Returns active packages allowed for the current agency category with an `assigned` flag.
+    Category -> code prefix mapping:
+      - agency_sub_franchise -> AG_SF*
+      - agency_pincode       -> AG_PIN*  (future-safe)
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        # Must be an agency account
+        try:
+            role = str(getattr(user, "role", "") or "").lower()
+            cat = str(getattr(user, "category", "") or "").lower()
+            is_agency = (role == "agency") or cat.startswith("agency")
+        except Exception:
+            is_agency = False
+        if not is_agency:
+            return Response([], status=status.HTTP_200_OK)
+
+        # Determine allowed prefix by category
+        prefix = None
+        try:
+            if cat == "agency_sub_franchise":
+                prefix = "AG_SF"
+            elif cat == "agency_pincode":
+                prefix = "AG_PIN"
+        except Exception:
+            prefix = None
+
+        if not prefix:
+            # No catalog for other categories
+            return Response([], status=status.HTTP_200_OK)
+
+        # Query allowed active packages and compute assigned flag
+        pkgs_qs = Package.objects.filter(is_active=True, code__istartswith=prefix).order_by("amount", "code")
+        pkg_ids = list(pkgs_qs.values_list("id", flat=True))
+        assigned_ids = set(
+            AgencyPackageAssignment.objects.filter(agency=user, package_id__in=pkg_ids).values_list("package_id", flat=True)
+        )
+
+        out = []
+        for p in pkgs_qs:
+            try:
+                amt = f"{p.amount}"
+            except Exception:
+                amt = None
+            out.append(
+                {
+                    "id": p.id,
+                    "code": p.code,
+                    "name": p.name,
+                    "description": p.description or "",
+                    "amount": amt,
+                    "is_active": bool(p.is_active),
+                    "assigned": bool(p.id in assigned_ids),
+                }
+            )
+        return Response(out, status=status.HTTP_200_OK)
+
 class AgencyPackagesMeView(APIView):
     """
     GET /api/business/agency-packages/
@@ -964,6 +1058,130 @@ class AgencyPackagesMeView(APIView):
         return Response(ser.data, status=status.HTTP_200_OK)
 
 
+class AgencyAssignPackageView(APIView):
+    """
+    POST /api/business/agency-packages/assign/
+    Body:
+      {
+        "package_id": 1,                  # or provide "package_code": "BASIC"
+        "package_code": "BASIC",          # case-insensitive; ignored if package_id is provided
+        "amount": 1000.00,                # optional partial amount; if > 0, a payment row is created
+        "reference": "UPI-REF-123",       # optional
+        "notes": "First partial payment"  # optional
+      }
+    Ensures an AgencyPackageAssignment exists for the current user (must be an Agency*)
+    and optionally records a partial payment.
+    Returns the assignment with computed totals and status.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        from decimal import Decimal
+        user = request.user
+
+        # Enforce: only agency role/categories can use this endpoint
+        try:
+            role = str(getattr(user, "role", "") or "").lower()
+            cat = str(getattr(user, "category", "") or "").lower()
+            is_agency = (role == "agency") or cat.startswith("agency")
+        except Exception:
+            is_agency = False
+        if not is_agency:
+            return Response({"detail": "Only agency accounts can buy agency packages."}, status=status.HTTP_403_FORBIDDEN)
+
+        pkg = None
+        pkg_id = request.data.get("package_id")
+        pkg_code = request.data.get("package_code")
+        if pkg_id is not None:
+            try:
+                pkg = Package.objects.get(pk=int(pkg_id), is_active=True)
+            except Exception:
+                return Response({"package_id": ["Invalid package_id."]}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            if not pkg_code:
+                return Response({"package_code": ["Provide package_id or package_code."]}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                pkg = Package.objects.get(code__iexact=str(pkg_code).strip(), is_active=True)
+            except Package.DoesNotExist:
+                return Response({"package_code": ["Package not found or inactive."]}, status=status.HTTP_404_NOT_FOUND)
+
+        # Category/prefix guard: restrict package purchase by agency category
+        try:
+            cat = str(getattr(user, "category", "") or "").lower()
+
+            def _allowed_prefix(c):
+                if c == "agency_sub_franchise":
+                    return "AG_SF"
+                if c == "agency_pincode":
+                    return "AG_PIN"
+                return None
+
+            pref = _allowed_prefix(cat)
+            if pref:
+                code_val = str(getattr(pkg, "code", "") or "")
+                if not code_val.upper().startswith(pref.upper()):
+                    return Response({"detail": "Package not allowed for your category."}, status=status.HTTP_403_FORBIDDEN)
+        except Exception:
+            # best-effort guard; do not block the flow on failure
+            pass
+
+        # Ensure assignment
+        try:
+            assignment, created = AgencyPackageAssignment.objects.get_or_create(agency=user, package=pkg)
+        except Exception:
+            return Response({"detail": "Failed to ensure assignment."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Optional partial payment
+        pay_obj = None
+        amt_raw = request.data.get("amount", None)
+        if amt_raw is not None:
+            return Response({"detail": "Direct payments are disabled. Submit a payment request for admin approval."}, status=status.HTTP_400_BAD_REQUEST)
+        if amt_raw is not None:
+            try:
+                amount = Decimal(str(amt_raw))
+            except Exception:
+                return Response({"amount": ["Invalid amount."]}, status=status.HTTP_400_BAD_REQUEST)
+            if amount <= 0:
+                return Response({"amount": ["Amount must be greater than 0."]}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Clamp to remaining (prevent overpayment). If fully paid, block further payments.
+            try:
+                pkg_total = Decimal(str(getattr(assignment.package, "amount", "0") or "0"))
+            except Exception:
+                pkg_total = Decimal("0")
+            try:
+                paid_sum = assignment.payments.aggregate(s=Sum("amount")).get("s") or Decimal("0")
+            except Exception:
+                paid_sum = Decimal("0")
+            remaining = pkg_total - paid_sum
+            if remaining <= 0:
+                return Response({"detail": "Package already fully paid."}, status=status.HTTP_400_BAD_REQUEST)
+            if amount > remaining:
+                amount = remaining
+
+            reference = str(request.data.get("reference") or "").strip()
+            notes = str(request.data.get("notes") or "").strip()
+            try:
+                pay_obj = AgencyPackagePayment.objects.create(
+                    assignment=assignment,
+                    amount=amount,
+                    reference=reference,
+                    notes=notes,
+                )
+            except Exception:
+                return Response({"detail": "Failed to record payment."}, status=status.HTTP_400_BAD_REQUEST)
+
+        data = AgencyPackageAssignmentSerializer(assignment).data
+        if pay_obj:
+            data["latest_payment"] = {
+                "id": pay_obj.id,
+                "amount": f"{pay_obj.amount}",
+                "paid_at": pay_obj.paid_at,
+                "reference": pay_obj.reference,
+                "notes": pay_obj.notes,
+            }
+        return Response(data, status=status.HTTP_201_CREATED if (pay_obj or created) else status.HTTP_200_OK)
+
 class AdminCreateAgencyPackagePaymentView(APIView):
     """
     POST /api/business/agency-packages/{pk}/payments/
@@ -988,6 +1206,21 @@ class AdminCreateAgencyPackagePaymentView(APIView):
         if amount <= 0:
             return Response({"amount": ["Amount must be greater than 0."]}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Clamp to remaining (prevent overpayment). If fully paid, block further payments.
+        try:
+            pkg_total = Decimal(str(getattr(assignment.package, "amount", "0") or "0"))
+        except Exception:
+            pkg_total = Decimal("0")
+        try:
+            paid_sum = assignment.payments.aggregate(s=Sum("amount")).get("s") or Decimal("0")
+        except Exception:
+            paid_sum = Decimal("0")
+        remaining = pkg_total - paid_sum
+        if remaining <= 0:
+            return Response({"detail": "Package already fully paid."}, status=status.HTTP_400_BAD_REQUEST)
+        if amount > remaining:
+            amount = remaining
+
         reference = str(request.data.get("reference") or "").strip()
         notes = str(request.data.get("notes") or "").strip()
 
@@ -1009,6 +1242,237 @@ class AdminCreateAgencyPackagePaymentView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+class AgencyCreateMyAgencyPackagePaymentView(APIView):
+    """
+    POST /api/business/agency-packages/<pk>/my-payments/
+    Body: { "amount": <number>, "reference": "optional", "notes": "optional" }
+    Authenticated agency user: records a partial payment against OWN package assignment.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        return Response({"detail": "Direct payments are disabled. Submit a payment request for admin approval."}, status=status.HTTP_403_FORBIDDEN)
+        from decimal import Decimal
+        try:
+            assignment = AgencyPackageAssignment.objects.select_related("package", "agency").get(pk=pk, agency=request.user)
+        except AgencyPackageAssignment.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        amt_raw = request.data.get("amount")
+        try:
+            amount = Decimal(str(amt_raw))
+        except Exception:
+            return Response({"amount": ["Invalid amount."]}, status=status.HTTP_400_BAD_REQUEST)
+        if amount <= 0:
+            return Response({"amount": ["Amount must be greater than 0."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Clamp to remaining (prevent overpayment). If fully paid, block further payments.
+        try:
+            pkg_total = Decimal(str(getattr(assignment.package, "amount", "0") or "0"))
+        except Exception:
+            pkg_total = Decimal("0")
+        try:
+            paid_sum = assignment.payments.aggregate(s=Sum("amount")).get("s") or Decimal("0")
+        except Exception:
+            paid_sum = Decimal("0")
+        remaining = pkg_total - paid_sum
+        if remaining <= 0:
+            return Response({"detail": "Package already fully paid."}, status=status.HTTP_400_BAD_REQUEST)
+        if amount > remaining:
+            amount = remaining
+
+        reference = str(request.data.get("reference") or "").strip()
+        notes = str(request.data.get("notes") or "").strip()
+
+        pay = AgencyPackagePayment.objects.create(
+            assignment=assignment,
+            amount=amount,
+            reference=reference,
+            notes=notes,
+        )
+        return Response(
+            {
+                "id": pay.id,
+                "assignment": assignment.id,
+                "amount": f"{pay.amount}",
+                "paid_at": pay.paid_at,
+                "reference": pay.reference,
+                "notes": pay.notes,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+# =======================
+# Agency Package: Agency-submitted Payment Requests
+# =======================
+from rest_framework.parsers import MultiPartParser, FormParser
+
+
+class AgencyCreatePaymentRequestView(APIView):
+    """
+    POST /api/business/agency-packages/<pk>/payment-requests/
+    Form-data:
+      - amount (required, >0)
+      - method (default "UPI")
+      - utr (optional)            # UPI reference/UTR or any text reference
+      - notes (optional)
+      - payment_proof (file, optional)
+    Creates a PENDING payment request for OWN assignment. One pending at a time per assignment.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
+
+    def post(self, request, pk: int):
+        from decimal import Decimal
+        try:
+            assignment = AgencyPackageAssignment.objects.select_related("package", "agency").get(
+                pk=pk, agency=request.user
+            )
+        except AgencyPackageAssignment.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Block duplicate pending request for same assignment
+        exists = AgencyPackagePaymentRequest.objects.filter(assignment=assignment, status="PENDING").exists()
+        if exists:
+            return Response({"detail": "A payment request is already pending for this package."}, status=status.HTTP_400_BAD_REQUEST)
+
+        amt_raw = request.data.get("amount")
+        try:
+            amount = Decimal(str(amt_raw))
+        except Exception:
+            return Response({"amount": ["Invalid amount."]}, status=status.HTTP_400_BAD_REQUEST)
+        if amount <= 0:
+            return Response({"amount": ["Amount must be greater than 0."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        method = str(request.data.get("method") or "UPI").strip().upper()[:16]
+        utr = str(request.data.get("utr") or "").strip()[:100]
+        notes = str(request.data.get("notes") or "").strip()
+        proof = request.FILES.get("payment_proof") or request.FILES.get("file")
+
+        obj = AgencyPackagePaymentRequest.objects.create(
+            assignment=assignment,
+            agency=request.user,
+            package=assignment.package,
+            amount=amount,
+            method=method or "UPI",
+            utr=utr or "",
+            payment_proof=proof,
+            notes=notes or "",
+            status="PENDING",
+        )
+        ser = AgencyPackagePaymentRequestSerializer(obj, context={"request": request})
+        return Response(ser.data, status=status.HTTP_201_CREATED)
+
+
+class AdminAgencyPaymentRequestListView(APIView):
+    """
+    GET /api/business/admin/agency-packages/payment-requests/?status=PENDING|APPROVED|REJECTED
+    Admin-only list of agency payment requests. Defaults to PENDING.
+    """
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        status_in = (request.query_params.get("status") or "PENDING").strip().upper()
+        valid = {"PENDING", "APPROVED", "REJECTED"}
+        qs = (
+            AgencyPackagePaymentRequest.objects
+            .select_related("assignment", "package", "agency", "approved_by")
+            .order_by("-created_at", "-id")
+        )
+        if status_in in valid:
+            qs = qs.filter(status=status_in)
+        ser = AgencyPackagePaymentRequestSerializer(qs, many=True, context={"request": request})
+        return Response(ser.data, status=status.HTTP_200_OK)
+
+
+class AdminApproveAgencyPaymentRequestView(APIView):
+    """
+    POST /api/business/admin/agency-packages/payment-requests/<pk>/approve/
+    Body: { "admin_notes": "optional" }
+    Marks the request APPROVED and stamps approver. Payment row creation is handled by model signal.
+    """
+    permission_classes = [IsAdminUser]
+
+    def post(self, request, pk: int):
+        obj = AgencyPackagePaymentRequest.objects.select_related("assignment", "package", "agency").filter(pk=pk).first()
+        if not obj:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        if obj.status != "PENDING":
+            return Response({"detail": "Only PENDING requests can be approved."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from django.db import transaction as _tx
+
+        with _tx.atomic():
+            obj.status = "APPROVED"
+            obj.approved_by = request.user
+            obj.approved_at = timezone.now()
+            admin_notes = str((request.data or {}).get("admin_notes") or "").strip()
+            if admin_notes:
+                obj.admin_notes = admin_notes
+            obj.save(update_fields=["status", "approved_by", "approved_at", "admin_notes"])
+
+            # Create a concrete payment row against the assignment (idempotent on reference)
+            try:
+                ref = f"REQ-{obj.id}-{(obj.utr or obj.method or '').strip()}"
+                # Avoid duplicates on re-approval attempts
+                if not AgencyPackagePayment.objects.filter(assignment=obj.assignment, reference=ref[:100]).exists():
+                    # Clamp approval amount to remaining to prevent overpayment
+                    from decimal import Decimal as D
+                    try:
+                        pkg_total = D(str(getattr(obj.assignment.package, "amount", "0") or "0"))
+                    except Exception:
+                        pkg_total = D("0")
+                    try:
+                        paid_sum = obj.assignment.payments.aggregate(s=Sum("amount")).get("s") or D("0")
+                    except Exception:
+                        paid_sum = D("0")
+                    remaining = pkg_total - paid_sum
+                    if remaining > 0:
+                        try:
+                            pay_amount = D(str(obj.amount))
+                        except Exception:
+                            pay_amount = remaining
+                        if pay_amount > remaining:
+                            pay_amount = remaining
+                        AgencyPackagePayment.objects.create(
+                            assignment=obj.assignment,
+                            amount=pay_amount,
+                            reference=ref[:100],
+                            notes=(obj.notes or "")[:1000],
+                        )
+            except Exception:
+                # best-effort; do not block approval if payment row creation fails
+                pass
+
+        ser = AgencyPackagePaymentRequestSerializer(obj, context={"request": request})
+        return Response(ser.data, status=status.HTTP_200_OK)
+
+
+class AdminRejectAgencyPaymentRequestView(APIView):
+    """
+    POST /api/business/admin/agency-packages/payment-requests/<pk>/reject/
+    Body: { "admin_notes": "optional" }
+    """
+    permission_classes = [IsAdminUser]
+
+    def post(self, request, pk: int):
+        obj = AgencyPackagePaymentRequest.objects.select_related("assignment", "package", "agency").filter(pk=pk).first()
+        if not obj:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        if obj.status != "PENDING":
+            return Response({"detail": "Only PENDING requests can be rejected."}, status=status.HTTP_400_BAD_REQUEST)
+
+        obj.status = "REJECTED"
+        obj.approved_by = request.user
+        obj.approved_at = timezone.now()
+        admin_notes = str((request.data or {}).get("admin_notes") or "").strip()
+        if admin_notes:
+            obj.admin_notes = admin_notes
+        obj.save(update_fields=["status", "approved_by", "approved_at", "admin_notes"])
+        ser = AgencyPackagePaymentRequestSerializer(obj, context={"request": request})
+        return Response(ser.data, status=status.HTTP_200_OK)
 
 
 class DailyReportAllView(APIView):
@@ -1077,3 +1541,118 @@ class DailyReportAllView(APIView):
 
         ser = DailyReportSerializer(qs, many=True)
         return Response(ser.data, status=status.HTTP_200_OK)
+
+
+# ==============================
+# TRI Apps (Holidays, EV, etc.) — Endpoints
+# ==============================
+class TriAppListView(APIView):
+    """
+    GET /api/business/tri/apps/
+    List active TRI apps with capability flags and banner URL.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        qs = TriApp.objects.filter(is_active=True).order_by("slug")
+        ser = TriAppSerializer(qs, many=True, context={"request": request})
+        return Response(ser.data, status=status.HTTP_200_OK)
+
+
+class TriAppDetailView(APIView):
+    """
+    GET /api/business/tri/apps/<slug>/
+    Retrieve a TRI app with active products (image URLs) and admin-controlled flags:
+      - allow_price, allow_add_to_cart, allow_payment
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, slug):
+        obj = TriApp.objects.filter(slug=slug, is_active=True).first()
+        if not obj:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        ser = TriAppSerializer(obj, context={"request": request})
+        return Response(ser.data, status=status.HTTP_200_OK)
+
+
+# ==============================
+# Withdrawals: Direct Refer Commission Breakdown + Apply (Admin)
+# ==============================
+class WithdrawCommissionBreakdownView(APIView):
+    """
+    GET /api/business/withdrawals/breakdown/?amount=123.45[&user_id=PK]
+    - Authenticated users can see their own breakdown by omitting user_id.
+    - Admins can pass user_id to view breakdown for any user.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        amt_raw = request.query_params.get("amount")
+        if amt_raw is None:
+            return Response({"detail": "amount is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Target user selection
+        target_user = request.user
+        user_id = request.query_params.get("user_id")
+        if user_id:
+            if not (getattr(request.user, "is_staff", False) or getattr(request.user, "is_superuser", False)):
+                return Response({"detail": "Only admin can view another user's breakdown."}, status=status.HTTP_403_FORBIDDEN)
+            try:
+                from accounts.models import CustomUser
+                target_user = CustomUser.objects.get(pk=int(user_id))
+            except Exception:
+                return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        from decimal import Decimal
+        try:
+            amount = Decimal(str(amt_raw))
+        except Exception:
+            return Response({"detail": "Invalid amount."}, status=status.HTTP_400_BAD_REQUEST)
+        if amount <= 0:
+            return Response({"detail": "Amount must be greater than 0."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            breakdown = compute_withdraw_distribution(target_user, amount)
+        except Exception:
+            return Response({"detail": "Failed to compute breakdown."}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(breakdown, status=status.HTTP_200_OK)
+
+
+class AdminApplyWithdrawCommissionView(APIView):
+    """
+    POST /api/business/admin/withdrawals/apply/
+    Body: { "user_id": PK, "amount": 123.45, "source_type": "WITHDRAWAL", "source_id": "ref-123" }
+    Admin-only: applies the distribution by crediting sponsor/company wallets.
+    """
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        uid = request.data.get("user_id")
+        amt_raw = request.data.get("amount")
+        source_type = str(request.data.get("source_type") or "WITHDRAWAL")
+        source_id = str(request.data.get("source_id") or "")
+
+        if uid is None or amt_raw is None:
+            return Response({"detail": "user_id and amount are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            from accounts.models import CustomUser
+            target_user = CustomUser.objects.get(pk=int(uid))
+        except Exception:
+            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        from decimal import Decimal
+        try:
+            amount = Decimal(str(amt_raw))
+        except Exception:
+            return Response({"detail": "Invalid amount."}, status=status.HTTP_400_BAD_REQUEST)
+        if amount <= 0:
+            return Response({"detail": "Amount must be greater than 0."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            breakdown = apply_withdraw_distribution(target_user, amount, source_type=source_type, source_id=source_id)
+        except Exception:
+            return Response({"detail": "Failed to apply distribution."}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(breakdown, status=status.HTTP_200_OK)

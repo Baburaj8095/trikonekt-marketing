@@ -109,6 +109,29 @@ function writeNamespaced(base, value) {
   } catch (_) {}
 }
 
+function clearNamespaced(base) {
+  try {
+    const ns = currentNamespace();
+    const k = nsKey(base, ns);
+    if (typeof localStorage !== "undefined") {
+      try { localStorage.removeItem(k); } catch (_) {}
+    }
+    if (typeof sessionStorage !== "undefined") {
+      try { sessionStorage.removeItem(k); } catch (_) {}
+    }
+  } catch (_) {}
+}
+
+function clearAllAuthForNamespace() {
+  try {
+    clearNamespaced("token");
+    clearNamespaced("refresh");
+    if (typeof window !== "undefined") {
+      window.__tk_auth_blocked = true;
+    }
+  } catch (_) {}
+}
+
 /**
  * JWT helpers to keep session active until logout or storage is cleared.
  */
@@ -170,7 +193,12 @@ async function refreshAccessToken() {
       writeNamespaced("refresh", newRefresh);
     }
     return access || null;
-  } catch (_) {
+  } catch (err) {
+    // Refresh failed (400/401/expired/missing user): clear auth to avoid infinite refresh loops
+    clearAllAuthForNamespace();
+    try {
+      if (typeof window !== "undefined") window.__tk_auth_blocked = true;
+    } catch (_) {}
     return null;
   }
 }
@@ -197,6 +225,12 @@ async function ensureFreshAccess() {
     });
   }
   const refreshed = await refreshingPromise;
+  const isExpired = exp && exp <= now;
+  if (!refreshed && isExpired) {
+    // Access is already expired and refresh failed: clear tokens and proceed unauthenticated
+    clearAllAuthForNamespace();
+    return null;
+  }
   return refreshed || token;
 }
 
@@ -334,7 +368,14 @@ API.interceptors.request.use(async (config) => {
   let token = await ensureFreshAccess();
   if (!token) token = getAccessToken();
 
-  if (token) {
+  // Do not attach Authorization header for public endpoints to avoid 401 on AllowAny views
+  // when a stale/invalid token is present.
+  const pathForAuth = String(config.url || "").replace(/^\//, "");
+  const isPublicEndpoint =
+    pathForAuth.startsWith("location/") ||
+    pathForAuth.startsWith("accounts/regions/by-sponsor/");
+
+  if (token && !isPublicEndpoint) {
     config.headers = config.headers || {};
     // Respect manually provided Authorization header (e.g., post-login profile fetch)
     if (!config.headers.Authorization) {
@@ -467,11 +508,11 @@ API.interceptors.response.use(
         return API(originalRequest);
       }
 
-      // No refresh available or refresh failed: do NOT clear tokens automatically.
-      // Persist session until explicit logout or manual cache clear.
+      // No refresh available or refresh failed: clear tokens and signal UI to route to login
+      clearAllAuthForNamespace();
       try {
         if (typeof window !== "undefined") {
-          window.__tk_auth_blocked = true; // can be used by UI to route to login without wiping storage
+          window.__tk_auth_blocked = true;
         }
       } catch (_) {}
 
@@ -671,6 +712,46 @@ export async function adminUpdateMatrixCommissionConfig(payload = {}) {
 }
 
 /**
+ * Admin: Master Commission (tax, withdrawal sponsor %, company user, upline %, geo %)
+ */
+export async function adminGetMasterCommission() {
+  const res = await API.get("/admin/commission/master/", {
+    cacheTTL: 10_000,
+    dedupe: "cancelPrevious",
+  });
+  return res?.data || res;
+}
+
+export async function adminUpdateMasterCommission(payload = {}) {
+  // Accepts any subset:
+  // {
+  //   tax: { percent },
+  //   tax_company_user_id,
+  //   withdrawal: { sponsor_percent },
+  //   upline: { l1, l2, l3, l4, l5 },
+  //   geo: { sub_franchise, pincode, pincode_coord, district, district_coord, state, state_coord, employee, royalty }
+  // }
+  const res = await API.patch("/admin/commission/master/", payload);
+  return res?.data || res;
+}
+
+/**
+ * Admin: Preview Direct Refer Withdraw distribution
+ */
+export async function adminPreviewWithdrawDistribution({ user_id = null, user = null, username = null, amount }) {
+  const params = {};
+  if (user_id) params.user_id = user_id;
+  if (!params.user_id && user) params.user = user;
+  if (!params.user_id && !params.user && username) params.username = username;
+  params.amount = amount;
+  const res = await API.get("/admin/withdrawals/distribution-preview/", {
+    params,
+    dedupe: "cancelPrevious",
+  });
+  return res?.data || res;
+}
+
+/**
  * Admin: Rewards Points Config (tiers + per-coupon after base)
  */
 export async function adminGetRewardPointsConfig() {
@@ -783,6 +864,31 @@ export async function createProductPurchaseRequest(payload = {}) {
   return res?.data || res;
 }
 
+// List my product purchase requests (consumer "My Orders")
+export async function listMyProductPurchaseRequests(params = {}) {
+  const res = await API.get("/purchase-requests", {
+    params: { ...params, mine: 1 },
+    dedupe: "cancelPrevious",
+  });
+  return res?.data || res;
+}
+
+// Build absolute/relative API URL for browser navigation (e.g., invoice download)
+function buildApiUrl(path = "") {
+  try {
+    const b = baseURL || "/api/";
+    const p = String(path || "");
+    return b + (p.startsWith("/") ? p.slice(1) : p);
+  } catch (_) {
+    return `/api/${String(path || "").replace(/^\/+/, "")}`;
+  }
+}
+
+// Get invoice download URL for a purchase request
+export function getPurchaseInvoiceUrl(id) {
+  return buildApiUrl(`/purchase-requests/${encodeURIComponent(id)}/invoice/`);
+}
+
 /**
  * Rewards Points (coupon activation milestones)
  */
@@ -793,6 +899,197 @@ export async function getRewardPointsSummary() {
 
 export async function getMyEBooks() {
   const res = await API.get("/business/ebooks/mine/", { cacheTTL: 10000, dedupe: "cancelPrevious" });
+  return res?.data || res;
+}
+
+/**
+ * TRI Apps (Holidays, EV, etc.)
+ */
+export async function getTriApps() {
+  const res = await API.get("/business/tri/apps/", {
+    cacheTTL: 10_000,
+    dedupe: "cancelPrevious",
+  });
+  return res?.data || res;
+}
+export async function getTriApp(slug) {
+  const res = await API.get(`/business/tri/apps/${encodeURIComponent(slug)}/`, {
+    dedupe: "cancelPrevious",
+  });
+  return res?.data || res;
+}
+
+/**
+ * Agency Packages (Assign + My Payments)
+ */
+export async function agencyAssignPackage({ package_id, amount = null, reference = "", notes = "" } = {}) {
+  const payload = {};
+  if (package_id != null) payload.package_id = package_id;
+  if (amount != null) payload.amount = amount;
+  if (reference) payload.reference = String(reference);
+  if (notes) payload.notes = String(notes);
+  const res = await API.post("/business/agency-packages/assign/", payload);
+  return res?.data || res;
+}
+
+export async function agencyCreateMyPackagePayment(assignmentId, { amount, reference = "", notes = "" } = {}) {
+  const res = await API.post(`/business/agency-packages/${encodeURIComponent(assignmentId)}/my-payments/`, {
+    amount,
+    reference,
+    notes,
+  });
+  return res?.data || res;
+}
+
+/**
+ * Agency: Create a payment request (goes to Admin approval queue)
+ * Endpoint: POST /business/agency-packages/{assignmentId}/payment-requests/
+ * Payload (multipart): amount, method (e.g., "UPI"), utr?, payment_proof?
+ */
+export async function agencyCreatePaymentRequest(assignmentId, { amount, method = "UPI", utr = "", payment_proof = null } = {}) {
+  const fd = new FormData();
+  fd.append("amount", String(amount));
+  if (method) fd.append("method", String(method));
+  if (utr) fd.append("utr", String(utr));
+  if (payment_proof) fd.append("payment_proof", payment_proof);
+  const res = await API.post(`/business/agency-packages/${encodeURIComponent(assignmentId)}/payment-requests/`, fd, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res?.data || res;
+}
+
+/**
+ * Admin: Agency Package Payment Requests (Approve/Reject)
+ */
+export async function adminListAgencyPackagePaymentRequests(params = {}) {
+  const res = await API.get("/business/admin/agency-packages/payment-requests/", {
+    params,
+    dedupe: "cancelPrevious",
+  });
+  return res?.data || res;
+}
+
+export async function adminApproveAgencyPackagePaymentRequest(id, admin_notes = "") {
+  const body = admin_notes ? { admin_notes } : {};
+  const res = await API.post(`/business/admin/agency-packages/payment-requests/${encodeURIComponent(id)}/approve/`, body);
+  return res?.data || res;
+}
+
+export async function adminRejectAgencyPackagePaymentRequest(id, admin_notes = "") {
+  const body = admin_notes ? { admin_notes } : {};
+  const res = await API.post(`/business/admin/agency-packages/payment-requests/${encodeURIComponent(id)}/reject/`, body);
+  return res?.data || res;
+}
+
+/**
+ * Merchant marketplace APIs
+ */
+
+// Public shops (ACTIVE only)
+export async function getPublicShops(params = {}) {
+  const res = await API.get("/shops/", { params, dedupe: "cancelPrevious", cacheTTL: 10_000 });
+  return res?.data || res;
+}
+
+export async function getShopDetail(id) {
+  const res = await API.get(`/shops/${encodeURIComponent(id)}/`, { dedupe: "cancelPrevious" });
+  return res?.data || res;
+}
+
+// Merchant profile (auto-created on first access)
+export async function getMerchantProfile() {
+  const res = await API.get("/merchant/profile/", { dedupe: "cancelPrevious" });
+  return res?.data || res;
+}
+
+export async function updateMerchantProfile(payload = {}) {
+  const res = await API.patch("/merchant/profile/", payload);
+  return res?.data || res;
+}
+
+// Merchant's own shops
+export async function listMyShops(params = {}) {
+  const res = await API.get("/merchant/shops/", { params, dedupe: "cancelPrevious" });
+  return res?.data || res;
+}
+
+export async function createShop({
+  shop_name = "",
+  address = "",
+  city = "",
+  latitude = "",
+  longitude = "",
+  contact_number = "",
+  shop_image = null,
+} = {}) {
+  const fd = new FormData();
+  if (shop_name) fd.append("shop_name", String(shop_name));
+  if (address) fd.append("address", String(address));
+  if (city) fd.append("city", String(city));
+  if (latitude !== "" && latitude !== null && latitude !== undefined) fd.append("latitude", String(latitude));
+  if (longitude !== "" && longitude !== null && longitude !== undefined) fd.append("longitude", String(longitude));
+  if (contact_number) fd.append("contact_number", String(contact_number));
+  if (shop_image) fd.append("shop_image", shop_image);
+  const res = await API.post("/merchant/shops/", fd, { headers: { "Content-Type": "multipart/form-data" } });
+  return res?.data || res;
+}
+
+export async function updateShop(id, {
+  shop_name,
+  address,
+  city,
+  latitude,
+  longitude,
+  contact_number,
+  shop_image,
+} = {}) {
+  const fd = new FormData();
+  if (shop_name !== undefined) fd.append("shop_name", String(shop_name));
+  if (address !== undefined) fd.append("address", String(address));
+  if (city !== undefined) fd.append("city", String(city));
+  if (latitude !== undefined) fd.append("latitude", String(latitude));
+  if (longitude !== undefined) fd.append("longitude", String(longitude));
+  if (contact_number !== undefined) fd.append("contact_number", String(contact_number));
+  if (shop_image !== undefined && shop_image !== null) fd.append("shop_image", shop_image);
+  const res = await API.patch(`/merchant/shops/${encodeURIComponent(id)}/`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+  return res?.data || res;
+}
+
+export async function deleteShop(id) {
+  const res = await API.delete(`/merchant/shops/${encodeURIComponent(id)}/`);
+  return res?.data || res;
+}
+
+/**
+ * Notifications APIs
+ */
+export async function notificationsRegisterDeviceToken(payload = {}) {
+  const res = await API.post("/notifications/device-token/", payload);
+  return res?.data || res;
+}
+export async function notificationsUnreadCount() {
+  const res = await API.get("/notifications/unread-count/", {
+    cacheTTL: 15_000,
+    dedupe: "cancelPrevious",
+  });
+  return res?.data || res;
+}
+export async function notificationsPinned() {
+  const res = await API.get("/notifications/pinned/", {
+    cacheTTL: 30_000,
+    dedupe: "cancelPrevious",
+  });
+  return res?.data || res;
+}
+export async function notificationsInbox(params = {}) {
+  const res = await API.get("/notifications/inbox/", {
+    params,
+    dedupe: "cancelPrevious",
+  });
+  return res?.data || res;
+}
+export async function notificationsMarkRead(body = {}) {
+  const res = await API.patch("/notifications/mark-read/", body);
   return res?.data || res;
 }
 

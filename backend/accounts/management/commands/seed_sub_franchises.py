@@ -228,7 +228,8 @@ class Command(BaseCommand):
         summary = []
 
         for pin in pins:
-            sf_username = f"9{pin}000"
+            phone_sf = f"9{pin}000"
+            sf_username = f"TRSF{phone_sf}"
             # Determine sponsor as the pincode-level agency user for this pin
             sponsor_u = None
             sponsor_name = ""
@@ -240,9 +241,9 @@ class Command(BaseCommand):
             if dry_run:
                 summary.append({"username": sf_username, "category": "agency_sub_franchise", "sponsor": sponsor_name, "pin": pin, "children": []})
                 for i in range(1, employees_per + 1):
-                    summary[-1]["children"].append({"username": f"9{pin}{i:03d}", "category": "employee"})
+                    summary[-1]["children"].append({"username": f"TREP9{pin}{i:03d}", "category": "employee"})
                 for j in range(1, consumers_per + 1):
-                    summary[-1]["children"].append({"username": f"9{pin}{100 + j - 1:03d}", "category": "consumer"})
+                    summary[-1]["children"].append({"username": f"TR9{pin}{100 + j - 1:03d}", "category": "consumer"})
                 continue
 
             # Ensure Sub-Franchise
@@ -256,7 +257,7 @@ class Command(BaseCommand):
                 sponsor_user=sponsor_u,
                 email=f"{sf_username}@example.com",
                 full_name=f"Sub Franchise {pin}",
-                phone=sf_username,
+                phone=phone_sf,
                 country=india,
                 state=state,
                 city=city,
@@ -267,7 +268,8 @@ class Command(BaseCommand):
             # Employees
             children = []
             for i in range(1, employees_per + 1):
-                emp_username = f"9{pin}{i:03d}"
+                emp_phone = f"9{pin}{i:03d}"
+                emp_username = f"TREP{emp_phone}"
                 emp = _ensure_user(
                     username=emp_username,
                     category="employee",
@@ -276,7 +278,7 @@ class Command(BaseCommand):
                     sponsor_user=sf_user,
                     email=f"{emp_username}@example.com",
                     full_name=f"Employee {pin}-{i:02d}",
-                    phone=emp_username,
+                    phone=emp_phone,
                     country=india,
                     state=state,
                     city=city,
@@ -286,7 +288,8 @@ class Command(BaseCommand):
 
             # Consumers
             for j in range(1, consumers_per + 1):
-                cust_username = f"9{pin}{100 + j - 1:03d}"
+                cust_phone = f"9{pin}{100 + j - 1:03d}"
+                cust_username = f"TR{cust_phone}"
                 cust = _ensure_user(
                     username=cust_username,
                     category="consumer",
@@ -295,7 +298,7 @@ class Command(BaseCommand):
                     sponsor_user=sf_user,
                     email=f"{cust_username}@example.com",
                     full_name=f"Consumer {pin}-{j:02d}",
-                    phone=cust_username,
+                    phone=cust_phone,
                     country=india,
                     state=state,
                     city=city,

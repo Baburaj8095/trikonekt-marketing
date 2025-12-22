@@ -292,10 +292,10 @@ export default function RoleSelect() {
             <RoleCard
               icon={<BusinessIcon />}
               title="Business"
-              desc="Register your business; login is disabled."
+              desc="Sell on Trikonekt as a merchant."
+              onLogin={() => navigate(buildUrl("business", "login"))}
               onRegister={() => navigate(buildUrl("business", "register"))}
               colors={palette.business}
-              loginDisabled={true}
               isActive={activeRole === "business"}
               onSelect={() => setActiveRole("business")}
             />

@@ -15,7 +15,7 @@ import {
   Snackbar,
   Alert,
 } from "@mui/material";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import API, { getEcouponStoreBootstrap } from "../../api/api";
 import normalizeMediaUrl from "../../utils/media";
 import { addProduct } from "../../store/cart";
@@ -23,6 +23,7 @@ import { addProduct } from "../../store/cart";
 export default function ProductDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [qtyInput, setQtyInput] = useState("1");
@@ -179,12 +180,16 @@ export default function ProductDetails() {
                     onClick={() => {
                       try {
                         const q = Math.max(1, parseInt(qtyInput || "1", 10));
+                        const isTri = (location.pathname || "").includes("/trikonekt-products");
                         addProduct({
                           productId: Number(id),
                           name: data.name,
                           unitPrice: Number((Number(data?.price || 0) * (1 - Number(data?.discount || 0) / 100)).toFixed(2)),
                           qty: q,
                           shipping_address: "",
+                          tri: isTri,
+                          max_reward_pct: Number(data?.max_reward_redeem_percent || 0),
+                          tri_app_slug: isTri ? "trikonekt" : "",
                         });
                         setSnack({ open: true, type: "success", msg: "Added to cart." });
                       } catch {

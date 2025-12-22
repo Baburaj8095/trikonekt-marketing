@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Product, PurchaseRequest, Banner, BannerItem, BannerPurchaseRequest
+from .models import Product, PurchaseRequest, Banner, BannerItem, BannerPurchaseRequest, MerchantProfile, Shop
 
 
 @admin.register(Product)
@@ -88,6 +88,45 @@ class BannerPurchaseRequestAdmin(admin.ModelAdmin):
     search_fields = ('banner__title', 'banner_item__name', 'consumer_name', 'consumer_email', 'consumer_phone')
     autocomplete_fields = ('banner', 'banner_item', 'created_by')
     readonly_fields = ('created_at',)
+
+
+# =====================
+# Merchant marketplace admin
+# =====================
+
+@admin.register(MerchantProfile)
+class MerchantProfileAdmin(admin.ModelAdmin):
+    list_display = ('id', 'user_username', 'business_name', 'mobile_number', 'is_verified', 'created_at')
+    list_filter = ('is_verified', 'created_at')
+    search_fields = ('user__username', 'user__full_name', 'business_name', 'mobile_number')
+    autocomplete_fields = ('user',)
+    readonly_fields = ('created_at',)
+
+    def user_username(self, obj):
+        try:
+            return getattr(obj.user, 'username', None)
+        except Exception:
+            return None
+    user_username.short_description = 'Username'
+
+
+@admin.register(Shop)
+class ShopAdmin(admin.ModelAdmin):
+    list_display = ('id', 'image_thumb', 'shop_name', 'city', 'status', 'merchant', 'created_at')
+    list_filter = ('status', 'city', 'created_at')
+    search_fields = ('shop_name', 'address', 'city', 'merchant__username', 'merchant__full_name')
+    autocomplete_fields = ('merchant',)
+    readonly_fields = ('created_at', 'image_thumb')
+
+    def image_thumb(self, obj):
+        try:
+            f = getattr(obj, 'shop_image', None)
+            if f and getattr(f, 'url', None):
+                return format_html('<img src="{}" style="height:60px;width:auto;border-radius:4px;" />', f.url)
+        except Exception:
+            pass
+        return "-"
+    image_thumb.short_description = "Image"
 
 # ======================
 # Prune Market admin: keep only Product

@@ -41,11 +41,16 @@ function cloudinaryBackendFallback(url) {
   return "";
 }
 
-
 function approx(a, b, eps = 0.5) {
   return Math.abs(Number(a) - Number(b)) < eps;
 }
 
+function isSeasonPackage(pkg) {
+  const t = String(pkg?.type || "");
+  const price = Number(pkg?.price || 0);
+  // Treat MONTHLY and PRIME ≈ ₹759 as Season packages
+  return t === "MONTHLY" || (t === "PRIME" && approx(price, 759));
+}
 function inferPlanKind(pkg) {
   const type = String(pkg?.type || "");
   const price = Number(pkg?.price || 0);
@@ -101,6 +106,7 @@ function BoxGrid({ total = 12, purchased = [], selected = [], onToggle }) {
   );
 }
 
+// Old chips list (kept for reference, not used now)
 function SelectList({ items = [] }) {
   if (!items.length) return null;
   return (
@@ -109,6 +115,24 @@ function SelectList({ items = [] }) {
         <Chip key={idx} size="small" variant="outlined" label={it} />
       ))}
     </Stack>
+  );
+}
+
+// New bullet list for quick scanning (closer to screenshot UX)
+function Bullets({ items = [] }) {
+  if (!items.length) return null;
+  return (
+    <Box component="ul" sx={{ pl: 2, my: 1, color: "text.secondary" }}>
+      {items.map((it, idx) => (
+        <Box
+          component="li"
+          key={idx}
+          sx={{ fontSize: 13, lineHeight: 1.6, "&::marker": { color: "#64748b" } }}
+        >
+          {it}
+        </Box>
+      ))}
+    </Box>
   );
 }
 
@@ -127,18 +151,52 @@ function getPkgImageUrl(pkg) {
   return fallback || normalizeMediaUrl(url);
 }
 
+// Season display helpers: map MONTHLY -> SEASON for UI only
+function getDisplayType(pkg) {
+  return isSeasonPackage(pkg) ? "SEASON" : String(pkg?.type || "");
+}
+function getDisplayName(pkg) {
+  const name = String(pkg?.name || "");
+  if (isSeasonPackage(pkg)) {
+    return name.replace(/monthly/gi, "Season");
+  }
+  return name;
+}
+function getDisplayDescription(pkg) {
+  const desc = String(pkg?.description || "");
+  if (isSeasonPackage(pkg)) {
+    return desc.replace(/monthly/gi, "Season").replace(/\bmonth\b/gi, "season");
+  }
+  return desc;
+}
+
+function getProductImageUrl(prod) {
+  const candidates = [
+    prod?.image,
+    prod?.thumbnail,
+    prod?.image_url,
+    prod?.banner,
+    prod?.cover,
+  ].filter(Boolean);
+  if (!candidates.length) return "";
+  const url = String(candidates[0]);
+  const fallback = cloudinaryBackendFallback(url);
+  return fallback || normalizeMediaUrl(url);
+}
+
 /**
  * Modern ecommerce-style PackageCard
- * - Visual only changes; business logic unchanged
+ * - Visual upgrades
+ * - PRIME 750 product selection now inline instead of redirecting away
  */
 function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
-  // Quantity input (buffer) for PRIME packages only
+  // Quantity for PRIME packages
   const [qtyInput, setQtyInput] = useState("1");
 
-  const isMonthly = String(pkg?.type || "") === "MONTHLY";
+  const isSeason = isSeasonPackage(pkg);
   const price = Number(pkg?.price || 0);
   const kind = inferPlanKind(pkg);
-  const selectOptions = getPlanOptions(kind);
+  const selectOptions = isSeason ? getPlanOptions("MONTHLY") : getPlanOptions(kind);
 
   const isPrime150 =
     String(pkg?.type || "") === "PRIME" &&
@@ -150,7 +208,7 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
     Math.abs(Number(pkg?.price || 0) - 750) < 0.5;
   const [prime750Choice, setPrime750Choice] = useState("PRODUCT");
 
-  // PRIME 750 product selection
+  // PRIME 750 product selection (inline)
   const promoProducts = Array.isArray(pkg?.promo_products)
     ? pkg.promo_products
     : [];
@@ -182,11 +240,11 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
   const promoProductsPath = useMemo(() => {
     try {
       const p = location.pathname || "";
-      if (p.startsWith("/agency")) return "/agency/trikonekt-products";
-      if (p.startsWith("/employee")) return "/employee/trikonekt-products";
-      return "/trikonekt-products";
+      if (p.startsWith("/agency")) return "/agency/promo-products";
+      if (p.startsWith("/employee")) return "/employee/promo-products";
+      return "/promo-products";
     } catch {
-      return "/trikonekt-products";
+      return "/promo-products";
     }
   }, [location.pathname]);
 
@@ -213,12 +271,12 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
   };
 
   const accentColor =
-    kind === "PRIME150"
+    isSeason
+      ? "#EF6C00"
+      : kind === "PRIME150"
       ? "#0C2D48"
       : kind === "PRIME750"
       ? "#5E35B1"
-      : kind === "MONTHLY"
-      ? "#EF6C00"
       : "divider";
 
   // price and discount visuals (if backend provides discount_price)
@@ -231,6 +289,7 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
     discountPrice < price;
 
   const imgUrl = getPkgImageUrl(pkg);
+  const savings = hasDiscount ? Math.max(0, price - discountPrice) : 0;
 
   return (
     <Paper
@@ -280,6 +339,22 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
           )}
         </Box>
 
+        {/* Recommended flag for PRIME 750 */}
+        {isPrime750 ? (
+          <Chip
+            label="RECOMMENDED"
+            size="small"
+            sx={{
+              position: "absolute",
+              top: 8,
+              left: 8,
+              bgcolor: "success.main",
+              color: "#fff",
+              fontWeight: 800,
+            }}
+          />
+        ) : null}
+
         {/* Optional quick view icon */}
         <IconButton
           size="small"
@@ -296,6 +371,29 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
         >
           <VisibilityOutlinedIcon fontSize="small" />
         </IconButton>
+
+        {/* ADD overlay - opens config inline */}
+        <Button
+          size="small"
+          variant="contained"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowConfig(true);
+          }}
+          sx={{
+            position: "absolute",
+            bottom: 8,
+            right: 8,
+            textTransform: "none",
+            bgcolor: "#ffffff",
+            color: "#0C2D48",
+            border: "1px solid rgba(0,0,0,0.08)",
+            "&:hover": { bgcolor: "#fff" },
+            boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
+          }}
+        >
+          ADD
+        </Button>
       </Box>
 
       {/* Content */}
@@ -316,16 +414,16 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
                 overflow: "hidden",
                 minHeight: 36,
               }}
-              title={pkg?.name}
+              title={getDisplayName(pkg)}
             >
-              {pkg.name}
+              {getDisplayName(pkg)}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              Code: {pkg.code} • Type: {pkg.type}
+              Code: {pkg.code} • Type: {getDisplayType(pkg)}
             </Typography>
           </Box>
 
-          <Box sx={{ textAlign: "right", minWidth: 110 }}>
+          <Box sx={{ textAlign: "right", minWidth: 140 }}>
             <Typography
               variant="overline"
               color="text.secondary"
@@ -333,7 +431,12 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
             >
               Price
             </Typography>
-            <Stack direction="row" spacing={1} alignItems="baseline" sx={{ justifyContent: "flex-end" }}>
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="baseline"
+              sx={{ justifyContent: "flex-end" }}
+            >
               <Typography
                 variant="body1"
                 sx={{
@@ -353,6 +456,27 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
                 </Typography>
               )}
             </Stack>
+
+            {hasDiscount ? (
+              <Stack
+                direction="row"
+                spacing={1}
+                alignItems="center"
+                sx={{ justifyContent: "flex-end", mt: 0.75 }}
+              >
+                <Typography variant="caption" sx={{ fontWeight: 700 }}>
+                  Get at ₹{discountPrice.toLocaleString("en-IN")}
+                </Typography>
+                <Button
+                  size="small"
+                  variant="contained"
+                  color="success"
+                  sx={{ textTransform: "none", py: 0.25, minWidth: 0 }}
+                >
+                  Extra ₹{savings.toLocaleString("en-IN")} OFF
+                </Button>
+              </Stack>
+            ) : null}
           </Box>
         </Stack>
 
@@ -368,27 +492,27 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
               minHeight: 48,
             }}
           >
-            {pkg.description}
+            {getDisplayDescription(pkg)}
           </Typography>
         ) : null}
 
-        {/* Feature chips */}
-        <SelectList items={selectOptions} />
+        {/* Feature list as bullets (closer to the target UX) */}
+        <Bullets items={selectOptions} />
 
         <Divider sx={{ my: 1 }} />
 
-        {/* Actions: Configure + Add to Cart */}
+        {/* Actions: Add (opens config) */}
         <Stack
           direction="row"
           alignItems="center"
           justifyContent="space-between"
           sx={{ mb: 0.5 }}
         >
-          {isMonthly ? (
+          {isSeason ? (
             <Typography variant="caption" color="text.secondary">
               {selectedBoxes.length
                 ? `${selectedBoxes.length} box(es) selected`
-                : "Tap Configure to choose boxes"}
+                : "Tap Add to choose boxes"}
             </Typography>
           ) : (
             <span />
@@ -399,15 +523,15 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
             onClick={() => setShowConfig((v) => !v)}
             sx={{ textTransform: "none" }}
           >
-            {showConfig ? "Hide" : "Configure"}
+            {showConfig ? "Hide" : "Add"}
           </Button>
         </Stack>
 
-        {/* Configuration section (unchanged logic, visually collapsed by default) */}
+        {/* Configuration section (collapsible) */}
         {showConfig ? (
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
             <Box sx={{ flex: 1, minWidth: 220 }}>
-              {!isMonthly ? (
+              {!isSeason ? (
                 <Box sx={{ mt: 1 }}>
                   <Typography variant="caption" color="text.secondary">
                     Quantity
@@ -432,16 +556,16 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
                 </Box>
               ) : (
                 <Box sx={{ mt: 1 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Package
-                  </Typography>
+<Typography variant="caption" color="text.secondary">
+  Season
+</Typography>
                   <TextField
                     select
                     size="small"
                     value={packageNumber}
                     onChange={(e) => setPackageNumber(Number(e.target.value))}
                     sx={{ width: 160, mt: 0.5 }}
-                    helperText="Only the current package is enabled"
+  helperText="Only the current season is enabled"
                   >
                     {availableNumbers.map((n) => (
                       <MenuItem
@@ -449,7 +573,7 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
                         value={n}
                         disabled={Number(n) !== Number(allowedNumber)}
                       >
-                        Package #{n}
+                        Season #{n}
                       </MenuItem>
                     ))}
                   </TextField>
@@ -517,9 +641,7 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
                     onChange={(e) => {
                       const val = e.target.value;
                       setPrime750Choice(val);
-                      if (val === "PRODUCT") {
-                        navigate(promoProductsPath);
-                      }
+                      // No redirect; selection is handled inline
                     }}
                   >
                     <FormControlLabel
@@ -540,9 +662,121 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
                   </RadioGroup>
 
                   {prime750Choice === "PRODUCT" ? (
-                    <Alert severity="info" sx={{ mt: 1 }}>
-                      Redirecting to Promo Products to select an item.
-                    </Alert>
+                    <Box sx={{ mt: 1 }}>
+                      {promoProducts.length > 0 ? (
+                        <>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ mb: 0.5, display: "block" }}
+                          >
+                            Choose a product
+                          </Typography>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              gap: 1,
+                              overflowX: "auto",
+                              pb: 1,
+                            }}
+                          >
+                            {promoProducts.map((pp) => {
+                              const sel = String(selectedProductId) === String(pp.id);
+                              const pImg = getProductImageUrl(pp);
+                              return (
+                                <Paper
+                                  key={pp.id}
+                                  elevation={sel ? 3 : 0}
+                                  onClick={() => setSelectedProductId(pp.id)}
+                                  sx={{
+                                    minWidth: 140,
+                                    borderRadius: 1,
+                                    border: "1px solid",
+                                    borderColor: sel ? "primary.main" : "divider",
+                                    cursor: "pointer",
+                                    overflow: "hidden",
+                                  }}
+                                >
+                                  <Box
+                                    sx={{
+                                      width: 140,
+                                      height: 90,
+                                      bgcolor: "#f8fafc",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                    }}
+                                  >
+                                    {pImg ? (
+                                      <Box
+                                        component="img"
+                                        src={pImg}
+                                        alt={pp?.name || "Product"}
+                                        loading="lazy"
+                                        sx={{
+                                          maxWidth: "100%",
+                                          maxHeight: "100%",
+                                          objectFit: "contain",
+                                        }}
+                                      />
+                                    ) : (
+                                      <Box sx={{ width: "100%", height: "100%" }} />
+                                    )}
+                                  </Box>
+                                  <Box sx={{ p: 1 }}>
+                                    <Typography
+                                      variant="caption"
+                                      sx={{
+                                        fontWeight: sel ? 800 : 600,
+                                        display: "-webkit-box",
+                                        WebkitLineClamp: 2,
+                                        WebkitBoxOrient: "vertical",
+                                        overflow: "hidden",
+                                        minHeight: 32,
+                                      }}
+                                    >
+                                      {pp?.name || "Product"}
+                                    </Typography>
+                                    <Button
+                                      fullWidth
+                                      size="small"
+                                      variant={sel ? "contained" : "outlined"}
+                                      sx={{ mt: 0.5, textTransform: "none" }}
+                                    >
+                                      {sel ? "Selected" : "Select"}
+                                    </Button>
+                                  </Box>
+                                </Paper>
+                              );
+                            })}
+                          </Box>
+                        </>
+                      ) : (
+                        <Alert severity="info" sx={{ mt: 1 }}>
+                          No curated promo products available. You can browse all.
+                        </Alert>
+                      )}
+
+                      <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                        <TextField
+                          label="Shipping Address"
+                          value={shippingAddress}
+                          onChange={(e) => setShippingAddress(e.target.value)}
+                          size="small"
+                          fullWidth
+                          multiline
+                          minRows={2}
+                        />
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => navigate(promoProductsPath)}
+                          sx={{ whiteSpace: "nowrap" }}
+                        >
+                          Browse all
+                        </Button>
+                      </Stack>
+                    </Box>
                   ) : (
                     <Typography variant="caption" color="text.secondary">
                       {prime750Choice === "REDEEM"
@@ -562,11 +796,11 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
                   variant="outlined"
                   onClick={() => {
                     if (onAddToCart) {
-                      if (isMonthly) {
+                      if (isSeason) {
                         if (!selectedBoxes || selectedBoxes.length === 0) {
                           try {
                             window.alert(
-                              "Please tap Configure and select at least one box."
+                              "Please tap Add and select at least one box."
                             );
                           } catch {}
                           setShowConfig(true);
@@ -579,20 +813,18 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
                           quantity: selectedBoxes.length,
                         });
                       } else {
-                        const q = Math.max(
-                          1,
-                          parseInt(qtyInput || "1", 10)
-                        );
+                        const q = Math.max(1, parseInt(qtyInput || "1", 10));
 
-                        // PRIME 750 PRODUCT flow: browse Promo Products page instead of in-card selection
+                        // PRIME 750 PRODUCT: require inline selection, do not redirect
                         if (isPrime750 && prime750Choice === "PRODUCT") {
-                          try {
-                            window.alert(
-                              "Browse Promo Products to select an item."
-                            );
-                          } catch {}
-                          navigate(promoProductsPath);
-                          return;
+                          if (!selectedProductId) {
+                            try {
+                              window.alert(
+                                "Please select a product before adding to cart."
+                              );
+                            } catch {}
+                            return;
+                          }
                         }
 
                         onAddToCart({
@@ -681,7 +913,11 @@ export default function PromoPackages() {
   const urlFilteredPkgs = useMemo(() => {
     const list = pkgs || [];
     if (selectedFilter === "monthly") {
-      return list.filter((p) => String(p.type) === "MONTHLY");
+      return list.filter((p) => {
+        const t = String(p.type);
+        const price = Number(p.price || 0);
+        return t === "MONTHLY" || (t === "PRIME" && approx(price, 759));
+      });
     }
     if (selectedFilter === "prime150") {
       return list.filter((p) => {
@@ -726,7 +962,7 @@ export default function PromoPackages() {
       const price = Number(p?.price || 0);
       const name = String(p?.name || "").toLowerCase();
       const code = String(p?.code || "").toLowerCase();
-      const isMonthly = type === "MONTHLY";
+      const isSeason = type === "MONTHLY" || (type === "PRIME" && approx(price, 759));
       const isPrime150 =
         type === "PRIME" &&
         (Math.abs(price - 150) < 0.5 ||
@@ -738,7 +974,7 @@ export default function PromoPackages() {
           name.includes("750") ||
           code.includes("750"));
       return (
-        (filterMonthly && isMonthly) ||
+        (filterMonthly && isSeason) ||
         (filterPrime150 && isPrime150) ||
         (filterPrime750 && isPrime750)
       );
@@ -803,7 +1039,7 @@ export default function PromoPackages() {
     loadPurchases();
   }, []);
 
-  // Add to centralized cart (unchanged business logic)
+  // Add to centralized cart (unchanged business logic except PRIME 750 UX)
   const addToCart = ({
     package: pkg,
     quantity = 1,
@@ -816,11 +1052,11 @@ export default function PromoPackages() {
     boxes = [],
   }) => {
     try {
-      const isMonthly = String(pkg?.type || "") === "MONTHLY";
-      if (isMonthly) {
+      const isSeason = isSeasonPackage(pkg);
+      if (isSeason) {
         addPromoPackageMonthly({
           pkgId: pkg?.id,
-          name: pkg?.name,
+      name: getDisplayName(pkg),
           unitPrice: Number(pkg?.price || 0),
           package_number,
           boxes: Array.isArray(boxes) ? boxes : [],
@@ -868,7 +1104,7 @@ export default function PromoPackages() {
       discount: discountPercent, // QuickViewModal expects a percent
       quantity: 999,
       image_url: getPkgImageUrl(pkg),
-      description: pkg?.description || "",
+      description: getDisplayDescription(pkg) || "",
       created_by_name: "", // not applicable
     };
     setQuickProduct(mapped);
@@ -931,7 +1167,7 @@ export default function PromoPackages() {
                     onChange={(e) => setFilterMonthly(e.target.checked)}
                   />
                 }
-                label="Monthly"
+                label="Season"
               />
               <FormControlLabel
                 control={
@@ -1023,7 +1259,7 @@ export default function PromoPackages() {
         </Stack>
       </Paper>
 
-      {/* My Purchases (kept as-is) */}
+      {/* My Purchases */}
       <Paper
         elevation={0}
         className="rounded-xl shadow-md"
@@ -1090,13 +1326,13 @@ export default function PromoPackages() {
                   >
                     <Box>
                       <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
-                        {pp?.package?.name}{" "}
+                        {getDisplayName(pp?.package)}{" "}
                         <Typography
                           component="span"
                           variant="caption"
                           color="text.secondary"
                         >
-                          ({pp?.package?.type})
+                          ({getDisplayType(pp?.package)})
                         </Typography>
                       </Typography>
                       <Typography variant="caption" color="text.secondary">

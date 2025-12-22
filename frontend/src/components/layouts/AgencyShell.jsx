@@ -23,6 +23,48 @@ export default function AgencyShell({ children }) {
   }, []);
   const displayName = storedUser?.full_name || storedUser?.username || "Agency";
 
+  // Compute small badge text to show agency category on the top-right (beside notifications)
+  const agencyCategory = storedUser?.category || "";
+  const pincode = storedUser?.pincode || "";
+  const categoryLabel = useMemo(() => {
+    const map = {
+      agency_sub_franchise: "Sub Franchise",
+      agency_pincode: "Pincode",
+      agency_pincode_coordinator: "Pincode Coordinator",
+      agency_district: "District",
+      agency_district_coordinator: "District Coordinator",
+      agency_state: "State",
+      agency_state_coordinator: "State Coordinator",
+      company: "Company",
+      business: "Business",
+      employee: "Employee",
+      consumer: "Consumer",
+    };
+    const raw = map[agencyCategory] || (agencyCategory ? agencyCategory.replaceAll("_", " ") : "Agency");
+    // Title-case
+    return raw.replace(/\b\w/g, (m) => m.toUpperCase());
+  }, [agencyCategory]);
+  const rightPill = useMemo(() => (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "4px 10px",
+        borderRadius: 999,
+        border: "1px solid #e2e8f0",
+        background: "#f8fafc",
+        color: "#0f172a",
+        fontSize: 12,
+        fontWeight: 700,
+        whiteSpace: "nowrap"
+      }}
+      title={agencyCategory}
+    >
+      {categoryLabel}{pincode ? ` • ${pincode}` : ""}
+    </span>
+  ), [categoryLabel, pincode, agencyCategory]);
+
   const onLogout = () => {
     try {
       localStorage.removeItem("token_agency");
@@ -41,29 +83,30 @@ export default function AgencyShell({ children }) {
   const menu = [
     { to: "/agency/dashboard", label: "Dashboard", icon: "dashboard" },
     { to: "/agency/profile", label: "Profile", icon: "users" },
-    { to: "/agency/wallet", label: "Wallet", icon: "wallet" },
+
+    // Refer & Earn (as in sketch order)
+    { to: "/agency/refer-earn", label: "Refer & Earn", icon: "users" },
+
+    // Wallet and History
+    { to: "/agency/wallet", label: "Earning Wallet", icon: "wallet" },
     { to: "/agency/history", label: "History", icon: "orders" },
 
-    // Lucky-coupons tabs
-    { to: "/agency/lucky-coupons?tab=pending", label: "Manual Coupon Submissions", icon: "ticket" },
-    { to: "/agency/lucky-coupons?tab=assign", label: "E Coupon", icon: "ticket" },
-    { to: "/agency/e-coupon-store", label: "E-Coupon Store", icon: "box" },
-    { to: "/agency/cart", label: "Cart", icon: "orders" },
-    // { to: "/agency/lucky-coupons?tab=commission", label: "Commission Summary", icon: "chart" },
+    // Agency Prime Package
+    { to: "/agency/prime-package", label: "Agency Prime Package", icon: "box" },
 
-    { to: "/agency/my-team", label: "My Team", icon: "tree" },
-    { to: "/agency/daily-report", label: "Daily Report", icon: "chart" },
+    // Genealogy
+    { to: "/agency/my-team", label: "Genealogy", icon: "tree" },
 
+    // Coupons (3 tabs inside: E‑coupon, Store, Cart)
+    { to: "/agency/coupons", label: "Coupons", icon: "ticket" },
+
+    // Reports
+    { to: "/agency/daily-report", label: "Daily Employee Report", icon: "chart" },
 
     // Trikonekt Products
     { to: "/agency/trikonekt-products", label: "Trikonekt Products", icon: "box" },
 
-    // Refer & Earn
-    { to: "/agency/refer-earn", label: "Refer & Earn", icon: "users" },
-
-    // Resources
-    { to: "/agency/banners", label: "Banners", icon: "image" },
-    { to: "/agency/purchase-requests", label: "Purchase Requests", icon: "orders" },
+    // Support
     { to: "/agency/support", label: "Support", icon: "ticket" },
   ];
 
@@ -94,6 +137,18 @@ export default function AgencyShell({ children }) {
       return loc.pathname === "/agency/trikonekt-products" || loc.pathname.startsWith("/agency/trikonekt-products/");
     }
 
+    // Coupons page (ignore query params)
+    if (toPath === "/agency/coupons") {
+      return loc.pathname === "/agency/coupons";
+    }
+    // Prime Package page (ignore query params)
+    if (toPath === "/agency/prime-package") {
+      return (
+        loc.pathname === "/agency/prime-package" ||
+        loc.pathname === "/agency/prime-approval"
+      );
+    }
+
     // Exact match including query for everything else
     return `${loc.pathname}${loc.search}` === to;
   };
@@ -105,6 +160,7 @@ export default function AgencyShell({ children }) {
       isActive={isActive}
       onLogout={onLogout}
       footerText={`Logged in as: ${displayName}`}
+      rightHeaderContent={rightPill}
     >
       {children}
     </ShellBase>
