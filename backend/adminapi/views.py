@@ -2155,50 +2155,163 @@ class AdminLevelCommissionSeedView(APIView):
 
 class AdminMatrixCommissionConfig(APIView):
     """
-    GET: Return current 5‑matrix and 3‑matrix commission configuration (levels + amounts/percents)
-         {
-           five_matrix_levels, five_matrix_amounts_json, five_matrix_percents_json,
-           three_matrix_levels, three_matrix_amounts_json, three_matrix_percents_json,
-           updated_at
-         }
-    PATCH: Update any subset of those keys with numeric arrays (coerced to length by levels)
-           Body e.g. { "five_matrix_amounts_json": [15, 2, 2.5, 0.5, 0.05, 0.1] }
+    GET:
+      - When no ?product= is provided: returns global typed fields on CommissionConfig
+        {
+          five_matrix_levels, five_matrix_amounts_json, five_matrix_percents_json,
+          three_matrix_levels, three_matrix_amounts_json, three_matrix_percents_json,
+          updated_at
+        }
+      - When ?product=coupon150|rs759 is provided: returns per‑product overrides under
+        master_commission_json.consumer_matrix_5/3[productKey] with fallback to globals.
+        productKey: "150" for coupon150, "759" for rs759.
+
+    PATCH:
+      - No product: same as before, updates typed fields via AdminAutopoolConfigSerializer.
+      - With product: updates master_commission_json.consumer_matrix_5/3[productKey].
+        Accepts any subset: five_matrix_levels, five_matrix_amounts_json, five_matrix_percents_json,
+                            three_matrix_levels, three_matrix_amounts_json, three_matrix_percents_json.
+        Arrays are coerced to 2 decimals; when levels provided, arrays are padded/truncated to match.
     """
     permission_classes = [IsAdminOrStaff]
 
+    def _product_key(self, request):
+        p = (request.query_params.get("product") or "").strip().lower()
+        if p in ("coupon150", "coupon_150", "150", "prime150", "prime_150"):
+            return "150"
+        if p in ("rs759", "759", "prime750", "prime_750", "750"):
+            return "759"
+        return None
+
+    def _to_num_list(self, arr):
+        out = []
+        try:
+            for x in (arr or []):
+                from decimal import Decimal as D
+                out.append(float(D(str(x)).quantize(D("0.01"))))
+        except Exception:
+            pass
+        return out
+
     def get(self, request):
         cfg = CommissionConfig.get_solo()
-        ser = AdminAutopoolConfigSerializer(cfg)
-        return Response(ser.data, status=200)
+        pk = self._product_key(request)
+        if not pk:
+            ser = AdminAutopoolConfigSerializer(cfg)
+            return Response(ser.data, status=200)
+
+        master = dict(getattr(cfg, "master_commission_json", {}) or {})
+        cm5_all = dict(master.get("consumer_matrix_5", {}) or {})
+        cm3_all = dict(master.get("consumer_matrix_3", {}) or {})
+        cm5 = dict(cm5_all.get(pk, {}) or {})
+        cm3 = dict(cm3_all.get(pk, {}) or {})
+
+        five_levels = int(cm5.get("levels") or getattr(cfg, "five_matrix_levels", 6) or 6)
+        three_levels = int(cm3.get("levels") or getattr(cfg, "three_matrix_levels", 15) or 15)
+
+        resp = {
+            "five_matrix_levels": five_levels,
+            "five_matrix_amounts_json": self._to_num_list(cm5.get("fixed_amounts") or getattr(cfg, "five_matrix_amounts_json", []) or []),
+            "five_matrix_percents_json": self._to_num_list(cm5.get("percents") or getattr(cfg, "five_matrix_percents_json", []) or []),
+            "three_matrix_levels": three_levels,
+            "three_matrix_amounts_json": self._to_num_list(cm3.get("fixed_amounts") or getattr(cfg, "three_matrix_amounts_json", []) or []),
+            "three_matrix_percents_json": self._to_num_list(cm3.get("percents") or getattr(cfg, "three_matrix_percents_json", []) or []),
+            "updated_at": getattr(cfg, "updated_at", None),
+        }
+        return Response(resp, status=200)
 
     def patch(self, request):
         cfg = CommissionConfig.get_solo()
-        ser = AdminAutopoolConfigSerializer(cfg, data=request.data, partial=True)
-        if ser.is_valid():
-            obj = ser.save()
-            return Response(AdminAutopoolConfigSerializer(obj).data, status=200)
-        return Response(ser.errors, status=400)
+        pk = self._product_key(request)
+        if not pk:
+            ser = AdminAutopoolConfigSerializer(cfg, data=request.data, partial=True)
+            if ser.is_valid():
+                obj = ser.save()
+                return Response(AdminAutopoolConfigSerializer(obj).data, status=200)
+            return Response(ser.errors, status=400)
+
+        data = request.data or {}
+        master = dict(getattr(cfg, "master_commission_json", {}) or {})
+        cm5_all = dict(master.get("consumer_matrix_5", {}) or {})
+        cm3_all = dict(master.get("consumer_matrix_3", {}) or {})
+        cm5 = dict(cm5_all.get(pk, {}) or {})
+        cm3 = dict(cm3_all.get(pk, {}) or {})
+
+        from decimal import Decimal as D
+
+        def coerce_int(v, default_val):
+            try:
+                iv = int(v)
+                return iv if iv > 0 else int(default_val)
+            except Exception:
+                return int(default_val)
+
+        # five levels
+        if "five_matrix_levels" in data:
+            cm5["levels"] = coerce_int(data.get("five_matrix_levels"), cm5.get("levels") or getattr(cfg, "five_matrix_levels", 6) or 6)
+        # amounts/percents (coerce to 2 decimals)
+        if "five_matrix_amounts_json" in data:
+            cm5["fixed_amounts"] = self._to_num_list(data.get("five_matrix_amounts_json"))
+        if "five_matrix_percents_json" in data:
+            cm5["percents"] = self._to_num_list(data.get("five_matrix_percents_json"))
+
+        # three levels
+        if "three_matrix_levels" in data:
+            cm3["levels"] = coerce_int(data.get("three_matrix_levels"), cm3.get("levels") or getattr(cfg, "three_matrix_levels", 15) or 15)
+        if "three_matrix_amounts_json" in data:
+            cm3["fixed_amounts"] = self._to_num_list(data.get("three_matrix_amounts_json"))
+        if "three_matrix_percents_json" in data:
+            cm3["percents"] = self._to_num_list(data.get("three_matrix_percents_json"))
+
+        # Normalize lengths to levels if both present
+        def normalize(block):
+            levels = int(block.get("levels") or 0)
+            if levels > 0:
+                for key in ("fixed_amounts", "percents"):
+                    arr = list(block.get(key) or [])
+                    if arr:
+                        if len(arr) > levels:
+                            block[key] = arr[:levels]
+                        elif len(arr) < levels:
+                            block[key] = arr + [0.0] * (levels - len(arr))
+
+        normalize(cm5)
+        normalize(cm3)
+
+        cm5_all[pk] = cm5
+        cm3_all[pk] = cm3
+        master["consumer_matrix_5"] = cm5_all
+        master["consumer_matrix_3"] = cm3_all
+        cfg.master_commission_json = master
+        try:
+            cfg.save(update_fields=["master_commission_json", "updated_at"])
+        except Exception:
+            cfg.save()
+        # Return fresh product-specific payload
+        request._request.GET._mutable = True if hasattr(request._request.GET, "_mutable") else False  # noop safety
+        return self.get(request)
 
 
 class AdminMasterCommissionConfig(APIView):
     """
-    GET: Current Master Commission configuration used across flows (withdrawals sponsor %, tax %, company user).
-         {
-           "tax": { "percent": 10.0 },
-           "withdrawal": { "sponsor_percent": 3.0 },
-           "company_user": { "id": 1, "username": "company" } | null,
-           "upline": { "l1": 2, "l2": 1, "l3": 1, "l4": 0.5, "l5": 0.5 },         // optional convenience
-           "geo": { "sub_franchise": 15, "pincode": 4, ... },                      // optional convenience
-           "updated_at": "..."
-         }
-    PATCH: Update any subset:
-         {
-           "tax": { "percent": 10 },
-           "tax_company_user_id": 1,
-           "withdrawal": { "sponsor_percent": 3 },
-           "upline": { "l1": 2, "l2": 1, "l3": 1, "l4": 0.5, "l5": 0.5 },
-           "geo": { "sub_franchise": 15, "pincode": 4, ... }
-         }
+    GET:
+      - No product: return global master commission view (tax, withdrawal %, company user, upline %, global geo %)
+      - With ?product=coupon150|rs759: additionally include per-product keys under master_commission_json:
+        {
+          direct_bonus: { sponsor, self },
+          geo_mode: "fixed" | "percent" | "",
+          geo_fixed: { role -> ₹ },
+          geo: percent overrides for this product (fallback to global if missing)
+        }
+    PATCH:
+      - No product: existing behavior (tax, withdrawal.sponsor_percent, upline %, global geo %)
+      - With product: accept any subset of:
+          { direct_bonus: { sponsor, self },
+            geo_mode: "fixed" | "percent",
+            geo_fixed: { sub_franchise, pincode, pincode_coord, district, district_coord, state, state_coord, employee, royalty },
+            geo: { same keys as above }  # product-specific percent overrides
+          }
+        Global keys (tax, withdrawal, upline) are also allowed and update as usual.
     """
     permission_classes = [IsAdminOrStaff]
 
@@ -2211,6 +2324,14 @@ class AdminMasterCommissionConfig(APIView):
                 return float(v)
             except Exception:
                 return 0.0
+
+    def _product_key(self, request):
+        p = (request.query_params.get("product") or "").strip().lower()
+        if p in ("coupon150", "coupon_150", "150", "prime150", "prime_150"):
+            return "150"
+        if p in ("rs759", "759", "prime750", "prime_750", "750"):
+            return "759"
+        return None
 
     def get(self, request):
         cfg = CommissionConfig.get_solo()
@@ -2227,25 +2348,49 @@ class AdminMasterCommissionConfig(APIView):
         except Exception:
             upline = {"l1": 0, "l2": 0, "l3": 0, "l4": 0, "l5": 0}
         geo_raw = cfg.get_geo_percents()
-        geo = {k: self._float(v) for k, v in (geo_raw.items() if isinstance(geo_raw, dict) else [])}
+        geo_global = {k: self._float(v) for k, v in (geo_raw.items() if isinstance(geo_raw, dict) else [])}
+
         payload = {
             "tax": {"percent": self._float(cfg.get_tax_percent())},
             "withdrawal": {"sponsor_percent": self._float(cfg.get_withdrawal_sponsor_percent())},
             "company_user": ({"id": getattr(cu, "id", None), "username": getattr(cu, "username", None)} if cu else None),
             "upline": upline,
-            "geo": geo,
+            "geo": geo_global,
             "updated_at": getattr(cfg, "updated_at", None),
         }
+
+        pk = self._product_key(request)
+        if pk:
+            master = dict(getattr(cfg, "master_commission_json", {}) or {})
+            direct_all = dict(master.get("direct_bonus", {}) or {})
+            geo_mode_all = dict(master.get("geo_mode", {}) or {})
+            geo_fixed_all = dict(master.get("geo_fixed", {}) or {})
+            geo_pct_all = dict(master.get("geo_percent", {}) or {})
+
+            direct = dict(direct_all.get(pk, {}) or {})
+            geo_mode = str(geo_mode_all.get(pk, "") or "")
+            geo_fixed = dict(geo_fixed_all.get(pk, {}) or {})
+            geo_pct = dict(geo_pct_all.get(pk, {}) or {})
+
+            # Compose per-product view (geo percent per-product falls back to global)
+            payload["direct_bonus"] = {
+                "sponsor": self._float(direct.get("sponsor", 0)),
+                "self": self._float(direct.get("self", 0)),
+            }
+            payload["geo_mode"] = geo_mode
+            payload["geo_fixed"] = {k: self._float(v) for k, v in geo_fixed.items()} if geo_fixed else {}
+            payload["geo"] = ({k: self._float(v) for k, v in geo_pct.items()} if geo_pct else payload["geo"])
+
         return Response(payload, status=200)
 
     def patch(self, request):
         from decimal import Decimal as D
         data = request.data or {}
         cfg = CommissionConfig.get_solo()
-        # Start from existing master json
         master = dict(getattr(cfg, "master_commission_json", {}) or {})
+        pk = self._product_key(request)
 
-        # tax.percent
+        # Global updates (always permitted)
         tax = data.get("tax")
         if isinstance(tax, dict) and "percent" in tax:
             try:
@@ -2258,7 +2403,6 @@ class AdminMasterCommissionConfig(APIView):
             except Exception:
                 return Response({"detail": "tax.percent must be a number"}, status=400)
 
-        # tax_company_user_id (relation field on model)
         if "tax_company_user_id" in data:
             try:
                 tid = int(data.get("tax_company_user_id") or 0)
@@ -2271,9 +2415,8 @@ class AdminMasterCommissionConfig(APIView):
                     return Response({"detail": "tax_company_user_id not found"}, status=400)
                 cfg.tax_company_user = user
             else:
-                cfg.tax_company_user = None  # allow clearing
+                cfg.tax_company_user = None
 
-        # withdrawal.sponsor_percent
         wd = data.get("withdrawal")
         if isinstance(wd, dict) and "sponsor_percent" in wd:
             try:
@@ -2286,7 +2429,6 @@ class AdminMasterCommissionConfig(APIView):
             except Exception:
                 return Response({"detail": "withdrawal.sponsor_percent must be a number"}, status=400)
 
-        # upline l1..l5 (optional convenience; stored under master.upline)
         up = data.get("upline")
         if isinstance(up, dict):
             u = dict(master.get("upline") or {})
@@ -2301,9 +2443,9 @@ class AdminMasterCommissionConfig(APIView):
                         return Response({"detail": f"upline.{k} must be a number"}, status=400)
             master["upline"] = u
 
-        # geo percents (optional convenience)
+        # Global geo percents
         geo = data.get("geo")
-        if isinstance(geo, dict):
+        if isinstance(geo, dict) and not pk:
             g_cur = dict(master.get("geo") or {})
             allowed = {"sub_franchise", "pincode", "pincode_coord", "district", "district_coord", "state", "state_coord", "employee", "royalty"}
             for k, v in geo.items():
@@ -2318,7 +2460,73 @@ class AdminMasterCommissionConfig(APIView):
                     return Response({"detail": f"geo.{k} must be a number"}, status=400)
             master["geo"] = g_cur
 
-        # Persist
+        # Product-specific updates
+        if pk:
+            direct_all = dict(master.get("direct_bonus", {}) or {})
+            geo_mode_all = dict(master.get("geo_mode", {}) or {})
+            geo_fixed_all = dict(master.get("geo_fixed", {}) or {})
+            geo_pct_all = dict(master.get("geo_percent", {}) or {})
+
+            # direct_bonus
+            db = data.get("direct_bonus")
+            if isinstance(db, dict):
+                row = dict(direct_all.get(pk, {}) or {})
+                for k in ("sponsor", "self"):
+                    if k in db:
+                        try:
+                            v = D(str(db.get(k)))
+                            if v < 0:
+                                return Response({"detail": f"direct_bonus.{k} must be >= 0"}, status=400)
+                            row[k] = float(v.quantize(D("0.01")))
+                        except Exception:
+                            return Response({"detail": f"direct_bonus.{k} must be a number"}, status=400)
+                direct_all[pk] = row
+                master["direct_bonus"] = direct_all
+
+            # geo_mode
+            if "geo_mode" in data:
+                gm = str(data.get("geo_mode") or "").strip().lower()
+                if gm not in ("fixed", "percent", ""):
+                    return Response({"detail": "geo_mode must be 'fixed' or 'percent'"}, status=400)
+                geo_mode_all[pk] = gm
+                master["geo_mode"] = geo_mode_all
+
+            # geo_fixed (rupees)
+            gf = data.get("geo_fixed")
+            if isinstance(gf, dict):
+                allowed = {"sub_franchise", "pincode", "pincode_coord", "district", "district_coord", "state", "state_coord", "employee", "royalty"}
+                row = dict(geo_fixed_all.get(pk, {}) or {})
+                for k, v in gf.items():
+                    if k not in allowed:
+                        continue
+                    try:
+                        vv = D(str(v))
+                        if vv < 0:
+                            return Response({"detail": f"geo_fixed.{k} must be >= 0"}, status=400)
+                        row[k] = float(vv.quantize(D("0.01")))
+                    except Exception:
+                        return Response({"detail": f"geo_fixed.{k} must be a number"}, status=400)
+                geo_fixed_all[pk] = row
+                master["geo_fixed"] = geo_fixed_all
+
+            # product-specific geo percents (optional)
+            geo_p = data.get("geo")
+            if isinstance(geo_p, dict):
+                allowed = {"sub_franchise", "pincode", "pincode_coord", "district", "district_coord", "state", "state_coord", "employee", "royalty"}
+                row = dict(geo_pct_all.get(pk, {}) or {})
+                for k, v in geo_p.items():
+                    if k not in allowed:
+                        continue
+                    try:
+                        vv = D(str(v))
+                        if vv < 0:
+                            return Response({"detail": f"geo.{k} must be >= 0"}, status=400)
+                        row[k] = float(vv.quantize(D("0.01")))
+                    except Exception:
+                        return Response({"detail": f"geo.{k} must be a number"}, status=400)
+                geo_pct_all[pk] = row
+                master["geo_percent"] = geo_pct_all
+
         cfg.master_commission_json = master
         try:
             if "tax_company_user_id" in data:
@@ -2328,7 +2536,6 @@ class AdminMasterCommissionConfig(APIView):
         except Exception:
             cfg.save()
 
-        # Return fresh GET payload
         return self.get(request)
 
 class AdminRewardPointsConfig(APIView):

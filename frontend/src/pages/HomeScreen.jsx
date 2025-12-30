@@ -1,367 +1,240 @@
-import React, { useEffect, useMemo, useState, useRef } from "react";
-import { Box, Container, Typography, IconButton, CircularProgress, Link } from "@mui/material";
+import React from "react";
+import {
+  Box,
+  Container,
+  Typography,
+  Button,
+  Grid,
+  Card,
+  CardContent,
+} from "@mui/material";
+import { motion } from "framer-motion";
 import PublicNavbar from "../components/PublicNavbar";
-import GeoBanner from "../components/GeoBanner";
-import API from "../api/api";
-import SmartLocation from "../components/SmartLocation";
-import normalizeMediaUrl from "../utils/media";
+import Footer from "../components/Footer";
+import {
+  fadeUp,
+  staggerContainer,
+  hoverLift,
+  tapScale,
+  viewportOnce,
+} from "../animations/motion";
+import { useNavigate } from "react-router-dom";
 
-const HomeScreen = () => {
-  const [slides, setSlides] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [idx, setIdx] = useState(0);
-  const [paused, setPaused] = useState(false);
-  const touchStartX = useRef(null);
-  const touchMoved = useRef(false);
-
-  const origin = useMemo(() => {
-    // API baseURL is like http://localhost:8000/api -> backend origin is http://localhost:8000
-    try {
-      return (API?.defaults?.baseURL || "").replace(/\/api\/?$/, "");
-    } catch {
-      return "";
-    }
-  }, []);
-
-  const toImageUrl = (image) => {
-    if (!image) return "";
-    if (typeof image === "string" && image.startsWith("http")) return image;
-    const path = typeof image === "string" ? image : String(image || "");
-    const withLeadingSlash = path.startsWith("/") ? path : `/${path}`;
-    return `${origin}${withLeadingSlash}`;
-  };
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const res = await API.get("/uploads/homecard/");
-        if (!mounted) return;
-        const data = Array.isArray(res?.data) ? res.data : [];
-        setSlides(data);
-      } catch (e) {
-        console.error("Failed to load home cards", e);
-        setSlides([]);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  // Autoplay
-  useEffect(() => {
-    if (!slides?.length || slides.length < 2) return;
-    const id = setInterval(() => {
-      if (!paused) {
-        setIdx((i) => (i + 1) % slides.length);
-      }
-    }, 4000);
-    return () => clearInterval(id);
-  }, [slides, paused]);
-
-  const handlePrev = () => {
-    if (!slides?.length) return;
-    setIdx((i) => (i - 1 + slides.length) % slides.length);
-  };
-
-  const handleNext = () => {
-    if (!slides?.length) return;
-    setIdx((i) => (i + 1) % slides.length);
-  };
-
-  const handleTouchStart = (e) => {
-    touchMoved.current = false;
-    touchStartX.current = e.touches?.[0]?.clientX ?? null;
-  };
-
-  const handleTouchMove = () => {
-    touchMoved.current = true;
-  };
-
-  const handleTouchEnd = (e) => {
-    const startX = touchStartX.current;
-    const endX = e.changedTouches?.[0]?.clientX ?? null;
-    if (startX != null && endX != null) {
-      const dx = endX - startX;
-      const threshold = 30;
-      if (Math.abs(dx) > threshold) {
-        if (dx < 0) {
-          handleNext();
-        } else {
-          handlePrev();
-        }
-      }
-    }
-    touchStartX.current = null;
-    touchMoved.current = false;
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === "ArrowLeft") {
-      e.preventDefault();
-      handlePrev();
-    } else if (e.key === "ArrowRight") {
-      e.preventDefault();
-      handleNext();
-    }
-  };
+export default function LandingPage() {
+  const navigate = useNavigate();
 
   return (
-    <Box sx={{ minHeight: "100vh", display: "flex", flexDirection: "column", bgcolor: "#fff" }}>
+    <Box bgcolor="#ffffff">
       <PublicNavbar />
-      {/* <GeoBanner /> */}
-      {/* <SmartLocation /> */}
 
-      {/* Hero Carousel */}
-      <Container maxWidth="lg" sx={{ mt: { xs: 2, md: 4 }, mb: { xs: 3, md: 5 }, px: { xs: 2, md: 0 } }}>
-        <Box
-          sx={{
-            position: "relative",
-            width: "100%",
-            height: { xs: 220, sm: 320, md: 480 },
-            overflow: "hidden",
-            bgcolor: "#eef2f7",
-            borderRadius: { xs: 2, md: 3 },
-            boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
-          }}
-          onMouseEnter={() => setPaused(true)}
-          onMouseLeave={() => setPaused(false)}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          tabIndex={0}
-          onKeyDown={handleKeyDown}
-          aria-roledescription="carousel"
-          aria-label="Home banners"
-          role="region"
+      {/* ================= HERO ================= */}
+      <Container sx={{ py: { xs: 5, md: 8 } }}>
+        <motion.div
+          variants={fadeUp}
+          initial="hidden"
+          whileInView="visible"
+          viewport={viewportOnce}
         >
-        {loading ? (
           <Box
             sx={{
-              position: "absolute",
-              inset: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              borderRadius: 4,
+              p: { xs: 3, md: 5 },
+              background:
+                "linear-gradient(180deg, #F5F7FB 0%, #FFFFFF 100%)",
             }}
           >
-            <CircularProgress />
-          </Box>
-        ) : slides.length === 0 ? (
-          <Box
-            sx={{
-              position: "absolute",
-              inset: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#666",
-              px: 2,
-              textAlign: "center",
-            }}
-          >
-            <Typography variant="h6">No banners available</Typography>
-          </Box>
-        ) : (
-          <>
-            {slides.map((s, i) => {
-              const visible = i === idx;
-              const src = normalizeMediaUrl(s?.image_url || toImageUrl(s?.image));
-              return (
-                <Box
-                  key={s?.id ?? i}
-                  sx={{
-                    position: "absolute",
-                    inset: 0,
-                    opacity: visible ? 1 : 0,
-                    transition: "opacity 600ms ease-in-out",
-                  }}
-                >
-                  {/* Background image */}
-                  <Box
-                    component="img"
-                    src={src}
-                    alt={s?.title || `Slide ${i + 1}`}
-                    sx={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                      display: "block",
-                    }}
-                    onError={(e) => {
-                      // Fallback background color on error
-                      e.currentTarget.style.display = "none";
-                    }}
-                  />
-                  {/* Title overlay if provided */}
-                  {(s?.title || "").trim() ? (
-                    <Box
-                      sx={{
-                        position: "absolute",
-                        left: { xs: 12, md: 24 },
-                        bottom: { xs: 48, md: 56 },
-                        bgcolor: "rgba(0,0,0,0.45)",
-                        color: "#fff",
-                        px: { xs: 1.5, md: 2 },
-                        py: { xs: 0.75, md: 1 },
-                        borderRadius: 1.5,
-                        maxWidth: { xs: "80%", md: "60%" },
-                      }}
-                    >
-                      <Typography
-                        variant="h6"
-                        sx={{
-                          fontWeight: 700,
-                          lineHeight: 1.3,
-                          fontSize: { xs: 16, sm: 18, md: 22 },
-                        }}
-                      >
-                        {s.title}
-                      </Typography>
-                    </Box>
-                  ) : null}
-                </Box>
-              );
-            })}
-
-            {/* Prev/Next controls */}
-            {slides.length > 1 && (
-              <>
-                <IconButton
-                  aria-label="Previous"
-                  onClick={handlePrev}
-                  sx={{
-                    position: "absolute",
-                    top: "50%",
-                    left: { xs: 6, md: 12 },
-                    transform: "translateY(-50%)",
-                    bgcolor: "rgba(0,0,0,0.55)",
-                    color: "#fff",
-                    zIndex: 3,
-                    width: { xs: 40, md: 52 },
-                    height: { xs: 40, md: 52 },
-                    border: "1px solid rgba(255,255,255,0.6)",
-                    backdropFilter: "blur(2px)",
-                    boxShadow: "0 2px 6px rgba(0,0,0,0.4)",
-                    "&:hover": { bgcolor: "rgba(0,0,0,0.7)" },
-                  }}
-                >
-                  <Box component="span" sx={{ display: "inline-flex" }}>
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                      <path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path>
-                    </svg>
-                  </Box>
-                </IconButton>
-                <IconButton
-                  aria-label="Next"
-                  onClick={handleNext}
-                  sx={{
-                    position: "absolute",
-                    top: "50%",
-                    right: { xs: 6, md: 12 },
-                    transform: "translateY(-50%)",
-                    bgcolor: "rgba(0,0,0,0.55)",
-                    color: "#fff",
-                    zIndex: 3,
-                    width: { xs: 40, md: 52 },
-                    height: { xs: 40, md: 52 },
-                    border: "1px solid rgba(255,255,255,0.6)",
-                    backdropFilter: "blur(2px)",
-                    boxShadow: "0 2px 6px rgba(0,0,0,0.4)",
-                    "&:hover": { bgcolor: "rgba(0,0,0,0.7)" },
-                  }}
-                >
-                  <Box component="span" sx={{ display: "inline-flex" }}>
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                      <path d="M8.59 16.59 10 18l6-6-6-6-1.41 1.41L13.17 12z"></path>
-                    </svg>
-                  </Box>
-                </IconButton>
-
-                {/* Dots */}
-                <Box
-                  sx={{
-                    position: "absolute",
-                    left: "50%",
-                    bottom: 12,
-                    transform: "translateX(-50%)",
-                    display: "flex",
-                    gap: 1,
-                    alignItems: "center",
-                    zIndex: 2,
-                  }}
-                >
-                  {slides.map((_, i) => (
-                    <Box
-                      key={`dot-${i}`}
-                      onClick={() => setIdx(i)}
-                      sx={{
-                        width: { xs: 8, md: 10 },
-                        height: { xs: 8, md: 10 },
-                        borderRadius: "50%",
-                        bgcolor: i === idx ? "#fff" : "rgba(255,255,255,0.6)",
-                        border: "1px solid rgba(255,255,255,0.85)",
-                        cursor: "pointer",
-                      }}
-                    />
-                  ))}
-                </Box>
-              </>
-            )}
-          </>
-        )}
-        </Box>
-      </Container>
-
-      {/* Optional content area under banner */}
-      <Container sx={{ py: { xs: 3, md: 5 } }}>
-        <Typography
-          variant="h5"
-          sx={{
-            fontWeight: 700,
-            color: "#0C2D48",
-            mb: 1,
-            fontSize: { xs: 20, md: 24 },
-          }}
-        >
-          Welcome to Trikonekt
-        </Typography>
-        <Typography variant="body1" sx={{ color: "text.secondary" }}>
-          Discover opportunities and updates. Use the Login button in the header to sign in or create an account.
-        </Typography>
-      </Container>
-
-      {/* Footer */}
-      <Box
-        sx={{
-          mt: "auto",
-          py: 3,
-          textAlign: "center",
-          backgroundColor: "rgba(255,255,255,0.85) !important",
-          color: "#000",
-          boxShadow: "0 0px 15px rgba(0,0,0,0.08) !important",
-        }}
-      >
-        <Typography variant="body2">
-            © {new Date().getFullYear()} Trikonekt. All rights reserved.
-          </Typography>
-          <Typography variant="body2" sx={{ mt: 1 }}>
-            Contact us:{" "}
-            <Link
-              href="mailto:contact@trikonekt.com"
-              underline="hover"
-              color="inherit"
-              sx={{ fontWeight: 500 }}
+            <Typography
+              fontSize={{ xs: 30, md: 40 }}
+              fontWeight={800}
+              color="#0C2D48"
+              lineHeight={1.2}
             >
-              contact@trikonekt.com
-            </Link>
+              One Platform.
+              <br />
+              Multiple Opportunities.
+            </Typography>
+
+            <Typography
+              mt={2}
+              fontSize={15}
+              color="text.secondary"
+              maxWidth={480}
+            >
+              Trikonekt connects shopping, services, and earning opportunities
+              into one powerful digital ecosystem.
+            </Typography>
+
+            <Box mt={4} display="flex" gap={2} flexWrap="wrap">
+              <motion.div {...tapScale}>
+                <Button
+                  variant="contained"
+                  size="large"
+                  sx={{
+                    bgcolor: "#145DA0",
+                    height: 48,
+                    px: 4,
+                  }}
+                  onClick={() => navigate("/auth/register-v2")}
+                >
+                  Get Started
+                </Button>
+              </motion.div>
+
+              <motion.div {...tapScale}>
+                <Button
+                  variant="outlined"
+                  size="large"
+                  sx={{ height: 48, px: 4 }}
+                  onClick={() => navigate("/auth/login")}
+                >
+                  Login
+                </Button>
+              </motion.div>
+            </Box>
+          </Box>
+        </motion.div>
+      </Container>
+
+      {/* ================= WHAT YOU CAN DO ================= */}
+      <Container sx={{ py: { xs: 5, md: 7 } }}>
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          whileInView="visible"
+          viewport={viewportOnce}
+        >
+          <Typography fontSize={24} fontWeight={800} mb={4}>
+            What You Can Do with Trikonekt
           </Typography>
+
+          <Grid container spacing={3}>
+            {[
+              "Shop Electronics & Home Appliances",
+              "Buy Furniture",
+              "Explore EV Solutions",
+              "Shop from Local Stores",
+              "Gift Cards & Digital Services",
+              "Travel & Holiday Packages",
+            ].map((item) => (
+              <Grid item xs={12} sm={6} md={4} key={item}>
+                <motion.div variants={fadeUp} {...hoverLift}>
+                  <Card sx={{ borderRadius: 3, height: "100%" }}>
+                    <CardContent>
+                      <Typography fontWeight={700}>{item}</Typography>
+                      <Typography
+                        mt={1}
+                        fontSize={14}
+                        color="text.secondary"
+                      >
+                        Discover trusted products and services in one platform.
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              </Grid>
+            ))}
+          </Grid>
+        </motion.div>
+      </Container>
+
+      {/* ================= ABOUT (HOME VERSION) ================= */}
+      <Box bgcolor="#F5F7FB" py={{ xs: 5, md: 7 }}>
+        <Container>
+          <motion.div
+            variants={fadeUp}
+            initial="hidden"
+            whileInView="visible"
+            viewport={viewportOnce}
+          >
+            <Typography fontSize={24} fontWeight={800} mb={2}>
+              About Trikonekt
+            </Typography>
+
+            <Typography color="text.secondary" maxWidth={700}>
+              <strong>TRIKONEKT</strong> is a smart digital platform built to
+              connect people, businesses, and opportunities into one powerful
+              network.
+            </Typography>
+
+            <Typography mt={2} color="text.secondary" maxWidth={700}>
+              Through our <strong>Connect → Earn → Grow</strong> model, everyday
+              spending and interactions are transformed into meaningful income
+              and long-term growth.
+            </Typography>
+          </motion.div>
+        </Container>
       </Box>
+
+      {/* ================= WHY TRIKONEKT ================= */}
+      <Container sx={{ py: { xs: 5, md: 7 } }}>
+        <motion.div
+          variants={fadeUp}
+          initial="hidden"
+          whileInView="visible"
+          viewport={viewportOnce}
+        >
+          <Typography fontSize={24} fontWeight={800} mb={3}>
+            Why Trikonekt
+          </Typography>
+
+          <Grid container spacing={2}>
+            {[
+              "Single unified digital platform",
+              "Transparent & trustworthy system",
+              "Growth opportunities for users & businesses",
+              "Designed for long-term value creation",
+            ].map((point) => (
+              <Grid item xs={12} sm={6} key={point}>
+                <Typography fontSize={15}>✔ {point}</Typography>
+              </Grid>
+            ))}
+          </Grid>
+        </motion.div>
+      </Container>
+
+      {/* ================= FINAL CTA ================= */}
+      <Box bgcolor="#0C2D48" py={{ xs: 6, md: 8 }}>
+        <Container textAlign="center">
+          <motion.div
+            variants={fadeUp}
+            initial="hidden"
+            whileInView="visible"
+            viewport={viewportOnce}
+          >
+            <Typography fontSize={26} fontWeight={800} color="#ffffff">
+              Ready to get started?
+            </Typography>
+
+            <Typography
+              mt={1}
+              color="rgba(255,255,255,0.85)"
+              maxWidth={520}
+              mx="auto"
+            >
+              Join Trikonekt and turn your everyday spending into opportunities
+              for growth.
+            </Typography>
+
+            <motion.div {...tapScale}>
+              <Button
+                variant="contained"
+                sx={{
+                  mt: 4,
+                  bgcolor: "#22C55E",
+                  color: "#0C2D48",
+                  height: 48,
+                  px: 5,
+                }}
+                onClick={() => navigate("/auth/register-v2")}
+              >
+                Create Account
+              </Button>
+            </motion.div>
+          </motion.div>
+        </Container>
+      </Box>
+
+      <Footer />
     </Box>
   );
-};
-
-export default HomeScreen;
+}

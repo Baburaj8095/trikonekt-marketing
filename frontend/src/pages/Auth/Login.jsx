@@ -2071,6 +2071,10 @@ const pincodeOptionsConsumer = useMemo(() => {
         display: "flex",
         flexDirection: "column",
         background: { xs: "linear-gradient(180deg,#fafcff 0%,#ffffff 100%)", md: "linear-gradient(135deg,#eaf6ff 0%,#ffffff 70%)" },
+        overflowX: "hidden",
+        maxWidth: "100%",
+        "&, *": { boxSizing: "border-box" },
+        "& img": { maxWidth: "100%", display: "block" },
       }}
     >
       {/* Nav */}

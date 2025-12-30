@@ -158,6 +158,68 @@ class HomeCard(models.Model):
         return self.title or f"HomeCard #{self.pk}"
 
 
+class HeroBanner(models.Model):
+    """
+    Admin-managed hero carousel banners. Shown at top of User Dashboard (max 3 on client).
+    """
+    title = models.CharField(max_length=200, blank=True, default="")
+    link = models.URLField(blank=True, default="")
+    image = models.ImageField(upload_to="uploads/hero/", storage=MEDIA_STORAGE)
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["order", "-created_at"]
+
+    def __str__(self):
+        return self.title or f"HeroBanner #{self.pk}"
+
+
+class Promotion(models.Model):
+    """
+    Admin-managed promos for 'Deals & Promotions' section.
+    Use keys like 'prime', 'tri-spinwin' to override existing cards without layout changes.
+    """
+    key = models.SlugField(max_length=50, blank=True, help_text="Optional stable key (e.g., 'prime', 'tri-spinwin')")
+    label = models.CharField(max_length=150, blank=True)
+    image = models.ImageField(upload_to="uploads/promotions/", storage=MEDIA_STORAGE)
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["order", "-created_at"]
+
+    def __str__(self):
+        return self.label or (self.key or f"Promotion #{self.pk}")
+
+
+class CategoryBanner(models.Model):
+    """
+    Admin-provided banners for category rows in dashboard (Electronics, Furniture, EV).
+    Keys must match dashboard app keys to enable overrides without UI changes.
+    """
+    KEY_CHOICES = (
+        ("tri-electronics", "TRI Electronics"),
+        ("tri-furniture", "TRI Furniture"),
+        ("tri-ev", "TRI EV"),
+    )
+    key = models.CharField(max_length=50, choices=KEY_CHOICES)
+    label = models.CharField(max_length=150, blank=True)
+    image = models.ImageField(upload_to="uploads/categories/", storage=MEDIA_STORAGE)
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["order", "-created_at"]
+        unique_together = (("key",),)
+
+    def __str__(self):
+        return self.label or self.key
+
+
 class LuckyCouponAssignment(models.Model):
     CHANNEL_CHOICES = (
         ("physical", "Physical"),

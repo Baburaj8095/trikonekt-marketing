@@ -40,10 +40,10 @@ function ProductGrid({
         <Grid
           key={p.id ?? `${p.name}-${p.image_url}-${p.price}`}
           item
-          xs={12}
-          sm={6}
-          md={4}
-          lg={4}
+          xs={6}
+          sm={4}
+          md={3}
+          lg={3}
         >
           <Box sx={{ height: "100%", maxWidth: 360, mx: "auto", width: "100%" }}>
             <ProductCard

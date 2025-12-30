@@ -915,15 +915,20 @@ def _resolve_upline(user, depth: int = 5):
     return chain
 
 
-def distribute_auto_pool_commissions(payer_user, base_amount: Decimal):
+def distribute_auto_pool_commissions(payer_user, base_amount: Decimal, fixed_key: str | None = None, source_type: str = "", source_id: str = "", extra_meta: dict | None = None):
     """
     Distribute commissions to L1..L5 and geo roles based on CommissionConfig.
     Credits wallets directly and records WalletTransaction entries.
+    If fixed_key is provided and CommissionConfig.master_commission_json["geo_mode"][fixed_key] == "fixed",
+    then use fixed rupee amounts from CommissionConfig.master_commission_json["geo_fixed"][fixed_key] for geo roles.
+    Optional source_type/source_id/extra_meta are forwarded to Wallet.credit for idempotent tracking/audit.
     """
     from accounts.models import Wallet, CustomUser, AgencyRegionAssignment  # local import to avoid circulars
     cfg = CommissionConfig.get_solo()
     if not cfg.enable_pool_distribution:
         return
+    st = source_type or "AUTO_POOL_GEO"
+    sid = source_id or str(getattr(payer_user, "id", ""))
 
     # Percentages mapping (L1..L5)
     percents = [
@@ -1017,36 +1022,99 @@ def distribute_auto_pool_commissions(payer_user, base_amount: Decimal):
             royalty = CustomUser.objects.filter(is_superuser=True).first() or CustomUser.objects.filter(is_staff=True).first()
             recipients["Royalty"] = royalty
 
-            geo_map = [
-                ("Sub Franchise", Decimal(cfg.sub_franchise_percent or 0)),
-                ("Pincode", Decimal(cfg.pincode_percent or 0)),
-                ("Pincode Coord", Decimal(cfg.pincode_coord_percent or 0)),
-                ("District", Decimal(cfg.district_percent or 0)),
-                ("District Coord", Decimal(cfg.district_coord_percent or 0)),
-                ("State", Decimal(cfg.state_percent or 0)),
-                ("State Coord", Decimal(cfg.state_coord_percent or 0)),
-                ("Employee", Decimal(cfg.employee_percent or 0)),
-                ("Royalty", Decimal(cfg.royalty_percent or 0)),
-            ]
+            # Decide fixed vs percent based on master_commission_json and fixed_key
+            master = dict(getattr(cfg, "master_commission_json", {}) or {})
+            mode_map = dict(master.get("geo_mode", {}) or {})
+            fixed_map_all = dict(master.get("geo_fixed", {}) or {})
+            use_fixed = bool(fixed_key and (str(mode_map.get(fixed_key, "")).lower() == "fixed"))
 
-            for label, pct in geo_map:
-                user_obj = recipients.get(label)
-                if not user_obj:
-                    continue
-                amt = (Decimal(base_amount) * pct / Decimal("100")).quantize(Decimal("0.01"))
-                if amt <= 0:
-                    continue
-                try:
-                    w = Wallet.get_or_create_for_user(user_obj)
-                    w.credit(
-                        amt,
-                        tx_type="COMMISSION_CREDIT",
-                        meta={"layer": label, "source": "AUTO_POOL_GEO", "payer": getattr(payer_user, "username", None)},
-                        source_type="AUTO_POOL_GEO",
-                        source_id=str(getattr(payer_user, "id", "")),
-                    )
-                except Exception:
-                    continue
+            role_key_to_label = {
+                "sub_franchise": "Sub Franchise",
+                "pincode": "Pincode",
+                "pincode_coord": "Pincode Coord",
+                "district": "District",
+                "district_coord": "District Coord",
+                "state": "State",
+                "state_coord": "State Coord",
+                "employee": "Employee",
+                "royalty": "Royalty",
+            }
+
+            if use_fixed and isinstance(fixed_map_all.get(fixed_key), dict):
+                fm = fixed_map_all.get(fixed_key) or {}
+                for k, v in fm.items():
+                    label = role_key_to_label.get(str(k))
+                    if not label:
+                        continue
+                    user_obj = recipients.get(label)
+                    if not user_obj:
+                        continue
+                    try:
+                        from decimal import Decimal as D
+                        amt = D(str(v or 0)).quantize(D("0.01"))
+                    except Exception:
+                        amt = Decimal("0.00")
+                    if amt <= 0:
+                        continue
+                    try:
+                        w = Wallet.get_or_create_for_user(user_obj)
+                        meta2 = {
+                            "layer": label,
+                            "source": "AUTO_POOL_GEO_FIXED",
+                            "package": str(fixed_key or ""),
+                            "payer": getattr(payer_user, "username", None),
+                        }
+                        if extra_meta:
+                            try:
+                                meta2.update(dict(extra_meta))
+                            except Exception:
+                                pass
+                        w.credit(
+                            amt,
+                            tx_type="COMMISSION_CREDIT",
+                            meta=meta2,
+                            source_type=st,
+                            source_id=sid,
+                        )
+                    except Exception:
+                        continue
+            else:
+                geo_map = [
+                    ("Sub Franchise", Decimal(cfg.sub_franchise_percent or 0)),
+                    ("Pincode", Decimal(cfg.pincode_percent or 0)),
+                    ("Pincode Coord", Decimal(cfg.pincode_coord_percent or 0)),
+                    ("District", Decimal(cfg.district_percent or 0)),
+                    ("District Coord", Decimal(cfg.district_coord_percent or 0)),
+                    ("State", Decimal(cfg.state_percent or 0)),
+                    ("State Coord", Decimal(cfg.state_coord_percent or 0)),
+                    ("Employee", Decimal(cfg.employee_percent or 0)),
+                    ("Royalty", Decimal(cfg.royalty_percent or 0)),
+                ]
+
+                for label, pct in geo_map:
+                    user_obj = recipients.get(label)
+                    if not user_obj:
+                        continue
+                    amt = (Decimal(base_amount) * pct / Decimal("100")).quantize(Decimal("0.01"))
+                    if amt <= 0:
+                        continue
+                    try:
+                        w = Wallet.get_or_create_for_user(user_obj)
+                        meta2 = {"layer": label, "source": "AUTO_POOL_GEO", "payer": getattr(payer_user, "username", None)}
+                        if extra_meta:
+                            try:
+                                meta2.update(dict(extra_meta))
+                            except Exception:
+                                pass
+                        w.credit(
+                            amt,
+                            tx_type="COMMISSION_CREDIT",
+                            meta=meta2,
+                            source_type=st,
+                            source_id=sid,
+                        )
+                    except Exception:
+                        continue
         except Exception:
             # Do not break the main flow due to geo failure
             pass

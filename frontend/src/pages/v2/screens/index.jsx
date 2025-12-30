@@ -15,3 +15,5 @@ export { default as Cart2 } from "./Cart2";
 export { default as TrikonektProducts2 } from "./TrikonektProducts2";
 export { default as MerchantMarketplace2 } from "./MerchantMarketplace2";
 export { default as Support2 } from "./Support2";
+export { default as Wallet2 } from "./Wallet2";
+export { default as History2 } from "./History2";

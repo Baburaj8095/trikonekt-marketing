@@ -4,13 +4,16 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.views import APIView
 from django.db.models import Q, Sum
 from accounts.models import CustomUser, Wallet, WalletTransaction
-from .models import FileUpload, DashboardCard, LuckyDrawSubmission, JobApplication, HomeCard, LuckyCouponAssignment, AgencyCouponQuota, LuckyDrawEligibility, LuckySpinDraw, LuckySpinWinner, LuckySpinAttempt
+from .models import FileUpload, DashboardCard, LuckyDrawSubmission, JobApplication, HomeCard, LuckyCouponAssignment, AgencyCouponQuota, LuckyDrawEligibility, LuckySpinDraw, LuckySpinWinner, LuckySpinAttempt, HeroBanner, Promotion, CategoryBanner
 from .serializers import (
     FileUploadSerializer,
     DashboardCardSerializer,
     LuckyDrawSubmissionSerializer,
     JobApplicationSerializer,
     HomeCardSerializer,
+    HeroBannerSerializer,
+    PromotionSerializer,
+    CategoryBannerSerializer,
     LuckyCouponAssignmentSerializer,
     LuckySpinDrawSerializer,
     LuckySpinWinnerSerializer,
@@ -449,6 +452,43 @@ class HomeCardList(generics.ListAPIView):
 
     def get_queryset(self):
         return HomeCard.objects.filter(is_active=True).order_by("order", "-created_at")
+
+
+class HeroBannerList(generics.ListAPIView):
+    serializer_class = HeroBannerSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        # Client may cap to 3; server returns all active ordered
+        return HeroBanner.objects.filter(is_active=True).order_by("order", "-created_at")
+
+
+class PromotionList(generics.ListAPIView):
+    serializer_class = PromotionSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        qs = Promotion.objects.filter(is_active=True).order_by("order", "-created_at")
+        keys = (self.request.query_params.get("keys") or "").strip()
+        if keys:
+            parts = [k.strip() for k in keys.split(",") if k.strip()]
+            if parts:
+                qs = qs.filter(key__in=parts)
+        return qs
+
+
+class CategoryBannerList(generics.ListAPIView):
+    serializer_class = CategoryBannerSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        qs = CategoryBanner.objects.filter(is_active=True).order_by("order", "-created_at")
+        keys = (self.request.query_params.get("keys") or "").strip()
+        if keys:
+            parts = [k.strip() for k in keys.split(",") if k.strip()]
+            if parts:
+                qs = qs.filter(key__in=parts)
+        return qs
 
 
 class LuckyDrawSubmissionView(generics.ListCreateAPIView):

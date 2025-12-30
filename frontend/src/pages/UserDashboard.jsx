@@ -19,25 +19,27 @@ import {
   Tabs,
   Tab,
   Chip,
+  Paper,
+  Avatar,
+  Badge,
 } from "@mui/material";
-import API, { listMyPromoPurchases } from "../api/api";
+import API, { listMyPromoPurchases, listHeroBanners, listPromotions, listCategoryBanners } from "../api/api";
 import LOGO from "../assets/TRIKONEKT.png";
 import banner_wg from "../assets/Wealth_Galaxy.jpg";
 import imgGiftCards from "../assets/gifts.jpg";
 import imgEcommerce from "../assets/ecommerce.jpg";
-import imgSpinWin from "../assets/lucky-draw-img.png";
+import imgSpinWin from "../assets/spin_deal.png";
 import imgHolidays from "../assets/holidays.jpg";
 import imgEV from "../assets/ev-img.jpg";
 import imgBillRecharge from "../assets/google-play-store.png";
-import imgPlaystoreScreen from "../assets/play_store_screen.webp";
+import imgPlaystoreScreen from "../assets/electronics-img.jpg";
 import imgFurniture from "../assets/furniture.jpeg";
 import imgProperties from "../assets/propeties.jpg";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import MenuIcon from "@mui/icons-material/Menu";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-
-// App tiles icons
+import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
 import CardGiftcardIcon from "@mui/icons-material/CardGiftcard";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
@@ -56,6 +58,9 @@ import AppHub from "./AppHub";
 import WealthGalaxy from "./WealthGalaxy";
 import AppsGrid from "../components/AppsGrid";
 import EBooks from "./EBooks";
+import AppIconTile from "../components/AppIconTile";
+import SmartImage from "../components/SmartImage";
+import { useCartStore } from "../store/cartStore";
 
 const drawerWidth = 220;
 
@@ -113,7 +118,6 @@ export default function UserDashboard({ embedded = false }) {
     navigate("/", { replace: true });
   };
 
-  // Load admin-managed cards (for marketplace section)
   useEffect(() => {
     let isMounted = true;
     async function fetchCards() {
@@ -134,7 +138,6 @@ export default function UserDashboard({ embedded = false }) {
     };
   }, [storedRole]);
 
-  // Promo package purchase ticks (for header chip only)
   const [purchasedPrime150, setPurchasedPrime150] = useState(false);
   const [purchasedPrime750, setPurchasedPrime750] = useState(false);
   const [purchasedMonthly, setPurchasedMonthly] = useState(false);
@@ -147,7 +150,9 @@ export default function UserDashboard({ embedded = false }) {
         const st = String(pp?.status || "").toUpperCase();
         return st === "APPROVED";
       });
-      let has150 = false, has750 = false, hasMonthly = false;
+      let has150 = false,
+        has750 = false,
+        hasMonthly = false;
       for (const pp of valid) {
         const pkg = pp?.package || {};
         const type = String(pkg?.type || "");
@@ -177,7 +182,51 @@ export default function UserDashboard({ embedded = false }) {
 
   const MEDIA_BASE = (API?.defaults?.baseURL || "").replace(/\/api\/?$/, "");
 
-  // Marketplace card wrapper (kept from previous design)
+  const [heroBannersAdmin, setHeroBannersAdmin] = useState([]);
+  const [promotionsAdmin, setPromotionsAdmin] = useState({});
+  const [categoryBannersAdmin, setCategoryBannersAdmin] = useState({});
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const hb = await listHeroBanners();
+        const arr = Array.isArray(hb) ? hb : (hb?.results || []);
+        if (alive) {
+          const urls = arr
+            .filter((x) => x?.is_active !== false)
+            .sort((a, b) => (a?.order || 0) - (b?.order || 0))
+            .map((x) => x?.image_url || x?.image)
+            .filter(Boolean);
+          setHeroBannersAdmin(urls);
+        }
+      } catch (_) {}
+
+      try {
+        const res = await listPromotions({ params: { keys: "prime,tri-spinwin" } });
+        const arr = Array.isArray(res) ? res : (res?.results || []);
+        const map = {};
+        arr.forEach((p) => {
+          const key = String(p?.key || "").toLowerCase();
+          if (key) map[key] = p?.image_url || p?.image;
+        });
+        if (alive) setPromotionsAdmin(map);
+      } catch (_) {}
+
+      try {
+        const res = await listCategoryBanners({ params: { keys: "tri-electronics,tri-furniture,tri-ev" } });
+        const arr = Array.isArray(res) ? res : (res?.results || []);
+        const map = {};
+        arr.forEach((c) => {
+          const key = String(c?.key || "");
+          if (key) map[key] = c?.image_url || c?.image;
+        });
+        if (alive) setCategoryBannersAdmin(map);
+      } catch (_) {}
+    })();
+    return () => { alive = false; };
+  }, []);
+
   function MarketplaceCard({ title, children, variant = "plain", defaultExpanded = true, onViewMarketplace }) {
     const [expanded, setExpanded] = useState(Boolean(defaultExpanded));
     const headerStyles =
@@ -188,13 +237,13 @@ export default function UserDashboard({ embedded = false }) {
     return (
       <Box
         sx={{
-          borderRadius: 2,
+          borderRadius: "6px",
           overflow: "hidden",
-          border: "1px solid #e2e8f0",
-          boxShadow: 1,
+          border: "1px solid #e5e7eb",
+          boxShadow: "0px 1px 3px rgba(15,23,42,0.06)",
           mb: 2,
           bgcolor: "#fff",
-          marginTop: "10px",
+          mt: "10px",
         }}
       >
         <Box
@@ -207,7 +256,7 @@ export default function UserDashboard({ embedded = false }) {
             borderBottom: "1px solid #e2e8f0",
           }}
         >
-          <Typography variant="h6" sx={{ fontWeight: 700, fontSize: "12px" }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, fontSize: 14 }}>
             {title}
           </Typography>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -240,20 +289,19 @@ export default function UserDashboard({ embedded = false }) {
     );
   }
 
-  // Admin-managed cards renderer (unchanged)
   const renderMarketplaceContent = () =>
     loading ? (
       <Typography variant="body1" sx={{ color: "text.secondary" }}>
         Loading cards...
       </Typography>
     ) : (
-      <Grid container spacing={2}>
+      <Grid container spacing={1}>
         {(Array.isArray(cards) ? cards : [])
           .filter((c) => c.is_active !== false)
           .map((card) => (
             <Grid
               item
-              xs={12}
+              xs={6}
               sm={6}
               md={4}
               key={card.id || card.key}
@@ -270,41 +318,34 @@ export default function UserDashboard({ embedded = false }) {
                   height: "100%",
                   display: "flex",
                   flexDirection: "column",
-                  borderRadius: 2,
+                  borderRadius: "6px",
                   backgroundColor: "#ffffff",
                   border: "1px solid",
                   borderColor: "divider",
-                  boxShadow: 1,
+                  boxShadow: "0px 1px 3px rgba(15,23,42,0.06)",
                   width: "100%",
                   transition: "box-shadow 120ms ease, transform 120ms ease",
                   overflow: "hidden",
                   color: "text.primary",
                   "&:hover": {
-                    boxShadow: 4,
+                    boxShadow: "0px 4px 12px rgba(15,23,42,0.10)",
                     transform: { xs: "none", sm: "translateY(-2px)" },
                   },
                 }}
               >
                 {card.image && (
-                  <Box
-                    component="img"
+                  <SmartImage
                     src={card.image?.startsWith("http") ? card.image : `${MEDIA_BASE}${card.image}`}
                     alt={card.title}
-                    sx={{
-                      width: "100%",
-                      height: 140,
-                      objectFit: "cover",
-                      display: "block",
-                      borderBottom: "1px solid",
-                      borderColor: "divider",
-                    }}
+                    type="banner"
                   />
                 )}
-                <CardContent sx={{ flexGrow: 1, p: 2 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+
+                <CardContent sx={{ flexGrow: 1, p: 1.25 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, mb: 1, fontSize: 16 }}>
                     {card.title}
                   </Typography>
-                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                  <Typography variant="body2" sx={{ color: "text.secondary", lineHeight: 1.45 }}>
                     {card.description || ""}
                   </Typography>
                 </CardContent>
@@ -314,7 +355,6 @@ export default function UserDashboard({ embedded = false }) {
       </Grid>
     );
 
-  // Apps grid items (Coming soon except E‑commerce + Spin & Win; Prime routes to promo page)
   const appItems = useMemo(
     () => [
       { key: "genealogy", label: "Genealogy", icon: GroupsIcon, route: "/user/my-team", image: LOGO },
@@ -352,72 +392,954 @@ export default function UserDashboard({ embedded = false }) {
     [appItems, isPrime]
   );
 
-  if (embedded) {
+  const appItemsFinal = useMemo(
+    () =>
+      appItemsWithBadge.map((it) => {
+        let image = it.image;
+        const k = it.key;
+        if (k === "prime" && promotionsAdmin["prime"]) image = promotionsAdmin["prime"];
+        if (k === "tri-spinwin" && promotionsAdmin["tri-spinwin"]) image = promotionsAdmin["tri-spinwin"];
+        if (categoryBannersAdmin[k]) image = categoryBannersAdmin[k];
+        return { ...it, image };
+      }),
+    [appItemsWithBadge, promotionsAdmin, categoryBannersAdmin]
+  );
+
+  const heroBanners = useMemo(() => {
+    const admin = (heroBannersAdmin || []).filter(Boolean);
+    if (admin.length) return admin.slice(0, 3);
+    return [banner_wg, imgEcommerce, imgHolidays].filter(Boolean).slice(0, 3);
+  }, [heroBannersAdmin]);
+
+  function HeroCarousel({ banners = [] }) {
+    const [idx, setIdx] = useState(0);
+
+    useEffect(() => {
+      if (!banners.length) return;
+      const id = setInterval(() => {
+        setIdx((p) => (p + 1) % banners.length);
+      }, 5000);
+      return () => clearInterval(id);
+    }, [banners.length]);
+
+    if (!banners.length) return null;
+
     return (
-      <Box sx={{ p: { xs: 2, md: 3 } }}>
-        {/* Banner */}
-        <Box
-          sx={{
-            position: "relative",
-            height: { xs: 220, sm: 220, md: 400 },
-            borderRadius: 3,
-            overflow: "hidden",
-            mb: 2,
-            boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
-            background: `linear-gradient(rgba(12,45,72,0.35), rgba(12,45,72,0.35)), url(${banner_wg}) center/cover no-repeat`,
-          }}
-        >
-          <Box sx={{ position: "absolute", top: 12, right: 12 }}>
-            <Chip
-              size="small"
-              color={isPrime ? "success" : "default"}
-              label={isPrime ? "Prime Account" : "Non‑Prime"}
-              sx={{
-                fontWeight: 700,
-                bgcolor: isPrime ? "success.main" : "rgba(255,255,255,0.15)",
-                color: "#fff",
+      <Box
+        sx={{
+          position: "relative",
+          width: "100%",
+          height: { xs: 170, sm: 220 },
+          borderRadius: "12px",
+          overflow: "hidden",
+          mb: 2,
+          backgroundColor: "#eef2f7",
+        }}
+      >
+        {banners.map((src, i) => (
+          <Box
+            key={i}
+            sx={{
+              position: "absolute",
+              inset: 0,
+              opacity: i === idx ? 1 : 0,
+              transition: "opacity 300ms ease",
+            }}
+          >
+            <img
+              src={src}
+              alt={`Banner ${i + 1}`}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
               }}
             />
           </Box>
-          <Box sx={{ position: "absolute", bottom: 16, left: 16, color: "#fff" }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-              Welcome, {displayName}
-            </Typography>
-            <Typography variant="body2" sx={{ opacity: 0.9 }}>
-              Explore offers, redeem coupons and more
-            </Typography>
-          </Box>
-        </Box>
+        ))}
 
-        {/* Top Navigation Tabs (embedded) */}
-        <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", mb: 2, border: "1px solid #e2e8f0" }}>
-          <Tabs
-            value={selectedMenu}
-            onChange={(e, val) => setSelectedMenu(val)}
-            variant="scrollable"
-            allowScrollButtonsMobile
-            textColor="primary"
-            indicatorColor="primary"
-          >
-            <Tab label="Dashboard" value="dashboard" />
-            {/* <Tab label="Wealth Galaxy" value="wealth-galaxy" /> */}
-            {/* <Tab label="Agency MarketPlace" value="marketplace" /> */}
-            <Tab label="App Hub" value="apphub" />
-            <Tab label="E‑Book" value="ebooks" />
-          </Tabs>
-        </Box>
-
-        {selectedMenu === "dashboard" ? (
-          <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", border: "1px solid #e2e8f0", p: 2 }}>
-            <AppsGrid
-              items={appItemsWithBadge}
-              variant={isSmUp ? "icon" : "image"}
-              columns={isSmUp ? { xs: 2, sm: 3, md: 4, lg: 4 } : { xs: 1, sm: 2, md: 3, lg: 4 }}
+        <Box
+          sx={{
+            position: "absolute",
+            bottom: 10,
+            left: "50%",
+            transform: "translateX(-50%)",
+            display: "flex",
+            gap: 1,
+          }}
+        >
+          {banners.map((_, i) => (
+            <Box
+              key={i}
+              onClick={() => setIdx(i)}
+              sx={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                cursor: "pointer",
+                bgcolor: i === idx ? "#1976d2" : "rgba(255,255,255,0.7)",
+              }}
             />
+          ))}
+        </Box>
+      </Box>
+    );
+  }
+
+  const CategoryTile = ({ item }) => (
+    <Box
+      onClick={() => item.route && navigate(item.route)}
+      sx={{
+        borderRadius: 2,
+        p: 1,
+        height: 110,
+        bgcolor: "rgba(2,132,199,0.06)",
+        border: "none",
+        textAlign: "center",
+        cursor: item.route ? "pointer" : "default",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+      }}
+      role="button"
+      aria-label={item.label}
+      title={item.label}
+    >
+      <Box
+        sx={{
+          flex: 1,
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: 0,
+        }}
+      >
+        <Box
+          sx={{
+            width: 48,
+            height: 48,
+            borderRadius: 1.5,
+            bgcolor: "rgba(2,132,199,0.10)",
+            border: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {item.icon ? (
+            <item.icon sx={{ fontSize: 34, color: "#0C2D48" }} />
+          ) : (
+            <Typography sx={{ fontWeight: 600, fontSize: 16, color: "#0C2D48", lineHeight: 1 }}>
+              {(item.label || "")
+                .split(" ")
+                .filter(Boolean)
+                .slice(0, 2)
+                .map((w) => w[0]?.toUpperCase())
+                .join("")}
+            </Typography>
+          )}
+        </Box>
+      </Box>
+      <Typography
+        variant="caption"
+        sx={{
+          color: "text.primary",
+          lineHeight: 1.15,
+          fontWeight: 600,
+          fontSize: 12,
+          mt: 1,
+          px: 0.25,
+          maxWidth: "100%",
+        }}
+        noWrap
+      >
+        {item.label}
+      </Typography>
+    </Box>
+  );
+
+  const PromoCard = ({ item, flag }) => (
+    <Box
+      sx={{
+        position: "relative",
+        width: "calc(50% - 8px)",
+        minWidth: "calc(50% - 8px)",
+        maxWidth: "calc(50% - 8px)",
+        borderRadius: 2,
+        overflow: "hidden",
+        backgroundColor: "#fff",
+        scrollSnapAlign: "start",
+        boxShadow: "0 1px 4px rgba(15,23,42,0.08)"
+      }}
+    >
+      <Box sx={{ height: 110, overflow: "hidden", backgroundColor: "#f5f7fa" }}>
+        <Box
+          component="img"
+          src={item.image}
+          alt={item.label}
+          sx={{ width: "100%", height: "100%" }}
+        />
+      </Box>
+
+      <Box sx={{ p: 1 }}>
+        <Typography fontSize={13} fontWeight={700} noWrap>
+          {item.label}
+        </Typography>
+      </Box>
+
+      <Chip
+        size="small"
+        label={flag}
+        color="error"
+        sx={{ position: "absolute", top: 8, left: 8 }}
+      />
+    </Box>
+  );
+
+  function PrimeSection() {
+    return (
+      <Box
+        sx={{
+          borderRadius: 2,
+          bgcolor: "#fff",
+          border: "1px solid #e2e8f0",
+          p: 1.25,
+          boxShadow: "0px 1px 3px rgba(15,23,42,0.06)",
+        }}
+      >
+        {isPrime ? (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Chip size="small" color="success" label="Prime Active" />
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              You’re enjoying Prime benefits.
+            </Typography>
           </Box>
+        ) : (
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                Upgrade to Prime
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Earn more rewards and offers
+              </Typography>
+            </Box>
+            <Button
+              size="small"
+              variant="contained"
+              onClick={() => navigate("/user/promo-packages")}
+              sx={{ textTransform: "none" }}
+            >
+              Upgrade
+            </Button>
+          </Box>
+        )}
+      </Box>
+    );
+  }
+
+  const FeaturedLogo = ({ data }) => (
+    <Box
+      onClick={data.onClick}
+      sx={{
+        minWidth: 110,
+        borderRadius: 2,
+        p: 1,
+        scrollSnapAlign: "start",
+        bgcolor: "#fff",
+        border: "1px solid rgba(0,0,0,0.06)",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+        cursor: "pointer",
+      }}
+      role="button"
+      aria-label={data.label}
+      title={data.label}
+    >
+      <Box
+        sx={{
+          height: 60,
+          borderRadius: 1.5,
+          background: data.image ? `url(${data.image}) center/contain no-repeat` : "#eef2f7",
+          border: "1px solid rgba(0,0,0,0.06)",
+        }}
+      />
+    </Box>
+  );
+
+  function ProductRow({ title, item }) {
+    if (!item) return null;
+
+    const names =
+      title === "Electronics"
+        ? ["Smart 4K TV", "Bluetooth Speaker"]
+        : title === "EV Vehicles"
+        ? ["E‑Bike", "E‑Scooter"]
+        : ["Modern Sofa", "Dining Set"];
+
+    const reward =
+      title === "Electronics" ? "6%" : title === "EV Vehicles" ? "10%" : "7%";
+
+    const indices = [0, 1];
+
+    return (
+      <Box
+        sx={{
+          borderRadius: 2,
+          bgcolor: "#fff",
+          border: "1px solid #e2e8f0",
+          boxShadow: "0px 1px 3px rgba(15,23,42,0.06)",
+          p: 1.25
+        }}
+      >
+        <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
+          <Typography fontSize={18} fontWeight={700}>
+            {title}
+          </Typography>
+          <Typography fontSize={13} color="primary" fontWeight={600}>
+            View All
+          </Typography>
+        </Box>
+
+        <Box
+          sx={{
+            display: "flex",
+            gap: 1.5,
+            overflowX: "auto",
+            overflowY: "hidden",
+            scrollSnapType: "x mandatory",
+            WebkitOverflowScrolling: "touch",
+            py: 0.5,
+            "&::-webkit-scrollbar": { display: "none" }
+          }}
+        >
+          {indices.map((i) => (
+            <Card
+              key={i}
+              onClick={() => item.route && navigate(item.route)}
+              sx={{
+                minWidth: "50%",
+                maxWidth: 360,
+                flex: "0 0 auto",
+                scrollSnapAlign: "start",
+                borderRadius: 1,
+                border: "1px solid #e5e7eb",
+                boxShadow: "0 1px 2px rgba(0,0,0,0.08)"
+              }}
+            >
+              <SmartImage src={item.image} alt={item.label} type="product" />
+              <Box sx={{ p: 1 }}>
+                <Typography
+                  fontSize={13}
+                  fontWeight={600}
+                  lineHeight={1.25}
+                  sx={{
+                    display: "-webkit-box",
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden"
+                  }}
+                >
+                  {names[i]}
+                </Typography>
+                <Typography fontSize={12} color="text.secondary">
+                  Earn up to {reward} rewards
+                </Typography>
+              </Box>
+            </Card>
+          ))}
+        </Box>
+      </Box>
+    );
+  }
+
+  function ShopProductsSection() {
+    const [active, setActive] = useState("electronics");
+
+    const catDefs = [
+      { key: "electronics", label: "Electronics", route: "/user/tri/tri-electronics" },
+      { key: "furniture", label: "Furniture", route: "/user/tri/tri-furniture" },
+      { key: "ev", label: "EV", route: "/user/tri/tri-ev" },
+    ];
+
+    const findImageByKey = (k) => {
+      const it = (appItemsFinal || []).find((i) => i.key === `tri-${k}`);
+      return it?.image;
+    };
+
+    const catImages = useMemo(
+      () => ({
+        electronics: categoryBannersAdmin["tri-electronics"] || findImageByKey("electronics") || imgPlaystoreScreen,
+        furniture: categoryBannersAdmin["tri-furniture"] || findImageByKey("furniture") || imgFurniture,
+        ev: categoryBannersAdmin["tri-ev"] || findImageByKey("ev") || imgEV,
+      }),
+      [categoryBannersAdmin, appItemsFinal]
+    );
+
+    const buildItems = useMemo(() => {
+      const make = (key, route, names) =>
+        names.slice(0, 6).map((title, idx) => ({
+          id: `${key}-${idx}`,
+          title,
+          image: catImages[key],
+          route,
+        }));
+
+      return {
+        electronics: make("electronics", "/user/tri/tri-electronics", [
+          "Smart TV 4K",
+          "Bluetooth Speaker",
+          "Air Conditioner",
+          "Washing Machine",
+          "Microwave Oven",
+          "Refrigerator",
+        ]),
+        furniture: make("furniture", "/user/tri/tri-furniture", [
+          "Modern Sofa",
+          "Dining Set",
+          "Wardrobe",
+          "Office Chair",
+          "Bookshelf",
+          "Coffee Table",
+        ]),
+        ev: make("ev", "/user/tri/tri-ev", ["E‑Bike", "E‑Scooter", "EV Charger", "E‑Cycle", "Battery Pack", "Helmet"]),
+      };
+    }, [catImages]);
+
+    const DashboardProductCard = ({ item, catKey }) => (
+      <Card
+        onClick={() => item.route && navigate(item.route)}
+        sx={{
+          height: "100%",
+          cursor: "pointer",
+          borderRadius: 2,
+          overflow: "hidden",
+          backgroundColor: "#ffffff",
+          border: "1px solid",
+          borderColor: "divider",
+          boxShadow: "0px 1px 3px rgba(15,23,42,0.06)",
+          transition: "transform 120ms ease, box-shadow 120ms ease",
+          "&:hover": {
+            boxShadow: { xs: "0px 1px 3px rgba(15,23,42,0.06)", sm: "0px 4px 12px rgba(15,23,42,0.10)" },
+            transform: { xs: "none", sm: "translateY(-2px)" },
+          },
+        }}
+      >
+        <Box sx={{ position: "relative" }}>
+          <SmartImage src={item.image} alt={item.title} type="product" />
+        </Box>
+        <CardContent sx={{ p: 1 }}>
+          <Typography fontSize={13} fontWeight={700} noWrap>
+            {item.title}
+          </Typography>
+        </CardContent>
+      </Card>
+    );
+
+    return (
+      <Box
+        sx={{
+          borderRadius: 2,
+          bgcolor: "#fff",
+          border: "1px solid #e2e8f0",
+          p: 1.25,
+          boxShadow: "0px 1px 3px rgba(15,23,42,0.06)",
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
+          <Typography variant="h6" sx={{ fontSize: 18, fontWeight: 700 }}>
+            Shop Products
+          </Typography>
+          <Typography variant="body2" color="primary" sx={{ fontWeight: 600 }}>
+            View All
+          </Typography>
+        </Box>
+
+        <Box
+          sx={{
+            display: "flex",
+            gap: 1,
+            pb: 1,
+            overflowX: "auto",
+            "&::-webkit-scrollbar": { display: "none" },
+          }}
+        >
+          {catDefs.map((c) => (
+            <Chip
+              key={c.key}
+              size="small"
+              label={c.label}
+              onClick={() => setActive(c.key)}
+              variant={active === c.key ? "filled" : "outlined"}
+              color={active === c.key ? "primary" : "default"}
+              sx={{ textTransform: "none" }}
+            />
+          ))}
+        </Box>
+
+        <Grid container spacing={1.25}>
+          {(buildItems[active] || []).slice(0, 6).map((it) => (
+            <Grid key={it.id} item xs={6} sm={4} md={3}>
+              <DashboardProductCard item={it} catKey={active} />
+            </Grid>
+          ))}
+        </Grid>
+      </Box>
+    );
+  }
+
+  const ServiceIcon = ({ data }) => (
+    <Box
+      onClick={data.onClick}
+      sx={{
+        borderRadius: 2,
+        p: 1,
+        height: "100%",
+        bgcolor: "#fff",
+        border: "1px solid rgba(0,0,0,0.06)",
+        textAlign: "center",
+        cursor: "pointer",
+      }}
+      role="button"
+      aria-label={data.label}
+      title={data.label}
+    >
+      <Avatar
+        src={data.image || undefined}
+        variant="rounded"
+        sx={{
+          width: 36,
+          height: 36,
+          mx: "auto",
+          fontWeight: 700,
+          bgcolor: "rgba(2,132,199,0.08)",
+          color: "#0C2D48",
+          border: "1px solid rgba(0,0,0,0.06)",
+          fontSize: 14,
+        }}
+      >
+        {!data.image &&
+          (data.label || "")
+            .split(" ")
+            .filter(Boolean)
+            .slice(0, 2)
+            .map((w) => w[0]?.toUpperCase())
+            .join("")}
+      </Avatar>
+    </Box>
+  );
+
+  function DashboardContent() {
+    const itemByKey = Object.fromEntries((appItemsFinal || []).map((i) => [i.key, i]));
+    const pick = (keys) => keys.map((k) => itemByKey[k]).filter(Boolean);
+
+    const categoryKeys = [
+      "tri-electronics",
+      "tri-furniture",
+      "tri-ev",
+      "tri-local-store",
+      "gift-cards",
+      "bill-recharge",
+      "tri-properties",
+      "tri-holidays",
+    ];
+    const categories = pick(categoryKeys);
+
+    const promoKeys = ["tri-spinwin"];
+    const promos = pick(promoKeys);
+
+    const featured = [
+      { label: "TRIKONEKT", image: LOGO, onClick: () => navigate("/trikonekt-products") },
+      itemByKey["wealth-galaxy"]
+        ? {
+            label: itemByKey["wealth-galaxy"].label,
+            image: itemByKey["wealth-galaxy"].image,
+            onClick: () => itemByKey["wealth-galaxy"].route && navigate(itemByKey["wealth-galaxy"].route),
+          }
+        : null,
+      itemByKey["tri-holidays"]
+        ? {
+            label: itemByKey["tri-holidays"].label,
+            image: itemByKey["tri-holidays"].image,
+            onClick: () => itemByKey["tri-holidays"].route && navigate(itemByKey["tri-holidays"].route),
+          }
+        : null,
+    ].filter(Boolean);
+
+    const electronics = itemByKey["tri-electronics"];
+    const furniture = itemByKey["tri-furniture"];
+    const ev = itemByKey["tri-ev"];
+
+    const services = [
+      { label: "App Hub", onClick: () => setSelectedMenu("apphub") },
+      { label: "E‑Book", onClick: () => setSelectedMenu("ebooks") },
+      itemByKey["tri-saving"]
+        ? {
+            label: itemByKey["tri-saving"].label,
+            image: itemByKey["tri-saving"].image,
+            onClick: () => itemByKey["tri-saving"].route && navigate(itemByKey["tri-saving"].route),
+          }
+        : null,
+      itemByKey["genealogy"]
+        ? {
+            label: itemByKey["genealogy"].label,
+            image: itemByKey["genealogy"].image,
+            onClick: () => itemByKey["genealogy"].route && navigate(itemByKey["genealogy"].route),
+          }
+        : null,
+    ].filter(Boolean);
+
+    const labelMap = {
+      "tri-electronics": "Electronics",
+      "tri-furniture": "Furniture",
+      "tri-ev": "EV",
+      "tri-local-store": "Local",
+      "gift-cards": "Gifts",
+      "bill-recharge": "Recharge",
+      "tri-properties": "Properties",
+      "tri-holidays": "Holidays",
+      prime: "Prime",
+    };
+
+    return (
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <HeroCarousel banners={heroBanners} />
+
+        {categories.length > 0 && (
+          <Box
+            sx={{
+              borderRadius: 2,
+              bgcolor: "#fff",
+              border: "1px solid #e2e8f0",
+              p: 2,
+              boxShadow: "0px 1px 3px rgba(15,23,42,0.06)",
+            }}
+          >
+            <Typography fontWeight={700} mb={1}>
+              Shop by Categories
+            </Typography>
+
+            <Box
+              sx={{
+                display: "grid",
+                gap: 2,
+                gridTemplateColumns: {
+                  xs: "repeat(4, 1fr)",
+                  sm: "repeat(6, 1fr)",
+                  md: "repeat(8, 1fr)"
+                }
+              }}
+            >
+              {categories
+                .map((it) => ({ ...it, label: labelMap[it.key] || it.label }))
+                .map((item) => (
+                  <Box
+                    key={item.key}
+                    onClick={() => item.route && navigate(item.route)}
+                    role="button"
+                    aria-label={item.label}
+                    title={item.label}
+                  >
+                    <AppIconTile label={item.label} image={item.image} />
+                  </Box>
+                ))}
+            </Box>
+          </Box>
+        )}
+
+        {promos.length > 0 && (
+          <Box
+            sx={{
+              borderRadius: 2,
+              bgcolor: "#fff",
+              border: "1px solid #e2e8f0",
+              p: 1.25,
+              boxShadow: "0px 1px 3px rgba(15,23,42,0.06)",
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
+              <Typography variant="h6" sx={{ fontSize: 18, fontWeight: 700 }}>
+                Deals & Promotions
+              </Typography>
+              <Typography variant="body2" color="primary" sx={{ fontWeight: 600 }}>
+                View All
+              </Typography>
+            </Box>
+            <Box
+              sx={{
+                display: "flex",
+                gap: 1.5,
+                overflowX: "auto",
+                overflowY: "hidden",
+                scrollSnapType: "x mandatory",
+                WebkitOverflowScrolling: "touch",
+                py: 0.5,
+                "&::-webkit-scrollbar": { display: "none" }
+              }}
+            >
+              {promos.map((item, idx) => (
+                <Card
+                  key={item.key || idx}
+                  onClick={() => item.route && navigate(item.route)}
+                  sx={{
+                    minWidth: "50%",
+                    maxWidth: 360,
+                    flex: "0 0 auto",
+                    scrollSnapAlign: "start",
+                    borderRadius: 1,
+                    border: "1px solid #e5e7eb",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.08)"
+                  }}
+                >
+                  <SmartImage src={item.image} alt={item.label} type="product" />
+                  <Box sx={{ p: 1 }}>
+                    <Typography
+                      fontSize={13}
+                      fontWeight={600}
+                      lineHeight={1.25}
+                      sx={{
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden"
+                      }}
+                    >
+                      {item.label}
+                    </Typography>
+                  </Box>
+                </Card>
+              ))}
+            </Box>
+          </Box>
+        )}
+
+        {/* <PrimeSection /> */}
+
+        {/* ================= Prime Membership ================= */}
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1.5,
+              p: 1.5,
+              borderRadius: 2,
+              background: "linear-gradient(135deg, #fff7e6, #fff1cc)",
+              border: "1px solid #f5d58d"
+            }}
+          >
+            {/* Prime Icon */}
+            <Box
+              sx={{
+                width: 36,
+                height: 36,
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, #facc15, #f59e0b)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#fff",
+                fontWeight: 800,
+                fontSize: 16,
+                flexShrink: 0
+              }}
+            >
+              ★
+            </Box>
+
+            {/* Prime Text */}
+            <Box sx={{ flex: 1 }}>
+              <Typography fontWeight={700} fontSize={14}>
+                Prime Member
+              </Typography>
+              <Typography fontSize={12} color="text.secondary">
+                Enjoy extra rewards & exclusive benefits
+              </Typography>
+            </Box>
+
+            {/* Status */}
+            <Box
+              sx={{
+                fontSize: 11,
+                fontWeight: 700,
+                px: 1,
+                py: 0.5,
+                borderRadius: 1,
+                backgroundColor: "#16a34a",
+                color: "#fff"
+              }}
+            >
+              ACTIVE
+            </Box>
+          </Box>
+
+
+        {/* ================= Bills & Recharge ================= */}
+          <Box sx={{ mt: 2 }}>
+            <Typography fontWeight={700} mb={1}>
+              Bills & Recharge
+            </Typography>
+
+            <Box
+              sx={{
+                display: "flex",
+                gap: 1.5,
+                overflowX: "auto",
+                pb: 1,
+                "&::-webkit-scrollbar": { display: "none" }
+              }}
+            >
+              {[
+                {
+                  label: "Mobile",
+                  icon: "https://cdn-icons-png.flaticon.com/512/724/724664.png"
+                },
+                {
+                  label: "DTH",
+                  icon: "https://cdn-icons-png.flaticon.com/512/2920/2920329.png"
+                },
+                {
+                  label: "Electricity",
+                  icon: "https://cdn-icons-png.flaticon.com/512/481/481874.png"
+                },
+                {
+                  label: "Broadband",
+                  icon: "https://cdn-icons-png.flaticon.com/512/1048/1048943.png"
+                },
+                {
+                  label: "Gas",
+                  icon: "https://cdn-icons-png.flaticon.com/512/2903/2903622.png"
+                },
+                {
+                  label: "Water",
+                  icon: "https://cdn-icons-png.flaticon.com/512/4148/4148460.png"
+                },
+                {
+                  label: "More",
+                  icon: "https://cdn-icons-png.flaticon.com/512/1828/1828817.png"
+                }
+              ].map((item) => (
+                <Box
+                  key={item.label}
+                  sx={{
+                    flex: "0 0 auto",
+                    width: 72,
+                    textAlign: "center"
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 56,
+                      height: 56,
+                      mx: "auto",
+                      borderRadius: 2,
+                      bgcolor: "#ffffff",
+                      border: "1px solid #e5e7eb",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center"
+                    }}
+                  >
+                    <img
+                      src={item.icon}
+                      alt={item.label}
+                      style={{
+                        width: 28,
+                        height: 28,
+                        objectFit: "contain"
+                      }}
+                    />
+                  </Box>
+
+                  <Typography
+                    fontSize={12}
+                    fontWeight={600}
+                    mt={0.75}
+                    noWrap
+                  >
+                    {item.label}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          </Box>
+
+
+        {featured.length > 0 && (
+          <Box
+            sx={{
+              borderRadius: 2,
+              bgcolor: "#fff",
+              border: "1px solid #e2e8f0",
+              p: 1.25,
+              boxShadow: "0px 1px 3px rgba(15,23,42,0.06)",
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
+              <Typography variant="h6" sx={{ fontSize: 18, fontWeight: 700 }}>
+                Featured Stores
+              </Typography>
+              <Typography variant="body2" color="primary" sx={{ fontWeight: 600 }}>
+                View All
+              </Typography>
+            </Box>
+            <Box
+              sx={{
+                display: "flex",
+                gap: 1.25,
+                overflowX: "auto",
+                pb: 0.5,
+                "&::-webkit-scrollbar": { display: "none" },
+                scrollSnapType: "x mandatory",
+              }}
+            >
+              {featured.map((f, idx) => (
+                <FeaturedLogo key={`fs-${idx}`} data={f} />
+              ))}
+            </Box>
+          </Box>
+        )}
+
+        <ProductRow title="Electronics" item={electronics} />
+        <ProductRow title="Furniture" item={furniture} />
+        <ProductRow title="EV Vehicles" item={ev} />
+
+        {services.length > 0 && (
+          <Box
+            sx={{
+              borderRadius: 2,
+              bgcolor: "#fff",
+              border: "1px solid #e2e8f0",
+              p: 1.25,
+              boxShadow: "0px 1px 3px rgba(15,23,42,0.06)",
+            }}
+          >
+            <Typography variant="h6" sx={{ fontSize: 18, fontWeight: 700, mb: 1 }}>
+              Services
+            </Typography>
+            <Grid container spacing={1.25}>
+              {services.map((s, i) => (
+                <Grid item xs={3} sm={3} key={`srv-${i}`}>
+                  <ServiceIcon data={s} />
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
+        )}
+      </Box>
+    );
+  }
+
+  // Cart count from existing Zustand store (UI-only usage)
+  const cartItems = useCartStore((s) => s.items);
+  const cartCount = Array.isArray(cartItems) ? cartItems.reduce((sum, i) => sum + (i.qty || 0), 0) : 0;
+
+  if (embedded) {
+    return (
+      <Box sx={{ p: { xs: 2, md: 3 } }}>
+        {selectedMenu === "dashboard" ? (
+          <DashboardContent />
         ) : selectedMenu === "wealth-galaxy" ? (
-          <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", border: "1px solid #e2e8f0", p: 2 }}>
-            {/* Reuse AppHub or a dedicated component for Wealth Galaxy if available */}
+          <Box sx={{ borderRadius: "6px", overflow: "hidden", bgcolor: "#fff", border: "1px solid #e2e8f0", p: 2 }}>
             <WealthGalaxy />
           </Box>
         ) : selectedMenu === "marketplace" ? (
@@ -430,11 +1352,11 @@ export default function UserDashboard({ embedded = false }) {
             {renderMarketplaceContent()}
           </MarketplaceCard>
         ) : selectedMenu === "apphub" ? (
-          <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", border: "1px solid #e2e8f0" }}>
+          <Box sx={{ borderRadius: "6px", overflow: "hidden", bgcolor: "#fff", border: "1px solid #e2e8f0" }}>
             <AppHub />
           </Box>
         ) : selectedMenu === "ebooks" ? (
-          <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", border: "1px solid #e2e8f0" }}>
+          <Box sx={{ borderRadius: "6px", overflow: "hidden", bgcolor: "#fff", border: "1px solid #e2e8f0" }}>
             <EBooks />
           </Box>
         ) : null}
@@ -443,41 +1365,41 @@ export default function UserDashboard({ embedded = false }) {
   }
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", backgroundColor: "#f7f9fb" }}>
-      {/* App Top Bar */}
+    <Box sx={{ display: "flex", minHeight: "100vh", backgroundColor: "#f7f9fb", overflowX: "hidden", maxWidth: "100%", "&, *": { boxSizing: "border-box" } }}>
       <AppBar
         position="fixed"
         sx={{
-          zIndex: (theme) => theme.zIndex.drawer + 1,
-          backgroundColor: "#0C2D48",
+          height: 56,
+          bgcolor: "#131921",
+          borderBottom: "1px solid rgba(0,0,0,0.06)",
         }}
       >
-        <Toolbar>
-          <IconButton color="inherit" edge="start" onClick={handleDrawerToggle} sx={{ mr: 2, display: { sm: "none" } }}>
-            <MenuIcon />
-          </IconButton>
-
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Box component="img" src={LOGO} alt="Trikonekt" sx={{ height: 36 }} />
-            <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 700 }}></Typography>
+        <Toolbar sx={{ minHeight: 56, px: 1 }}>
+          <Box sx={{ display: "flex", alignItems: "center", width: 56 }}>
+            <IconButton color="inherit" edge="start" onClick={handleDrawerToggle} aria-label="Menu">
+              <MenuIcon />
+            </IconButton>
           </Box>
 
-          <Box sx={{ flexGrow: 1 }} />
+          <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", px: 1 }}>
+            <Typography variant="h6" sx={{ color: "#fff", fontWeight: 700, fontSize: 16 }} noWrap>
+              {displayName || "Consumer"}
+            </Typography>
+          </Box>
 
-          <Chip
-            size="small"
-            color={isPrime ? "success" : "default"}
-            label={isPrime ? "Prime Account" : "Non‑Prime"}
-            sx={{ mr: 1, fontWeight: 700, bgcolor: isPrime ? undefined : "rgba(255,255,255,0.15)", color: isPrime ? undefined : "#fff" }}
-          />
-
-          <Button color="inherit" size="small" sx={{ fontWeight: 500, textTransform: "none" }} onClick={handleLogout}>
-            Logout
-          </Button>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5, minWidth: 96 }}>
+            <IconButton color="inherit" size="large" aria-label="Notifications">
+              <NotificationsNoneOutlinedIcon />
+            </IconButton>
+            <IconButton color="inherit" size="large" aria-label="Cart" onClick={() => navigate("/user/cart")}>
+              <Badge color="error" badgeContent={cartCount} showZero>
+                <ShoppingCartIcon />
+              </Badge>
+            </IconButton>
+          </Box>
         </Toolbar>
       </AppBar>
 
-      {/* Sidebar */}
       <Drawer
         variant="temporary"
         open={mobileOpen}
@@ -493,7 +1415,7 @@ export default function UserDashboard({ embedded = false }) {
           },
         }}
       >
-        <Toolbar />
+        <Toolbar sx={{ minHeight: 56 }} />
         <Box sx={{ overflow: "auto" }}>
           <List>
             <ListItemButton
@@ -560,9 +1482,15 @@ export default function UserDashboard({ embedded = false }) {
             </ListItemButton>
           </List>
           <Divider />
+          <List>
+            <ListItemButton onClick={handleLogout}>
+              <ListItemText primary="Logout" />
+            </ListItemButton>
+          </List>
           <Box sx={{ p: 2, color: "text.secondary", fontSize: 13 }}></Box>
         </Box>
       </Drawer>
+
       <Drawer
         variant="permanent"
         sx={{
@@ -578,7 +1506,7 @@ export default function UserDashboard({ embedded = false }) {
         }}
         open
       >
-        <Toolbar />
+        <Toolbar sx={{ minHeight: 56 }} />
         <Box sx={{ overflow: "auto" }}>
           <List>
             <ListItemButton
@@ -631,46 +1559,38 @@ export default function UserDashboard({ embedded = false }) {
             </ListItemButton>
           </List>
           <Divider />
-          <Box sx={{ p: 2, color: "text.secondary", fontSize: 13 }}>{/* Footer note */}</Box>
+          <List>
+            <ListItemButton onClick={handleLogout}>
+              <ListItemText primary="Logout" />
+            </ListItemButton>
+          </List>
+          <Box sx={{ p: 2, color: "text.secondary", fontSize: 13 }}></Box>
         </Box>
       </Drawer>
 
-      {/* Main Content */}
       <Box
         component="main"
         sx={{
           flexGrow: 1,
           p: { xs: 2, md: 3 },
+          overflowX: "hidden",
+          maxWidth: "100%",
         }}
       >
         <Toolbar />
-        {/* Banner */}
+
         <Box
           sx={{
-            position: "relative",
-            width: { xs: "calc(100% + 32px)", md: "100%" },
-            ml: { xs: -2, md: 0 },
-            mr: { xs: -2, md: 0 },
-            height: { xs: 140, sm: 180, md: 220 },
-            borderRadius: 3,
+            borderRadius: "6px",
             overflow: "hidden",
+            bgcolor: "#fff",
             mb: 2,
-            boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
-            background: `linear-gradient(rgba(12,45,72,0.35), rgba(12,45,72,0.35)), url(${LOGO}) center/cover no-repeat`,
+            border: "1px solid #e2e8f0",
+            boxShadow: "0px 1px 3px rgba(15,23,42,0.06)",
+            px: 1,
+            py: 0.5,
           }}
         >
-          <Box sx={{ position: "absolute", bottom: 16, left: 16, color: "#fff" }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-              Welcome, {displayName}
-            </Typography>
-            <Typography variant="body2" sx={{ opacity: 0.9 }}>
-              Explore offers, redeem coupons and more
-            </Typography>
-          </Box>
-        </Box>
-
-        {/* Top Navigation Tabs */}
-        <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", mb: 2, border: "1px solid #e2e8f0" }}>
           <Tabs
             value={selectedMenu}
             onChange={(e, val) => setSelectedMenu(val)}
@@ -680,7 +1600,6 @@ export default function UserDashboard({ embedded = false }) {
             indicatorColor="primary"
           >
             <Tab label="Dashboard" value="dashboard" />
-            {/* <Tab label="Wealth Galaxy" value="wealth-galaxy" /> */}
             <Tab label="MarketPlace" value="marketplace" />
             <Tab label="App Hub" value="apphub" />
             <Tab label="E‑Book" value="ebooks" />
@@ -688,15 +1607,9 @@ export default function UserDashboard({ embedded = false }) {
         </Box>
 
         {selectedMenu === "dashboard" ? (
-          <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", border: "1px solid #e2e8f0", p: 2 }}>
-            <AppsGrid
-              items={appItemsWithBadge}
-              variant={isSmUp ? "icon" : "image"}
-              columns={isSmUp ? { xs: 2, sm: 3, md: 4, lg: 4 } : { xs: 1, sm: 2, md: 3, lg: 4 }}
-            />
-          </Box>
+          <DashboardContent />
         ) : selectedMenu === "wealth-galaxy" ? (
-          <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", border: "1px solid #e2e8f0" }}>
+          <Box sx={{ borderRadius: "6px", overflow: "hidden", bgcolor: "#fff", border: "1px solid #e2e8f0" }}>
             <AppHub />
           </Box>
         ) : selectedMenu === "marketplace" ? (
@@ -709,11 +1622,11 @@ export default function UserDashboard({ embedded = false }) {
             {renderMarketplaceContent()}
           </MarketplaceCard>
         ) : selectedMenu === "apphub" ? (
-          <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", border: "1px solid #e2e8f0" }}>
+          <Box sx={{ borderRadius: "6px", overflow: "hidden", bgcolor: "#fff", border: "1px solid #e2e8f0" }}>
             <AppHub />
           </Box>
         ) : selectedMenu === "ebooks" ? (
-          <Box sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff", border: "1px solid #e2e8f0" }}>
+          <Box sx={{ borderRadius: "6px", overflow: "hidden", bgcolor: "#fff", border: "1px solid #e2e8f0" }}>
             <EBooks />
           </Box>
         ) : null}

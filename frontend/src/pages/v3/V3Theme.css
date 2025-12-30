@@ -1,0 +1,379 @@
+/* v3 Theme (scoped) — Do NOT affect global styles */
+/* Wrap v3 pages in a container with className="v3-root" */
+.v3-root {
+  color-scheme: dark;
+  --v3-bg: #0f1115;
+  --v3-surface: #161a22;
+  --v3-surface-2: #1b2030;
+  --v3-border: rgba(255, 255, 255, 0.08);
+  --v3-text: #e6e6e6;
+  --v3-muted: #a0a4ac;
+  --v3-gold-1: #d4af37;
+  --v3-gold-2: #f4d180;
+  --v3-radius: 14px;
+  --v3-radius-sm: 12px;
+  --v3-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  --v3-shadow-soft: 0 2px 10px rgba(0, 0, 0, 0.28);
+  --v3-gap: 12px;
+  --v3-pad: 16px;
+  --v3-pad-lg: 20px;
+  --v3-focus: 0 0 0 2px rgba(244, 209, 128, 0.5);
+  background: var(--v3-bg);
+  color: var(--v3-text);
+}
+
+/* Page container */
+.v3-page {
+  min-height: 100%;
+  background: var(--v3-bg);
+  padding: calc(var(--v3-pad) + 4px);
+}
+
+/* Generic card */
+.v3-card {
+  background: var(--v3-surface);
+  border: 1px solid var(--v3-border);
+  border-radius: var(--v3-radius);
+  box-shadow: var(--v3-shadow-soft);
+}
+
+/* Gold accent gradient */
+.v3-gold {
+  background: linear-gradient(135deg, var(--v3-gold-1), var(--v3-gold-2));
+  color: #111;
+}
+.v3-gold-text {
+  background: linear-gradient(135deg, var(--v3-gold-1), var(--v3-gold-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Top bar */
+.v3-topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--v3-gap);
+  padding: var(--v3-pad);
+  background: var(--v3-surface);
+  border: 1px solid var(--v3-border);
+  border-radius: var(--v3-radius);
+}
+.v3-topbar-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--v3-surface-2);
+  border: 1px solid var(--v3-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--v3-text);
+  font-weight: 600;
+}
+.v3-topbar-search {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--v3-surface-2);
+  border: 1px solid var(--v3-border);
+  border-radius: 999px;
+  padding: 10px 12px;
+}
+.v3-topbar-search input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--v3-text);
+  font-size: 14px;
+}
+.v3-balance-pill {
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, rgba(212,175,55,0.15), rgba(244,209,128,0.15));
+  border: 1px solid rgba(244,209,128,0.25);
+  color: var(--v3-text);
+  font-weight: 600;
+}
+
+/* Action chips */
+.v3-chip-row {
+  display: flex;
+  gap: var(--v3-gap);
+  padding: var(--v3-pad) 0;
+}
+.v3-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--v3-surface);
+  border: 1px solid var(--v3-border);
+  border-radius: 999px;
+  color: var(--v3-text);
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  box-shadow: var(--v3-shadow-soft);
+  transition: transform 0.08s ease, background 0.2s ease, border-color 0.2s ease;
+}
+.v3-chip:hover {
+  transform: translateY(-1px);
+  border-color: rgba(244,209,128,0.35);
+}
+.v3-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--v3-focus);
+}
+
+/* Section */
+.v3-section {
+  margin-top: 12px;
+}
+.v3-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 2px 8px 2px;
+}
+.v3-section-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #ffffff;
+}
+.v3-section-body {
+  padding: var(--v3-pad);
+}
+
+/* Highlight/hero card */
+.v3-hero {
+  border-radius: var(--v3-radius);
+  padding: var(--v3-pad-lg);
+  background: linear-gradient(135deg, rgba(212,175,55,0.15), rgba(244,209,128,0.1));
+  border: 1px solid rgba(244,209,128,0.2);
+  color: var(--v3-text);
+  box-shadow: var(--v3-shadow);
+}
+
+/* List tile (history/transactions, orders, etc.) */
+.v3-tile {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--v3-border);
+}
+.v3-tile:last-child {
+  border-bottom: none;
+}
+.v3-tile-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--v3-surface-2);
+  border: 1px solid var(--v3-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--v3-text);
+}
+.v3-tile-title {
+  font-weight: 700;
+  color: #fff;
+  font-size: 14px;
+}
+.v3-tile-subtitle {
+  font-size: 12px;
+  color: var(--v3-muted);
+}
+.v3-tile-right {
+  text-align: right;
+  color: #fff;
+  font-weight: 700;
+}
+
+/* Bottom tabs (optional) */
+.v3-bottom-tabs {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  margin-top: 16px;
+  background: var(--v3-surface);
+  border-top: 1px solid var(--v3-border);
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0;
+}
+.v3-bottom-tab {
+  padding: 10px 8px;
+  text-align: center;
+  color: var(--v3-muted);
+  font-size: 12px;
+}
+.v3-bottom-tab--active {
+  color: #fff;
+  background: linear-gradient(135deg, rgba(212,175,55,0.12), rgba(244,209,128,0.08));
+  border-top: 2px solid var(--v3-gold-2);
+}
+
+/* Utilities */
+.v3-grid {
+  display: grid;
+  gap: var(--v3-gap);
+}
+@media (min-width: 600px) {
+  .v3-grid-cols-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .v3-grid-cols-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .v3-grid-cols-4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+.v3-scroll {
+  overflow: auto;
+}
+.v3-click {
+  cursor: pointer;
+}
+.v3-muted {
+  color: var(--v3-muted);
+}
+.v3-pill {
+  border-radius: 999px;
+  padding: 6px 10px;
+  border: 1px solid var(--v3-border);
+  background: var(--v3-surface-2);
+}
+
+/* ===== Auth (Login) - Dark + Teal look ===== */
+.v3-auth {
+  position: relative;
+  background:
+    linear-gradient(180deg, #0a0b0e 0%, #0a0b0e 55%, #0b1a16 100%),
+    radial-gradient(1200px 600px at 50% 115%, rgba(52, 211, 153, 0.12), transparent 60%);
+}
+
+.v3-auth-card {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+/* Inputs on dark surface */
+.v3-auth-card .MuiInputBase-root {
+  color: var(--v3-text);
+  background: var(--v3-surface-2);
+  border-radius: 12px;
+}
+.v3-auth-card .MuiOutlinedInput-notchedOutline {
+  border-color: var(--v3-border);
+}
+.v3-auth-card .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+  border-color: rgba(52, 211, 153, 0.45);
+}
+.v3-auth-card .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: rgba(52, 211, 153, 0.9);
+  box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.25);
+}
+
+/* Labels */
+.v3-auth-card .MuiFormLabel-root {
+  color: var(--v3-muted);
+}
+.v3-auth-card .MuiFormLabel-root.Mui-focused {
+  color: #34d399;
+}
+
+/* Accent button */
+.v3-auth-accent-btn {
+  background: linear-gradient(90deg, #34d399 0%, #10b981 100%) !important;
+  color: #06291f !important;
+  box-shadow: 0 8px 20px rgba(16, 185, 129, 0.25) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.v3-auth-accent-btn:hover {
+  filter: brightness(1.05);
+  box-shadow: 0 10px 24px rgba(16, 185, 129, 0.32) !important;
+}
+
+/* Links */
+.v3-auth-link {
+  color: #34d399;
+}
+.v3-auth-link:hover {
+  color: #6ee7b7;
+  text-decoration: underline;
+}
+
+/* Brand heading */
+.v3-auth-brand {
+  font-weight: 900;
+  font-size: 28px;
+  letter-spacing: 1px;
+  color: #34d399;
+}
+
+/* Pill dark inputs */
+.v3-input .MuiOutlinedInput-root {
+  color: var(--v3-text);
+  background: #23262b;
+  border-radius: 12px;
+}
+.v3-input .MuiOutlinedInput-notchedOutline {
+  border-color: rgba(255, 255, 255, 0.06);
+}
+.v3-input .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+  border-color: rgba(52, 211, 153, 0.35);
+}
+.v3-input .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: rgba(52, 211, 153, 0.9);
+  box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.25);
+}
+.v3-input input::placeholder {
+  color: #9fb2af;
+  opacity: 1;
+}
+
+/* Accent button tweaks */
+.v3-auth-accent-btn {
+  border-radius: 12px !important;
+}
+
+/* Forgot row spacing to match reference */
+.v3-forgot-row {
+  margin-top: -4px;
+  margin-bottom: 16px;
+}
+
+/* Adjust input height/padding for compact dark pills */
+.v3-input .MuiOutlinedInput-root {
+  min-height: 44px;
+}
+.v3-input .MuiOutlinedInput-input {
+  padding: 12px 12px;
+  font-size: 14px;
+}
+
+/* Soft abstract illustration at bottom to mimic reference */
+.v3-auth-illustration {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 56px; /* leave room for footer text */
+  height: 300px;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 70% at 55% 100%, rgba(11, 36, 29, 0.85), rgba(11, 26, 22, 0.0) 70%),
+    radial-gradient(28% 40% at 68% 70%, rgba(210, 120, 80, 0.25), rgba(210, 120, 80, 0.0) 70%),
+    radial-gradient(22% 30% at 52% 78%, rgba(244, 180, 150, 0.18), rgba(244, 180, 150, 0.0) 70%);
+  opacity: 0.75;
+  filter: saturate(0.9);
+}

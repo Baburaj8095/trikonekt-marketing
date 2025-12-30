@@ -151,6 +151,13 @@ def ensure_first_purchase_activation(user: CustomUser, source: Dict[str, Any]) -
             "can_create_self_accounts",
             "account_active",
         ])
+        # Release any pending ledger for this user now that account is active (idempotent)
+        try:
+            from accounts.models import Wallet
+            Wallet.release_pending_for_user(user)
+        except Exception:
+            pass
+
         # Free lucky draw coupon equivalent: increment rewards coupon progress by 1 (best-effort)
         try:
             from business.models import RewardProgress
@@ -268,7 +275,11 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
     # Distribute 5-matrix (L6) with fixed-amount override support
     five_levels = int(getattr(cfg, "five_matrix_levels", 6) or 6)
     upline6 = _resolve_upline(user, depth=five_levels)
-    fixed_amounts5 = list(getattr(cfg, "five_matrix_amounts_json", []) or [])
+    # Prefer admin master overrides: consumer_matrix_5["150"].fixed_amounts -> fallback to typed field
+    master = dict(getattr(cfg, "master_commission_json", {}) or {})
+    cm5 = dict(master.get("consumer_matrix_5", {}) or {})
+    cm3 = dict(master.get("consumer_matrix_3", {}) or {})
+    fixed_amounts5 = list((cm5.get("150", {}) or {}).get("fixed_amounts") or getattr(cfg, "five_matrix_amounts_json", []) or [])
     if fixed_amounts5:
         for idx, recipient in enumerate(upline6):
             if idx >= len(fixed_amounts5):
@@ -289,7 +300,7 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
             _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_FIVE", meta=meta, source_type=src_type, source_id=src_id)
             _update_matrix_progress(recipient, pool_type="FIVE_150", level=idx + 1, amount=amt)
     else:
-        five_percents = _as_percents(getattr(cfg, "five_matrix_percents_json", []) or [], five_levels)
+        five_percents = _as_percents(((cm5.get("150", {}) or {}).get("percents") or getattr(cfg, "five_matrix_percents_json", []) or []), five_levels)
         _distribute_levels(
             upline6,
             base_amount=base150,
@@ -304,7 +315,7 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
     upline15 = _resolve_upline(user, depth=three_levels)
 
     # Prefer fixed-amount overrides if configured, else fall back to percent distribution
-    fixed_amounts = list(getattr(cfg, "three_matrix_amounts_json", []) or [])
+    fixed_amounts = list((cm3.get("150", {}) or {}).get("fixed_amounts") or getattr(cfg, "three_matrix_amounts_json", []) or [])
     if fixed_amounts:
         for idx, recipient in enumerate(upline15):
             if idx >= len(fixed_amounts):
@@ -325,7 +336,7 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
             _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_THREE", meta=meta, source_type=src_type, source_id=src_id)
             _update_matrix_progress(recipient, pool_type="THREE_150", level=idx + 1, amount=amt)
     else:
-        three_percents = _as_percents(getattr(cfg, "three_matrix_percents_json", []) or [], three_levels)
+        three_percents = _as_percents(((cm3.get("150", {}) or {}).get("percents") or getattr(cfg, "three_matrix_percents_json", []) or []), three_levels)
         _distribute_levels(
             upline15,
             base_amount=base150,
@@ -334,6 +345,20 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
             meta={"source": "THREE_MATRIX_150", "source_type": src_type, "source_id": src_id},
             pool_type="THREE_150",
         )
+
+    # Geo (Agency) configurable payout for 150 Active
+    try:
+        from business.models import distribute_auto_pool_commissions
+        distribute_auto_pool_commissions(
+            user,
+            base_amount=base150,
+            fixed_key="active_150",
+            source_type=src_type,
+            source_id=src_id,
+            extra_meta={"trigger": "ACTIVE_150"},
+        )
+    except Exception:
+        pass
 
     # Mark first purchase activation (idempotent)
     try:
@@ -425,16 +450,43 @@ def activate_50(user: CustomUser, source: Dict[str, Any], package_code: str = "G
         pass
 
     three_levels = int(getattr(cfg, "three_matrix_levels", 15) or 15)
-    three_percents = _as_percents(getattr(cfg, "three_matrix_percents_json", []) or [], three_levels)
     upline15 = _resolve_upline(user, depth=three_levels)
-    _distribute_levels(
-        upline15,
-        base_amount=base50,
-        percents=three_percents,
-        tx_type="AUTOPOOL_BONUS_THREE",
-        meta={"source": "THREE_MATRIX_50", "source_type": src_type, "source_id": src_id},
-        pool_type="THREE_50",
-    )
+    # Prefer admin master overrides for 50 path (consumer_matrix_3["50"])
+    try:
+        master = dict(getattr(cfg, "master_commission_json", {}) or {})
+    except Exception:
+        master = {}
+    cm3 = dict(master.get("consumer_matrix_3", {}) or {})
+    fixed_amounts50 = list((cm3.get("50", {}) or {}).get("fixed_amounts") or [])
+    if fixed_amounts50:
+        for idx, recipient in enumerate(upline15):
+            if idx >= len(fixed_amounts50):
+                break
+            amt = _q2(fixed_amounts50[idx] or 0)
+            if amt <= 0:
+                continue
+            # Skip matrix payout for agency/employee recipients
+            if _is_agency_or_employee(recipient):
+                continue
+            meta = {
+                "source": "THREE_MATRIX_50_FIXED",
+                "source_type": src_type,
+                "source_id": src_id,
+                "level_index": idx + 1,
+                "fixed": True,
+            }
+            _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_THREE", meta=meta, source_type=src_type, source_id=src_id)
+            _update_matrix_progress(recipient, pool_type="THREE_50", level=idx + 1, amount=amt)
+    else:
+        three_percents = _as_percents(((cm3.get("50", {}) or {}).get("percents") or getattr(cfg, "three_matrix_percents_json", []) or []), three_levels)
+        _distribute_levels(
+            upline15,
+            base_amount=base50,
+            percents=three_percents,
+            tx_type="AUTOPOOL_BONUS_THREE",
+            meta={"source": "THREE_MATRIX_50", "source_type": src_type, "source_id": src_id},
+            pool_type="THREE_50",
+        )
 
     # Mark first purchase activation (idempotent)
     try:
@@ -543,7 +595,11 @@ def open_matrix_accounts_for_coupon(user: CustomUser, coupon_id: int | str, amou
     try:
         five_levels = int(getattr(cfg, "five_matrix_levels", 6) or 6)
         upline6 = _resolve_upline(user, depth=five_levels)
-        fixed5 = list(getattr(cfg, "five_matrix_amounts_json", []) or [])
+        # Prefer admin master overrides for 150 path
+        master = dict(getattr(cfg, "master_commission_json", {}) or {})
+        cm5 = dict(master.get("consumer_matrix_5", {}) or {})
+        cm3 = dict(master.get("consumer_matrix_3", {}) or {})
+        fixed5 = list((cm5.get("150", {}) or {}).get("fixed_amounts") or getattr(cfg, "five_matrix_amounts_json", []) or [])
         if fixed5:
             for idx, recipient in enumerate(upline6):
                 if idx >= len(fixed5):
@@ -557,7 +613,7 @@ def open_matrix_accounts_for_coupon(user: CustomUser, coupon_id: int | str, amou
                 _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_FIVE", meta=meta, source_type=src_type, source_id=src_id)
                 _update_matrix_progress(recipient, pool_type="FIVE_150", level=idx + 1, amount=amt)
         else:
-            five_percents = _as_percents(getattr(cfg, "five_matrix_percents_json", []) or [], five_levels)
+            five_percents = _as_percents(((cm5.get("150", {}) or {}).get("percents") or getattr(cfg, "five_matrix_percents_json", []) or []), five_levels)
             _distribute_levels(
                 upline6,
                 base_amount=base150,
@@ -573,7 +629,7 @@ def open_matrix_accounts_for_coupon(user: CustomUser, coupon_id: int | str, amou
     try:
         three_levels = int(getattr(cfg, "three_matrix_levels", 15) or 15)
         upline15 = _resolve_upline(user, depth=three_levels)
-        fixed3 = list(getattr(cfg, "three_matrix_amounts_json", []) or [])
+        fixed3 = list((cm3.get("150", {}) or {}).get("fixed_amounts") or getattr(cfg, "three_matrix_amounts_json", []) or [])
         if fixed3:
             for idx, recipient in enumerate(upline15):
                 if idx >= len(fixed3):
@@ -587,7 +643,7 @@ def open_matrix_accounts_for_coupon(user: CustomUser, coupon_id: int | str, amou
                 _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_THREE", meta=meta, source_type=src_type, source_id=src_id)
                 _update_matrix_progress(recipient, pool_type="THREE_150", level=idx + 1, amount=amt)
         else:
-            three_percents = _as_percents(getattr(cfg, "three_matrix_percents_json", []) or [], three_levels)
+            three_percents = _as_percents(((cm3.get("150", {}) or {}).get("percents") or getattr(cfg, "three_matrix_percents_json", []) or []), three_levels)
             _distribute_levels(
                 upline15,
                 base_amount=base150,
@@ -596,6 +652,20 @@ def open_matrix_accounts_for_coupon(user: CustomUser, coupon_id: int | str, amou
                 meta={"source": "THREE_MATRIX_COUPON", "source_type": src_type, "source_id": src_id, "trigger": trigger},
                 pool_type="THREE_150",
             )
+    except Exception:
+        pass
+
+    # Geo (Agency) configurable payout for per-coupon 150 (ECOUPON)
+    try:
+        from business.models import distribute_auto_pool_commissions
+        distribute_auto_pool_commissions(
+            user,
+            base_amount=base150,
+            fixed_key="active_150",
+            source_type=src_type,
+            source_id=src_id,
+            extra_meta={"trigger": "ECOUPON_150"},
+        )
     except Exception:
         pass
 

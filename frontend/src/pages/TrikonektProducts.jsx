@@ -5,7 +5,6 @@ import {
   Typography,
   TextField,
   MenuItem,
-  Button,
   CircularProgress,
   Snackbar,
   Alert,
@@ -25,6 +24,9 @@ import ProductGrid from "../components/market/ProductGrid";
 import QuickViewModal from "../components/market/QuickViewModal";
 import CartDrawer from "../components/ecoupon/CartDrawer";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
+import colors from "./v2/theme/colors";
+import cardTokens from "./v2/theme/card";
+import V2Button from "./v2/components/V2Button";
 
 export default function TrikonektProducts() {
   const navigate = useNavigate();
@@ -195,11 +197,11 @@ export default function TrikonektProducts() {
     <Container maxWidth="lg" sx={{ py: { xs: 2, md: 3 } }}>
       <Box sx={{ mb: 1.5 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-          <Typography variant="h5" sx={{ fontWeight: 700, color: "#0C2D48" }}>
+          <Typography variant="h5" sx={{ fontWeight: 700, color: colors.textPrimary }}>
             Trikonekt Products
           </Typography>
           <IconButton size="small" onClick={() => setDrawerOpen(true)} title="Open cart">
-            <Badge badgeContent={cartCount} color="primary">
+            <Badge badgeContent={cartCount} sx={{ "& .MuiBadge-badge": { bgcolor: colors.primary, color: colors.textOnPrimary } }}>
               <ShoppingCartIcon />
             </Badge>
           </IconButton>
@@ -211,11 +213,11 @@ export default function TrikonektProducts() {
       <Box
         sx={{
           mb: 2,
-          p: 1.5,
-          borderRadius: 2,
-          border: "1px solid",
-          borderColor: "divider",
-          bgcolor: "#fff",
+          p: 2,
+          borderRadius: `${cardTokens.radius}px`,
+          border: cardTokens.border,
+          bgcolor: cardTokens.bg,
+          boxShadow: "none",
         }}
       >
         <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems={{ xs: "stretch", md: "center" }}>
@@ -230,38 +232,54 @@ export default function TrikonektProducts() {
             <Chip
               size="small"
               label="Popular"
-              variant={sort === "rating_desc" ? "filled" : "outlined"}
-              color={sort === "rating_desc" ? "primary" : "default"}
               onClick={() => setSort((s) => (s === "rating_desc" ? "" : "rating_desc"))}
+              sx={{
+                fontWeight: 700,
+                bgcolor: sort === "rating_desc" ? colors.primary : colors.white,
+                color: sort === "rating_desc" ? colors.textOnPrimary : colors.textPrimary,
+                border: `1px solid ${colors.primary}`,
+              }}
             />
             <Chip
               size="small"
               label="Newest"
-              variant={sort === "newest" ? "filled" : "outlined"}
-              color={sort === "newest" ? "primary" : "default"}
               onClick={() => setSort((s) => (s === "newest" ? "" : "newest"))}
+              sx={{
+                fontWeight: 700,
+                bgcolor: sort === "newest" ? colors.primary : colors.white,
+                color: sort === "newest" ? colors.textOnPrimary : colors.textPrimary,
+                border: `1px solid ${colors.primary}`,
+              }}
             />
             <Chip
               size="small"
               label="Price Low"
-              variant={sort === "price_asc" ? "filled" : "outlined"}
-              color={sort === "price_asc" ? "primary" : "default"}
               onClick={() => setSort((s) => (s === "price_asc" ? "" : "price_asc"))}
+              sx={{
+                fontWeight: 700,
+                bgcolor: sort === "price_asc" ? colors.primary : colors.white,
+                color: sort === "price_asc" ? colors.textOnPrimary : colors.textPrimary,
+                border: `1px solid ${colors.primary}`,
+              }}
             />
             <Chip
               size="small"
               label="Price High"
-              variant={sort === "price_desc" ? "filled" : "outlined"}
-              color={sort === "price_desc" ? "primary" : "default"}
               onClick={() => setSort((s) => (s === "price_desc" ? "" : "price_desc"))}
+              sx={{
+                fontWeight: 700,
+                bgcolor: sort === "price_desc" ? colors.primary : colors.white,
+                color: sort === "price_desc" ? colors.textOnPrimary : colors.textPrimary,
+                border: `1px solid ${colors.primary}`,
+              }}
             />
           </Stack>
           <Box flex={{ md: 1 }} />
           <Stack direction="row" spacing={1}>
-            <Button size="small" variant="outlined" onClick={() => setDense((d) => !d)}>
+            <V2Button variant="secondary" onClick={() => setDense((d) => !d)}>
               {dense ? "Cozy View" : "Compact View"}
-            </Button>
-            <Button size="small" onClick={fetchProducts}>Refresh</Button>
+            </V2Button>
+            <V2Button onClick={fetchProducts}>Refresh</V2Button>
           </Stack>
         </Stack>
       </Box>
@@ -342,10 +360,10 @@ export default function TrikonektProducts() {
                 <MenuItem value="newest">Newest</MenuItem>
                 <MenuItem value="rating_desc">Rating</MenuItem>
               </TextField>
-              <Button size="small" variant="outlined" onClick={() => setDense((d) => !d)}>
+              <V2Button variant="secondary" onClick={() => setDense((d) => !d)}>
                 {dense ? "Cozy view" : "Compact view"}
-              </Button>
-              <Button size="small" onClick={fetchProducts}>Refresh</Button>
+              </V2Button>
+              <V2Button onClick={fetchProducts}>Refresh</V2Button>
             </Box>
           </Box>
           <ProductGrid
@@ -390,18 +408,17 @@ export default function TrikonektProducts() {
           zIndex: 1300,
         }}
       >
-        <Button
-          variant="contained"
+        <V2Button
           onClick={() => setDrawerOpen(true)}
           startIcon={
-            <Badge badgeContent={cartCount} color="secondary">
+            <Badge badgeContent={cartCount} sx={{ "& .MuiBadge-badge": { bgcolor: colors.primary, color: colors.textOnPrimary } }}>
               <ShoppingCartIcon />
             </Badge>
           }
-          sx={{ borderRadius: 999, boxShadow: "0 10px 24px rgba(2,132,199,0.25)" }}
+          sx={{ borderRadius: `${cardTokens.radius}px` }}
         >
           Cart
-        </Button>
+        </V2Button>
       </Box>
 
       <Dialog
@@ -427,11 +444,10 @@ export default function TrikonektProducts() {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAddressDlg({ open: false, pkgId: null, product: null, address: "" })}>
+          <V2Button variant="secondary" onClick={() => setAddressDlg({ open: false, pkgId: null, product: null, address: "" })}>
             Cancel
-          </Button>
-          <Button
-            variant="contained"
+          </V2Button>
+          <V2Button
             onClick={() => {
               const addr = String(addressDlg.address || "").trim();
               if (!addr) {
@@ -456,7 +472,7 @@ export default function TrikonektProducts() {
             }}
           >
             Add to Cart
-          </Button>
+          </V2Button>
         </DialogActions>
       </Dialog>
       <Snackbar

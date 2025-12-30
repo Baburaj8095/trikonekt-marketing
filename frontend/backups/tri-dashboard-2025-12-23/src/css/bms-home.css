@@ -1,0 +1,167 @@
+/* BookMyShow-style Dark Home - Visual Only (no logic changes) */
+
+:root {
+  /* Premium GOLDEN Dark tokens */
+  --bms-bg: #121212;             /* deep charcoal */
+  --bms-bg-2: #161616;           /* slightly raised surface */
+  --bms-text-1: #EAEAEA;         /* soft white */
+  --bms-text-2: #9A9A9A;         /* muted gray */
+  --bms-text-3: rgba(234,234,234,0.56);
+
+  /* Gold palette */
+  --bms-gold-1: #C9A24D;
+  --bms-gold-2: #D4AF37;         /* primary */
+  --bms-gold-3: #E6C76A;
+  --bms-gold-grad: linear-gradient(135deg, #9E7C2F 0%, #C9A24D 35%, #D4AF37 65%, #E6C76A 100%);
+
+  /* Accent used across nav/underline etc. */
+  --bms-accent: #D4AF37;
+}
+
+/* Utility */
+.tapable { position: relative; overflow: hidden; transition: transform 120ms ease; }
+.tapable::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient( circle at 50% 50%, rgba(255,255,255,0.15), rgba(255,255,255,0) 60% );
+  opacity: 0;
+  transition: opacity 200ms ease;
+  pointer-events: none;
+}
+.tapable:active { transform: scale(0.98); }
+.tapable:active::after { opacity: 1; }
+
+.scroll-x { scrollbar-width: none; -ms-overflow-style: none; }
+.scroll-x::-webkit-scrollbar { height: 0; width: 0; }
+
+/* Top App Bar (ultra-minimal) */
+.bms-appbar {
+  height: 56px;
+  background: var(--bms-bg);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.bms-appbar .logo {
+  color: #fff;
+  font-weight: 900;
+  letter-spacing: 0.3px;
+}
+.bms-appbar .icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  color: #EAEFF7;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  position: relative;
+}
+.bms-appbar .icon-btn .dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--bms-accent);
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.5);
+}
+
+/* Hero Carousel side peek container */
+.bms-hero-carousel {
+  padding: 0 10px; /* 10dp side peek */
+}
+
+/* Bottom Navigation */
+.bms-bottom-nav {
+  background: var(--bms-bg-2);
+  border-top: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 -10px 20px rgba(0,0,0,0.25); /* subtle elevation */
+}
+.bms-bottom-nav .tab {
+  position: relative;
+  padding-top: 6px;
+  transition: transform 180ms ease, color 180ms ease, opacity 180ms ease;
+  opacity: 0.8;
+}
+.bms-bottom-nav .tab .underline {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  width: 22px;
+  height: 2px;
+  background: var(--bms-accent);
+  border-radius: 2px;
+  transform: translateX(-50%) scaleX(0.4);
+  opacity: 0;
+  transition: transform 180ms ease, opacity 180ms ease;
+}
+.bms-bottom-nav .tab.active {
+  color: var(--bms-accent);
+  transform: scale(1.05);
+  opacity: 1;
+}
+.bms-bottom-nav .tab.active .underline {
+  opacity: 1;
+  transform: translateX(-50%) scaleX(1);
+}
+
+/* Poster card visuals */
+.bms-poster-card {
+  background: radial-gradient(120% 120% at 0% 0%, #12151c 0%, #0f1115 70%);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+  overflow: hidden;
+}
+.bms-poster-card .img-wrap {
+  position: relative;
+  overflow: hidden;
+}
+.bms-poster-card .img-wrap::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 42%;
+  background: linear-gradient(180deg, rgba(15,17,21,0) 0%, rgba(15,17,21,0.85) 80%);
+}
+.bms-poster-card .meta {
+  padding: 10px 12px 12px;
+  color: var(--bms-text-1);
+}
+
+/* Icon strip tiles (if class is used elsewhere) */
+.bms-icon-tile {
+  width: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: var(--bms-text-1);
+  text-decoration: none;
+}
+.bms-icon-tile .icon-wrap {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+.bms-icon-tile .label {
+  font-size: 12px;
+  font-weight: 400;
+  text-align: center;
+  color: var(--bms-text-2);
+  max-width: 72px;
+  line-height: 1.15;
+}

@@ -3,6 +3,9 @@ from django.http import HttpResponse
 from django.utils import timezone
 from django.db.models import Q
 import csv
+from django import forms
+from decimal import Decimal
+import json
 
 from .models import BusinessRegistration, CommissionConfig, AutoPoolAccount, RewardProgress, RewardRedemption, UserMatrixProgress, ReferralJoinPayout, FranchisePayout, DailyReport, WithholdingReserve, Package, AgencyPackageAssignment, AgencyPackagePayment, PromoPackage, PromoProduct, PromoPurchase, PromoPackageProduct, PromoMonthlyPackage, PromoMonthlyBox, PromoEBook, PromoPackageEBook, EBookAccess, TriApp, TriAppProduct
 from accounts.models import CustomUser
@@ -85,15 +88,356 @@ class BusinessRegistrationAdmin(admin.ModelAdmin):
     mark_as_forwarded.short_description = "Mark selected as Forwarded"
 
 
+class CommissionConfigForm(forms.ModelForm):
+    # Monthly 759 (admin-friendly fields mapped to master_commission_json["monthly_759"])
+    monthly_759_direct_first_month = forms.DecimalField(required=False, min_value=0, label="Monthly 759: Direct (first month)")
+    monthly_759_direct_monthly = forms.DecimalField(required=False, min_value=0, label="Monthly 759: Direct (subsequent months)")
+    monthly_759_levels_fixed = forms.CharField(required=False, label="Monthly 759: Levels fixed (comma-separated 5 values)", widget=forms.Textarea(attrs={"rows": 2}))
+    monthly_759_agency_enabled = forms.BooleanField(required=False, label="Monthly 759: Agency distribution enabled")
+
+    # Geo overrides for Active 150 (mapped to master_commission_json['geo_mode']['active_150'] and ['geo_fixed']['active_150'])
+    geo_mode_active_150 = forms.ChoiceField(
+        required=False,
+        choices=(("percent", "Percent-based"), ("fixed", "Fixed amounts")),
+        label="Geo Mode for Active 150"
+    )
+    geo_fixed_active_150_json = forms.CharField(
+        required=False,
+        label="Geo fixed amounts for Active 150 (JSON: role->amount)",
+        widget=forms.Textarea(attrs={"rows": 3, "placeholder": '{"sub_franchise":15,"pincode":4,"pincode_coord":2,"district":1,"district_coord":1,"state":1,"state_coord":1,"employee":0,"royalty":0}'})
+    )
+
+    # Consumer matrix overrides (stored under master_commission_json.consumer_matrix_3 / consumer_matrix_5)
+    consumer_3_50_percents = forms.CharField(
+        required=False,
+        label="Consumer 3‑Matrix 50: percents (15 comma-separated)",
+        widget=forms.Textarea(attrs={"rows": 2})
+    )
+    consumer_3_50_fixed = forms.CharField(
+        required=False,
+        label="Consumer 3‑Matrix 50: fixed amounts (15 comma-separated)",
+        widget=forms.Textarea(attrs={"rows": 2})
+    )
+    consumer_3_150_percents = forms.CharField(
+        required=False,
+        label="Consumer 3‑Matrix 150: percents (15 comma-separated)",
+        widget=forms.Textarea(attrs={"rows": 2})
+    )
+    consumer_3_150_fixed = forms.CharField(
+        required=False,
+        label="Consumer 3‑Matrix 150: fixed amounts (15 comma-separated)",
+        widget=forms.Textarea(attrs={"rows": 2})
+    )
+    consumer_5_150_percents = forms.CharField(
+        required=False,
+        label="Consumer 5‑Matrix 150: percents (6 comma-separated)",
+        widget=forms.Textarea(attrs={"rows": 2})
+    )
+    consumer_5_150_fixed = forms.CharField(
+        required=False,
+        label="Consumer 5‑Matrix 150: fixed amounts (6 comma-separated)",
+        widget=forms.Textarea(attrs={"rows": 2})
+    )
+
+    # Geo overrides for Monthly 759
+    geo_mode_monthly_759 = forms.ChoiceField(
+        required=False,
+        choices=(("percent", "Percent-based"), ("fixed", "Fixed amounts")),
+        label="Geo Mode for Monthly 759"
+    )
+    geo_fixed_monthly_759_json = forms.CharField(
+        required=False,
+        label="Geo fixed amounts for Monthly 759 (JSON: role->amount)",
+        widget=forms.Textarea(attrs={"rows": 3, "placeholder": '{"sub_franchise":25,"pincode":0,"pincode_coord":0,"district":0,"district_coord":0,"state":0,"state_coord":0,"employee":0,"royalty":0}'})
+    )
+
+    class Meta:
+        model = CommissionConfig
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        inst = self.instance
+        master = {}
+        try:
+            master = dict(getattr(inst, "master_commission_json", {}) or {})
+        except Exception:
+            master = {}
+
+        # Monthly 759 defaults
+        m759 = dict(master.get("monthly_759", {}) or {})
+        self.fields["monthly_759_direct_first_month"].initial = m759.get("direct_first_month", 250)
+        self.fields["monthly_759_direct_monthly"].initial = m759.get("direct_monthly", 50)
+        levels = m759.get("levels_fixed") or [50, 10, 5, 5, 10]
+        try:
+            self.fields["monthly_759_levels_fixed"].initial = ", ".join(str(x) for x in levels[:5])
+        except Exception:
+            self.fields["monthly_759_levels_fixed"].initial = "50, 10, 5, 5, 10"
+        self.fields["monthly_759_agency_enabled"].initial = bool(m759.get("agency_enabled", True))
+
+        # Geo mode/fixed for Active 150
+        geo_mode = (master.get("geo_mode") or {}).get("active_150")
+        self.fields["geo_mode_active_150"].initial = geo_mode or "percent"
+        fixed_map = (master.get("geo_fixed") or {}).get("active_150") or {}
+        try:
+            self.fields["geo_fixed_active_150_json"].initial = json.dumps(fixed_map, ensure_ascii=False)
+        except Exception:
+            self.fields["geo_fixed_active_150_json"].initial = ""
+
+        # Consumer matrix overrides (initials)
+        cm3 = dict(master.get("consumer_matrix_3", {}) or {})
+        cm5 = dict(master.get("consumer_matrix_5", {}) or {})
+        try:
+            m3_50 = dict(cm3.get("50", {}) or {})
+            p = m3_50.get("percents") or []
+            self.fields["consumer_3_50_percents"].initial = ", ".join(str(x) for x in p[:15]) if p else ""
+            f = m3_50.get("fixed_amounts") or []
+            self.fields["consumer_3_50_fixed"].initial = ", ".join(str(x) for x in f[:15]) if f else ""
+        except Exception:
+            pass
+        try:
+            m3_150 = dict(cm3.get("150", {}) or {})
+            p = m3_150.get("percents") or []
+            self.fields["consumer_3_150_percents"].initial = ", ".join(str(x) for x in p[:15]) if p else ""
+            f = m3_150.get("fixed_amounts") or []
+            self.fields["consumer_3_150_fixed"].initial = ", ".join(str(x) for x in f[:15]) if f else ""
+        except Exception:
+            pass
+        try:
+            m5_150 = dict(cm5.get("150", {}) or {})
+            p = m5_150.get("percents") or []
+            self.fields["consumer_5_150_percents"].initial = ", ".join(str(x) for x in p[:6]) if p else ""
+            f = m5_150.get("fixed_amounts") or []
+            self.fields["consumer_5_150_fixed"].initial = ", ".join(str(x) for x in f[:6]) if f else ""
+        except Exception:
+            pass
+
+        # Geo monthly 759 override (initials)
+        geo_mode_m = (master.get("geo_mode") or {}).get("monthly_759")
+        self.fields["geo_mode_monthly_759"].initial = geo_mode_m or "percent"
+        fixed_map_m = (master.get("geo_fixed") or {}).get("monthly_759") or {}
+        try:
+            self.fields["geo_fixed_monthly_759_json"].initial = json.dumps(fixed_map_m, ensure_ascii=False)
+        except Exception:
+            self.fields["geo_fixed_monthly_759_json"].initial = ""
+
+    def save(self, commit=True):
+        inst = super().save(commit=False)
+        # Work on a copy of existing master
+        try:
+            master = dict(getattr(inst, "master_commission_json", {}) or {})
+        except Exception:
+            master = {}
+
+        # Monthly 759
+        m759 = dict(master.get("monthly_759", {}) or {})
+        dfm = self.cleaned_data.get("monthly_759_direct_first_month")
+        dm = self.cleaned_data.get("monthly_759_direct_monthly")
+        levels_raw = (self.cleaned_data.get("monthly_759_levels_fixed") or "").strip()
+        agency_enabled = bool(self.cleaned_data.get("monthly_759_agency_enabled"))
+
+        if dfm is not None:
+            try:
+                m759["direct_first_month"] = float(Decimal(str(dfm)))
+            except Exception:
+                pass
+        if dm is not None:
+            try:
+                m759["direct_monthly"] = float(Decimal(str(dm)))
+            except Exception:
+                pass
+        if levels_raw:
+            try:
+                parts = [p.strip() for p in levels_raw.replace("\n", ",").split(",") if p.strip()]
+                vals = [float(Decimal(p)) for p in parts][:5]
+                m759["levels_fixed"] = vals
+            except Exception:
+                # keep existing if parsing fails
+                pass
+        m759["agency_enabled"] = agency_enabled
+        master["monthly_759"] = m759
+
+        # Geo mode/fixed for Active 150
+        gm = dict(master.get("geo_mode", {}) or {})
+        mode_val = self.cleaned_data.get("geo_mode_active_150")
+        if mode_val in {"percent", "fixed"}:
+            gm["active_150"] = mode_val
+        master["geo_mode"] = gm
+
+        gf = dict(master.get("geo_fixed", {}) or {})
+        fixed_json_txt = (self.cleaned_data.get("geo_fixed_active_150_json") or "").strip()
+        if fixed_json_txt:
+            try:
+                fixed_map = json.loads(fixed_json_txt)
+                if isinstance(fixed_map, dict):
+                    # normalize numeric values
+                    norm = {}
+                    for k, v in fixed_map.items():
+                        try:
+                            norm[str(k)] = float(Decimal(str(v)))
+                        except Exception:
+                            continue
+                    gf["active_150"] = norm
+            except Exception:
+                # ignore if invalid json
+                pass
+        master["geo_fixed"] = gf
+
+        # Geo override: Monthly 759
+        gm2 = dict(master.get("geo_mode", {}) or {})
+        mode_m759 = self.cleaned_data.get("geo_mode_monthly_759")
+        if mode_m759 in {"percent", "fixed"}:
+            gm2["monthly_759"] = mode_m759
+        master["geo_mode"] = gm2
+
+        gf2 = dict(master.get("geo_fixed", {}) or {})
+        fixed_m759_txt = (self.cleaned_data.get("geo_fixed_monthly_759_json") or "").strip()
+        if fixed_m759_txt:
+            try:
+                fixed_map2 = json.loads(fixed_m759_txt)
+                if isinstance(fixed_map2, dict):
+                    norm2 = {}
+                    for k, v in fixed_map2.items():
+                        try:
+                            norm2[str(k)] = float(Decimal(str(v)))
+                        except Exception:
+                            continue
+                    gf2["monthly_759"] = norm2
+            except Exception:
+                pass
+        master["geo_fixed"] = gf2
+
+        # Consumer matrix overrides
+        cm3 = dict(master.get("consumer_matrix_3", {}) or {})
+        cm5 = dict(master.get("consumer_matrix_5", {}) or {})
+
+        def _parse_csv(txt):
+            parts = [p.strip() for p in (txt or "").replace("\n", ",").split(",") if p.strip()]
+            out = []
+            for p in parts:
+                try:
+                    out.append(float(Decimal(p)))
+                except Exception:
+                    continue
+            return out
+
+        # 3-Matrix 50
+        t = self.cleaned_data.get("consumer_3_50_percents")
+        if t:
+            sec = dict(cm3.get("50", {}) or {})
+            sec["percents"] = _parse_csv(t)[:15]
+            cm3["50"] = sec
+        t = self.cleaned_data.get("consumer_3_50_fixed")
+        if t:
+            sec = dict(cm3.get("50", {}) or {})
+            sec["fixed_amounts"] = _parse_csv(t)[:15]
+            cm3["50"] = sec
+
+        # 3-Matrix 150
+        t = self.cleaned_data.get("consumer_3_150_percents")
+        if t:
+            sec = dict(cm3.get("150", {}) or {})
+            sec["percents"] = _parse_csv(t)[:15]
+            cm3["150"] = sec
+        t = self.cleaned_data.get("consumer_3_150_fixed")
+        if t:
+            sec = dict(cm3.get("150", {}) or {})
+            sec["fixed_amounts"] = _parse_csv(t)[:15]
+            cm3["150"] = sec
+
+        # 5-Matrix 150
+        t = self.cleaned_data.get("consumer_5_150_percents")
+        if t:
+            sec = dict(cm5.get("150", {}) or {})
+            sec["percents"] = _parse_csv(t)[:6]
+            cm5["150"] = sec
+        t = self.cleaned_data.get("consumer_5_150_fixed")
+        if t:
+            sec = dict(cm5.get("150", {}) or {})
+            sec["fixed_amounts"] = _parse_csv(t)[:6]
+            cm5["150"] = sec
+
+        master["consumer_matrix_3"] = cm3
+        master["consumer_matrix_5"] = cm5
+
+        inst.master_commission_json = master
+        if commit:
+            inst.save()
+        return inst
+
+
 @admin.register(CommissionConfig)
 class CommissionConfigAdmin(admin.ModelAdmin):
-    list_display = ("base_coupon_value", "enable_pool_distribution", "enable_geo_distribution", "enable_franchise_on_join", "enable_franchise_on_purchase", "autopool_trigger_on_direct_referral", "updated_at", "created_at")
+    form = CommissionConfigForm
+    list_display = (
+        "base_coupon_value",
+        "enable_pool_distribution",
+        "enable_geo_distribution",
+        "enable_franchise_on_join",
+        "enable_franchise_on_purchase",
+        "autopool_trigger_on_direct_referral",
+        "updated_at",
+        "created_at",
+    )
     readonly_fields = ("updated_at", "created_at")
     fieldsets = (
         ("Base", {"fields": ("base_coupon_value",)}),
-        ("Toggles", {"fields": ("enable_pool_distribution", "enable_geo_distribution")}),
-        ("Hierarchical L1-L5", {"fields": ("l1_percent", "l2_percent", "l3_percent", "l4_percent", "l5_percent")}),
-        ("Geo Distribution", {"fields": (
+
+        ("Global Toggles", {"fields": (
+            "enable_pool_distribution",
+            "enable_geo_distribution",
+            "enable_geo_distribution_on_activation",
+        )}),
+
+        ("Hierarchical L1-L5 (Upline percent)", {"fields": ("l1_percent", "l2_percent", "l3_percent", "l4_percent", "l5_percent")}),
+
+        ("Prime 150 (Active)", {"fields": (
+            "prime_activation_amount",
+            "redeem_credit_amount_150",
+            "active_direct_bonus_amount",
+            "active_self_bonus_amount",
+            "product_opens_prime",
+        )}),
+
+        ("Global 50", {"fields": ("global_activation_amount",)}),
+
+        ("3‑Matrix (Consumer)", {"fields": (
+            "three_matrix_levels",
+            "three_matrix_percents_json",
+            "three_matrix_amounts_json",
+        )}),
+
+        ("5‑Matrix (Consumer)", {"fields": (
+            "five_matrix_levels",
+            "five_matrix_percents_json",
+            "five_matrix_amounts_json",
+        )}),
+
+        ("Monthly 759 (Admin Config)", {"fields": (
+            "monthly_759_direct_first_month",
+            "monthly_759_direct_monthly",
+            "monthly_759_levels_fixed",
+            "monthly_759_agency_enabled",
+        )}),
+
+        ("Geo Override: Monthly 759", {"fields": (
+            "geo_mode_monthly_759",
+            "geo_fixed_monthly_759_json",
+        )}),
+
+        ("Consumer 3‑Matrix Overrides", {"fields": (
+            "consumer_3_50_percents",
+            "consumer_3_50_fixed",
+            "consumer_3_150_percents",
+            "consumer_3_150_fixed",
+        )}),
+
+        ("Consumer 5‑Matrix Overrides", {"fields": (
+            "consumer_5_150_percents",
+            "consumer_5_150_fixed",
+        )}),
+
+        ("Agency Geo Distribution (Global Percent)", {"fields": (
             "sub_franchise_percent",
             "pincode_percent",
             "pincode_coord_percent",
@@ -104,8 +448,17 @@ class CommissionConfigAdmin(admin.ModelAdmin):
             "employee_percent",
             "royalty_percent",
         )}),
-        ("Trikonekt Toggles", {"fields": ("enable_franchise_on_join", "enable_franchise_on_purchase", "autopool_trigger_on_direct_referral")}),
-        ("Trikonekt Fixed Amounts", {"fields": ("franchise_fixed_json", "referral_join_fixed_json", "three_matrix_amounts_json", "five_matrix_amounts_json")}),
+
+        ("Geo Override: Active 150", {"fields": (
+            "geo_mode_active_150",
+            "geo_fixed_active_150_json",
+        )}),
+
+        ("Trikonekt Fixed Amounts / Referral", {"fields": (
+            "franchise_fixed_json",
+            "referral_join_fixed_json",
+        )}),
+
         ("Audit", {"fields": ("updated_at", "created_at")}),
     )
 

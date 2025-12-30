@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Paper,
@@ -7,66 +7,22 @@ import {
   Button,
   Alert,
   Divider,
-  Grid,
-  TextField,
-  Chip,
-  Table,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableBody,
-  TableContainer,
-  CircularProgress,
-  FormControl,
-  FormLabel,
-  RadioGroup,
-  FormControlLabel,
-  Radio,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import normalizeMediaUrl from "../utils/media";
-import {
-  getEcouponStoreBootstrap,
-  createEcouponOrder,
-  createPromoPurchase,
-  createProductPurchaseRequest,
-  agencyCreatePaymentRequest,
-} from "../api/api";
 import {
   subscribe as subscribeCart,
   getItems as getCartItems,
   getCartTotal as getCartTotalPrice,
   updateQty as cartUpdateQty,
   removeItem as cartRemoveItem,
-  clearCart as cartClear,
-  setItemFile as cartSetItemFile,
-  setItemMeta as cartSetItemMeta,
-  setItemUnitPrice as cartSetItemUnitPrice,
 } from "../store/cart";
 
-/**
- * Centralized Cart & Checkout
- * - Aggregates line items across modules.
- * - Supports:
- *   * ECOUPON: grouped payment (manual UPI today)
- *   * PROMO_PACKAGE: PRIME and MONTHLY (file per line item)
- */
 export default function Cart() {
   const navigate = useNavigate();
   const [cart, setCart] = useState({ items: [], total: 0 });
-  const [loading, setLoading] = useState(false);
-
-  // ECOUPON payment config (QR/UPI etc.)
-  const [payment, setPayment] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState("MANUAL"); // MANUAL | ONLINE (placeholder)
-  const [ecouponPayment, setEcouponPayment] = useState({
-    utr: "",
-    notes: "",
-    file: null, // optional global file to apply to each e-coupon order if line.file not set
-  });
 
   useEffect(() => {
-    // Prime cart snapshot
     const pushState = () => {
       try {
         const items = getCartItems();
@@ -85,328 +41,21 @@ export default function Cart() {
     };
   }, []);
 
-  const loadBootstrap = async () => {
-    setLoading(true);
-    try {
-      const data = await getEcouponStoreBootstrap();
-      setPayment(data?.payment_config || null);
-    } catch {
-      // Do not block the page if payment config fails
-      setPayment(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadBootstrap();
-  }, []);
-
   const items = cart.items || [];
   const total = Number(cart.total || 0);
 
-  const grouped = useMemo(() => {
-    const out = { ECOUPON: [], PROMO_PACKAGE: [], AGENCY_PACKAGE: [], PRODUCT: [], OTHERS: [] };
-    for (const it of items) {
-      const t = String(it.type || "").toUpperCase();
-      if (t === "ECOUPON") out.ECOUPON.push(it);
-      else if (t === "PROMO_PACKAGE") out.PROMO_PACKAGE.push(it);
-      else if (t === "AGENCY_PACKAGE") out.AGENCY_PACKAGE.push(it);
-      else if (t === "PRODUCT") out.PRODUCT.push(it);
-      else out.OTHERS.push(it);
-    }
-    return out;
-  }, [items]);
-
-  const [qtyInputs, setQtyInputs] = useState({});
-  useEffect(() => {
-    setQtyInputs((prev) => {
-      const next = { ...prev };
-      const keysInCart = new Set();
-      for (const it of items) {
-        keysInCart.add(it.key);
-        if (next[it.key] == null) {
-          const q = Math.max(1, parseInt(it.qty || 1, 10));
-          next[it.key] = String(q);
-        }
-      }
-      for (const k of Object.keys(next)) {
-        if (!keysInCart.has(k)) {
-          delete next[k];
-        }
-      }
-      return next;
-    });
-  }, [items]);
-
-  const setQtyInput = (key, val) => {
-    setQtyInputs((s) => ({ ...s, [key]: val }));
-  };
-
-  const commitQtyInput = (key) => {
-    const raw = qtyInputs[key];
-    let q = parseInt(raw, 10);
-    if (!Number.isFinite(q) || q < 1) q = 1;
-    handleUpdateQty(key, q);
-    setQtyInputs((s) => ({ ...s, [key]: String(q) }));
-  };
-
-  const handleUpdateQty = (key, qty) => {
+  const inc = (it) => {
+    const qty = Math.max(1, parseInt(it.qty || 1, 10));
     try {
-      cartUpdateQty(key, qty);
+      cartUpdateQty(it.key, qty + 1);
     } catch {}
   };
-
-  const handleRemove = (key) => {
+  const dec = (it) => {
+    const qty = Math.max(1, parseInt(it.qty || 1, 10));
     try {
-      cartRemoveItem(key);
+      cartUpdateQty(it.key, Math.max(1, qty - 1));
     } catch {}
   };
-
-  const handleSetFile = (key, file) => {
-    try {
-      cartSetItemFile(key, file);
-    } catch {}
-  };
-
-  const handleSetMeta = (key, partial) => {
-    try {
-      cartSetItemMeta(key, partial || {});
-    } catch {}
-  };
-
-  const handleSetUnitPrice = (key, price) => {
-    try {
-      cartSetItemUnitPrice(key, price);
-    } catch {}
-  };
-
-  const [checkingOut, setCheckingOut] = useState(false);
-  // Mobile cart UI helpers
-  const [couponCode, setCouponCode] = useState("");
-  const [couponApplied, setCouponApplied] = useState("");
-
-  // Contact details for product requests (prefilled from logged-in user if available)
-  const storedUser = useMemo(() => {
-    try {
-      const ls = localStorage.getItem("user") || sessionStorage.getItem("user");
-      return ls ? JSON.parse(ls) : {};
-    } catch {
-      return {};
-    }
-  }, []);
-  const [contact, setContact] = useState({ name: "", email: "", phone: "" });
-  useEffect(() => {
-    setContact((c) => ({
-      name: c.name || storedUser?.full_name || storedUser?.username || "",
-      email: c.email || storedUser?.email || "",
-      phone: c.phone || storedUser?.phone || storedUser?.mobile || storedUser?.contact || "",
-    }));
-  }, [storedUser]);
-
-  // Product payment method
-  const [productPayMethod, setProductPayMethod] = useState("wallet");
-
-  const checkout = async () => {
-    if (!items.length) {
-      try {
-        alert("Cart is empty.");
-      } catch {}
-      return;
-    }
-
-    // Preflight validation for PRODUCT lines
-    if ((grouped.PRODUCT || []).length > 0) {
-      const missing = (grouped.PRODUCT || [])
-        .filter((it) => !String(it?.meta?.shipping_address || "").trim())
-        .map((it) => it.name);
-      if (missing.length > 0) {
-        try {
-          alert(`Add shipping address for: ${missing.join(", ")}`);
-        } catch {}
-        return;
-      }
-      if (!String(contact.name || "").trim() || !String(contact.phone || "").trim()) {
-        try {
-          alert("Please provide your name and phone for product orders.");
-        } catch {}
-        return;
-      }
-    }
-
-    setCheckingOut(true);
-
-    const results = [];
-    try {
-      // 1) Submit ECOUPON line items
-      for (const it of grouped.ECOUPON) {
-        try {
-          const lineFile = it.file || ecouponPayment.file || null;
-          await createEcouponOrder({
-            product: it.id,
-            quantity: it.qty,
-            utr: String(ecouponPayment.utr || ""),
-            notes: String(`[${paymentMethod}] ` + (ecouponPayment.notes || "")),
-            file: lineFile,
-          });
-          results.push({ key: it.key, ok: true });
-        } catch (e) {
-          results.push({
-            key: it.key,
-            ok: false,
-            msg:
-              e?.response?.data?.detail ||
-              e?.message ||
-              "Failed to submit e‑coupon order.",
-          });
-        }
-      }
-
-      // 2) Submit PROMO PACKAGE items
-      for (const it of grouped.PROMO_PACKAGE) {
-        try {
-          const kind = String(it?.meta?.kind || "").toUpperCase();
-          const file = it.file || null; // expected for promo packages
-          if (kind === "MONTHLY") {
-            const package_number = it?.meta?.package_number ?? null;
-            const boxes = Array.isArray(it?.meta?.boxes) ? it.meta.boxes : [];
-            await createPromoPurchase({
-              package_id: it.id,
-              quantity: Math.max(1, parseInt(it.qty || 1, 10)),
-              package_number,
-              boxes,
-              file,
-            });
-          } else if (kind === "PRIME") {
-            const selected_product_id =
-              it?.meta?.selected_product_id != null
-                ? it.meta.selected_product_id
-                : null;
-            const shipping_address = it?.meta?.shipping_address || "";
-            await createPromoPurchase({
-              package_id: it.id,
-              quantity: Math.max(1, parseInt(it.qty || 1, 10)),
-              selected_product_id,
-              shipping_address,
-              file,
-            });
-          } else {
-            // Unknown promo subtype; fallback using qty+file only
-            await createPromoPurchase({
-              package_id: it.id,
-              quantity: Math.max(1, parseInt(it.qty || 1, 10)),
-              file,
-            });
-          }
-          results.push({ key: it.key, ok: true });
-        } catch (e) {
-          results.push({
-            key: it.key,
-            ok: false,
-            msg:
-              e?.response?.data?.detail ||
-              e?.message ||
-              "Failed to submit promo package.",
-          });
-        }
-      }
-
-      // 2b) Submit AGENCY PACKAGE payment requests (go to admin approval)
-      for (const it of grouped.AGENCY_PACKAGE) {
-        try {
-          const unit = Number(it.unitPrice || 0);
-          const qty = Math.max(1, parseInt(it.qty || 1, 10));
-          const amount = unit * qty;
-          await agencyCreatePaymentRequest(it.id, {
-            amount,
-            method: "UPI",
-            utr: String(it?.meta?.reference || ""),
-            // payment_proof not collected in Cart; agencies can upload from Prime Approval page
-          });
-          results.push({ key: it.key, ok: true });
-        } catch (e) {
-          results.push({
-            key: it.key,
-            ok: false,
-            msg:
-              e?.response?.data?.detail ||
-              e?.message ||
-              "Failed to create agency package payment request.",
-          });
-        }
-      }
-
-      // 3) Submit PRODUCT items
-      for (const it of grouped.PRODUCT) {
-        try {
-          const addr = String(it?.meta?.shipping_address || "").trim();
-          await createProductPurchaseRequest({
-            product: it.id,
-            quantity: Math.max(1, parseInt(it.qty || 1, 10)),
-            consumer_name: contact.name,
-            consumer_email: contact.email,
-            consumer_phone: contact.phone,
-            consumer_address: addr,
-            payment_method: productPayMethod,
-          });
-          results.push({ key: it.key, ok: true });
-        } catch (e) {
-          results.push({
-            key: it.key,
-            ok: false,
-            msg:
-              e?.response?.data?.detail ||
-              e?.message ||
-              "Failed to submit product request.",
-          });
-        }
-      }
-
-      // Remove lines that succeeded
-      for (const r of results) {
-        if (r.ok) {
-          try {
-            cartRemoveItem(r.key);
-          } catch {}
-        }
-      }
-
-      const success = results.filter((r) => r.ok).length;
-      const failed = results.length - success;
-      try {
-        alert(
-          `Submitted ${success} item(s).${failed > 0 ? ` Failed ${failed}.` : ""}`
-        );
-      } catch {}
-      // Reset ecoupon payment form on success if all succeeded
-      if (failed === 0) {
-        setEcouponPayment({ utr: "", notes: "", file: null });
-      }
-    } finally {
-      setCheckingOut(false);
-    }
-  };
-
-  const promoMissingFiles = useMemo(() => {
-    return grouped.PROMO_PACKAGE.filter((it) => !it.file).map((it) => it.name);
-  }, [grouped.PROMO_PACKAGE]);
-
-  const productMissingAddresses = useMemo(() => {
-    return (grouped.PRODUCT || [])
-      .filter((it) => !String(it?.meta?.shipping_address || "").trim())
-      .map((it) => it.name);
-  }, [grouped.PRODUCT]);
-
-  const roleHint = useMemo(() => {
-    try {
-      const p = window.location.pathname;
-      if (p.startsWith("/agency")) return "agency";
-      if (p.startsWith("/employee")) return "employee";
-      return "consumer";
-    } catch {
-      return "consumer";
-    }
-  }, []);
 
   const goCheckout = () => {
     try {
@@ -418,549 +67,195 @@ export default function Cart() {
   };
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 } }}>
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent="space-between"
-        sx={{ mb: 2 }}
-      >
-        <Typography variant="h5" sx={{ fontWeight: 800, color: "#0C2D48" }}>
-          Cart & Checkout
-        </Typography>
-        <Stack direction="row" spacing={1}>
-          <Chip size="small" label={`Items: ${items.length}`} />
-          <Chip
-            size="small"
-            color="primary"
-            label={`Total: ₹${Number(total || 0).toLocaleString("en-IN")}`}
-          />
-          <Button
-            size="small"
-            variant="contained"
-            onClick={goCheckout}
-            disabled={items.length === 0}
-            sx={{ textTransform: "none", fontWeight: 700 }}
-          >
-            Proceed to Checkout
-          </Button>
-        </Stack>
-      </Stack>
-
-      {loading ? (
-        <Box sx={{ py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
-          <CircularProgress size={18} />{" "}
-          <Typography variant="body2">Loading payment config...</Typography>
-        </Box>
-      ) : null}
+    <Box sx={{ p: 2, pb: { xs: 12, sm: 12 } }}>
+      <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>
+        Shopping Cart
+      </Typography>
 
       {items.length === 0 ? (
         <Alert severity="info">Your cart is empty. Add items from store pages.</Alert>
       ) : (
-        <>
-          {/* Items */}
-          <Paper
-            elevation={0}
-            sx={{
-              p: { xs: 2, md: 3 },
-              borderRadius: 2,
-              mb: 2,
-              border: "1px solid",
-              borderColor: "divider",
-              bgcolor: "#fff",
-            }}
-          >
-            <Typography
-              variant="h6"
-              sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}
-            >
-              Items
-            </Typography>
+        <Stack spacing={1.5}>
+          {items.map((it) => {
+            const unit = Number(it.unitPrice || 0);
+            const qty = Math.max(1, parseInt(it.qty || 1, 10));
+            const subtotal = unit * qty;
+            const img =
+              (it?.meta?.image_url && normalizeMediaUrl(it.meta.image_url)) || null;
 
-            {/* Mobile-first product list cards (all item types) */}
-            <Stack spacing={1.25} sx={{ mb: 1.5, display: { xs: "flex", md: "none" } }}>
-              {items.map((it) => {
-                const unit = Number(it.unitPrice || 0);
-                const qty = Math.max(1, parseInt(it.qty || 1, 10));
-                const subtotal = unit * qty;
-                const t = String(it.type || "").toUpperCase();
-                const img = it?.meta?.image_url ? normalizeMediaUrl(it.meta.image_url) : null;
-
-                return (
-                  <Paper key={it.key} variant="outlined" sx={{ p: 1.25, borderRadius: 1.5 }}>
-                    <Stack direction="row" spacing={1.25} alignItems="flex-start">
-                      <Box
-                        sx={{
-                          width: 64,
-                          height: 64,
-                          flexShrink: 0,
-                          borderRadius: 1.25,
-                          overflow: "hidden",
-                          bgcolor: "#f1f5f9",
-                          border: "1px solid",
-                          borderColor: "divider",
-                        }}
-                      >
-                        {img ? (
-                          <img
-                            src={img}
-                            alt={it.name}
-                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                          />
-                        ) : (
-                          <Box sx={{ width: "100%", height: "100%", display: "grid", placeItems: "center", color: "text.disabled", fontSize: 12 }}>
-                            No Image
-                          </Box>
-                        )}
-                      </Box>
-
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-                          {it.name}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          ₹{unit.toLocaleString("en-IN")}
-                        </Typography>
-
-                        {t === "PROMO_PACKAGE" ? (
-                          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-                            {String(it?.meta?.kind || "")}
-                          </Typography>
-                        ) : null}
-                        {t === "ECOUPON" ? (
-                          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-                            Denomination:{" "}
-                            {it?.meta?.denomination != null ? `₹${it.meta.denomination}` : "—"}
-                          </Typography>
-                        ) : null}
-                        {t === "PRODUCT" ? (
-                          <TextField
-                            size="small"
-                            fullWidth
-                            multiline
-                            minRows={2}
-                            sx={{ mt: 1 }}
-                            placeholder="Enter delivery address"
-                            value={it?.meta?.shipping_address || ""}
-                            onChange={(e) =>
-                              handleSetMeta(it.key, { shipping_address: e.target.value })
-                            }
-                          />
-                        ) : t === "AGENCY_PACKAGE" ? (
-                          <>
-                            <TextField
-                              size="small"
-                              fullWidth
-                              type="number"
-                              label="Amount (₹)"
-                              sx={{ mt: 1 }}
-                              placeholder="Enter amount"
-                              value={it?.unitPrice ?? ""}
-                              inputProps={{ min: 1, step: "1" }}
-                              onChange={(e) => handleSetUnitPrice(it.key, e.target.value)}
-                            />
-                            <TextField
-                              size="small"
-                              fullWidth
-                              label="Reference"
-                              sx={{ mt: 1 }}
-                              placeholder="Reference (optional)"
-                              value={it?.meta?.reference || ""}
-                              onChange={(e) => handleSetMeta(it.key, { reference: e.target.value })}
-                            />
-                            <TextField
-                              size="small"
-                              fullWidth
-                              multiline
-                              minRows={2}
-                              sx={{ mt: 1 }}
-                              label="Notes"
-                              placeholder="Notes (optional)"
-                              value={it?.meta?.notes || ""}
-                              onChange={(e) => handleSetMeta(it.key, { notes: e.target.value })}
-                            />
-                          </>
-                        ) : null}
-
-                        <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={() => handleUpdateQty(it.key, Math.max(1, qty - 1))}
-                            sx={{ minWidth: 32, p: 0 }}
-                          >
-                            −
-                          </Button>
-                          <TextField
-                            size="small"
-                            type="number"
-                            value={qty}
-                            onChange={(e) => handleUpdateQty(it.key, e.target.value)}
-                            inputProps={{ min: 1, style: { textAlign: "center", width: 56 } }}
-                          />
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={() => handleUpdateQty(it.key, qty + 1)}
-                            sx={{ minWidth: 32, p: 0 }}
-                          >
-                            +
-                          </Button>
-                          <Box sx={{ flex: 1 }} />
-                          {t === "PROMO_PACKAGE" ? (
-                            <Button size="small" variant="outlined" component="label">
-                              {it.file ? "Change Proof" : "Attach Proof"}
-                              <input
-                                type="file"
-                                hidden
-                                accept="image/*,application/pdf"
-                                onChange={(e) =>
-                                  handleSetFile(
-                                    it.key,
-                                    e.target.files && e.target.files[0] ? e.target.files[0] : null
-                                  )
-                                }
-                              />
-                            </Button>
-                          ) : null}
-                          <Button size="small" color="error" onClick={() => handleRemove(it.key)}>
-                            Remove
-                          </Button>
-                        </Stack>
-
-                        <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.5 }}>
-                          <Typography variant="caption" color="text.secondary">
-                            Subtotal
-                          </Typography>
-                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                            ₹{Number(subtotal).toLocaleString("en-IN")}
-                          </Typography>
-                        </Stack>
-                      </Box>
-                    </Stack>
-                  </Paper>
-                );
-              })}
-            </Stack>
-            <TableContainer sx={{ maxWidth: "100%", overflowX: "auto", display: { xs: "none", md: "block" } }}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Details</TableCell>
-                    <TableCell>Qty</TableCell>
-                    <TableCell>Unit</TableCell>
-                    <TableCell>Subtotal</TableCell>
-                    <TableCell align="right">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {items.map((it) => {
-                    const unit = Number(it.unitPrice || 0);
-                    const qty = Math.max(1, parseInt(it.qty || 1, 10));
-                    const subtotal = unit * qty;
-                    const t = String(it.type || "").toUpperCase();
-                    const details =
-                      t === "PROMO_PACKAGE" ? (
-                        <div style={{ fontSize: 12, color: "#475569" }}>
-                          {String(it?.meta?.kind || "").toUpperCase() ===
-                          "MONTHLY" ? (
-                            <>
-                              Season #{it?.meta?.package_number ?? "-"}
-                              {" • "}Boxes:{" "}
-                              {Array.isArray(it?.meta?.boxes)
-                                ? it.meta.boxes.join(", ")
-                                : "-"}
-                            </>
-                          ) : (
-                            <>
-                              {String(it?.meta?.kind || "")}
-                              {it?.meta?.selected_product_id != null
-                                ? ` • Product: ${it.meta.selected_product_id}`
-                                : ""}
-                              {it?.meta?.shipping_address
-                                ? ` • Address: ${it.meta.shipping_address}`
-                                : ""}
-                            </>
-                          )}
-                        </div>
-                      ) : t === "ECOUPON" ? (
-                        <div style={{ fontSize: 12, color: "#475569" }}>
-                          Denomination:{" "}
-                          {it?.meta?.denomination != null
-                            ? `₹${it.meta.denomination}`
-                            : "—"}
-                        </div>
-                      ) : t === "PRODUCT" ? (
-                        <div style={{ fontSize: 12, color: "#475569" }}>
-                          <div>Shipping address:</div>
-                          <TextField
-                            size="small"
-                            fullWidth
-                            multiline
-                            minRows={2}
-                            placeholder="Enter delivery address"
-                            value={it?.meta?.shipping_address || ""}
-                            onChange={(e) =>
-                              handleSetMeta(it.key, { shipping_address: e.target.value })
-                            }
-                          />
-                        </div>
-                      ) : t === "AGENCY_PACKAGE" ? (
-                        <div style={{ fontSize: 12, color: "#475569" }}>
-                          <Grid container spacing={1}>
-                            <Grid item xs={12} md={6}>
-                              <TextField
-                                size="small"
-                                fullWidth
-                                type="number"
-                                label="Amount (₹)"
-                                placeholder="Enter amount"
-                                value={it?.unitPrice ?? ""}
-                                inputProps={{ min: 1, step: "1" }}
-                                onChange={(e) => handleSetUnitPrice(it.key, e.target.value)}
-                              />
-                            </Grid>
-                            <Grid item xs={12} md={6}>
-                              <TextField
-                                size="small"
-                                fullWidth
-                                label="Reference"
-                                placeholder="Reference (optional)"
-                                value={it?.meta?.reference || ""}
-                                onChange={(e) => handleSetMeta(it.key, { reference: e.target.value })}
-                              />
-                            </Grid>
-                            <Grid item xs={12}>
-                              <TextField
-                                size="small"
-                                fullWidth
-                                multiline
-                                minRows={2}
-                                label="Notes"
-                                placeholder="Notes (optional)"
-                                value={it?.meta?.notes || ""}
-                                onChange={(e) => handleSetMeta(it.key, { notes: e.target.value })}
-                              />
-                            </Grid>
-                          </Grid>
-                        </div>
-                      ) : null;
-
-                    return (
-                      <TableRow key={it.key}>
-                        <TableCell>{t}</TableCell>
-                        <TableCell>{it.name}</TableCell>
-                        <TableCell>{details}</TableCell>
-                        <TableCell style={{ maxWidth: 120 }}>
-                          <TextField
-                            size="small"
-                            type="number"
-                            inputProps={{ min: 1 }}
-                            value={qtyInputs[it.key] ?? String(qty)}
-                            onChange={(e) => setQtyInput(it.key, e.target.value)}
-                            onBlur={() => commitQtyInput(it.key)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                commitQtyInput(it.key);
-                                try { e.currentTarget.blur(); } catch {}
-                              }
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell>₹{unit.toLocaleString("en-IN")}</TableCell>
-                        <TableCell>
-                          ₹{Number(subtotal).toLocaleString("en-IN")}
-                        </TableCell>
-                        <TableCell align="right">
-                          <Stack direction="row" spacing={1} justifyContent="flex-end">
-                            {String(it.type || "").toUpperCase() ===
-                            "PROMO_PACKAGE" ? (
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                component="label"
-                              >
-                                {it.file ? "Change Proof" : "Attach Proof"}
-                                <input
-                                  type="file"
-                                  hidden
-                                  accept="image/*,application/pdf"
-                                  onChange={(e) =>
-                                    handleSetFile(
-                                      it.key,
-                                      e.target.files && e.target.files[0]
-                                        ? e.target.files[0]
-                                        : null
-                                    )
-                                  }
-                                />
-                              </Button>
-                            ) : null}
-                            <Button
-                              size="small"
-                              color="error"
-                              onClick={() => handleRemove(it.key)}
-                            >
-                              Remove
-                            </Button>
-                          </Stack>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                  <TableRow>
-                    <TableCell colSpan={5} align="right" style={{ fontWeight: 800 }}>
-                      Total
-                    </TableCell>
-                    <TableCell style={{ fontWeight: 800 }}>
-                      ₹{Number(total).toLocaleString("en-IN")}
-                    </TableCell>
-                    <TableCell align="right">
-                      <Button size="small" onClick={() => cartClear()}>
-                        Clear
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </TableContainer>
-
-            {/* Coupon input (UI placeholder) */}
-            <Box sx={{ mt: 1, display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
-              <TextField
-                size="small"
-                label="Coupon code"
-                value={couponCode}
-                onChange={(e) => setCouponCode(e.target.value)}
-              />
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={() => setCouponApplied(couponCode.trim())}
-                disabled={!couponCode.trim()}
+            return (
+              <Paper
+                key={it.key}
+                elevation={0}
+                sx={{
+                  p: 1.5,
+                  borderRadius: 2,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  bgcolor: "#fff",
+                }}
               >
-                Apply Coupon
-              </Button>
-              {couponApplied ? (
-                <Chip
-                  size="small"
-                  color="success"
-                  label={`Applied: ${couponApplied}`}
-                  onDelete={() => setCouponApplied("")}
-                />
-              ) : null}
-            </Box>
+                <Stack direction="row" spacing={1.5} alignItems="flex-start">
+                  <Box
+                    sx={{
+                      width: 64,
+                      height: 64,
+                      borderRadius: 1.5,
+                      overflow: "hidden",
+                      bgcolor: img ? "#f8fafc" : "#f1f5f9",
+                      flexShrink: 0,
+                      border: "1px solid",
+                      borderColor: "divider",
+                    }}
+                  >
+                    {img ? (
+                      <Box
+                        component="img"
+                        alt={it.name}
+                        src={img}
+                        sx={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                    ) : (
+                      <Stack
+                        sx={{ width: "100%", height: "100%" }}
+                        alignItems="center"
+                        justifyContent="center"
+                      >
+                        <Typography variant="caption" color="text.secondary">
+                          {String(it.type || "").toUpperCase().slice(0, 1) || "P"}
+                        </Typography>
+                      </Stack>
+                    )}
+                  </Box>
 
-            {promoMissingFiles.length > 0 ? (
-              <Alert severity="warning" sx={{ mt: 1 }}>
-                Some Promo Package items do not have a payment proof attached:
-                {" "}
-                {promoMissingFiles.join(", ")}. You can attach a file for each
-                such item before submitting. Submission will still be attempted.
-              </Alert>
-            ) : null}
-          </Paper>
-
-          {/* Payment method (UPI) preview */}
-          {/* {items.length > 0 ? (
-            <Paper
-              elevation={0}
-              sx={{
-                p: { xs: 2, md: 3 },
-                borderRadius: 2,
-                mb: 2,
-                border: "1px solid",
-                borderColor: "divider",
-                bgcolor: "#fff",
-              }}
-            >
-              <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
-                Payment Method (UPI)
-              </Typography>
-              {payment ? (
-                <Grid container spacing={2}>
-                  <Grid item xs={12} md="auto">
-                    <Box
-                      sx={{
-                        width: 160,
-                        height: 160,
-                        borderRadius: 2,
-                        border: "1px solid #e2e8f0",
-                        overflow: "hidden",
-                        background: "#fff",
-                      }}
+                  <Stack sx={{ flex: 1, minWidth: 0, gap: 0.5 }}>
+                    <Typography
+                      variant="subtitle2"
+                      sx={{ fontWeight: 700, lineHeight: 1.2 }}
+                      noWrap
                     >
-                      {payment.upi_qr_image_url ? (
-                        <img
-                          alt="UPI QR Code"
-                          src={normalizeMediaUrl(payment.upi_qr_image_url)}
-                          style={{ width: "100%", height: "100%", objectFit: "contain" }}
-                        />
-                      ) : (
-                        <Box sx={{ p: 2, color: "text.secondary" }}>No QR image uploaded.</Box>
-                      )}
-                    </Box>
-                  </Grid>
-                  <Grid item xs={12} md>
-                    <Grid container spacing={1}>
-                      <Grid item xs={12} sm={6} md={4}>
-                        <Typography variant="caption" color="text.secondary">Payee</Typography>
-                        <div style={{ fontWeight: 800 }}>{payment.payee_name || "—"}</div>
-                      </Grid>
-                      <Grid item xs={12} sm={6} md={4}>
-                        <Typography variant="caption" color="text.secondary">UPI ID</Typography>
-                        <div style={{ fontWeight: 800 }}>{payment.upi_id || "—"}</div>
-                      </Grid>
-                      <Grid item xs={12}>
-                        <Typography variant="caption" color="text.secondary">Instructions</Typography>
-                        <Box sx={{ whiteSpace: "pre-wrap" }}>
-                          {payment.instructions || "Scan the QR or pay to the UPI ID. You can upload proof and enter UTR at Checkout."}
-                        </Box>
-                      </Grid>
-                    </Grid>
-                  </Grid>
-                </Grid>
-              ) : (
-                <Alert severity="info">Payment configuration not available. You can still review items; try again later.</Alert>
-              )}
-            </Paper>
-          ) : null} */}
+                      {it.name}
+                    </Typography>
 
-          {/* Checkout prompt */}
-          <Paper elevation={0} sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, mb: 2, border: "1px solid", borderColor: "divider", bgcolor: "#fff", position: { xs: "sticky", md: "static" }, bottom: 0, zIndex: 5 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
-              Next Step
-            </Typography>
-            <Alert severity="info" sx={{ mb: 1 }}>
-              Payment is completed at Checkout. Proceed to Checkout to view UPI QR and submit.
-            </Alert>
-            <Button
-              variant="contained"
-              onClick={goCheckout}
-              disabled={items.length === 0}
-              sx={{ textTransform: "none", fontWeight: 800 }}
-            >
-              Go to Checkout
-            </Button>
-          </Paper>
-        </>
+                    <Typography variant="body2" sx={{ color: "text.primary" }}>
+                      ₹{unit.toLocaleString("en-IN")}
+                    </Typography>
+
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      spacing={1}
+                      sx={{ mt: 0.25 }}
+                    >
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => dec(it)}
+                        sx={{
+                          minWidth: 36,
+                          p: "2px 6px",
+                          lineHeight: 1,
+                          fontWeight: 700,
+                        }}
+                        aria-label="decrease quantity"
+                      >
+                        −
+                      </Button>
+                      <Typography
+                        variant="body2"
+                        sx={{ minWidth: 28, textAlign: "center" }}
+                      >
+                        {qty}
+                      </Typography>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => inc(it)}
+                        sx={{
+                          minWidth: 36,
+                          p: "2px 6px",
+                          lineHeight: 1,
+                          fontWeight: 700,
+                        }}
+                        aria-label="increase quantity"
+                      >
+                        +
+                      </Button>
+
+                      <Box sx={{ flex: 1 }} />
+
+                      <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                        ₹{Number(subtotal).toLocaleString("en-IN")}
+                      </Typography>
+                    </Stack>
+
+                    <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.5 }}>
+                      <Button
+                        size="small"
+                        color="error"
+                        onClick={() => {
+                          try {
+                            cartRemoveItem(it.key);
+                          } catch {}
+                        }}
+                        sx={{ textTransform: "none", p: 0, minWidth: 0, fontWeight: 600 }}
+                      >
+                        Remove
+                      </Button>
+                    </Stack>
+                  </Stack>
+                </Stack>
+              </Paper>
+            );
+          })}
+        </Stack>
       )}
 
       <Paper
-        elevation={0}
+        elevation={3}
         sx={{
+          position: "fixed",
+          left: 0,
+          right: 0,
+          bottom: 0,
           p: 2,
-          borderRadius: 2,
-          border: "1px solid",
+          borderTopLeftRadius: 12,
+          borderTopRightRadius: 12,
+          borderTop: "1px solid",
           borderColor: "divider",
           bgcolor: "#fff",
+          zIndex: 1000,
         }}
       >
-        <Typography variant="caption" color="text.secondary">
-          Role: {roleHint}. This cart aggregates e‑coupon store, promo packages, and marketplace products.
-        </Typography>
+        <Stack spacing={1}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <Typography variant="caption" color="text.secondary">
+              Items
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 700 }}>
+              {items.length}
+            </Typography>
+          </Stack>
+          <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <Typography variant="body2" color="text.secondary">
+              Subtotal
+            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 800 }}>
+              ₹{Number(total || 0).toLocaleString("en-IN")}
+            </Typography>
+          </Stack>
+          <Divider />
+          <Button
+            variant="contained"
+            size="large"
+            onClick={goCheckout}
+            disabled={items.length === 0}
+            sx={{ textTransform: "none", fontWeight: 800 }}
+            fullWidth
+          >
+            Proceed to Checkout
+          </Button>
+        </Stack>
       </Paper>
     </Box>
   );

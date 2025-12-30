@@ -107,10 +107,32 @@ def distribute_monthly_759_payouts(
             source_id=src_id,
         )
 
-    # Agency distribution (₹25 default via franchise service). Best-effort.
+    # Agency distribution (configurable). Best-effort.
     if agency_enabled:
+        # Prefer geo config under master_commission_json['geo_mode']['monthly_759'] + ['geo_fixed']['monthly_759']
+        # When mode=fixed, amounts are taken per role from geo_fixed.monthly_759
+        # When mode=percent, amounts are computed as percent of base_amount (defaults to 759 unless overridden by master.monthly_759.base_amount)
         try:
-            from business.services.franchise import distribute_franchise_benefit
-            distribute_franchise_benefit(consumer, trigger="purchase", source={"type": src_type, "id": src_id})
+            from business.models import distribute_auto_pool_commissions, CommissionConfig
+            cfg2 = CommissionConfig.get_solo()
+            master2 = dict(getattr(cfg2, "master_commission_json", {}) or {})
+            base_amt_val = (master2.get("monthly_759", {}) or {}).get("base_amount", 759)
+            try:
+                base_amt = _q2(base_amt_val)
+            except Exception:
+                base_amt = _q2(759)
+            distribute_auto_pool_commissions(
+                consumer,
+                base_amount=base_amt,
+                fixed_key="monthly_759",
+                source_type=src_type,
+                source_id=src_id,
+                extra_meta={"trigger": "MONTHLY_759", "is_first_month": bool(is_first_month)},
+            )
         except Exception:
-            pass
+            # Fallback to legacy fixed ₹25 split via franchise service
+            try:
+                from business.services.franchise import distribute_franchise_benefit
+                distribute_franchise_benefit(consumer, trigger="purchase", source={"type": src_type, "id": src_id})
+            except Exception:
+                pass

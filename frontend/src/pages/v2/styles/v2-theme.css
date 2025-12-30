@@ -1,0 +1,289 @@
+:root {
+  /* Light, gold-centric palette mapped to v2/theme/colors.js */
+  --tri-bg: #FFCD90;         /* Background Cream */
+  --tri-bg-2: #FFFFFF;       /* Surface */
+  --tri-card: #FFFFFF;       /* Card */
+  --tri-gold: #FF7B00;       /* Primary Gold */
+  --tri-text-1: #1F2937;     /* Text Primary */
+  --tri-text-2: #6B7280;     /* Text Secondary */
+  --tri-border: #E5E7EB;     /* Border Light */
+  --tri-radius: 12px;
+  --tri-radius-md: 8px;
+  --tri-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  --tri-shadow-soft: 0 2px 10px rgba(0, 0, 0, 0.10);
+}
+
+/* Shared scope wrapper for all v2 pages (optional) */
+.v2-scope {
+  background-color: var(--tri-bg);
+  color: var(--tri-text-1);
+}
+
+/* Logo sizing rules (max 36px as per spec) */
+.tri-logo {
+  height: 36px;
+  max-height: 36px;
+  width: auto;
+  display: block;
+  object-fit: contain;
+}
+
+/* Navbar */
+.v2-navbar {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background-color: var(--tri-bg-2);
+  border-bottom: 1px solid var(--tri-border);
+  backdrop-filter: saturate(140%) blur(6px);
+}
+.v2-nav-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.v2-nav-links {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.v2-nav-link {
+  color: var(--tri-text-1);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+  opacity: 0.9;
+}
+.v2-nav-link:hover {
+  color: var(--tri-gold);
+  opacity: 1;
+}
+.v2-nav-link.active {
+  color: var(--tri-gold);
+}
+
+/* Footer */
+.v2-footer {
+  background-color: var(--tri-bg-2);
+  border-top: 1px solid var(--tri-border);
+  color: var(--tri-text-2);
+}
+.v2-footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 18px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+}
+.v2-footer-links {
+  display: flex;
+  gap: 16px;
+}
+.v2-footer-link {
+  color: var(--tri-text-2);
+  text-decoration: none;
+  font-size: 13px;
+}
+.v2-footer-link:hover {
+  color: var(--tri-gold);
+}
+
+/* Hero Banner (light) */
+.v2-hero {
+  background-color: var(--tri-bg-2);
+  border-bottom: 1px solid var(--tri-border);
+}
+.v2-hero-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+.v2-hero-banner {
+  position: relative;
+  height: 200px; /* within 180–220px spec */
+  border-radius: var(--tri-radius);
+  background: linear-gradient(180deg, rgba(255,123,0,0.06), rgba(255,123,0,0.00)) , var(--tri-bg-2);
+  border: 1px solid var(--tri-border);
+  box-shadow: var(--tri-shadow-soft);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  padding: 24px;
+}
+.v2-hero-title {
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: var(--tri-text-1);
+  margin: 0;
+}
+.v2-hero-subtitle {
+  margin-top: 6px;
+  color: var(--tri-text-2);
+  font-size: 14px;
+}
+.v2-hero-cta {
+  margin-top: 12px;
+}
+
+/* Gold button utilities (kept for legacy pages, map to system spec) */
+.tri-btn-primary {
+  background-color: var(--tri-gold) !important; /* Primary */
+  color: #FFFFFF !important;                    /* White text */
+  border-radius: var(--tri-radius-md) !important;
+  box-shadow: 0 8px 20px rgba(255, 123, 0, 0.18) !important;
+}
+.tri-btn-primary:hover {
+  filter: brightness(0.98);
+}
+.tri-btn-outline {
+  border: 1px solid var(--tri-gold) !important;
+  color: var(--tri-gold) !important;
+  background: #FFFFFF !important; /* Secondary: white bg + gold border */
+  border-radius: var(--tri-radius-md) !important;
+}
+.tri-btn-outline:hover {
+  background-color: #FFFFFF !important;
+  filter: brightness(0.98);
+}
+
+/* Product Grid */
+.v2-products {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px;
+}
+.v2-section-title {
+  color: var(--tri-text-1);
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  margin: 8px 0 12px 4px;
+}
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)); /* 2-col mobile */
+  gap: 12px;
+}
+@media (min-width: 640px) {
+  .product-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)); /* 3-col tablet */
+  }
+}
+@media (min-width: 900px) {
+  .product-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)); /* 4-col desktop */
+  }
+}
+.product-card {
+  background-color: var(--tri-card);
+  border: 1px solid var(--tri-border);
+  border-radius: var(--tri-radius);
+  box-shadow: var(--tri-shadow-soft);
+  color: var(--tri-text-1);
+  text-decoration: none;
+  display: block;
+  overflow: hidden;
+}
+.product-card-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px; /* card internal padding: 16px */
+  width: 100%;
+  height: 100%;
+}
+.product-card-square {
+  aspect-ratio: 1 / 1; /* perfect square */
+  width: 100%;
+}
+.product-card-icon {
+  color: var(--tri-gold);
+}
+.product-card-name {
+  font-weight: 700;
+  color: var(--tri-text-1);
+  font-size: 13px;
+  text-align: center;
+}
+.product-card-arrow {
+  color: var(--tri-text-2);
+  font-size: 12px;
+}
+
+/* About section */
+.v2-about {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 12px 16px 24px 16px;
+  color: var(--tri-text-2);
+  line-height: 1.6;
+}
+
+/* Auth Pages (Login / Register) */
+.v2-auth {
+  min-height: 100vh;
+  background-color: var(--tri-bg);
+  color: var(--tri-text-1);
+  display: flex;
+  flex-direction: column;
+}
+.v2-auth-topbar {
+  background-color: var(--tri-bg-2);
+  border-bottom: 1px solid var(--tri-border);
+}
+.v2-auth-card {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  border-radius: var(--tri-radius);
+  background-color: var(--tri-card) !important;
+  color: var(--tri-text-1) !important;
+  border: 1px solid var(--tri-border) !important;
+  box-shadow: var(--tri-shadow);
+}
+.v2-auth-muted {
+  color: var(--tri-text-2);
+}
+
+/* Focus states for MUI inputs within v2 auth */
+.v2-auth .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: var(--tri-gold) !important;
+}
+.v2-auth .MuiFormLabel-root.Mui-focused {
+  color: var(--tri-gold) !important;
+}
+.v2-auth .MuiInputAdornment-root .MuiSvgIcon-root {
+  color: var(--tri-text-2);
+}
+
+/* Utility spacings */
+.v2-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px; /* page padding mobile */
+}
+
+/* Remove oversized elements by default in v2 */
+.v2-reset h1, .v2-reset h2, .v2-reset h3 {
+  margin: 0;
+}
+
+/* Subtle hover for cards */
+.product-card:hover {
+  border-color: var(--tri-border);
+  transform: translateY(-1px);
+  transition: transform 120ms ease, border-color 120ms ease;
+}
+
+/* Consistent paddings (8pt grid) */
+.pad-12 { padding: 12px; }
+.pad-16 { padding: 16px; }
+.pad-24 { padding: 24px; }

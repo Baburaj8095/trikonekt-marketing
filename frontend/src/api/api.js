@@ -641,6 +641,17 @@ export async function listStoreProducts(params = {}) {
   return res?.data || res;
 }
 
+export async function listCouponSeasons(params = {}) {
+  // Admin-created Season/Coupon masters
+  // Returns array of coupons where code/title/campaign starts with "Season"
+  const res = await API.get("/coupons/seasons/", {
+    params,
+    cacheTTL: 10_000,
+    dedupe: "cancelPrevious",
+  });
+  return res?.data || res;
+}
+
 /**
  * Consumer e‑coupon wallet helpers
  */
@@ -695,34 +706,34 @@ export async function adminSeedLevelCommission() {
   return res?.data || res;
 }
 
-export async function adminGetMatrixCommissionConfig() {
-  const res = await API.get("/admin/commission/matrix/", {
-    cacheTTL: 10_000,
-    dedupe: "cancelPrevious",
-  });
+export async function adminGetMatrixCommissionConfig(product = null) {
+  const cfg = { cacheTTL: 10_000, dedupe: "cancelPrevious" };
+  if (product) cfg.params = { product };
+  const res = await API.get("/admin/commission/matrix/", cfg);
   return res?.data || res;
 }
 
-export async function adminUpdateMatrixCommissionConfig(payload = {}) {
+export async function adminUpdateMatrixCommissionConfig(payload = {}, product = null) {
   // Accepts any subset of:
   //  - five_matrix_levels, five_matrix_amounts_json, five_matrix_percents_json
   //  - three_matrix_levels, three_matrix_amounts_json, three_matrix_percents_json
-  const res = await API.patch("/admin/commission/matrix/", payload);
+  const cfg = {};
+  if (product) cfg.params = { product };
+  const res = await API.patch("/admin/commission/matrix/", payload, cfg);
   return res?.data || res;
 }
 
 /**
  * Admin: Master Commission (tax, withdrawal sponsor %, company user, upline %, geo %)
  */
-export async function adminGetMasterCommission() {
-  const res = await API.get("/admin/commission/master/", {
-    cacheTTL: 10_000,
-    dedupe: "cancelPrevious",
-  });
+export async function adminGetMasterCommission(product = null) {
+  const cfg = { cacheTTL: 10_000, dedupe: "cancelPrevious" };
+  if (product) cfg.params = { product };
+  const res = await API.get("/admin/commission/master/", cfg);
   return res?.data || res;
 }
 
-export async function adminUpdateMasterCommission(payload = {}) {
+export async function adminUpdateMasterCommission(payload = {}, product = null) {
   // Accepts any subset:
   // {
   //   tax: { percent },
@@ -731,7 +742,9 @@ export async function adminUpdateMasterCommission(payload = {}) {
   //   upline: { l1, l2, l3, l4, l5 },
   //   geo: { sub_franchise, pincode, pincode_coord, district, district_coord, state, state_coord, employee, royalty }
   // }
-  const res = await API.patch("/admin/commission/master/", payload);
+  const cfg = {};
+  if (product) cfg.params = { product };
+  const res = await API.patch("/admin/commission/master/", payload, cfg);
   return res?.data || res;
 }
 
@@ -894,6 +907,11 @@ export function getPurchaseInvoiceUrl(id) {
  */
 export async function getRewardPointsSummary() {
   const res = await API.get("/business/rewards/points/", { cacheTTL: 10_000, dedupe: "cancelPrevious" });
+  return res?.data || res;
+}
+
+export async function getActivationStatus() {
+  const res = await API.get("/business/activation/status/", { dedupe: "cancelPrevious" });
   return res?.data || res;
 }
 
@@ -1090,6 +1108,36 @@ export async function notificationsInbox(params = {}) {
 }
 export async function notificationsMarkRead(body = {}) {
   const res = await API.patch("/notifications/mark-read/", body);
+  return res?.data || res;
+}
+
+/**
+ * Admin-managed dashboard media
+ */
+export async function listHeroBanners(params = {}) {
+  const res = await API.get("/uploads/hero-banners/", {
+    params,
+    cacheTTL: 10_000,
+    dedupe: "cancelPrevious",
+  });
+  return res?.data || res;
+}
+
+export async function listPromotions({ params = {} } = {}) {
+  const res = await API.get("/uploads/promotions/", {
+    params,
+    cacheTTL: 10_000,
+    dedupe: "cancelPrevious",
+  });
+  return res?.data || res;
+}
+
+export async function listCategoryBanners({ params = {} } = {}) {
+  const res = await API.get("/uploads/category-banners/", {
+    params,
+    cacheTTL: 10_000,
+    dedupe: "cancelPrevious",
+  });
   return res?.data || res;
 }
 

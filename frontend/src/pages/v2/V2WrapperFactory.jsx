@@ -1,5 +1,6 @@
 import React from "react";
 import { Box } from "@mui/material";
+import colors from "./theme/colors";
 
 import {
   Profile2,
@@ -13,6 +14,8 @@ import {
   MerchantMarketplace2,
   Support2,
   Cart2,
+  Wallet2,
+  History2,
 } from "./screens";
 
 /**
@@ -34,13 +37,15 @@ const registry = {
   "merchant-marketplace2": MerchantMarketplace2,
   support2: Support2,
   cart2: Cart2,
+  wallet2: Wallet2,
+  history2: History2,
 };
 
 export default function V2WrapperFactory({ name }) {
   const Cmp = registry[name];
   if (!Cmp) {
     return (
-      <Box sx={{ color: "#e5e7eb" }}>
+      <Box sx={{ color: colors.textPrimary }}>
         Unknown screen: {String(name || "")}
       </Box>
     );

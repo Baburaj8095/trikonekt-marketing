@@ -1,12 +1,17 @@
 import React, { useMemo } from "react";
 import { Box, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
+import colors from "./theme/colors";
+import V2SectionCard from "./components/V2SectionCard";
+import V2Button from "./components/V2Button";
 
 /**
- * Profile tab for v2 dashboard
- * - Mirrors the items from ConsumerShell (Profile/Genealogy/Wallet/History/etc.)
- * - Adds mining-related shortcuts (Wealth Galaxy, Lucky Draw) as requested
- * - Navigates to existing routes; does not modify any existing pages
+ * Dashboard2Profile (v2)
+ * Standardized to v2 design-system:
+ * - Uses colors tokens (no inline hex)
+ * - Uses V2SectionCard for all grouped lists
+ * - Uses V2Button for all actions (fixed height, radius, font)
+ * - Consistent spacing and typography scale
  */
 export default function Dashboard2Profile({ setTab, openScreen }) {
   const navigate = useNavigate();
@@ -64,30 +69,23 @@ export default function Dashboard2Profile({ setTab, openScreen }) {
   ];
 
   return (
-    <Box sx={{ color: "#e5e7eb" }}>
+    <Box sx={{ color: colors.textPrimary }}>
       <Box sx={{ mb: 2 }}>
-        <Typography sx={{ fontSize: 16, fontWeight: 800, color: "#fff", lineHeight: 1.2 }}>
+        <Typography sx={{ fontSize: 16, fontWeight: 800, color: colors.textPrimary, lineHeight: 1.2 }}>
           {displayName}
         </Typography>
         {displayEmail ? (
-          <Typography sx={{ fontSize: 12, opacity: 0.75 }}>{displayEmail}</Typography>
+          <Typography sx={{ fontSize: 12, color: colors.textSecondary }}>{displayEmail}</Typography>
         ) : null}
       </Box>
 
       {groups.map((group) => (
         <Box key={group.title} sx={{ mb: 2 }}>
-          <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#fff", mb: 1 }}>
+          <Typography sx={{ fontSize: 14, fontWeight: 800, color: colors.textPrimary, mb: 1 }}>
             {group.title}
           </Typography>
 
-          <Box
-            sx={{
-              borderRadius: 2,
-              overflow: "hidden",
-              border: "1px solid rgba(255,255,255,0.08)",
-              bgcolor: "#111827",
-            }}
-          >
+          <V2SectionCard sx={{ p: 0 }}>
             {group.items.map((item, idx, arr) => (
               <Box
                 key={item.label}
@@ -105,46 +103,24 @@ export default function Dashboard2Profile({ setTab, openScreen }) {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  "&:hover": { bgcolor: "rgba(255,255,255,0.06)" },
-                  borderBottom:
-                    idx < arr.length - 1 ? "1px solid rgba(255,255,255,0.08)" : "none",
+                  "&:hover": { bgcolor: colors.mutedBg },
+                  borderBottom: idx < arr.length - 1 ? `1px solid ${colors.borderWeak}` : "none",
                 }}
               >
-                <Typography sx={{ fontSize: 14, color: "#e5e7eb" }}>{item.label}</Typography>
-                <Typography sx={{ fontSize: 12, opacity: 0.6 }}>›</Typography>
+                <Typography sx={{ fontSize: 14, color: colors.textPrimary }}>{item.label}</Typography>
+                <Typography sx={{ fontSize: 12, color: colors.textSecondary }}>›</Typography>
               </Box>
             ))}
-          </Box>
+          </V2SectionCard>
         </Box>
       ))}
 
-      {/* Shortcuts to quickly switch tabs if needed */}
+      {/* Shortcuts (use standardized buttons) */}
       <Box sx={{ mt: 2, display: "flex", gap: 1 }}>
-        <ChipButton label="Dashboard" onClick={() => setTab && setTab("home")} />
-        <ChipButton label="Wallet" onClick={() => setTab && setTab("wallet")} />
-        <ChipButton label="History" onClick={() => setTab && setTab("history")} />
+        <V2Button variant="secondary" onClick={() => setTab && setTab("home")}>Dashboard</V2Button>
+        <V2Button variant="secondary" onClick={() => setTab && setTab("wallet")}>Wallet</V2Button>
+        <V2Button variant="secondary" onClick={() => setTab && setTab("history")}>History</V2Button>
       </Box>
-    </Box>
-  );
-}
-
-function ChipButton({ label, onClick }) {
-  return (
-    <Box
-      onClick={onClick}
-      sx={{
-        px: 1.5,
-        py: 0.5,
-        borderRadius: 999,
-        fontSize: 12,
-        fontWeight: 700,
-        bgcolor: "rgba(255,255,255,0.08)",
-        color: "#fff",
-        cursor: "pointer",
-        "&:hover": { bgcolor: "rgba(255,255,255,0.14)" },
-      }}
-    >
-      {label}
     </Box>
   );
 }

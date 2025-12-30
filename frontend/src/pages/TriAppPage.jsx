@@ -3,32 +3,25 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
   Typography,
-  Grid,
   Paper,
   Button,
   Alert,
-  Chip,
   CircularProgress,
-  Stack,
 } from "@mui/material";
 import { getTriApp } from "../api/api";
 import normalizeMediaUrl from "../utils/media";
-import { addProduct } from "../store/cart";
+import { addProduct as addCartProduct } from "../store/cart";
 
 function Price({ value, currency = "₹" }) {
-  try {
-    const n = Number(value || 0);
-    if (!isFinite(n) || n < 0) return null;
-    const sign = currency === "INR" ? "₹" : currency || "₹";
-    return (
-      <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#0C2D48" }}>
-        {sign}
-        {n.toLocaleString("en-IN")}
-      </Typography>
-    );
-  } catch {
-    return null;
-  }
+  const n = Number(value || 0);
+  if (!isFinite(n) || n < 0) return null;
+  const sign = currency === "INR" ? "₹" : currency || "₹";
+  return (
+    <Typography sx={{ fontWeight: 800, fontSize: 14, color: "#0C2D48" }}>
+      {sign}
+      {n.toLocaleString("en-IN")}
+    </Typography>
+  );
 }
 
 export default function TriAppPage() {
@@ -41,201 +34,222 @@ export default function TriAppPage() {
 
   useEffect(() => {
     let alive = true;
-    async function load() {
-      setLoading(true);
-      setError("");
+    (async () => {
       try {
+        setLoading(true);
         const data = await getTriApp(slug);
-        if (!alive) return;
-        setApp(data || null);
-      } catch (e) {
-        if (!alive) return;
-        setError("Unable to load app. Please try again.");
-        setApp(null);
+        if (alive) setApp(data || null);
+      } catch {
+        if (alive) setError("Unable to load products.");
       } finally {
         if (alive) setLoading(false);
       }
-    }
-    load();
-    return () => {
-      alive = false;
-    };
+    })();
+    return () => (alive = false);
   }, [slug]);
-
-  const allowPrice = !!app?.allow_price;
-  const allowAddToCart = !!app?.allow_add_to_cart;
-  const allowPayment = !!app?.allow_payment;
-
-  const bannerUrl = useMemo(() => {
-    const u = app?.banner_url || "";
-    return u ? normalizeMediaUrl(u) : "";
-  }, [app]);
 
   const products = Array.isArray(app?.products) ? app.products : [];
 
-  const handleAddToCart = (p) => {
-    try {
-      addProduct({
-        productId: p.id,
-        name: p.name,
-        unitPrice: allowPrice ? Number(p.price || 0) : 0,
-        qty: 1,
-        shipping_address: "",
-        image_url: p.image_url || "",
-        // TRI App reward points metadata
-        tri: true,
-        max_reward_pct: Number(p?.max_reward_points_percent || 0),
-        tri_app_slug: slug,
-      });
-      // Small UX: route to cart quickly?
-      // Keep user here but provide quick CTA to cart
-      alert("Added to cart");
-    } catch {
-      // no-op
-    }
-  };
+  const bannerUrl = useMemo(() => {
+    return app?.banner_url ? normalizeMediaUrl(app.banner_url) : "";
+  }, [app]);
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 } }}>
-      {/* Header */}
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-        <Typography variant="h5" sx={{ fontWeight: 800, color: "#0C2D48" }}>
-          {app?.name || "TRI"}
-        </Typography>
-        <Stack direction="row" spacing={1}>
-          <Chip size="small" label={`Products: ${products.length}`} />
-          <Button
-            size="small"
-            variant="contained"
-            onClick={() => navigate("/user/cart")}
-            sx={{ textTransform: "none", fontWeight: 700 }}
-          >
-            View Cart
-          </Button>
-        </Stack>
-      </Stack>
-
-      {loading ? (
-        <Box sx={{ py: 2, display: "flex", alignItems: "center", gap: 1 }}>
-          <CircularProgress size={18} /> <Typography variant="body2">Loading…</Typography>
+    <Box sx={{ px: 1, py: 2, width: "100%" }}>
+      {/* ===== HEADER ===== */}
+      <Box
+        sx={{
+          mb: 1.5,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <Box>
+          <Typography sx={{ fontSize: 16, fontWeight: 800 }}>
+            {app?.name || "TRI"}
+          </Typography>
+          <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+            {products.length} products
+          </Typography>
         </Box>
-      ) : null}
 
-      {error ? <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert> : null}
-
-      {/* Banner */}
-      {bannerUrl ? (
-        <Box
+        <Button
+          size="small"
+          variant="contained"
+          onClick={() => navigate("/user/cart")}
           sx={{
-            position: "relative",
-            borderRadius: 3,
-            overflow: "hidden",
-            mb: 2,
-            border: "1px solid",
-            borderColor: "divider",
+            textTransform: "none",
+            fontSize: 12,
+            fontWeight: 700,
+            px: 1.5,
           }}
         >
-          <Box
-            component="img"
-            src={bannerUrl}
-            alt={app?.name || "TRI App"}
-            sx={{ width: "100%", height: { xs: 160, sm: 220, md: 260 }, objectFit: "cover", display: "block" }}
-          />
+          Cart
+        </Button>
+      </Box>
+
+      {/* ===== LOADING / ERROR ===== */}
+      {loading && (
+        <Box sx={{ mb: 2, display: "flex", alignItems: "center", gap: 1 }}>
+          <CircularProgress size={16} />
+          <Typography variant="body2">Loading…</Typography>
         </Box>
-      ) : null}
+      )}
 
-      {/* Info / Controls */}
-      {app?.description ? (
-        <Paper
-          elevation={0}
-          sx={{ p: 2, mb: 2, borderRadius: 2, border: "1px solid", borderColor: "divider", bgcolor: "#fff" }}
-        >
-          <Typography variant="body2" sx={{ color: "text.secondary", whiteSpace: "pre-wrap" }}>
-            {app.description}
-          </Typography>
-        </Paper>
-      ) : null}
+      {error && <Alert severity="error">{error}</Alert>}
 
-      {!allowPayment ? (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          Payments are currently disabled for this app. You can browse products; checkout will be enabled once the admin turns it on.
-        </Alert>
-      ) : null}
+      {/* ===== BANNER ===== */}
+      {bannerUrl && (
+        <Box
+          component="img"
+          src={bannerUrl}
+          alt={app?.name}
+          sx={{
+            width: "100%",
+            height: 110,
+            objectFit: "cover",
+            borderRadius: 2,
+            mb: 2,
+          }}
+        />
+      )}
 
-      {!allowAddToCart ? (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          Add to cart is disabled by admin. You can view product details and price{allowPrice ? "" : " (hidden)"}.
-        </Alert>
-      ) : null}
-
-      {/* Products */}
-      <Grid container spacing={2}>
+      {/* ===== PRODUCT GRID (PURE CSS GRID) ===== */}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+          gap: 1,
+          width: "100%",
+        }}
+      >
         {products.map((p) => {
           const img = p?.image_url ? normalizeMediaUrl(p.image_url) : "";
-          const priceNode = allowPrice ? <Price value={p?.price} currency={p?.currency || "₹"} /> : null;
+
           return (
-            <Grid item xs={12} sm={6} md={4} key={p.id || p.name}>
-              <Paper
-                elevation={0}
+            <Paper
+              key={p.id}
+              elevation={0}
+              onClick={() =>
+                navigate(`/trikonekt-products/products/${p.id}`)
+              }
+              sx={{
+                height: 240,
+                display: "flex",
+                flexDirection: "column",
+                border: "1px solid",
+                borderColor: "divider",
+                borderRadius: 1,
+                bgcolor: "#fff",
+                cursor: "pointer",
+                overflow: "hidden",
+              }}
+            >
+              {/* Image */}
+              <Box
                 sx={{
-                  height: "100%",
-                  display: "flex",
-                  flexDirection: "column",
-                  borderRadius: 2,
-                  border: "1px solid",
+                  height: 110,
+                  bgcolor: "#f8fafc",
+                  borderBottom: "1px solid",
                   borderColor: "divider",
-                  bgcolor: "#fff",
-                  overflow: "hidden",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                 }}
               >
-                {img ? (
+                {img && (
                   <Box
                     component="img"
                     src={img}
-                    alt={p?.name || "Product"}
+                    alt={p.name}
                     sx={{
-                      width: "100%",
-                      height: 160,
-                      objectFit: "cover",
-                      display: "block",
-                      borderBottom: "1px solid",
-                      borderColor: "divider",
+                      maxWidth: "90%",
+                      maxHeight: "90%",
+                      objectFit: "contain",
                     }}
                   />
-                ) : null}
-                <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1, flexGrow: 1 }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, color: "#0f172a" }}>
-                    {p?.name || "Product"}
-                  </Typography>
-                  {priceNode}
-                  {p?.description ? (
-                    <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                      {p.description}
-                    </Typography>
-                  ) : null}
-                  <Box sx={{ flexGrow: 1 }} />
-                  <Stack direction="row" spacing={1}>
-                    <Button
-                      fullWidth
-                      variant="contained"
-                      disabled={!allowAddToCart}
-                      onClick={() => handleAddToCart(p)}
-                      sx={{ textTransform: "none", fontWeight: 700 }}
-                    >
-                      {allowAddToCart ? "Add to Cart" : "Add to Cart Disabled"}
-                    </Button>
-                  </Stack>
-                </Box>
-              </Paper>
-            </Grid>
+                )}
+              </Box>
+
+              {/* Content */}
+              <Box
+                sx={{
+                  p: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 0.5,
+                  flexGrow: 1,
+                }}
+              >
+                <Typography
+                  sx={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    lineHeight: 1.4,
+                    overflow: "hidden",
+                    display: "-webkit-box",
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: "vertical",
+                  }}
+                >
+                  {p.name}
+                </Typography>
+
+                <Price value={p.price} currency={p.currency} />
+
+                <Typography variant="caption" color="text.secondary">
+                  Earn up to {p?.max_reward_points_percent || 0}% rewards
+                </Typography>
+
+                <Button
+                  variant="contained"
+                  size="small"
+                  fullWidth
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    try {
+                      addCartProduct({
+                        productId: p.id,
+                        name: p.name,
+                        unitPrice: Number(p.price || 0),
+                        qty: 1,
+                        shipping_address: "",
+                        image_url: p?.image_url || "",
+                        tri: true,
+                        max_reward_pct: Number(p?.max_reward_points_percent || 0),
+                        tri_app_slug: slug || "",
+                      });
+                    } catch {}
+                  }}
+                  sx={{ mt: 0.5, textTransform: "none", fontWeight: 800 }}
+                >
+                  Add to Cart
+                </Button>
+
+                <Box sx={{ flexGrow: 1 }} />
+
+                {/* <Typography
+                  sx={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: "primary.main",
+                  }}
+                >
+                  View →
+                </Typography> */}
+              </Box>
+            </Paper>
           );
         })}
-        {products.length === 0 && !loading ? (
-          <Grid item xs={12}>
-            <Alert severity="info">No products available.</Alert>
-          </Grid>
-        ) : null}
-      </Grid>
+      </Box>
+
+      {!loading && products.length === 0 && (
+        <Alert severity="info" sx={{ mt: 2 }}>
+          No products available.
+        </Alert>
+      )}
     </Box>
   );
 }

@@ -359,14 +359,11 @@ class Wallet(models.Model):
         - COMMISSION_CREDIT: withhold cfg.tax_percent to company wallet, add gross to main, net to withdrawable.
         - Other credits: add to main (no withholding), do not change withdrawable unless explicitly done elsewhere.
         """
-        # Enforce: No wallet credits for inactive accounts (except admin adjustments)
+        # Determine activation status; accrue to main ledger for inactive users, but do not add to withdrawable or run auto-block
         try:
-            if not bool(getattr(self.user, "account_active", False)) and tx_type not in {"ADJUSTMENT_CREDIT", "ADJUSTMENT_DEBIT"}:
-                # Skip creating any credit transactions for inactive users
-                return self.balance
+            inactive = not bool(getattr(self.user, "account_active", False))
         except Exception:
-            # best-effort guard; if any error evaluating active flag, continue normal flow
-            pass
+            inactive = False
         from decimal import Decimal as D
         # Lock this wallet row
         w = Wallet.objects.select_for_update().get(pk=self.pk)
@@ -411,11 +408,18 @@ class Wallet(models.Model):
 
             # Update own wallet balances
             w.main_balance = (w.main_balance or D("0")) + amt
-            w.withdrawable_balance = (w.withdrawable_balance or D("0")) + net
+            if not inactive:
+                w.withdrawable_balance = (w.withdrawable_balance or D("0")) + net
             w.balance = (w.balance or D("0")) + amt
-            w.save(update_fields=["balance", "main_balance", "withdrawable_balance", "updated_at"])
+            fields_to_update = ["balance", "main_balance", "updated_at"]
+            if not inactive:
+                fields_to_update.insert(2, "withdrawable_balance")
+            w.save(update_fields=fields_to_update)
 
             # Record gross commission (main ledger)
+            meta_main = {**meta, "ledger": "MAIN", "gross": str(amt), "net": str(net), "tax": str(tax), "tax_percent": str(tax_percent)}
+            if inactive:
+                meta_main["pending_due_to_inactive"] = True
             WalletTransaction.objects.create(
                 user=self.user,
                 amount=amt,
@@ -423,11 +427,11 @@ class Wallet(models.Model):
                 type=tx_type,
                 source_type=source_type or '',
                 source_id=str(source_id) if source_id is not None else '',
-                meta={**meta, "ledger": "MAIN", "gross": str(amt), "net": str(net), "tax": str(tax), "tax_percent": str(tax_percent)}
+                meta=meta_main
             )
 
-            # Record net withdrawable component
-            if net > 0:
+            # Record net withdrawable component (only when active)
+            if (not inactive) and net > 0:
                 WalletTransaction.objects.create(
                     user=self.user,
                     amount=net,
@@ -454,17 +458,21 @@ class Wallet(models.Model):
                     # best-effort
                     pass
 
-            # Auto-apply 1k block rule after commission credits (best-effort)
-            try:
-                self._apply_auto_block_rule(w)
-            except Exception:
-                pass
+            # Auto-apply 1k block rule after commission credits (best-effort) only for active users
+            if not inactive:
+                try:
+                    self._apply_auto_block_rule(w)
+                except Exception:
+                    pass
             return w.balance
 
         # Default: non-commission or withholding disabled
         w.main_balance = (w.main_balance or D("0")) + amt
         w.balance = (w.balance or D("0")) + amt
         w.save(update_fields=['balance', 'main_balance', 'updated_at'])
+        meta2 = dict(meta or {})
+        if inactive:
+            meta2["pending_due_to_inactive"] = True
         WalletTransaction.objects.create(
             user=self.user,
             amount=amt,
@@ -472,13 +480,14 @@ class Wallet(models.Model):
             type=tx_type,
             source_type=source_type or '',
             source_id=str(source_id) if source_id is not None else '',
-            meta=meta or {}
+            meta=meta2
         )
-        # Auto-apply 1k block rule after non-commission credit (best-effort)
-        try:
-            self._apply_auto_block_rule(w)
-        except Exception:
-            pass
+        # Auto-apply 1k block rule after non-commission credit (best-effort) only for active users
+        if not inactive:
+            try:
+                self._apply_auto_block_rule(w)
+            except Exception:
+                pass
         return w.balance
 
     @transaction.atomic
@@ -529,6 +538,69 @@ class Wallet(models.Model):
             meta=meta or {}
         )
         return w.balance
+
+    @classmethod
+    @transaction.atomic
+    def release_pending_for_user(cls, user: "CustomUser"):
+        """
+        Convert all pending_due_to_inactive credits into withdrawable credits for the given user.
+        - For commission transactions: use recorded 'net' in meta.
+        - For non-commission transactions: release full amount.
+        - Does not change total balance; only increases withdrawable balance and appends WITHDRAWABLE_CREDIT markers.
+        - Clears the pending flag on original transactions to ensure idempotency.
+        """
+        from decimal import Decimal as D
+        if not user:
+            return
+        # Ensure wallet and lock for update
+        w = cls.get_or_create_for_user(user)
+        w = cls.objects.select_for_update().get(pk=w.pk)
+
+        # Find all transactions marked pending due to inactive
+        qs = WalletTransaction.objects.filter(user=user, meta__pending_due_to_inactive=True).order_by("id")
+        for tx in qs:
+            try:
+                meta = dict(tx.meta or {})
+            except Exception:
+                meta = {}
+            # Determine net to release
+            net_val = meta.get("net", None)
+            try:
+                net = D(str(net_val)) if net_val is not None else D(str(tx.amount or "0"))
+            except Exception:
+                net = D("0")
+            if net <= 0:
+                # Clear the pending flag even if nothing to release
+                if meta.get("pending_due_to_inactive"):
+                    meta["pending_due_to_inactive"] = False
+                    tx.meta = meta
+                    tx.save(update_fields=["meta"])
+                continue
+
+            # Increase withdrawable only (do not change total balance/main)
+            w.withdrawable_balance = (w.withdrawable_balance or D("0")) + net
+            w.save(update_fields=["withdrawable_balance", "updated_at"])
+
+            # Append a withdrawable credit marker linked to original tx
+            WalletTransaction.objects.create(
+                user=user,
+                amount=net,
+                balance_after=w.balance,
+                type="WITHDRAWABLE_CREDIT",
+                source_type=tx.source_type or "",
+                source_id=tx.source_id or "",
+                meta={"ledger": "WITHDRAWAL", "released_from": "pending_inactive", "original_tx_id": tx.id},
+            )
+
+            # Clear pending flag on original transaction
+            meta["pending_due_to_inactive"] = False
+            meta["released_from_pending"] = True
+            try:
+                meta["released_net"] = str(net)
+            except Exception:
+                pass
+            tx.meta = meta
+            tx.save(update_fields=["meta"])
 
     @classmethod
     def get_or_create_for_user(cls, user: CustomUser) -> "Wallet":
@@ -1157,6 +1229,23 @@ def handle_new_user_post_save(sender, instance: CustomUser, created: bool, **kwa
     # DEFERRED: No franchise payouts on registration.
     # Franchise payouts will be triggered on first activation inside ensure_first_purchase_activation.
 
+
+@receiver(post_save, sender=CustomUser)
+def release_pending_on_activation(sender, instance: CustomUser, created: bool, **kwargs):
+    """
+    When a user's account_active becomes True (via admin or any other path),
+    release all pending_due_to_inactive wallet credits into withdrawable balance.
+    Idempotent: original txs have their pending flag cleared on release.
+    """
+    if created:
+        return
+    try:
+        if getattr(instance, "account_active", False):
+            from accounts.models import Wallet
+            Wallet.release_pending_for_user(instance)
+    except Exception:
+        # best-effort; do not block saves
+        pass
 
 class UserNominee(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="nominees", db_index=True)

@@ -2,6 +2,9 @@ from django.urls import path
 from .views import (
     DashboardCardList,
     HomeCardList,
+    HeroBannerList,
+    PromotionList,
+    CategoryBannerList,
     LuckyDrawSubmissionView,
     LuckyDrawHistoryTREView,
     LuckyDrawPendingTREView,
@@ -37,6 +40,10 @@ urlpatterns = [
     path('homecard/', HomeCardList.as_view(), name='homecard'),
     path('homecard/<int:pk>/debug-reupload/', DebugReuploadHomeCardView.as_view(), name='homecard-debug-reupload'),
     path('homecard/debug-reupload-all/', DebugReuploadAllHomeCardsView.as_view(), name='homecard-debug-reupload-all'),
+    # New admin-driven dashboard media
+    path('hero-banners/', HeroBannerList.as_view(), name='hero-banners'),
+    path('promotions/', PromotionList.as_view(), name='promotions'),
+    path('category-banners/', CategoryBannerList.as_view(), name='category-banners'),
     # Diagnostics (prod safe): verify storage backend and CLOUDINARY_URL usage
     path('debug/storage/', StorageInfoView.as_view(), name='storage-info'),
     path('files/', FileUploadView.as_view(), name='file-uploads'),

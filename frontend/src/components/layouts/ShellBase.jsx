@@ -262,13 +262,10 @@ export default function ShellBase({
                 <line x1="3" y1="18" x2="21" y2="18"></line>
               </svg>
             </button>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+            <NotificationsBell />
+            <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", display: "flex", alignItems: "baseline", gap: 8, pointerEvents: "none", textAlign: "center" }}>
               <span style={{ fontWeight: 900, color: "#0f172a", fontSize: 18 }}>{title}</span>
               <span style={{ color: "#64748b", fontSize: 12 }}>Dashboard</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {rightHeaderContent ? <div>{rightHeaderContent}</div> : null}
-            <NotificationsBell />
           </div>
         </div>
         </div>

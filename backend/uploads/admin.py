@@ -3,7 +3,7 @@ from django.utils.html import format_html
 from django.db import connection
 from django.db.utils import OperationalError, ProgrammingError
 
-from .models import FileUpload, DashboardCard, LuckyDrawSubmission, JobApplication, HomeCard, AgencyCouponQuota
+from .models import FileUpload, DashboardCard, LuckyDrawSubmission, JobApplication, HomeCard, AgencyCouponQuota, HeroBanner, Promotion, CategoryBanner
 
 
 def is_agency_staff(user):
@@ -178,6 +178,165 @@ class HomeCardAdmin(admin.ModelAdmin):
     list_display = ("id", "image_thumb", "title", "order", "is_active", "created_at")
     list_filter = ("is_active",)
     search_fields = ("title",)
+    ordering = ("order", "-created_at")
+    readonly_fields = ("image_thumb",)
+
+    def image_thumb(self, obj):
+        try:
+            img = getattr(obj, "image", None)
+            url = getattr(img, "url", None)
+            if url:
+                return format_html('<img src="{}" style="height:60px;width:auto;border-radius:4px;" />', url)
+        except Exception:
+            pass
+        return "-"
+    image_thumb.short_description = "Image"
+
+    def has_module_permission(self, request):
+        if request.user.is_superuser:
+            return True
+        return is_agency_staff(request.user)
+
+    def get_model_perms(self, request):
+        if request.user.is_superuser:
+            return super().get_model_perms(request)
+        if is_agency_staff(request.user):
+            return {"add": True, "change": True, "delete": True, "view": True}
+        return {"add": False, "change": False, "delete": False, "view": False}
+
+    def has_view_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        return is_agency_staff(request.user)
+
+    def has_add_permission(self, request):
+        if request.user.is_superuser:
+            return True
+        return is_agency_staff(request.user)
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        return is_agency_staff(request.user)
+
+    def has_delete_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        return is_agency_staff(request.user)
+
+
+# ===========================
+# Admin-managed dashboard media
+# ===========================
+@admin.register(HeroBanner)
+class HeroBannerAdmin(admin.ModelAdmin):
+    list_display = ("id", "image_thumb", "title", "order", "is_active", "created_at")
+    list_filter = ("is_active",)
+    search_fields = ("title",)
+    ordering = ("order", "-created_at")
+    readonly_fields = ("image_thumb",)
+
+    def image_thumb(self, obj):
+        try:
+            img = getattr(obj, "image", None)
+            url = getattr(img, "url", None)
+            if url:
+                return format_html('<img src="{}" style="height:60px;width:auto;border-radius:4px;" />', url)
+        except Exception:
+            pass
+        return "-"
+    image_thumb.short_description = "Image"
+
+    def has_module_permission(self, request):
+        if request.user.is_superuser:
+            return True
+        return is_agency_staff(request.user)
+
+    def get_model_perms(self, request):
+        if request.user.is_superuser:
+            return super().get_model_perms(request)
+        if is_agency_staff(request.user):
+            return {"add": True, "change": True, "delete": True, "view": True}
+        return {"add": False, "change": False, "delete": False, "view": False}
+
+    def has_view_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        return is_agency_staff(request.user)
+
+    def has_add_permission(self, request):
+        if request.user.is_superuser:
+            return True
+        return is_agency_staff(request.user)
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        return is_agency_staff(request.user)
+
+    def has_delete_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        return is_agency_staff(request.user)
+
+
+@admin.register(Promotion)
+class PromotionAdmin(admin.ModelAdmin):
+    list_display = ("id", "image_thumb", "key", "label", "order", "is_active", "created_at")
+    list_filter = ("is_active",)
+    search_fields = ("key", "label")
+    ordering = ("order", "-created_at")
+    readonly_fields = ("image_thumb",)
+
+    def image_thumb(self, obj):
+        try:
+            img = getattr(obj, "image", None)
+            url = getattr(img, "url", None)
+            if url:
+                return format_html('<img src="{}" style="height:60px;width:auto;border-radius:4px;" />', url)
+        except Exception:
+            pass
+        return "-"
+    image_thumb.short_description = "Image"
+
+    def has_module_permission(self, request):
+        if request.user.is_superuser:
+            return True
+        return is_agency_staff(request.user)
+
+    def get_model_perms(self, request):
+        if request.user.is_superuser:
+            return super().get_model_perms(request)
+        if is_agency_staff(request.user):
+            return {"add": True, "change": True, "delete": True, "view": True}
+        return {"add": False, "change": False, "delete": False, "view": False}
+
+    def has_view_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        return is_agency_staff(request.user)
+
+    def has_add_permission(self, request):
+        if request.user.is_superuser:
+            return True
+        return is_agency_staff(request.user)
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        return is_agency_staff(request.user)
+
+    def has_delete_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        return is_agency_staff(request.user)
+
+
+@admin.register(CategoryBanner)
+class CategoryBannerAdmin(admin.ModelAdmin):
+    list_display = ("id", "image_thumb", "key", "label", "order", "is_active", "created_at")
+    list_filter = ("is_active", "key")
+    search_fields = ("key", "label")
     ordering = ("order", "-created_at")
     readonly_fields = ("image_thumb",)
 

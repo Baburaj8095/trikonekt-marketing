@@ -80,6 +80,9 @@ function Section({ title, subtitle, right, children }) {
   );
 }
 
+const PRODUCT_COUPON_150 = "coupon150";
+const PRODUCT_RS_759 = "rs759";
+
 export default function AdminCommissionDistribute() {
   // Global page messages
   const [err, setErr] = useState("");
@@ -592,6 +595,612 @@ export default function AdminCommissionDistribute() {
     }
   }
 
+  // 3b) Product-specific Overrides — 150 Coupon (Geo + Matrix)
+  const [m150Loading, setM150Loading] = useState(true);
+  const [m150Saving, setM150Saving] = useState(false);
+const [m150Server, setM150Server] = useState(null);
+  const [m150Form, setM150Form] = useState({
+    // Direct referral bonuses (₹)
+    direct_bonus_sponsor: "",
+    direct_bonus_self: "",
+    // Geo mode
+    geo_mode: "",
+    // Geo percents (%)
+    geo_sub_franchise: "",
+    geo_pincode: "",
+    geo_pincode_coord: "",
+    geo_district: "",
+    geo_district_coord: "",
+    geo_state: "",
+    geo_state_coord: "",
+    geo_employee: "",
+    geo_royalty: "",
+    // Geo fixed rupees (₹)
+    geo_fixed_sub_franchise: "",
+    geo_fixed_pincode: "",
+    geo_fixed_pincode_coord: "",
+    geo_fixed_district: "",
+    geo_fixed_district_coord: "",
+    geo_fixed_state: "",
+    geo_fixed_state_coord: "",
+    geo_fixed_employee: "",
+    geo_fixed_royalty: "",
+  });
+
+  useEffect(() => {
+    let mounted = true;
+    setM150Loading(true);
+    adminGetMasterCommission(PRODUCT_COUPON_150)
+      .then((data) => {
+        if (!mounted) return;
+        const geo = data?.geo || {};
+        const vals = {
+          geo_sub_franchise: toFixedStr(geo.sub_franchise ?? 0, 2),
+          geo_pincode: toFixedStr(geo.pincode ?? 0, 2),
+          geo_pincode_coord: toFixedStr(geo.pincode_coord ?? 0, 2),
+          geo_district: toFixedStr(geo.district ?? 0, 2),
+          geo_district_coord: toFixedStr(geo.district_coord ?? 0, 2),
+          geo_state: toFixedStr(geo.state ?? 0, 2),
+          geo_state_coord: toFixedStr(geo.state_coord ?? 0, 2),
+          geo_employee: toFixedStr(geo.employee ?? 0, 2),
+          geo_royalty: toFixedStr(geo.royalty ?? 0, 2),
+        };
+        setM150Server({
+          geo: {
+            sub_franchise: toNum(vals.geo_sub_franchise),
+            pincode: toNum(vals.geo_pincode),
+            pincode_coord: toNum(vals.geo_pincode_coord),
+            district: toNum(vals.geo_district),
+            district_coord: toNum(vals.geo_district_coord),
+            state: toNum(vals.geo_state),
+            state_coord: toNum(vals.geo_state_coord),
+            employee: toNum(vals.geo_employee),
+            royalty: toNum(vals.geo_royalty),
+          },
+        });
+        setM150Form(vals);
+      })
+      .catch((e) => setErr(parseError(e) || "Failed to load 150 Coupon Geo Commission"))
+      .finally(() => mounted && setM150Loading(false));
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+function onM150Change(name, value) {
+    if (name === "geo_mode") {
+      setM150Form((f) => ({ ...f, geo_mode: String(value || "").toLowerCase() }));
+      return;
+    }
+    if (value === "") {
+      setM150Form((f) => ({ ...f, [name]: "" }));
+      return;
+    }
+    // numeric with 2 decimals
+    const cleaned = String(value).replace(/[^\d.]/g, "");
+    const parts = cleaned.split(".");
+    let norm = parts[0];
+    if (parts.length > 1) norm += "." + parts[1].slice(0, 2);
+    if (norm === "") norm = "0";
+    const n = Number(norm);
+    if (!isFinite(n) || n < 0) return;
+    setM150Form((f) => ({ ...f, [name]: norm }));
+  }
+
+  const m150ChangedPayload = useMemo(() => {
+    if (!m150Server) return {};
+    const out = {};
+    // direct bonus (₹)
+    const sponsorCur = Number(Number(m150Form.direct_bonus_sponsor || 0).toFixed(2));
+    const sponsorBase = Number(Number(m150Server.direct_bonus?.sponsor ?? 0).toFixed(2));
+    const selfCur = Number(Number(m150Form.direct_bonus_self || 0).toFixed(2));
+    const selfBase = Number(Number(m150Server.direct_bonus?.self ?? 0).toFixed(2));
+    if (sponsorCur !== sponsorBase || selfCur !== selfBase) {
+      out.direct_bonus = {};
+      if (sponsorCur !== sponsorBase) out.direct_bonus.sponsor = sponsorCur;
+      if (selfCur !== selfBase) out.direct_bonus.self = selfCur;
+    }
+    // geo mode
+    const gmCur = (m150Form.geo_mode || "").toLowerCase();
+    const gmBase = String(m150Server.geo_mode || "").toLowerCase();
+    if (gmCur !== gmBase) out.geo_mode = gmCur;
+
+    // geo percents
+    const gKeys = [
+      "sub_franchise",
+      "pincode",
+      "pincode_coord",
+      "district",
+      "district_coord",
+      "state",
+      "state_coord",
+      "employee",
+      "royalty",
+    ];
+    gKeys.forEach((k) => {
+      const formV = Number(Number(m150Form[`geo_${k}`] || 0).toFixed(2));
+      const baseV = Number(Number(m150Server.geo?.[k] ?? 0).toFixed(2));
+      if (formV !== baseV) {
+        out.geo = out.geo || {};
+        out.geo[k] = formV;
+      }
+    });
+
+    // geo fixed rupees
+    gKeys.forEach((k) => {
+      const formV = Number(Number(m150Form[`geo_fixed_${k}`] || 0).toFixed(2));
+      const baseV = Number(Number(m150Server.geo_fixed?.[k] ?? 0).toFixed(2));
+      if (formV !== baseV) {
+        out.geo_fixed = out.geo_fixed || {};
+        out.geo_fixed[k] = formV;
+      }
+    });
+
+    return out;
+  }, [m150Server, m150Form]);
+  const m150Dirty = Object.keys(m150ChangedPayload).length > 0;
+
+  async function onM150Save() {
+    if (!m150Dirty || m150Saving) return;
+    setM150Saving(true);
+    setErr("");
+    setOk("");
+    try {
+      const data = await adminUpdateMasterCommission(m150ChangedPayload, PRODUCT_COUPON_150);
+      const gm = String(data?.geo_mode || "").toLowerCase();
+      const direct = data?.direct_bonus || {};
+      const geo = data?.geo || {};
+      const gf = data?.geo_fixed || {};
+      const vals = {
+        // direct bonus
+        direct_bonus_sponsor: toFixedStr(direct.sponsor ?? 0, 2),
+        direct_bonus_self: toFixedStr(direct.self ?? 0, 2),
+        // geo mode
+        geo_mode: gm,
+        // geo percents
+        geo_sub_franchise: toFixedStr(geo.sub_franchise ?? 0, 2),
+        geo_pincode: toFixedStr(geo.pincode ?? 0, 2),
+        geo_pincode_coord: toFixedStr(geo.pincode_coord ?? 0, 2),
+        geo_district: toFixedStr(geo.district ?? 0, 2),
+        geo_district_coord: toFixedStr(geo.district_coord ?? 0, 2),
+        geo_state: toFixedStr(geo.state ?? 0, 2),
+        geo_state_coord: toFixedStr(geo.state_coord ?? 0, 2),
+        geo_employee: toFixedStr(geo.employee ?? 0, 2),
+        geo_royalty: toFixedStr(geo.royalty ?? 0, 2),
+        // geo fixed rupees
+        geo_fixed_sub_franchise: toFixedStr(gf.sub_franchise ?? 0, 2),
+        geo_fixed_pincode: toFixedStr(gf.pincode ?? 0, 2),
+        geo_fixed_pincode_coord: toFixedStr(gf.pincode_coord ?? 0, 2),
+        geo_fixed_district: toFixedStr(gf.district ?? 0, 2),
+        geo_fixed_district_coord: toFixedStr(gf.district_coord ?? 0, 2),
+        geo_fixed_state: toFixedStr(gf.state ?? 0, 2),
+        geo_fixed_state_coord: toFixedStr(gf.state_coord ?? 0, 2),
+        geo_fixed_employee: toFixedStr(gf.employee ?? 0, 2),
+        geo_fixed_royalty: toFixedStr(gf.royalty ?? 0, 2),
+      };
+      setM150Server({
+        direct_bonus: {
+          sponsor: toNum(vals.direct_bonus_sponsor),
+          self: toNum(vals.direct_bonus_self),
+        },
+        geo_mode: vals.geo_mode || "",
+        geo: {
+          sub_franchise: toNum(vals.geo_sub_franchise),
+          pincode: toNum(vals.geo_pincode),
+          pincode_coord: toNum(vals.geo_pincode_coord),
+          district: toNum(vals.geo_district),
+          district_coord: toNum(vals.geo_district_coord),
+          state: toNum(vals.geo_state),
+          state_coord: toNum(vals.geo_state_coord),
+          employee: toNum(vals.geo_employee),
+          royalty: toNum(vals.geo_royalty),
+        },
+        geo_fixed: {
+          sub_franchise: toNum(vals.geo_fixed_sub_franchise),
+          pincode: toNum(vals.geo_fixed_pincode),
+          pincode_coord: toNum(vals.geo_fixed_pincode_coord),
+          district: toNum(vals.geo_fixed_district),
+          district_coord: toNum(vals.geo_fixed_district_coord),
+          state: toNum(vals.geo_fixed_state),
+          state_coord: toNum(vals.geo_fixed_state_coord),
+          employee: toNum(vals.geo_fixed_employee),
+          royalty: toNum(vals.geo_fixed_royalty),
+        },
+      });
+      setM150Form(vals);
+      setOk("150 Coupon Commission saved");
+    } catch (e) {
+      setErr(parseError(e) || "Save failed (150 Coupon Commission)");
+    } finally {
+      setM150Saving(false);
+    }
+  }
+
+  // Matrix overrides — 150 Coupon
+  const [mx150Loading, setMx150Loading] = useState(true);
+  const [mx150Saving, setMx150Saving] = useState(false);
+  const [mx150Server, setMx150Server] = useState(null);
+  const [mx150Form, setMx150Form] = useState({
+    five_levels: "",
+    five_amounts: "",
+    five_percents: "",
+    three_levels: "",
+    three_amounts: "",
+    three_percents: "",
+  });
+
+  useEffect(() => {
+    let mounted = true;
+    setMx150Loading(true);
+    adminGetMatrixCommissionConfig(PRODUCT_COUPON_150)
+      .then((d) => {
+        if (!mounted) return;
+        const fiveLevels = Number(d?.five_matrix_levels ?? 0) || 0;
+        const fiveAmounts = Array.isArray(d?.five_matrix_amounts_json) ? d.five_matrix_amounts_json : [];
+        const fivePercs = Array.isArray(d?.five_matrix_percents_json) ? d.five_matrix_percents_json : [];
+        const threeLevels = Number(d?.three_matrix_levels ?? 0) || 0;
+        const threeAmounts = Array.isArray(d?.three_matrix_amounts_json) ? d.three_matrix_amounts_json : [];
+        const threePercs = Array.isArray(d?.three_matrix_percents_json) ? d.three_matrix_percents_json : [];
+
+        setMx150Server({
+          five_matrix_levels: fiveLevels,
+          five_matrix_amounts_json: fiveAmounts.map((x) => toNum(x)),
+          five_matrix_percents_json: fivePercs.map((x) => toNum(x)),
+          three_matrix_levels: threeLevels,
+          three_matrix_amounts_json: threeAmounts.map((x) => toNum(x)),
+          three_matrix_percents_json: threePercs.map((x) => toNum(x)),
+        });
+        setMx150Form({
+          five_levels: String(fiveLevels || ""),
+          five_amounts: fiveAmounts.map((x) => toFixedStr(x, 2)).join(", "),
+          five_percents: fivePercs.map((x) => toFixedStr(x, 2)).join(", "),
+          three_levels: String(threeLevels || ""),
+          three_amounts: threeAmounts.map((x) => toFixedStr(x, 2)).join(", "),
+          three_percents: threePercs.map((x) => toFixedStr(x, 2)).join(", "),
+        });
+      })
+      .catch((e) => setErr(parseError(e) || "Failed to load 150 Coupon Matrix Commission"))
+      .finally(() => mounted && setMx150Loading(false));
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  function onMx150Change(name, value) {
+    if (name.endsWith("_levels")) {
+      if (/^\d*$/.test(value)) setMx150Form((f) => ({ ...f, [name]: value }));
+      return;
+    }
+    setMx150Form((f) => ({ ...f, [name]: value }));
+  }
+
+  const mx150ChangedPayload = useMemo(() => {
+    if (!mx150Server) return {};
+    const out = {};
+    const fiveL = mx150Form.five_levels === "" ? null : Number(mx150Form.five_levels);
+    if (fiveL !== null && fiveL !== mx150Server.five_matrix_levels) out.five_matrix_levels = fiveL;
+
+    const fiveAmt = parseNumArray(mx150Form.five_amounts);
+    if (JSON.stringify(fiveAmt) !== JSON.stringify(mx150Server.five_matrix_amounts_json))
+      out.five_matrix_amounts_json = fiveAmt;
+
+    const fivePct = parseNumArray(mx150Form.five_percents);
+    if (JSON.stringify(fivePct) !== JSON.stringify(mx150Server.five_matrix_percents_json))
+      out.five_matrix_percents_json = fivePct;
+
+    const threeL = mx150Form.three_levels === "" ? null : Number(mx150Form.three_levels);
+    if (threeL !== null && threeL !== mx150Server.three_matrix_levels) out.three_matrix_levels = threeL;
+
+    const threeAmt = parseNumArray(mx150Form.three_amounts);
+    if (JSON.stringify(threeAmt) !== JSON.stringify(mx150Server.three_matrix_amounts_json))
+      out.three_matrix_amounts_json = threeAmt;
+
+    const threePct = parseNumArray(mx150Form.three_percents);
+    if (JSON.stringify(threePct) !== JSON.stringify(mx150Server.three_matrix_percents_json))
+      out.three_matrix_percents_json = threePct;
+
+    return out;
+  }, [mx150Server, mx150Form]);
+  const mx150Dirty = Object.keys(mx150ChangedPayload).length > 0;
+
+  async function onMx150Save() {
+    if (!mx150Dirty || mx150Saving) return;
+    setMx150Saving(true);
+    setErr("");
+    setOk("");
+    try {
+      const data = await adminUpdateMatrixCommissionConfig(mx150ChangedPayload, PRODUCT_COUPON_150);
+      const fiveLevels = Number(data?.five_matrix_levels ?? 0) || 0;
+      const fiveAmounts = Array.isArray(data?.five_matrix_amounts_json) ? data.five_matrix_amounts_json : [];
+      const fivePercs = Array.isArray(data?.five_matrix_percents_json) ? data.five_matrix_percents_json : [];
+      const threeLevels = Number(data?.three_matrix_levels ?? 0) || 0;
+      const threeAmounts = Array.isArray(data?.three_matrix_amounts_json) ? data.three_matrix_amounts_json : [];
+      const threePercs = Array.isArray(data?.three_matrix_percents_json) ? data.three_matrix_percents_json : [];
+      setMx150Server({
+        five_matrix_levels: fiveLevels,
+        five_matrix_amounts_json: fiveAmounts.map((x) => toNum(x)),
+        five_matrix_percents_json: fivePercs.map((x) => toNum(x)),
+        three_matrix_levels: threeLevels,
+        three_matrix_amounts_json: threeAmounts.map((x) => toNum(x)),
+        three_matrix_percents_json: threePercs.map((x) => toNum(x)),
+      });
+      setMx150Form({
+        five_levels: String(fiveLevels || ""),
+        five_amounts: fiveAmounts.map((x) => toFixedStr(x, 2)).join(", "),
+        five_percents: fivePercs.map((x) => toFixedStr(x, 2)).join(", "),
+        three_levels: String(threeLevels || ""),
+        three_amounts: threeAmounts.map((x) => toFixedStr(x, 2)).join(", "),
+        three_percents: threePercs.map((x) => toFixedStr(x, 2)).join(", "),
+      });
+      setOk("150 Coupon Matrix Commission saved");
+    } catch (e) {
+      setErr(parseError(e) || "Save failed (150 Coupon Matrix Commission)");
+    } finally {
+      setMx150Saving(false);
+    }
+  }
+
+  // 3c) Product-specific Overrides — ₹759 (Geo + Matrix)
+  const [m759Loading, setM759Loading] = useState(true);
+  const [m759Saving, setM759Saving] = useState(false);
+  const [m759Server, setM759Server] = useState(null);
+  const [m759Form, setM759Form] = useState({
+    geo_sub_franchise: "",
+    geo_pincode: "",
+    geo_pincode_coord: "",
+    geo_district: "",
+    geo_district_coord: "",
+    geo_state: "",
+    geo_state_coord: "",
+    geo_employee: "",
+    geo_royalty: "",
+  });
+
+  useEffect(() => {
+    let mounted = true;
+    setM759Loading(true);
+    adminGetMasterCommission(PRODUCT_RS_759)
+      .then((data) => {
+        if (!mounted) return;
+        const geo = data?.geo || {};
+        const vals = {
+          geo_sub_franchise: toFixedStr(geo.sub_franchise ?? 0, 2),
+          geo_pincode: toFixedStr(geo.pincode ?? 0, 2),
+          geo_pincode_coord: toFixedStr(geo.pincode_coord ?? 0, 2),
+          geo_district: toFixedStr(geo.district ?? 0, 2),
+          geo_district_coord: toFixedStr(geo.district_coord ?? 0, 2),
+          geo_state: toFixedStr(geo.state ?? 0, 2),
+          geo_state_coord: toFixedStr(geo.state_coord ?? 0, 2),
+          geo_employee: toFixedStr(geo.employee ?? 0, 2),
+          geo_royalty: toFixedStr(geo.royalty ?? 0, 2),
+        };
+        setM759Server({
+          geo: {
+            sub_franchise: toNum(vals.geo_sub_franchise),
+            pincode: toNum(vals.geo_pincode),
+            pincode_coord: toNum(vals.geo_pincode_coord),
+            district: toNum(vals.geo_district),
+            district_coord: toNum(vals.geo_district_coord),
+            state: toNum(vals.geo_state),
+            state_coord: toNum(vals.geo_state_coord),
+            employee: toNum(vals.geo_employee),
+            royalty: toNum(vals.geo_royalty),
+          },
+        });
+        setM759Form(vals);
+      })
+      .catch((e) => setErr(parseError(e) || "Failed to load ₹759 Geo Commission"))
+      .finally(() => mounted && setM759Loading(false));
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  function onM759Change(name, value) {
+    if (value === "") {
+      setM759Form((f) => ({ ...f, [name]: "" }));
+      return;
+    }
+    const cleaned = value.replace(/[^\d.]/g, "");
+    const parts = cleaned.split(".");
+    let norm = parts[0];
+    if (parts.length > 1) norm += "." + parts[1].slice(0, 2);
+    if (norm === "") norm = "0";
+    const n = Number(norm);
+    if (!isFinite(n) || n < 0) return;
+    setM759Form((f) => ({ ...f, [name]: norm }));
+  }
+
+  const m759ChangedPayload = useMemo(() => {
+    if (!m759Server) return {};
+    const out = {};
+    const gKeys = [
+      "sub_franchise",
+      "pincode",
+      "pincode_coord",
+      "district",
+      "district_coord",
+      "state",
+      "state_coord",
+      "employee",
+      "royalty",
+    ];
+    gKeys.forEach((k) => {
+      const formV = Number(Number(m759Form[`geo_${k}`] || 0).toFixed(2));
+      const baseV = Number(Number(m759Server.geo?.[k] ?? 0).toFixed(2));
+      if (formV !== baseV) {
+        out.geo = out.geo || {};
+        out.geo[k] = formV;
+      }
+    });
+    return out;
+  }, [m759Server, m759Form]);
+  const m759Dirty = Object.keys(m759ChangedPayload).length > 0;
+
+  async function onM759Save() {
+    if (!m759Dirty || m759Saving) return;
+    setM759Saving(true);
+    setErr("");
+    setOk("");
+    try {
+      const data = await adminUpdateMasterCommission(m759ChangedPayload, PRODUCT_RS_759);
+      const geo = data?.geo || {};
+      const vals = {
+        geo_sub_franchise: toFixedStr(geo.sub_franchise ?? 0, 2),
+        geo_pincode: toFixedStr(geo.pincode ?? 0, 2),
+        geo_pincode_coord: toFixedStr(geo.pincode_coord ?? 0, 2),
+        geo_district: toFixedStr(geo.district ?? 0, 2),
+        geo_district_coord: toFixedStr(geo.district_coord ?? 0, 2),
+        geo_state: toFixedStr(geo.state ?? 0, 2),
+        geo_state_coord: toFixedStr(geo.state_coord ?? 0, 2),
+        geo_employee: toFixedStr(geo.employee ?? 0, 2),
+        geo_royalty: toFixedStr(geo.royalty ?? 0, 2),
+      };
+      setM759Server({
+        geo: {
+          sub_franchise: toNum(vals.geo_sub_franchise),
+          pincode: toNum(vals.geo_pincode),
+          pincode_coord: toNum(vals.geo_pincode_coord),
+          district: toNum(vals.geo_district),
+          district_coord: toNum(vals.geo_district_coord),
+          state: toNum(vals.geo_state),
+          state_coord: toNum(vals.geo_state_coord),
+          employee: toNum(vals.geo_employee),
+          royalty: toNum(vals.geo_royalty),
+        },
+      });
+      setM759Form(vals);
+      setOk("₹759 Geo Commission saved");
+    } catch (e) {
+      setErr(parseError(e) || "Save failed (₹759 Geo Commission)");
+    } finally {
+      setM759Saving(false);
+    }
+  }
+
+  // Matrix overrides — ₹759
+  const [mx759Loading, setMx759Loading] = useState(true);
+  const [mx759Saving, setMx759Saving] = useState(false);
+  const [mx759Server, setMx759Server] = useState(null);
+  const [mx759Form, setMx759Form] = useState({
+    five_levels: "",
+    five_amounts: "",
+    five_percents: "",
+    three_levels: "",
+    three_amounts: "",
+    three_percents: "",
+  });
+
+  useEffect(() => {
+    let mounted = true;
+    setMx759Loading(true);
+    adminGetMatrixCommissionConfig(PRODUCT_RS_759)
+      .then((d) => {
+        if (!mounted) return;
+        const fiveLevels = Number(d?.five_matrix_levels ?? 0) || 0;
+        const fiveAmounts = Array.isArray(d?.five_matrix_amounts_json) ? d.five_matrix_amounts_json : [];
+        const fivePercs = Array.isArray(d?.five_matrix_percents_json) ? d.five_matrix_percents_json : [];
+        const threeLevels = Number(d?.three_matrix_levels ?? 0) || 0;
+        const threeAmounts = Array.isArray(d?.three_matrix_amounts_json) ? d.three_matrix_amounts_json : [];
+        const threePercs = Array.isArray(d?.three_matrix_percents_json) ? d.three_matrix_percents_json : [];
+        setMx759Server({
+          five_matrix_levels: fiveLevels,
+          five_matrix_amounts_json: fiveAmounts.map((x) => toNum(x)),
+          five_matrix_percents_json: fivePercs.map((x) => toNum(x)),
+          three_matrix_levels: threeLevels,
+          three_matrix_amounts_json: threeAmounts.map((x) => toNum(x)),
+          three_matrix_percents_json: threePercs.map((x) => toNum(x)),
+        });
+        setMx759Form({
+          five_levels: String(fiveLevels || ""),
+          five_amounts: fiveAmounts.map((x) => toFixedStr(x, 2)).join(", "),
+          five_percents: fivePercs.map((x) => toFixedStr(x, 2)).join(", "),
+          three_levels: String(threeLevels || ""),
+          three_amounts: threeAmounts.map((x) => toFixedStr(x, 2)).join(", "),
+          three_percents: threePercs.map((x) => toFixedStr(x, 2)).join(", "),
+        });
+      })
+      .catch((e) => setErr(parseError(e) || "Failed to load ₹759 Matrix Commission"))
+      .finally(() => mounted && setMx759Loading(false));
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  function onMx759Change(name, value) {
+    if (name.endsWith("_levels")) {
+      if (/^\d*$/.test(value)) setMx759Form((f) => ({ ...f, [name]: value }));
+      return;
+    }
+    setMx759Form((f) => ({ ...f, [name]: value }));
+  }
+
+  const mx759ChangedPayload = useMemo(() => {
+    if (!mx759Server) return {};
+    const out = {};
+    const fiveL = mx759Form.five_levels === "" ? null : Number(mx759Form.five_levels);
+    if (fiveL !== null && fiveL !== mx759Server.five_matrix_levels) out.five_matrix_levels = fiveL;
+
+    const fiveAmt = parseNumArray(mx759Form.five_amounts);
+    if (JSON.stringify(fiveAmt) !== JSON.stringify(mx759Server.five_matrix_amounts_json))
+      out.five_matrix_amounts_json = fiveAmt;
+
+    const fivePct = parseNumArray(mx759Form.five_percents);
+    if (JSON.stringify(fivePct) !== JSON.stringify(mx759Server.five_matrix_percents_json))
+      out.five_matrix_percents_json = fivePct;
+
+    const threeL = mx759Form.three_levels === "" ? null : Number(mx759Form.three_levels);
+    if (threeL !== null && threeL !== mx759Server.three_matrix_levels) out.three_matrix_levels = threeL;
+
+    const threeAmt = parseNumArray(mx759Form.three_amounts);
+    if (JSON.stringify(threeAmt) !== JSON.stringify(mx759Server.three_matrix_amounts_json))
+      out.three_matrix_amounts_json = threeAmt;
+
+    const threePct = parseNumArray(mx759Form.three_percents);
+    if (JSON.stringify(threePct) !== JSON.stringify(mx759Server.three_matrix_percents_json))
+      out.three_matrix_percents_json = threePct;
+
+    return out;
+  }, [mx759Server, mx759Form]);
+  const mx759Dirty = Object.keys(mx759ChangedPayload).length > 0;
+
+  async function onMx759Save() {
+    if (!mx759Dirty || mx759Saving) return;
+    setMx759Saving(true);
+    setErr("");
+    setOk("");
+    try {
+      const data = await adminUpdateMatrixCommissionConfig(mx759ChangedPayload, PRODUCT_RS_759);
+      const fiveLevels = Number(data?.five_matrix_levels ?? 0) || 0;
+      const fiveAmounts = Array.isArray(data?.five_matrix_amounts_json) ? data.five_matrix_amounts_json : [];
+      const fivePercs = Array.isArray(data?.five_matrix_percents_json) ? data.five_matrix_percents_json : [];
+      const threeLevels = Number(data?.three_matrix_levels ?? 0) || 0;
+      const threeAmounts = Array.isArray(data?.three_matrix_amounts_json) ? data.three_matrix_amounts_json : [];
+      const threePercs = Array.isArray(data?.three_matrix_percents_json) ? data.three_matrix_percents_json : [];
+      setMx759Server({
+        five_matrix_levels: fiveLevels,
+        five_matrix_amounts_json: fiveAmounts.map((x) => toNum(x)),
+        five_matrix_percents_json: fivePercs.map((x) => toNum(x)),
+        three_matrix_levels: threeLevels,
+        three_matrix_amounts_json: threeAmounts.map((x) => toNum(x)),
+        three_matrix_percents_json: threePercs.map((x) => toNum(x)),
+      });
+      setMx759Form({
+        five_levels: String(fiveLevels || ""),
+        five_amounts: fiveAmounts.map((x) => toFixedStr(x, 2)).join(", "),
+        five_percents: fivePercs.map((x) => toFixedStr(x, 2)).join(", "),
+        three_levels: String(threeLevels || ""),
+        three_amounts: threeAmounts.map((x) => toFixedStr(x, 2)).join(", "),
+        three_percents: threePercs.map((x) => toFixedStr(x, 2)).join(", "),
+      });
+      setOk("₹759 Matrix Commission saved");
+    } catch (e) {
+      setErr(parseError(e) || "Save failed (₹759 Matrix Commission)");
+    } finally {
+      setMx759Saving(false);
+    }
+  }
+
   // 4) Withdraw Distribution Preview
   const [pUser, setPUser] = useState(""); // user id or username
   const [pAmount, setPAmount] = useState("");
@@ -616,6 +1225,32 @@ export default function AdminCommissionDistribute() {
       setPLoading(false);
     }
   }
+
+  const SubHeader = ({ title, right }) => (
+    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 4 }}>
+      <div style={{ fontSize: 13, fontWeight: 800, color: "#0f172a" }}>{title}</div>
+      {right}
+    </div>
+  );
+
+  const SaveBtn = ({ onClick, disabled, saving, dirty, labelSaved = "Saved" }) => (
+    <button
+      onClick={onClick}
+      disabled={disabled || saving || !dirty}
+      style={{
+        height: 30,
+        padding: "0 12px",
+        borderRadius: 8,
+        border: "1px solid #0b8d2b",
+        background: dirty ? "#10b981" : "#86efac",
+        color: "#052e16",
+        fontWeight: 900,
+        cursor: disabled || saving || !dirty ? "not-allowed" : "pointer",
+      }}
+    >
+      {saving ? "Saving..." : dirty ? "Save Changes" : labelSaved}
+    </button>
+  );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -879,6 +1514,308 @@ export default function AdminCommissionDistribute() {
                 <textarea
                   value={mxForm.three_percents}
                   onChange={(e) => onMxChange("three_percents", e.target.value)}
+                  placeholder="e.g. 10, 5, 3, 2, 1, 1, ..."
+                  rows={2}
+                  style={{
+                    borderRadius: 8,
+                    border: "1px solid #e2e8f0",
+                    padding: "8px 10px",
+                    background: "#fff",
+                    color: "#0f172a",
+                    fontWeight: 600,
+                  }}
+                />
+              </div>
+            </div>
+          </>
+        )}
+      </Section>
+
+      {/* Product Overrides — 150 Coupon */}
+      <Section
+        title="150 Coupon — Commission Overrides"
+        subtitle="Specific overrides for 150 Coupon product. Empty values imply global defaults."
+      >
+        {/* 150 Direct Bonuses (₹) */}
+        <SubHeader
+          title="Direct Referral Bonuses (₹) — 150 Coupon"
+          right={
+            <SaveBtn
+              onClick={onM150Save}
+              disabled={m150Loading}
+              saving={m150Saving}
+              dirty={m150Dirty}
+            />
+          }
+        />
+        {m150Loading ? (
+          <div style={{ color: "#64748b" }}>Loading...</div>
+        ) : (
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
+            <Input label="Sponsor (₹)" value={m150Form.direct_bonus_sponsor} onChange={(v) => onM150Change("direct_bonus_sponsor", v)} />
+            <Input label="Self (₹)" value={m150Form.direct_bonus_self} onChange={(v) => onM150Change("direct_bonus_self", v)} />
+          </div>
+        )}
+
+        {/* 150 Geo */}
+        <SubHeader
+          title="Geo (Agency) — 150 Coupon"
+          right={
+            <SaveBtn
+              onClick={onM150Save}
+              disabled={m150Loading}
+              saving={m150Saving}
+              dirty={m150Dirty}
+            />
+          }
+        />
+        {m150Loading ? (
+          <div style={{ color: "#64748b" }}>Loading...</div>
+        ) : (
+          <>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
+              <Input label="Sub Franchise (%)" value={m150Form.geo_sub_franchise} onChange={(v) => onM150Change("geo_sub_franchise", v)} />
+              <Input label="Pincode (%)" value={m150Form.geo_pincode} onChange={(v) => onM150Change("geo_pincode", v)} />
+              <Input label="Pincode Coordinator (%)" value={m150Form.geo_pincode_coord} onChange={(v) => onM150Change("geo_pincode_coord", v)} />
+              <Input label="District (%)" value={m150Form.geo_district} onChange={(v) => onM150Change("geo_district", v)} />
+              <Input label="District Coordinator (%)" value={m150Form.geo_district_coord} onChange={(v) => onM150Change("geo_district_coord", v)} />
+              <Input label="State (%)" value={m150Form.geo_state} onChange={(v) => onM150Change("geo_state", v)} />
+              <Input label="State Coordinator (%)" value={m150Form.geo_state_coord} onChange={(v) => onM150Change("geo_state_coord", v)} />
+              <Input label="Employee (%)" value={m150Form.geo_employee} onChange={(v) => onM150Change("geo_employee", v)} />
+              <Input label="Royalty (%)" value={m150Form.geo_royalty} onChange={(v) => onM150Change("geo_royalty", v)} />
+            </div>
+            <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 8 }}>
+              <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>Geo Mode</label>
+              <select
+                value={m150Form.geo_mode || ""}
+                onChange={(e) => onM150Change("geo_mode", e.target.value)}
+                style={{ height: 36, borderRadius: 8, border: "1px solid #e2e8f0", padding: "0 10px", fontWeight: 700 }}
+              >
+                <option value="">—</option>
+                <option value="percent">Percent</option>
+                <option value="fixed">Fixed (₹)</option>
+              </select>
+            </div>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <Input label="Sub Franchise (₹)" value={m150Form.geo_fixed_sub_franchise} onChange={(v) => onM150Change("geo_fixed_sub_franchise", v)} />
+              <Input label="Pincode (₹)" value={m150Form.geo_fixed_pincode} onChange={(v) => onM150Change("geo_fixed_pincode", v)} />
+              <Input label="Pincode Coordinator (₹)" value={m150Form.geo_fixed_pincode_coord} onChange={(v) => onM150Change("geo_fixed_pincode_coord", v)} />
+              <Input label="District (₹)" value={m150Form.geo_fixed_district} onChange={(v) => onM150Change("geo_fixed_district", v)} />
+              <Input label="District Coordinator (₹)" value={m150Form.geo_fixed_district_coord} onChange={(v) => onM150Change("geo_fixed_district_coord", v)} />
+              <Input label="State (₹)" value={m150Form.geo_fixed_state} onChange={(v) => onM150Change("geo_fixed_state", v)} />
+              <Input label="State Coordinator (₹)" value={m150Form.geo_fixed_state_coord} onChange={(v) => onM150Change("geo_fixed_state_coord", v)} />
+              <Input label="Employee (₹)" value={m150Form.geo_fixed_employee} onChange={(v) => onM150Change("geo_fixed_employee", v)} />
+              <Input label="Royalty (₹)" value={m150Form.geo_fixed_royalty} onChange={(v) => onM150Change("geo_fixed_royalty", v)} />
+            </div>
+          </>
+        )}
+
+        {/* 150 Matrix */}
+        <SubHeader
+          title="Matrix Commission (5 & 3) — 150 Coupon"
+          right={
+            <SaveBtn
+              onClick={onMx150Save}
+              disabled={mx150Loading}
+              saving={mx150Saving}
+              dirty={mx150Dirty}
+            />
+          }
+        />
+        {mx150Loading ? (
+          <div style={{ color: "#64748b" }}>Loading...</div>
+        ) : (
+          <>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
+              <Input label="5-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 6" value={mx150Form.five_levels} onChange={(v) => onMx150Change("five_levels", v)} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 380px" }}>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>5-Matrix Amounts (₹, CSV)</label>
+                <textarea
+                  value={mx150Form.five_amounts}
+                  onChange={(e) => onMx150Change("five_amounts", e.target.value)}
+                  placeholder="e.g. 15, 2, 2.5, 0.5, 0.05, 0.1"
+                  rows={2}
+                  style={{
+                    borderRadius: 8,
+                    border: "1px solid #e2e8f0",
+                    padding: "8px 10px",
+                    background: "#fff",
+                    color: "#0f172a",
+                    fontWeight: 600,
+                  }}
+                />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 380px" }}>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>5-Matrix Percents (%, CSV)</label>
+                <textarea
+                  value={mx150Form.five_percents}
+                  onChange={(e) => onMx150Change("five_percents", e.target.value)}
+                  placeholder="e.g. 10, 5, 3, 2, 1, 1"
+                  rows={2}
+                  style={{
+                    borderRadius: 8,
+                    border: "1px solid #e2e8f0",
+                    padding: "8px 10px",
+                    background: "#fff",
+                    color: "#0f172a",
+                    fontWeight: 600,
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <Input label="3-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 15" value={mx150Form.three_levels} onChange={(v) => onMx150Change("three_levels", v)} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 380px" }}>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>3-Matrix Amounts (₹, CSV)</label>
+                <textarea
+                  value={mx150Form.three_amounts}
+                  onChange={(e) => onMx150Change("three_amounts", e.target.value)}
+                  placeholder="e.g. 15, 2, 2.5, 0.5, 0.05, 0.1, ..."
+                  rows={2}
+                  style={{
+                    borderRadius: 8,
+                    border: "1px solid #e2e8f0",
+                    padding: "8px 10px",
+                    background: "#fff",
+                    color: "#0f172a",
+                    fontWeight: 600,
+                  }}
+                />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 380px" }}>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>3-Matrix Percents (%, CSV)</label>
+                <textarea
+                  value={mx150Form.three_percents}
+                  onChange={(e) => onMx150Change("three_percents", e.target.value)}
+                  placeholder="e.g. 10, 5, 3, 2, 1, 1, ..."
+                  rows={2}
+                  style={{
+                    borderRadius: 8,
+                    border: "1px solid #e2e8f0",
+                    padding: "8px 10px",
+                    background: "#fff",
+                    color: "#0f172a",
+                    fontWeight: 600,
+                  }}
+                />
+              </div>
+            </div>
+          </>
+        )}
+      </Section>
+
+      {/* Product Overrides — ₹759 */}
+      <Section
+        title="₹759 — Commission Overrides"
+        subtitle="Specific overrides for ₹759 product. Empty values imply global defaults."
+      >
+        {/* 759 Geo */}
+        <SubHeader
+          title="Geo (Agency) Percents — ₹759"
+          right={
+            <SaveBtn
+              onClick={onM759Save}
+              disabled={m759Loading}
+              saving={m759Saving}
+              dirty={m759Dirty}
+            />
+          }
+        />
+        {m759Loading ? (
+          <div style={{ color: "#64748b" }}>Loading...</div>
+        ) : (
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
+            <Input label="Sub Franchise (%)" value={m759Form.geo_sub_franchise} onChange={(v) => onM759Change("geo_sub_franchise", v)} />
+            <Input label="Pincode (%)" value={m759Form.geo_pincode} onChange={(v) => onM759Change("geo_pincode", v)} />
+            <Input label="Pincode Coordinator (%)" value={m759Form.geo_pincode_coord} onChange={(v) => onM759Change("geo_pincode_coord", v)} />
+            <Input label="District (%)" value={m759Form.geo_district} onChange={(v) => onM759Change("geo_district", v)} />
+            <Input label="District Coordinator (%)" value={m759Form.geo_district_coord} onChange={(v) => onM759Change("geo_district_coord", v)} />
+            <Input label="State (%)" value={m759Form.geo_state} onChange={(v) => onM759Change("geo_state", v)} />
+            <Input label="State Coordinator (%)" value={m759Form.geo_state_coord} onChange={(v) => onM759Change("geo_state_coord", v)} />
+            <Input label="Employee (%)" value={m759Form.geo_employee} onChange={(v) => onM759Change("geo_employee", v)} />
+            <Input label="Royalty (%)" value={m759Form.geo_royalty} onChange={(v) => onM759Change("geo_royalty", v)} />
+          </div>
+        )}
+
+        {/* 759 Matrix */}
+        <SubHeader
+          title="Matrix Commission (5 & 3) — ₹759"
+          right={
+            <SaveBtn
+              onClick={onMx759Save}
+              disabled={mx759Loading}
+              saving={mx759Saving}
+              dirty={mx759Dirty}
+            />
+          }
+        />
+        {mx759Loading ? (
+          <div style={{ color: "#64748b" }}>Loading...</div>
+        ) : (
+          <>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
+              <Input label="5-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 6" value={mx759Form.five_levels} onChange={(v) => onMx759Change("five_levels", v)} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 380px" }}>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>5-Matrix Amounts (₹, CSV)</label>
+                <textarea
+                  value={mx759Form.five_amounts}
+                  onChange={(e) => onMx759Change("five_amounts", e.target.value)}
+                  placeholder="e.g. 15, 2, 2.5, 0.5, 0.05, 0.1"
+                  rows={2}
+                  style={{
+                    borderRadius: 8,
+                    border: "1px solid #e2e8f0",
+                    padding: "8px 10px",
+                    background: "#fff",
+                    color: "#0f172a",
+                    fontWeight: 600,
+                  }}
+                />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 380px" }}>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>5-Matrix Percents (%, CSV)</label>
+                <textarea
+                  value={mx759Form.five_percents}
+                  onChange={(e) => onMx759Change("five_percents", e.target.value)}
+                  placeholder="e.g. 10, 5, 3, 2, 1, 1"
+                  rows={2}
+                  style={{
+                    borderRadius: 8,
+                    border: "1px solid #e2e8f0",
+                    padding: "8px 10px",
+                    background: "#fff",
+                    color: "#0f172a",
+                    fontWeight: 600,
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <Input label="3-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 15" value={mx759Form.three_levels} onChange={(v) => onMx759Change("three_levels", v)} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 380px" }}>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>3-Matrix Amounts (₹, CSV)</label>
+                <textarea
+                  value={mx759Form.three_amounts}
+                  onChange={(e) => onMx759Change("three_amounts", e.target.value)}
+                  placeholder="e.g. 15, 2, 2.5, 0.5, 0.05, 0.1, ..."
+                  rows={2}
+                  style={{
+                    borderRadius: 8,
+                    border: "1px solid #e2e8f0",
+                    padding: "8px 10px",
+                    background: "#fff",
+                    color: "#0f172a",
+                    fontWeight: 600,
+                  }}
+                />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 380px" }}>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>3-Matrix Percents (%, CSV)</label>
+                <textarea
+                  value={mx759Form.three_percents}
+                  onChange={(e) => onMx759Change("three_percents", e.target.value)}
                   placeholder="e.g. 10, 5, 3, 2, 1, 1, ..."
                   rows={2}
                   style={{

@@ -11,12 +11,14 @@ import {
   Stack,
   Tooltip,
   Rating,
-  Button,
 } from "@mui/material";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import ShoppingCartCheckoutIcon from "@mui/icons-material/ShoppingCartCheckout";
 import normalizeMediaUrl from "../../utils/media";
+import cardTokens from "../../pages/v2/theme/card";
+import colors from "../../pages/v2/theme/colors";
+import V2Button from "../../pages/v2/components/V2Button";
 
 /**
  * ProductCard
@@ -53,18 +55,24 @@ function ProductCard({ product, onSelect, onQuickView, onAddToCart, showAddToCar
       variant="outlined"
       sx={{
         height: "100%",
-        borderRadius: 2,
+        borderRadius: `${cardTokens.radius}px`,
         overflow: "hidden",
         position: "relative",
-        "&:hover": { boxShadow: 3 },
-        transition: "box-shadow 0.2s ease",
+        bgcolor: cardTokens.bg,
+        border: cardTokens.border,
+        boxShadow: cardTokens.shadow,
+        "&:hover": {
+          bgcolor: cardTokens.hover.bg,
+          border: cardTokens.hover.border,
+          boxShadow: cardTokens.hover.shadow,
+        },
+        transition: "background-color 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease",
       }}
     >
       <Box sx={{ position: "relative" }}>
         {discount > 0 && (
           <Chip
             label={`${discount}% OFF`}
-            color="error"
             size="small"
             sx={{
               position: "absolute",
@@ -72,6 +80,8 @@ function ProductCard({ product, onSelect, onQuickView, onAddToCart, showAddToCar
               left: 8,
               zIndex: 2,
               fontWeight: 700,
+              bgcolor: colors.primary,
+              color: colors.textOnPrimary,
             }}
           />
         )}
@@ -79,7 +89,6 @@ function ProductCard({ product, onSelect, onQuickView, onAddToCart, showAddToCar
         {outOfStock ? (
           <Chip
             label="Sold Out"
-            color="default"
             size="small"
             sx={{
               position: "absolute",
@@ -87,14 +96,13 @@ function ProductCard({ product, onSelect, onQuickView, onAddToCart, showAddToCar
               right: 8,
               zIndex: 2,
               fontWeight: 700,
-              bgcolor: "grey.800",
-              color: "#fff",
+              bgcolor: colors.border,
+              color: colors.textPrimary,
             }}
           />
         ) : (
           <Chip
             label="In Stock"
-            color="success"
             size="small"
             sx={{
               position: "absolute",
@@ -102,6 +110,8 @@ function ProductCard({ product, onSelect, onQuickView, onAddToCart, showAddToCar
               right: 40,
               zIndex: 2,
               fontWeight: 700,
+              bgcolor: colors.success,
+              color: colors.textOnPrimary,
             }}
           />
         )}
@@ -113,8 +123,8 @@ function ProductCard({ product, onSelect, onQuickView, onAddToCart, showAddToCar
             top: 4,
             right: 4,
             zIndex: 3,
-            bgcolor: "rgba(255,255,255,0.9)",
-            ":hover": { bgcolor: "rgba(255,255,255,1)" },
+            bgcolor: colors.surface,
+            border: `1px solid ${colors.border}`,
           }}
           disabled
         >
@@ -137,12 +147,12 @@ function ProductCard({ product, onSelect, onQuickView, onAddToCart, showAddToCar
               }}
             />
           ) : (
-            <Box sx={{ width: "100%", aspectRatio: "4 / 3", bgcolor: "#f1f5f9" }} />
+            <Box sx={{ width: "100%", aspectRatio: "4 / 3", bgcolor: colors.mutedBg }} />
           )}
         </CardActionArea>
       </Box>
 
-      <CardContent sx={{ p: dense ? 1 : 1.5 }}>
+      <CardContent sx={{ p: `${cardTokens.padding}px` }}>
         {/* Title */}
         <Typography
           variant={dense ? "body2" : "subtitle2"}
@@ -254,9 +264,7 @@ function ProductCard({ product, onSelect, onQuickView, onAddToCart, showAddToCar
           <Stack direction="row" justifyContent="flex-end" sx={{ mt: 1 }}>
             <Tooltip title={outOfStock ? "Out of Stock" : "Add to Cart"}>
               <span>
-                <Button
-                  size="small"
-                  variant="contained"
+                <V2Button
                   startIcon={<ShoppingCartCheckoutIcon />}
                   disabled={outOfStock}
                   onClick={(e) => {
@@ -264,10 +272,9 @@ function ProductCard({ product, onSelect, onQuickView, onAddToCart, showAddToCar
                     e.stopPropagation();
                     if (typeof onAddToCart === "function") onAddToCart(product);
                   }}
-                  sx={{ fontWeight: 800 }}
                 >
                   Add to Cart
-                </Button>
+                </V2Button>
               </span>
             </Tooltip>
           </Stack>
@@ -276,8 +283,7 @@ function ProductCard({ product, onSelect, onQuickView, onAddToCart, showAddToCar
         {outOfStock && (
           <Typography
             variant="caption"
-            color="error"
-            sx={{ fontWeight: 700, display: "block", mt: 0.5 }}
+            sx={{ fontWeight: 700, display: "block", mt: 0.5, color: colors.error }}
           >
             This product is out of stock.
           </Typography>

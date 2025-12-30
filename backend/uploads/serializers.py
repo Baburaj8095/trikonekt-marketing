@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import FileUpload, DashboardCard, LuckyDrawSubmission, JobApplication, HomeCard, LuckyCouponAssignment, LuckySpinDraw, LuckySpinWinner, LuckySpinAttempt
+from .models import FileUpload, DashboardCard, LuckyDrawSubmission, JobApplication, HomeCard, LuckyCouponAssignment, LuckySpinDraw, LuckySpinWinner, LuckySpinAttempt, HeroBanner, Promotion, CategoryBanner
 from django.conf import settings
 try:
     from cloudinary_storage.storage import MediaCloudinaryStorage
@@ -56,6 +56,69 @@ class HomeCardSerializer(serializers.ModelSerializer):
         if not f:
             return None
         # Prefer the field's own URL first (Cloudinary will yield https://res.cloudinary.com/..., local FS yields /media/...)
+        try:
+            url = f.url
+        except Exception:
+            url = None
+        if not url:
+            return None
+        request = self.context.get("request") if hasattr(self, "context") else None
+        return request.build_absolute_uri(url) if (request and not str(url).startswith("http")) else url
+
+
+class HeroBannerSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = HeroBanner
+        fields = ["id", "title", "link", "image", "image_url", "order", "is_active", "created_at"]
+
+    def get_image_url(self, obj):
+        f = getattr(obj, "image", None)
+        if not f:
+            return None
+        try:
+            url = f.url
+        except Exception:
+            url = None
+        if not url:
+            return None
+        request = self.context.get("request") if hasattr(self, "context") else None
+        return request.build_absolute_uri(url) if (request and not str(url).startswith("http")) else url
+
+
+class PromotionSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Promotion
+        fields = ["id", "key", "label", "image", "image_url", "order", "is_active", "created_at"]
+
+    def get_image_url(self, obj):
+        f = getattr(obj, "image", None)
+        if not f:
+            return None
+        try:
+            url = f.url
+        except Exception:
+            url = None
+        if not url:
+            return None
+        request = self.context.get("request") if hasattr(self, "context") else None
+        return request.build_absolute_uri(url) if (request and not str(url).startswith("http")) else url
+
+
+class CategoryBannerSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CategoryBanner
+        fields = ["id", "key", "label", "image", "image_url", "order", "is_active", "created_at"]
+
+    def get_image_url(self, obj):
+        f = getattr(obj, "image", None)
+        if not f:
+            return None
         try:
             url = f.url
         except Exception:

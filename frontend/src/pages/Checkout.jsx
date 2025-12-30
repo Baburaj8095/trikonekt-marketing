@@ -7,21 +7,16 @@ import {
   Button,
   Alert,
   Divider,
-  Grid,
   TextField,
-  Chip,
-  Table,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableBody,
-  TableContainer,
   CircularProgress,
   FormControl,
   FormLabel,
   RadioGroup,
   FormControlLabel,
   Radio,
+  Stepper,
+  Step,
+  StepLabel,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import normalizeMediaUrl from "../utils/media";
@@ -36,34 +31,27 @@ import {
   subscribe as subscribeCart,
   getItems as getCartItems,
   getCartTotal as getCartTotalPrice,
-  updateQty as cartUpdateQty,
   removeItem as cartRemoveItem,
-  clearCart as cartClear,
   setItemFile as cartSetItemFile,
   setItemMeta as cartSetItemMeta,
 } from "../store/cart";
 
-/**
- * Dedicated Checkout page
- * - Same submission logic as Cart
- * - Always focuses user on payment section (shows QR if configured)
- */
 export default function Checkout() {
   const navigate = useNavigate();
   const [cart, setCart] = useState({ items: [], total: 0 });
   const [loading, setLoading] = useState(false);
 
-  // ECOUPON payment config (QR/UPI etc.)
+  // Payment config for UPI/manual method
   const [payment, setPayment] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState("MANUAL"); // MANUAL | ONLINE (placeholder)
+  const [paymentMethod, setPaymentMethod] = useState("MANUAL"); // MANUAL | ONLINE (disabled)
   const [ecouponPayment, setEcouponPayment] = useState({
     utr: "",
     notes: "",
-    file: null, // optional global file to apply to each e-coupon order if line.file not set
+    file: null, // optional global file to apply to each e‑coupon order if line.file not set
   });
 
+  // Sync cart snapshot
   useEffect(() => {
-    // Prime cart snapshot
     const pushState = () => {
       try {
         const items = getCartItems();
@@ -82,13 +70,13 @@ export default function Checkout() {
     };
   }, []);
 
+  // Load payment bootstrap
   const loadBootstrap = async () => {
     setLoading(true);
     try {
       const data = await getEcouponStoreBootstrap();
       setPayment(data?.payment_config || null);
     } catch {
-      // Do not block the page if payment config fails
       setPayment(null);
     } finally {
       setLoading(false);
@@ -102,6 +90,7 @@ export default function Checkout() {
   const items = cart.items || [];
   const total = Number(cart.total || 0);
 
+  // Group items by type
   const grouped = useMemo(() => {
     const out = { ECOUPON: [], PROMO_PACKAGE: [], PRODUCT: [], OTHERS: [] };
     for (const it of items) {
@@ -114,33 +103,10 @@ export default function Checkout() {
     return out;
   }, [items]);
 
-  const handleUpdateQty = (key, qty) => {
-    try {
-      cartUpdateQty(key, qty);
-    } catch {}
-  };
+  // Step control
+  const [step, setStep] = useState(1);
 
-  const handleRemove = (key) => {
-    try {
-      cartRemoveItem(key);
-    } catch {}
-  };
-
-  const handleSetFile = (key, file) => {
-    try {
-      cartSetItemFile(key, file);
-    } catch {}
-  };
-
-  const handleSetMeta = (key, partial) => {
-    try {
-      cartSetItemMeta(key, partial || {});
-    } catch {}
-  };
-
-  const [checkingOut, setCheckingOut] = useState(false);
-
-  // Contact details for product requests (prefilled from logged-in user if available)
+  // Contact details (prefill from user if available)
   const storedUser = useMemo(() => {
     try {
       const ls = localStorage.getItem("user") || sessionStorage.getItem("user");
@@ -154,18 +120,54 @@ export default function Checkout() {
     setContact((c) => ({
       name: c.name || storedUser?.full_name || storedUser?.username || "",
       email: c.email || storedUser?.email || "",
-      phone: c.phone || storedUser?.phone || storedUser?.mobile || storedUser?.contact || "",
+      phone:
+        c.phone ||
+        storedUser?.phone ||
+        storedUser?.mobile ||
+        storedUser?.contact ||
+        "",
     }));
   }, [storedUser]);
 
-  // Product payment method
-  const [productPayMethod, setProductPayMethod] = useState("wallet");
+  // STEP 1: Delivery address (apply to all PRODUCT and PRIME promo items)
+  const initialAddress = useMemo(() => {
+    const firstAddr =
+      (grouped.PRODUCT.find((i) =>
+        String(i?.meta?.shipping_address || "").trim()
+      )?.meta?.shipping_address) ||
+      (grouped.PROMO_PACKAGE.find(
+        (i) =>
+          String(i?.meta?.shipping_address || "").trim() &&
+          String(i?.meta?.kind || "").toUpperCase() === "PRIME"
+      )?.meta?.shipping_address) ||
+      "";
+    return firstAddr;
+  }, [grouped.PRODUCT, grouped.PROMO_PACKAGE]);
+  const [deliveryAddress, setDeliveryAddress] = useState("");
+  useEffect(() => {
+    setDeliveryAddress((prev) => (prev ? prev : initialAddress));
+  }, [initialAddress]);
 
-  // Reward points summary + order reward cap and chosen redeem amount
+  const applyAddressToItems = () => {
+    const addr = String(deliveryAddress || "").trim();
+    try {
+      for (const it of grouped.PRODUCT) {
+        cartSetItemMeta(it.key, { shipping_address: addr });
+      }
+      for (const it of grouped.PROMO_PACKAGE) {
+        const kind = String(it?.meta?.kind || "").toUpperCase();
+        if (kind === "PRIME") {
+          cartSetItemMeta(it.key, { shipping_address: addr });
+        }
+      }
+    } catch {}
+  };
+
+  // PRODUCT payment method + rewards
+  const [productPayMethod, setProductPayMethod] = useState("wallet");
   const [rewardSummary, setRewardSummary] = useState({ available: 0 });
   const orderRewardCap = useMemo(() => {
     try {
-      // Cap across PRODUCT lines having a >0 per-product reward percent
       let cap = 0;
       for (const it of grouped.PRODUCT) {
         const unit = Number(it.unitPrice || 0);
@@ -181,10 +183,11 @@ export default function Checkout() {
     }
   }, [grouped.PRODUCT]);
   const [redeemUse, setRedeemUse] = useState(0);
-  const availablePoints = Number(rewardSummary?.available || rewardSummary?.current_points || 0);
+  const availablePoints = Number(
+    rewardSummary?.available || rewardSummary?.current_points || 0
+  );
   const redeemMax = Math.max(0, Math.min(availablePoints, orderRewardCap));
 
-  // Load reward summary once
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -203,7 +206,6 @@ export default function Checkout() {
     };
   }, []);
 
-  // Keep chosen redeem within bounds; if bounds shrink below current, clamp it.
   useEffect(() => {
     setRedeemUse((prev) => {
       const n = Number(prev || 0);
@@ -213,6 +215,8 @@ export default function Checkout() {
     });
   }, [redeemMax]);
 
+  const [checkingOut, setCheckingOut] = useState(false);
+
   const checkout = async () => {
     if (!items.length) {
       try {
@@ -221,7 +225,7 @@ export default function Checkout() {
       return;
     }
 
-    // Preflight validation for PRODUCT lines
+    // Validate product lines
     if ((grouped.PRODUCT || []).length > 0) {
       const missing = (grouped.PRODUCT || [])
         .filter((it) => !String(it?.meta?.shipping_address || "").trim())
@@ -244,7 +248,7 @@ export default function Checkout() {
 
     const results = [];
     try {
-      // 1) Submit ECOUPON line items
+      // 1) ECOUPON lines
       for (const it of grouped.ECOUPON) {
         try {
           const lineFile = it.file || ecouponPayment.file || null;
@@ -268,11 +272,11 @@ export default function Checkout() {
         }
       }
 
-      // 2) Submit PROMO PACKAGE items
+      // 2) PROMO PACKAGE lines
       for (const it of grouped.PROMO_PACKAGE) {
         try {
           const kind = String(it?.meta?.kind || "").toUpperCase();
-          const file = it.file || null; // expected for promo packages
+          const file = it.file || null; // optional proof
           let remarks = "";
           try {
             const ch = String(it?.meta?.prime150_choice || "").toUpperCase();
@@ -317,7 +321,6 @@ export default function Checkout() {
               remarks,
             });
           } else {
-            // Unknown promo subtype; fallback using qty+file only
             await createPromoPurchase({
               package_id: it.id,
               quantity: Math.max(1, parseInt(it.qty || 1, 10)),
@@ -338,25 +341,27 @@ export default function Checkout() {
         }
       }
 
-      // 3) Submit PRODUCT items (allocate redeem across TRI lines up to per-line cap and chosen total)
+      // 3) PRODUCT lines with reward allocation
       {
-        // Remaining redeem budget (₹) across all TRI product lines
-        let remainingRedeem = Math.max(0, Math.min(Number(redeemUse || 0), Number(redeemMax || 0)));
+        let remainingRedeem = Math.max(
+          0,
+          Math.min(Number(redeemUse || 0), Number(redeemMax || 0))
+        );
         for (const it of grouped.PRODUCT) {
           try {
             const addr = String(it?.meta?.shipping_address || "").trim();
             const unit = Number(it.unitPrice || 0);
             const qty = Math.max(1, parseInt(it.qty || 1, 10));
-            const isTri = !!(it?.meta?.tri);
             const maxPct = Math.max(0, Number(it?.meta?.max_reward_pct || 0));
             const lineCap = maxPct > 0 ? Math.max(0, (unit * qty * maxPct) / 100) : 0;
-            // Allocate redeem for this line from remaining budget
             let lineRedeem = 0;
             if (remainingRedeem > 0 && lineCap > 0) {
               lineRedeem = Math.min(remainingRedeem, lineCap);
-              // Round to 2 decimals
               lineRedeem = Math.round(lineRedeem * 100) / 100;
-              remainingRedeem = Math.max(0, Math.round((remainingRedeem - lineRedeem) * 100) / 100);
+              remainingRedeem = Math.max(
+                0,
+                Math.round((remainingRedeem - lineRedeem) * 100) / 100
+              );
             }
 
             await createProductPurchaseRequest({
@@ -367,7 +372,6 @@ export default function Checkout() {
               consumer_phone: contact.phone,
               consumer_address: addr,
               payment_method: productPayMethod,
-              // New: optional reward discount for this line (₹)
               reward_discount_amount: lineRedeem,
             });
             results.push({ key: it.key, ok: true });
@@ -384,7 +388,7 @@ export default function Checkout() {
         }
       }
 
-      // Remove lines that succeeded
+      // Remove succeeded lines
       for (const r of results) {
         if (r.ok) {
           try {
@@ -400,11 +404,9 @@ export default function Checkout() {
           `Submitted ${success} item(s).${failed > 0 ? ` Failed ${failed}.` : ""}`
         );
       } catch {}
-      // Reset ecoupon payment form on success if all succeeded
       if (failed === 0) {
         setEcouponPayment({ utr: "", notes: "", file: null });
       }
-      // If everything succeeded, take user back to role cart or dashboard
       if (failed === 0) {
         try {
           const p = window.location.pathname;
@@ -418,569 +420,216 @@ export default function Checkout() {
     }
   };
 
-  const promoMissingFiles = useMemo(() => {
-    return grouped.PROMO_PACKAGE.filter((it) => !it.file).map((it) => it.name);
-  }, [grouped.PROMO_PACKAGE]);
+  // UI pieces
 
-  const productMissingAddresses = useMemo(() => {
-    return (grouped.PRODUCT || [])
-      .filter((it) => !String(it?.meta?.shipping_address || "").trim())
-      .map((it) => it.name);
-  }, [grouped.PRODUCT]);
+  const OrderSummaryCard = ({ it }) => {
+    const unit = Number(it.unitPrice || 0);
+    const qty = Math.max(1, parseInt(it.qty || 1, 10));
+    const subtotal = unit * qty;
+    const img =
+      (it?.meta?.image_url && normalizeMediaUrl(it.meta.image_url)) || null;
+    const t = String(it.type || "").toUpperCase();
 
-  const roleHint = useMemo(() => {
-    try {
-      const p = window.location.pathname;
-      if (p.startsWith("/agency")) return "agency";
-      if (p.startsWith("/employee")) return "employee";
-      return "consumer";
-    } catch {
-      return "consumer";
-    }
-  }, []);
-
-  return (
-    <Box sx={{ p: { xs: 2, md: 3 } }}>
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent="space-between"
-        sx={{ mb: 2 }}
+    return (
+      <Paper
+        elevation={0}
+        sx={{
+          p: 1.5,
+          borderRadius: 2,
+          border: "1px solid",
+          borderColor: "divider",
+          bgcolor: "#fff",
+        }}
       >
-        <Typography variant="h5" sx={{ fontWeight: 800, color: "#0C2D48" }}>
-          Checkout
-        </Typography>
-        <Stack direction="row" spacing={1}>
-          <Chip size="small" label={`Items: ${items.length}`} />
-          <Chip
-            size="small"
-            color="primary"
-            label={`Total: ₹${Number(total || 0).toLocaleString("en-IN")}`}
-          />
-        </Stack>
-      </Stack>
-
-      {loading ? (
-        <Box sx={{ py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
-          <CircularProgress size={18} />{" "}
-          <Typography variant="body2">Loading payment config...</Typography>
-        </Box>
-      ) : null}
-
-      {items.length === 0 ? (
-        <Alert severity="info">
-          Cart is empty. Add items from store pages.
-          <Button size="small" sx={{ ml: 1 }} onClick={() => {
-            const p = window.location.pathname;
-            if (p.startsWith("/agency")) navigate("/agency/cart");
-            else if (p.startsWith("/employee")) navigate("/employee/cart");
-            else navigate("/user/cart");
-          }}>Go to Cart</Button>
-        </Alert>
-      ) : (
-        <>
-          {/* Items (readonly edits except qty/address/proof) */}
-          <Paper
-            elevation={0}
+        <Stack direction="row" spacing={1.5} alignItems="flex-start">
+          <Box
             sx={{
-              p: { xs: 2, md: 3 },
-              borderRadius: 2,
-              mb: 2,
+              width: 64,
+              height: 64,
+              borderRadius: 1.5,
+              overflow: "hidden",
+              bgcolor: img ? "#f8fafc" : "#f1f5f9",
+              flexShrink: 0,
               border: "1px solid",
               borderColor: "divider",
-              bgcolor: "#fff",
             }}
           >
-            <Typography
-              variant="h6"
-              sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}
-            >
-              Review Items
-            </Typography>
-            <TableContainer sx={{ maxWidth: "100%", overflowX: "auto" }}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Details</TableCell>
-                    <TableCell>Qty</TableCell>
-                    <TableCell>Unit</TableCell>
-                    <TableCell>Subtotal</TableCell>
-                    <TableCell align="right">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {items.map((it) => {
-                    const unit = Number(it.unitPrice || 0);
-                    const qty = Math.max(1, parseInt(it.qty || 1, 10));
-                    const subtotal = unit * qty;
-                    const t = String(it.type || "").toUpperCase();
-                    const details =
-                      t === "PROMO_PACKAGE" ? (
-                        <div style={{ fontSize: 12, color: "#475569" }}>
-                          {String(it?.meta?.kind || "").toUpperCase() ===
-                          "MONTHLY" ? (
-                            <>
-                              Season #{it?.meta?.package_number ?? "-"}
-                              {" • "}Boxes:{" "}
-                              {Array.isArray(it?.meta?.boxes)
-                                ? it.meta.boxes.join(", ")
-                                : "-"}
-                            </>
-                          ) : (
-                            <>
-                              {String(it?.meta?.kind || "")}
-                              {it?.meta?.selected_promo_product_id != null
-                                ? ` • Promo Product: ${it.meta.selected_promo_product_id}`
-                                : it?.meta?.selected_product_id != null
-                                ? ` • Product: ${it.meta.selected_product_id}`
-                                : ""}
-                              {it?.meta?.shipping_address
-                                ? ` • Address: ${it.meta.shipping_address}`
-                                : ""}
-                              {it?.meta?.prime750_choice
-                                ? ` • Choice: ${String(it.meta.prime750_choice)}`
-                                : ""}
-                            </>
-                          )}
-                        </div>
-                      ) : t === "ECOUPON" ? (
-                        <div style={{ fontSize: 12, color: "#475569" }}>
-                          Denomination:{" "}
-                          {it?.meta?.denomination != null
-                            ? `₹${it.meta.denomination}`
-                            : "—"}
-                        </div>
-                      ) : t === "PRODUCT" ? (
-                        <div style={{ fontSize: 12, color: "#475569" }}>
-                          <div>Shipping address:</div>
-                          <TextField
-                            size="small"
-                            fullWidth
-                            multiline
-                            minRows={2}
-                            placeholder="Enter delivery address"
-                            value={it?.meta?.shipping_address || ""}
-                            onChange={(e) =>
-                              handleSetMeta(it.key, { shipping_address: e.target.value })
-                            }
-                          />
-                          <div style={{ marginTop: 4 }}>
-                            Max reward: {Math.max(0, Number(it?.meta?.max_reward_pct || 0))}% • Line cap: ₹
-                            {Math.max(
-                              0,
-                              (unit * qty * Math.max(0, Number(it?.meta?.max_reward_pct || 0))) / 100
-                            ).toFixed(2)}
-                          </div>
-                        </div>
-                      ) : null;
-
-                    return (
-                      <TableRow key={it.key}>
-                        <TableCell>{t}</TableCell>
-                        <TableCell>{it.name}</TableCell>
-                        <TableCell>{details}</TableCell>
-                        <TableCell style={{ maxWidth: 120 }}>
-                          <TextField
-                            size="small"
-                            type="number"
-                            inputProps={{ min: 1 }}
-                            value={qty}
-                            onChange={(e) =>
-                              handleUpdateQty(it.key, e.target.value)
-                            }
-                          />
-                        </TableCell>
-                        <TableCell>₹{unit.toLocaleString("en-IN")}</TableCell>
-                        <TableCell>
-                          ₹{Number(subtotal).toLocaleString("en-IN")}
-                        </TableCell>
-                        <TableCell align="right">
-                          <Stack direction="row" spacing={1} justifyContent="flex-end">
-                            {String(it.type || "").toUpperCase() ===
-                            "PROMO_PACKAGE" ? (
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                component="label"
-                              >
-                                {it.file ? "Change Proof" : "Attach Proof"}
-                                <input
-                                  type="file"
-                                  hidden
-                                  accept="image/*,application/pdf"
-                                  onChange={(e) =>
-                                    handleSetFile(
-                                      it.key,
-                                      e.target.files && e.target.files[0]
-                                        ? e.target.files[0]
-                                        : null
-                                    )
-                                  }
-                                />
-                              </Button>
-                            ) : null}
-                            <Button
-                              size="small"
-                              color="error"
-                              onClick={() => handleRemove(it.key)}
-                            >
-                              Remove
-                            </Button>
-                          </Stack>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                  <TableRow>
-                    <TableCell colSpan={5} align="right" style={{ fontWeight: 800 }}>
-                      Total
-                    </TableCell>
-                    <TableCell style={{ fontWeight: 800 }}>
-                      ₹{Number(total).toLocaleString("en-IN")}
-                    </TableCell>
-                    <TableCell align="right">
-                      <Button size="small" onClick={() => cartClear()}>
-                        Clear
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </TableContainer>
-
-            {promoMissingFiles.length > 0 ? (
-              <Alert severity="warning" sx={{ mt: 1 }}>
-                Some Promo Package items do not have a payment proof attached:{" "}
-                {promoMissingFiles.join(", ")}. You can attach a file for each
-                such item before submitting. Submission will still be attempted.
-              </Alert>
-            ) : null}
-          </Paper>
-
-          {/* Payment section */}
-          <Paper
-            elevation={0}
-            sx={{
-              p: { xs: 2, md: 3 },
-              borderRadius: 2,
-              mb: 2,
-              border: "1px solid",
-              borderColor: "divider",
-              bgcolor: "#fff",
-            }}
-          >
-            <Typography
-              variant="h6"
-              sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}
-            >
-              Payment
-            </Typography>
-
-            {/* Payment instructions (Manual UPI) */}
-            {items.length > 0 ? (
-              <>
-                <FormControl component="fieldset" size="small" sx={{ mb: 1 }}>
-                  <FormLabel component="legend">Payment Method</FormLabel>
-                  <RadioGroup
-                    row
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                  >
-                    <FormControlLabel
-                      value="MANUAL"
-                      control={<Radio size="small" />}
-                      label="Manual (UPI)"
-                    />
-                    <FormControlLabel
-                      value="ONLINE"
-                      control={<Radio size="small" />}
-                      label="Online"
-                      disabled
-                    />
-                  </RadioGroup>
-                </FormControl>
-
-                {payment ? (
-                  <Grid container spacing={2} sx={{ mb: 1 }}>
-                    <Grid item xs={12} md="auto">
-                      <Box
-                        sx={{
-                          width: 200,
-                          height: 200,
-                          borderRadius: 2,
-                          border: "1px solid #e2e8f0",
-                          overflow: "hidden",
-                          background: "#fff",
-                        }}
-                      >
-                        {payment.upi_qr_image_url ? (
-                          <img
-                            alt="UPI QR Code"
-                            src={normalizeMediaUrl(payment.upi_qr_image_url)}
-                            style={{
-                              width: "100%",
-                              height: "100%",
-                              objectFit: "contain",
-                            }}
-                          />
-                        ) : (
-                          <Box sx={{ p: 2, color: "text.secondary" }}>
-                            No QR image uploaded.
-                          </Box>
-                        )}
-                      </Box>
-                    </Grid>
-                    <Grid item xs={12} md>
-                      <Grid container spacing={1}>
-                        <Grid item xs={12} sm={6} md={4}>
-                          <Typography variant="caption" color="text.secondary">
-                            Payee
-                          </Typography>
-                          <div style={{ fontWeight: 800 }}>
-                            {payment.payee_name || "—"}
-                          </div>
-                        </Grid>
-                        <Grid item xs={12} sm={6} md={4}>
-                          <Typography variant="caption" color="text.secondary">
-                            UPI ID
-                          </Typography>
-                          <div style={{ fontWeight: 800 }}>
-                            {payment.upi_id || "—"}
-                          </div>
-                        </Grid>
-                        <Grid item xs={12}>
-                          <Typography variant="caption" color="text.secondary">
-                            Instructions
-                          </Typography>
-                          <Box sx={{ whiteSpace: "pre-wrap" }}>
-                            {payment.instructions ||
-                              "Scan the QR or pay to the UPI ID, then provide UTR and optionally upload payment proof."}
-                          </Box>
-                        </Grid>
-                      </Grid>
-                    </Grid>
-                  </Grid>
-                ) : (
-                  <Alert severity="warning" sx={{ mb: 1 }}>
-                    Payments are temporarily unavailable or not configured for e‑coupons.
-                  </Alert>
-                )}
-
-                <Grid container spacing={1.5} sx={{ mb: 1 }}>
-                  <Grid item xs={12} md={4}>
-                    <TextField
-                      size="small"
-                      label="UTR (optional)"
-                      fullWidth
-                      value={ecouponPayment.utr}
-                      onChange={(e) =>
-                        setEcouponPayment((s) => ({ ...s, utr: e.target.value }))
-                      }
-                    />
-                  </Grid>
-                  <Grid item xs={12} md={8}>
-                    <TextField
-                      size="small"
-                      label="Notes (optional)"
-                      fullWidth
-                      value={ecouponPayment.notes}
-                      onChange={(e) =>
-                        setEcouponPayment((s) => ({
-                          ...s,
-                          notes: e.target.value,
-                        }))
-                      }
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <Button variant="outlined" size="small" component="label">
-                      {ecouponPayment.file ? "Change Payment Proof" : "Attach Payment Proof (optional)"}
-                      <input
-                        type="file"
-                        hidden
-                        accept="image/*,application/pdf"
-                        onChange={(e) =>
-                          setEcouponPayment((s) => ({
-                            ...s,
-                            file:
-                              e.target.files && e.target.files[0]
-                                ? e.target.files[0]
-                                : null,
-                          }))
-                        }
-                      />
-                    </Button>
-                    {ecouponPayment.file ? (
-                      <Typography variant="caption" sx={{ ml: 1 }}>
-                        {ecouponPayment.file.name}
-                      </Typography>
-                    ) : null}
-                  </Grid>
-                </Grid>
-              </>
-            ) : (
-              <Alert severity="info" sx={{ mb: 1 }}>
-                No items in cart.
-              </Alert>
-            )}
-
-            {/* Product contact and payment */}
-            {grouped.PRODUCT.length > 0 ? (
-              <>
-                <Typography variant="subtitle2" sx={{ mt: 1 }}>Product checkout details</Typography>
-                <Grid container spacing={1.5} sx={{ mb: 1, mt: 0.5 }}>
-                  <Grid item xs={12} sm={4}>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      label="Your Name"
-                      value={contact.name}
-                      onChange={(e) => setContact((s) => ({ ...s, name: e.target.value }))}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={4}>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      label="Email"
-                      type="email"
-                      value={contact.email}
-                      onChange={(e) => setContact((s) => ({ ...s, email: e.target.value }))}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={4}>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      label="Phone"
-                      value={contact.phone}
-                      onChange={(e) => setContact((s) => ({ ...s, phone: e.target.value }))}
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <FormControl component="fieldset" size="small">
-                      <FormLabel component="legend">Product Payment Method</FormLabel>
-                      <RadioGroup
-                        row
-                        value={productPayMethod}
-                        onChange={(e) => setProductPayMethod(e.target.value)}
-                      >
-                        <FormControlLabel value="wallet" control={<Radio size="small" />} label="Wallet" />
-                        <FormControlLabel value="cash" control={<Radio size="small" />} label="Cash" />
-                      </RadioGroup>
-                    </FormControl>
-                  </Grid>
-                </Grid>
-                {productMissingAddresses.length > 0 ? (
-                  <Alert severity="warning" sx={{ mb: 1 }}>
-                    Add shipping address for: {productMissingAddresses.join(", ")}.
-                  </Alert>
-                ) : null}
-              </>
-            ) : null}
-
-            {/* Reward points redeem (TRI products only) */}
-            {grouped.PRODUCT.length > 0 ? (
+            {img ? (
               <Box
-                sx={{
-                  mt: 1,
-                  mb: 1.5,
-                  p: 1.5,
-                  borderRadius: 1.5,
-                  border: "1px dashed",
-                  borderColor: "divider",
-                  bgcolor: "#fafafa",
-                }}
+                component="img"
+                src={img}
+                alt={it.name}
+                sx={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : (
+              <Stack
+                sx={{ width: "100%", height: "100%" }}
+                alignItems="center"
+                justifyContent="center"
               >
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                  Redeem Reward Points (applies to eligible products; capped per product %)
+                <Typography variant="caption" color="text.secondary">
+                  {t.slice(0, 1) || "P"}
                 </Typography>
-                <Grid container spacing={1.5} alignItems="center">
-                  <Grid item xs={12} sm={4}>
-                    <Typography variant="caption" color="text.secondary">Available</Typography>
-                    <div style={{ fontWeight: 800 }}>₹{Number(availablePoints).toLocaleString("en-IN")}</div>
-                  </Grid>
-                  <Grid item xs={12} sm={4}>
-                    <Typography variant="caption" color="text.secondary">Max this order (cap)</Typography>
-                    <div style={{ fontWeight: 800 }}>₹{Number(orderRewardCap).toLocaleString("en-IN")}</div>
-                  </Grid>
-                  <Grid item xs={12} sm={4}>
-                    <TextField
-                      size="small"
-                      label={`Redeem amount (₹, max ₹${Number(redeemMax).toLocaleString("en-IN")})`}
-                      type="number"
-                      inputProps={{ min: 0, max: Math.max(0, Math.floor(redeemMax * 100) / 100), step: "0.50" }}
-                      value={redeemUse}
-                      onChange={(e) => {
-                        const v = Number(e.target.value || 0);
-                        if (!isFinite(v) || v < 0) return setRedeemUse(0);
-                        if (v > redeemMax) return setRedeemUse(redeemMax);
-                        setRedeemUse(v);
-                      }}
-                      fullWidth
-                    />
-                  </Grid>
-                </Grid>
-                <Stack direction={{ xs: "row" }} spacing={1} sx={{ mt: 1 }}>
-                  <Button size="small" variant="outlined" onClick={() => setRedeemUse(redeemMax)}>
-                    Apply Reward Coupon
-                  </Button>
-                  <Button size="small" onClick={() => setRedeemUse(0)}>
-                    Remove
-                  </Button>
-                </Stack>
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mt: 1 }}>
-                  <Chip size="small" label={`Subtotal: ₹${Number(total).toLocaleString("en-IN")}`} />
-                  <Chip size="small" color="success" label={`Reward discount: -₹${Number(redeemUse).toLocaleString("en-IN")}`} />
-                  <Chip
-                    size="small"
-                    color="primary"
-                    label={`Payable: ₹${Math.max(0, Number(total) - Number(redeemUse)).toLocaleString("en-IN")}`}
-                  />
-                </Stack>
-                {redeemUse > 0 && productPayMethod === "cash" ? (
-                  <Typography variant="caption" color="text.secondary">
-                    Note: For cash method, discount will be recorded with your request; no wallet debit is performed online.
-                  </Typography>
-                ) : null}
-              </Box>
-            ) : null}
+              </Stack>
+            )}
+          </Box>
 
-            <Divider sx={{ my: 1.5 }} />
+          <Stack sx={{ flex: 1, minWidth: 0, gap: 0.5 }}>
+            <Typography
+              variant="subtitle2"
+              sx={{ fontWeight: 700, lineHeight: 1.2 }}
+              noWrap
+            >
+              {it.name}
+            </Typography>
 
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems="center">
-              <Button
-                variant="contained"
-                onClick={checkout}
-                disabled={checkingOut || items.length === 0}
-                sx={{ textTransform: "none", fontWeight: 800 }}
-              >
-                {checkingOut ? "Submitting..." : "Submit for Approval"}
-              </Button>
-              <Typography variant="caption" color="text.secondary">
-                Orders are reviewed by admin. Upon approval, allocations will be made to your account.
+            <Typography variant="body2" color="text.secondary">
+              Qty: {qty}
+            </Typography>
+
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Typography variant="body2">
+                ₹{unit.toLocaleString("en-IN")}
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                ₹{Number(subtotal).toLocaleString("en-IN")}
               </Typography>
             </Stack>
-          </Paper>
 
-          <Stack direction="row" spacing={1}>
-            <Button
-              variant="outlined"
-              onClick={() => {
-                const p = window.location.pathname;
-                if (p.startsWith("/agency")) navigate("/agency/cart");
-                else if (p.startsWith("/employee")) navigate("/employee/cart");
-                else navigate("/user/cart");
-              }}
-            >
-              Back to Cart
-            </Button>
+            {/* Optional per-line proof for PROMO_PACKAGE only (read-only otherwise) */}
+            {t === "PROMO_PACKAGE" ? (
+              <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
+                <Button variant="outlined" size="small" component="label">
+                  {it.file ? "Change Proof" : "Attach Proof"}
+                  <input
+                    type="file"
+                    hidden
+                    accept="image/*,application/pdf"
+                    onChange={(e) =>
+                      cartSetItemFile(
+                        it.key,
+                        e.target.files && e.target.files[0]
+                          ? e.target.files[0]
+                          : null
+                      )
+                    }
+                  />
+                </Button>
+                {it.file ? (
+                  <Typography variant="caption" color="text.secondary">
+                    {it.file.name || "Attached"}
+                  </Typography>
+                ) : null}
+              </Stack>
+            ) : null}
           </Stack>
-        </>
-      )}
+        </Stack>
+      </Paper>
+    );
+  };
 
+  const StepOne = (
+    <Paper
+      elevation={0}
+      sx={{
+        p: 2,
+        borderRadius: 2,
+        border: "1px solid",
+        borderColor: "divider",
+        bgcolor: "#fff",
+      }}
+    >
+      <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+        Delivery Address
+      </Typography>
+      <TextField
+        size="small"
+        fullWidth
+        multiline
+        minRows={3}
+        placeholder="Enter delivery address"
+        value={deliveryAddress}
+        onChange={(e) => setDeliveryAddress(e.target.value)}
+      />
+      <Divider sx={{ my: 1.5 }} />
+      <Button
+        variant="contained"
+        onClick={() => {
+          applyAddressToItems();
+          setStep(2);
+        }}
+        disabled={items.length === 0}
+        sx={{ textTransform: "none", fontWeight: 800 }}
+        fullWidth
+      >
+        Continue
+      </Button>
+    </Paper>
+  );
+
+  const StepTwo = (
+    <Paper
+      elevation={0}
+      sx={{
+        p: 2,
+        borderRadius: 2,
+        border: "1px solid",
+        borderColor: "divider",
+        bgcolor: "#fff",
+      }}
+    >
+      <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+        Contact Details
+      </Typography>
+      <Stack spacing={1.5}>
+        <TextField
+          size="small"
+          fullWidth
+          label="Name"
+          value={contact.name}
+          onChange={(e) => setContact((s) => ({ ...s, name: e.target.value }))}
+        />
+        <TextField
+          size="small"
+          fullWidth
+          label="Email"
+          type="email"
+          value={contact.email}
+          onChange={(e) => setContact((s) => ({ ...s, email: e.target.value }))}
+        />
+        <TextField
+          size="small"
+          fullWidth
+          label="Phone"
+          value={contact.phone}
+          onChange={(e) => setContact((s) => ({ ...s, phone: e.target.value }))}
+        />
+      </Stack>
+      <Divider sx={{ my: 1.5 }} />
+      <Stack direction="row" spacing={1}>
+        <Button
+          variant="outlined"
+          onClick={() => setStep(1)}
+          sx={{ textTransform: "none" }}
+          fullWidth
+        >
+          Back
+        </Button>
+        <Button
+          variant="contained"
+          onClick={() => setStep(3)}
+          sx={{ textTransform: "none", fontWeight: 800 }}
+          fullWidth
+        >
+          Continue
+        </Button>
+      </Stack>
+    </Paper>
+  );
+
+  const StepThree = (
+    <Stack spacing={1.5}>
+      {/* Order Summary (read-only) */}
       <Paper
         elevation={0}
         sx={{
@@ -989,13 +638,314 @@ export default function Checkout() {
           border: "1px solid",
           borderColor: "divider",
           bgcolor: "#fff",
-          mt: 2,
         }}
       >
-        <Typography variant="caption" color="text.secondary">
-          Role: {roleHint}. This checkout shows UPI QR (if configured) and submits e‑coupon orders, promo purchases, and product requests together.
+        <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+          Review & Payment
         </Typography>
+
+        {items.length === 0 ? (
+          <Alert severity="info">No items in cart.</Alert>
+        ) : (
+          <Stack spacing={1}>
+            {items.map((it) => (
+              <OrderSummaryCard key={it.key} it={it} />
+            ))}
+          </Stack>
+        )}
+
+        <Divider sx={{ my: 1.5 }} />
+        <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Typography variant="body2" color="text.secondary">
+            Total amount
+          </Typography>
+          <Typography variant="h6" sx={{ fontWeight: 800 }}>
+            ₹{Number(total).toLocaleString("en-IN")}
+          </Typography>
+        </Stack>
       </Paper>
+
+      {/* Payment method and details (ecoupon / manual UPI) */}
+      <Paper
+        elevation={0}
+        sx={{
+          p: 2,
+          borderRadius: 2,
+          border: "1px solid",
+          borderColor: "divider",
+          bgcolor: "#fff",
+        }}
+      >
+        {loading ? (
+          <Box sx={{ py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+            <CircularProgress size={18} />
+            <Typography variant="body2">Loading payment config...</Typography>
+          </Box>
+        ) : null}
+
+        <FormControl component="fieldset" size="small" sx={{ mb: 1 }}>
+          <FormLabel component="legend">Payment Method</FormLabel>
+          <RadioGroup
+            row
+            value={paymentMethod}
+            onChange={(e) => setPaymentMethod(e.target.value)}
+          >
+            <FormControlLabel
+              value="MANUAL"
+              control={<Radio size="small" />}
+              label="Manual (UPI)"
+            />
+            <FormControlLabel
+              value="ONLINE"
+              control={<Radio size="small" />}
+              label="Online"
+              disabled
+            />
+          </RadioGroup>
+        </FormControl>
+
+        {payment ? (
+          <Box sx={{ mb: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              Payee
+            </Typography>
+            <div style={{ fontWeight: 800 }}>{payment.payee_name || "—"}</div>
+            <Typography variant="caption" color="text.secondary">
+              UPI ID
+            </Typography>
+            <div style={{ fontWeight: 800 }}>{payment.upi_id || "—"}</div>
+            <Typography variant="caption" color="text.secondary">
+              Instructions
+            </Typography>
+            <Box sx={{ whiteSpace: "pre-wrap" }}>
+              {payment.instructions ||
+                "Scan the QR or pay to the UPI ID, then provide UTR and optionally upload payment proof."}
+            </Box>
+          </Box>
+        ) : (
+          <Alert severity="warning" sx={{ mb: 1 }}>
+            Payments are temporarily unavailable or not configured for e‑coupons.
+          </Alert>
+        )}
+
+        <Stack spacing={1.5}>
+          <TextField
+            size="small"
+            label="UTR (optional)"
+            fullWidth
+            value={ecouponPayment.utr}
+            onChange={(e) =>
+              setEcouponPayment((s) => ({ ...s, utr: e.target.value }))
+            }
+          />
+          <TextField
+            size="small"
+            label="Notes (optional)"
+            fullWidth
+            value={ecouponPayment.notes}
+            onChange={(e) =>
+              setEcouponPayment((s) => ({ ...s, notes: e.target.value }))
+            }
+          />
+          <Button
+            variant="outlined"
+            size="small"
+            component="label"
+            sx={{ alignSelf: "flex-start" }}
+          >
+            {ecouponPayment.file
+              ? "Change Payment Proof"
+              : "Attach Payment Proof (optional)"}
+            <input
+              type="file"
+              hidden
+              accept="image/*,application/pdf"
+              onChange={(e) =>
+                setEcouponPayment((s) => ({
+                  ...s,
+                  file:
+                    e.target.files && e.target.files[0]
+                      ? e.target.files[0]
+                      : null,
+                }))
+              }
+            />
+          </Button>
+          {ecouponPayment.file ? (
+            <Typography variant="caption">{ecouponPayment.file.name}</Typography>
+          ) : null}
+        </Stack>
+      </Paper>
+
+      {/* Product payment + rewards */}
+      {grouped.PRODUCT.length > 0 ? (
+        <Paper
+          elevation={0}
+          sx={{
+            p: 2,
+            borderRadius: 2,
+            border: "1px solid",
+            borderColor: "divider",
+            bgcolor: "#fff",
+          }}
+        >
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            Product Payment
+          </Typography>
+          <FormControl component="fieldset" size="small" sx={{ mb: 1 }}>
+            <FormLabel component="legend">Payment Method</FormLabel>
+            <RadioGroup
+              row
+              value={productPayMethod}
+              onChange={(e) => setProductPayMethod(e.target.value)}
+            >
+              <FormControlLabel
+                value="wallet"
+                control={<Radio size="small" />}
+                label="Wallet"
+              />
+              <FormControlLabel
+                value="cash"
+                control={<Radio size="small" />}
+                label="Cash"
+              />
+            </RadioGroup>
+          </FormControl>
+
+          <Box
+            sx={{
+              mt: 1,
+              p: 1.5,
+              borderRadius: 1.5,
+              border: "1px dashed",
+              borderColor: "divider",
+              bgcolor: "#fafafa",
+            }}
+          >
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              Redeem Reward Points (eligible products only)
+            </Typography>
+            <Stack spacing={1}>
+              <Stack direction="row" justifyContent="space-between">
+                <Typography variant="caption" color="text.secondary">
+                  Available
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                  ₹{Number(availablePoints).toLocaleString("en-IN")}
+                </Typography>
+              </Stack>
+              <Stack direction="row" justifyContent="space-between">
+                <Typography variant="caption" color="text.secondary">
+                  Max this order (cap)
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                  ₹{Number(orderRewardCap).toLocaleString("en-IN")}
+                </Typography>
+              </Stack>
+              <TextField
+                size="small"
+                label={`Redeem amount (₹, max ₹${Number(
+                  redeemMax
+                ).toLocaleString("en-IN")})`}
+                type="number"
+                inputProps={{
+                  min: 0,
+                  max: Math.max(0, Math.floor(redeemMax * 100) / 100),
+                  step: "0.50",
+                }}
+                value={redeemUse}
+                onChange={(e) => {
+                  const v = Number(e.target.value || 0);
+                  if (!isFinite(v) || v < 0) return setRedeemUse(0);
+                  if (v > redeemMax) return setRedeemUse(redeemMax);
+                  setRedeemUse(v);
+                }}
+                fullWidth
+              />
+              <Stack direction="row" justifyContent="space-between">
+                <Typography variant="body2">Payable</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                  ₹
+                  {Math.max(0, Number(total) - Number(redeemUse)).toLocaleString(
+                    "en-IN"
+                  )}
+                </Typography>
+              </Stack>
+              {redeemUse > 0 && productPayMethod === "cash" ? (
+                <Typography variant="caption" color="text.secondary">
+                  Note: For cash method, discount will be recorded with your
+                  request; no wallet debit is performed online.
+                </Typography>
+              ) : null}
+            </Stack>
+          </Box>
+        </Paper>
+      ) : null}
+
+      <Stack direction="row" spacing={1}>
+        <Button
+          variant="outlined"
+          onClick={() => setStep(2)}
+          sx={{ textTransform: "none" }}
+          fullWidth
+        >
+          Back
+        </Button>
+        <Button
+          variant="contained"
+          onClick={checkout}
+          disabled={checkingOut || items.length === 0}
+          sx={{ textTransform: "none", fontWeight: 800 }}
+          fullWidth
+        >
+          {checkingOut ? "Submitting..." : "Continue to Payment"}
+        </Button>
+      </Stack>
+    </Stack>
+  );
+
+  return (
+    <Box sx={{ p: 2, pb: 2 }}>
+      <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>
+        Checkout
+      </Typography>
+
+      {items.length === 0 ? (
+        <Alert
+          severity="info"
+          action={
+            <Button
+              size="small"
+              onClick={() => {
+                const p = window.location.pathname;
+                if (p.startsWith("/agency")) navigate("/agency/cart");
+                else if (p.startsWith("/employee")) navigate("/employee/cart");
+                else navigate("/user/cart");
+              }}
+            >
+              Go to Cart
+            </Button>
+          }
+        >
+          Cart is empty. Add items from store pages.
+        </Alert>
+      ) : (
+        <>
+          <Stepper activeStep={step - 1} alternativeLabel sx={{ mb: 2 }}>
+            {["Address", "Contact", "Review"].map((label) => (
+              <Step key={label}>
+                <StepLabel>{label}</StepLabel>
+              </Step>
+            ))}
+          </Stepper>
+
+          <Stack spacing={1.5}>
+            {step === 1 ? StepOne : null}
+            {step === 2 ? StepTwo : null}
+            {step === 3 ? StepThree : null}
+          </Stack>
+        </>
+      )}
     </Box>
   );
 }

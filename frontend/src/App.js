@@ -80,6 +80,7 @@ import AdminRewardPoints from "./pages/admin/AdminRewardPoints";
 import Cart from "./pages/Cart";
 import CheckoutV2 from "./pages/CheckoutV2";
 import CheckoutSuccess from "./pages/CheckoutSuccess";
+import Payment from "./pages/Payment";
 import RegisterV2 from "./pages/Auth/RegisterV2";
 import MyOrdersAll from "./pages/MyOrdersAll";
 import TriAppPage from "./pages/TriAppPage";
@@ -96,6 +97,18 @@ import AgencyPrimeApproval from "./pages/agency/AgencyPrimeApproval";
 import AgencyWallet from "./pages/agency/AgencyWallet";
 import UserDashboardV2 from "./pages/UserDashboardV2";
 import UserDashboard2Shell from "./pages/v2/UserDashboard2Shell";
+import HomeV2 from "./pages/v2/HomeV2";
+import LoginV2 from "./pages/v2/Auth/LoginV2";
+import RegisterV2V2 from "./pages/v2/Auth/RegisterV2";
+import AboutV2 from "./pages/v2/AboutV2";
+import PrivacyV2 from "./pages/v2/PrivacyV2";
+import TermsV2 from "./pages/v2/TermsV2";
+import ContactV2 from "./pages/v2/ContactV2";
+import "./css/bms-home.css";
+import UserApp from "./pages/UserApp";
+import AboutPage from "./pages/AboutPage";
+import PrimePage from "./pages/PrimePage";
+import BusinessPage from "./pages/BusinessPage";
 
 function LegacyAuthEntry() {
   const location = useLocation();
@@ -122,8 +135,14 @@ function App() {
       <LoadingOverlay />
       <Routes>
         {/* Public Routes */}
-        
+
+
+        <Route path="/v4/home" element={<UserApp />} />
+       
         <Route path="/" element={<HomeScreen/>} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/prime" element={<PrimePage />} />
+        <Route path="/business" element={<BusinessPage />} />
         <Route path="/auth/select" element={<RoleSelect />} />
         <Route path="/login" element={<LegacyAuthEntry />} />
         <Route path="/register" element={<EnhancedLogin />} />
@@ -135,6 +154,14 @@ function App() {
         <Route path="/auth/register" element={<EnhancedLogin />} />
         <Route path="/auth/register-v2" element={<RegisterV2 />} />
         <Route path="/auth/register-v2/:role" element={<RegisterV2 />} />
+        {/* V2 public routes */}
+        <Route path="/v2/home" element={<HomeV2 />} />
+        <Route path="/v2/about" element={<AboutV2 />} />
+        <Route path="/v2/privacy" element={<PrivacyV2 />} />
+        <Route path="/v2/terms" element={<TermsV2 />} />
+        <Route path="/v2/contact" element={<ContactV2 />} />
+        <Route path="/v2/login/:role" element={<LoginV2 />} />
+        <Route path="/v2/register/:role" element={<RegisterV2V2 />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/impersonate" element={<ImpersonateLanding />} />
         <Route path="/agency/impersonate" element={<ImpersonateLanding />} />
@@ -316,6 +343,16 @@ function App() {
             <ProtectedRoute allowedRoles={["user"]}>
               <ConsumerShell>
                 <CheckoutSuccess />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/payment"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <Payment />
               </ConsumerShell>
             </ProtectedRoute>
           }
@@ -518,6 +555,16 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/agency/payment"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <Payment />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/agency/banners"
@@ -654,6 +701,16 @@ function App() {
             <ProtectedRoute allowedRoles={["employee"]}>
               <EmployeeShell>
                 <CheckoutSuccess />
+              </EmployeeShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee/payment"
+          element={
+            <ProtectedRoute allowedRoles={["employee"]}>
+              <EmployeeShell>
+                <Payment />
               </EmployeeShell>
             </ProtectedRoute>
           }
