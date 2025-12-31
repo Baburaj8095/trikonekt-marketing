@@ -51,7 +51,8 @@ export default function ECouponStore() {
 
   const [denomFilter, setDenomFilter] = useState("all");
   const [denomOptions, setDenomOptions] = useState([]);
-  const [availByDenom, setAvailByDenom] = useState({});
+  const [storeAvailByDenom, setStoreAvailByDenom] = useState({});
+  const [myPoolAvailByDenom, setMyPoolAvailByDenom] = useState({});
 
   // Normalize denomination to a stable string key, e.g., 150.00 -> "150"
   function denomKey(v) {
@@ -129,7 +130,8 @@ export default function ECouponStore() {
       setPriceRange([minP, maxP]);
 
       // Availability summary per denomination (server count)
-      await computeAvailabilities(denoms);
+      await computeStoreAvailabilities(denoms);
+      await computeMyPoolAvailabilities(denoms);
     } catch (e) {
       const msg = e?.response?.data?.detail || "Failed to load store.";
       setError(msg);
@@ -176,9 +178,8 @@ export default function ECouponStore() {
     }
   }
 
-  async function computeAvailabilities(denoms = []) {
+  async function computeStoreAvailabilities(denoms = []) {
     try {
-      // Show GLOBAL availability for store: codes that are AVAILABLE and not assigned/sold/redeemed
       const entries = await Promise.all(
         (denoms || []).map(async (d) => {
           const cnt = await fetchCount({ issued_channel: "e_coupon", status: "AVAILABLE", value: d });
@@ -187,7 +188,30 @@ export default function ECouponStore() {
       );
       const map = {};
       for (const [k, v] of entries) map[k] = v;
-      setAvailByDenom(map);
+      setStoreAvailByDenom(map);
+    } catch {}
+  }
+
+  async function computeMyPoolAvailabilities(denoms = []) {
+    try {
+      let statusIn = null;
+      if (roleHint === "agency") statusIn = "ASSIGNED_AGENCY";
+      else if (roleHint === "employee") statusIn = "ASSIGNED_EMPLOYEE";
+
+      if (!statusIn) {
+        setMyPoolAvailByDenom({});
+        return;
+      }
+
+      const entries = await Promise.all(
+        (denoms || []).map(async (d) => {
+          const cnt = await fetchCount({ status: statusIn, value: d });
+          return [String(d), cnt];
+        })
+      );
+      const map = {};
+      for (const [k, v] of entries) map[k] = v;
+      setMyPoolAvailByDenom(map);
     } catch {}
   }
 
@@ -261,7 +285,7 @@ export default function ECouponStore() {
     const assigned = Number(res?.assigned || 0);
     const after = Number(res?.available_after || 0);
     const samples = Array.isArray(res?.sample_codes) ? res.sample_codes : [];
-    try { await computeAvailabilities(denomOptions.filter((d) => d !== "all")); } catch {}
+    try { await computeMyPoolAvailabilities(denomOptions.filter((d) => d !== "all")); } catch {}
     return { message: `Assigned ${assigned}${body.value ? ` (₹${body.value})` : ""}. Remaining in your pool: ${after}. Samples: ${samples.join(", ")}` };
   };
 
@@ -279,7 +303,7 @@ export default function ECouponStore() {
     const assigned = Number(res?.assigned || 0);
     const after = Number(res?.available_after || 0);
     const samples = Array.isArray(res?.sample_codes) ? res.sample_codes : [];
-    try { await computeAvailabilities(denomOptions.filter((d) => d !== "all")); } catch {}
+    try { await computeMyPoolAvailabilities(denomOptions.filter((d) => d !== "all")); } catch {}
     return { message: `Assigned ${assigned}${body.value ? ` (₹${body.value})` : ""} to ${username}. Remaining in agency pool: ${after}. Samples: ${samples.join(", ")}` };
   };
 
@@ -360,7 +384,7 @@ export default function ECouponStore() {
               <Grid item xs={12} sm={6} md={4} lg={3} key={p.id}>
                 <ECouponProductCard
                   product={p}
-                  available={availByDenom[denomKey(p.denomination)]}
+                  available={storeAvailByDenom[denomKey(p.denomination)]}
                   onAddToCart={(pid, qty) => addToCart(pid, qty)}
                 />
               </Grid>
@@ -382,7 +406,7 @@ export default function ECouponStore() {
               variant="consumer"
               onSubmit={onAssignConsumer}
               denomOptions={denomOptions.filter((d) => d !== "all")}
-              availByDenom={availByDenom}
+              availByDenom={myPoolAvailByDenom}
               hideZeroDenoms={false}
             />
           </AccordionDetails>
@@ -401,7 +425,7 @@ export default function ECouponStore() {
               variant="employee"
               onSubmit={onAssignEmployee}
               denomOptions={denomOptions.filter((d) => d !== "all")}
-              availByDenom={availByDenom}
+              availByDenom={myPoolAvailByDenom}
               hideZeroDenoms={false}
             />
           </AccordionDetails>

@@ -1113,64 +1113,7 @@ export default function UserDashboard({ embedded = false }) {
           </Box>
         )}
 
-        {/* <PrimeSection /> */}
-
-        {/* ================= Prime Membership ================= */}
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 1.5,
-              p: 1.5,
-              borderRadius: 2,
-              background: "linear-gradient(135deg, #fff7e6, #fff1cc)",
-              border: "1px solid #f5d58d"
-            }}
-          >
-            {/* Prime Icon */}
-            <Box
-              sx={{
-                width: 36,
-                height: 36,
-                borderRadius: "50%",
-                background: "linear-gradient(135deg, #facc15, #f59e0b)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#fff",
-                fontWeight: 800,
-                fontSize: 16,
-                flexShrink: 0
-              }}
-            >
-              ★
-            </Box>
-
-            {/* Prime Text */}
-            <Box sx={{ flex: 1 }}>
-              <Typography fontWeight={700} fontSize={14}>
-                Prime Member
-              </Typography>
-              <Typography fontSize={12} color="text.secondary">
-                Enjoy extra rewards & exclusive benefits
-              </Typography>
-            </Box>
-
-            {/* Status */}
-            <Box
-              sx={{
-                fontSize: 11,
-                fontWeight: 700,
-                px: 1,
-                py: 0.5,
-                borderRadius: 1,
-                backgroundColor: "#16a34a",
-                color: "#fff"
-              }}
-            >
-              ACTIVE
-            </Box>
-          </Box>
+        <PrimeSection />
 
 
         {/* ================= Bills & Recharge ================= */}
