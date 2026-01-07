@@ -276,7 +276,7 @@ export default function UserDashboard({ embedded = false }) {
       </AppBar> */}
 
       {/* CONTENT */}
-      <Box pb={3}>
+      <Box px={2} pb={3}>
         {/* HERO */}
         <Box mt={2}>
           <SmartImage type="hero" src={heroSrc} />
