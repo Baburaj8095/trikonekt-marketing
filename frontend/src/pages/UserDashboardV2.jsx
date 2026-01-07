@@ -20,8 +20,8 @@ import {
   Tab,
   Chip,
   Paper,
-  InputBase,
   Avatar,
+  Badge,
 } from "@mui/material";
 import API, { listMyPromoPurchases, listHeroBanners, listPromotions, listCategoryBanners } from "../api/api";
 import LOGO from "../assets/TRIKONEKT.png";
@@ -39,7 +39,7 @@ import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import MenuIcon from "@mui/icons-material/Menu";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-// App tiles icons (original set preserved)
+import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
 import CardGiftcardIcon from "@mui/icons-material/CardGiftcard";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
@@ -53,73 +53,16 @@ import StorefrontIcon from "@mui/icons-material/Storefront";
 import ElectricCarIcon from "@mui/icons-material/ElectricCar";
 import StarIcon from "@mui/icons-material/Star";
 import GroupsIcon from "@mui/icons-material/Groups";
-import NotificationsNoneIcon from "@mui/icons-material/NotificationsNone";
 
 import AppHub from "./AppHub";
 import WealthGalaxy from "./WealthGalaxy";
 import AppsGrid from "../components/AppsGrid";
 import EBooks from "./EBooks";
-import ElectronicsSection from "../components/ElectronicsSection";
-
-
-// ================= GLOBAL IMAGE ENFORCER (ADDED) =================
-/* ---------------- IMAGE ENFORCER ---------------- */
-function SmartImage({ src, alt = "", variant = "product", type, sx, ...rest }) {
-  // Support both `variant` and legacy `type` prop.
-  const key = type || variant || "product";
-
-  const MAP = {
-    product: { ratio: "4 / 3", fit: "contain", bg: "#ffffff" },
-    hero: { ratio: "16 / 9", fit: "cover", bg: "#f8fafc" },
-    banner: { ratio: "3 / 1", fit: "cover", bg: "#f8fafc" },
-    icon: { ratio: "1 / 1", fit: "contain", bg: "#ffffff" },
-    // Extra keys used across dashboard
-    electronics: { ratio: "4 / 3", fit: "contain", bg: "#ffffff" },
-    furniture: { ratio: "4 / 3", fit: "contain", bg: "#ffffff" },
-    ev: { ratio: "16 / 9", fit: "contain", bg: "#ffffff" }
-  };
-
-  const cfg = MAP[key] || MAP.product;
-
-  return (
-    <Box
-      sx={{
-        width: "100%",
-        aspectRatio: cfg?.ratio || "4 / 3",
-        backgroundColor: cfg?.bg || "#ffffff",
-        border: "1px solid #e5e7eb",
-        borderRadius: key === "icon" ? 2 : 0,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        overflow: "hidden",
-        ...sx
-      }}
-      {...rest}
-    >
-      {src ? (
-        <Box
-          component="img"
-          src={src}
-          alt={alt}
-          loading="lazy"
-          onError={(e) => {
-            e.currentTarget.style.display = "none";
-          }}
-          sx={{
-            width: "100%",
-            height: "100%",
-            objectFit: cfg?.fit || "contain"
-          }}
-        />
-      ) : null}
-    </Box>
-  );
-}
-
-
-
-
+import AppIconTile from "../components/AppIconTile";
+import SmartImage from "../components/SmartImage";
+import { useCartStore } from "../store/cartStore";
+import HorizontalSection from "../components/primitives/HorizontalSection";
+import HorizontalProductCard from "../components/HorizontalProductCard";
 
 const drawerWidth = 220;
 
@@ -177,7 +120,6 @@ export default function UserDashboard({ embedded = false }) {
     navigate("/", { replace: true });
   };
 
-  // Load admin-managed cards (for marketplace section)
   useEffect(() => {
     let isMounted = true;
     async function fetchCards() {
@@ -198,7 +140,6 @@ export default function UserDashboard({ embedded = false }) {
     };
   }, [storedRole]);
 
-  // Promo package purchase ticks (for header chip only)
   const [purchasedPrime150, setPurchasedPrime150] = useState(false);
   const [purchasedPrime750, setPurchasedPrime750] = useState(false);
   const [purchasedMonthly, setPurchasedMonthly] = useState(false);
@@ -243,7 +184,6 @@ export default function UserDashboard({ embedded = false }) {
 
   const MEDIA_BASE = (API?.defaults?.baseURL || "").replace(/\/api\/?$/, "");
 
-  // Admin-managed media state (hero carousel, promotions, category banners)
   const [heroBannersAdmin, setHeroBannersAdmin] = useState([]);
   const [promotionsAdmin, setPromotionsAdmin] = useState({});
   const [categoryBannersAdmin, setCategoryBannersAdmin] = useState({});
@@ -251,7 +191,6 @@ export default function UserDashboard({ embedded = false }) {
   useEffect(() => {
     let alive = true;
     (async () => {
-      // Hero banners (max 3 on client; server returns all active ordered)
       try {
         const hb = await listHeroBanners();
         const arr = Array.isArray(hb) ? hb : (hb?.results || []);
@@ -265,7 +204,6 @@ export default function UserDashboard({ embedded = false }) {
         }
       } catch (_) {}
 
-      // Promotions: prime, tri-spinwin
       try {
         const res = await listPromotions({ params: { keys: "prime,tri-spinwin" } });
         const arr = Array.isArray(res) ? res : (res?.results || []);
@@ -277,7 +215,6 @@ export default function UserDashboard({ embedded = false }) {
         if (alive) setPromotionsAdmin(map);
       } catch (_) {}
 
-      // Category banners: tri-electronics, tri-furniture, tri-ev
       try {
         const res = await listCategoryBanners({ params: { keys: "tri-electronics,tri-furniture,tri-ev" } });
         const arr = Array.isArray(res) ? res : (res?.results || []);
@@ -292,7 +229,6 @@ export default function UserDashboard({ embedded = false }) {
     return () => { alive = false; };
   }, []);
 
-  // Marketplace card wrapper (kept from original design; style-only tweaks)
   function MarketplaceCard({ title, children, variant = "plain", defaultExpanded = true, onViewMarketplace }) {
     const [expanded, setExpanded] = useState(Boolean(defaultExpanded));
     const headerStyles =
@@ -355,7 +291,6 @@ export default function UserDashboard({ embedded = false }) {
     );
   }
 
-  // Admin-managed cards renderer (content preserved; visual polish only)
   const renderMarketplaceContent = () =>
     loading ? (
       <Typography variant="body1" sx={{ color: "text.secondary" }}>
@@ -404,7 +339,7 @@ export default function UserDashboard({ embedded = false }) {
                   <SmartImage
                     src={card.image?.startsWith("http") ? card.image : `${MEDIA_BASE}${card.image}`}
                     alt={card.title}
-                    variant="banner"
+                    type="banner"
                   />
                 )}
 
@@ -422,7 +357,6 @@ export default function UserDashboard({ embedded = false }) {
       </Grid>
     );
 
-  // Apps grid items (original content preserved)
   const appItems = useMemo(
     () => [
       { key: "genealogy", label: "Genealogy", icon: GroupsIcon, route: "/user/my-team", image: LOGO },
@@ -433,11 +367,11 @@ export default function UserDashboard({ embedded = false }) {
       { key: "ecommerce", label: "E‑commerce", icon: ShoppingCartIcon, route: "/trikonekt-products", image: imgEcommerce },
       { key: "tri-holidays", label: "TRI Holidays", icon: BeachAccessIcon, route: "/user/tri/tri-holidays", image: imgHolidays },
       { key: "tri-furniture", label: "TRI Furniture", icon: WeekendIcon, route: "/user/tri/tri-furniture", image: imgFurniture },
-      { key: "tri-electronics", label: "TRI Electronics & Home Appliances", icon: DevicesOtherIcon, route: "/user/tri/tri-electronics", image: imgPlaystoreScreen },
+      { key: "tri-electronics", label: "TRI Electronics", icon: DevicesOtherIcon, route: "/user/tri/tri-electronics", image: imgPlaystoreScreen },
       { key: "tri-properties", label: "TRI Properties", icon: HomeWorkIcon, route: "/user/tri/tri-properties", image: imgProperties },
       { key: "tri-spinwin", label: "TRI Spin & Win", icon: CasinoIcon, route: "/user/lucky-draw", image: imgSpinWin },
       { key: "tri-saving", label: "TRI Saving App", icon: SavingsIcon, route: "/user/tri/tri-saving", image: LOGO },
-      { key: "tri-local-store", label: "Local Store", icon: StorefrontIcon, route: "/user/tri/tri-local-store", image: imgGiftCards },
+      { key: "tri-local-store", label: "TRI Local Store", icon: StorefrontIcon, route: "/user/tri/tri-local-store", image: imgGiftCards },
       { key: "tri-ev", label: "TRI EV Vehicles", icon: ElectricCarIcon, route: "/user/tri/tri-ev", image: imgEV },
     ],
     []
@@ -460,7 +394,6 @@ export default function UserDashboard({ embedded = false }) {
     [appItems, isPrime]
   );
 
-  // Override images with admin-managed ones when available (no layout change)
   const appItemsFinal = useMemo(
     () =>
       appItemsWithBadge.map((it) => {
@@ -474,7 +407,6 @@ export default function UserDashboard({ embedded = false }) {
     [appItemsWithBadge, promotionsAdmin, categoryBannersAdmin]
   );
 
-  // HERO CAROUSEL (prefers admin banners; fallback to asset images)
   const heroBanners = useMemo(() => {
     const admin = (heroBannersAdmin || []).filter(Boolean);
     if (admin.length) return admin.slice(0, 3);
@@ -482,82 +414,87 @@ export default function UserDashboard({ embedded = false }) {
   }, [heroBannersAdmin]);
 
   function HeroCarousel({ banners = [] }) {
-  const [idx, setIdx] = useState(0);
+    const [idx, setIdx] = useState(0);
 
-  useEffect(() => {
-    if (!banners.length) return;
-    const id = setInterval(() => {
-      setIdx((p) => (p + 1) % banners.length);
-    }, 5000);
-    return () => clearInterval(id);
-  }, [banners.length]);
+    useEffect(() => {
+      if (!banners.length) return;
+      const id = setInterval(() => {
+        setIdx((p) => (p + 1) % banners.length);
+      }, 5000);
+      return () => clearInterval(id);
+    }, [banners.length]);
 
-  if (!banners.length) return null;
+    if (!banners.length) return null;
 
-  return (
-    <Box
-      sx={{
-        position: "relative",
-        width: "100%",
-        height: { xs: 170, sm: 220 },
-        borderRadius: "12px",
-        overflow: "hidden",
-        mb: 2,
-        backgroundColor: "#eef2f7",
-      }}
-    >
-      {banners.map((src, i) => (
-        <Box
-          key={i}
-          sx={{
-            position: "absolute",
-            inset: 0,
-            opacity: i === idx ? 1 : 0,
-            transition: "opacity 300ms ease",
-          }}
-        >
-          <img
-            src={src}
-            alt={`Banner ${i + 1}`}
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-            }}
-          />
-        </Box>
-      ))}
-
-      {/* DOTS */}
+    return (
+  <Box
+  sx={{
+    position: "relative",
+    width: "100%",
+    height: { xs: 150, sm: 190 },
+    borderRadius: 2,
+    overflow: "hidden",
+    mb: 2,
+    backgroundColor: "#ffffff",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
+  }}
+>
+    {banners.map((src, i) => (
       <Box
+        key={i}
         sx={{
           position: "absolute",
-          bottom: 10,
-          left: "50%",
-          transform: "translateX(-50%)",
-          display: "flex",
-          gap: 1,
+          inset: 0,
+          opacity: i === idx ? 1 : 0,
+          transition: "opacity 400ms ease",
         }}
       >
-        {banners.map((_, i) => (
-          <Box
-            key={i}
-            onClick={() => setIdx(i)}
-            sx={{
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              cursor: "pointer",
-              bgcolor: i === idx ? "#1976d2" : "rgba(255,255,255,0.7)",
-            }}
-          />
-        ))}
-      </Box>
-    </Box>
-  );
-}
+        <SmartImage
+  src={src}
+  alt={`Banner ${i + 1}`}
+  type="hero"
+  sx={{
+    width: "100%",
+    height: "100%",
+    objectFit: "contain",          // 🔑 CRITICAL FIX
+    backgroundColor: "#ffffff",    // Blinkit-style bright canvas
+    filter: "brightness(1.06) saturate(1.08)",
+  }}
+/>
 
-  // CATEGORY TILE (icon + label) — polished: equal size, unified icon style, consistent label alignment
+      </Box>
+    ))}
+
+    {/* Indicators */}
+    <Box
+      sx={{
+        position: "absolute",
+        bottom: 8,
+        left: "50%",
+        transform: "translateX(-50%)",
+        display: "flex",
+        gap: 0.75,
+      }}
+    >
+      {banners.map((_, i) => (
+        <Box
+          key={i}
+          onClick={() => setIdx(i)}
+          sx={{
+            width: 6,
+            height: 6,
+            borderRadius: "50%",
+            cursor: "pointer",
+            bgcolor: i === idx ? "#1976d2" : "rgba(255,255,255,0.9)",
+          }}
+        />
+      ))}
+    </Box>
+  </Box>
+);
+
+  }
+
   const CategoryTile = ({ item }) => (
     <Box
       onClick={() => item.route && navigate(item.route)}
@@ -587,18 +524,17 @@ export default function UserDashboard({ embedded = false }) {
           minHeight: 0,
         }}
       >
-        <Box
-          sx={{
-            width: 48,
-            height: 48,
-            borderRadius: 1.5,
-            bgcolor: "rgba(2,132,199,0.10)",
-            border: "none",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
+            <Box
+              sx={{
+                display: "grid",
+                gap: 2,
+                gridTemplateColumns: {
+                  xs: "repeat(4, 1fr)",
+                  sm: "repeat(6, 1fr)",
+                  md: "repeat(8, 1fr)"
+                }
+              }}
+            >
           {item.icon ? (
             <item.icon sx={{ fontSize: 34, color: "#0C2D48" }} />
           ) : (
@@ -631,48 +567,44 @@ export default function UserDashboard({ embedded = false }) {
     </Box>
   );
 
-  // PROMO CARD (horizontal + urgency)
- // PROMO CARD (FIXED – NO BACKGROUND IMAGES)
-const PromoCard = ({ item, flag }) => (
-  <Box
-    sx={{
-      position: "relative",
-      width: "calc(50% - 8px)",
-      minWidth: "calc(50% - 8px)",
-      maxWidth: "calc(50% - 8px)",
-      borderRadius: 2,
-      overflow: "hidden",
-      backgroundColor: "#fff",
-      scrollSnapAlign: "start",
-      boxShadow: "0 1px 4px rgba(15,23,42,0.08)"
-    }}
-  >
-    <Box sx={{ height: 110, overflow: "hidden", backgroundColor: "#f5f7fa" }}>
-      <Box
-        component="img"
-        src={item.image}
-        alt={item.label}
-        sx={{ width: "100%", height: "100%" }}
+  const PromoCard = ({ item, flag }) => (
+    <Box
+      sx={{
+        position: "relative",
+        width: "calc(50% - 8px)",
+        minWidth: "calc(50% - 8px)",
+        maxWidth: "calc(50% - 8px)",
+        borderRadius: 2,
+        overflow: "hidden",
+        backgroundColor: "#fff",
+        scrollSnapAlign: "start",
+        boxShadow: "0 1px 4px rgba(15,23,42,0.08)"
+      }}
+    >
+      <Box sx={{ height: 110, overflow: "hidden", backgroundColor: "#f5f7fa" }}>
+        <Box
+          component="img"
+          src={item.image}
+          alt={item.label}
+          sx={{ width: "100%", height: "100%" }}
+        />
+      </Box>
+
+      <Box sx={{ p: 1 }}>
+        <Typography fontSize={13} fontWeight={700} noWrap>
+          {item.label}
+        </Typography>
+      </Box>
+
+      <Chip
+        size="small"
+        label={flag}
+        color="error"
+        sx={{ position: "absolute", top: 8, left: 8 }}
       />
     </Box>
+  );
 
-    <Box sx={{ p: 1 }}>
-      <Typography fontSize={13} fontWeight={700} noWrap>
-        {item.label}
-      </Typography>
-    </Box>
-
-    <Chip
-      size="small"
-      label={flag}
-      color="error"
-      sx={{ position: "absolute", top: 8, left: 8 }}
-    />
-  </Box>
-);
-
-
-  // PRIME (single summary/upgrade card)
   function PrimeSection() {
     return (
       <Box
@@ -715,8 +647,6 @@ const PromoCard = ({ item, flag }) => (
     );
   }
 
-
-  // FEATURED LOGO (logo only)
   const FeaturedLogo = ({ data }) => (
     <Box
       onClick={data.onClick}
@@ -745,24 +675,142 @@ const PromoCard = ({ item, flag }) => (
     </Box>
   );
 
-  // PRODUCT ROW (horizontal product-like cards)
+  // Horizontal product card - Blinkit-style
+  function HorizontalProductCard({ title, image, rewardPct, onClick }) {
+    return (
+      <Box
+        onClick={onClick}
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 1.25,
+          p: 1,
+          border: "1px solid #e2e8f0",
+          borderRadius: "12px",
+          bgcolor: "#fff",
+          boxShadow: "0 1px 3px rgba(15,23,42,0.06)",
+          cursor: onClick ? "pointer" : "default",
+          maxHeight: 112,
+          width: "100%"
+        }}
+      >
+        <Box
+          sx={{
+            width: 80,
+            height: 80,
+            flex: "0 0 auto",
+            borderRadius: "8px",
+            bgcolor: "#f5f7fa",
+            overflow: "hidden"
+          }}
+        >
+          <SmartImage
+            src={image}
+            alt={title}
+            type="thumb"
+            sx={{ width: "100%", height: "100%", aspectRatio: "auto" }}
+          />
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography
+            sx={{
+              fontSize: 14,
+              fontWeight: 600,
+              lineHeight: 1.25,
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden"
+            }}
+          >
+            {title}
+          </Typography>
+          <Typography sx={{ fontSize: 12.5, color: "text.secondary", fontWeight: 500, mt: 0.5 }}>
+            {`Earn up to ${rewardPct}% rewards`}
+          </Typography>
+        </Box>
+      </Box>
+    );
+  }
+
+  // Compact feature card for Spin & Win using the same horizontal layout
+  function SpinWinFeatureCard({ image, onClick }) {
+    return (
+      <Box
+        onClick={onClick}
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 1.25,
+          p: 1,
+          border: "1px solid #e2e8f0",
+          borderRadius: "12px",
+          bgcolor: "#fff",
+          boxShadow: "0 1px 3px rgba(15,23,42,0.06)",
+          cursor: onClick ? "pointer" : "default",
+          maxHeight: 112,
+          width: "100%"
+        }}
+      >
+        <Box>
+  <Typography fontSize={18} fontWeight={700} mb={1}>
+    Spin & Win
+  </Typography>
+
+  <Box
+    onClick={() => promos[0]?.route && navigate(promos[0].route)}
+    sx={{
+      display: "flex",
+      alignItems: "center",
+      gap: 1,
+      cursor: "pointer",
+    }}
+  >
+    <Box
+      sx={{
+        width: 48,
+        height: 48,
+        bgcolor: "#f1f5f9",
+        flexShrink: 0,
+      }}
+    >
+      <SmartImage
+        src={promos[0]?.image}
+        alt="Spin & Win"
+        type="thumb"
+        sx={{ width: "100%", height: "100%" }}
+      />
+    </Box>
+
+    <Box>
+      <Typography fontSize={14.5} fontWeight={600}>
+        Spin & Win Rewards
+      </Typography>
+      <Typography fontSize={12.5} color="text.secondary">
+        Try your luck & earn rewards
+      </Typography>
+    </Box>
+  </Box>
+</Box>
+
+      </Box>
+    );
+  }
+
   function ProductRow({ title, item }) {
     if (!item) return null;
 
-    const imageType =
-      title === "Electronics" ? "electronics" :
-      title === "EV Vehicles" ? "ev" :
-      "furniture";
-
     const names =
       title === "Electronics"
-        ? ["Smart TV 4K", "Bluetooth Speaker"]
+        ? ["Smart 4K TV", "Bluetooth Speaker"]
         : title === "EV Vehicles"
         ? ["E‑Bike", "E‑Scooter"]
         : ["Modern Sofa", "Dining Set"];
 
     const reward =
-      title === "Electronics" ? "5%" : title === "EV Vehicles" ? "10%" : "7%";
+      title === "Electronics" ? "6%" : title === "EV Vehicles" ? "10%" : "7%";
+
+    const indices = [0, 1];
 
     return (
       <Box
@@ -771,12 +819,7 @@ const PromoCard = ({ item, flag }) => (
           bgcolor: "#fff",
           border: "1px solid #e2e8f0",
           boxShadow: "0px 1px 3px rgba(15,23,42,0.06)",
-          p: 1.25,
-          minWidth: "80%",
-          flex: "0 0 auto",
-          scrollSnapAlign: "start",
-          maxWidth: 340,
-
+          p: 1.25
         }}
       >
         <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
@@ -788,93 +831,58 @@ const PromoCard = ({ item, flag }) => (
           </Typography>
         </Box>
 
-        {title === "Electronics" ? (
-          <Grid container spacing={1.25}>
-            {[0].map((i) => (
-              <Grid key={i} item xs={6}>
-                <Card
-                  onClick={() => item.route && navigate(item.route)}
+        <Box
+          sx={{
+            display: "flex",
+            gap: 1.5,
+            overflowX: "auto",
+            overflowY: "hidden",
+            scrollSnapType: "x mandatory",
+            WebkitOverflowScrolling: "touch",
+            py: 0.5,
+            "&::-webkit-scrollbar": { display: "none" }
+          }}
+        >
+          {indices.map((i) => (
+            <Card
+              key={i}
+              onClick={() => item.route && navigate(item.route)}
+              sx={{
+                minWidth: "50%",
+                maxWidth: 360,
+                flex: "0 0 auto",
+                scrollSnapAlign: "start",
+                borderRadius: 1,
+                border: "1px solid #e5e7eb",
+                boxShadow: "0 1px 2px rgba(0,0,0,0.08)"
+              }}
+            >
+              <SmartImage src={item.image} alt={item.label} type="product" />
+              <Box sx={{ p: 1 }}>
+                <Typography
+                  fontSize={13}
+                  fontWeight={600}
+                  lineHeight={1.25}
                   sx={{
-                    height: "100%",
-                    cursor: item.route ? "pointer" : "default",
-                    borderRadius: 2,
-                    overflow: "hidden",
-                    backgroundColor: "#ffffff",
-                    border: "1px solid",
-                    borderColor: "divider",
-                    boxShadow: "0px 1px 3px rgba(15,23,42,0.06)",
-                    maxWidth: 340,
+                    display: "-webkit-box",
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden"
                   }}
                 >
-                  <SmartImage src={item.image} alt={item.label} type={imageType} />
-                  <Box sx={{ p: 1 }}>
-                    <Typography fontSize={13} fontWeight={700} noWrap>
-                      {names[i]}
-                    </Typography>
-                    <Typography fontSize={12} color="text.secondary" noWrap>
-                      Earn up to {reward} rewards
-                    </Typography>
-                    <Typography fontSize={12} color="primary" fontWeight={700} sx={{ mt: 0.25 }}>
-                      View →
-                    </Typography>
-                  </Box>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
-        ) : (
-          <Box
-            sx={{
-              display: "flex",
-              gap: 1.25,
-              overflowX: "auto",
-              overflowY: "hidden",
-              WebkitOverflowScrolling: "touch",
-              scrollSnapType: "x mandatory",
-              "&::-webkit-scrollbar": { display: "none" },
-            }}
-          >
-            {[0, 1].map((i) => (
-              <Card
-                key={i}
-                onClick={() => item.route && navigate(item.route)}
-                sx={{
-                  height: "100%",
-                  cursor: item.route ? "pointer" : "default",
-                  borderRadius: 2,
-                  overflow: "hidden",
-                  backgroundColor: "#ffffff",
-                  border: "1px solid",
-                  borderColor: "divider",
-                  boxShadow: "0px 1px 3px rgba(15,23,42,0.06)",
-                  flex: "0 0 auto",
-                  minWidth: "80%",
-                  scrollSnapAlign: "start",
-                }}
-              >
-                <Box sx={{ width: "100%", height: imageType === "ev" ? "160px" : "180px", overflow: "hidden" }}>
-                  <SmartImage src={item.image} alt={item.label} variant={imageType} fillHeight />
-                </Box>
-                <Box sx={{ p: 1 }}>
-                  <Typography fontSize={13} fontWeight={700} noWrap>
-                    {names[i]}
-                  </Typography>
-                  <Typography fontSize={12} color="text.secondary" noWrap>
-                    Earn up to {reward} rewards
-                  </Typography>
-                  <Typography fontSize={12} color="primary" fontWeight={700} sx={{ mt: 0.25 }}>
-                    View →
-                  </Typography>
-                </Box>
-              </Card>
-            ))}
-          </Box>
-        )}
+                  {names[i]}
+                </Typography>
+                <Typography fontSize={12} color="text.secondary">
+                  Earn up to {reward} rewards
+                </Typography>
+              </Box>
+            </Card>
+          ))}
+        </Box>
       </Box>
     );
   }
 
-  // SHOP PRODUCTS (merged Electronics, Furniture, EV into one)
   function ShopProductsSection() {
     const [active, setActive] = useState("electronics");
 
@@ -885,7 +893,6 @@ const PromoCard = ({ item, flag }) => (
     ];
 
     const findImageByKey = (k) => {
-      // appItemsFinal contains admin/banners overrides; keys are like 'tri-electronics'
       const it = (appItemsFinal || []).find((i) => i.key === `tri-${k}`);
       return it?.image;
     };
@@ -949,7 +956,7 @@ const PromoCard = ({ item, flag }) => (
         }}
       >
         <Box sx={{ position: "relative" }}>
-          <SmartImage src={item.image} alt={item.title} type={catKey === "ev" ? "ev" : catKey} />
+          <SmartImage src={item.image} alt={item.title} type="product" />
         </Box>
         <CardContent sx={{ p: 1 }}>
           <Typography fontSize={13} fontWeight={700} noWrap>
@@ -1011,7 +1018,6 @@ const PromoCard = ({ item, flag }) => (
     );
   }
 
-  // SERVICE ICON (icon-only)
   const ServiceIcon = ({ data }) => (
     <Box
       onClick={data.onClick}
@@ -1050,18 +1056,13 @@ const PromoCard = ({ item, flag }) => (
             .map((w) => w[0]?.toUpperCase())
             .join("")}
       </Avatar>
-      {/* Intentionally no visible label for icon-only requirement */}
     </Box>
   );
 
-  // DASHBOARD CONTENT (strict section order)
   function DashboardContent() {
-    // Map items by key
     const itemByKey = Object.fromEntries((appItemsFinal || []).map((i) => [i.key, i]));
     const pick = (keys) => keys.map((k) => itemByKey[k]).filter(Boolean);
 
-    // 1) HERO SECTION
-    // 2) PRIMARY ACTION ICON GRID (4x2) exact categories
     const categoryKeys = [
       "tri-electronics",
       "tri-furniture",
@@ -1074,11 +1075,9 @@ const PromoCard = ({ item, flag }) => (
     ];
     const categories = pick(categoryKeys);
 
-    // 3) DEALS & PROMOTIONS (horizontal)
     const promoKeys = ["tri-spinwin"];
     const promos = pick(promoKeys);
 
-    // 4) FEATURED STORES (logos only)
     const featured = [
       { label: "TRIKONEKT", image: LOGO, onClick: () => navigate("/trikonekt-products") },
       itemByKey["wealth-galaxy"]
@@ -1097,12 +1096,10 @@ const PromoCard = ({ item, flag }) => (
         : null,
     ].filter(Boolean);
 
-    // 5) PRODUCT SECTIONS (MAX 3): Electronics, Furniture, EV Vehicles
     const electronics = itemByKey["tri-electronics"];
     const furniture = itemByKey["tri-furniture"];
     const ev = itemByKey["tri-ev"];
 
-    // 6) SERVICES (LAST): App Hub, E‑Book, Saving App, Genealogy (icon-only)
     const services = [
       { label: "App Hub", onClick: () => setSelectedMenu("apphub") },
       { label: "E‑Book", onClick: () => setSelectedMenu("ebooks") },
@@ -1122,102 +1119,216 @@ const PromoCard = ({ item, flag }) => (
         : null,
     ].filter(Boolean);
 
+    const labelMap = {
+      "tri-electronics": "Electronics",
+      "tri-furniture": "Furniture",
+      "tri-ev": "EV",
+      "tri-local-store": "Local",
+      "gift-cards": "Gifts",
+      "bill-recharge": "Recharge",
+      "tri-properties": "Properties",
+      "tri-holidays": "Holidays",
+      prime: "Prime",
+    };
+
     return (
       <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        {/* 1. HERO */}
         <HeroCarousel banners={heroBanners} />
 
-        {/* 2. PRIMARY ACTION ICON LIST (horizontal) */}
         {categories.length > 0 && (
-          <Box
-            sx={{
-              borderRadius: 2,
-              bgcolor: "#fff",
-              border: "1px solid #e2e8f0",
-              p: 1.25,
-              boxShadow: "0px 1px 3px rgba(15,23,42,0.06)",
-            }}
-          >
-            <Typography variant="h6" sx={{ fontSize: 18, fontWeight: 700, mb: 1 }}>
-              Shop by Tri Categories
-            </Typography>
-            <Box
-              sx={{
-                display: "flex",
-                gap: 1,
-                overflowX: "auto",
-                pb: 0.5,
-                scrollSnapType: "x mandatory",
-                scrollBehavior: "smooth",
-                "&::-webkit-scrollbar": { display: "none" },
-              }}
-            >
-              {categories
-                .map((it) => {
-                  const labelMap = {
-                    "tri-electronics": "Electronics",
-                    "tri-furniture": "Furniture",
-                    "tri-ev": "EV",
-                    "tri-local-store": "Local",
-                    "gift-cards": "Gifts",
-                    "bill-recharge": "Recharge",
-                    "tri-properties": "Properties",
-                    "tri-holidays": "Holidays",
-                    prime: "Prime",
-                  };
-                  return { ...it, label: labelMap[it.key] || it.label };
-                })
-                .map((item) => (
-                  <Box key={item.key} sx={{ width: 96, scrollSnapAlign: "start" }}>
-                    <CategoryTile item={item} />
-                  </Box>
-                ))}
-            </Box>
-          </Box>
+          <Box>
+  <Typography fontSize={18} fontWeight={700} mb={1}>
+    Shop by Categories
+  </Typography>
+
+  <Box
+    sx={{
+      display: "grid",
+      gridTemplateColumns: "repeat(4, 1fr)",
+      rowGap: 1.5,   // 10px
+      columnGap: 1,   // 8px
+    }}
+  >
+    {categories.map((c) => (
+      <Box
+        key={c.key}
+        onClick={() => navigate(c.route)}
+        sx={{
+          textAlign: "center",
+          cursor: "pointer",
+        }}
+      >
+        <Box
+          sx={{
+            width: 48,
+            height: 48,
+            mx: "auto",
+            mb: 0.5,
+            borderRadius: 1,
+            backgroundColor: "#f1f5f9",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <img
+            src={c.image}
+            alt={c.label}
+            style={{ width: 28, height: 28, objectFit: "contain" }}
+          />
+        </Box>
+
+        <Typography
+          fontSize={12}
+          fontWeight={600}
+          lineHeight="13px"
+        >
+          {c.label}
+        </Typography>
+      </Box>
+    ))}
+  </Box>
+</Box>
+
         )}
 
-        {/* 3. DEALS & PROMOTIONS */}
         {promos.length > 0 && (
-          <Box
-            sx={{
-              borderRadius: 2,
-              bgcolor: "#fff",
-              border: "1px solid #e2e8f0",
-              p: 1.25,
-              boxShadow: "0px 1px 3px rgba(15,23,42,0.06)",
-            }}
-          >
-            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
-              <Typography variant="h6" sx={{ fontSize: 18, fontWeight: 700 }}>
-                Deals & Promotions
-              </Typography>
-              <Typography variant="body2" color="primary" sx={{ fontWeight: 600 }}>
-                View All
-              </Typography>
-            </Box>
+  <Box>
+    <Typography fontSize={18} fontWeight={700} mb={1}>
+      Spin & Win
+    </Typography>
+
+    <Box
+      onClick={() => promos[0]?.route && navigate(promos[0].route)}
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        gap: 1,
+        cursor: "pointer",
+      }}
+    >
+      <Box
+        sx={{
+          width: 56,
+          height: 56,
+          bgcolor: "#f1f5f9",
+          flexShrink: 0,
+        }}
+      >
+        <SmartImage
+          src={promos[0]?.image}
+          alt="Spin & Win"
+          type="thumb"
+          sx={{ width: "100%", height: "100%" }}
+        />
+      </Box>
+
+      <Box>
+        <Typography fontSize={15} fontWeight={600}>
+          Spin & Win Rewards
+        </Typography>
+        <Typography fontSize={13} color="text.secondary">
+          Try your luck & earn rewards
+        </Typography>
+      </Box>
+    </Box>
+  </Box>
+)}
+
+
+        <PrimeSection />
+
+
+        {/* ================= Bills & Recharge ================= */}
+          <Box sx={{ mt: 2 }}>
+            <Typography fontWeight={700} mb={1}>
+              Bills & Recharge
+            </Typography>
+
             <Box
               sx={{
                 display: "flex",
-                gap: 1.25,
+                gap: 1.5,
                 overflowX: "auto",
-                pb: 0.5,
-                scrollSnapType: "x mandatory",
-                "& > *": { scrollSnapAlign: "start" },
-                "&::-webkit-scrollbar": { display: "none" },
+                pb: 1,
+                "&::-webkit-scrollbar": { display: "none" }
               }}
             >
+              {[
+                {
+                  label: "Mobile",
+                  icon: "https://cdn-icons-png.flaticon.com/512/724/724664.png"
+                },
+                {
+                  label: "DTH",
+                  icon: "https://cdn-icons-png.flaticon.com/512/2920/2920329.png"
+                },
+                {
+                  label: "Electricity",
+                  icon: "https://cdn-icons-png.flaticon.com/512/481/481874.png"
+                },
+                {
+                  label: "Broadband",
+                  icon: "https://cdn-icons-png.flaticon.com/512/1048/1048943.png"
+                },
+                {
+                  label: "Gas",
+                  icon: "https://cdn-icons-png.flaticon.com/512/2903/2903622.png"
+                },
+                {
+                  label: "Water",
+                  icon: "https://cdn-icons-png.flaticon.com/512/4148/4148460.png"
+                },
+                {
+                  label: "More",
+                  icon: "https://cdn-icons-png.flaticon.com/512/1828/1828817.png"
+                }
+              ].map((item) => (
+                <Box
+                  key={item.label}
+                  sx={{
+                    flex: "0 0 auto",
+                    width: 72,
+                    textAlign: "center"
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 56,
+                      height: 56,
+                      mx: "auto",
+                      borderRadius: 2,
+                      bgcolor: "#ffffff",
+                      border: "1px solid #e5e7eb",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center"
+                    }}
+                  >
+                    <img
+                      src={item.icon}
+                      alt={item.label}
+                      style={{
+                        width: 28,
+                        height: 28,
+                        objectFit: "contain"
+                      }}
+                    />
+                  </Box>
 
-              {promos.map((item) => (
-                <PromoCard key={item.key} item={item} flag={item.key === "prime" ? "Ends soon" : "Limited time"} />
+                  <Typography
+                    fontSize={12}
+                    fontWeight={600}
+                    mt={0.75}
+                    noWrap
+                  >
+                    {item.label}
+                  </Typography>
+                </Box>
               ))}
             </Box>
           </Box>
-        )}
 
-        {/* PRIME */}
-        <PrimeSection />
-
-        {/* 4. FEATURED STORES (logos only) */}
         {featured.length > 0 && (
           <Box
             sx={{
@@ -1253,12 +1364,56 @@ const PromoCard = ({ item, flag }) => (
           </Box>
         )}
 
-        {/* 5. PRODUCT SECTIONS */}
-        <ElectronicsSection />
-        <ProductRow title="Furniture" item={furniture} />
-        <ProductRow title="EV Vehicles" item={ev} />
+        {electronics && (
+         
+          <HorizontalSection
+              title="Electronics"
+              items={["Smart 4K TV", "Bluetooth Speaker", "Air Conditioner"]}
+              onViewAll={() => electronics.route && navigate(electronics.route)}
+              renderItem={(name) => (
+              <HorizontalProductCard
+              title={name}
+              image={electronics.image}
+              rewardPct={6}
+              onClick={() => electronics.route && navigate(electronics.route)}
+          />
+          )}
+          />
+         
+        )}
 
-        {/* 6. SERVICES (icon-only) */}
+        {furniture && (
+          <HorizontalSection
+title="Furniture"
+items={["Modern Sofa", "Dining Set", "Wardrobe"]}
+onViewAll={() => furniture.route && navigate(furniture.route)}
+renderItem={(name) => (
+<HorizontalProductCard
+title={name}
+image={furniture.image}
+rewardPct={7}
+onClick={() => furniture.route && navigate(furniture.route)}
+/>
+)}
+/>
+        )}
+
+        {ev && (
+          <HorizontalSection
+title="EV"
+items={["E-Bike", "E-Scooter", "EV Charger"]}
+onViewAll={() => ev.route && navigate(ev.route)}
+renderItem={(name) => (
+<HorizontalProductCard
+title={name}
+image={ev.image}
+rewardPct={10}
+onClick={() => ev.route && navigate(ev.route)}
+/>
+)}
+/>
+        )}
+
         {services.length > 0 && (
           <Box
             sx={{
@@ -1285,36 +1440,13 @@ const PromoCard = ({ item, flag }) => (
     );
   }
 
+  // Cart count from existing Zustand store (UI-only usage)
+  const cartItems = useCartStore((s) => s.items);
+  const cartCount = Array.isArray(cartItems) ? cartItems.reduce((sum, i) => sum + (i.qty || 0), 0) : 0;
+
   if (embedded) {
     return (
       <Box sx={{ p: { xs: 2, md: 3 } }}>
-        {/* Top Navigation Tabs (embedded, unchanged) */}
-        {/* <Box
-          sx={{
-            borderRadius: "6px",
-            overflow: "hidden",
-            bgcolor: "#fff",
-            mb: 2,
-            border: "1px solid #e2e8f0",
-            boxShadow: "0px 1px 3px rgba(15,23,42,0.06)",
-            px: 1,
-            py: 0.5,
-          }}
-        >
-          <Tabs
-            value={selectedMenu}
-            onChange={(e, val) => setSelectedMenu(val)}
-            variant="scrollable"
-            allowScrollButtonsMobile
-            textColor="primary"
-            indicatorColor="primary"
-          >
-            <Tab label="Dashboard" value="dashboard" />
-            <Tab label="App Hub" value="apphub" />
-            <Tab label="E‑Book" value="ebooks" />
-          </Tabs>
-        </Box> */}
-
         {selectedMenu === "dashboard" ? (
           <DashboardContent />
         ) : selectedMenu === "wealth-galaxy" ? (
@@ -1345,36 +1477,40 @@ const PromoCard = ({ item, flag }) => (
 
   return (
     <Box sx={{ display: "flex", minHeight: "100vh", backgroundColor: "#f7f9fb", overflowX: "hidden", maxWidth: "100%", "&, *": { boxSizing: "border-box" } }}>
-      {/* App Top Bar (bug fix: remove undefined primary reference) */}
       <AppBar
         position="fixed"
         sx={{
           height: 56,
-          background: "linear-gradient(180deg,#0C2D48 0%, #145DA0 100%)",
+          bgcolor: "#131921",
           borderBottom: "1px solid rgba(0,0,0,0.06)",
         }}
       >
-        <Toolbar>
-          <IconButton color="inherit" edge="start" onClick={handleDrawerToggle} sx={{ mr: 1.5, display: { sm: "none" } }}>
-            <MenuIcon />
-          </IconButton>
+        <Toolbar sx={{ minHeight: 56, px: 1 }}>
+          <Box sx={{ display: "flex", alignItems: "center", width: 56 }}>
+            <IconButton color="inherit" edge="start" onClick={handleDrawerToggle} aria-label="Menu">
+              <MenuIcon />
+            </IconButton>
+          </Box>
 
-          <Box sx={{ position: "absolute", left: 56, right: 56, display: "flex", justifyContent: "center" }}>
-            <Typography variant="subtitle1" noWrap sx={{ fontWeight: 700, color: "#fff" }}>
-              <Box component="span" sx={{ fontWeight: 800 }}>Consumer</Box>
-              <Box component="span" sx={{ opacity: 0.85, ml: 0.75, fontWeight: 600 }}>Dashboard</Box>
+          <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", px: 1 }}>
+            <Typography variant="h6" sx={{ color: "#fff", fontWeight: 700, fontSize: 16 }} noWrap>
+              {displayName || "Consumer"}
             </Typography>
           </Box>
 
-          <Box sx={{ marginLeft: "auto" }}>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5, minWidth: 96 }}>
             <IconButton color="inherit" size="large" aria-label="Notifications">
-              <NotificationsNoneIcon />
+              <NotificationsNoneOutlinedIcon />
+            </IconButton>
+            <IconButton color="inherit" size="large" aria-label="Cart" onClick={() => navigate("/user/cart")}>
+              <Badge color="error" badgeContent={cartCount} showZero>
+                <ShoppingCartIcon />
+              </Badge>
             </IconButton>
           </Box>
         </Toolbar>
       </AppBar>
 
-      {/* Sidebar (mobile) */}
       <Drawer
         variant="temporary"
         open={mobileOpen}
@@ -1466,7 +1602,6 @@ const PromoCard = ({ item, flag }) => (
         </Box>
       </Drawer>
 
-      {/* Sidebar (desktop) */}
       <Drawer
         variant="permanent"
         sx={{
@@ -1540,11 +1675,10 @@ const PromoCard = ({ item, flag }) => (
               <ListItemText primary="Logout" />
             </ListItemButton>
           </List>
-          <Box sx={{ p: 2, color: "text.secondary", fontSize: 13 }}>{/* Footer note */}</Box>
+          <Box sx={{ p: 2, color: "text.secondary", fontSize: 13 }}></Box>
         </Box>
       </Drawer>
 
-      {/* Main Content */}
       <Box
         component="main"
         sx={{
@@ -1556,7 +1690,6 @@ const PromoCard = ({ item, flag }) => (
       >
         <Toolbar />
 
-        {/* Top Navigation Tabs (unchanged) */}
         <Box
           sx={{
             borderRadius: "6px",

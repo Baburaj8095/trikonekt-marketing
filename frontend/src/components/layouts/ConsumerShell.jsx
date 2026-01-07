@@ -66,11 +66,13 @@ export default function ConsumerShell({ children }) {
 
   return (
     <ShellBase
-      title="Consumer"
+      title={displayName}
       menu={menu}
       isActive={isActive}
       onLogout={onLogout}
       footerText={`Logged in as: ${displayName}`}
+      rootPaths={["/user/dashboard"]}
+      onBackFallbackPath="/user/dashboard"
     >
       {children}
     </ShellBase>

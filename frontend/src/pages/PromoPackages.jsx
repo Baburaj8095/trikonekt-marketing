@@ -73,6 +73,9 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
   const [copied, setCopied] = useState(false);
   const [payment, setPayment] = useState(null); // admin seeded payment config
   const [zoomOpen, setZoomOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorOpen, setErrorOpen] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
     let alive = true;
@@ -221,19 +224,34 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
           fullWidth
           variant="contained"
           sx={{ mt: 3, height: 52 }}
-          disabled={!txnId}
+          disabled={!txnId || submitting}
           onClick={async () => {
-            await createPromoPurchase({
-              package_id: data.pkg.id,
-              remarks: txnId,
-              file,
-              ...(data.purchasePayload || {}),
-            });
-            onClose();
-            onSuccess();
+            setSubmitting(true);
+            setErrorMsg("");
+            try {
+              await createPromoPurchase({
+                package_id: data.pkg.id,
+                remarks: txnId,
+                file,
+                ...(data.purchasePayload || {}),
+              });
+              onClose();
+              onSuccess();
+              setTxnId("");
+              setFile(null);
+            } catch (e) {
+              const msg =
+                e?.response?.data?.detail ||
+                e?.message ||
+                "Failed to submit payment. Please try again.";
+              setErrorMsg(msg);
+              setErrorOpen(true);
+            } finally {
+              setSubmitting(false);
+            }
           }}
         >
-          Submit Payment
+          {submitting ? "Submitting..." : "Submit Payment"}
         </Button>
 
         <Button fullWidth variant="text" sx={{ mt: 1 }} onClick={onClose}>
@@ -260,6 +278,16 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
         onClose={() => setCopied(false)}
         message="UPI ID copied"
       />
+      <Snackbar
+        open={errorOpen}
+        autoHideDuration={4000}
+        onClose={() => setErrorOpen(false)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert onClose={() => setErrorOpen(false)} severity="error" sx={{ width: "100%" }}>
+          {errorMsg || "Something went wrong. Please try again."}
+        </Alert>
+      </Snackbar>
     </>
   );
 }
@@ -273,7 +301,7 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
  * - Requires choice: Redeem | Product
  * - Bonus ₹150 info is UI-only (no backend flag; reflected in uiMeta for summary)
  */
-function Prime750Section({ pkg, prime150Active, onBuy }) {
+function Prime750Section({ pkg, prime150Active, prime750Active, onBuy }) {
   const [choice, setChoice] = useState("");
   const [selProd, setSelProd] = useState("");
 
@@ -287,7 +315,7 @@ function Prime750Section({ pkg, prime150Active, onBuy }) {
   return (
     <Box sx={{ p: 2 }}>
       <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5 }}>
-        Prime 750
+        Prime 750 {prime750Active ? <Chip size="small" color="success" sx={{ ml: 1 }} label="Active" /> : null}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
         Includes wallet bonus ₹150
@@ -421,7 +449,7 @@ function Prime150Section({ reg150Pkg, prime150Active, onBuy }) {
  * - Plan selector under Season 1: Registration ₹150 | Season Prime ₹759
  * - Box grid (4x3) visible only for Season Prime
  */
-function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, seasonsHints = [] }) {
+function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, seasonsHints = [], seasonActive }) {
   const meta = seasonPkg?.monthly_meta || {};
   const totalBoxes = Math.max(1, Number(meta?.total_boxes || 12));
   const defaultSeason = Number(meta?.current_package_number || 1);
@@ -531,7 +559,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
   return (
     <Box sx={{ p: 2 }}>
       <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5 }}>
-        Season
+        Season {seasonActive ? <Chip size="small" color="success" sx={{ ml: 1 }} label="Active" /> : null}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
         Choose a season and plan to get started.
@@ -539,7 +567,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
 
       {/* ① Season selector */}
       <Typography variant="subtitle2" sx={{ mt: 1 }}>
-        ① Choose Season
+        ① Choose Season 
       </Typography>
       <Box sx={{ display: "grid", gap: 1 }}>
         {seasonsToShow.map((n) => {
@@ -566,7 +594,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
               <Radio size="small" checked={selectedSeason === n} disabled={!enabled} />
               <Typography sx={{ flex: 1 }}>Season {n}</Typography>
               {active ? (
-                <Chip size="small" label="Active" color="success" />
+                <Chip size="small" label="Available" color="success" />
               ) : locked ? (
                 <Stack direction="row" spacing={0.5} alignItems="center">
                   <LockRoundedIcon fontSize="small" />
@@ -695,7 +723,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
  * - No season chooser, no membership info
  * - Uses current package_number from monthly_meta
  */
-function PromoSection({ seasonPkg, history, onBuy }) {
+function PromoSection({ seasonPkg, history, onBuy, seasonActive }) {
   const meta = seasonPkg?.monthly_meta || {};
   const totalBoxes = Math.max(1, Number(meta?.total_boxes || 12));
   const packageNumber = Number(meta?.current_package_number || 1);
@@ -753,7 +781,7 @@ function PromoSection({ seasonPkg, history, onBuy }) {
   return (
     <Box sx={{ p: 2 }}>
       <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5 }}>
-        Monthly Promo 759
+        Monthly Promo 759 {seasonActive ? <Chip size="small" color="success" sx={{ ml: 1 }} label="Active" /> : null}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
         Pick months to include in this promotion.
@@ -913,6 +941,7 @@ export default function PromoPackages() {
   const [seasonsHints, setSeasonsHints] = useState([]);
   const [tab, setTab] = useState(0);
   const mappedTab = tab >= 1 ? tab + 1 : tab;
+  const [paymentSuccessOpen, setPaymentSuccessOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -969,6 +998,32 @@ export default function PromoPackages() {
       return false;
     }
   }, [history, reg150Pkg?.id]);
+
+  const activePackageIds = useMemo(() => {
+    try {
+      const ids = new Set();
+      (history || []).forEach((h) => {
+        const status = String(h?.status || "").toUpperCase();
+        if (status === "APPROVED") {
+          const pid = h?.package?.id || h?.package_id;
+          if (pid) ids.add(pid);
+        }
+      });
+      return ids;
+    } catch {
+      return new Set();
+    }
+  }, [history]);
+
+  const prime750Active = useMemo(() => {
+    const id = primePkg?.id;
+    return !!id && activePackageIds.has(id);
+  }, [activePackageIds, primePkg?.id]);
+
+  const seasonActive = useMemo(() => {
+    const id = seasonPkg?.id;
+    return !!id && activePackageIds.has(id);
+  }, [activePackageIds, seasonPkg?.id]);
 
   const onBuy = (data) => {
     // Open shared payment sheet
@@ -1049,6 +1104,14 @@ export default function PromoPackages() {
         Consumer Packages
       </Typography>
 
+      {/* {(prime150Active || prime750Active || seasonActive) ? (
+        <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: "wrap" }}>
+          {prime150Active && <Chip size="small" color="success" label="Prime 150 Active" />}
+          {prime750Active && <Chip size="small" color="success" label="Prime 750 Active" />}
+          {seasonActive && <Chip size="small" color="success" label="Monthly Promo Active" />}
+        </Stack>
+      ) : null} */}
+
       {/* Tabs: one section active at a time */}
       <Paper elevation={0} sx={{ borderRadius: 2 }}>
         <Tabs
@@ -1071,7 +1134,7 @@ export default function PromoPackages() {
               <Prime150Section reg150Pkg={reg150Pkg} prime150Active={prime150Active} onBuy={onBuy} />
               <Divider sx={{ my: 1.5 }} />
               {primePkg ? (
-                <Prime750Section pkg={primePkg} prime150Active={prime150Active} onBuy={onBuy} />
+                <Prime750Section pkg={primePkg} prime150Active={prime150Active} prime750Active={prime750Active} onBuy={onBuy} />
               ) : (
                 <Alert severity="warning">Prime 750 package not available.</Alert>
               )}
@@ -1081,7 +1144,7 @@ export default function PromoPackages() {
           {/* PROMO: Monthly Promo 759, 3x4 grid, selected count, Proceed to Pay */}
           {mappedTab === 1 ? (
             seasonPkg ? (
-              <PromoSection seasonPkg={seasonPkg} history={history} onBuy={onBuy} />
+              <PromoSection seasonPkg={seasonPkg} history={history} onBuy={onBuy} seasonActive={seasonActive} />
             ) : (
               <Alert severity="warning">Monthly promo package not available.</Alert>
             )
@@ -1097,6 +1160,7 @@ export default function PromoPackages() {
                 history={history}
                 onBuy={onBuy}
                 seasonsHints={seasonsHints}
+                seasonActive={seasonActive}
               />
             ) : (
               <Alert severity="warning">Season package not available.</Alert>
@@ -1120,8 +1184,22 @@ export default function PromoPackages() {
         data={paymentData}
         onSuccess={async () => {
           setHistory(await listMyPromoPurchases());
+          setPaymentSuccessOpen(true);
         }}
       />
+      <Dialog open={paymentSuccessOpen} onClose={() => setPaymentSuccessOpen(false)}>
+        <Box sx={{ p: 3, textAlign: "center", minWidth: 280 }}>
+          <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>
+            Payment Request Submitted
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            We will review it shortly.
+          </Typography>
+          <Button variant="contained" sx={{ mt: 2 }} onClick={() => setPaymentSuccessOpen(false)}>
+            OK
+          </Button>
+        </Box>
+      </Dialog>
     </Box>
   );
 }

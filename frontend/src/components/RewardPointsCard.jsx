@@ -27,7 +27,7 @@ export default function RewardPointsCard({ compact = false }) {
     load();
   }, []);
 
-  const points = Number(data?.current_points || 0);
+  const points = Number((data?.available ?? data?.current_points) || 0);
   const count = Number(data?.activated_coupon_count || 0);
   const nextTarget = Number(data?.next_target_count || 0);
   const nextPoints = Number(data?.points_at_next_target || 0);
@@ -95,7 +95,7 @@ export default function RewardPointsCard({ compact = false }) {
         <Box>
           <Box sx={{ mb: 1.5 }}>
             <Typography variant="body2" color="text.secondary">
-              Current points
+              Available (₹)
             </Typography>
             <Typography variant="h4" sx={{ fontWeight: 900 }}>
               ₹{points.toLocaleString("en-IN")}

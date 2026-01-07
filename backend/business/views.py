@@ -6,6 +6,10 @@ from django.db import transaction
 from django.utils import timezone
 from django.http import HttpResponse
 from django.db.models import Q, Sum
+from django.conf import settings
+import time
+import logging
+import os
 from .models import (
     BusinessRegistration,
     RewardProgress,
@@ -27,6 +31,8 @@ from .serializers import (
     AgencyPackagePaymentSerializer,
     AgencyPackagePaymentRequestSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class BusinessRegistrationCreateView(generics.CreateAPIView):
@@ -445,6 +451,7 @@ class AdminPromoPurchaseApproveView(APIView):
             return Response({"detail": "Only PENDING purchases can be approved."}, status=status.HTTP_400_BAD_REQUEST)
 
         from decimal import Decimal as D
+        t0 = time.perf_counter()
 
         # Infer denomination for allocation (default ₹150)
         try:
@@ -476,16 +483,62 @@ class AdminPromoPurchaseApproveView(APIView):
         except Exception:
             price = D("0")
         is_prime_150 = str(getattr(obj.package, "type", "")) == "PRIME" and abs(price - D("150")) <= D("0.5")
-        ebook_choice = str(getattr(obj, "prime150_choice", "") or "").strip().upper() == "EBOOK"
+        prime150_choice = str(getattr(obj, "prime150_choice", "") or "").strip().upper()
+        ebook_choice = prime150_choice == "EBOOK"
+        redeem150_choice = prime150_choice == "REDEEM"
+
         is_prime_750 = str(getattr(obj.package, "type", "")) == "PRIME" and abs(price - D("750")) <= D("0.5")
         prime750_choice = str(getattr(obj, "prime750_choice", "") or "").strip().upper()
-        # Skip allocation for PRIME150(EBOOK) or PRIME750(PRODUCT/COUPON); allow for PRIME750(REDEEM)
-        skip_allocation = (is_prime_150 and ebook_choice) or (is_prime_750 and prime750_choice in ("PRODUCT", "COUPON"))
+        redeem750_choice = prime750_choice == "REDEEM"
+
+        # Skip allocation when user selected a non-code option:
+        #  - PRIME150: EBOOK or REDEEM -> no code allocation
+        #  - PRIME750: PRODUCT / COUPON / REDEEM -> no 150-code allocation
+        # Allocate 150 e‑coupon even for PRIME150 REDEEM (only skip when EBOOK is chosen).
+        # For PRIME750, do not allocate 150 codes for PRODUCT/COUPON/REDEEM choices.
+        skip_allocation = (
+            (is_prime_150 and ebook_choice)
+            or (is_prime_750 and prime750_choice in ("PRODUCT", "COUPON", "REDEEM"))
+        )
+
+        # Debug start: capture computed state
+        try:
+            logger.info(
+                "Approve#%s: type=%s price=%s prime150=%s choice150=%s prime750=%s choice750=%s qty=%s need=%s skip_alloc=%s",
+                obj.id, getattr(obj.package, "type", None), str(price),
+                bool(is_prime_150), prime150_choice, bool(is_prime_750), prime750_choice,
+                int(qty_in), int(need), bool(skip_allocation)
+            )
+        except Exception:
+            pass
+        try:
+            from coupons.models import AuditTrail
+            AuditTrail.objects.create(
+                action="promo_purchase_approve_debug_start",
+                actor=request.user,
+                notes=f"start approve #{obj.id}",
+                metadata={
+                    "purchase_id": obj.id,
+                    "ptype": getattr(obj.package, "type", None),
+                    "price": str(price),
+                    "prime150_choice": prime150_choice,
+                    "prime750_choice": prime750_choice,
+                    "is_prime_150": bool(is_prime_150),
+                    "is_prime_750": bool(is_prime_750),
+                    "qty_in": int(qty_in),
+                    "units_per_pkg": int(units_per_pkg),
+                    "need": int(need),
+                    "skip_allocation": bool(skip_allocation),
+                },
+            )
+        except Exception:
+            pass
 
         # Try allocation (or e‑book grant) before setting approval
         allocated_ids = []
         sample_codes = []
         ebooks_granted = 0
+        allocated_759_count = 0
 
         per_coupon_activation_done = False
         with transaction.atomic():
@@ -528,6 +581,26 @@ class AdminPromoPurchaseApproveView(APIView):
                     except Exception:
                         sample_codes = []
 
+                    # Debug allocation (150)
+                    try:
+                        logger.info(
+                            "Approve#%s: alloc150 ids=%s sample=%s",
+                            obj.id, len(allocated_ids), sample_codes
+                        )
+                        from coupons.models import AuditTrail
+                        AuditTrail.objects.create(
+                            action="promo_purchase_approve_debug_alloc150",
+                            actor=request.user,
+                            notes=f"alloc150 #{obj.id}",
+                            metadata={
+                                "purchase_id": obj.id,
+                                "allocated": int(len(allocated_ids)),
+                                "sample": sample_codes,
+                            },
+                        )
+                    except Exception:
+                        pass
+
             # PRIME150: grant e‑book access mapped to the package (visible to all ₹150 buyers)
             # If no explicit mapping exists, fall back to granting the most recent active e‑book.
             if is_prime_150:
@@ -556,20 +629,75 @@ class AdminPromoPurchaseApproveView(APIView):
                 except Exception:
                     ebooks_granted = 0
 
-            # Per-coupon matrix accounts + distribution (N coupons -> N accounts in FIVE_150 and THREE_150)
+            # Per-coupon matrix accounts + distribution (enqueue as background jobs)
             try:
                 if is_prime_150 and not skip_allocation and allocated_ids:
-                    from business.services.activation import open_matrix_accounts_for_coupon
+                    from jobs.models import enqueue_coupon_distribution
                     from decimal import Decimal as D4
-                    for cid in allocated_ids:
+                    batch_size = int(os.environ.get("COUPON_DIST_BATCH", "50"))
+                    if batch_size <= 0:
+                        batch_size = 50
+                    for i in range(0, len(allocated_ids), batch_size):
+                        chunk = allocated_ids[i:i + batch_size]
                         try:
-                            open_matrix_accounts_for_coupon(obj.user, cid, amount_150=D4("150.00"), distribute=True, trigger="promo_purchase")
+                            enqueue_coupon_distribution(
+                                obj.user_id,
+                                obj.id,
+                                chunk,
+                                batch_index=int(i // batch_size),
+                                amount_150=D4("150.00"),
+                                trigger="promo_purchase",
+                            )
                         except Exception:
                             continue
                     per_coupon_activation_done = True
             except Exception:
                 per_coupon_activation_done = per_coupon_activation_done or False
-                # best-effort
+
+            # Promo REDEEM credits (best-effort, non-blocking)
+            credited_750 = False
+            credited_150_redeem = False
+            try:
+                # 750 REDEEM: credit full 750 as Reward Points (not money wallet)
+                if is_prime_750 and redeem750_choice:
+                    from accounts.models import RewardPointsAccount
+                    from decimal import Decimal as Dp
+                    try:
+                        RewardPointsAccount.credit_points(
+                            obj.user,
+                            Dp("750.00"),
+                            reason="REDEEM_750",
+                            meta={"purchase_id": obj.id, "package": getattr(obj.package, "code", None)},
+                        )
+                        credited_750 = True
+                    except Exception:
+                        pass
+                # 150 REDEEM: use existing redeem flow (credits configured 150 by default into points)
+                if is_prime_150 and redeem150_choice:
+                    from business.services.activation import redeem_150 as _redeem_150
+                    _redeem_150(obj.user, {"type": "PROMO_150_REDEEM", "id": obj.id})
+                    credited_150_redeem = True
+            except Exception:
+                pass
+            # Debug redeem credits (points)
+            try:
+                logger.info(
+                    "Approve#%s: redeem credits -> 750_pts=%s, 150_pts=%s",
+                    obj.id, bool(credited_750), bool(credited_150_redeem)
+                )
+                from coupons.models import AuditTrail
+                AuditTrail.objects.create(
+                    action="promo_purchase_approve_debug_redeem",
+                    actor=request.user,
+                    notes=f"redeem step #{obj.id}",
+                    metadata={
+                        "purchase_id": obj.id,
+                        "credited_750_points": bool(credited_750),
+                        "credited_150_points": bool(credited_150_redeem),
+                    },
+                )
+            except Exception:
+                pass
 
             # Mark approved and set active window
             obj.status = "APPROVED"
@@ -597,20 +725,59 @@ class AdminPromoPurchaseApproveView(APIView):
                             )
                         except Exception:
                             continue
-                    # Monthly 759 payouts (best-effort). First purchased box gets the first-month direct bonus.
+                    # Allocate E‑coupon(s) of ₹759 for each selected monthly box (best‑effort)
                     try:
-                        from business.services.monthly import distribute_monthly_759_payouts
+                        if boxes:
+                            from coupons.models import CouponCode
+                            denom_759 = D("759.00")
+                            base_qs2 = CouponCode.objects.filter(
+                                issued_channel="e_coupon",
+                                value=denom_759,
+                                status="AVAILABLE",
+                                assigned_agency__isnull=True,
+                                assigned_employee__isnull=True,
+                                assigned_consumer__isnull=True,
+                            )
+                            try:
+                                locking2 = base_qs2.select_for_update(skip_locked=True)
+                            except Exception:
+                                locking2 = base_qs2
+                            pick_759 = list(locking2.order_by("serial", "id").values_list("id", flat=True)[: len(boxes)])
+                            affected_759 = CouponCode.objects.filter(id__in=pick_759).filter(
+                                issued_channel="e_coupon",
+                                status="AVAILABLE",
+                                assigned_agency__isnull=True,
+                                assigned_employee__isnull=True,
+                                assigned_consumer__isnull=True,
+                            ).update(assigned_consumer_id=obj.user_id, status="SOLD")
+                            allocated_759_count = int(affected_759 or 0)
+                            if allocated_759_count > 0:
+                                allocated_ids.extend(pick_759[:allocated_759_count])
+                    except Exception:
+                        # allocation best‑effort
+                        pass
+
+                    # Monthly 759 payouts (enqueue as background jobs). First purchased box gets the first-month direct bonus.
+                    try:
+                        from jobs.models import enqueue_monthly_759
+                        box_tasks = []
                         for idx, b in enumerate(boxes):
                             try:
                                 bn = int(b)
                             except Exception:
                                 bn = None
                             is_first = bool(prev_count == 0 and idx == 0)
-                            distribute_monthly_759_payouts(
-                                obj.user,
-                                is_first_month=is_first,
-                                source={"type": "MONTHLY_759", "id": f"{obj.id}:{number}:{bn}"},
-                            )
+                            box_tasks.append({"package_number": number, "box_number": bn, "is_first": is_first})
+                        if box_tasks:
+                            batch_size = int(os.environ.get("MONTHLY_759_BATCH", "50"))
+                            if batch_size <= 0:
+                                batch_size = 50
+                            for i in range(0, len(box_tasks), batch_size):
+                                chunk = box_tasks[i:i + batch_size]
+                                try:
+                                    enqueue_monthly_759(obj.user_id, obj.id, chunk, batch_index=int(i // batch_size))
+                                except Exception:
+                                    continue
                     except Exception:
                         pass
                 except Exception:
@@ -641,20 +808,64 @@ class AdminPromoPurchaseApproveView(APIView):
             try:
                 from decimal import Decimal as D3
                 from .services.activation import activate_150_active, activate_50, ensure_first_purchase_activation
+                from jobs.models import enqueue_prime_150_units
                 pkg_price = D3(str(getattr(obj.package, "price", "0") or "0"))
                 src = {"type": "promo_purchase", "id": obj.id}
-                # Open 150 Active if price >= 150 (idempotent)
-                if pkg_price >= D3("150") and not per_coupon_activation_done:
-                    try:
-                        activate_150_active(obj.user, src)
-                    except Exception:
-                        pass
-                # Open 50 pool if price >= 50 (idempotent)
+                activated150_active = False
+                activated50 = False
+                prime_units_enqueued = False
+
+                # Always open ₹50 path when price >= 50 (idempotent)
                 if pkg_price >= D3("50"):
                     try:
                         activate_50(obj.user, src, package_code="GLOBAL_50")
+                        activated50 = True
                     except Exception:
                         pass
+
+                # Decide 150 activations by package type
+                is_prime_pkg = str(getattr(obj.package, "type", "") or "") == "PRIME"
+                is_monthly_pkg = str(getattr(obj.package, "type", "") or "") == "MONTHLY"
+                is_prime_150_now = is_prime_pkg and (abs(pkg_price - D3("150")) <= D3("0.5"))
+                is_prime_750_now = is_prime_pkg and (abs(pkg_price - D3("750")) <= D3("0.5"))
+
+                if is_prime_150_now:
+                    try:
+                        activate_150_active(obj.user, src)
+                        activated150_active = True
+                    except Exception:
+                        pass
+                elif is_prime_750_now:
+                    try:
+                        cfg = CommissionConfig.get_solo()
+                        mode = str(getattr(cfg, "prime_750_redeem_mode", "units_and_wallet") or "units_and_wallet").lower()
+                        units = int(getattr(cfg, "prime_750_units", 5) or 5)
+                    except Exception:
+                        mode = "units_and_wallet"
+                        units = 5
+                    # If REDEEM chosen and mode is wallet_only, skip enqueuing units
+                    if not (redeem750_choice and mode == "wallet_only"):
+                        try:
+                            enqueue_prime_150_units(obj.user_id, obj.id, units=units, trigger="PRIME_750")
+                            prime_units_enqueued = True
+                        except Exception:
+                            pass
+                elif is_monthly_pkg:
+                    # Open 150 Active only on the very first 759 approval for this user/package
+                    try:
+                        from .models import PromoMonthlyBox
+                        prev_count_before = PromoMonthlyBox.objects.filter(
+                            user=obj.user, package=obj.package, created_at__lt=obj.approved_at
+                        ).count()
+                    except Exception:
+                        prev_count_before = 0
+                    if prev_count_before == 0:
+                        try:
+                            activate_150_active(obj.user, src)
+                            activated150_active = True
+                        except Exception:
+                            pass
+
                 # Ensure account_active and first purchase flags are stamped (idempotent)
                 try:
                     ensure_first_purchase_activation(obj.user, src)
@@ -688,6 +899,10 @@ class AdminPromoPurchaseApproveView(APIView):
             # Audit (best effort)
             try:
                 from coupons.models import AuditTrail
+                try:
+                    prime_units_flag = bool(prime_units_enqueued)
+                except Exception:
+                    prime_units_flag = False
                 AuditTrail.objects.create(
                     action="promo_purchase_approved_allocated",
                     actor=request.user,
@@ -705,6 +920,17 @@ class AdminPromoPurchaseApproveView(APIView):
                         "prime150_choice": getattr(obj, "prime150_choice", None),
                         "prime750_choice": getattr(obj, "prime750_choice", None),
                         "ebooks_granted": int(ebooks_granted),
+                        "allocated_759": int(allocated_759_count),
+                        "heavy_skipped": bool(getattr(settings, "SKIP_HEAVY_ON_APPROVE", False)),
+                        "credited_750": bool(credited_750),
+                        "credited_150_redeem": bool(credited_150_redeem),
+                        "skip_allocation": bool(skip_allocation),
+                        "is_prime_150": bool(is_prime_150),
+                        "is_prime_750": bool(is_prime_750),
+                        "activated150_active": bool(activated150_active),
+                        "activated50": bool(activated50),
+                        "prime_150_units_enqueued": bool(prime_units_flag),
+                        "duration_ms": int((time.perf_counter() - t0) * 1000),
                     },
                 )
             except Exception:

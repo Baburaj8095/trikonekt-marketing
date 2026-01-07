@@ -155,12 +155,14 @@ export default function AgencyShell({ children }) {
 
   return (
     <ShellBase
-      title="Agency"
+      title={displayName}
       menu={menu}
       isActive={isActive}
       onLogout={onLogout}
       footerText={`Logged in as: ${displayName}`}
       rightHeaderContent={rightPill}
+      rootPaths={["/agency/dashboard", "/agency/coupons"]}
+      onBackFallbackPath="/agency/dashboard"
     >
       {children}
     </ShellBase>

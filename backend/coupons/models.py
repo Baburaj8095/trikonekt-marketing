@@ -69,6 +69,10 @@ class CouponCode(models.Model):
             models.Index(fields=["batch"]),
             models.Index(fields=["serial"]),
             models.Index(fields=["assigned_consumer"]),
+            # Composite indexes to accelerate allocation scans and reduce lock time
+            models.Index(fields=["issued_channel", "value", "status", "assigned_agency", "assigned_employee", "assigned_consumer", "serial"]),
+            models.Index(fields=["issued_channel", "status", "serial"]),
+            models.Index(fields=["issued_channel", "value", "status"]),
         ]
 
     def __str__(self):

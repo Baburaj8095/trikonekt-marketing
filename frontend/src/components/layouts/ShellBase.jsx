@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import NotificationsBell from "../NotificationsBell";
+import { useCartStore } from "../../store/cartStore";
 
 /**
  * ShellBase
@@ -23,9 +24,13 @@ export default function ShellBase({
   onLogout,
   footerText,
   rightHeaderContent,
+  rootPaths,
+  isRoot,
+  onBackFallbackPath,
   children,
 }) {
   const loc = useLocation();
+  const navigate = useNavigate();
 
   // Responsive flags
   const [isMobile, setIsMobile] = useState(
@@ -190,6 +195,22 @@ export default function ShellBase({
     }
   }
 
+
+
+  function CartIcon({ size = 22, stroke = "#0f172a" }) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="9" cy="20" r="1.5" />
+        <circle cx="17" cy="20" r="1.5" />
+        <path d="M2 3h2l2.6 10.4A2 2 0 0 0 8.5 15H17a2 2 0 0 0 2-1.6L21 7H6" />
+      </svg>
+    );
+  }
+
+  // Dynamic cart count from global store
+  const cartItems = useCartStore((s) => s.items);
+  const cartCount = Array.isArray(cartItems) ? cartItems.reduce((sum, i) => sum + (i.qty || 0), 0) : 0;
+
   function NavLink({ to, label, icon }) {
     const active = activeCheck(to, loc);
     return (
@@ -222,53 +243,154 @@ export default function ShellBase({
   const sidebarGap = 20;
   const topOffset = isMobile ? headerHeightMobile : 0;
 
+  const cartPath = useMemo(() => {
+    const p = loc.pathname || "";
+    if (p.startsWith("/agency")) return "/agency/coupons?tab=cart";
+    if (p.startsWith("/employee")) return "/employee/cart";
+    return "/user/cart";
+  }, [loc.pathname]);
+
+  const defaultRootPath = useMemo(() => {
+    try {
+      const first = menu && menu[0] && typeof menu[0].to === "string" ? menu[0].to.split("?")[0] : "";
+      return first || "";
+    } catch {
+      return "";
+    }
+  }, [menu]);
+
+  const rootPathsList = useMemo(() => {
+    const arr = Array.isArray(rootPaths) ? rootPaths : [];
+    return arr.map((p) => String(p || "").split("?")[0]).filter(Boolean);
+  }, [rootPaths]);
+
+  const currentPath = loc.pathname;
+  const isRootScreen = useMemo(() => {
+    if (typeof isRoot === "function") return !!isRoot(loc);
+    if (rootPathsList.length) return rootPathsList.includes(currentPath);
+    return currentPath === defaultRootPath && !!defaultRootPath;
+  }, [isRoot, loc, rootPathsList, currentPath, defaultRootPath]);
+
+  const backFallback = onBackFallbackPath || defaultRootPath || "/";
+
+  function handleBack() {
+    try {
+      if (window.history.length > 1) {
+        navigate(-1);
+      } else {
+        navigate(backFallback, { replace: true });
+      }
+    } catch {
+      navigate(backFallback, { replace: true });
+    }
+  }
+
   return (
     <div className="role-shell-scope" style={{ minHeight: "100vh", background: "#f1f5f9" }}>
       {/* Top bar: shown only on mobile */}
       {isMobile ? (
         <div
-          style={{
-            position: "sticky",
-            top: 0,
-            zIndex: 30,
-            height: headerHeightMobile,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "0 12px",
-            borderBottom: "1px solid #e2e8f0",
-            background: "#ffffff",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <button
-              aria-label="Toggle sidebar"
-              onClick={() => setSidebarOpen((v) => !v)}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 36,
-                height: 36,
-                borderRadius: 8,
-                border: "1px solid #e2e8f0",
-                background: "#fff",
-                cursor: "pointer",
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <line x1="3" y1="6" x2="21" y2="6"></line>
-                <line x1="3" y1="12" x2="21" y2="12"></line>
-                <line x1="3" y1="18" x2="21" y2="18"></line>
-              </svg>
-            </button>
-            <NotificationsBell />
-            <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", display: "flex", alignItems: "baseline", gap: 8, pointerEvents: "none", textAlign: "center" }}>
-              <span style={{ fontWeight: 900, color: "#0f172a", fontSize: 18 }}>{title}</span>
-              <span style={{ color: "#64748b", fontSize: 12 }}>Dashboard</span>
-          </div>
-        </div>
-        </div>
+  style={{
+    position: "sticky",
+    top: 0,
+    zIndex: 30,
+    height: 56,
+    display: "grid",
+    gridTemplateColumns: "48px 1fr max-content",
+    alignItems: "center",
+    padding: "0 8px",
+    borderBottom: "1px solid #e2e8f0",
+    background: "#ffffff",
+  }}
+>
+  {/* LEFT */}
+  {isRootScreen ? (
+    <button
+      aria-label="Toggle sidebar"
+      onClick={() => setSidebarOpen((v) => !v)}
+      style={{
+        width: 36,
+        height: 36,
+        borderRadius: 8,
+        border: "1px solid #e2e8f0",
+        background: "#fff",
+        cursor: "pointer",
+        justifySelf: "start",
+      }}
+    >
+      ☰
+    </button>
+  ) : (
+    <button
+      aria-label="Go back"
+      onClick={handleBack}
+      style={{
+        width: 36,
+        height: 36,
+        borderRadius: 8,
+        border: "1px solid #e2e8f0",
+        background: "#fff",
+        cursor: "pointer",
+        justifySelf: "start",
+      }}
+    >
+      ←
+    </button>
+  )}
+
+  {/* CENTER */}
+  <div
+    style={{
+      textAlign: "center",
+      fontWeight: 700,
+      fontSize: 16,
+      color: "#0f172a",
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      pointerEvents: "none",
+    }}
+  >
+    {title}
+  </div>
+
+  {/* RIGHT */}
+  <div style={{ justifySelf: "end", display: "flex", alignItems: "center", gap: 8 }}>
+    <NotificationsBell />
+    <Link
+      to={cartPath}
+      aria-label="Cart"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        textDecoration: "none",
+        color: "#0f172a",
+      }}
+    >
+      <CartIcon size={22} />
+      <span
+        style={{
+          background: "#ef4444",
+          color: "#fff",
+          fontWeight: 700,
+          fontSize: 11,
+          borderRadius: 9999,
+          minWidth: 18,
+          height: 18,
+          padding: "0 6px",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          lineHeight: 1,
+        }}
+      >
+        {cartCount}
+      </span>
+    </Link>
+  </div>
+</div>
+
       ) : null}
 
       {/* Backdrop for mobile drawer */}
@@ -475,6 +597,37 @@ export default function ShellBase({
               <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, marginBottom: 8 }}>
                 {rightHeaderContent ? <div>{rightHeaderContent}</div> : null}
                 <NotificationsBell />
+                <Link
+                  to={cartPath}
+                  aria-label="Cart"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    textDecoration: "none",
+                    color: "#0f172a",
+                  }}
+                >
+                  <CartIcon size={22} />
+                  <span
+                    style={{
+                      background: "#ef4444",
+                      color: "#fff",
+                      fontWeight: 700,
+                      fontSize: 11,
+                      borderRadius: 9999,
+                      minWidth: 18,
+                      height: 18,
+                      padding: "0 6px",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      lineHeight: 1,
+                    }}
+                  >
+                    {cartCount}
+                  </span>
+                </Link>
               </div>
             ) : null}
             {children}

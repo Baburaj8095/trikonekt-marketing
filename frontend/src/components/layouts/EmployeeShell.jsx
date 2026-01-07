@@ -74,11 +74,13 @@ export default function EmployeeShell({ children }) {
 
   return (
     <ShellBase
-      title="Employee"
+      title={displayName}
       menu={menu}
       isActive={isActive}
       onLogout={onLogout}
       footerText={`Logged in as: ${displayName}`}
+      rootPaths={["/employee/dashboard", "/employee/dashboard/"]}
+      onBackFallbackPath="/employee/dashboard"
     >
       {children}
     </ShellBase>

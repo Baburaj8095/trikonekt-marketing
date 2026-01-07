@@ -7,6 +7,9 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
+import time
+import logging
+logger = logging.getLogger(__name__)
 
 from accounts.models import CustomUser
 from .models import (
@@ -226,42 +229,46 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     @action(detail=False, methods=["get"], url_path="mine-consumer", permission_classes=[IsAuthenticated])
     def mine_consumer(self, request):
         """
-        Consumer: list my e-coupon codes (ownership via assigned_consumer)
-        Performance optimized:
-          - restrict to issued_channel='e_coupon'
-          - single pass to fetch activation/transfer audits for current page
-          - pass precomputed sets to serializer to avoid per-row queries
+        Consumer: list my e-coupon codes (ownership via assigned_consumer).
+        Hard requirement: always return HTTP 200 quickly, even under background writes/locks.
+        Strategy:
+          - Avoid any joins to AuditTrail which may be locked by activation tasks.
+          - Paginate and cap fallback slice to prevent heavy scans.
+          - Guard with broad try/except and return minimal shape on any error.
         """
         if not is_consumer_user(request.user):
             return Response({"detail": "Only consumers can view their codes."}, status=status.HTTP_403_FORBIDDEN)
 
-        qs = (CouponCode.objects
-              .filter(assigned_consumer=request.user, issued_channel="e_coupon")
-              .select_related("coupon", "assigned_employee", "assigned_agency", "issued_by", "batch")
-              .order_by("-created_at"))
-
-        page = self.paginate_queryset(qs)
-        objs = list(page if page is not None else qs)
-        ids = [o.id for o in objs]
-
-        from .models import AuditTrail
-        activated_set = set(
-            AuditTrail.objects.filter(
-                action="coupon_activated", actor=request.user, coupon_code_id__in=ids
-            ).values_list("coupon_code_id", flat=True)
-        )
-        transferred_set = set(
-            AuditTrail.objects.filter(
-                action="consumer_transfer", actor=request.user, coupon_code_id__in=ids
-            ).values_list("coupon_code_id", flat=True)
+        # Lean queryset (avoid heavy select_related to minimize lock contention)
+        qs = (
+            CouponCode.objects
+            .filter(assigned_consumer=request.user, issued_channel="e_coupon")
+            .order_by("-created_at")
         )
 
-        ctx = self.get_serializer_context()
-        ctx.update({"activated_ids_set": activated_set, "transferred_ids_set": transferred_set})
-        ser = self.get_serializer(objs, many=True, context=ctx)
-        if page is not None:
-            return self.get_paginated_response(ser.data)
-        return Response(ser.data)
+        # Try paginating; on any error, fall back to an empty result with 200
+        try:
+            page = self.paginate_queryset(qs)
+            # If not paginated by DRF (e.g., custom clients), hard-cap to 100 items to keep it fast
+            objs = list(page if page is not None else qs[:100])
+        except Exception:
+            page = None
+            objs = []
+
+        # Do not touch AuditTrail here to avoid blocking on background writes.
+        activated_set = set()
+        transferred_set = set()
+
+        try:
+            ctx = self.get_serializer_context()
+            ctx.update({"activated_ids_set": activated_set, "transferred_ids_set": transferred_set})
+            ser = self.get_serializer(objs, many=True, context=ctx)
+            if page is not None:
+                return self.get_paginated_response(ser.data)
+            return Response(ser.data, status=status.HTTP_200_OK)
+        except Exception:
+            # Final safety net: always 200 with an empty list if serialization fails
+            return Response([], status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["get"], url_path="consumer-summary", permission_classes=[IsAuthenticated])
     def consumer_summary(self, request):
@@ -292,14 +299,14 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         # Audits (actor scoped)
         try:
             activated_count = (AuditTrail.objects
-                               .filter(action="coupon_activated", actor=request.user)
+                               .filter(action="coupon_activated", actor_id=request.user.id)
                                .values("coupon_code_id")
                                .distinct()
                                .count())
         except Exception:
             activated_count = 0
         try:
-            transferred_count = AuditTrail.objects.filter(action="consumer_transfer", actor=request.user).count()
+            transferred_count = AuditTrail.objects.filter(action="consumer_transfer", actor_id=request.user.id).count()
         except Exception:
             transferred_count = 0
 
@@ -326,7 +333,7 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
 
             # Activations by this consumer grouped by value
             act_rows = (AuditTrail.objects
-                        .filter(action="coupon_activated", actor=request.user)
+                            .filter(action="coupon_activated", actor_id=request.user.id)
                         .values("coupon_code__value")
                         .annotate(c=Count("id")))
             for r in act_rows:
@@ -337,7 +344,7 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
 
             # Transfers initiated by this consumer grouped by value
             tr_rows = (AuditTrail.objects
-                       .filter(action="consumer_transfer", actor=request.user)
+                           .filter(action="consumer_transfer", actor_id=request.user.id)
                        .values("coupon_code__value")
                        .annotate(c=Count("id")))
             for r in tr_rows:
@@ -362,6 +369,159 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
             "by_value": by_value,
         }
         return Response(summary, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="consumer-overview", permission_classes=[IsAuthenticated])
+    def consumer_overview(self, request):
+        """
+        Single call for consumer KPIs + codes list.
+        Returns:
+          {
+            "summary": { available, redeemed, activated, transferred, by_value },
+            "codes": [ ... up to 100 recent codes ... ]
+          }
+        """
+        if not is_consumer_user(request.user):
+            return Response({"detail": "Only consumers can access."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Base queryset for this consumer's e-coupons
+        assigned_qs = CouponCode.objects.filter(assigned_consumer=request.user, issued_channel="e_coupon")
+
+        # Build summary (same logic as consumer_summary)
+        try:
+            sold_assigned = assigned_qs.filter(status="SOLD").count()
+        except Exception:
+            sold_assigned = 0
+        try:
+            redeemed_assigned = assigned_qs.filter(status="REDEEMED").count()
+        except Exception:
+            redeemed_assigned = 0
+
+        try:
+            activated_count = (AuditTrail.objects
+                               .filter(action="coupon_activated", actor_id=request.user.id)
+                               .values("coupon_code_id")
+                               .distinct()
+                               .count())
+        except Exception:
+            activated_count = 0
+        try:
+            transferred_count = AuditTrail.objects.filter(action="consumer_transfer", actor_id=request.user.id).count()
+        except Exception:
+            transferred_count = 0
+
+        available_overall = sold_assigned - activated_count
+        if available_overall < 0:
+            available_overall = 0
+
+        by_value = {}
+        try:
+            rows = (assigned_qs.values("value", "status").annotate(c=Count("id")))
+            for r in rows:
+                v = str(r.get("value"))
+                st = (r.get("status") or "").upper()
+                ent = by_value.get(v) or {"available": 0, "redeemed": 0, "activated": 0, "transferred": 0}
+                if st == "SOLD":
+                    ent["available"] += int(r.get("c") or 0)
+                elif st == "REDEEMED":
+                    ent["redeemed"] += int(r.get("c") or 0)
+                by_value[v] = ent
+
+            # Optionally include heavy per-value details (activations/transfers) only when requested
+            if str(self.request.query_params.get("by_value_details") or "0").lower() in ("1", "true", "yes"):
+                act_rows = (AuditTrail.objects
+                            .filter(action="coupon_activated", actor_id=request.user.id)
+                            .values("coupon_code__value")
+                            .annotate(c=Count("id")))
+                for r in act_rows:
+                    v = str(r.get("coupon_code__value"))
+                    ent = by_value.get(v) or {"available": 0, "redeemed": 0, "activated": 0, "transferred": 0}
+                    ent["activated"] += int(r.get("c") or 0)
+                    by_value[v] = ent
+
+                tr_rows = (AuditTrail.objects
+                           .filter(action="consumer_transfer", actor_id=request.user.id)
+                           .values("coupon_code__value")
+                           .annotate(c=Count("id")))
+                for r in tr_rows:
+                    v = str(r.get("coupon_code__value"))
+                    ent = by_value.get(v) or {"available": 0, "redeemed": 0, "activated": 0, "transferred": 0}
+                    ent["transferred"] += int(r.get("c") or 0)
+                    by_value[v] = ent
+
+            for v, ent in list(by_value.items()):
+                avail = int(ent.get("available") or 0) - int(ent.get("activated") or 0)
+                ent["available"] = avail if avail > 0 else 0
+                by_value[v] = ent
+        except Exception:
+            by_value = {}
+
+        summary = {
+            "available": available_overall,
+            "redeemed": redeemed_assigned,
+            "activated": activated_count,
+            "transferred": transferred_count,
+            "by_value": by_value,
+        }
+
+        # Codes list (optional): include_codes=0 to skip for ultra-light responses
+        include_codes = str(self.request.query_params.get("include_codes") or "1").lower() in ("1", "true", "yes")
+        objs = []
+        if include_codes:
+            try:
+                # Preload related to avoid N+1 queries in serializer
+                qs = (assigned_qs
+                      .select_related("coupon", "assigned_employee", "assigned_agency", "assigned_consumer", "issued_by", "batch")
+                      .order_by("-created_at"))
+                try:
+                    limit = int(self.request.query_params.get("codes_limit") or 100)
+                except Exception:
+                    limit = 100
+                if limit < 0:
+                    limit = 0
+                if limit > 200:
+                    limit = 200
+                objs = list(qs[:limit])
+            except Exception:
+                objs = []
+
+        try:
+            # Build per-code activated/transferred markers for this consumer
+            include_markers = str(self.request.query_params.get("include_markers") or "1").lower() in ("1", "true", "yes")
+            ids_subset = [getattr(o, "id", None) for o in objs]
+            ids_subset = [i for i in ids_subset if i is not None]
+
+            act_ids = set()
+            tr_ids = set()
+            if include_markers and ids_subset:
+                try:
+                    act_ids = set(
+                        AuditTrail.objects.filter(
+                            action="coupon_activated",
+                            actor_id=request.user.id,
+                            coupon_code_id__in=ids_subset,
+                        ).values_list("coupon_code_id", flat=True)
+                    )
+                except Exception:
+                    act_ids = set()
+                try:
+                    tr_ids = set(
+                        AuditTrail.objects.filter(
+                            action="consumer_transfer",
+                            actor_id=request.user.id,
+                            coupon_code_id__in=ids_subset,
+                        ).values_list("coupon_code_id", flat=True)
+                    )
+                except Exception:
+                    tr_ids = set()
+
+            ctx = self.get_serializer_context()
+            ctx.update({"activated_ids_set": act_ids, "transferred_ids_set": tr_ids})
+            codes_ser = self.get_serializer(objs, many=True, context=ctx)
+            codes = codes_ser.data
+        except Exception:
+            codes = []
+
+        return Response({"summary": summary, "codes": codes}, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["get"], url_path="my-ranges", permission_classes=[IsAuthenticated])
     def my_ranges(self, request):
@@ -669,6 +829,50 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
                 return Response({"employee_id": "Not allowed for employee."}, status=status.HTTP_400_BAD_REQUEST)
 
         # Build eligibility filter (prevents duplicates/repeats)
+        # Async path: enqueue background bulk-assign like activate API to avoid heavy DB in HTTP
+        try:
+            from jobs.models import BackgroundTask
+            idem_key = f"assign_consumer_count:{request.user.id}:{consumer.id}:{int(count)}:{str(value_param) if value_param is not None else ''}:{int(batch_id) if batch_id else ''}"
+            task = BackgroundTask.enqueue(
+                task_type="assign_consumer_count",
+                payload={
+                    "actor_id": int(request.user.id),
+                    "consumer_username": consumer.username,
+                    "count": int(count),
+                    "batch_id": int(batch_id) if batch_id else None,
+                    "value": str(value_param) if value_param is not None else None,
+                    "notes": notes,
+                    "attribute_employee_id": int(employee_to_attribute.id) if employee_to_attribute else None,
+                },
+                idempotency_key=idem_key,
+            )
+            try:
+                AuditTrail.objects.create(
+                    action="assign_consumer_count_enqueued",
+                    actor=request.user,
+                    notes=f"Queued assign {int(count)} codes to {consumer.username}",
+                    metadata={
+                        "consumer_id": consumer.id,
+                        "count": int(count),
+                        "batch_id": int(batch_id) if batch_id else None,
+                        "value": str(value_param) if value_param is not None else None,
+                        "task_id": task.id,
+                    },
+                )
+            except Exception:
+                pass
+            return Response(
+                {
+                    "status": "queued",
+                    "task_id": task.id,
+                    "detail": f"Assign {int(count)} codes to {consumer.username} queued."
+                },
+                status=status.HTTP_200_OK,
+            )
+        except Exception:
+            # Fallback to synchronous assignment if enqueue fails
+            pass
+
         base_qs = CouponCode.objects.all()
         if is_employee_user(user):
             base_qs = base_qs.filter(
@@ -841,6 +1045,49 @@ class CouponCodeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
 
         if not is_employee_user(employee):
             return Response({"employee": ["Provided user is not an employee."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Async path: enqueue background bulk-assign like activate API to avoid heavy DB in HTTP
+        try:
+            from jobs.models import BackgroundTask
+            idem_key = f"assign_employee_count:{request.user.id}:{employee.id}:{int(cnt)}:{str(value_param) if value_param is not None else ''}:{int(batch_id) if batch_id else ''}"
+            task = BackgroundTask.enqueue(
+                task_type="assign_employee_count",
+                payload={
+                    "actor_id": int(request.user.id),
+                    "employee_id": int(employee.id),
+                    "count": int(cnt),
+                    "batch_id": int(batch_id) if batch_id else None,
+                    "value": str(value_param) if value_param is not None else None,
+                    "notes": notes,
+                },
+                idempotency_key=idem_key,
+            )
+            try:
+                AuditTrail.objects.create(
+                    action="assign_employee_count_enqueued",
+                    actor=request.user,
+                    notes=f"Queued assign {int(cnt)} codes to employee {employee.username}",
+                    metadata={
+                        "employee_id": employee.id,
+                        "count": int(cnt),
+                        "batch_id": int(batch_id) if batch_id else None,
+                        "value": str(value_param) if value_param is not None else None,
+                        "task_id": task.id,
+                    },
+                )
+            except Exception:
+                pass
+            return Response(
+                {
+                    "status": "queued",
+                    "task_id": task.id,
+                    "detail": f"Assign {int(cnt)} codes to employee {employee.username} queued."
+                },
+                status=status.HTTP_200_OK,
+            )
+        except Exception:
+            # Fallback to synchronous assignment if enqueue fails
+            pass
 
         base_qs = CouponCode.objects.filter(
             assigned_agency=user,
@@ -1560,6 +1807,43 @@ class CouponBatchViewSet(mixins.CreateModelMixin,
             return Response({"per_agency": ["This field is required and must be integer."]}, status=status.HTTP_400_BAD_REQUEST)
 
         agency_ids = request.data.get("agency_ids")
+
+        # Async path: enqueue background bulk assign to agencies
+        try:
+            from jobs.models import BackgroundTask
+            # Normalize agency_ids to list[int]
+            ids_payload = []
+            try:
+                if isinstance(agency_ids, list):
+                    ids_payload = [int(x) for x in agency_ids]
+                elif agency_ids:
+                    ids_payload = [int(agency_ids)]
+            except Exception:
+                ids_payload = []
+            idem_key = f"bulk_assign_agencies:{request.user.id}:{batch.id}:{int(per_agency)}:{','.join(map(str, ids_payload))}"
+            task = BackgroundTask.enqueue(
+                task_type="bulk_assign_agencies",
+                payload={
+                    "actor_id": int(request.user.id),
+                    "batch_id": int(batch.id),
+                    "per_agency": int(per_agency),
+                    "agency_ids": ids_payload or [],
+                },
+                idempotency_key=idem_key,
+            )
+            try:
+                AuditTrail.objects.create(
+                    action="bulk_assigned_to_agencies_enqueued",
+                    actor=request.user,
+                    batch=batch,
+                    notes=f"Queued bulk assign per_agency={int(per_agency)}",
+                    metadata={"agency_ids": ids_payload or [], "task_id": task.id},
+                )
+            except Exception:
+                pass
+            return Response({"status": "queued", "task_id": task.id, "detail": f"Bulk assign per_agency={int(per_agency)} queued."}, status=status.HTTP_200_OK)
+        except Exception:
+            pass
         qs_agencies = CustomUser.objects.filter(Q(role="agency") | Q(category__startswith="agency"))
         if agency_ids:
             qs_agencies = qs_agencies.filter(id__in=agency_ids)
@@ -1727,6 +2011,34 @@ class CouponBatchViewSet(mixins.CreateModelMixin,
         if not is_agency_user(agency):
             return Response({"agency_id": ["Provided user is not an agency."]}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Async path: enqueue background assign to agency by count
+        try:
+            from jobs.models import BackgroundTask
+            idem_key = f"assign_agency_count:{request.user.id}:{batch.id}:{agency.id}:{int(count)}"
+            task = BackgroundTask.enqueue(
+                task_type="assign_agency_count",
+                payload={
+                    "actor_id": int(request.user.id),
+                    "batch_id": int(batch.id),
+                    "agency_id": int(agency.id),
+                    "count": int(count),
+                },
+                idempotency_key=idem_key,
+            )
+            try:
+                AuditTrail.objects.create(
+                    action="assigned_to_agency_by_count_enqueued",
+                    actor=request.user,
+                    batch=batch,
+                    notes=f"Queued assign {int(count)} to {agency.username}",
+                    metadata={"agency_id": agency.id, "count": int(count), "task_id": task.id},
+                )
+            except Exception:
+                pass
+            return Response({"status": "queued", "task_id": task.id, "detail": f"Assign {int(count)} to agency {agency.username} queued."}, status=status.HTTP_200_OK)
+        except Exception:
+            pass
+
         code_ids = list(
             CouponCode.objects
             .filter(batch=batch, status="AVAILABLE")
@@ -1774,6 +2086,34 @@ class CouponBatchViewSet(mixins.CreateModelMixin,
             return Response({"employee_id": ["Invalid employee id."]}, status=status.HTTP_400_BAD_REQUEST)
         if not is_employee_user(employee):
             return Response({"employee_id": ["Provided user is not an employee."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Async path: enqueue background admin assign to employee by count
+        try:
+            from jobs.models import BackgroundTask
+            idem_key = f"admin_assign_employee_count:{request.user.id}:{batch.id}:{employee.id}:{int(count)}"
+            task = BackgroundTask.enqueue(
+                task_type="admin_assign_employee_count",
+                payload={
+                    "actor_id": int(request.user.id),
+                    "batch_id": int(batch.id),
+                    "employee_id": int(employee.id),
+                    "count": int(count),
+                },
+                idempotency_key=idem_key,
+            )
+            try:
+                AuditTrail.objects.create(
+                    action="admin_assigned_to_employee_by_count_enqueued",
+                    actor=request.user,
+                    batch=batch,
+                    notes=f"Queued assign {int(count)} to employee {employee.username}",
+                    metadata={"employee_id": employee.id, "count": int(count), "task_id": task.id},
+                )
+            except Exception:
+                pass
+            return Response({"status": "queued", "task_id": task.id, "detail": f"Assign {int(count)} to employee {employee.username} queued."}, status=status.HTTP_200_OK)
+        except Exception:
+            pass
 
         code_ids = list(
             CouponCode.objects
@@ -2500,6 +2840,8 @@ class CouponActivateView(APIView):
     def post(self, request):
         t = str(request.data.get("type") or "").strip()
         source = request.data.get("source") or {}
+        t_start = time.time()
+        timing = {}
         # Normalize source for e-coupon activations: attach CouponCode.id for traceability
         try:
             code_str = str(source.get("code") or "").strip()
@@ -2512,6 +2854,30 @@ class CouponActivateView(APIView):
             pass
         if t not in ("150", "50", "750", "759"):
             return Response({"detail": "type must be '150', '50', '750' or '759'."}, status=status.HTTP_400_BAD_REQUEST)
+        # Async: enqueue background activation and return 200 immediately
+        try:
+            from jobs.models import BackgroundTask
+            code_or_id = str(source.get("id") or source.get("code") or "")
+            idem_key = f"coupon_activate:{request.user.id}:{t}:{code_or_id}"
+            task = BackgroundTask.enqueue(
+                task_type="coupon_activate",
+                payload={"user_id": int(request.user.id), "type": t, "source": source},
+                idempotency_key=idem_key,
+            )
+            try:
+                AuditTrail.objects.create(
+                    action="coupon_activate_enqueued",
+                    actor=request.user,
+                    notes=f"Activation queued type={t}",
+                    metadata={"type": t, "code": source.get("code"), "id": source.get("id"), "task_id": task.id},
+                )
+            except Exception:
+                pass
+            return Response({"status": "queued", "task_id": task.id, "detail": f"Coupon {t} activation queued."}, status=status.HTTP_200_OK)
+        except Exception:
+            # If enqueue fails, fall back to synchronous path below
+            pass
+        t_act = time.time()
         if t == "150":
             ok = activate_150_active(request.user, {"type": "coupon_150_activate", **source})
         elif t == "50":
@@ -2519,6 +2885,8 @@ class CouponActivateView(APIView):
         else:
             # 750 and 759: treat as activation event for account status only
             ok = True
+        timing["activate"] = time.time() - t_act
+        t_after = time.time()
         # Mark first purchase flags (safe idempotent)
         try:
             ensure_first_purchase_activation(request.user, {"type": "coupon_first_purchase", **source})
@@ -2629,6 +2997,18 @@ class CouponActivateView(APIView):
         except Exception:
             pass
 
+        try:
+            timing["post"] = time.time() - t_after
+            timing["total"] = time.time() - t_start
+            logger.info(
+                "coupon_activate timings user=%s type=%s code=%s timings=%s",
+                getattr(request.user, "id", None),
+                t,
+                str(source.get("code") or ""),
+                timing,
+            )
+        except Exception:
+            pass
         return Response({"activated": bool(ok), "detail": f"Coupon {t} activation processed."}, status=status.HTTP_200_OK)
 
 
@@ -2931,6 +3311,33 @@ class ECouponOrderViewSet(mixins.CreateModelMixin,
         role = order.role_at_purchase
         if role not in ("consumer", "agency", "employee"):
             return Response({"detail": "Invalid role on order."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Async: enqueue background approval and return quickly, like activate API
+        try:
+            from jobs.models import BackgroundTask
+            idem_key = f"ecoupon_order_approve:{order.id}"
+            task = BackgroundTask.enqueue(
+                task_type="ecoupon_order_approve",
+                payload={
+                    "order_id": int(order.id),
+                    "reviewer_id": int(request.user.id) if request.user and getattr(request.user, 'id', None) else None,
+                    "review_note": str(request.data.get("review_note") or "").strip(),
+                },
+                idempotency_key=idem_key,
+            )
+            try:
+                AuditTrail.objects.create(
+                    action="store_order_approve_enqueued",
+                    actor=request.user,
+                    notes=f"Queued approval for order #{order.id}",
+                    metadata={"order_id": order.id, "task_id": task.id},
+                )
+            except Exception:
+                pass
+            return Response({"status": "queued", "task_id": task.id, "detail": f"Order {order.id} approval queued."}, status=status.HTTP_200_OK)
+        except Exception:
+            # Fallback to synchronous approval if enqueue fails
+            pass
 
         with transaction.atomic():
             # First try product-scoped pool (coupon-specific)

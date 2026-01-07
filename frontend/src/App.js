@@ -109,6 +109,7 @@ import UserApp from "./pages/UserApp";
 import AboutPage from "./pages/AboutPage";
 import PrimePage from "./pages/PrimePage";
 import BusinessPage from "./pages/BusinessPage";
+import DashboardContent from "./pages/DashboardContent";
 
 function LegacyAuthEntry() {
   const location = useLocation();
@@ -178,11 +179,12 @@ function App() {
           }
         />
 
+       
         <Route
           path="/user/dashboard2"
           element={
             <ProtectedRoute allowedRoles={["user"]}>
-              <UserDashboard2Shell />
+              <DashboardContent embedded />
             </ProtectedRoute>
           }
         />

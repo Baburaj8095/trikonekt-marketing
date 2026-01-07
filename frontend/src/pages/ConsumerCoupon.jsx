@@ -23,6 +23,10 @@ import {
   Tabs,
   Tab,
   Chip,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Select,
 } from "@mui/material";
 import API from "../api/api";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
@@ -86,7 +90,88 @@ export default function ConsumerCoupon() {
   const [transferCodeForms, setTransferCodeForms] = useState({});
   const [transferCodeBusy, setTransferCodeBusy] = useState({});
   const [activateCodeBusy, setActivateCodeBusy] = useState({});
+  const [queuedByCode, setQueuedByCode] = useState({});
 
+  // Persist queued activations across refresh
+  const QUEUE_LS_KEY = "queued_coupon_codes";
+  const QUEUE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+  const readQueuedStorage = () => {
+    try {
+      const raw = localStorage.getItem(QUEUE_LS_KEY) || "{}";
+      const obj = JSON.parse(raw);
+      return obj && typeof obj === "object" ? obj : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const writeQueuedStorage = (m) => {
+    try {
+      localStorage.setItem(QUEUE_LS_KEY, JSON.stringify(m || {}));
+    } catch {}
+  };
+
+  const markQueued = (id) => {
+    setQueuedByCode((m) => ({ ...m, [id]: true }));
+    const map = readQueuedStorage();
+    map[id] = Date.now();
+    writeQueuedStorage(map);
+  };
+
+  const clearQueued = (id) => {
+    setQueuedByCode((m) => {
+      const { [id]: _omit, ...rest } = m;
+      return rest;
+    });
+    const map = readQueuedStorage();
+    if (map && typeof map === "object" && map[id]) {
+      delete map[id];
+      writeQueuedStorage(map);
+    }
+  };
+
+  const hydrateQueuedFromStorage = () => {
+    const map = readQueuedStorage();
+    const now = Date.now();
+    const fresh = {};
+    Object.entries(map).forEach(([k, ts]) => {
+      if (now - Number(ts) < QUEUE_TTL_MS) fresh[k] = true;
+    });
+    setQueuedByCode(fresh);
+    if (Object.keys(fresh).length !== Object.keys(map).length) {
+      const toWrite = {};
+      Object.keys(fresh).forEach((k) => { toWrite[k] = now; });
+      writeQueuedStorage(toWrite);
+    }
+  };
+
+  // Filter state for codes list (default: show pending)
+  const [codeFilter, setCodeFilter] = useState("pending");
+
+  const filteredCodes = useMemo(() => {
+    const list = Array.isArray(myCodes) ? myCodes : [];
+    if (codeFilter === "all") return list;
+    return list.filter((c) => {
+      const status = String(c.display_status || c.status || "").toUpperCase();
+      const isQueuedLocal = !!queuedByCode[c.id];
+      switch (codeFilter) {
+        case "pending":
+          return isQueuedLocal || status === "PENDING" || status === "SOLD";
+        case "available":
+          return status === "SOLD";
+        case "activated":
+          return status === "ACTIVATED";
+        case "redeemed":
+          return status === "REDEEMED";
+        case "transferred":
+          return status === "TRANSFERRED";
+        default:
+          return true;
+      }
+    });
+  }, [myCodes, codeFilter, queuedByCode]);
+  
   // Manual lucky coupon submission
   const [manual, setManual] = useState({
     coupon_code: "",
@@ -154,8 +239,7 @@ export default function ConsumerCoupon() {
       setTransferDialog((d) => ({ ...d, submitting: false, open: false }));
       // Immediately reflect transferred state locally
       setMyCodes((prev) => prev.map((x) => x.id === codeId ? { ...x, display_status: "TRANSFERRED", can_transfer: false, can_activate: false } : x));
-      await loadMyCodes();
-      await loadMySummary();
+      await loadCombined();
     } catch (e) {
       const err = e?.response?.data;
       const msg = (typeof err === "string" ? err : (err?.detail || JSON.stringify(err || {}))) || "Transfer failed.";
@@ -196,7 +280,7 @@ export default function ConsumerCoupon() {
       alert("Transfer submitted.");
       setTransferForms((m) => ({ ...m, [id]: { to_username: "", pincode: "", notes: "" } }));
       await loadMySubmissions();
-      await loadMySummary();
+      await loadCombined();
     } catch (e) {
       const err = e?.response?.data;
       const msg = (typeof err === "string" ? err : (err?.detail || JSON.stringify(err || {}))) || "Transfer failed.";
@@ -268,6 +352,27 @@ export default function ConsumerCoupon() {
     }
   };
 
+  // Combined loader for KPIs (summary) + coupons list
+  const loadCombined = async () => {
+    try {
+      setLoadingSummary(true);
+      setCodesLoading(true);
+      setErrorSummary("");
+      setCodesError("");
+      const res = await API.get("/coupons/codes/consumer-overview/");
+      setMySummary(res?.data?.summary || null);
+      const codes = res?.data?.codes;
+      const arr = Array.isArray(codes) ? codes : (codes?.results || []);
+      setMyCodes(arr || []);
+    } catch (e) {
+      setErrorSummary("Failed to load summary.");
+      setCodesError("Failed to load my e‑coupons.");
+    } finally {
+      setLoadingSummary(false);
+      setCodesLoading(false);
+    }
+  };
+
   const onCodeTransferChange = (codeId, field, value) => {
     setTransferCodeForms((m) => ({ ...m, [codeId]: { ...(m[codeId] || {}), [field]: value } }));
   };
@@ -292,8 +397,7 @@ export default function ConsumerCoupon() {
       // Immediately reflect transferred state locally
       setMyCodes((prev) => prev.map((x) => x.id === codeId ? { ...x, display_status: "TRANSFERRED", can_transfer: false, can_activate: false } : x));
       setTransferCodeForms((m) => ({ ...m, [codeId]: { to_username: "", pincode: "", notes: "" } }));
-      await loadMyCodes();
-      await loadMySummary();
+      await loadCombined();
     } catch (e) {
       const err = e?.response?.data;
       const msg = (typeof err === "string" ? err : (err?.detail || JSON.stringify(err || {}))) || "Transfer failed.";
@@ -301,6 +405,23 @@ export default function ConsumerCoupon() {
     } finally {
       setTransferCodeBusy((m) => ({ ...m, [codeId]: false }));
     }
+  };
+
+  // Helpers for activation task polling
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const pollTask = async (taskId, { intervalMs = 1500, timeoutMs = 30000 } = {}) => {
+    const started = Date.now();
+    while (Date.now() - started < timeoutMs) {
+      try {
+        const res = await API.get(`/jobs/${taskId}/status/`);
+        const st = res?.data?.status;
+        if (st === "DONE" || st === "FAILED") return res?.data;
+      } catch (e) {
+        // ignore transient errors and continue polling
+      }
+      await sleep(intervalMs);
+    }
+    return { id: taskId, status: "TIMEOUT" };
   };
 
   // Quick Activate button per owned e‑coupon
@@ -319,15 +440,58 @@ export default function ConsumerCoupon() {
       };
       const ref = String(form.referral_id || "").trim();
       if (ref) src.referral_id = ref;
-      await API.post("/v1/coupon/activate/", {
+
+      const res = await API.post("/v1/coupon/activate/", {
         type: t,
         source: src,
       });
-      try { alert(`Activated (${t}).`); } catch {}
-      // Immediately disable actions locally for this code
-      setMyCodes((prev) => prev.map((x) => x.id === codeId ? { ...x, display_status: "ACTIVATED", can_activate: false, can_transfer: false } : x));
-      await loadMySummary();
-      await loadMyCodes();
+      const data = res?.data || {};
+
+      // If queued, set local pending and poll job status
+      if (data?.status === "queued" && data?.task_id) {
+        try { alert("Activation queued. Processing in background..."); } catch {}
+        markQueued(codeId);
+        // Reflect PENDING locally and disable actions while processing
+        setMyCodes((prev) =>
+          prev.map((x) =>
+            x.id === codeId ? { ...x, display_status: "PENDING", can_activate: false, can_transfer: false } : x
+          )
+        );
+        const result = await pollTask(data.task_id, { intervalMs: 1500, timeoutMs: 30000 });
+        if (result?.status === "DONE") {
+          clearQueued(codeId);
+          await loadCombined();
+          try { alert(`Activation completed (${t}).`); } catch {}
+        } else if (result?.status === "FAILED") {
+          clearQueued(codeId);
+          try { alert("Activation failed. Please try again."); } catch {}
+          // Re-enable actions for this code
+          setMyCodes((prev) =>
+            prev.map((x) =>
+              x.id === codeId ? { ...x, display_status: "SOLD", can_activate: true, can_transfer: true } : x
+            )
+          );
+        } else {
+          // TIMEOUT: keep pending, allow manual refresh
+          try { alert("Still processing... it will update shortly."); } catch {}
+        }
+      } else if (typeof data?.activated !== "undefined") {
+        // Synchronous fallback path
+        if (data.activated) {
+          setMyCodes((prev) =>
+            prev.map((x) =>
+              x.id === codeId ? { ...x, display_status: "ACTIVATED", can_activate: false, can_transfer: false } : x
+            )
+          );
+          await loadCombined();
+          try { alert(`Activated (${t}).`); } catch {}
+        } else {
+          try { alert("Activation failed."); } catch {}
+        }
+      } else {
+        // Unknown response shape: do a single refresh
+        await loadCombined();
+      }
     } catch (e) {
       const err = e?.response?.data;
       const msg = (typeof err === "string" ? err : (err?.detail || JSON.stringify(err || {}))) || "Activation failed.";
@@ -404,10 +568,34 @@ export default function ConsumerCoupon() {
   };
 
   useEffect(() => {
-    loadWallet();
-    loadMySummary();
-    loadMyCodes();
+    loadCombined();
   }, []);
+
+  // Initialize queued state from storage once on mount
+  useEffect(() => {
+    try {
+      hydrateQueuedFromStorage();
+    } catch {}
+  }, []);
+
+  // Prune queued markers for terminal statuses whenever myCodes refresh
+  useEffect(() => {
+    try {
+      setQueuedByCode((prev) => {
+        const next = { ...prev };
+        (myCodes || []).forEach((c) => {
+          const s = String(c.display_status || c.status || "").toUpperCase();
+          if (s === "ACTIVATED" || s === "REDEEMED" || s === "TRANSFERRED") {
+            delete next[c.id];
+          }
+        });
+        const toWrite = {};
+        Object.keys(next).forEach((id) => { toWrite[id] = Date.now(); });
+        writeQueuedStorage(toWrite);
+        return next;
+      });
+    } catch {}
+  }, [myCodes]);
 
   const validate = () => {
     if (!form.coupon_code) {
@@ -920,34 +1108,51 @@ export default function ConsumerCoupon() {
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
           All My E‑Coupon Codes
         </Typography>
+        <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1 }}>
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel id="codeFilterLbl">Filter</InputLabel>
+            <Select
+              labelId="codeFilterLbl"
+              id="codeFilter"
+              label="Filter"
+              value={codeFilter}
+              onChange={(e) => setCodeFilter(e.target.value)}
+            >
+              <MenuItem value="pending">Pending</MenuItem>
+              <MenuItem value="available">Available</MenuItem>
+              <MenuItem value="activated">Activated</MenuItem>
+              <MenuItem value="redeemed">Redeemed</MenuItem>
+              <MenuItem value="transferred">Transferred</MenuItem>
+              <MenuItem value="all">All</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
         {codesLoading ? (
           <Box sx={{ py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
             <CircularProgress size={18} /> <Typography variant="body2">Loading...</Typography>
           </Box>
         ) : codesError ? (
           <Alert severity="error">{codesError}</Alert>
-        ) : (myCodes || []).length === 0 ? (
+        ) : filteredCodes.length === 0 ? (
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
             No e‑coupon entries.
           </Typography>
         ) : (
           <>
           <Box sx={{ display: { xs: "block", sm: "none" } }}>
-            {(myCodes || []).map((c) => {
+            {filteredCodes.map((c) => {
               const status = String(c.display_status || c.status || "").toUpperCase();
               const isActivated = status === "ACTIVATED";
-              const isPending = status === "PENDING";
-              const isRedeemed = status === "REDEEMED";
-              const canAct = !!c.can_activate;
-              const canTrans = !!c.can_transfer;
-              const busy = !!transferCodeBusy[c.id];
-              const forceEnable = isPending;
-              const dialogBusyThis = Boolean(transferDialog.submitting && transferDialog.code && transferDialog.code.id === c.id);
-              const isTransferred = status === "TRANSFERRED";
-              const disableActivate = (isActivated || isTransferred) ? true : (Boolean(activateCodeBusy[c.id]) || busy || dialogBusyThis || (!forceEnable && !canAct));
-              const disableTransfer = forceEnable
-                ? (!!busy || Boolean(activateCodeBusy[c.id]) || dialogBusyThis)
-                : (busy || !canTrans || Boolean(activateCodeBusy[c.id]) || isActivated || isTransferred || dialogBusyThis);
+                const isPending = status === "PENDING";
+                const isRedeemed = status === "REDEEMED";
+                const canAct = !!c.can_activate;
+                const canTrans = !!c.can_transfer;
+                const busy = !!transferCodeBusy[c.id];
+                const dialogBusyThis = Boolean(transferDialog.submitting && transferDialog.code && transferDialog.code.id === c.id);
+                const isTransferred = status === "TRANSFERRED";
+                const isQueuedLocal = !!queuedByCode[c.id];
+                const disableActivate = isActivated || isTransferred || isQueuedLocal || Boolean(activateCodeBusy[c.id]) || busy || dialogBusyThis || !canAct;
+                const disableTransfer = isTransferred || isActivated || isQueuedLocal || busy || Boolean(activateCodeBusy[c.id]) || dialogBusyThis || !canTrans;
               const chipColor = isActivated ? "success" : (isRedeemed ? "error" : (isPending ? "warning" : (isTransferred ? "info" : "default")));
               return (
                 <Paper key={c.id} sx={{ p: 1.5, mb: 1.5, borderRadius: 2 }}>
@@ -975,9 +1180,7 @@ export default function ConsumerCoupon() {
                           onClick={() => !isActivated && handleActivateCode(c)}
                           startIcon={isActivated ? <CheckCircleIcon /> : undefined}
                         >
-                          {isActivated
-                            ? "Activated"
-                            : (activateCodeBusy[c.id] ? "Activating..." : "Activate")}
+                            {isActivated ? "Activated" : (isQueuedLocal ? "Queued..." : (activateCodeBusy[c.id] ? "Activating..." : "Activate"))}
                         </Button>
                         <Button
                           size="small"
@@ -1030,7 +1233,7 @@ export default function ConsumerCoupon() {
                 </TableRow>
               </TableHead>
               <TableBody>
-              {(myCodes || []).map((c) => {
+              {filteredCodes.map((c) => {
                 const status = String(c.display_status || c.status || "").toUpperCase();
                 const isActivated = status === "ACTIVATED";
                 const isPending = status === "PENDING";
@@ -1039,13 +1242,11 @@ export default function ConsumerCoupon() {
                 const canTrans = !!c.can_transfer;
                 const tf = transferCodeForms[c.id] || {};
                 const busy = !!transferCodeBusy[c.id];
-                const forceEnable = isPending;
                 const dialogBusyThis = Boolean(transferDialog.submitting && transferDialog.code && transferDialog.code.id === c.id);
                 const isTransferred = status === "TRANSFERRED";
-                const disableActivate = (isActivated || isTransferred) ? true : (Boolean(activateCodeBusy[c.id]) || busy || dialogBusyThis || (!forceEnable && !canAct));
-                const disableTransfer = forceEnable
-                  ? (!!busy || Boolean(activateCodeBusy[c.id]) || dialogBusyThis)
-                  : (busy || !canTrans || Boolean(activateCodeBusy[c.id]) || isActivated || isTransferred || dialogBusyThis);
+                const isQueuedLocal = !!queuedByCode[c.id];
+                const disableActivate = isActivated || isTransferred || isQueuedLocal || Boolean(activateCodeBusy[c.id]) || busy || dialogBusyThis || !canAct;
+                const disableTransfer = isTransferred || isActivated || isQueuedLocal || busy || Boolean(activateCodeBusy[c.id]) || dialogBusyThis || !canTrans;
                 return (
                   <TableRow key={c.id}>
                     <TableCell>{c.code}</TableCell>
@@ -1069,9 +1270,7 @@ export default function ConsumerCoupon() {
                             onClick={() => !isActivated && handleActivateCode(c)}
                             startIcon={isActivated ? <CheckCircleIcon /> : undefined}
                           >
-                            {isActivated
-                              ? "Activated"
-                              : (activateCodeBusy[c.id] ? "Activating..." : "Activate")}
+                            {isActivated ? "Activated" : (isQueuedLocal ? "Queued..." : (activateCodeBusy[c.id] ? "Activating..." : "Activate"))}
                           </Button>
                           <Button
                             size="small"

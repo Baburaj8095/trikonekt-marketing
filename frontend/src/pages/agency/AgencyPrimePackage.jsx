@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Box, Container, Paper, Tabs, Tab, Typography, Grid, Card, CardContent, Chip } from "@mui/material";
+import { Box, Container, Paper, Tabs, Tab, Typography, Grid, Card, CardContent, Chip, Dialog, Button } from "@mui/material";
 import API from "../../api/api";
 import SubFranchisePrimePricing from "../../components/SubFranchisePrimePricing";
 
@@ -18,6 +18,7 @@ export default function AgencyPrimePackage() {
   const [packages, setPackages] = useState([]);
   const [pkgLoading, setPkgLoading] = useState(false);
   const [pkgError, setPkgError] = useState("");
+  const [paymentSuccessOpen, setPaymentSuccessOpen] = useState(false);
 
   const loadAgencyPackages = async () => {
     try {
@@ -42,6 +43,11 @@ export default function AgencyPrimePackage() {
   useEffect(() => {
     loadAgencyPackages();
   }, []);
+
+  const handlePurchased = async () => {
+    await loadAgencyPackages();
+    setPaymentSuccessOpen(true);
+  };
 
 
 
@@ -120,9 +126,23 @@ export default function AgencyPrimePackage() {
 
       {tab === "subfranchise" && (
         <Box>
-          <SubFranchisePrimePricing packages={packages} onPurchased={loadAgencyPackages} />
+          <SubFranchisePrimePricing packages={packages} onPurchased={handlePurchased} />
         </Box>
       )}
+      {/* Success Popup */}
+      <Dialog open={paymentSuccessOpen} onClose={() => setPaymentSuccessOpen(false)}>
+        <Box sx={{ p: 3, textAlign: "center", minWidth: 280 }}>
+          <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>
+            Payment Request Submitted
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            We will review it shortly.
+          </Typography>
+          <Button variant="contained" sx={{ mt: 2 }} onClick={() => setPaymentSuccessOpen(false)}>
+            OK
+          </Button>
+        </Box>
+      </Dialog>
     </Container>
   );
 }

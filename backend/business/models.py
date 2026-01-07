@@ -131,7 +131,12 @@ class CommissionConfig(models.Model):
     # ===== Extended fields for MLM feature set =====
     prime_activation_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("150.00"))
     global_activation_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("50.00"))
-    redeem_credit_amount_150 = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("140.00"))
+    redeem_credit_amount_150 = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("150.00"))
+    # PRIME 750 behavior
+    prime_750_units = models.PositiveIntegerField(default=5, help_text="How many 150-units to open for PRIME 750")
+    prime_750_redeem_mode = models.CharField(max_length=24, default="units_and_wallet", help_text="units_and_wallet | wallet_only")
+    # MONTHLY 759: open 5/3 matrices only on the first purchase/box when True
+    monthly_759_open_once = models.BooleanField(default=True, help_text="If true, 5/3 matrices open only on the first 759 purchase")
     active_direct_bonus_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("2.00"))
     active_self_bonus_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("1.00"))
     five_matrix_levels = models.PositiveIntegerField(default=6)

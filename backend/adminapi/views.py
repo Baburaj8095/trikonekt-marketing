@@ -2162,9 +2162,9 @@ class AdminMatrixCommissionConfig(APIView):
           three_matrix_levels, three_matrix_amounts_json, three_matrix_percents_json,
           updated_at
         }
-      - When ?product=coupon150|rs759 is provided: returns per‑product overrides under
+      - When ?product=coupon150|rs759|750 is provided: returns per‑product overrides under
         master_commission_json.consumer_matrix_5/3[productKey] with fallback to globals.
-        productKey: "150" for coupon150, "759" for rs759.
+        productKey: "150" for coupon150, "759" for rs759, "750" for 750.
 
     PATCH:
       - No product: same as before, updates typed fields via AdminAutopoolConfigSerializer.
@@ -2179,8 +2179,10 @@ class AdminMatrixCommissionConfig(APIView):
         p = (request.query_params.get("product") or "").strip().lower()
         if p in ("coupon150", "coupon_150", "150", "prime150", "prime_150"):
             return "150"
-        if p in ("rs759", "759", "prime750", "prime_750", "750"):
+        if p in ("rs759", "759"):
             return "759"
+        if p in ("750", "prime750", "prime_750", "rs750"):
+            return "750"
         return None
 
     def _to_num_list(self, arr):
@@ -2296,7 +2298,7 @@ class AdminMasterCommissionConfig(APIView):
     """
     GET:
       - No product: return global master commission view (tax, withdrawal %, company user, upline %, global geo %)
-      - With ?product=coupon150|rs759: additionally include per-product keys under master_commission_json:
+      - With ?product=coupon150|rs759|750: additionally include per-product keys under master_commission_json:
         {
           direct_bonus: { sponsor, self },
           geo_mode: "fixed" | "percent" | "",
@@ -2329,8 +2331,10 @@ class AdminMasterCommissionConfig(APIView):
         p = (request.query_params.get("product") or "").strip().lower()
         if p in ("coupon150", "coupon_150", "150", "prime150", "prime_150"):
             return "150"
-        if p in ("rs759", "759", "prime750", "prime_750", "750"):
+        if p in ("rs759", "759"):
             return "759"
+        if p in ("750", "prime750", "prime_750", "rs750"):
+            return "750"
         return None
 
     def get(self, request):

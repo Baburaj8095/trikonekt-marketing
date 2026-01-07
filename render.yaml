@@ -15,19 +15,19 @@ services:
       elif [ "$SEED_LOCATIONS_ON_DEPLOY" = "True" ]; then
         python manage.py load_location_data
       fi
-    startCommand: gunicorn core.wsgi:application --bind 0.0.0.0:$PORT
-    healthCheckPath: /admin/login/?next=/admin/
+    startCommand: gunicorn core.wsgi:application --bind 0.0.0.0:$PORT --worker-class gthread --workers 2 --threads 2 --timeout 300 --graceful-timeout 30 --max-requests 200 --max-requests-jitter 50
+    healthCheckPath: /healthz
     envVars:
       - key: SECRET_KEY
         generateValue: true
       - key: DEBUG
         value: "False"
       - key: ALLOWED_HOSTS
-        value: ".onrender.com"
+        value: ".onrender.com,.trikonekt.com,www.trikonekt.com"
       - key: CSRF_TRUSTED_ORIGINS
-        value: "https://*.vercel.app,https://*.onrender.com"
+        value: "https://*.vercel.app,https://*.onrender.com,https://www.trikonekt.com,https://trikonekt.com"
       - key: CORS_ALLOWED_ORIGINS
-        value: "https://your-frontend.vercel.app"
+        value: "https://your-frontend.vercel.app,https://www.trikonekt.com,https://trikonekt.com"
       - key: CORS_ALLOWED_ORIGIN_REGEXES
         value: '^https://.*\.vercel\.app$'
       - key: SECURE_SSL_REDIRECT
@@ -68,10 +68,62 @@ services:
         value: "False"
       - key: SEED_LOCATIONS_FIXTURE
         value: "False"
+      # Production should not skip heavy work in HTTP; heavy is offloaded to worker
+      - key: SKIP_HEAVY_ON_APPROVE
+        value: "False"
+      # Optional tuning for background batches
+      - key: COUPON_DIST_BATCH
+        value: "50"
+      - key: MONTHLY_759_BATCH
+        value: "50"
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: DB_CONN_MAX_AGE
+        value: "120"
+      - key: DRF_PAGE_SIZE
+        value: "25"
+      - key: DRF_THROTTLE_ANON
+        value: "60/min"
+      - key: DRF_THROTTLE_USER
+        value: "300/min"
+      - key: DATA_UPLOAD_MAX_MEMORY_SIZE
+        value: "5242880"
+      - key: FILE_UPLOAD_MAX_MEMORY_SIZE
+        value: "5242880"
     disk:
       name: media
       mountPath: /opt/render/project/src/backend/media
 
+  - type: worker
+    name: trikonekt-worker
+    env: python
+    plan: free
+    rootDir: backend
+    autoDeploy: true
+    buildCommand: |
+      pip install -r requirements.txt
+    preDeployCommand: |
+      python manage.py migrate --noinput
+    startCommand: python manage.py process_tasks
+    envVars:
+      # IMPORTANT: Use the same SECRET_KEY value as the web service for consistent signing.
+      # Render YAML cannot auto-sync between services; after first deploy, copy the generated SECRET_KEY from web to worker.
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: trikonekt-db
+          property: connectionString
+      - key: COUPON_DIST_BATCH
+        value: "50"
+      - key: MONTHLY_759_BATCH
+        value: "50"
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: DB_CONN_MAX_AGE
+        value: "120"
 
 databases:
   - name: trikonekt-db

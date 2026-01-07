@@ -5,6 +5,9 @@ from typing import Iterable, Optional, Dict, Any
 
 from django.db import transaction, IntegrityError
 from django.utils import timezone
+import time
+import logging
+logger = logging.getLogger(__name__)
 
 from accounts.models import Wallet, CustomUser
 from business.models import (
@@ -200,9 +203,14 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
       - Idempotent via SubscriptionActivation
     Returns True if newly activated, False if already existed.
     """
+    t0 = time.time()
+    timings: Dict[str, Any] = {}
+
     cfg = CommissionConfig.get_solo()
     src_type = str(source.get("type") or "")
     src_id = str(source.get("id") or source.get("code") or "")
+
+    t_create_start = time.time()
     try:
         SubscriptionActivation.objects.create(
             user=user,
@@ -213,12 +221,36 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
             metadata=source,
         )
         created = True
+        try:
+            from coupons.models import AuditTrail
+            AuditTrail.objects.create(
+                action="debug_activate_150_active_created",
+                actor=user,
+                metadata={"source_type": src_type, "source_id": src_id},
+            )
+        except Exception:
+            pass
     except IntegrityError:
+        try:
+            from coupons.models import AuditTrail
+            AuditTrail.objects.create(
+                action="debug_activate_150_active_exists",
+                actor=user,
+                metadata={"source_type": src_type, "source_id": src_id},
+            )
+        except Exception:
+            pass
         return False
+    timings["create_activation"] = time.time() - t_create_start
 
     # Bonuses
     base150 = _q2(cfg.prime_activation_amount or 150)
     if base150 <= 0:
+        timings["total"] = time.time() - t0
+        try:
+            logger.info("activate_150_active timings user=%s source_id=%s timings=%s", getattr(user, "id", None), src_id, timings)
+        except Exception:
+            pass
         return created
 
     # Direct sponsor bonus ₹2
@@ -256,13 +288,21 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
         skip_matrix_parts = False
 
     if skip_matrix_parts:
+        t_first_start = time.time()
         try:
             ensure_first_purchase_activation(user, source)
+        except Exception:
+            pass
+        timings["ensure_first"] = time.time() - t_first_start
+        timings["total"] = time.time() - t0
+        try:
+            logger.info("activate_150_active timings user=%s source_id=%s timings=%s", getattr(user, "id", None), src_id, timings)
         except Exception:
             pass
         return created
 
     # Create 5-matrix and 3-matrix pool entries
+    t_open_start = time.time()
     try:
         AutoPoolAccount.create_five_150_for_user(user, amount=base150)
     except Exception:
@@ -271,8 +311,10 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
         AutoPoolAccount.place_three_150_for_user(user, amount=base150)
     except Exception:
         pass
+    timings["open_accounts"] = time.time() - t_open_start
 
     # Distribute 5-matrix (L6) with fixed-amount override support
+    t5_start = time.time()
     five_levels = int(getattr(cfg, "five_matrix_levels", 6) or 6)
     upline6 = _resolve_upline(user, depth=five_levels)
     # Prefer admin master overrides: consumer_matrix_5["150"].fixed_amounts -> fallback to typed field
@@ -309,8 +351,10 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
             meta={"source": "FIVE_MATRIX_150", "source_type": src_type, "source_id": src_id},
             pool_type="FIVE_150",
         )
+    timings["distribute_five"] = time.time() - t5_start
 
     # Distribute 3-matrix (L15)
+    t3_start = time.time()
     three_levels = int(getattr(cfg, "three_matrix_levels", 15) or 15)
     upline15 = _resolve_upline(user, depth=three_levels)
 
@@ -345,8 +389,10 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
             meta={"source": "THREE_MATRIX_150", "source_type": src_type, "source_id": src_id},
             pool_type="THREE_150",
         )
+    timings["distribute_three"] = time.time() - t3_start
 
     # Geo (Agency) configurable payout for 150 Active
+    t_geo_start = time.time()
     try:
         from business.models import distribute_auto_pool_commissions
         distribute_auto_pool_commissions(
@@ -359,10 +405,18 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
         )
     except Exception:
         pass
+    timings["geo"] = time.time() - t_geo_start
 
     # Mark first purchase activation (idempotent)
+    t_first_start = time.time()
     try:
         ensure_first_purchase_activation(user, source)
+    except Exception:
+        pass
+    timings["ensure_first"] = time.time() - t_first_start
+    timings["total"] = time.time() - t0
+    try:
+        logger.info("activate_150_active timings user=%s source_id=%s timings=%s", getattr(user, "id", None), src_id, timings)
     except Exception:
         pass
 
@@ -373,7 +427,7 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
 def redeem_150(user: CustomUser, source: Dict[str, Any]) -> bool:
     """
     150 'Redeem' path:
-      - Credit ₹140 to consumer wallet
+      - Credit 150 reward points (1pt = ₹1) to user's Reward Points account
       - No pools opened
       - Idempotent via SubscriptionActivation(PRIME_150_REDEEM)
     """
@@ -386,23 +440,54 @@ def redeem_150(user: CustomUser, source: Dict[str, Any]) -> bool:
             package="PRIME_150_REDEEM",
             source_type=src_type,
             source_id=src_id,
-            amount=_q2(cfg.redeem_credit_amount_150 or 140),
+            amount=_q2(cfg.redeem_credit_amount_150 or 150),
             metadata=source,
         )
         created = True
+        try:
+            from coupons.models import AuditTrail
+            AuditTrail.objects.create(
+                action="debug_redeem_150_created",
+                actor=user,
+                metadata={"source_type": src_type, "source_id": src_id},
+            )
+        except Exception:
+            pass
     except IntegrityError:
+        try:
+            from coupons.models import AuditTrail
+            AuditTrail.objects.create(
+                action="debug_redeem_150_exists",
+                actor=user,
+                metadata={"source_type": src_type, "source_id": src_id},
+            )
+        except Exception:
+            pass
         return False
 
-    credit = _q2(cfg.redeem_credit_amount_150 or 140)
+    credit = _q2(cfg.redeem_credit_amount_150 or 150)
     if credit > 0:
-        _credit_wallet(
-            user,
-            credit,
-            tx_type="REDEEM_ECOUPON_CREDIT",
-            meta={"source": "REDEEM_150", "source_type": src_type, "source_id": src_id},
-            source_type=src_type,
-            source_id=src_id,
-        )
+        # Credit reward points instead of money wallet
+        try:
+            from accounts.models import RewardPointsAccount
+            RewardPointsAccount.credit_points(
+                user,
+                credit,
+                reason="REDEEM_150",
+                meta={"source_type": src_type, "source_id": src_id, "note": "Redeem 150 credited as reward points"},
+            )
+        except Exception:
+            # best-effort: do not block redeem flow if points credit fails
+            pass
+        try:
+            from coupons.models import AuditTrail
+            AuditTrail.objects.create(
+                action="debug_redeem_150_points_credit",
+                actor=user,
+                metadata={"points": str(credit), "source_type": src_type, "source_id": src_id},
+            )
+        except Exception:
+            pass
     return created
 
 
@@ -427,7 +512,25 @@ def activate_50(user: CustomUser, source: Dict[str, Any], package_code: str = "G
             metadata=source,
         )
         created = True
+        try:
+            from coupons.models import AuditTrail
+            AuditTrail.objects.create(
+                action="debug_activate_50_created",
+                actor=user,
+                metadata={"source_type": src_type, "source_id": src_id, "package": package_code},
+            )
+        except Exception:
+            pass
     except IntegrityError:
+        try:
+            from coupons.models import AuditTrail
+            AuditTrail.objects.create(
+                action="debug_activate_50_exists",
+                actor=user,
+                metadata={"source_type": src_type, "source_id": src_id, "package": package_code},
+            )
+        except Exception:
+            pass
         return False
 
     base50 = _q2(cfg.global_activation_amount or 50)

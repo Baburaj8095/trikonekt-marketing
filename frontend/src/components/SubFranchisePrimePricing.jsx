@@ -11,8 +11,16 @@ import {
   CircularProgress,
   Alert,
   TextField,
+  Drawer,
+  IconButton,
+  InputAdornment,
+  Snackbar,
+  Divider,
+  Dialog,
 } from "@mui/material";
-import API, { agencyAssignPackage } from "../api/api";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import API, { agencyAssignPackage, getEcouponStoreBootstrap } from "../api/api";
+import normalizeMediaUrl from "../utils/media";
 import { useNavigate } from "react-router-dom";
 import { addAgencyPackage } from "../store/cart";
 
@@ -44,6 +52,18 @@ export default function SubFranchisePrimePricing({
   const [buyingId, setBuyingId] = React.useState(null);
   // Per‑package custom amount input (₹)
   const [customAmounts, setCustomAmounts] = React.useState({});
+
+  // Payment drawer (UI only) — mirror consumer UX without changing backend flow
+  const [drawerOpen, setDrawerOpen] = React.useState(false);
+  const [selectedPkg, setSelectedPkg] = React.useState(null);
+  const [txnId, setTxnId] = React.useState("");
+  const [file, setFile] = React.useState(null);
+  const [payment, setPayment] = React.useState(null);
+  const [copied, setCopied] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [errorOpen, setErrorOpen] = React.useState(false);
+  const [errorMsg, setErrorMsg] = React.useState("");
+  const [zoomOpen, setZoomOpen] = React.useState(false);
 
   // Legacy detection: consider AG_SF already assigned if present in `packages` prop
   const legacyHasAgSf = React.useMemo(() => {
@@ -82,6 +102,24 @@ export default function SubFranchisePrimePricing({
   React.useEffect(() => {
     loadCatalog();
   }, []);
+
+  // Load UPI payment config when drawer opens (UI only; no API/contract change)
+  React.useEffect(() => {
+    let alive = true;
+    if (drawerOpen) {
+      (async () => {
+        try {
+          const boot = await getEcouponStoreBootstrap();
+          if (alive) setPayment(boot?.payment_config || null);
+        } catch {
+          if (alive) setPayment(null);
+        }
+      })();
+    }
+    return () => {
+      alive = false;
+    };
+  }, [drawerOpen]);
 
   const formatAmount = (amt) => {
     try {
@@ -240,36 +278,23 @@ export default function SubFranchisePrimePricing({
                         sx={{ mt: 1 }}
                       />
                       <Box sx={{ mt: "auto" }}>
-                        <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
-                          <Button
-                            variant="contained"
-                            onClick={() => addToCartInternal(pkg, false)}
-                            disabled={buyingId === pkg.id}
-                            fullWidth
-                            sx={{
-                              py: 1,
-                              fontWeight: 800,
-                              borderRadius: 2,
-                              backgroundColor: "#2563eb",
-                              "&:hover": { backgroundColor: "#1e40af" },
-                            }}
-                          >
-                            {buyingId === pkg.id ? "ADDING..." : "Add to Cart"}
-                          </Button>
-                          <Button
-                            variant="outlined"
-                            onClick={() => addToCartInternal(pkg, true)}
-                            disabled={buyingId === pkg.id}
-                            fullWidth
-                            sx={{
-                              py: 1,
-                              fontWeight: 800,
-                              borderRadius: 2,
-                            }}
-                          >
-                            {buyingId === pkg.id ? "..." : "Checkout Now"}
-                          </Button>
-                        </Stack>
+                        <Button
+                          variant="contained"
+                          onClick={() => {
+                            setSelectedPkg(pkg);
+                            setDrawerOpen(true);
+                          }}
+                          fullWidth
+                          sx={{
+                            py: 1,
+                            fontWeight: 800,
+                            borderRadius: 2,
+                            backgroundColor: "#2563eb",
+                            "&:hover": { backgroundColor: "#1e40af" },
+                          }}
+                        >
+                          Buy Now
+                        </Button>
                       </Box>
                     </CardContent>
                   </Card>
@@ -329,6 +354,191 @@ export default function SubFranchisePrimePricing({
           </Grid>
         ))}
       </Grid> */}
+      {/* Payment Drawer (UI/UX only) */}
+      <Drawer
+        anchor="bottom"
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        PaperProps={{
+          sx: {
+            borderTopLeftRadius: 16,
+            borderTopRightRadius: 16,
+            height: "88vh",
+            p: 2,
+          },
+        }}
+      >
+        {/* Handle bar */}
+        <Box sx={{ width: 40, height: 4, bgcolor: "divider", mx: "auto", mb: 1 }} />
+
+        <Typography fontWeight={900} fontSize={18} textAlign="center">
+          Complete Payment
+        </Typography>
+
+        {/* Summary */}
+        <Box
+          sx={{
+            p: 2,
+            mt: 2,
+            bgcolor: "grey.50",
+            borderRadius: 1.5,
+            border: "1px solid",
+            borderColor: "divider",
+          }}
+        >
+          <Typography fontWeight={700}>{selectedPkg?.name || "Package"}</Typography>
+
+          <Stack direction="row" justifyContent="space-between" mt={1}>
+            <Typography color="text.secondary">Total Amount</Typography>
+            <Typography fontWeight={900} fontSize={20}>
+              ₹
+              {(() => {
+                try {
+                  const v = customAmounts?.[selectedPkg?.id];
+                  const parsed = parseFloat(String(v ?? "").replace(/[,₹\s]/g, ""));
+                  if (Number.isFinite(parsed) && parsed > 0) return parsed;
+                  const n = Number(selectedPkg?.amount || 0);
+                  return Number.isFinite(n) ? n : 0;
+                } catch {
+                  return 0;
+                }
+              })()}
+            </Typography>
+          </Stack>
+        </Box>
+        <Divider sx={{ my: 1.5 }} />
+
+        {/* UPI Section */}
+        <Box sx={{ p: 2, mt: 2 }}>
+          <Typography fontWeight={700} mb={1}>
+            UPI Payment
+          </Typography>
+
+          {payment?.upi_qr_image_url ? (
+            <Box
+              component="img"
+              src={normalizeMediaUrl(payment.upi_qr_image_url)}
+              alt="UPI QR"
+              sx={{ width: 180, mx: "auto", display: "block", mb: 2, cursor: "pointer", borderRadius: 1 }}
+              onClick={() => setZoomOpen(true)}
+            />
+          ) : null}
+
+          <TextField
+            label="UPI ID"
+            value={payment?.upi_id || ""}
+            fullWidth
+            onClick={() => {
+              const v = payment?.upi_id || "";
+              if (v) navigator.clipboard.writeText(v);
+              setCopied(true);
+            }}
+            InputProps={{
+              readOnly: true,
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() => {
+                      const v = payment?.upi_id || "";
+                      if (v) navigator.clipboard.writeText(v);
+                      setCopied(true);
+                    }}
+                  >
+                    <ContentCopyIcon fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+        </Box>
+
+        <Alert severity="info" sx={{ mt: 2 }}>
+          Amount is auto‑calculated/entered above. Pay the exact amount and enter the UTR below.
+        </Alert>
+
+        <TextField
+          label="Transaction / UTR ID"
+          fullWidth
+          required
+          sx={{ mt: 2 }}
+          value={txnId}
+          onChange={(e) => setTxnId(e.target.value)}
+        />
+
+        <Button component="label" sx={{ mt: 2 }}>
+          Upload Payment Screenshot
+          <input type="file" hidden onChange={(e) => setFile(e.target.files?.[0] || null)} />
+        </Button>
+
+        <Button
+          fullWidth
+          variant="contained"
+          sx={{ mt: 3, height: 52 }}
+          disabled={!txnId || submitting || !selectedPkg}
+          onClick={async () => {
+            // UI-only flow: create/ensure assignment and refresh; do not alter API contracts
+            setSubmitting(true);
+            setErrorMsg("");
+            try {
+              await agencyAssignPackage({ package_id: selectedPkg.id });
+              try {
+                await loadCatalog();
+              } catch {}
+              if (typeof onPurchased === "function") {
+                try {
+                  await onPurchased();
+                } catch {}
+              }
+              setDrawerOpen(false);
+              setTxnId("");
+              setFile(null);
+            } catch (e) {
+              const msg =
+                e?.response?.data?.detail ||
+                (typeof e?.response?.data === "string" ? e.response.data : "") ||
+                e?.message ||
+                "Failed to submit request.";
+              setErrorMsg(String(msg));
+              setErrorOpen(true);
+            } finally {
+              setSubmitting(false);
+            }
+          }}
+        >
+          {submitting ? "Submitting..." : "Submit Payment"}
+        </Button>
+
+        <Button fullWidth variant="text" sx={{ mt: 1 }} onClick={() => setDrawerOpen(false)}>
+          Cancel
+        </Button>
+      </Drawer>
+
+      {/* QR Zoom Dialog */}
+      <Dialog open={zoomOpen} onClose={() => setZoomOpen(false)}>
+        <Box sx={{ p: 2 }}>
+          {payment?.upi_qr_image_url ? (
+            <Box
+              component="img"
+              src={normalizeMediaUrl(payment.upi_qr_image_url)}
+              alt="UPI QR Large"
+              sx={{ width: { xs: 300, sm: 400 }, height: "auto" }}
+            />
+          ) : null}
+        </Box>
+      </Dialog>
+
+      {/* Snackbars */}
+      <Snackbar open={copied} autoHideDuration={2000} onClose={() => setCopied(false)} message="UPI ID copied" />
+      <Snackbar
+        open={errorOpen}
+        autoHideDuration={4000}
+        onClose={() => setErrorOpen(false)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert onClose={() => setErrorOpen(false)} severity="error" sx={{ width: "100%" }}>
+          {errorMsg || "Something went wrong. Please try again."}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

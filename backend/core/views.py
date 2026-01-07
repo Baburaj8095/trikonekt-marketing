@@ -69,3 +69,21 @@ class CompanyPackagesView(APIView):
             ],
         }
         return Response(packages, status=status.HTTP_200_OK)
+
+class HealthzView(APIView):
+    """
+    GET /healthz
+    Lightweight health check with DB ping for Render health checks.
+    """
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request):
+        from django.db import connection
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1")
+                cursor.fetchone()
+        except Exception as e:
+            return Response({"status": "error", "db": False, "error": str(e)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        return Response({"status": "ok", "db": True}, status=status.HTTP_200_OK)

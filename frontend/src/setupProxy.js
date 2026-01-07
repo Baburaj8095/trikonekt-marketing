@@ -23,8 +23,8 @@ module.exports = function (app) {
       // Avoids noisy [HPM] WebSocket ECONNRESET logs during backend reloads.
       ws: false,
       logLevel: "error",
-      timeout: 120000,
-      proxyTimeout: 120000,
+      timeout: 300000,
+      proxyTimeout: 300000,
       onError(err, req, res) {
         try {
           res.writeHead(502, { "Content-Type": "application/json" });
@@ -42,8 +42,8 @@ module.exports = function (app) {
       changeOrigin: true,
       secure: false,
       logLevel: "error",
-      timeout: 120000,
-      proxyTimeout: 120000,
+      timeout: 300000,
+      proxyTimeout: 300000,
       onError(err, req, res) {
         try {
           res.writeHead(502, { "Content-Type": "application/json" });

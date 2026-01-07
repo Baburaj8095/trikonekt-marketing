@@ -1,0 +1,19 @@
+{
+  "user": {
+    "id": 78,
+    "username": "TR1010000038",
+    "prefixed_id": "TR-0000000026",
+    "sponsor_id": "TRROOT",
+    "category": "consumer",
+    "role": "user",
+    "account_active": true
+  },
+  "wallet": {
+    "balance": "558.00",
+    "main_balance": "758.00",
+    "withdrawable_balance": "3301.00"
+  },
+  "wallet_tx_sums": [
+    {
+      "type": "ADJUSTMENT_DEBIT",
+      "sum": 

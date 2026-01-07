@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     'adminapi',
     'core',
     'notifications',
+    'jobs',
 ]
 
 MIDDLEWARE = [
@@ -77,8 +78,9 @@ WSGI_APPLICATION = 'core.wsgi.application'
 
 DATABASES = {
     'default': dj_database_url.config(
-        default="postgresql://trikonekt:Lmt91m5Lnp1dwEoKBPzOuFFjXF0fk4Xi@dpg-d4734kn5r7bs73ajic80-a.singapore-postgres.render.com/trikonekt_rn21"
-       
+        default="postgresql://trikonekt:Lmt91m5Lnp1dwEoKBPzOuFFjXF0fk4Xi@dpg-d4734kn5r7bs73ajic80-a.singapore-postgres.render.com/trikonekt_rn21",
+        conn_max_age=int(os.environ.get('DB_CONN_MAX_AGE', '120')),
+        ssl_require=True
     )
 }
 
@@ -109,7 +111,19 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.BasicAuthentication',
-    )
+    ),
+    # Global pagination to bound response sizes
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': int(os.environ.get('DRF_PAGE_SIZE', '25')),
+    # Basic rate limiting (tune per needs)
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': os.environ.get('DRF_THROTTLE_ANON', '60/min'),
+        'user': os.environ.get('DRF_THROTTLE_USER', '300/min'),
+    },
 }
 
 SIMPLE_JWT = {
@@ -149,6 +163,10 @@ CORS_ALLOW_METHODS = [
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Request/Upload size limits (override via env)
+DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get('DATA_UPLOAD_MAX_MEMORY_SIZE', str(5 * 1024 * 1024)))
+FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get('FILE_UPLOAD_MAX_MEMORY_SIZE', str(5 * 1024 * 1024)))
 
 # Cloudinary media storage (enabled when CLOUDINARY_URL is set)
 if os.environ.get('CLOUDINARY_URL'):
@@ -190,3 +208,7 @@ SECURE_HSTS_PRELOAD = os.environ.get('SECURE_HSTS_PRELOAD', 'False').lower() in 
 # Feature flags (disabled by default to avoid impacting existing functionality)
 NOTIFICATIONS_ENABLED = os.environ.get('NOTIFICATIONS_ENABLED', 'False').lower() in ('1', 'true', 'yes')
 NOTIFICATIONS_PUSH_ENABLED = os.environ.get('NOTIFICATIONS_PUSH_ENABLED', 'False').lower() in ('1', 'true', 'yes')
+
+# Dev-performance flag: skip heavy allocation/distribution during promo purchase approval.
+# Default True in DEBUG to avoid long requests against remote databases; override via env in prod.
+SKIP_HEAVY_ON_APPROVE = os.environ.get('SKIP_HEAVY_ON_APPROVE', 'True' if DEBUG else 'False').lower() in ('1', 'true', 'yes')

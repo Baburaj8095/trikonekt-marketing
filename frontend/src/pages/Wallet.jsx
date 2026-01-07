@@ -89,14 +89,31 @@ export default function Wallet() {
     return net < 0 ? 0 : net;
   }, [mainBalance]);
 
+  // Sum of money earnings (wallet credits) per spec: direct refer, 5/3 matrix, global incomes, withdrawal benefits, any bonus
+  const grossMoneyIncome = useMemo(() => {
+    const vals = [
+      directRefIncome,
+      matrixIncome,
+      globalTriIncome,
+      globalTurnoverIncome,
+      withdrawalBenefit,
+      directRefWithdrawCommission,
+    ];
+    let sum = 0;
+    for (const v of vals) sum += Number(v || 0);
+    return sum;
+  }, [directRefIncome, matrixIncome, globalTriIncome, globalTurnoverIncome, withdrawalBenefit, directRefWithdrawCommission]);
+
   const computedRewardsRedeemed = useMemo(() => {
-    // Spec clarified: Redeemed = Total Reward − All Earnings (without TDS)
-    // Prefer backend-provided totals.allEarnings; fallback to gross mainBalance
+    // Spec: Redeemed = Total Reward Points − Money earned (wallet credits)
+    // Use summed income buckets; fallback to backend totals.allEarnings if income buckets are zero.
     const total = Number(rewards.total || 0);
-    const gross = Number(allEarningsGross || mainBalance || 0);
+    const incomeSum = Number(grossMoneyIncome || 0);
+    const grossFallback = Number(allEarningsGross || mainBalance || 0);
+    const gross = incomeSum > 0 ? incomeSum : grossFallback;
     const val = total - gross;
     return val > 0 ? val : 0;
-  }, [rewards.total, allEarningsGross, mainBalance]);
+  }, [rewards.total, grossMoneyIncome, allEarningsGross, mainBalance]);
 
   const blockMath = useMemo(() => {
     const blockSize = Number((autoBlock?.block_size ?? 1000));
@@ -247,7 +264,7 @@ export default function Wallet() {
       try {
         const rs = await getRewardPointsSummary();
         const total = Number(
-          rs?.current_points ?? rs?.total ?? rs?.total_points ?? rs?.points_total ?? rs?.summary?.total ?? 0
+          (rs?.available ?? rs?.current_points ?? rs?.total ?? rs?.total_points ?? rs?.points_total ?? rs?.summary?.total ?? 0)
         );
         // Redeemed is computed in UI from incomes according to spec
         setRewards((prev) => ({ total, redeemed: prev?.redeemed ?? 0 }));

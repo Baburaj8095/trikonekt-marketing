@@ -1,0 +1,94 @@
+{
+  "user": {
+    "id": 78,
+    "username": "TR1010000038",
+    "prefixed_id": "TR-0000000026",
+    "sponsor_id": "TRROOT",
+    "category": "consumer",
+    "role": "user"
+  },
+  "params": {
+    "since": "2026-01-01",
+    "dry_run": false
+  },
+  "target_types": [
+    "REDEEM_PROMO_750",
+    "REDEEM_ECOUPON_CREDIT"
+  ],
+  "affected_count": 3,
+  "affected_total": "2250.00",
+  "pre_state": {
+    "wallet": {
+      "balance": "2058.00",
+      "main_balance": "2258.00",
+      "withdrawable_balance": "3301.00"
+    },
+    "reward_points": {
+      "balance_points": "0.00"
+    }
+  },
+  "post_state": {
+    "wallet": {
+      "balance": "558.00",
+      "main_balance": "758.00",
+      "withdrawable_balance": "3301.00"
+    },
+    "reward_points": {
+      "balance_points": "1500.00"
+    }
+  },
+  "processed_tx_ids": [
+    48815,
+    56755
+  ],
+  "errors": [
+    {
+      "tx_id": 56797,
+      "error": "Insufficient wallet balance."
+    }
+  ],
+  "sample_transactions": [
+    {
+      "id": 48815,
+      "type": "REDEEM_PROMO_750",
+      "amount": "750.00",
+      "created_at": "2026-01-06T14:05:58.773090+00:00",
+      "source_type": "PROMO_750_REDEEM",
+      "source_id": "42",
+      "meta": {
+        "package": "PRIME750",
+        "purchase_id": 42,
+        "released_net": "750.00",
+        "released_from_pending": true,
+        "pending_due_to_inactive": false
+      }
+    },
+    {
+      "id": 56755,
+      "type": "REDEEM_PROMO_750",
+      "amount": "750.00",
+      "created_at": "2026-01-06T14:59:04.131100+00:00",
+      "source_type": "PROMO_750_REDEEM",
+      "source_id": "42",
+      "meta": {
+        "package": "PRIME750",
+        "purchase_id": 42,
+        "released_net": "750.00",
+        "released_from_pending": true,
+        "pending_due_to_inactive": false
+      }
+    },
+    {
+      "id": 56797,
+      "type": "REDEEM_PROMO_750",
+      "amount": "750.00",
+      "created_at": "2026-01-06T15:18:37.204039+00:00",
+      "source_type": "PROMO_750_REDEEM",
+      "source_id": "39",
+      "meta": {
+        "package": "PRIME750",
+        "purchase_id": 39
+      }
+    }
+  ]
+}

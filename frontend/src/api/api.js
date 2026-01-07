@@ -860,11 +860,19 @@ export async function adminListPromoPurchases(params = {}) {
   return res?.data || res;
 }
 export async function adminApprovePromoPurchase(id) {
-  const res = await API.post(`/business/admin/promo/purchases/${id}/approve/`, {});
+  const res = await API.post(
+    `/business/admin/promo/purchases/${encodeURIComponent(id)}/approve/`,
+    {},
+    { timeout: 300000 }
+  );
   return res?.data || res;
 }
 export async function adminRejectPromoPurchase(id, reason = "") {
-  const res = await API.post(`/business/admin/promo/purchases/${id}/reject/`, { reason });
+  const res = await API.post(
+    `/business/admin/promo/purchases/${encodeURIComponent(id)}/reject/`,
+    { reason },
+    { timeout: 300000 }
+  );
   return res?.data || res;
 }
 

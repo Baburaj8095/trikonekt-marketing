@@ -54,11 +54,13 @@ export default function BusinessShell({ children }) {
 
   return (
     <ShellBase
-      title="Merchant"
+      title={displayName}
       menu={menu}
       isActive={isActive}
       onLogout={onLogout}
       footerText={`Logged in as: ${displayName}`}
+      rootPaths={["/business/dashboard"]}
+      onBackFallbackPath="/business/dashboard"
     >
       {children}
     </ShellBase>

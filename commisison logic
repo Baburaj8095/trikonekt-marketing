@@ -1,0 +1,174 @@
+Commission Logic — Simple English with Examples
+
+Scenario used for examples
+- Admin user holds all geo/agency roles from State down to Sub‑Franchise (including Royalty).
+- A Sub‑Franchise has 2 employees and 2 consumers.
+- All users are tied in a sponsor/upline chain by sponsor ID.
+- A consumer activates a prime package or coupon of ₹150, ₹750, or ₹759.
+- We show how commissions split to the direct sponsor/upline and to geo/agency roles.
+- Every commission credited to any person has 10% deducted to the company (TDS/company pool) at the time of credit. The remaining 90% is what the receiver can withdraw.
+
+What the system rules say (based on files in your repo)
+- Company/TDS: 10% is cut from every commission when it is credited to a wallet.
+- Direct referral on join/activation (fixed rupees):
+  - Direct: ₹15
+  - L1: ₹2
+  - L2: ₹1
+  - L3: ₹1
+  - L4: ₹0.5
+  - L5: ₹0.5
+  - Note: These are fixed rupees, not percentages. Each recipient still gets 10% TDS cut on their own credit.
+- Optional “percent-of-commission” upline sharing (example defaults): L1 2%, L2 1%, L3 1%, L4 0.5%, L5 0.5
+  - Not included in the calculations below because the live JSON config does not show these enabled for activation events. If you switch this on, those would be extra small overrides on top of the numbers below.
+- Geo/Agency sharing (percent of the activation amount; each role’s credit also gets 10% TDS):
+  - Sub‑Franchise: 15%
+  - Pincode: 4%
+  - Pincode Coordinator: 2%
+  - District: 1%
+  - District Coordinator: 1%
+  - State: 1%
+  - State Coordinator: 1%
+  - Employee: 2%
+  - Royalty: 10%
+  - If any role is not available for the location, that role’s share is skipped.
+  - In this scenario, Admin holds all roles above, so Admin receives all those role credits except the Employee share. The Employee 2% can be:
+    - Split equally among the 2 employees (1% each), or
+    - Given fully to the closest relevant employee (2% to one person). Below we show equal split for clarity.
+- 3‑wide and 5‑wide Matrix:
+  - Config shows five_matrix_levels=6 and three_matrix_levels=15 but the per‑level payout tables are empty in JSON, so matrix payouts are currently ₹0 until you configure amounts/percentages per level.
+
+Direct referral fixed amounts (net after 10% TDS) — this is the same for ₹150/₹750/₹759
+- Direct sponsor (Employee‑1): ₹15 → ₹13.50 net
+- L1 (Sub‑Franchise owner): ₹2 → ₹1.80 net
+- L2 (Franchise): ₹1 → ₹0.90 net
+- L3 (District): ₹1 → ₹0.90 net
+- L4 (State): ₹0.5 → ₹0.45 net
+- L5 (Admin): ₹0.5 → ₹0.45 net
+- Total net across the direct/upline chain: ₹18.00
+
+Geo/Agency sharing calculation method
+- For a package price P, each role’s gross share is (Role% × P).
+- Each role’s net (withdrawable) amount is 90% of its gross (after 10% TDS).
+- In this scenario, Admin receives all geo roles except the Employee share.
+- Employees together receive the Employee role net; with 2 employees, that is split equally (shown below).
+
+Detailed examples
+
+1) Activation of ₹150
+A) Direct referral fixed (net)
+- Direct: ₹13.50
+- L1: ₹1.80
+- L2: ₹0.90
+- L3: ₹0.90
+- L4: ₹0.45
+- L5 (Admin): ₹0.45
+- Total net across chain: ₹18.00
+
+B) Geo/Agency roles (gross → net after 10% TDS)
+- Sub‑Franchise: 15% of 150 = ₹22.50 → ₹20.25 to Admin
+- Pincode: 4% = ₹6.00 → ₹5.40 to Admin
+- Pincode Coordinator: 2% = ₹3.00 → ₹2.70 to Admin
+- District: 1% = ₹1.50 → ₹1.35 to Admin
+- District Coordinator: 1% = ₹1.50 → ₹1.35 to Admin
+- State: 1% = ₹1.50 → ₹1.35 to Admin
+- State Coordinator: 1% = ₹1.50 → ₹1.35 to Admin
+- Employee: 2% = ₹3.00 → ₹2.70 total to employees (₹1.35 each if split among 2 employees)
+- Royalty: 10% = ₹15.00 → ₹13.50 to Admin
+- Admin net from geo roles: ₹47.25
+- Employees net from geo roles: ₹2.70 total
+
+C) Matrix (3‑wide and 5‑wide)
+- ₹0 because per‑level payouts are not set.
+
+D) Quick totals for ₹150 example
+- Admin total net (geo + L5 direct): ₹47.25 + ₹0.45 = ₹47.70
+- Employees total net (geo Employee share): ₹2.70 (₹1.35 each if split)
+- Other upline net (Direct+L1+L2+L3+L4): ₹13.50 + ₹1.80 + ₹0.90 + ₹0.90 + ₹0.45 = ₹17.55
+- Total net to people (geo + direct chain): ₹49.95 + ₹18.00 = ₹67.95
+- Company TDS pool collected from these events:
+  - Geo gross total: 37% of ₹150 = ₹55.50 → TDS 10% = ₹5.55
+  - Direct fixed gross total: ₹20.00 → TDS 10% = ₹2.00
+  - Total TDS to company pool: ₹7.55
+
+2) Activation of ₹750
+A) Direct referral fixed (net)
+- Same net split as above, total ₹18.00 across chain.
+
+B) Geo/Agency roles (gross → net after 10% TDS)
+- Sub‑Franchise: 15% of 750 = ₹112.50 → ₹101.25 to Admin
+- Pincode: 4% = ₹30.00 → ₹27.00 to Admin
+- Pincode Coordinator: 2% = ₹15.00 → ₹13.50 to Admin
+- District: 1% = ₹7.50 → ₹6.75 to Admin
+- District Coordinator: 1% = ₹7.50 → ₹6.75 to Admin
+- State: 1% = ₹7.50 → ₹6.75 to Admin
+- State Coordinator: 1% = ₹7.50 → ₹6.75 to Admin
+- Employee: 2% = ₹15.00 → ₹13.50 total to employees (₹6.75 each if split)
+- Royalty: 10% = ₹75.00 → ₹67.50 to Admin
+- Admin net from geo roles: ₹236.25
+- Employees net from geo roles: ₹13.50 total
+
+C) Matrix
+- ₹0 (not configured)
+
+D) Quick totals for ₹750 example
+- Admin total net (geo + L5 direct): ₹236.25 + ₹0.45 = ₹236.70
+- Employees total net: ₹13.50 (₹6.75 each if split)
+- Other upline net (Direct+L1+L2+L3+L4): ₹17.55
+- Total net to people (geo + direct chain): ₹249.75 + ₹18.00 = ₹267.75
+- Company TDS pool from these events:
+  - Geo gross total: 37% of ₹750 = ₹277.50 → TDS 10% = ₹27.75
+  - Direct fixed gross total: ₹20.00 → TDS 10% = ₹2.00
+  - Total TDS to company pool: ₹29.75
+
+3) Activation of ₹759
+A) Direct referral fixed (net)
+- Same net split as above, total ₹18.00 across chain.
+
+B) Geo/Agency roles (gross → net after 10% TDS)
+- Sub‑Franchise: 15% of 759 = ₹113.85 → ≈₹102.47 to Admin
+- Pincode: 4% = ₹30.36 → ≈₹27.32 to Admin
+- Pincode Coordinator: 2% = ₹15.18 → ≈₹13.66 to Admin
+- District: 1% = ₹7.59 → ≈₹6.83 to Admin
+- District Coordinator: 1% = ₹7.59 → ≈₹6.83 to Admin
+- State: 1% = ₹7.59 → ≈₹6.83 to Admin
+- State Coordinator: 1% = ₹7.59 → ≈₹6.83 to Admin
+- Employee: 2% = ₹15.18 → ≈₹13.66 total to employees (≈₹6.83 each if split)
+- Royalty: 10% = ₹75.90 → ₹68.31 to Admin
+- Admin net from geo roles: ≈₹239.09
+- Employees net from geo roles: ≈₹13.66 total
+
+C) Matrix
+- ₹0 (not configured)
+
+D) Quick totals for ₹759 example
+- Admin total net (geo + L5 direct): ≈₹239.09 + ₹0.45 = ≈₹239.54
+- Employees total net: ≈₹13.66 (≈₹6.83 each if split)
+- Other upline net (Direct+L1+L2+L3+L4): ₹17.55
+- Total net to people (geo + direct chain): ≈₹252.75 + ₹18.00 = ≈₹270.75
+- Company TDS pool from these events:
+  - Geo gross total: 37% of ₹759 = ₹280.83 → TDS 10% ≈ ₹28.08
+  - Direct fixed gross total: ₹20.00 → TDS 10% = ₹2.00
+  - Total TDS to company pool: ≈₹30.08
+
+About 3‑wide and 5‑wide Matrix in this setup
+- Your settings say:
+  - 5‑wide matrix: 6 levels
+  - 3‑wide matrix: 15 levels
+  - But per‑level payout arrays are empty, so current matrix earnings are ₹0.
+- Once you define per‑level amounts or percentages for the 3‑wide and 5‑wide matrices:
+  - Each matrix earning becomes a commission event to the receiver, with 10% TDS cut at credit time.
+  - If you also turn on the “percent-of-commission” upline share (e.g., L1 2%, L2 1%, etc.), then those matrix earnings themselves will share small amounts up the sponsor chain as additional events (each of those also getting 10% TDS on receipt).
+
+Other notes
+- If a geo role is missing for the location, that share is simply skipped (not reassigned).
+- Direct referral fixed rupees do not change with package price unless you change the settings.
+- Auto ₹1000 rule (from your guide) happens as wallets accumulate totals over time; it is not tied to a single activation and is not included in the single‑activation numbers above.
+- Withdrawals: When someone withdraws, their direct sponsor can receive a small lifetime bonus (default 3% of the withdrawn amount). This is separate from activation earnings.
+- Rounding shown to 2 decimals for readability; the system can store exact amounts and display rounded values.
+
+Summary in one line per package (net to people, current config without matrix payouts):
+- ₹150 activation → Net to people ≈ ₹67.95 (Admin ≈ ₹47.70 including L5, Employees ≈ ₹2.70, Rest of sponsor chain ≈ ₹17.55); Company TDS ≈ ₹7.55.
+- ₹750 activation → Net to people ≈ ₹267.75 (Admin ≈ ₹236.70 including L5, Employees ≈ ₹13.50, Rest of sponsor chain ≈ ₹17.55); Company TDS ≈ ₹29.75.
+- ₹759 activation → Net to people ≈ ₹270.75 (Admin ≈ ₹239.54 including L5, Employees ≈ ₹13.66, Rest of sponsor chain ≈ ₹17.55); Company TDS ≈ ₹30.08.
+
+If you provide the exact 3‑wide and 5‑wide per‑level payout tables (amounts or percentages), these numbers can be extended to include matrix earnings as well.
