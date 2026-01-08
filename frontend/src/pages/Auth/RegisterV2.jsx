@@ -138,6 +138,18 @@ const RegisterV2 = () => {
     []
   );
 
+  // Normalize API list payloads into arrays to avoid `.map is not a function`
+  const toArray = (data, extraKeys = []) => {
+    if (Array.isArray(data)) return data;
+    if (data && typeof data === "object") {
+      for (const k of ["results", "data", "items", ...extraKeys]) {
+        const v = data[k];
+        if (Array.isArray(v)) return v;
+      }
+    }
+    return [];
+  };
+
   // Locations
   const [countries, setCountries] = useState([]);
   const [states, setStates] = useState([]);
@@ -278,7 +290,7 @@ const RegisterV2 = () => {
     (async () => {
       try {
         const res = await API.get("/location/countries/");
-        setCountries(res.data || []);
+        setCountries(toArray(res?.data, ["countries", "results"]));
       } catch (e) {
         // ignore
       }
@@ -288,7 +300,7 @@ const RegisterV2 = () => {
   const loadStates = async (countryId) => {
     try {
       const res = await API.get("/location/states/", { params: { country: countryId } });
-      setStates(res.data || []);
+      setStates(toArray(res?.data, ["states", "results"]));
     } catch {
       setStates([]);
     }
@@ -296,7 +308,7 @@ const RegisterV2 = () => {
   const loadCities = async (stateId) => {
     try {
       const res = await API.get("/location/cities/", { params: { state: stateId } });
-      setCities(res.data || []);
+      setCities(toArray(res?.data, ["cities", "results"]));
     } catch {
       setCities([]);
     }
@@ -652,7 +664,7 @@ const RegisterV2 = () => {
         }
         if (countryId) {
           const resp = await API.get(`/location/states/`, { params: { country: countryId } });
-          const rows = Array.isArray(resp?.data) ? resp.data : resp?.data?.results || [];
+          const rows = toArray(resp?.data, ["states", "results"]);
           const norm = rows.map((r) => ({ id: r.id, name: r.name }));
           setAllStatesList(norm);
         } else {
@@ -677,8 +689,8 @@ const RegisterV2 = () => {
         const resp = await API.get(`/accounts/regions/by-sponsor/`, {
           params: { sponsor: s, level: "state" },
         });
-        const states = resp?.data?.states || [];
-        setSponsorStates(states);
+        const rows = toArray(resp?.data, ["states", "results"]);
+        setSponsorStates(rows);
       } catch {
         setSponsorStates([]);
       }
@@ -701,8 +713,8 @@ const RegisterV2 = () => {
         const resp = await API.get(`/accounts/regions/by-sponsor/`, {
           params: { sponsor: s, level: "district", state_id: selectedState },
         });
-        const districts = resp?.data?.districts || [];
-        setSponsorDistricts(districts);
+        const rows = toArray(resp?.data, ["districts", "results"]);
+        setSponsorDistricts(rows);
       } catch {
         setSponsorDistricts([]);
       }
