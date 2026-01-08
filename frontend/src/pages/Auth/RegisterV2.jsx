@@ -476,9 +476,10 @@ const RegisterV2 = () => {
         const resp = await API.get("/location/pincodes/by-district/", {
           params: { district_name: selectedCity, state_id: selectedState },
         });
+        const rows = toArray(resp?.data, ["pincodes", "results"]);
         const pins = Array.from(
           new Set(
-            (resp?.data?.pincodes || [])
+            rows
               .map((p) => String(p || "").replace(/\D/g, "").slice(0, 6))
               .filter((p) => /^\d{6}$/.test(p))
           )
@@ -762,9 +763,10 @@ const RegisterV2 = () => {
         const resp = await API.get(`/accounts/regions/by-sponsor/`, {
           params: { sponsor: s, level: "pincode" },
         });
+        const rows = toArray(resp?.data, ["pincodes", "results"]);
         const pins = Array.from(
           new Set(
-            (resp?.data?.pincodes || [])
+            rows
               .map((p) => String(p || "").replace(/\D/g, "").slice(0, 6))
               .filter((p) => /^\d{6}$/.test(p))
           )
@@ -792,9 +794,10 @@ const RegisterV2 = () => {
         const resp = await API.get("/location/pincodes/by-district/", {
           params: { district_name: selectedDistrictAgency, state_id: selectedState },
         });
+        const rows = toArray(resp?.data, ["pincodes", "results"]);
         const pins = Array.from(
           new Set(
-            (resp?.data?.pincodes || [])
+            rows
               .map((p) => String(p || "").replace(/\D/g, "").slice(0, 6))
               .filter((p) => /^\d{6}$/.test(p))
           )
