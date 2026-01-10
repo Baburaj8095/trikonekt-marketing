@@ -1,0 +1,487 @@
+{
+  "by_actor": {
+    "coupon_activated": [
+      {
+        "action": "coupon_activated",
+        "coupon_code_id": 1051,
+        "created_at": "2026-01-10 08:23:59.375200+00:00",
+        "notes": "",
+        "metadata": {
+          "type": "150"
+        }
+      },
+      {
+        "action": "coupon_activated",
+        "coupon_code_id": 1052,
+        "created_at": "2026-01-10 08:23:22.130580+00:00",
+        "notes": "",
+        "metadata": {
+          "type": "150"
+        }
+      },
+      {
+        "action": "coupon_activated",
+        "coupon_code_id": 1053,
+        "created_at": "2026-01-10 08:22:38.825039+00:00",
+        "notes": "",
+        "metadata": {
+          "type": "150"
+        }
+      },
+      {
+        "action": "coupon_activated",
+        "coupon_code_id": 1054,
+        "created_at": "2026-01-10 08:22:23.309389+00:00",
+        "notes": "",
+        "metadata": {
+          "type": "150"
+        }
+      },
+      {
+        "action": "coupon_activated",
+        "coupon_code_id": 1045,
+        "created_at": "2026-01-10 07:07:15.270636+00:00",
+        "notes": "",
+        "metadata": {
+          "type": "150"
+        }
+      },
+      {
+        "action": "coupon_activated",
+        "coupon_code_id": 1046,
+        "created_at": "2026-01-10 07:07:05.168376+00:00",
+        "notes": "",
+        "metadata": {
+          "type": "150"
+        }
+      },
+      {
+        "action": "coupon_activated",
+        "coupon_code_id": 1047,
+        "created_at": "2026-01-10 07:06:57.597647+00:00",
+        "notes": "",
+        "metadata": {
+          "type": "150"
+        }
+      },
+      {
+        "action": "coupon_activated",
+        "coupon_code_id": 1048,
+        "created_at": "2026-01-10 07:05:27.810236+00:00",
+        "notes": "",
+        "metadata": {
+          "type": "150"
+        }
+      },
+      {
+        "action": "coupon_activated",
+        "coupon_code_id": 1049,
+        "created_at": "2026-01-10 07:05:16.309704+00:00",
+        "notes": "",
+        "metadata": {
+          "type": "150"
+        }
+      },
+      {
+        "action": "coupon_activated",
+        "coupon_code_id": 195,
+        "created_at": "2026-01-10 06:58:22.560247+00:00",
+        "notes": "",
+        "metadata": {
+          "type": "759"
+        }
+      },
+      {
+        "action": "coupon_activated",
+        "coupon_code_id": 196,
+        "created_at": "2026-01-10 06:58:12.867637+00:00",
+        "notes": "",
+        "metadata": {
+          "type": "759"
+        }
+      },
+      {
+        "action": "coupon_activated",
+        "coupon_code_id": 197,
+        "created_at": "2026-01-10 06:58:06.050963+00:00",
+        "notes": "",
+        "metadata": {
+          "type": "759"
+        }
+      },
+      {
+        "action": "coupon_activated",
+        "coupon_code_id": 1039,
+        "created_at": "2026-01-10 06:56:41.209291+00:00",
+        "notes": "",
+        "metadata": {
+          "type": "150"
+        }
+      },
+      {
+        "action": "coupon_activated",
+        "coupon_code_id": 198,
+        "created_at": "2026-01-10 06:54:07.194255+00:00",
+        "notes": "",
+        "metadata": {
+          "type": "759"
+        }
+      },
+      {
+        "action": "coupon_activated",
+        "coupon_code_id": 1040,
+        "created_at": "2026-01-10 06:53:04.039311+00:00",
+        "notes": "",
+        "metadata": {
+          "type": "150"
+        }
+      },
+      {
+        "action": "coupon_activated",
+        "coupon_code_id": 1041,
+        "created_at": "2026-01-10 06:50:18.741234+00:00",
+        "notes": "",
+        "metadata": {
+          "type": "150"
+        }
+      },
+      {
+        "action": "coupon_activated",
+        "coupon_code_id": 1042,
+        "created_at": "2026-01-10 06:49:40.443710+00:00",
+        "notes": "",
+        "metadata": {
+          "type": "150"
+        }
+      },
+      {
+        "action": "coupon_activated",
+        "coupon_code_id": 1043,
+        "created_at": "2026-01-10 06:49:01.116899+00:00",
+        "notes": "",
+        "metadata": {
+          "type": "150"
+        }
+      },
+      {
+        "action": "coupon_activated",
+        "coupon_code_id": 1033,
+        "created_at": "2026-01-10 06:46:53.844396+00:00",
+        "notes": "",
+        "metadata": {
+          "type": "150"
+        }
+      },
+      {
+        "action": "coupon_activated",
+        "coupon_code_id": 1034,
+        "created_at": "2026-01-10 06:46:37.675260+00:00",
+        "notes": "",
+        "metadata": {
+          "type": "150"
+        }
+      },
+      {
+        "action": "coupon_activated",
+        "coupon_code_id": 1035,
+        "created_at": "2026-01-10 06:45:49.351084+00:00",
+        "notes": "",
+        "metadata": {
+          "type": "150"
+        }
+      },
+      {
+        "action": "coupon_activated",
+        "coupon_code_id": 1036,
+        "created_at": "2026-01-10 06:44:51.612481+00:00",
+        "notes": "",
+        "metadata": {
+          "type": "150"
+        }
+      },
+      {
+        "action": "coupon_activated",
+        "coupon_code_id": 1037,
+        "created_at": "2026-01-10 06:44:27.685449+00:00",
+        "notes": "",
+        "metadata": {
+          "type": "150"
+        }
+      },
+      {
+        "action": "coupon_activated",
+        "coupon_code_id": 1027,
+        "created_at": "2026-01-10 06:26:32.056666+00:00",
+        "notes": "",
+        "metadata": {
+          "type": "150"
+        }
+      },
+      {
+        "action": "coupon_activated",
+        "coupon_code_id": 1029,
+        "created_at": "2026-01-10 06:25:50.157337+00:00",
+        "notes": "",
+        "metadata": {
+          "type": "150"
+        }
+      }
+    ],
+    "coupon_activate_skipped": [],
+    "coupon_activate_code_not_found": [],
+    "coupon_activate_not_owner": [],
+    "prime_150_distributed": [
+      {
+        "action": "prime_150_distributed",
+        "coupon_code_id": 1054,
+        "created_at": "2026-01-10 08:22:25.213650+00:00",
+        "notes": "Prime 150 commission distribution applied",
+        "metadata": {
+          "denomination": "150"
+        }
+      },
+      {
+        "action": "prime_150_distributed",
+        "coupon_code_id": 1045,
+        "created_at": "2026-01-10 07:07:16.786851+00:00",
+        "notes": "Prime 150 commission distribution applied",
+        "metadata": {
+          "denomination": "150"
+        }
+      },
+      {
+        "action": "prime_150_distributed",
+        "coupon_code_id": 1046,
+        "created_at": "2026-01-10 07:07:06.619898+00:00",
+        "notes": "Prime 150 commission distribution applied",
+        "metadata": {
+          "denomination": "150"
+        }
+      },
+      {
+        "action": "prime_150_distributed",
+        "coupon_code_id": 1049,
+        "created_at": "2026-01-10 07:05:17.768578+00:00",
+        "notes": "Prime 150 commission distribution applied",
+        "metadata": {
+          "denomination": "150"
+        }
+      },
+      {
+        "action": "prime_150_distributed",
+        "coupon_code_id": 1039,
+        "created_at": "2026-01-10 06:56:42.801321+00:00",
+        "notes": "Prime 150 commission distribution applied",
+        "metadata": {
+          "denomination": "150"
+        }
+      },
+      {
+        "action": "prime_150_distributed",
+        "coupon_code_id": 1033,
+        "created_at": "2026-01-10 06:46:55.465184+00:00",
+        "notes": "Prime 150 commission distribution applied",
+        "metadata": {
+          "denomination": "150"
+        }
+      },
+      {
+        "action": "prime_150_distributed",
+        "coupon_code_id": 1034,
+        "created_at": "2026-01-10 06:46:39.290397+00:00",
+        "notes": "Prime 150 commission distribution applied",
+        "metadata": {
+          "denomination": "150"
+        }
+      },
+      {
+        "action": "prime_150_distributed",
+        "coupon_code_id": 1035,
+        "created_at": "2026-01-10 06:45:53.943790+00:00",
+        "notes": "Prime 150 commission distribution applied",
+        "metadata": {
+          "denomination": "150"
+        }
+      },
+      {
+        "action": "prime_150_distributed",
+        "coupon_code_id": 1036,
+        "created_at": "2026-01-10 06:44:53.265417+00:00",
+        "notes": "Prime 150 commission distribution applied",
+        "metadata": {
+          "denomination": "150"
+        }
+      },
+      {
+        "action": "prime_150_distributed",
+        "coupon_code_id": 1027,
+        "created_at": "2026-01-10 06:26:33.580394+00:00",
+        "notes": "Prime 150 commission distribution applied",
+        "metadata": {
+          "denomination": "150"
+        }
+      },
+      {
+        "action": "prime_150_distributed",
+        "coupon_code_id": 1028,
+        "created_at": "2026-01-10 06:24:00.108178+00:00",
+        "notes": "Prime 150 commission distribution applied",
+        "metadata": {
+          "denomination": "150"
+        }
+      },
+      {
+        "action": "prime_150_distributed",
+        "coupon_code_id": 995,
+        "created_at": "2026-01-10 06:15:19.270233+00:00",
+        "notes": "Prime 150 commission distribution applied",
+        "metadata": {
+          "denomination": "150"
+        }
+      },
+      {
+        "action": "prime_150_distributed",
+        "coupon_code_id": 1017,
+        "created_at": "2026-01-10 02:53:12.048677+00:00",
+        "notes": "Prime 150 commission distribution applied",
+        "metadata": {
+          "denomination": "150"
+        }
+      },
+      {
+        "action": "prime_150_distributed",
+        "coupon_code_id": 1018,
+        "created_at": "2026-01-10 02:48:27.105328+00:00",
+        "notes": "Prime 150 commission distribution applied",
+        "metadata": {
+          "denomination": "150"
+        }
+      },
+      {
+        "action": "prime_150_distributed",
+        "coupon_code_id": 1019,
+        "created_at": "2026-01-10 02:48:02.847752+00:00",
+        "notes": "Prime 150 commission distribution applied",
+        "metadata": {
+          "denomination": "150"
+        }
+      },
+      {
+        "action": "prime_150_distributed",
+        "coupon_code_id": 1020,
+        "created_at": "2026-01-10 02:30:07.648891+00:00",
+        "notes": "Prime 150 commission distribution applied",
+        "metadata": {
+          "denomination": "150"
+        }
+      },
+      {
+        "action": "prime_150_distributed",
+        "coupon_code_id": 1021,
+        "created_at": "2026-01-10 02:29:42.690994+00:00",
+        "notes": "Prime 150 commission distribution applied",
+        "metadata": {
+          "denomination": "150"
+        }
+      },
+      {
+        "action": "prime_150_distributed",
+        "coupon_code_id": 1022,
+        "created_at": "2026-01-09 20:05:01.817926+00:00",
+        "notes": "Prime 150 commission distribution applied",
+        "metadata": {
+          "denomination": "150"
+        }
+      },
+      {
+        "action": "prime_150_distributed",
+        "coupon_code_id": 1010,
+        "created_at": "2026-01-09 19:58:30.050758+00:00",
+        "notes": "Prime 150 commission distribution applied",
+        "metadata": {
+          "denomination": "150"
+        }
+      },
+      {
+        "action": "prime_150_distributed",
+        "coupon_code_id": 1011,
+        "created_at": "2026-01-09 19:57:45.346310+00:00",
+        "notes": "Prime 150 commission distribution applied",
+        "metadata": {
+          "denomination": "150"
+        }
+      }
+    ],
+    "prime_150_distribution_failed": [],
+    "coupon_matrix_distributed": [
+      {
+        "action": "coupon_matrix_distributed",
+        "coupon_code_id": 1031,
+        "created_at": "2026-01-10 06:23:56.697413+00:00",
+        "notes": "Matrix accounts created and distributed for coupon 1031",
+        "metadata": {
+          "trigger": "ecoupon_order",
+          "source_id": "1031",
+          "source_type": "ECOUPON"
+        }
+      },
+      {
+        "action": "coupon_matrix_distributed",
+        "coupon_code_id": 1030,
+        "created_at": "2026-01-10 06:23:38.720486+00:00",
+        "notes": "Matrix accounts created and distributed for coupon 1030",
+        "metadata": {
+          "trigger": "ecoupon_order",
+          "source_id": "1030",
+          "source_type": "ECOUPON"
+        }
+      },
+      {
+        "action": "coupon_matrix_distributed",
+        "coupon_code_id": 1029,
+        "created_at": "2026-01-10 06:23:19.946650+00:00",
+        "notes": "Matrix accounts created and distributed for coupon 1029",
+        "metadata": {
+          "trigger": "ecoupon_order",
+          "source_id": "1029",
+          "source_type": "ECOUPON"
+        }
+      },
+      {
+        "action": "coupon_matrix_distributed",
+        "coupon_code_id": 1028,
+        "created_at": "2026-01-10 06:23:01.758123+00:00",
+        "notes": "Matrix accounts created and distributed for coupon 1028",
+        "metadata": {
+          "trigger": "ecoupon_order",
+          "source_id": "1028",
+          "source_type": "ECOUPON"
+        }
+      },
+      {
+        "action": "coupon_matrix_distributed",
+        "coupon_code_id": 1027,
+        "created_at": "2026-01-10 06:22:40.932946+00:00",
+        "notes": "Matrix accounts created and distributed for coupon 1027",
+        "metadata": {
+          "trigger": "ecoupon_order",
+          "source_id": "1027",
+          "source_type": "ECOUPON"
+        }
+      },
+      {
+        "action": "coupon_matrix_distributed",
+        "coupon_code_id": 1026,
+        "created_at": "2026-01-10 06:22:21.449932+00:00",
+        "notes": "Matrix accounts created and distributed for coupon 1026",
+        "metadata": {
+          "trigger": "ecoupon_order",
+          "source_id": "1026",
+          "source_type": "ECOUPON"
+        }
+      }
+    ],
+    "debug_activate_150_active_created": [],
+    "debug_activate_150_active_exists": []
+  }
+}

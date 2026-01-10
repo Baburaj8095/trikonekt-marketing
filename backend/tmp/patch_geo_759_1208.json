@@ -1,0 +1,57 @@
+{
+  "ok": true,
+  "now": "2026-01-10T17:01:35.639524+00:00",
+  "code": {
+    "id": 1208,
+    "code": "S1-759QSIGJFC",
+    "owner_id": 400
+  },
+  "config": {
+    "geo_mode_759": "fixed",
+    "geo_fixed_759": {
+      "state": 2.0,
+      "pincode": 5.0,
+      "district": 4.0,
+      "employee": 1.0,
+      "state_coord": 2.0,
+      "pincode_coord": 4.0,
+      "sub_franchise": 25.0,
+      "district_coord": 3.0
+    }
+  },
+  "resolved": {
+    "Sub Franchise": {
+      "id": 16,
+      "username": "TRSF9560001007",
+      "category": "agency_sub_franchise"
+    },
+    "Pincode": {
+      "id": 15,
+      "username": "TRPN9560001006",
+      "category": "agency_pincode"
+    },
+    "Pincode Coord": {
+      "id": 14,
+      "username": "TRPC9560001005",
+      "category": "agency_pincode_coordinator"
+    }
+  },
+  "created": [
+    {
+      "label": "Sub Franchise",
+      "user_id": 16,
+      "amount": "25.00"
+    },
+    {
+      "label": "Pincode",
+      "user_id": 15,
+      "amount": "5.00"
+    },
+    {
+      "label": "Pincode Coord",
+      "user_id": 14,
+      "amount": "4.00"
+    }
+  ],
+  "skipped": []
+}

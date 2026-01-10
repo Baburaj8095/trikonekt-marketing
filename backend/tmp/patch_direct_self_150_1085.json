@@ -1,0 +1,28 @@
+{
+  "ok": true,
+  "now": "2026-01-10T16:54:28.936985+00:00",
+  "code": {
+    "id": 1085,
+    "code": "S1-1503EX6350",
+    "owner_id": 400
+  },
+  "consumer_id": 400,
+  "sponsor_id": 16,
+  "config_amounts": {
+    "sponsor": "15.00",
+    "self": "1.00"
+  },
+  "created": [
+    {
+      "type": "DIRECT_REF_BONUS",
+      "user_id": 16,
+      "amount": "15.00"
+    },
+    {
+      "type": "SELF_BONUS_ACTIVE",
+      "user_id": 400,
+      "amount": "1.00"
+    }
+  ],
+  "skipped": []
+}

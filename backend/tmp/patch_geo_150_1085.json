@@ -1,0 +1,94 @@
+{
+  "ok": true,
+  "now": "2026-01-10T16:38:07.722965+00:00",
+  "code": {
+    "id": 1085,
+    "code": "S1-1503EX6350",
+    "owner_id": 400
+  },
+  "config": {
+    "geo_mode_150": "fixed",
+    "geo_fixed_150": {
+      "state": 1.0,
+      "pincode": 4.0,
+      "royalty": 10.0,
+      "district": 1.0,
+      "employee": 2.0,
+      "state_coord": 1.0,
+      "pincode_coord": 2.0,
+      "sub_franchise": 15.0,
+      "district_coord": 1.0
+    }
+  },
+  "resolved": {
+    "Sub Franchise": {
+      "id": 16,
+      "username": "TRSF9560001007",
+      "role": "agency",
+      "category": "agency_sub_franchise",
+      "pincode": "560001",
+      "state_id": 4026,
+      "state": "Karnataka"
+    },
+    "Pincode": {
+      "id": 15,
+      "username": "TRPN9560001006",
+      "role": "agency",
+      "category": "agency_pincode",
+      "pincode": "560001",
+      "state_id": 4026,
+      "state": "Karnataka"
+    },
+    "Pincode Coord": {
+      "id": 14,
+      "username": "TRPC9560001005",
+      "role": "agency",
+      "category": "agency_pincode_coordinator",
+      "pincode": "560001",
+      "state_id": 4026,
+      "state": "Karnataka"
+    }
+  },
+  "created": [
+    {
+      "label": "Sub Franchise",
+      "user": {
+        "id": 16,
+        "username": "TRSF9560001007",
+        "role": "agency",
+        "category": "agency_sub_franchise",
+        "pincode": "560001",
+        "state_id": 4026,
+        "state": "Karnataka"
+      },
+      "amount": "15.00"
+    },
+    {
+      "label": "Pincode",
+      "user": {
+        "id": 15,
+        "username": "TRPN9560001006",
+        "role": "agency",
+        "category": "agency_pincode",
+        "pincode": "560001",
+        "state_id": 4026,
+        "state": "Karnataka"
+      },
+      "amount": "4.00"
+    },
+    {
+      "label": "Pincode Coord",
+      "user": {
+        "id": 14,
+        "username": "TRPC9560001005",
+        "role": "agency",
+        "category": "agency_pincode_coordinator",
+        "pincode": "560001",
+        "state_id": 4026,
+        "state": "Karnataka"
+      },
+      "amount": "2.00"
+    }
+  ],
+  "skipped": []
+}

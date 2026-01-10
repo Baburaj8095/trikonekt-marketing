@@ -1,0 +1,163 @@
+{
+  "ok": true,
+  "now": "2026-01-10T16:35:29.389045+00:00",
+  "code": {
+    "id": 1085,
+    "code": "S1-1503EX6350",
+    "value": "150.00",
+    "status": "SOLD",
+    "owner_id": 400,
+    "issued_channel": "e_coupon"
+  },
+  "task": {
+    "id": 183,
+    "type": "coupon_activate",
+    "status": "DONE",
+    "attempts": 1,
+    "max_attempts": 5,
+    "last_error": "",
+    "payload": {
+      "type": "150",
+      "source": {
+        "id": 1085,
+        "code": "S1-1503EX6350",
+        "channel": "e_coupon"
+      },
+      "user_id": 400
+    }
+  },
+  "audits_presence": {
+    "prime_150_distributed": true,
+    "prime_150_distribution_failed": false,
+    "coupon_matrix_distributed": true,
+    "monthly_759_distributed": false
+  },
+  "audits_rows": [
+    {
+      "action": "prime_150_distributed",
+      "created_at": "2026-01-10 15:58:46.423256+00:00",
+      "notes": "Prime 150 commission distribution applied",
+      "metadata": {
+        "denomination": "150"
+      }
+    },
+    {
+      "action": "coupon_matrix_distributed",
+      "created_at": "2026-01-10 15:58:46.293377+00:00",
+      "notes": "Matrix accounts created and distributed for coupon 1085",
+      "metadata": {
+        "trigger": "ecoupon_activate",
+        "source_id": "1085",
+        "source_type": "ECOUPON"
+      }
+    },
+    {
+      "action": "ecoupon_commission_awarded",
+      "created_at": "2026-01-10 13:54:13.127304+00:00",
+      "notes": "Activation commission split",
+      "metadata": {
+        "awards": [
+          {
+            "role": "agency",
+            "user": "TRSF9560001007",
+            "amount": "30.00"
+          }
+        ]
+      }
+    },
+    {
+      "action": "coupon_activated",
+      "created_at": "2026-01-10 13:54:13.080635+00:00",
+      "notes": "",
+      "metadata": {
+        "type": "150"
+      }
+    }
+  ],
+  "matrix_five_count": 1,
+  "matrix_three_count": 1,
+  "geo_count": 5,
+  "matrix_five_rows": [
+    {
+      "id": 60832,
+      "user_id": 400,
+      "amount": "20.00",
+      "type": "AUTOPOOL_BONUS_FIVE",
+      "source_type": "ECOUPON",
+      "source_id": "1085",
+      "meta_layer": null,
+      "meta_source": "FIVE_MATRIX_COUPON_FIXED",
+      "created_at": "2026-01-10T15:58:43.043163+00:00"
+    }
+  ],
+  "matrix_three_rows": [
+    {
+      "id": 60835,
+      "user_id": 400,
+      "amount": "5.00",
+      "type": "AUTOPOOL_BONUS_THREE",
+      "source_type": "ECOUPON",
+      "source_id": "1085",
+      "meta_layer": null,
+      "meta_source": "THREE_MATRIX_COUPON_FIXED",
+      "created_at": "2026-01-10T15:58:45.128320+00:00"
+    }
+  ],
+  "geo_rows": [
+    {
+      "id": 60830,
+      "user_id": 12,
+      "amount": "1.00",
+      "type": "COMMISSION_CREDIT",
+      "source_type": "ECOUPON_150",
+      "source_id": "1085",
+      "meta_layer": "District Coord",
+      "meta_source": "AUTO_POOL_GEO_FIXED",
+      "created_at": "2026-01-10T15:58:36.619593+00:00"
+    },
+    {
+      "id": 60828,
+      "user_id": 10,
+      "amount": "1.00",
+      "type": "COMMISSION_CREDIT",
+      "source_type": "ECOUPON_150",
+      "source_id": "1085",
+      "meta_layer": "State Coord",
+      "meta_source": "AUTO_POOL_GEO_FIXED",
+      "created_at": "2026-01-10T15:58:35.502983+00:00"
+    },
+    {
+      "id": 60826,
+      "user_id": 13,
+      "amount": "1.00",
+      "type": "COMMISSION_CREDIT",
+      "source_type": "ECOUPON_150",
+      "source_id": "1085",
+      "meta_layer": "District",
+      "meta_source": "AUTO_POOL_GEO_FIXED",
+      "created_at": "2026-01-10T15:58:34.097664+00:00"
+    },
+    {
+      "id": 60823,
+      "user_id": 1,
+      "amount": "10.00",
+      "type": "COMMISSION_CREDIT",
+      "source_type": "ECOUPON_150",
+      "source_id": "1085",
+      "meta_layer": "Royalty",
+      "meta_source": "AUTO_POOL_GEO_FIXED",
+      "created_at": "2026-01-10T15:58:32.878903+00:00"
+    },
+    {
+      "id": 60821,
+      "user_id": 11,
+      "amount": "1.00",
+      "type": "COMMISSION_CREDIT",
+      "source_type": "ECOUPON_150",
+      "source_id": "1085",
+      "meta_layer": "State",
+      "meta_source": "AUTO_POOL_GEO_FIXED",
+      "created_at": "2026-01-10T15:58:31.787161+00:00"
+    }
+  ]
+}

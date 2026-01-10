@@ -1,0 +1,73 @@
+{
+  "ok": true,
+  "task_id": 133,
+  "task": {
+    "id": 133,
+    "type": "coupon_activate",
+    "status": "DONE",
+    "attempts": 1,
+    "max_attempts": 5,
+    "scheduled_at": "2026-01-10T06:50:17.446744+00:00",
+    "started_at": "2026-01-10T06:50:18.719331+00:00",
+    "finished_at": "2026-01-10T06:50:18.754845+00:00",
+    "last_error": "",
+    "payload": {
+      "type": "150",
+      "source": {
+        "id": 1041,
+        "code": "S1-150DLSZZX6",
+        "channel": "e_coupon"
+      },
+      "user_id": 400
+    }
+  },
+  "payload_parsed": {
+    "user_id": 400,
+    "type": "150",
+    "source": {
+      "id": 1041,
+      "code": "S1-150DLSZZX6",
+      "channel": "e_coupon"
+    }
+  },
+  "user": {
+    "id": 400,
+    "username": "TR0000000001"
+  },
+  "code": {
+    "id": 1041,
+    "code": "S1-150DLSZZX6",
+    "issued_channel": "e_coupon",
+    "assigned_consumer_id": 400,
+    "value": "150.00",
+    "channel_in_source": "e_coupon",
+    "channel_ok": true,
+    "owner_ok": true
+  },
+  "audits": {
+    "coupon_activated_by_user": [
+      {
+        "coupon_code_id": 1057,
+        "created_at": "2026-01-10 09:41:17.681216+00:00"
+      },
+      {
+        "coupon_code_id": 1058,
+        "created_at": "2026-01-10 09:40:08.366925+00:00"
+      },
+      {
+        "coupon_code_id": 1059,
+        "created_at": "2026-01-10 09:39:43.170115+00:00"
+      },
+      {
+        "coupon_code_id": 1060,
+        "created_at": "2026-01-10 09:38:27.342740+00:00"
+      },
+      {
+        "coupon_code_id": 1061,
+        "created_at": "2026-01-10 09:17:05.909246+00:00"
+      }
+    ],
+    "for_code": []
+  },
+  "commissions_for_code": []
+}

@@ -1,0 +1,32 @@
+{
+  "ok": true,
+  "now": "2026-01-10T17:02:42.747322+00:00",
+  "code": {
+    "id": 1208,
+    "code": "S1-759QSIGJFC",
+    "owner_id": 400
+  },
+  "created": [],
+  "skipped": [
+    {
+      "level": 1,
+      "reason": "no_recipient_or_zero_amount"
+    },
+    {
+      "level": 2,
+      "reason": "no_recipient_or_zero_amount"
+    },
+    {
+      "level": 3,
+      "reason": "no_recipient_or_zero_amount"
+    },
+    {
+      "level": 4,
+      "reason": "no_recipient_or_zero_amount"
+    },
+    {
+      "level": 5,
+      "reason": "no_recipient_or_zero_amount"
+    }
+  ]
+}

@@ -981,35 +981,57 @@ def distribute_auto_pool_commissions(payer_user, base_amount: Decimal, fixed_key
                 except Exception:
                     return None
 
-            recipients = {}
+            # Resolve agency recipients using region assignments (pincode/district/state) like franchise flow
+            recipients = {
+                "Sub Franchise": None,
+                "Pincode": None,
+                "Pincode Coord": None,
+                "District": None,
+                "District Coord": None,
+                "State": None,
+                "State Coord": None,
+            }
 
-            # Sub Franchise at pincode
+            # Pincode-level roles (exact pin)
             if pin:
-                sf_qs = CustomUser.objects.filter(category="agency_sub_franchise", region_assignments__level="pincode", region_assignments__pincode=pin).distinct()
-                recipients["Sub Franchise"] = first_qs(sf_qs)
+                recipients["Sub Franchise"] = CustomUser.objects.filter(
+                    category="agency_sub_franchise",
+                    region_assignments__level="pincode",
+                    region_assignments__pincode=pin,
+                ).distinct().first()
+                recipients["Pincode"] = CustomUser.objects.filter(
+                    category="agency_pincode",
+                    region_assignments__level="pincode",
+                    region_assignments__pincode=pin,
+                ).distinct().first()
+                recipients["Pincode Coord"] = CustomUser.objects.filter(
+                    category="agency_pincode_coordinator",
+                    region_assignments__level="pincode",
+                    region_assignments__pincode=pin,
+                ).distinct().first()
 
-            # Pincode
-            if pin:
-                ap_qs = CustomUser.objects.filter(category="agency_pincode", region_assignments__level="pincode", region_assignments__pincode=pin).distinct()
-                recipients["Pincode"] = first_qs(ap_qs)
-
-                apc_qs = CustomUser.objects.filter(category="agency_pincode_coordinator", region_assignments__level="pincode", region_assignments__pincode=pin).distinct()
-                recipients["Pincode Coord"] = first_qs(apc_qs)
-
-            # District (best-effort: if district not known, target any district user in same state)
+            # District/State-level roles (scoped by State best-effort)
             if state:
-                ad_qs = CustomUser.objects.filter(category="agency_district", region_assignments__level="district", region_assignments__state=state).distinct()
-                recipients["District"] = first_qs(ad_qs)
-
-                adc_qs = CustomUser.objects.filter(category="agency_district_coordinator", region_assignments__level="district", region_assignments__state=state).distinct()
-                recipients["District Coord"] = first_qs(adc_qs)
-
-                # State
-                as_qs = CustomUser.objects.filter(category="agency_state", region_assignments__level="state", region_assignments__state=state).distinct()
-                recipients["State"] = first_qs(as_qs)
-
-                asc_qs = CustomUser.objects.filter(category="agency_state_coordinator", region_assignments__level="state", region_assignments__state=state).distinct()
-                recipients["State Coord"] = first_qs(asc_qs)
+                recipients["District"] = CustomUser.objects.filter(
+                    category="agency_district",
+                    region_assignments__level="district",
+                    region_assignments__state=state,
+                ).distinct().first()
+                recipients["District Coord"] = CustomUser.objects.filter(
+                    category="agency_district_coordinator",
+                    region_assignments__level="district",
+                    region_assignments__state=state,
+                ).distinct().first()
+                recipients["State"] = CustomUser.objects.filter(
+                    category="agency_state",
+                    region_assignments__level="state",
+                    region_assignments__state=state,
+                ).distinct().first()
+                recipients["State Coord"] = CustomUser.objects.filter(
+                    category="agency_state_coordinator",
+                    region_assignments__level="state",
+                    region_assignments__state=state,
+                ).distinct().first()
 
             # Employee: prefer immediate registered_by if employee, else first employee in upline
             emp = None

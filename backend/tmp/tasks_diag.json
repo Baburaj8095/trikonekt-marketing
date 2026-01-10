@@ -1,0 +1,253 @@
+{
+  "counts": {
+    "pending": 0,
+    "running": 0,
+    "done": 245,
+    "failed": 0
+  },
+  "tail": [
+    {
+      "id": 245,
+      "type": "ecoupon_order_approve",
+      "status": "DONE",
+      "scheduled_at": "2026-01-10 19:29:41.698163+00:00",
+      "started_at": "2026-01-10 19:29:41.954210+00:00",
+      "finished_at": "2026-01-10 19:29:44.627230+00:00",
+      "attempts": 2
+    },
+    {
+      "id": 244,
+      "type": "coupon_activate",
+      "status": "DONE",
+      "scheduled_at": "2026-01-10 19:06:32.856962+00:00",
+      "started_at": "2026-01-10 19:06:33.340918+00:00",
+      "finished_at": "2026-01-10 19:06:34.140958+00:00",
+      "attempts": 1
+    },
+    {
+      "id": 243,
+      "type": "coupon_activate",
+      "status": "DONE",
+      "scheduled_at": "2026-01-10 19:06:20.104499+00:00",
+      "started_at": "2026-01-10 19:06:20.879224+00:00",
+      "finished_at": "2026-01-10 19:06:21.638999+00:00",
+      "attempts": 1
+    },
+    {
+      "id": 242,
+      "type": "coupon_activate",
+      "status": "DONE",
+      "scheduled_at": "2026-01-10 19:06:19.657805+00:00",
+      "started_at": "2026-01-10 19:06:20.969043+00:00",
+      "finished_at": "2026-01-10 19:06:21.004529+00:00",
+      "attempts": 1
+    },
+    {
+      "id": 241,
+      "type": "coupon_activate",
+      "status": "DONE",
+      "scheduled_at": "2026-01-10 19:06:18.816757+00:00",
+      "started_at": "2026-01-10 19:06:19.550420+00:00",
+      "finished_at": "2026-01-10 19:06:20.313693+00:00",
+      "attempts": 1
+    },
+    {
+      "id": 240,
+      "type": "coupon_activate",
+      "status": "DONE",
+      "scheduled_at": "2026-01-10 19:06:09.951298+00:00",
+      "started_at": "2026-01-10 19:06:10.269478+00:00",
+      "finished_at": "2026-01-10 19:06:11.209080+00:00",
+      "attempts": 1
+    },
+    {
+      "id": 239,
+      "type": "coupon_activate",
+      "status": "DONE",
+      "scheduled_at": "2026-01-10 19:06:08.225174+00:00",
+      "started_at": "2026-01-10 19:06:09.669272+00:00",
+      "finished_at": "2026-01-10 19:06:09.718628+00:00",
+      "attempts": 1
+    },
+    {
+      "id": 238,
+      "type": "coupon_activate",
+      "status": "DONE",
+      "scheduled_at": "2026-01-10 19:06:07.681136+00:00",
+      "started_at": "2026-01-10 19:06:08.245901+00:00",
+      "finished_at": "2026-01-10 19:06:09.016935+00:00",
+      "attempts": 1
+    },
+    {
+      "id": 237,
+      "type": "coupon_activate",
+      "status": "DONE",
+      "scheduled_at": "2026-01-10 19:05:57.085904+00:00",
+      "started_at": "2026-01-10 19:05:57.883695+00:00",
+      "finished_at": "2026-01-10 19:05:58.669851+00:00",
+      "attempts": 1
+    },
+    {
+      "id": 236,
+      "type": "coupon_activate",
+      "status": "DONE",
+      "scheduled_at": "2026-01-10 19:05:56.375181+00:00",
+      "started_at": "2026-01-10 19:05:57.504754+00:00",
+      "finished_at": "2026-01-10 19:05:57.540006+00:00",
+      "attempts": 1
+    },
+    {
+      "id": 235,
+      "type": "coupon_activate",
+      "status": "DONE",
+      "scheduled_at": "2026-01-10 19:05:55.706467+00:00",
+      "started_at": "2026-01-10 19:05:56.466857+00:00",
+      "finished_at": "2026-01-10 19:05:56.502501+00:00",
+      "attempts": 1
+    },
+    {
+      "id": 234,
+      "type": "coupon_activate",
+      "status": "DONE",
+      "scheduled_at": "2026-01-10 19:05:12.794397+00:00",
+      "started_at": "2026-01-10 19:05:13.418652+00:00",
+      "finished_at": "2026-01-10 19:05:14.184729+00:00",
+      "attempts": 1
+    },
+    {
+      "id": 233,
+      "type": "coupon_activate",
+      "status": "DONE",
+      "scheduled_at": "2026-01-10 19:05:11.977874+00:00",
+      "started_at": "2026-01-10 19:05:13.049028+00:00",
+      "finished_at": "2026-01-10 19:05:13.091376+00:00",
+      "attempts": 1
+    },
+    {
+      "id": 232,
+      "type": "coupon_activate",
+      "status": "DONE",
+      "scheduled_at": "2026-01-10 19:05:10.811249+00:00",
+      "started_at": "2026-01-10 19:05:11.582868+00:00",
+      "finished_at": "2026-01-10 19:05:12.045822+00:00",
+      "attempts": 1
+    },
+    {
+      "id": 231,
+      "type": "coupon_activate",
+      "status": "DONE",
+      "scheduled_at": "2026-01-10 19:05:10.354653+00:00",
+      "started_at": "2026-01-10 19:05:11.232259+00:00",
+      "finished_at": "2026-01-10 19:05:12.167151+00:00",
+      "attempts": 1
+    },
+    {
+      "id": 230,
+      "type": "coupon_activate",
+      "status": "DONE",
+      "scheduled_at": "2026-01-10 19:04:56.156749+00:00",
+      "started_at": "2026-01-10 19:04:57.370254+00:00",
+      "finished_at": "2026-01-10 19:04:57.414306+00:00",
+      "attempts": 1
+    },
+    {
+      "id": 229,
+      "type": "coupon_activate",
+      "status": "DONE",
+      "scheduled_at": "2026-01-10 19:04:55.455292+00:00",
+      "started_at": "2026-01-10 19:04:55.901145+00:00",
+      "finished_at": "2026-01-10 19:04:56.664966+00:00",
+      "attempts": 1
+    },
+    {
+      "id": 228,
+      "type": "coupon_activate",
+      "status": "DONE",
+      "scheduled_at": "2026-01-10 19:04:54.024137+00:00",
+      "started_at": "2026-01-10 19:04:54.352796+00:00",
+      "finished_at": "2026-01-10 19:04:55.336435+00:00",
+      "attempts": 1
+    },
+    {
+      "id": 227,
+      "type": "coupon_activate",
+      "status": "DONE",
+      "scheduled_at": "2026-01-10 18:54:44.319534+00:00",
+      "started_at": "2026-01-10 18:54:44.817398+00:00",
+      "finished_at": "2026-01-10 18:54:45.595890+00:00",
+      "attempts": 1
+    },
+    {
+      "id": 226,
+      "type": "coupon_activate",
+      "status": "DONE",
+      "scheduled_at": "2026-01-10 18:54:32.983100+00:00",
+      "started_at": "2026-01-10 18:54:33.622789+00:00",
+      "finished_at": "2026-01-10 18:54:33.666830+00:00",
+      "attempts": 1
+    },
+    {
+      "id": 225,
+      "type": "coupon_activate",
+      "status": "DONE",
+      "scheduled_at": "2026-01-10 18:54:17.996904+00:00",
+      "started_at": "2026-01-10 18:54:18.505869+00:00",
+      "finished_at": "2026-01-10 18:54:19.300495+00:00",
+      "attempts": 1
+    },
+    {
+      "id": 224,
+      "type": "ecoupon_order_approve",
+      "status": "DONE",
+      "scheduled_at": "2026-01-10 18:50:13.761107+00:00",
+      "started_at": "2026-01-10 18:50:14.964896+00:00",
+      "finished_at": "2026-01-10 18:52:30.602328+00:00",
+      "attempts": 1
+    },
+    {
+      "id": 223,
+      "type": "ecoupon_order_approve",
+      "status": "DONE",
+      "scheduled_at": "2026-01-10 18:48:01.369239+00:00",
+      "started_at": "2026-01-10 18:48:01.769375+00:00",
+      "finished_at": "2026-01-10 18:52:29.355973+00:00",
+      "attempts": 1
+    },
+    {
+      "id": 222,
+      "type": "coupon_activate",
+      "status": "DONE",
+      "scheduled_at": "2026-01-10 18:44:18.621498+00:00",
+      "started_at": "2026-01-10 18:44:19.103876+00:00",
+      "finished_at": "2026-01-10 18:44:19.165375+00:00",
+      "attempts": 1
+    },
+    {
+      "id": 221,
+      "type": "ecoupon_order_approve",
+      "status": "DONE",
+      "scheduled_at": "2026-01-10 18:22:48.177909+00:00",
+      "started_at": "2026-01-10 18:22:48.561460+00:00",
+      "finished_at": "2026-01-10 18:26:54.732410+00:00",
+      "attempts": 1
+    }
+  ],
+  "stuck_running": [],
+  "task_245": {
+    "exists": true,
+    "id": 245,
+    "type": "ecoupon_order_approve",
+    "status": "DONE",
+    "scheduled_at": "2026-01-10 19:29:41.698163+00:00",
+    "started_at": "2026-01-10 19:29:41.954210+00:00",
+    "finished_at": "2026-01-10 19:29:44.627230+00:00",
+    "attempts": 2,
+    "max_attempts": 5,
+    "last_error": "",
+    "payload": {
+      "order_id": 17,
+      "review_note": "",
+      "reviewer_id": 2
+    }
+  }
+}

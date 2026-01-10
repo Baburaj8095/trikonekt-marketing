@@ -1,0 +1,99 @@
+{
+  "enable_pool_distribution": true,
+  "enable_geo_distribution": true,
+  "prime_activation_amount": "150.00",
+  "three_matrix_levels": 15,
+  "five_matrix_levels": 10,
+  "master_keys": [
+    "auto_block",
+    "commissions",
+    "consumer_matrix_3",
+    "consumer_matrix_5",
+    "direct_bonus",
+    "geo",
+    "geo_fixed",
+    "geo_mode",
+    "geo_percent",
+    "matrix_five",
+    "matrix_three",
+    "monthly_759",
+    "products",
+    "referral_join",
+    "tax",
+    "upline",
+    "withdrawal"
+  ],
+  "products.150.base_amount": "150.0",
+  "geo_mode.150": "fixed",
+  "geo_fixed.150": {
+    "state": 1.0,
+    "pincode": 4.0,
+    "royalty": 10.0,
+    "district": 1.0,
+    "employee": 2.0,
+    "state_coord": 1.0,
+    "pincode_coord": 2.0,
+    "sub_franchise": 15.0,
+    "district_coord": 1.0
+  },
+  "consumer_matrix_5.150": {
+    "levels": 6,
+    "fixed_amounts": [
+      20.0,
+      10.0,
+      5.0,
+      5.0,
+      5.0,
+      5.0
+    ]
+  },
+  "consumer_matrix_3.150": {
+    "levels": 15,
+    "fixed_amounts": [
+      5.0,
+      4.0,
+      3.0,
+      2.0,
+      2.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "commissions.prime_150": {
+    "direct": {
+      "self": 1.0,
+      "sponsor": 15.0
+    },
+    "matrix": {
+      "enable_3": true,
+      "enable_5": true
+    },
+    "coupons": {
+      "activation_count": 1
+    },
+    "rewards": {
+      "points_amount": 0
+    }
+  },
+  "commissions.prime_750": {
+    "multiplier": 1,
+    "base_package": "prime_150"
+  },
+  "policy_hash_safe": "0c19deabe51a4405fbc7c030e0188c85c408d3945371aa419fe472cd1b46b1a9",
+  "prime_150_policy": {
+    "direct_sponsor": "15.0",
+    "direct_self": "1.0",
+    "enable_3_matrix": true,
+    "enable_5_matrix": true,
+    "coupon_activation_count": 1,
+    "reward_points_amount": "0"
+  }
+}

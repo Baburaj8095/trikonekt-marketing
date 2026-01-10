@@ -36,8 +36,38 @@ def _credit_wallet(
 
 
 def _load_products_block(cfg: CommissionConfig) -> Dict[str, Any]:
+    """
+    Return a 'products' block that supports both nested and flattened admin JSON:
+      - Nested: {"products": {"150": {"base_amount": 150.00}, "750": {...}}}
+      - Flattened: {"products.150.base_amount": 150.00, "products.750.base_amount": ...}
+    Flattened keys are merged into the nested map for compatibility.
+    """
     master = dict(getattr(cfg, "master_commission_json", {}) or {})
-    return dict(master.get("products", {}) or {})
+    products = dict(master.get("products", {}) or {})
+    # Merge flattened keys like "products.150.base_amount"
+    try:
+        for k, v in list(master.items()):
+            if isinstance(k, str) and k.startswith("products."):
+                try:
+                    _, rest = k.split("products.", 1)
+                    parts = rest.split(".")
+                    if not parts:
+                        continue
+                    pkey = parts[0]
+                    node = products.setdefault(pkey, {})
+                    if len(parts) == 1:
+                        # e.g., "products.150": {...}
+                        if isinstance(v, dict):
+                            node.update(dict(v))
+                    else:
+                        # e.g., "products.150.base_amount": 150
+                        node[parts[1]] = v
+                except Exception:
+                    continue
+    except Exception:
+        # best-effort
+        pass
+    return products
 
 
 def _require_base_amount_for_150(cfg: CommissionConfig) -> Decimal:

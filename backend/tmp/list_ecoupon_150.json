@@ -1,0 +1,558 @@
+{
+  "counts": {
+    "total_150": 752,
+    "e_coupon_total": 752,
+    "e_coupon_assigned_consumer": 378,
+    "e_coupon_available": 114,
+    "e_coupon_assigned_agency": 205,
+    "e_coupon_assigned_employee": 0,
+    "e_coupon_sold": 433,
+    "e_coupon_redeemed": 0
+  },
+  "latest_assigned_consumer": [
+    {
+      "id": 1085,
+      "code": "S1-1503EX6350",
+      "status": "SOLD",
+      "assigned_consumer_id": 400,
+      "assigned_agency_id": 16,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1084,
+      "code": "S1-150XEYP1XE",
+      "status": "SOLD",
+      "assigned_consumer_id": 400,
+      "assigned_agency_id": 16,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1083,
+      "code": "S1-150TOH1JBC",
+      "status": "SOLD",
+      "assigned_consumer_id": 400,
+      "assigned_agency_id": 16,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1082,
+      "code": "S1-150VFENF06",
+      "status": "SOLD",
+      "assigned_consumer_id": 400,
+      "assigned_agency_id": 16,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1081,
+      "code": "S1-150H9TGS23",
+      "status": "SOLD",
+      "assigned_consumer_id": 400,
+      "assigned_agency_id": 16,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1080,
+      "code": "S1-150VXPENMB",
+      "status": "SOLD",
+      "assigned_consumer_id": 400,
+      "assigned_agency_id": 16,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1079,
+      "code": "S1-150W5BD2WC",
+      "status": "SOLD",
+      "assigned_consumer_id": 400,
+      "assigned_agency_id": 16,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1078,
+      "code": "S1-150K1AHO9M",
+      "status": "SOLD",
+      "assigned_consumer_id": 400,
+      "assigned_agency_id": 16,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1077,
+      "code": "S1-150GSOEY2N",
+      "status": "SOLD",
+      "assigned_consumer_id": 400,
+      "assigned_agency_id": 16,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1076,
+      "code": "S1-1501QR2LAW",
+      "status": "SOLD",
+      "assigned_consumer_id": 400,
+      "assigned_agency_id": 16,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1075,
+      "code": "S1-150PO4XNYC",
+      "status": "SOLD",
+      "assigned_consumer_id": 400,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1074,
+      "code": "S1-150OYVZEKC",
+      "status": "SOLD",
+      "assigned_consumer_id": 400,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1073,
+      "code": "S1-1509ERKOY8",
+      "status": "SOLD",
+      "assigned_consumer_id": 400,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1072,
+      "code": "S1-150UV3VLL2",
+      "status": "SOLD",
+      "assigned_consumer_id": 400,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1071,
+      "code": "S1-150D32011V",
+      "status": "SOLD",
+      "assigned_consumer_id": 400,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1070,
+      "code": "S1-15053PVF31",
+      "status": "SOLD",
+      "assigned_consumer_id": 400,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1069,
+      "code": "S1-1501MCEDKP",
+      "status": "SOLD",
+      "assigned_consumer_id": 400,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1068,
+      "code": "S1-1502XX2NJF",
+      "status": "SOLD",
+      "assigned_consumer_id": 400,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1067,
+      "code": "S1-150LJIHAD1",
+      "status": "SOLD",
+      "assigned_consumer_id": 400,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1066,
+      "code": "S1-150VSW5OMI",
+      "status": "SOLD",
+      "assigned_consumer_id": 400,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    }
+  ],
+  "latest_e_coupon_any": [
+    {
+      "id": 1204,
+      "code": "S1-150TQ6I2PM",
+      "status": "AVAILABLE",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1203,
+      "code": "S1-150Z1705C6",
+      "status": "AVAILABLE",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1202,
+      "code": "S1-150CTZXFD3",
+      "status": "AVAILABLE",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1201,
+      "code": "S1-150T08EBTN",
+      "status": "AVAILABLE",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1200,
+      "code": "S1-150I9LE7FQ",
+      "status": "AVAILABLE",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1199,
+      "code": "S1-1500ZYVOBD",
+      "status": "AVAILABLE",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1198,
+      "code": "S1-150LM5P6ZP",
+      "status": "AVAILABLE",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1197,
+      "code": "S1-150FO7ZYJF",
+      "status": "AVAILABLE",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1196,
+      "code": "S1-150Z6C01I3",
+      "status": "AVAILABLE",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1195,
+      "code": "S1-150YPUR8X4",
+      "status": "AVAILABLE",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1194,
+      "code": "S1-150EOTE9F3",
+      "status": "AVAILABLE",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1193,
+      "code": "S1-150U2JV12V",
+      "status": "AVAILABLE",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1192,
+      "code": "S1-150IUOGFGW",
+      "status": "AVAILABLE",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1191,
+      "code": "S1-150XXJKHHD",
+      "status": "AVAILABLE",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1190,
+      "code": "S1-1506E6F0R2",
+      "status": "AVAILABLE",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1189,
+      "code": "S1-150MDIS0LO",
+      "status": "AVAILABLE",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1188,
+      "code": "S1-150DENUSE5",
+      "status": "AVAILABLE",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1187,
+      "code": "S1-150US9I2D5",
+      "status": "AVAILABLE",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1186,
+      "code": "S1-150ACCUVMA",
+      "status": "AVAILABLE",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    },
+    {
+      "id": 1185,
+      "code": "S1-150GNWU2JZ",
+      "status": "AVAILABLE",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null,
+      "issued_channel": "e_coupon"
+    }
+  ],
+  "latest_any_150": [
+    {
+      "id": 1204,
+      "code": "S1-150TQ6I2PM",
+      "status": "AVAILABLE",
+      "issued_channel": "e_coupon",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null
+    },
+    {
+      "id": 1203,
+      "code": "S1-150Z1705C6",
+      "status": "AVAILABLE",
+      "issued_channel": "e_coupon",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null
+    },
+    {
+      "id": 1202,
+      "code": "S1-150CTZXFD3",
+      "status": "AVAILABLE",
+      "issued_channel": "e_coupon",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null
+    },
+    {
+      "id": 1201,
+      "code": "S1-150T08EBTN",
+      "status": "AVAILABLE",
+      "issued_channel": "e_coupon",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null
+    },
+    {
+      "id": 1200,
+      "code": "S1-150I9LE7FQ",
+      "status": "AVAILABLE",
+      "issued_channel": "e_coupon",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null
+    },
+    {
+      "id": 1199,
+      "code": "S1-1500ZYVOBD",
+      "status": "AVAILABLE",
+      "issued_channel": "e_coupon",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null
+    },
+    {
+      "id": 1198,
+      "code": "S1-150LM5P6ZP",
+      "status": "AVAILABLE",
+      "issued_channel": "e_coupon",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null
+    },
+    {
+      "id": 1197,
+      "code": "S1-150FO7ZYJF",
+      "status": "AVAILABLE",
+      "issued_channel": "e_coupon",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null
+    },
+    {
+      "id": 1196,
+      "code": "S1-150Z6C01I3",
+      "status": "AVAILABLE",
+      "issued_channel": "e_coupon",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null
+    },
+    {
+      "id": 1195,
+      "code": "S1-150YPUR8X4",
+      "status": "AVAILABLE",
+      "issued_channel": "e_coupon",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null
+    },
+    {
+      "id": 1194,
+      "code": "S1-150EOTE9F3",
+      "status": "AVAILABLE",
+      "issued_channel": "e_coupon",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null
+    },
+    {
+      "id": 1193,
+      "code": "S1-150U2JV12V",
+      "status": "AVAILABLE",
+      "issued_channel": "e_coupon",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null
+    },
+    {
+      "id": 1192,
+      "code": "S1-150IUOGFGW",
+      "status": "AVAILABLE",
+      "issued_channel": "e_coupon",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null
+    },
+    {
+      "id": 1191,
+      "code": "S1-150XXJKHHD",
+      "status": "AVAILABLE",
+      "issued_channel": "e_coupon",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null
+    },
+    {
+      "id": 1190,
+      "code": "S1-1506E6F0R2",
+      "status": "AVAILABLE",
+      "issued_channel": "e_coupon",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null
+    },
+    {
+      "id": 1189,
+      "code": "S1-150MDIS0LO",
+      "status": "AVAILABLE",
+      "issued_channel": "e_coupon",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null
+    },
+    {
+      "id": 1188,
+      "code": "S1-150DENUSE5",
+      "status": "AVAILABLE",
+      "issued_channel": "e_coupon",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null
+    },
+    {
+      "id": 1187,
+      "code": "S1-150US9I2D5",
+      "status": "AVAILABLE",
+      "issued_channel": "e_coupon",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null
+    },
+    {
+      "id": 1186,
+      "code": "S1-150ACCUVMA",
+      "status": "AVAILABLE",
+      "issued_channel": "e_coupon",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null
+    },
+    {
+      "id": 1185,
+      "code": "S1-150GNWU2JZ",
+      "status": "AVAILABLE",
+      "issued_channel": "e_coupon",
+      "assigned_consumer_id": null,
+      "assigned_agency_id": null,
+      "assigned_employee_id": null
+    }
+  ]
+}

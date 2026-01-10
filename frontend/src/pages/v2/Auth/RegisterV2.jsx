@@ -298,18 +298,47 @@ const RegisterV2 = () => {
     })();
   }, []);
 
+  // Pagination-aware fetch helper (follows Django REST Framework-style pagination)
+  const fetchAllPages = async (url, params = {}) => {
+    let items = [];
+    try {
+      // First page
+      let res = await API.get(url, { params });
+      let data = res?.data;
+      let chunk = Array.isArray(data) ? data : data?.results || [];
+      items = items.concat(chunk);
+
+      // Follow 'next' until exhausted (handles absolute or relative next URLs)
+      let next = data?.next;
+      let guard = 0;
+      while (next && guard < 100) {
+        const r = await API.get(next);
+        const d = r?.data;
+        const c = Array.isArray(d) ? d : d?.results || [];
+        items = items.concat(c);
+        next = d?.next;
+        guard += 1;
+      }
+    } catch {
+      // ignore; return items gathered so far (possibly empty)
+    }
+    return items;
+  };
+
   const loadStates = async (countryId) => {
     try {
-      const res = await API.get("/location/states/", { params: { country: countryId } });
-      setStates(res.data || []);
+      const rows = await fetchAllPages("/location/states/", { country: countryId });
+      // rows is already a flattened array of items
+      setStates(Array.isArray(rows) ? rows : (rows?.results || []));
     } catch {
       setStates([]);
     }
   };
   const loadCities = async (stateId) => {
     try {
-      const res = await API.get("/location/cities/", { params: { state: stateId } });
-      setCities(res.data || []);
+      const rows = await fetchAllPages("/location/cities/", { state: stateId });
+      // rows is already a flattened array of items
+      setCities(Array.isArray(rows) ? rows : (rows?.results || []));
     } catch {
       setCities([]);
     }

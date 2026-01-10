@@ -1,0 +1,96 @@
+{
+  "ok": true,
+  "now": "2026-01-10T16:29:39.546243+00:00",
+  "consumer": {
+    "id": 400,
+    "username": "TR0000000001",
+    "role": "user",
+    "category": "consumer",
+    "pincode": "560087",
+    "state_id": 4026,
+    "state": "Karnataka"
+  },
+  "geo_resolution": {
+    "pin_available": true,
+    "pin_value": "560087",
+    "state_available": true,
+    "state_id": 4026,
+    "state_name": "Karnataka",
+    "resolved": {
+      "Sub Franchise": {
+        "count": 0,
+        "first": null
+      },
+      "Pincode": {
+        "count": 0,
+        "first": null
+      },
+      "Pincode Coord": {
+        "count": 0,
+        "first": null
+      },
+      "District": {
+        "count": 1,
+        "first": {
+          "id": 13,
+          "username": "TRDT9560001004",
+          "role": "agency",
+          "category": "agency_district",
+          "pincode": "560001",
+          "state_id": 4026,
+          "state": "Karnataka"
+        }
+      },
+      "District Coord": {
+        "count": 1,
+        "first": {
+          "id": 12,
+          "username": "TRDC9560001003",
+          "role": "agency",
+          "category": "agency_district_coordinator",
+          "pincode": "560001",
+          "state_id": 4026,
+          "state": "Karnataka"
+        }
+      },
+      "State": {
+        "count": 1,
+        "first": {
+          "id": 11,
+          "username": "TRST9560001002",
+          "role": "agency",
+          "category": "agency_state",
+          "pincode": "560001",
+          "state_id": 4026,
+          "state": "Karnataka"
+        }
+      },
+      "State Coord": {
+        "count": 1,
+        "first": {
+          "id": 10,
+          "username": "TRSC9560001001",
+          "role": "agency",
+          "category": "agency_state_coordinator",
+          "pincode": "560001",
+          "state_id": 4026,
+          "state": "Karnataka"
+        }
+      }
+    }
+  },
+  "config": {
+    "geo_mode_150": "fixed",
+    "geo_fixed_150": {
+      "state": 1.0,
+      "pincode": 4.0,
+      "royalty": 10.0,
+      "district": 1.0,
+      "employee": 2.0,
+      "state_coord": 1.0,
+      "pincode_coord": 2.0,
+      "sub_franchise": 15.0,
+      "district_coord": 1.0
+    }
+  }
+}

@@ -1,0 +1,184 @@
+{
+  "ok": true,
+  "now": "2026-01-10T17:02:55.091110+00:00",
+  "code": {
+    "id": 1208,
+    "code": "S1-759QSIGJFC",
+    "value": "759.00",
+    "status": "SOLD",
+    "owner_id": 400,
+    "issued_channel": "e_coupon"
+  },
+  "seed_assignments": {
+    "ok": true,
+    "created": [],
+    "resolved": {
+      "Sub Franchise": 16,
+      "Pincode": 15,
+      "Pincode Coord": 14
+    }
+  },
+  "task": {
+    "id": 172,
+    "type": "coupon_activate",
+    "status": "DONE",
+    "attempts": 1,
+    "max_attempts": 5,
+    "last_error": "",
+    "payload": {
+      "type": "759",
+      "source": {
+        "id": 1208,
+        "code": "S1-759QSIGJFC",
+        "channel": "e_coupon"
+      },
+      "user_id": 400
+    }
+  },
+  "audits_presence": {
+    "monthly_759_distributed": true,
+    "prime_150_distributed": false,
+    "coupon_activated": true
+  },
+  "audits_rows": [
+    {
+      "action": "monthly_759_distributed",
+      "created_at": "2026-01-10 11:19:25.590713+00:00",
+      "notes": "Monthly 759 commission distribution applied",
+      "metadata": {
+        "first_month": false
+      }
+    },
+    {
+      "action": "coupon_activated",
+      "created_at": "2026-01-10 11:19:24.989051+00:00",
+      "notes": "",
+      "metadata": {
+        "type": "759"
+      }
+    }
+  ],
+  "verify": {
+    "product": "759",
+    "coupon_id": 1208,
+    "direct_present": true,
+    "self_present": true,
+    "direct_rows": [
+      {
+        "id": 60673,
+        "user_id": 16,
+        "amount": "50.00",
+        "type": "MONTHLY_759_DIRECT",
+        "source_type": "ECOUPON_759",
+        "source_id": "1208",
+        "meta_layer": null,
+        "meta_source": "MONTHLY_759",
+        "created_at": "2026-01-10T11:19:25.026665+00:00"
+      }
+    ],
+    "self_rows": [
+      {
+        "id": 60674,
+        "user_id": 400,
+        "amount": "1.00",
+        "type": "MONTHLY_759_SELF",
+        "source_type": "ECOUPON_759",
+        "source_id": "1208",
+        "meta_layer": null,
+        "meta_source": "MONTHLY_759",
+        "created_at": "2026-01-10T11:19:25.067809+00:00"
+      }
+    ],
+    "levels_count": 0,
+    "levels_rows": [],
+    "geo_rows": [
+      {
+        "id": 60921,
+        "user_id": 14,
+        "amount": "4.00",
+        "type": "COMMISSION_CREDIT",
+        "source_type": "ECOUPON_759",
+        "source_id": "1208",
+        "meta_layer": "Pincode Coord",
+        "meta_source": "AUTO_POOL_GEO_FIXED",
+        "created_at": "2026-01-10T17:01:39.156997+00:00"
+      },
+      {
+        "id": 60919,
+        "user_id": 15,
+        "amount": "5.00",
+        "type": "COMMISSION_CREDIT",
+        "source_type": "ECOUPON_759",
+        "source_id": "1208",
+        "meta_layer": "Pincode",
+        "meta_source": "AUTO_POOL_GEO_FIXED",
+        "created_at": "2026-01-10T17:01:37.984808+00:00"
+      },
+      {
+        "id": 60916,
+        "user_id": 16,
+        "amount": "25.00",
+        "type": "COMMISSION_CREDIT",
+        "source_type": "ECOUPON_759",
+        "source_id": "1208",
+        "meta_layer": "Sub Franchise",
+        "meta_source": "AUTO_POOL_GEO_FIXED",
+        "created_at": "2026-01-10T17:01:36.678334+00:00"
+      },
+      {
+        "id": 60692,
+        "user_id": 12,
+        "amount": "3.00",
+        "type": "COMMISSION_CREDIT",
+        "source_type": "ECOUPON_759",
+        "source_id": "1208",
+        "meta_layer": "District Coord",
+        "meta_source": "AUTO_POOL_GEO_FIXED",
+        "created_at": "2026-01-10T11:19:25.558963+00:00"
+      },
+      {
+        "id": 60690,
+        "user_id": 10,
+        "amount": "2.00",
+        "type": "COMMISSION_CREDIT",
+        "source_type": "ECOUPON_759",
+        "source_id": "1208",
+        "meta_layer": "State Coord",
+        "meta_source": "AUTO_POOL_GEO_FIXED",
+        "created_at": "2026-01-10T11:19:25.488458+00:00"
+      },
+      {
+        "id": 60688,
+        "user_id": 13,
+        "amount": "4.00",
+        "type": "COMMISSION_CREDIT",
+        "source_type": "ECOUPON_759",
+        "source_id": "1208",
+        "meta_layer": "District",
+        "meta_source": "AUTO_POOL_GEO_FIXED",
+        "created_at": "2026-01-10T11:19:25.456820+00:00"
+      },
+      {
+        "id": 60686,
+        "user_id": 11,
+        "amount": "2.00",
+        "type": "COMMISSION_CREDIT",
+        "source_type": "ECOUPON_759",
+        "source_id": "1208",
+        "meta_layer": "State",
+        "meta_source": "AUTO_POOL_GEO_FIXED",
+        "created_at": "2026-01-10T11:19:25.381266+00:00"
+      }
+    ],
+    "geo_layer_presence": {
+      "Sub Franchise": true,
+      "Pincode": true,
+      "Pincode Coord": true,
+      "District": true,
+      "District Coord": true,
+      "State": true,
+      "State Coord": true
+    },
+    "geo_count": 7
+  }
+}

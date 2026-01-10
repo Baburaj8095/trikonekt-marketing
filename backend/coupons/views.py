@@ -2846,10 +2846,17 @@ class CouponActivateView(APIView):
         try:
             code_str = str(source.get("code") or "").strip()
             ch = str(source.get("channel") or "").replace("-", "_").lower()
-            if code_str and ch == "e_coupon":
+            if code_str:
                 code_obj = CouponCode.objects.filter(code=code_str).first()
                 if code_obj and code_obj.assigned_consumer_id == request.user.id:
                     source["id"] = code_obj.id
+                    # Backfill channel for safety if the code itself is an e-coupon
+                    try:
+                        issued_ch = str(getattr(code_obj, "issued_channel", "")).replace("-", "_").lower()
+                        if ch != "e_coupon" and issued_ch == "e_coupon":
+                            source["channel"] = "e_coupon"
+                    except Exception:
+                        pass
         except Exception:
             pass
         if t not in ("150", "50", "750", "759"):
@@ -2875,6 +2882,15 @@ class CouponActivateView(APIView):
             from django.conf import settings
             if getattr(settings, "DEBUG", False) and not async_override:
                 use_async = False
+        except Exception:
+            pass
+        # Force async processing for e-coupon channel to offload heavy work regardless of DEBUG.
+        # This guarantees a BackgroundTask is enqueued and visible to the worker for UI polling.
+        try:
+            ch_force = str(source.get("channel") or "").replace("-", "_").lower()
+            if ch_force == "e_coupon":
+                use_async = True
+                async_override = True
         except Exception:
             pass
         if use_async:
@@ -2937,9 +2953,10 @@ class CouponActivateView(APIView):
         try:
             code_str = str(source.get("code") or "").strip()
             ch = str(source.get("channel") or "").replace("-", "_").lower()
-            if code_str and ch == "e_coupon":
+            if code_str:
                 code_obj = CouponCode.objects.filter(code=code_str).select_related("assigned_employee", "assigned_agency").first()
-                if code_obj and code_obj.assigned_consumer_id == request.user.id:
+                ch_ok = (ch == "e_coupon") or (str(getattr(code_obj, "issued_channel", "")).replace("-", "_").lower() == "e_coupon")
+                if code_obj and code_obj.assigned_consumer_id == request.user.id and ch_ok:
                     # Special handling for Monthly 759 activations: sponsor + L1..L5 + agency split
                     try:
                         from decimal import Decimal as D
@@ -2986,44 +3003,64 @@ class CouponActivateView(APIView):
                         # Idempotent per code and denomination
                         if val == D("150"):
                             if not AuditTrail.objects.filter(action="prime_150_distributed", coupon_code=code_obj).exists():
+                                dist_ok = False
                                 try:
                                     from business.services.prime import distribute_prime_150_payouts
                                     distribute_prime_150_payouts(
                                         request.user,
                                         source={"type": "ECOUPON_150", "id": code_obj.id, "code": code_obj.code}
                                     )
+                                    dist_ok = True
                                 except Exception:
-                                    pass
+                                    dist_ok = False
+                                # Also perform consumer matrix distribution per admin config (exclude direct/self & agency here to avoid duplication)
                                 try:
-                                    AuditTrail.objects.create(
-                                        action="prime_150_distributed",
-                                        actor=request.user,
-                                        coupon_code=code_obj,
-                                        notes="Prime 150 commission distribution applied",
-                                        metadata={"denomination": "150"},
+                                    from business.services.activation import open_matrix_accounts_for_coupon
+                                    open_matrix_accounts_for_coupon(
+                                        request.user,
+                                        code_obj.id,
+                                        amount_150=D("150.00"),
+                                        distribute=True,
+                                        trigger="ecoupon_activate",
+                                        include_direct_self=False,
+                                        include_agency=False,
                                     )
                                 except Exception:
                                     pass
+                                if dist_ok:
+                                    try:
+                                        AuditTrail.objects.create(
+                                            action="prime_150_distributed",
+                                            actor=request.user,
+                                            coupon_code=code_obj,
+                                            notes="Prime 150 commission distribution applied",
+                                            metadata={"denomination": "150"},
+                                        )
+                                    except Exception:
+                                        pass
                         elif val == D("750"):
                             if not AuditTrail.objects.filter(action="prime_750_distributed", coupon_code=code_obj).exists():
+                                dist_ok = False
                                 try:
                                     from business.services.prime import distribute_prime_750_payouts
                                     distribute_prime_750_payouts(
                                         request.user,
                                         source={"type": "ECOUPON_750", "id": code_obj.id, "code": code_obj.code}
                                     )
+                                    dist_ok = True
                                 except Exception:
-                                    pass
-                                try:
-                                    AuditTrail.objects.create(
-                                        action="prime_750_distributed",
-                                        actor=request.user,
-                                        coupon_code=code_obj,
-                                        notes="Prime 750 commission distribution applied",
-                                        metadata={"denomination": "750"},
-                                    )
-                                except Exception:
-                                    pass
+                                    dist_ok = False
+                                if dist_ok:
+                                    try:
+                                        AuditTrail.objects.create(
+                                            action="prime_750_distributed",
+                                            actor=request.user,
+                                            coupon_code=code_obj,
+                                            notes="Prime 750 commission distribution applied",
+                                            metadata={"denomination": "750"},
+                                        )
+                                    except Exception:
+                                        pass
                         else:
                             # For other denominations (e.g., 50), no commission is applied here.
                             # 50 path is handled by activate_50 service earlier; skip any legacy fixed splits.
@@ -3346,7 +3383,7 @@ class ECouponOrderViewSet(mixins.CreateModelMixin,
         if role not in ("consumer", "agency", "employee"):
             return Response({"detail": "Invalid role on order."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Async: enqueue background approval unless forced sync via ?sync=1 or settings.DEBUG
+        # Async by default; allow ?sync=1 to force sync, and ?async=1 to force async. Do not force sync in DEBUG.
         use_async = True
         try:
             sync_param = str(request.query_params.get("sync") or request.data.get("sync") or "").strip().lower()
@@ -3355,9 +3392,9 @@ class ECouponOrderViewSet(mixins.CreateModelMixin,
         except Exception:
             pass
         try:
-            from django.conf import settings
-            if getattr(settings, "DEBUG", False):
-                use_async = False
+            async_param = str(request.query_params.get("async") or request.data.get("async") or "").strip().lower()
+            if async_param in ("1", "true", "yes", "async"):
+                use_async = True
         except Exception:
             pass
         if use_async:
@@ -3496,19 +3533,23 @@ class ECouponOrderViewSet(mixins.CreateModelMixin,
                         if val == D("150"):
                             # Five + Three matrix with per-level distribution, idempotent per code
                             try:
-                                open_matrix_accounts_for_coupon(order.buyer, c.id, amount_150=D("150.00"), distribute=True, trigger="ecoupon_order")
-                            except Exception:
-                                continue
-                        elif val == D("50"):
-                            # Per-code 50 activation opens THREE_50 and distributes level-wise, idempotent per code
-                            try:
-                                activate_50(
+                                open_matrix_accounts_for_coupon(
                                     order.buyer,
-                                    {"type": "ECOUPON_ORDER_50", "id": c.id, "code": getattr(c, "code", ""), "channel": "e_coupon"},
-                                    package_code="ECOUPON_ORDER_50",
+                                    c.id,
+                                    amount_150=D("150.00"),
+                                    distribute=False,
+                                    trigger="ecoupon_order",
+                                    include_direct_self=False,
+                                    include_agency=False,
                                 )
                             except Exception:
                                 continue
+                        elif val == D("50"):
+                            # Defer 50 activation to consumer click; no activation or commission at approval time
+                            try:
+                                pass
+                            except Exception:
+                                pass
             except Exception:
                 # Best-effort; do not block order approval
                 pass
@@ -3528,6 +3569,19 @@ class ECouponOrderViewSet(mixins.CreateModelMixin,
                     notes=f"Approved order #{order.id}",
                     metadata={"order_id": order.id, "allocated": int(affected or 0), "role": role},
                 )
+                # Hint audit for 150 denomination: payouts await consumer activation
+                if role == "consumer":
+                    try:
+                        from decimal import Decimal as D
+                        if D(str(getattr(order, "denomination_snapshot", "0") or 0)) == D("150"):
+                            AuditTrail.objects.create(
+                                action="await_consumer_activation_for_payouts",
+                                actor=request.user,
+                                notes=f"Order #{order.id} allocated ₹150 e‑coupons; payouts on consumer activation",
+                                metadata={"order_id": order.id, "denomination": "150"},
+                            )
+                    except Exception:
+                        pass
             except Exception:
                 pass
 

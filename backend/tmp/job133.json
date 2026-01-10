@@ -1,0 +1,1 @@
+{"id": 133, "type": "coupon_activate", "status": "DONE", "attempts": 1, "max_attempts": 5, "last_error": "", "scheduled_at": "2026-01-10 06:50:17.446744+00:00", "started_at": "2026-01-10 06:50:18.719331+00:00", "finished_at": "2026-01-10 06:50:18.754845+00:00", "payload": {"type": "150", "source": {"id": 1041, "code": "S1-150DLSZZX6", "channel": "e_coupon"}, "user_id": 400}}

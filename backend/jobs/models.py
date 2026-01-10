@@ -361,18 +361,80 @@ def handle_coupon_activate(task: BackgroundTask) -> None:
         return
 
     # Normalize source for e-coupon activations: attach CouponCode.id for traceability
+    code_obj = None
     try:
         code_str = str(source.get("code") or "").strip()
+        code_id_raw = source.get("id")
         ch = str(source.get("channel") or "").replace("-", "_").lower()
-        if code_str and ch == "e_coupon":
+
+        # Resolve by code first, else fallback to id
+        if code_str:
             code_obj = CouponCode.objects.filter(code=code_str).first()
-            if code_obj and code_obj.assigned_consumer_id == user.id:
-                source["id"] = code_obj.id
+        elif code_id_raw:
+            try:
+                code_obj = CouponCode.objects.filter(id=int(code_id_raw)).first()
+            except Exception:
+                code_obj = None
+            if code_obj:
+                # backfill code string so downstream guards treat it as referenced
+                try:
+                    code_str = str(getattr(code_obj, "code", "") or "").strip()
+                except Exception:
+                    code_str = ""
+
+        # If the resolved code belongs to this user, ensure id is populated
+        if code_obj and code_obj.assigned_consumer_id == user.id:
+            source["id"] = code_obj.id
+            # Backfill channel from the code if the code itself is an e-coupon
+            try:
+                issued_ch = str(getattr(code_obj, "issued_channel", "")).replace("-", "_").lower()
+            except Exception:
+                issued_ch = ""
+            if ch != "e_coupon" and issued_ch == "e_coupon":
+                source["channel"] = "e_coupon"
+                ch = "e_coupon"
+        else:
+            try:
+                issued_ch = str(getattr(code_obj, "issued_channel", "")).replace("-", "_").lower() if code_obj else ""
+            except Exception:
+                issued_ch = ""
+
+        ch_ok = (ch == "e_coupon") or (issued_ch == "e_coupon")
     except Exception:
         code_str = str(source.get("code") or "").strip()
+        issued_ch = ""
+        ch_ok = False
 
     # Core activation
-    if t == "150":
+    # For e-coupon 150 activations owned by this user, use the new Prime 150 engine instead of legacy activate_150_active
+    from decimal import Decimal as D
+    parse_err = False
+    is_150_fallback = False
+    raw_value_str = None
+    val = None
+    try:
+        raw_value_str = str(getattr(code_obj, "value", "0") or "0").strip()
+        val = D(raw_value_str.replace(",", ""))
+    except Exception:
+        parse_err = True
+        val = None
+        try:
+            is_150_fallback = bool(raw_value_str) and raw_value_str.strip().startswith("150")
+        except Exception:
+            is_150_fallback = False
+    is_ecoupon_150 = bool(
+        t == "150"
+        and code_obj
+        and code_obj.assigned_consumer_id == user.id
+        and (
+            str(source.get("channel") or "").replace("-", "_").lower() == "e_coupon"
+            or str(getattr(code_obj, "issued_channel", "")).replace("-", "_").lower() == "e_coupon"
+        )
+        and (val == D("150") or is_150_fallback)
+    )
+    if t == "150" and is_ecoupon_150:
+        ok = True  # defer to config-driven engine below; skip legacy path to avoid double credits
+    elif t == "150":
         ok = activate_150_active(user, {"type": "coupon_150_activate", **source})
     elif t == "50":
         ok = activate_50(user, {"type": "coupon_50_activate", **source})
@@ -387,10 +449,26 @@ def handle_coupon_activate(task: BackgroundTask) -> None:
 
     # Record activation audit for e-coupons (no approval flow) - idempotent per user+code
     try:
+        # Re-resolve code_obj if needed, allowing id fallback
         code_str = str(source.get("code") or "").strip()
+        code_id_raw = source.get("id")
+        if not code_obj:
+            if code_str:
+                code_obj = CouponCode.objects.filter(code=code_str).first()
+            elif code_id_raw:
+                try:
+                    code_obj = CouponCode.objects.filter(id=int(code_id_raw)).first()
+                    if code_obj and not code_str:
+                        code_str = str(getattr(code_obj, "code", "") or "").strip()
+                except Exception:
+                    code_obj = None
+
+        issued_ch = str(getattr(code_obj, "issued_channel", "")).replace("-", "_").lower() if code_obj else ""
         ch = str(source.get("channel") or "").replace("-", "_").lower()
-        if code_str and ch == "e_coupon":
-            code_obj = CouponCode.objects.filter(code=code_str).first()
+        ch_ok = (ch == "e_coupon") or (issued_ch == "e_coupon")
+        has_ref = bool(code_str or code_id_raw)
+
+        if has_ref and ch_ok:
             if code_obj and code_obj.assigned_consumer_id == user.id:
                 if not AuditTrail.objects.filter(action="coupon_activated", actor=user, coupon_code=code_obj).exists():
                     AuditTrail.objects.create(
@@ -406,76 +484,155 @@ def handle_coupon_activate(task: BackgroundTask) -> None:
     # E-coupon activation commission distribution
     try:
         code_str = str(source.get("code") or "").strip()
+        code_id_raw = source.get("id")
         ch = str(source.get("channel") or "").replace("-", "_").lower()
-        if code_str and ch == "e_coupon":
-            code_obj = CouponCode.objects.filter(code=code_str).select_related("assigned_employee", "assigned_agency").first()
-            if code_obj and code_obj.assigned_consumer_id == user.id:
-                # Monthly 759 special handling
+
+        # Ensure we have the code object (with relations) and compute channel truth
+        if not code_obj:
+            if code_str:
+                code_obj = CouponCode.objects.filter(code=code_str).select_related("assigned_employee", "assigned_agency").first()
+            elif code_id_raw:
                 try:
-                    val = D(str(getattr(code_obj, "value", "0") or 0))
+                    code_obj = CouponCode.objects.filter(id=int(code_id_raw)).select_related("assigned_employee", "assigned_agency").first()
+                    if code_obj and not code_str:
+                        code_str = str(getattr(code_obj, "code", "") or "").strip()
                 except Exception:
-                    val = None
-                if val == D("759"):
-                    if not AuditTrail.objects.filter(action="monthly_759_distributed", coupon_code=code_obj).exists():
-                        prev_exists = AuditTrail.objects.filter(
-                            action="coupon_activated",
+                    code_obj = None
+        else:
+            code_obj = CouponCode.objects.filter(id=code_obj.id).select_related("assigned_employee", "assigned_agency").first()
+
+        issued_ch = str(getattr(code_obj, "issued_channel", "")).replace("-", "_").lower() if code_obj else ""
+        ch_ok = (ch == "e_coupon") or (issued_ch == "e_coupon")
+        has_ref = bool(code_str or code_id_raw)
+
+        if not (has_ref and ch_ok):
+            return
+        if not code_obj:
+            return
+        if code_obj.assigned_consumer_id != user.id:
+            return
+
+        # Determine denomination
+        try:
+            val = D(str(getattr(code_obj, "value", "0") or 0))
+        except Exception:
+            val = None
+
+        if val == D("759"):
+            if not AuditTrail.objects.filter(action="monthly_759_distributed", coupon_code=code_obj).exists():
+                prev_exists = AuditTrail.objects.filter(
+                    action="coupon_activated",
+                    actor=user,
+                    coupon_code__value=D("759")
+                ).exclude(coupon_code_id=code_obj.id).exists()
+                try:
+                    from business.services.monthly import distribute_monthly_759_payouts
+                    distribute_monthly_759_payouts(
+                        user,
+                        is_first_month=(not prev_exists),
+                        source={"type": "ECOUPON_759", "id": code_obj.id, "code": code_obj.code},
+                    )
+                    AuditTrail.objects.create(
+                        action="monthly_759_distributed",
+                        actor=user,
+                        coupon_code=code_obj,
+                        notes="Monthly 759 commission distribution applied",
+                        metadata={"first_month": bool(not prev_exists)},
+                    )
+                except Exception:
+                    pass
+        elif (val == D("150") or is_150_fallback):
+            # If legacy per-coupon distribution already happened (order approval path), avoid double-paying.
+            legacy_done = AuditTrail.objects.filter(action="coupon_matrix_distributed", coupon_code=code_obj).exists()
+            if legacy_done:
+                if not AuditTrail.objects.filter(action="prime_150_distributed", coupon_code=code_obj).exists():
+                    try:
+                        AuditTrail.objects.create(
+                            action="prime_150_distributed",
                             actor=user,
-                            coupon_code__value=D("759")
-                        ).exclude(coupon_code_id=code_obj.id).exists()
+                            coupon_code=code_obj,
+                            notes="Backfilled from legacy coupon_matrix_distributed",
+                            metadata={"denomination": "150", "backfilled": True},
+                        )
+                    except Exception:
+                        pass
+            else:
+                if not AuditTrail.objects.filter(action="prime_150_distributed", coupon_code=code_obj).exists():
+                    try:
+                        from business.services.prime import distribute_prime_150_payouts
+                        distribute_prime_150_payouts(
+                            user,
+                            source={"type": "ECOUPON_150", "id": code_obj.id, "code": code_obj.code},
+                        )
+                        # Also perform consumer matrix distribution per admin config (exclude direct/self & agency here to avoid duplication)
                         try:
-                            from business.services.monthly import distribute_monthly_759_payouts
-                            distribute_monthly_759_payouts(
+                            from business.services.activation import open_matrix_accounts_for_coupon
+                            open_matrix_accounts_for_coupon(
                                 user,
-                                is_first_month=(not prev_exists),
-                                source={"type": "ECOUPON_759", "id": code_obj.id, "code": code_obj.code},
+                                code_obj.id,
+                                amount_150=D("150.00"),
+                                distribute=True,
+                                trigger="ecoupon_activate",
+                                include_direct_self=False,
+                                include_agency=False,
                             )
                         except Exception:
+                            # best-effort: do not fail the prime engine audit if matrix distribution errors
                             pass
+                        AuditTrail.objects.create(
+                            action="prime_150_distributed",
+                            actor=user,
+                            coupon_code=code_obj,
+                            notes="Prime 150 commission distribution applied",
+                            metadata={"denomination": "150"},
+                        )
+                    except Exception:
+                        # stamp failure audit for observability
                         try:
                             AuditTrail.objects.create(
-                                action="monthly_759_distributed",
+                                action="prime_150_distribution_failed",
                                 actor=user,
                                 coupon_code=code_obj,
-                                notes="Monthly 759 commission distribution applied",
-                                metadata={"first_month": bool(not prev_exists)},
+                                notes="Prime 150 engine failed during e-coupon activation",
+                                metadata={"denomination": "150"},
                             )
                         except Exception:
                             pass
-                else:
-                    # Default commission split for e-coupon activation (once per code)
-                    if not AuditTrail.objects.filter(action="ecoupon_commission_awarded", coupon_code=code_obj).exists():
-                        from decimal import Decimal
-                        awards = []
-                        if code_obj.assigned_employee_id:
-                            if code_obj.assigned_employee:
-                                awards.append(("employee", code_obj.assigned_employee, Decimal("15.00")))
-                            if code_obj.assigned_agency:
-                                awards.append(("agency", code_obj.assigned_agency, Decimal("15.00")))
-                        elif code_obj.assigned_agency_id:
-                            if code_obj.assigned_agency:
-                                awards.append(("agency", code_obj.assigned_agency, Decimal("30.00")))
-                        for role, uobj, amt in awards:
-                            try:
-                                w = Wallet.get_or_create_for_user(uobj)
-                                w.credit(
-                                    amt,
-                                    tx_type="COMMISSION_CREDIT",
-                                    meta={"role": role, "source": "ECOUPON_ACTIVATION", "code": code_obj.code},
-                                    source_type="ECOUPON_COMMISSION",
-                                    source_id=str(code_obj.id),
-                                )
-                            except Exception:
-                                pass
-                        try:
-                            AuditTrail.objects.create(
-                                action="ecoupon_commission_awarded",
-                                actor=user,
-                                coupon_code=code_obj,
-                                notes="Activation commission split",
-                                metadata={"awards": [{"role": r, "user": getattr(u, "username", None), "amount": str(a)} for (r, u, a) in awards]},
-                            )
-                        except Exception:
-                            pass
+        elif val == D("750"):
+            if not AuditTrail.objects.filter(action="prime_750_distributed", coupon_code=code_obj).exists():
+                try:
+                    from business.services.prime import distribute_prime_750_payouts
+                    distribute_prime_750_payouts(
+                        user,
+                        source={"type": "ECOUPON_750", "id": code_obj.id, "code": code_obj.code}
+                    )
+                    AuditTrail.objects.create(
+                        action="prime_750_distributed",
+                        actor=user,
+                        coupon_code=code_obj,
+                        notes="Prime 750 commission distribution applied",
+                        metadata={"denomination": "750"},
+                    )
+                except Exception:
+                    pass
+        else:
+            # Other denominations or parse failures: no commission here
+            try:
+                AuditTrail.objects.create(
+                    action="coupon_activate_skipped",
+                    actor=user,
+                    coupon_code=code_obj,
+                    notes="Skipped commission distribution for unknown denomination",
+                    metadata={
+                        "denomination_raw": raw_value_str,
+                        "denomination_parsed": (str(val) if val is not None else None),
+                        "parse_error": bool(parse_err),
+                        "channel": ch,
+                        "type": t,
+                    },
+                )
+            except Exception:
+                pass
     except Exception:
         pass
 
@@ -589,7 +746,7 @@ def handle_ecoupon_order_approve(task: BackgroundTask) -> None:
         affected = write_qs.update(**update_kwargs)
         sample_codes = list(CouponCode.objects.filter(id__in=pick_ids).values_list("code", flat=True)[:5])
 
-        # For consumer allocations: eligibility and per-code activation/distribution
+        # For consumer allocations: eligibility only. Activation is performed later by consumer.
         if role == "consumer" and affected:
             assigned_codes = list(
                 CouponCode.objects
@@ -599,29 +756,10 @@ def handle_ecoupon_order_approve(task: BackgroundTask) -> None:
             )
             for c in assigned_codes:
                 try:
-                    val = D(str(getattr(c, "value", "0") or 0))
-                except Exception:
-                    continue
-                # Lucky draw eligibility (idempotent)
-                try:
+                    # Lucky draw eligibility (idempotent)
                     record_lucky_draw_eligibility_for_code(c)
                 except Exception:
                     pass
-                # Per-denomination post-allocation actions
-                try:
-                    if val == D("150"):
-                        from business.services.activation import open_matrix_accounts_for_coupon
-                        open_matrix_accounts_for_coupon(order.buyer, c.id, amount_150=D("150.00"), distribute=True, trigger="ecoupon_order")
-                    elif val == D("50"):
-                        from business.services.activation import activate_50
-                        activate_50(
-                            order.buyer,
-                            {"type": "ECOUPON_ORDER_50", "id": c.id, "code": getattr(c, "code", ""), "channel": "e_coupon"},
-                            package_code="ECOUPON_ORDER_50",
-                        )
-                except Exception:
-                    # continue best-effort per code
-                    continue
 
         # Finalize order
         order.status = "APPROVED"
@@ -639,6 +777,19 @@ def handle_ecoupon_order_approve(task: BackgroundTask) -> None:
                 notes=f"Approved order #{order.id}",
                 metadata={"order_id": order.id, "allocated": int(affected or 0), "role": role},
             )
+            # Hint audit for 150 denomination: payouts await consumer activation
+            if role == "consumer":
+                try:
+                    from decimal import Decimal as D
+                    if D(str(getattr(order, "denomination_snapshot", "0") or 0)) == D("150"):
+                        AuditTrail.objects.create(
+                            action="await_consumer_activation_for_payouts",
+                            actor=reviewer,
+                            notes=f"Order #{order.id} allocated ₹150 e‑coupons; payouts on consumer activation",
+                            metadata={"order_id": order.id, "denomination": "150"},
+                        )
+                except Exception:
+                    pass
         except Exception:
             pass
 

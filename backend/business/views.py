@@ -492,13 +492,11 @@ class AdminPromoPurchaseApproveView(APIView):
         redeem750_choice = prime750_choice == "REDEEM"
         is_prime_759 = str(getattr(obj.package, "type", "")) == "PRIME" and abs(price - D("759")) <= D("0.75")
 
-        # Skip allocation when user selected a non-code option:
-        #  - PRIME150: EBOOK or REDEEM -> no code allocation
-        #  - PRIME750: PRODUCT / COUPON / REDEEM -> no 150-code allocation
-        # Allocate 150 e‑coupon even for PRIME150 REDEEM (only skip when EBOOK is chosen).
-        # For PRIME750, do not allocate 150 codes for PRODUCT/COUPON/REDEEM choices.
-        # Allocate 150 e‑coupon only for PRIME150 (non‑EBOOK). For all other packages (750/759/MONTHLY), skip 150 allocation.
-        skip_allocation = not (is_prime_150 and not ebook_choice)
+        # Allocation rules (updated):
+        # - PRIME150 (non‑EBOOK): allocate 150 e‑coupon(s)
+        # - PRIME750: allocate 5×150 per unit (based on price/₹150), irrespective of choice
+        # - PRIME759 and MONTHLY: do not allocate 150 codes here (handled separately)
+        skip_allocation = not ((is_prime_150 and not ebook_choice) or is_prime_750)
         # If skipping generic 150 allocation, set required 150-codes to 0 so audit reflects truth.
         if skip_allocation:
             need = 0

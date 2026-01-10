@@ -122,6 +122,7 @@ class StateViewSet(viewsets.ReadOnlyModelViewSet):
 
 class CityViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = CitySerializer
+    pagination_class = None
 
     def get_queryset(self):
         # Optimize nested serializer (City -> State -> Country) to avoid N+1s
@@ -155,13 +156,10 @@ class CityViewSet(viewsets.ReadOnlyModelViewSet):
         if q:
             queryset = queryset.filter(name__icontains=q)
 
-        # Limit results by default to keep responses fast; override with ?all=1 or set ?limit=...
+        # Return full result set by default (no hard limits); optional client-driven limit
         limit = (self.request.query_params.get('limit') or '').strip()
-        all_flag = (self.request.query_params.get('all') or '').strip().lower() in ('1', 'true', 'yes')
         if limit.isdigit():
             queryset = queryset[:int(limit)]
-        elif not all_flag:
-            queryset = queryset[:500]
 
         return queryset
 

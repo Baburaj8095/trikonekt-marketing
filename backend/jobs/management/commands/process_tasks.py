@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 
 from django.core.management.base import BaseCommand
 from django.utils import timezone
+from django.db.models import F
 
 from jobs.models import BackgroundTask
 
@@ -17,6 +18,8 @@ class Command(BaseCommand):
         parser.add_argument("--max-runtime-seconds", type=int, default=0, help="Max total runtime before exit (0 = infinite)")
         parser.add_argument("--backoff-base", type=float, default=2.0, help="Exponential backoff base for failures (default: 2.0)")
         parser.add_argument("--backoff-max", type=float, default=60.0, help="Max backoff seconds (default: 60.0)")
+        parser.add_argument("--reap-stuck-seconds", type=int, default=300, help="Requeue RUNNING tasks stuck longer than this many seconds (0 to disable)")
+        parser.add_argument("--reap-on-start", action="store_true", help="Run stuck-task reaper once on startup")
 
     def handle(self, *args, **opts):
         once = opts["once"]
@@ -30,7 +33,33 @@ class Command(BaseCommand):
         iterations = 0
         idle_streak = 0
 
+        reap_stuck_secs = int(opts["reap_stuck_seconds"] or 0)
+        reap_on_start = bool(opts["reap_on_start"])
+
+        def reap_stuck():
+            if reap_stuck_secs <= 0:
+                return 0, 0
+            try:
+                stale_before = timezone.now() - timedelta(seconds=reap_stuck_secs)
+                requeued = (BackgroundTask.objects
+                            .filter(status=BackgroundTask.STATUS_RUNNING, started_at__lt=stale_before)
+                            .filter(attempts__lt=F("max_attempts"))
+                            .update(status=BackgroundTask.STATUS_PENDING, scheduled_at=timezone.now()))
+                failed = (BackgroundTask.objects
+                          .filter(status=BackgroundTask.STATUS_RUNNING, started_at__lt=stale_before)
+                          .filter(attempts__gte=F("max_attempts"))
+                          .update(status=BackgroundTask.STATUS_FAILED, finished_at=timezone.now(), last_error="Watchdog: stuck RUNNING marked FAILED"))
+                if requeued or failed:
+                    self.stdout.write(self.style.WARNING(f"Reaped stuck tasks: requeued={requeued} failed={failed}"))
+                return requeued, failed
+            except Exception as e:
+                self.stdout.write(self.style.ERROR(f"Reaper exception: {e!r}"))
+                return 0, 0
+
         self.stdout.write(self.style.SUCCESS("Worker started"))
+
+        if reap_stuck_secs > 0 and reap_on_start:
+            reap_stuck()
 
         while True:
             if max_iter and iterations >= max_iter:
@@ -41,6 +70,9 @@ class Command(BaseCommand):
                 break
 
             iterations += 1
+
+            if reap_stuck_secs > 0:
+                reap_stuck()
 
             task = BackgroundTask.fetch_next()
             if not task:

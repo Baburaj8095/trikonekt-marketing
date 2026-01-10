@@ -198,6 +198,11 @@ class CommissionPolicy:
         for k in (product_key, "global", "default"):
             if k in cm_all:
                 candidates.append(cm_all.get(k))
+        # Alias support for product key "150"
+        if product_key == "150":
+            for alias in ("coupon150", "coupon_150", "prime150", "prime_150"):
+                if alias in cm_all:
+                    candidates.append(cm_all.get(alias))
         for v in candidates:
             if isinstance(v, list) and len(v) > 0:
                 return True
@@ -229,8 +234,23 @@ class CommissionPolicy:
         # -------- prime_150 (direct + enable flags; coupons/rewards safe-minimal) --------
         direct_all = dict(master.get("direct_bonus", {}) or {})
         row150 = dict(direct_all.get("150", {}) or {})
+        if not row150:
+            for alias in ("coupon150", "coupon_150", "prime150", "prime_150"):
+                if alias in direct_all:
+                    row150 = dict(direct_all.get(alias) or {})
+                    break
+
         enable3_150 = cls._enabled_from_cm(master, "consumer_matrix_3", "150")
         enable5_150 = cls._enabled_from_cm(master, "consumer_matrix_5", "150")
+
+        # Preserve existing coupons/rewards if present under commissions.prime_150
+        existing_comm = dict(master.get("commissions", {}) or {})
+        p150_existing = dict(existing_comm.get("prime_150", {}) or {})
+        coupons_existing = dict(p150_existing.get("coupons", {}) or {})
+        rewards_existing = dict(p150_existing.get("rewards", {}) or {})
+        activation_count = coupons_existing.get("activation_count", 0)
+        reward_points_amount = rewards_existing.get("points_amount", 0)
+
         commissions["prime_150"] = {
             "direct": {
                 "sponsor": row150.get("sponsor", 0),
@@ -240,10 +260,8 @@ class CommissionPolicy:
                 "enable_3": enable3_150,
                 "enable_5": enable5_150,
             },
-            # default to 0 to avoid implicit placements unless admin configures it
-            "coupons": {"activation_count": 0},
-            # reward points optional (0 => skip)
-            "rewards": {"points_amount": 0},
+            "coupons": {"activation_count": activation_count if isinstance(activation_count, (int, float, str)) else 0},
+            "rewards": {"points_amount": reward_points_amount if isinstance(reward_points_amount, (int, float, str)) else 0},
         }
 
         # -------- prime_750 (policy ties to prime_150 via multiplier) --------

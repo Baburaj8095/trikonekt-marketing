@@ -2385,6 +2385,27 @@ class AdminMasterCommissionConfig(APIView):
             payload["geo_fixed"] = {k: self._float(v) for k, v in geo_fixed.items()} if geo_fixed else {}
             payload["geo"] = ({k: self._float(v) for k, v in geo_pct.items()} if geo_pct else payload["geo"])
 
+            # Expose per-product base amount and (for 150) coupon activation count for admin UI
+            try:
+                products_all = dict(master.get("products", {}) or {})
+                prod_row = dict(products_all.get(pk, {}) or {})
+                if "base_amount" in prod_row:
+                    payload["product_base_amount"] = self._float(prod_row.get("base_amount"))
+            except Exception:
+                pass
+            if pk == "150":
+                try:
+                    comm = dict(master.get("commissions", {}) or {})
+                    p150c = dict(comm.get("prime_150", {}) or {})
+                    cnode = dict(p150c.get("coupons", {}) or {})
+                    if "activation_count" in cnode:
+                        try:
+                            payload["coupon_activation_count"] = int(cnode.get("activation_count") or 0)
+                        except Exception:
+                            payload["coupon_activation_count"] = 0
+                except Exception:
+                    pass
+
             # Monthly 759 product-specific config (first-month vs subsequent months, levels, agency toggle, base amount)
             if pk == "759":
                 m759 = dict(master.get("monthly_759", {}) or {})
@@ -2610,7 +2631,49 @@ class AdminMasterCommissionConfig(APIView):
                     # agency_enabled (boolean)
                     if "agency_enabled" in mm:
                         m759["agency_enabled"] = bool(mm.get("agency_enabled"))
+                # Persist back only when product=759 to avoid UnboundLocalError for other products
                 master["monthly_759"] = m759
+
+            # product base amount (per-product)
+            if "product_base_amount" in data:
+                try:
+                    v = D(str(data.get("product_base_amount")))
+                    if v < 0:
+                        return Response({"detail": "product_base_amount must be >= 0"}, status=400)
+                    pro_all = dict(master.get("products") or {})
+                    row = dict(pro_all.get(pk, {}) or {})
+                    row["base_amount"] = float(v)
+                    pro_all[pk] = row
+                    master["products"] = pro_all
+                except Exception:
+                    return Response({"detail": "product_base_amount must be a number"}, status=400)
+
+            # coupons activation count (only applicable for 150 product)
+            if "coupon_activation_count" in data and pk == "150":
+                try:
+                    iv = int(data.get("coupon_activation_count"))
+                    if iv < 0:
+                        return Response({"detail": "coupon_activation_count must be >= 0"}, status=400)
+                    comm = dict(master.get("commissions", {}) or {})
+                    p150 = dict(comm.get("prime_150", {}) or {})
+                    coupons = dict(p150.get("coupons", {}) or {})
+                    coupons["activation_count"] = iv
+                    p150["coupons"] = coupons
+                    if "direct" not in p150:
+                        p150["direct"] = {"sponsor": 0, "self": 0}
+                    if "rewards" not in p150:
+                        p150["rewards"] = {"points_amount": 0}
+                    comm["prime_150"] = p150
+                    master["commissions"] = comm
+                except Exception:
+                    return Response({"detail": "coupon_activation_count must be an integer"}, status=400)
+
+        # keep commissions in sync with master keys
+        try:
+            from business.services.commission_policy import CommissionPolicy
+            master["commissions"] = CommissionPolicy._synth_from_master(master)
+        except Exception:
+            pass
 
         cfg.master_commission_json = master
         try:

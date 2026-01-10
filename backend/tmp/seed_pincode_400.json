@@ -1,0 +1,89 @@
+{
+  "ok": true,
+  "now": "2026-01-10T16:33:07.070760+00:00",
+  "consumer": {
+    "id": 400,
+    "username": "TR0000000001",
+    "role": "user",
+    "category": "consumer",
+    "state_id": 4026,
+    "state": "Karnataka",
+    "pincode": "560087"
+  },
+  "resolved": {
+    "Sub Franchise": {
+      "id": 16,
+      "username": "TRSF9560001007",
+      "role": "agency",
+      "category": "agency_sub_franchise",
+      "state_id": 4026,
+      "state": "Karnataka",
+      "pincode": "560001"
+    },
+    "Pincode": {
+      "id": 15,
+      "username": "TRPN9560001006",
+      "role": "agency",
+      "category": "agency_pincode",
+      "state_id": 4026,
+      "state": "Karnataka",
+      "pincode": "560001"
+    },
+    "Pincode Coord": {
+      "id": 14,
+      "username": "TRPC9560001005",
+      "role": "agency",
+      "category": "agency_pincode_coordinator",
+      "state_id": 4026,
+      "state": "Karnataka",
+      "pincode": "560001"
+    }
+  },
+  "created": [
+    {
+      "label": "Sub Franchise",
+      "agency": {
+        "id": 16,
+        "username": "TRSF9560001007",
+        "role": "agency",
+        "category": "agency_sub_franchise",
+        "state_id": 4026,
+        "state": "Karnataka",
+        "pincode": "560001"
+      },
+      "assignment_id": 21,
+      "pincode": "560087",
+      "state_id": 4026
+    },
+    {
+      "label": "Pincode",
+      "agency": {
+        "id": 15,
+        "username": "TRPN9560001006",
+        "role": "agency",
+        "category": "agency_pincode",
+        "state_id": 4026,
+        "state": "Karnataka",
+        "pincode": "560001"
+      },
+      "assignment_id": 22,
+      "pincode": "560087",
+      "state_id": 4026
+    },
+    {
+      "label": "Pincode Coord",
+      "agency": {
+        "id": 14,
+        "username": "TRPC9560001005",
+        "role": "agency",
+        "category": "agency_pincode_coordinator",
+        "state_id": 4026,
+        "state": "Karnataka",
+        "pincode": "560001"
+      },
+      "assignment_id": 23,
+      "pincode": "560087",
+      "state_id": 4026
+    }
+  ]
+}

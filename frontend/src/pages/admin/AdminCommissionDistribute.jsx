@@ -637,6 +637,9 @@ export default function AdminCommissionDistribute() {
     geo_fixed_state_coord: "",
     geo_fixed_employee: "",
     geo_fixed_royalty: "",
+    // Product base & opening
+    product_base_amount: "",
+    coupon_activation_count: "",
   });
 
   useEffect(() => {
@@ -670,6 +673,8 @@ export default function AdminCommissionDistribute() {
           geo_fixed_state_coord: toFixedStr(data?.geo_fixed?.state_coord ?? 0, 2),
           geo_fixed_employee: toFixedStr(data?.geo_fixed?.employee ?? 0, 2),
           geo_fixed_royalty: toFixedStr(data?.geo_fixed?.royalty ?? 0, 2),
+          product_base_amount: toFixedStr(data?.product_base_amount ?? 0, 2),
+          coupon_activation_count: String(data?.coupon_activation_count ?? ""),
         };
         setM150Server({
           direct_bonus: { sponsor: toNum(vals.direct_bonus_sponsor), self: toNum(vals.direct_bonus_self) },
@@ -696,6 +701,8 @@ export default function AdminCommissionDistribute() {
             employee: toNum(vals.geo_fixed_employee),
             royalty: toNum(vals.geo_fixed_royalty),
           },
+          product_base_amount: toNum(vals.product_base_amount),
+          coupon_activation_count: (vals.coupon_activation_count === "" ? null : Number(vals.coupon_activation_count)),
         });
         setM150Form(vals);
       })
@@ -709,6 +716,11 @@ export default function AdminCommissionDistribute() {
   function onM150Change(name, value) {
     if (name === "geo_mode") {
       setM150Form((f) => ({ ...f, geo_mode: String(value || "").toLowerCase() }));
+      return;
+    }
+    if (name === "coupon_activation_count") {
+      const s = String(value);
+      if (/^\d*$/.test(s)) setM150Form((f) => ({ ...f, coupon_activation_count: s }));
       return;
     }
     if (value === "") {
@@ -775,6 +787,17 @@ export default function AdminCommissionDistribute() {
       }
     });
 
+    // product base amount (₹)
+    const pbaCur = Number(Number(m150Form.product_base_amount || 0).toFixed(2));
+    const pbaBase = Number(Number(m150Server.product_base_amount || 0).toFixed(2));
+    if (pbaCur !== pbaBase) out.product_base_amount = pbaCur;
+
+    // coupon activation count (int)
+    const actStr = m150Form.coupon_activation_count;
+    const actCur = actStr === "" ? null : Number(actStr);
+    const actBase = (m150Server.coupon_activation_count == null ? null : Number(m150Server.coupon_activation_count));
+    if (actCur !== null && actCur !== actBase) out.coupon_activation_count = actCur;
+
     return out;
   }, [m150Server, m150Form]);
   const m150Dirty = Object.keys(m150ChangedPayload).length > 0;
@@ -816,6 +839,8 @@ export default function AdminCommissionDistribute() {
         geo_fixed_state_coord: toFixedStr(gf.state_coord ?? 0, 2),
         geo_fixed_employee: toFixedStr(gf.employee ?? 0, 2),
         geo_fixed_royalty: toFixedStr(gf.royalty ?? 0, 2),
+        product_base_amount: toFixedStr(data?.product_base_amount ?? 0, 2),
+        coupon_activation_count: String(data?.coupon_activation_count ?? ""),
       };
       setM150Server({
         direct_bonus: {
@@ -845,6 +870,8 @@ export default function AdminCommissionDistribute() {
           employee: toNum(vals.geo_fixed_employee),
           royalty: toNum(vals.geo_fixed_royalty),
         },
+        product_base_amount: toNum(vals.product_base_amount),
+        coupon_activation_count: (vals.coupon_activation_count === "" ? null : Number(vals.coupon_activation_count)),
       });
       setM150Form(vals);
       setOk("150 Coupon Commission saved");
@@ -1926,6 +1953,28 @@ export default function AdminCommissionDistribute() {
         </Section>
 
         <Section
+          title="₹150 Activation — Base & Opening"
+          subtitle="Base used for geo percent splits; activation count opens N 5/3 matrix accounts per activation."
+          right={
+            <SaveBtn
+              onClick={onM150Save}
+              disabled={m150Loading}
+              saving={m150Saving}
+              dirty={m150Dirty}
+            />
+          }
+        >
+          {m150Loading ? (
+            <div style={{ color: "#64748b" }}>Loading...</div>
+          ) : (
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
+              <Input label="Base Amount (₹)" value={m150Form.product_base_amount} onChange={(v) => onM150Change("product_base_amount", v)} />
+              <Input label="Coupons Activation Count" type="text" step="1" min="0" placeholder="e.g. 1" value={m150Form.coupon_activation_count} onChange={(v) => onM150Change("coupon_activation_count", v)} />
+            </div>
+          )}
+        </Section>
+
+        <Section
           title="₹150 Activation — Geo (Agency)"
           subtitle="Percent vs fixed mode per role. Empty values imply fallback to global defaults."
           right={
@@ -1950,7 +1999,7 @@ export default function AdminCommissionDistribute() {
                 <Input label="State (%)" value={m150Form.geo_state} onChange={(v) => onM150Change("geo_state", v)} />
                 <Input label="State Coordinator (%)" value={m150Form.geo_state_coord} onChange={(v) => onM150Change("geo_state_coord", v)} />
                 <Input label="Employee (%)" value={m150Form.geo_employee} onChange={(v) => onM150Change("geo_employee", v)} />
-                <Input label="Royalty (%)" value={m150Form.geo_royalty} onChange={(v) => onM150Change("geo_royalty", v)} />
+                <Input label="Admin (Company) (%)" value={m150Form.geo_royalty} onChange={(v) => onM150Change("geo_royalty", v)} />
               </div>
               <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 8 }}>
                 <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>Geo Mode</label>
@@ -1973,7 +2022,7 @@ export default function AdminCommissionDistribute() {
                 <Input label="State (₹)" value={m150Form.geo_fixed_state} onChange={(v) => onM150Change("geo_fixed_state", v)} />
                 <Input label="State Coordinator (₹)" value={m150Form.geo_fixed_state_coord} onChange={(v) => onM150Change("geo_fixed_state_coord", v)} />
                 <Input label="Employee (₹)" value={m150Form.geo_fixed_employee} onChange={(v) => onM150Change("geo_fixed_employee", v)} />
-                <Input label="Royalty (₹)" value={m150Form.geo_fixed_royalty} onChange={(v) => onM150Change("geo_fixed_royalty", v)} />
+                <Input label="Admin (Company) (₹)" value={m150Form.geo_fixed_royalty} onChange={(v) => onM150Change("geo_fixed_royalty", v)} />
               </div>
             </>
           )}
@@ -1985,7 +2034,7 @@ export default function AdminCommissionDistribute() {
           right={
             <SaveBtn
               onClick={onMx150Save}
-              disabled={mx150Loading}
+              disabled={mx150Loading || ((Number(mx150Form.five_levels||0)>0)&&((mx150Form.five_amounts && parseNumArray(mx150Form.five_amounts).length!==Number(mx150Form.five_levels))||(mx150Form.five_percents && parseNumArray(mx150Form.five_percents).length!==Number(mx150Form.five_levels)))) || ((Number(mx150Form.three_levels||0)>0)&&((mx150Form.three_amounts && parseNumArray(mx150Form.three_amounts).length!==Number(mx150Form.three_levels))||(mx150Form.three_percents && parseNumArray(mx150Form.three_percents).length!==Number(mx150Form.three_levels))))}
               saving={mx150Saving}
               dirty={mx150Dirty}
             />
@@ -2127,7 +2176,7 @@ export default function AdminCommissionDistribute() {
                 <Input label="State (%)" value={m750Form.geo_state} onChange={(v) => onM750Change("geo_state", v)} />
                 <Input label="State Coordinator (%)" value={m750Form.geo_state_coord} onChange={(v) => onM750Change("geo_state_coord", v)} />
                 <Input label="Employee (%)" value={m750Form.geo_employee} onChange={(v) => onM750Change("geo_employee", v)} />
-                <Input label="Royalty (%)" value={m750Form.geo_royalty} onChange={(v) => onM750Change("geo_royalty", v)} />
+                <Input label="Admin (Company) (%)" value={m750Form.geo_royalty} onChange={(v) => onM750Change("geo_royalty", v)} />
               </div>
               <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 8 }}>
                 <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>Geo Mode</label>
@@ -2150,7 +2199,7 @@ export default function AdminCommissionDistribute() {
                 <Input label="State (₹)" value={m750Form.geo_fixed_state} onChange={(v) => onM750Change("geo_fixed_state", v)} />
                 <Input label="State Coordinator (₹)" value={m750Form.geo_fixed_state_coord} onChange={(v) => onM750Change("geo_fixed_state_coord", v)} />
                 <Input label="Employee (₹)" value={m750Form.geo_fixed_employee} onChange={(v) => onM750Change("geo_fixed_employee", v)} />
-                <Input label="Royalty (₹)" value={m750Form.geo_fixed_royalty} onChange={(v) => onM750Change("geo_fixed_royalty", v)} />
+                <Input label="Admin (Company) (₹)" value={m750Form.geo_fixed_royalty} onChange={(v) => onM750Change("geo_fixed_royalty", v)} />
               </div>
             </>
           )}
@@ -2162,7 +2211,7 @@ export default function AdminCommissionDistribute() {
           right={
             <SaveBtn
               onClick={onMx750Save}
-              disabled={mx750Loading}
+              disabled={mx750Loading || ((Number(mx750Form.five_levels||0)>0)&&((mx750Form.five_amounts && parseNumArray(mx750Form.five_amounts).length!==Number(mx750Form.five_levels))||(mx750Form.five_percents && parseNumArray(mx750Form.five_percents).length!==Number(mx750Form.five_levels)))) || ((Number(mx750Form.three_levels||0)>0)&&((mx750Form.three_amounts && parseNumArray(mx750Form.three_amounts).length!==Number(mx750Form.three_levels))||(mx750Form.three_percents && parseNumArray(mx750Form.three_percents).length!==Number(mx750Form.three_levels))))}
               saving={mx750Saving}
               dirty={mx750Dirty}
             />
@@ -2347,7 +2396,7 @@ export default function AdminCommissionDistribute() {
                 <Input label="State (%)" value={m759Form.geo_state} onChange={(v) => onM759Change("geo_state", v)} />
                 <Input label="State Coordinator (%)" value={m759Form.geo_state_coord} onChange={(v) => onM759Change("geo_state_coord", v)} />
                 <Input label="Employee (%)" value={m759Form.geo_employee} onChange={(v) => onM759Change("geo_employee", v)} />
-                <Input label="Royalty (%)" value={m759Form.geo_royalty} onChange={(v) => onM759Change("geo_royalty", v)} />
+                <Input label="Admin (Company) (%)" value={m759Form.geo_royalty} onChange={(v) => onM759Change("geo_royalty", v)} />
               </div>
               <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 8 }}>
                 <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>Geo Mode</label>
@@ -2370,7 +2419,7 @@ export default function AdminCommissionDistribute() {
                 <Input label="State (₹)" value={m759Form.geo_fixed_state} onChange={(v) => onM759Change("geo_fixed_state", v)} />
                 <Input label="State Coordinator (₹)" value={m759Form.geo_fixed_state_coord} onChange={(v) => onM759Change("geo_fixed_state_coord", v)} />
                 <Input label="Employee (₹)" value={m759Form.geo_fixed_employee} onChange={(v) => onM759Change("geo_fixed_employee", v)} />
-                <Input label="Royalty (₹)" value={m759Form.geo_fixed_royalty} onChange={(v) => onM759Change("geo_fixed_royalty", v)} />
+                <Input label="Admin (Company) (₹)" value={m759Form.geo_fixed_royalty} onChange={(v) => onM759Change("geo_fixed_royalty", v)} />
               </div>
             </>
           )}
@@ -2382,7 +2431,7 @@ export default function AdminCommissionDistribute() {
           right={
             <SaveBtn
               onClick={onMx759Save}
-              disabled={mx759Loading}
+              disabled={mx759Loading || ((Number(mx759Form.five_levels||0)>0)&&((mx759Form.five_amounts && parseNumArray(mx759Form.five_amounts).length!==Number(mx759Form.five_levels))||(mx759Form.five_percents && parseNumArray(mx759Form.five_percents).length!==Number(mx759Form.five_levels)))) || ((Number(mx759Form.three_levels||0)>0)&&((mx759Form.three_amounts && parseNumArray(mx759Form.three_amounts).length!==Number(mx759Form.three_levels))||(mx759Form.three_percents && parseNumArray(mx759Form.three_percents).length!==Number(mx759Form.three_levels))))}
               saving={mx759Saving}
               dirty={mx759Dirty}
             />
