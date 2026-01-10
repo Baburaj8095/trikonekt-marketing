@@ -1372,6 +1372,39 @@ export default function AdminCommissionDistribute() {
     geo_fixed_royalty: "",
   });
 
+  // ₹759 — Monthly config (first vs subsequent, levels, agency, base)
+  const [m759MServer, setM759MServer] = useState(null);
+  const [m759MForm, setM759MForm] = useState({
+    monthly_direct_first: "",
+    monthly_direct_monthly: "",
+    monthly_base_amount: "",
+    monthly_agency_enabled: "1",
+    monthly_l1: "",
+    monthly_l2: "",
+    monthly_l3: "",
+    monthly_l4: "",
+    monthly_l5: "",
+  });
+
+  function onM759MonthlyChange(name, value) {
+    if (name === "monthly_agency_enabled") {
+      setM759MForm((f) => ({ ...f, monthly_agency_enabled: value === "1" ? "1" : "0" }));
+      return;
+    }
+    if (value === "") {
+      setM759MForm((f) => ({ ...f, [name]: "" }));
+      return;
+    }
+    const cleaned = String(value).replace(/[^\d.]/g, "");
+    const parts = cleaned.split(".");
+    let norm = parts[0];
+    if (parts.length > 1) norm += "." + parts[1].slice(0, 2);
+    if (norm === "") norm = "0";
+    const n = Number(norm);
+    if (!isFinite(n) || n < 0) return;
+    setM759MForm((f) => ({ ...f, [name]: norm }));
+  }
+
   useEffect(() => {
     let mounted = true;
     setM759Loading(true);
@@ -1432,6 +1465,31 @@ export default function AdminCommissionDistribute() {
             royalty: toNum(vals.geo_fixed_royalty),
           },
         });
+
+        // Populate monthly 759 config (first vs subsequent, levels, agency toggle, base)
+        const mm = data?.monthly_759 || {};
+        const levels = Array.isArray(mm?.levels_fixed) ? mm.levels_fixed : [50, 10, 5, 5, 10];
+        const padded = [...levels, 0, 0, 0, 0, 0].slice(0, 5);
+        const mvals = {
+          monthly_direct_first: toFixedStr(mm?.direct_first_month ?? 250, 2),
+          monthly_direct_monthly: toFixedStr(mm?.direct_monthly ?? 50, 2),
+          monthly_base_amount: toFixedStr(mm?.base_amount ?? 759, 2),
+          monthly_agency_enabled: (mm?.agency_enabled ? "1" : "0"),
+          monthly_l1: toFixedStr(padded[0] ?? 0, 2),
+          monthly_l2: toFixedStr(padded[1] ?? 0, 2),
+          monthly_l3: toFixedStr(padded[2] ?? 0, 2),
+          monthly_l4: toFixedStr(padded[3] ?? 0, 2),
+          monthly_l5: toFixedStr(padded[4] ?? 0, 2),
+        };
+        setM759MServer({
+          direct_first_month: toNum(mvals.monthly_direct_first),
+          direct_monthly: toNum(mvals.monthly_direct_monthly),
+          base_amount: toNum(mvals.monthly_base_amount),
+          agency_enabled: mvals.monthly_agency_enabled === "1",
+          levels_fixed: padded.map((x) => toNum(x)),
+        });
+        setM759MForm(mvals);
+
         setM759Form(vals);
       })
       .catch((e) => setErr(parseError(e) || "Failed to load ₹759 Commission"))
@@ -1513,13 +1571,71 @@ export default function AdminCommissionDistribute() {
   }, [m759Server, m759Form]);
   const m759Dirty = Object.keys(m759ChangedPayload).length > 0;
 
+  const m759MonthlyChangedPayload = useMemo(() => {
+    if (!m759MServer) return {};
+    const out = {};
+    const vFirst = Number(Number(m759MForm.monthly_direct_first || 0).toFixed(2));
+    const vFirstBase = Number(Number(m759MServer.direct_first_month || 0).toFixed(2));
+    if (vFirst !== vFirstBase) out.direct_first_month = vFirst;
+
+    const vMon = Number(Number(m759MForm.monthly_direct_monthly || 0).toFixed(2));
+    const vMonBase = Number(Number(m759MServer.direct_monthly || 0).toFixed(2));
+    if (vMon !== vMonBase) out.direct_monthly = vMon;
+
+    const vBaseAmt = Number(Number(m759MForm.monthly_base_amount || 0).toFixed(2));
+    const vBaseAmtBase = Number(Number(m759MServer.base_amount || 0).toFixed(2));
+    if (vBaseAmt !== vBaseAmtBase) out.base_amount = vBaseAmt;
+
+    const vAgency = m759MForm.monthly_agency_enabled === "1";
+    const vAgencyBase = Boolean(m759MServer.agency_enabled);
+    if (vAgency !== vAgencyBase) out.agency_enabled = vAgency;
+
+    const lvls = [
+      Number(Number(m759MForm.monthly_l1 || 0).toFixed(2)),
+      Number(Number(m759MForm.monthly_l2 || 0).toFixed(2)),
+      Number(Number(m759MForm.monthly_l3 || 0).toFixed(2)),
+      Number(Number(m759MForm.monthly_l4 || 0).toFixed(2)),
+      Number(Number(m759MForm.monthly_l5 || 0).toFixed(2)),
+    ];
+    const baseLvls = Array.isArray(m759MServer.levels_fixed) ? m759MServer.levels_fixed : [];
+    let levelsDiff = false;
+    for (let i = 0; i < 5; i++) {
+      const cur = Number(Number(lvls[i] || 0).toFixed(2));
+      const base = Number(Number(baseLvls[i] || 0).toFixed(2));
+      if (cur !== base) {
+        levelsDiff = true;
+        break;
+      }
+    }
+    if (levelsDiff) out.levels_fixed = lvls;
+
+    return out;
+  }, [m759MServer, m759MForm]);
+  const m759MonthlyDirty = Object.keys(m759MonthlyChangedPayload).length > 0;
+
   async function onM759Save() {
-    if (!m759Dirty || m759Saving) return;
+    if ((!m759Dirty && !m759MonthlyDirty) || m759Saving) return;
     setM759Saving(true);
     setErr("");
     setOk("");
     try {
-      const data = await adminUpdateMasterCommission(m759ChangedPayload, PRODUCT_RS_759);
+      const payload = { ...m759ChangedPayload };
+      if (m759MonthlyDirty) {
+        payload.monthly_759 = {
+          direct_first_month: Number(Number(m759MForm.monthly_direct_first || 0).toFixed(2)),
+          direct_monthly: Number(Number(m759MForm.monthly_direct_monthly || 0).toFixed(2)),
+          base_amount: Number(Number(m759MForm.monthly_base_amount || 0).toFixed(2)),
+          agency_enabled: m759MForm.monthly_agency_enabled === "1",
+          levels_fixed: [
+            Number(Number(m759MForm.monthly_l1 || 0).toFixed(2)),
+            Number(Number(m759MForm.monthly_l2 || 0).toFixed(2)),
+            Number(Number(m759MForm.monthly_l3 || 0).toFixed(2)),
+            Number(Number(m759MForm.monthly_l4 || 0).toFixed(2)),
+            Number(Number(m759MForm.monthly_l5 || 0).toFixed(2)),
+          ],
+        };
+      }
+      const data = await adminUpdateMasterCommission(payload, PRODUCT_RS_759);
       const gm = String(data?.geo_mode || "").toLowerCase();
       const direct = data?.direct_bonus || {};
       const geo = data?.geo || {};
@@ -1576,6 +1692,30 @@ export default function AdminCommissionDistribute() {
           royalty: toNum(vals.geo_fixed_royalty),
         },
       });
+      // Normalize monthly block back to UI
+      const mm2 = data?.monthly_759 || {};
+      const levels2 = Array.isArray(mm2?.levels_fixed) ? mm2.levels_fixed : [50, 10, 5, 5, 10];
+      const padded2 = [...levels2, 0, 0, 0, 0, 0].slice(0, 5);
+      const mvals2 = {
+        monthly_direct_first: toFixedStr(mm2?.direct_first_month ?? 250, 2),
+        monthly_direct_monthly: toFixedStr(mm2?.direct_monthly ?? 50, 2),
+        monthly_base_amount: toFixedStr(mm2?.base_amount ?? 759, 2),
+        monthly_agency_enabled: (mm2?.agency_enabled ? "1" : "0"),
+        monthly_l1: toFixedStr(padded2[0] ?? 0, 2),
+        monthly_l2: toFixedStr(padded2[1] ?? 0, 2),
+        monthly_l3: toFixedStr(padded2[2] ?? 0, 2),
+        monthly_l4: toFixedStr(padded2[3] ?? 0, 2),
+        monthly_l5: toFixedStr(padded2[4] ?? 0, 2),
+      };
+      setM759MServer({
+        direct_first_month: toNum(mvals2.monthly_direct_first),
+        direct_monthly: toNum(mvals2.monthly_direct_monthly),
+        base_amount: toNum(mvals2.monthly_base_amount),
+        agency_enabled: mvals2.monthly_agency_enabled === "1",
+        levels_fixed: padded2.map((x) => toNum(x)),
+      });
+      setM759MForm(mvals2);
+
       setM759Form(vals);
       setOk("₹759 Commission saved");
     } catch (e) {
@@ -2125,7 +2265,7 @@ export default function AdminCommissionDistribute() {
               onClick={onM759Save}
               disabled={m759Loading}
               saving={m759Saving}
-              dirty={m759Dirty}
+              dirty={m759Dirty || m759MonthlyDirty}
             />
           }
         >
@@ -2140,6 +2280,49 @@ export default function AdminCommissionDistribute() {
         </Section>
 
         <Section
+          title="₹759 Monthly — Direct and Level Bonuses"
+          subtitle="Configure first-month vs subsequent-month sponsor bonus and fixed level payouts for ₹759 Prime/Coupon flow."
+          right={
+            <SaveBtn
+              onClick={onM759Save}
+              disabled={m759Loading}
+              saving={m759Saving}
+              dirty={m759Dirty || m759MonthlyDirty}
+            />
+          }
+        >
+          {m759Loading ? (
+            <div style={{ color: "#64748b" }}>Loading...</div>
+          ) : (
+            <>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
+                <Input label="First Month Sponsor (₹)" value={m759MForm.monthly_direct_first} onChange={(v) => onM759MonthlyChange("monthly_direct_first", v)} />
+                <Input label="Monthly Sponsor (₹)" value={m759MForm.monthly_direct_monthly} onChange={(v) => onM759MonthlyChange("monthly_direct_monthly", v)} />
+                <Input label="Base Amount (₹)" value={m759MForm.monthly_base_amount} onChange={(v) => onM759MonthlyChange("monthly_base_amount", v)} />
+              </div>
+              <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 8 }}>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>Agency Enabled</label>
+                <select
+                  value={m759MForm.monthly_agency_enabled || "1"}
+                  onChange={(e) => onM759MonthlyChange("monthly_agency_enabled", e.target.value)}
+                  style={{ height: 36, borderRadius: 8, border: "1px solid #e2e8f0", padding: "0 10px", fontWeight: 700 }}
+                >
+                  <option value="1">Enabled</option>
+                  <option value="0">Disabled</option>
+                </select>
+              </div>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                <Input label="L1 (₹)" value={m759MForm.monthly_l1} onChange={(v) => onM759MonthlyChange("monthly_l1", v)} />
+                <Input label="L2 (₹)" value={m759MForm.monthly_l2} onChange={(v) => onM759MonthlyChange("monthly_l2", v)} />
+                <Input label="L3 (₹)" value={m759MForm.monthly_l3} onChange={(v) => onM759MonthlyChange("monthly_l3", v)} />
+                <Input label="L4 (₹)" value={m759MForm.monthly_l4} onChange={(v) => onM759MonthlyChange("monthly_l4", v)} />
+                <Input label="L5 (₹)" value={m759MForm.monthly_l5} onChange={(v) => onM759MonthlyChange("monthly_l5", v)} />
+              </div>
+            </>
+          )}
+        </Section>
+
+        <Section
           title="₹759 Activation — Geo (Agency)"
           subtitle="Percent vs fixed mode per role. Empty values imply fallback to global defaults."
           right={
@@ -2147,7 +2330,7 @@ export default function AdminCommissionDistribute() {
               onClick={onM759Save}
               disabled={m759Loading}
               saving={m759Saving}
-              dirty={m759Dirty}
+              dirty={m759Dirty || m759MonthlyDirty}
             />
           }
         >

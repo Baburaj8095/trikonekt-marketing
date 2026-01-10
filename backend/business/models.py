@@ -1084,16 +1084,53 @@ def distribute_auto_pool_commissions(payer_user, base_amount: Decimal, fixed_key
                     except Exception:
                         continue
             else:
+                # Percent mode: allow per-product percent overrides from master_commission_json
+                # Supported locations (first match wins):
+                #   - master.geo[fixed_key] = { role_key: percent, ... }
+                #   - master.geo_percents[fixed_key] / master.geo_percent[fixed_key]
+                #   - master.products[product_key].geo (product_key: coupon150|rs750|rs759)
+                override_map = {}
+                try:
+                    # direct per-key map
+                    gm = dict(master.get("geo", {}) or {})
+                    if isinstance(gm.get(fixed_key), dict):
+                        override_map = dict(gm.get(fixed_key) or {})
+                    # explicit geo_percents/geo_percent maps
+                    if not override_map:
+                        gpx = dict(master.get("geo_percents", {}) or {})
+                        if isinstance(gpx.get(fixed_key), dict):
+                            override_map = dict(gpx.get(fixed_key) or {})
+                    if not override_map:
+                        gpx2 = dict(master.get("geo_percent", {}) or {})
+                        if isinstance(gpx2.get(fixed_key), dict):
+                            override_map = dict(gpx2.get(fixed_key) or {})
+                    # legacy products.* map
+                    if not override_map:
+                        prod_key_map = {"150": "coupon150", "750": "rs750", "759": "rs759"}
+                        pk = prod_key_map.get(str(fixed_key))
+                        if pk:
+                            override_map = dict(((master.get("products", {}) or {}).get(pk, {}) or {}).get("geo", {}) or {})
+                except Exception:
+                    override_map = {}
+
+                def get_pct(role_key: str, fallback) -> Decimal:
+                    try:
+                        if role_key in override_map:
+                            return Decimal(str(override_map.get(role_key, "0") or "0"))
+                    except Exception:
+                        pass
+                    return Decimal(fallback or 0)
+
                 geo_map = [
-                    ("Sub Franchise", Decimal(cfg.sub_franchise_percent or 0)),
-                    ("Pincode", Decimal(cfg.pincode_percent or 0)),
-                    ("Pincode Coord", Decimal(cfg.pincode_coord_percent or 0)),
-                    ("District", Decimal(cfg.district_percent or 0)),
-                    ("District Coord", Decimal(cfg.district_coord_percent or 0)),
-                    ("State", Decimal(cfg.state_percent or 0)),
-                    ("State Coord", Decimal(cfg.state_coord_percent or 0)),
-                    ("Employee", Decimal(cfg.employee_percent or 0)),
-                    ("Royalty", Decimal(cfg.royalty_percent or 0)),
+                    ("Sub Franchise", get_pct("sub_franchise", cfg.sub_franchise_percent)),
+                    ("Pincode", get_pct("pincode", cfg.pincode_percent)),
+                    ("Pincode Coord", get_pct("pincode_coord", cfg.pincode_coord_percent)),
+                    ("District", get_pct("district", cfg.district_percent)),
+                    ("District Coord", get_pct("district_coord", cfg.district_coord_percent)),
+                    ("State", get_pct("state", cfg.state_percent)),
+                    ("State Coord", get_pct("state_coord", cfg.state_coord_percent)),
+                    ("Employee", get_pct("employee", cfg.employee_percent)),
+                    ("Royalty", get_pct("royalty", cfg.royalty_percent)),
                 ]
 
                 for label, pct in geo_map:

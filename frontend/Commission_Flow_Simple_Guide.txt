@@ -1,158 +1,325 @@
-Commission & Rewards Flow — Simple English Guide
+Prime/coupon flows in this codebase are driven by business.services.activation, business.services.monthly, and orchestration in business.views + jobs.models. Key amounts are admin‑configurable in CommissionConfig; below are the defaults shown in code.
 
-Purpose
-This note explains, in plain language, how money and points are shared in the system. It covers:
-- TDS/Company deduction (10%)
-- Direct sponsor and upline sharing
-- Local agency (geo) sharing
-- Auto ₹1000 rule
-- Withdrawals and the sponsor bonus on withdrawals
-- Fixed direct/level amounts on join/activation
-- Reward Points (team milestones)
-- Matrix (3‑wide and 5‑wide) placement and earnings
-- Who can change the numbers
-No technical terms are used; only how it works for people involved.
+Definitions
 
+Direct sponsor: consumer.registered_by.
+Wallet credits use Wallet.credit with typed tx_type for traceability.
+Upline resolution: registered_by chain, skipping agency/employee recipients for matrix payouts.
+PRIME 150 (a “150 Active” unit)
+On approval and/or activation:
 
-1) When money is added to someone’s wallet (a “commission”)
-- This happens after activities like coupon approvals, auto‑pool/matrix earnings, level bonuses, franchise/geo earnings, etc.
-- Whenever such a commission is given to a person, two things occur:
-  a) A small part is kept aside for the company as TDS/Tax (10% by default).
-  b) The rest becomes available for that person to withdraw.
+A SubscriptionActivation(PRIME_150_ACTIVE) row is created (idempotent).
+Direct to sponsor: cfg.active_direct_bonus_amount (default ₹2) as DIRECT_REF_BONUS.
+Self bonus to buyer: cfg.active_self_bonus_amount (default ₹1) as SELF_BONUS_ACTIVE.
+Matrix payouts (Autopool):
+FIVE_150 (6-level “5-matrix”): amounts pulled from CommissionConfig.master_commission_json.consumer_matrix_5["150"] (either fixed_amounts or percents of base=₹150).
+THREE_150 (15-level “3-matrix”): from consumer_matrix_3["150"] (fixed or percents of base=₹150).
+Agency/employee recipients in upline do not receive matrix payouts (skipped).
+Geo/Agency distribution: distribute_auto_pool_commissions(user, base_amount=150, fixed_key="active_150") best-effort.
+First purchase flags: ensure_first_purchase_activation stamps first_purchase_activated_at, autopool_enabled, rewards_enabled, is_agency_unlocked, can_create_self_accounts, account_active, and triggers referral/franchise handlers. Also +1 to RewardProgress.coupon_count (best‑effort).
+50 path also opened once when a paid package price >= 50: activate_50 opens THREE_50 and distributes per consumer_matrix_3["50"].
+PRIME 150 via e‑coupon vs via prime package
 
+e‑coupon “activate 150”: jobs.handle_coupon_activate(type="150") calls activate_150_active (so sponsor gets ₹2, self ₹1, plus 3/5 matrix and geo).
+e‑coupon assigned/approved in orders: open_matrix_accounts_for_coupon creates FIVE_150 + THREE_150 for that coupon and distributes per pool (no direct/self here). Distribution is idempotent per (user, pool, coupon.id).
+Prime package (type=PRIME, price=150): Admin approval typically
+Allocates one ₹150 e‑coupon and enqueues per‑coupon distribution (matrix only); and
+Also calls activate_150_active(user, {"type": "promo_purchase", "id": purchase.id}) once, which does direct/self and 3/5 matrix again. Notes: duplication protections depend on config/audit guards. The code tries to avoid double-distribution for per‑coupon sources, but source ids differ (purchase.id vs coupon.id), so ensure your admin config aligns (e.g., use fixed_amounts/percents accordingly).
+PRIME 750
 
-2) The 10% TDS / Company deduction
-- From every commission payment, 10% goes to the company’s pool as tax (by default).
-- The remaining 90% is the person’s “take‑home” amount that they can withdraw.
-- The company can change this 10% number whenever needed.
+Buyer chooses a prime750_choice (PRODUCT | COUPON | REDEEM). Behavior:
+Always opens 50 path once (activate_50) because price >= 50.
+Unless “REDEEM” with prime_750_redeem_mode == "wallet_only":
+Enqueues jobs.enqueue_prime_150_units(units=cfg.prime_750_units, default 5). Worker runs activate_150_active N times with unique sources.
+Each 150 unit pays:
+Sponsor: ₹2 (DIRECT_REF_BONUS), so total default direct to sponsor = 5 × ₹2 = ₹10.
+Buyer self bonus: ₹1 per unit; 3/5 matrix distributions per unit; geo split.
+If REDEEM chosen:
+Credits RewardPointsAccount with ₹750 (REDEEM_750) instead of units when mode is wallet_only; no sponsor direct for 150 units in that mode.
+Lucky draw: if prime750_choice == COUPON, grants LuckyDrawEligibility tokens.
+MONTHLY 759
 
+On admin approval of a MONTHLY package:
+Creates PromoMonthlyBox records for the selected boxes and best-effort allocates ₹759 e‑coupon(s) to the buyer (one per box).
+Enqueues jobs.enqueue_monthly_759 for each box with is_first determined by whether this is the first paid box for this user/package.
+Calls activate_150_active only on the very first 759 approval for this user/package (to unlock account/autopool and also pay direct/self/matrix once for ₹150).
+Per box distribution (business.services.monthly.distribute_monthly_759_payouts):
+Direct to sponsor (MONTHLY_759_DIRECT):
+First month (first box): default ₹250 (m759.direct_first_month).
+Subsequent months: default ₹50 per box (m759.direct_monthly).
+Levels L1..L5 each month (MONTHLY_759_LEVEL): defaults [₹50, ₹10, ₹5, ₹5, ₹10] to upline levels 1..5.
+Agency/geo distribution: via distribute_auto_pool_commissions or fallback to franchise fixed ₹25 split (best-effort).
+All defaults are overridable via CommissionConfig.master_commission_json["monthly_759"].
+Direct sponsor earnings summary (defaults)
 
-3) Sharing to your sponsor and your higher levels (upline)
-- The system can also share a small percentage of a commission with people above you.
-- There are five levels above you called L1 to L5.
-  Typical default sharing from a commission (example values):
-  - L1: 2%
-  - L2: 1%
-  - L3: 1%
-  - L4: 0.5%
-  - L5: 0.5%
-- These numbers can be changed by the company at any time.
+150 unit activation:
+Direct: ₹2 once per 150 unit (DIRECT_REF_BONUS).
+750 prime:
+If units are enqueued (default): 5 units × ₹2 = ₹10 total to sponsor.
+If REDEEM with mode=wallet_only: units not enqueued → ₹0 from 150 units.
+50 path has no direct sponsor bonus.
+759 monthly:
+First purchased box/month: ₹250 to sponsor.
+Each subsequent month per box: ₹50 to sponsor.
+Difference: PRIME vs COUPONS [150, 750, 759]
 
+Prime is a packaged purchase (business PromoPackage). Approval can:
+Allocate e‑coupons (150 or 759) and separately trigger activations/jobs.
+For PRIME 150: also grants e‑book access mapping; REDEEM credits ₹150 in Reward Points; EBOOK choice skips code allocation.
+For PRIME 750: typically triggers 5× 150 unit activations (driving sponsor/self/matrix) unless REDEEM wallet_only; may add Lucky Draw eligibility on COUPON choice.
+Always enforces first‑purchase account unlocks and opens the 50 path when price ≥ 50.
+Coupons are denominated codes (e_coupon):
+50 coupon activation: opens THREE_50 and distributes per config; no direct bonus.
+150 coupon activation: activate_150_active (direct ₹2 to sponsor, self ₹1, 3/5 matrix, geo).
+759 coupon activation: monthly flow applied once per month basis; first ever 759 activation for a user gets the first‑month direct (₹250), later ones default monthly direct (₹50). Also records monthly_759_distributed audit.
+Non‑759 coupon activation may pay employee/agency (e.g., ₹15 each) via ecoupon_commission_awarded; this is separate from sponsor payouts.
+Notes on configurability and idempotency
 
-4) Sharing to local agency roles (geo sharing)
-- A part of a commission can also be shared with agency roles based on where the earning person lives (their pincode/state).
-- The roles are:
-  - Sub‑Franchise (at pincode)
-  - Pincode
-  - Pincode Coordinator
-  - District
-  - District Coordinator
-  - State
-  - State Coordinator
-  - Employee (closest relevant employee)
-  - Royalty (company/owner side)
-- Typical default ideas (company can change them):
-  - Sub‑Franchise ~15%
-  - Pincode ~4%
-  - Pincode Coord ~2%
-  - District ~1%
-  - District Coord ~1%
-  - State ~1%
-  - State Coord ~1%
-  - Employee ~2%
-  - Royalty ~10%
-- If a role is not available for a location, that share is simply skipped.
+Amounts and level splits come from CommissionConfig:
+active_direct_bonus_amount, active_self_bonus_amount, three_matrix_levels, five_matrix_levels
+master_commission_json.consumer_matrix_3/5 for “50” and “150” (fixed_amounts or percents)
+master_commission_json.monthly_759: direct_first_month, direct_monthly, levels_fixed, base_amount, agency_enabled
+Distribution calls are guarded with SubscriptionActivation uniqueness and/or per-source audit guards; per‑coupon distributions are idempotent per pool+coupon id.
+Concrete outcomes for your examples (with defaults)
 
+User buys PRIME 150:
+Sponsor gets ₹2 once.
+Buyer gets ₹1 self.
+3‑matrix (15L) and 5‑matrix (6L) pay their configured amounts/percents on base ₹150 to upline.
+50 path is also opened once (3‑matrix on base ₹50).
+If a 150 e‑coupon was also allocated, that coupon triggers matrix distribution per coupon (no extra direct/self).
+User buys PRIME 750:
+If not REDEEM wallet_only: 5 units of 150 are activated.
+Sponsor total = 5 × ₹2 = ₹10.
+Buyer total self = 5 × ₹1 = ₹5.
+Matrix and geo distributions fire 5 times.
+Regardless, 50 path opens once.
+If REDEEM wallet_only: ₹750 credited to Reward Points; no 150 units → sponsor gets ₹0 from 150; 50 path still opens.
+User buys MONTHLY 759:
+First 759 approval for this user/package also runs one 150 Active (sponsor +₹2, self +₹1, matrix).
+For each paid box in the month:
+Direct to sponsor: ₹250 for very first box/month; ₹50 per box in later months.
+L1..L5 get [₹50, ₹10, ₹5, ₹5, ₹10] each month.
+Agency/geo distribution applied per config.
+These behaviors match the code paths in business.services.activation, business.services.monthly, jobs.models (handlers/enqueues), and AdminPromoPurchaseApproveView (approval orchestration).
 
-5) Auto ₹1000 rule (happens automatically as you earn)
-- As your total earnings grow, for every full ₹1000 collected in your wallet’s main balance, one “auto pack” is applied:
-  - The system tries to give you one ₹150 e‑coupon for yourself (if stock is available).
-  - The company receives ₹50 (tax/maintenance).
-  - Your direct sponsor receives ₹50 as a thank‑you.
-  - You get the remaining ₹750 added to the amount you can withdraw.
-- If the ₹150 coupon is not available at that moment, the system still does the other parts.
-- This rule repeats for every full ₹1000 you earn (₹2000 = two packs, and so on).
-
-
-6) Direct referral on join/activation (fixed rupee amounts)
-- When someone joins/activates under you, the system can give fixed rupee amounts to you (Direct) and your upline levels.
-- Typical defaults:
-  - Direct: ₹15
-  - L1: ₹2
-  - L2: ₹1
-  - L3: ₹1
-  - L4: ₹0.5
-  - L5: ₹0.5
-- These are not percentages; they are fixed rupees. The company can change these anytime.
-
-
-7) Withdrawals (when you take money out)
-- You request a withdrawal of your available amount.
-- After approval, that amount is paid to you.
-- Additionally, your direct sponsor gets a small “lifetime” bonus on your withdrawal (default 3% of what you withdrew).
-- No extra tax is cut at withdrawal time because the tax was already taken when you originally earned the commissions.
-
-
-8) Reward Points (team milestones)
-- Apart from money, the system also gives Reward Points when your team reaches certain coupon milestones.
-- Example default rewards (company can change these):
-  - After 1 coupon: 1,000 points
-  - After 2 coupons: 10,000 points
-  - After 3 coupons: 30,000 points
-  - After 4 coupons: 60,000 points
-  - After 5 coupons: 110,000 points
-  - After that, every extra coupon: 20,000 points each
-- These points can be used on selected products/services where points are allowed.
-
-
-9) Matrix (3‑wide and 5‑wide)
-- The system builds two kinds of team trees for consumers:
-  - 3‑wide matrix (up to many levels)
-  - 5‑wide matrix (up to 6 levels by default)
-- New accounts for you first try to sit under your own existing matrix branch (to keep your cluster together).
-- If that is not possible, they sit under your upline’s open spot.
-- Earnings from these matrix placements flow as commissions, and then the normal sharing and 10% tax rule apply.
-- The company can set:
-  - How many levels the matrix pays
-  - Either fixed rupee amounts per level or percentages per level
+..................................
 
 
-10) Company pool and transparency
-- The company pool (the 10% TDS part) is recorded clearly.
-- From time to time, the company may distribute that pool internally or keep it for operations.
-- All people’s earnings and the company pool entries are recorded so they can be reviewed.
 
+Prime packages, coupons, and what the user will see (analysis)
 
-11) Who can change the numbers
-- The company can change:
-  - The 10% tax/TDS number and the company user who receives it
-  - The sponsor/upline (L1..L5) percentages
-  - The geo/agency percentages
-  - The fixed rupee amounts for direct and levels on join/activation
-  - Reward Points milestones and “points per extra coupon”
-  - Matrix level counts and per‑level payouts
-- If the company changes values, new earnings use the new values going forward.
+Scope
 
+- Code reviewed:
 
-12) Quick examples
+  - Backend: business/services/activation.py, business/services/monthly.py, business/views.py (AdminPromoPurchaseApproveView), jobs/models.py, coupons/models.py
+  - Frontend: frontend/src/pages/ConsumerCoupon.jsx, frontend/src/pages/ECouponStore.jsx
 
-A. Example commission of ₹100 to a person
-- 10% to company = ₹10
-- Person’s available to withdraw ≈ ₹90
-- If this commission also includes sharing to upline/agency roles, those people get their parts too (and each of them also has 10% deducted from their own share). The system does this automatically.
+- Goal: Explain user-facing outcomes for Prime 150 / Prime 750 (Redeem) / Monthly 759, whether coupons appear, which denominations are supported, and why ₹750 coupons can appear even though Prime 750 is modeled as 5 × ₹150.
 
-B. Example withdrawal of ₹1,000 by you
-- You receive ₹1,000 (assuming you had that much available).
-- Your direct sponsor gets 3% of ₹1,000 = ₹30 as a lifetime withdrawal bonus.
+A. What the user sees after Prime package activation (by package and choice) A.1 PRIME 150 package
 
-C. Example auto ₹1000 rule
-- When you cross ₹1,000 earned:
-  - One ₹150 coupon for you (if in stock),
-  - ₹50 to company,
-  - ₹50 to your sponsor,
-  - ₹750 gets added to your withdrawable amount.
+- Approval path: AdminPromoPurchaseApproveView in business/views.py
 
-Important notes
-- Percentages and fixed rupee amounts shown here are typical defaults. The company can update them whenever needed.
-- If a particular role (like “Pincode Coordinator”) does not exist for your area, that role’s share is simply skipped.
-- Withdrawals do not cut extra tax because the tax was already deducted when you earned the commission.
+  - Denomination for e‑coupon allocation is inferred as ₹150 (denom = 150).
+
+  - Unless the buyer chose EBOOK, the system:
+
+    1. Allocates one ₹150 e‑coupon to the consumer (SOLD status; visible in “My E‑Coupons”).
+
+    2. Enqueues per‑coupon distribution jobs (matrix payouts for FIVE_150 and THREE_150).
+
+    3. Also calls activate_150_active(user, {type: "promo_purchase", id: purchaseId}), which additionally pays:
+
+       - Sponsor DIRECT_REF_BONUS (default ₹2).
+       - Self bonus (default ₹1).
+       - Matrix payouts on FIVE_150 and THREE_150 again (admin-configured fixed/percents).
+       - Geo distribution (best‑effort).
+
+    4. Opens the ₹50 path once (THREE_50) because package price >= 50.
+
+- If the buyer selected EBOOK for Prime 150:
+
+  - skip_allocation is True → NO ₹150 e‑coupon is allocated to the user.
+  - E‑book access is granted/recorded instead.
+  - The system still stamps account activation flags via ensure_first_purchase_activation.
+
+- User-visible:
+
+  - If not EBOOK: The user typically sees a new ₹150 e‑coupon in the ConsumerCoupon screen under “All My E‑Coupon Codes”. Quick Activate will treat it as type “150” and activate normally.
+  - If EBOOK: No new e‑coupon is shown. The account still becomes active; the e‑book is visible via /business/ebooks/mine.
+
+A.2 PRIME 750 package (focus: REDEEM)
+
+- Approval path for 750 (type PRIME price ~ ₹750):
+
+  - The system always opens the ₹50 path once (THREE_50).
+
+  - Unless “REDEEM with wallet_only mode”, it enqueues N 150-unit activations (default units=5): jobs.enqueue_prime_150_units → runs activate_150_active 5 times (each unit pays sponsor ₹2, self ₹1, matrix payouts, geo).
+
+  - If buyer selects REDEEM:
+
+    - When cfg.prime_750_redeem_mode == "wallet_only", no 150 units are enqueued.
+    - RewardPointsAccount is credited ₹750 (REDEEM_750).
+
+  - Crucially: skip_allocation is True for PRIME750 when choice in ("PRODUCT","COUPON","REDEEM") → NO ₹150 e‑coupons are allocated to the user from this approval.
+
+- User-visible for REDEEM case:
+
+  - Reward Points: +₹750 points (not money wallet).
+  - No new e‑coupon codes appear (neither 150 nor 750) from this purchase.
+  - ActivationStatus (pools) can reflect 50 path open; first-purchase account flags are stamped; no 5×150 codes in the user’s coupon list because units are activations, not code allocations.
+
+A.3 MONTHLY 759 package
+
+- Approval path: MONTHLY type
+
+  - System creates PromoMonthlyBox records for each selected box.
+
+  - Best‑effort allocation of ₹759 e‑coupon(s) equal to the number of paid boxes:
+    - Allocates from e‑coupon inventory where value=759; assigned to consumer; user will see these in “My E‑Coupons”.
+
+  - Enqueues monthly payouts per box via jobs.enqueue_monthly_759:
+
+    - First ever purchased box for that user/package gets “first month” direct (default ₹250 to sponsor).
+    - Every month: direct ₹50 per box to sponsor.
+    - Level payouts L1..L5 each month: defaults [₹50, ₹10, ₹5, ₹5, ₹10].
+    - Agency/geo distribution also applies (configurable).
+
+  - Additionally, only on the very first 759 approval for this user/package: activate_150_active once (unlocks account and pays the 150 unit bonuses once).
+
+- User-visible:
+
+  - New ₹759 e‑coupon codes appear (count equals selected boxes successfully allocated).
+  - Monthly rewards run in background; “Quick Activate” for a ₹759 code will call the activation with type “759”.
+
+B. Will coupons be available to the user after these purchases?
+
+- PRIME 150:
+  - Yes, typically 1 × ₹150 e‑coupon is allocated and visible to the user UNLESS the user explicitly chose EBOOK (then no e‑coupon is allocated).
+
+- PRIME 750:
+
+  - No e‑coupons are allocated from the Prime 750 approval regardless of choice (PRODUCT/COUPON/REDEEM), because skip_allocation=True in all three cases.
+  - 150 units (if not wallet‑only REDEEM) are processed as activations, not as codes assigned to the user.
+
+- MONTHLY 759:
+  - Yes. One ₹759 e‑coupon for each selected/paid box is allocated to the consumer and visible in their list.
+
+C. What denominations can Admin create?
+
+- Data model:
+  - CouponCode.value is Decimal; ECouponProduct.denomination is Decimal. Admin can technically create any denomination.
+
+- Business logic coverage:
+
+  - Strongly supported paths:
+
+    - ₹50: three‑matrix (THREE_50) activation path via activate_50 (no direct sponsor bonus).
+    - ₹150: full “150 Active” path with direct/self bonuses and 3/5 matrix payouts.
+    - ₹759: monthly flow (direct first ₹250, then ₹50 monthly; L1..L5 fixed amounts).
+
+  - ₹750 is explicitly included for LuckyDrawEligibility and consumer UI mapping, but “Monthly 759 payouts” in coupon_activate are tied to coupon value == 759 (see D.3).
+
+- ECouponStore (frontend) filter defaults:
+  - Default denomination filter options include ["150","750","759"] regardless of actual products configured, and then the real list is extended by denominations present in active ECouponProduct rows. Products shown are ONLY those active ECouponProduct entries; filters just help selection.
+
+D. Why a ₹750 coupon appears in ConsumerCoupon/Store even though Prime 750 is 5 × ₹150? D.1 Store product vs. Prime package logic
+
+- Prime 750 (package) logic treats it as 5 × 150 activations under the hood; it does not allocate 150 codes from the PRIME approval, and it does not imply a “₹750 code”.
+- The Store lists ECouponProduct entries (admin‑configured). If an ECouponProduct exists with denomination=750 and is active, it will show as a “₹750 coupon” product. This is independent of the Prime 750 package approval logic.
+- Additionally, the Store’s denomination filter always includes a “750” option by default. That filter presence alone does not create a product card; actual ECouponProduct entries control what appears to add to cart.
+
+D.2 Owned codes view in ConsumerCoupon
+
+- The “All My E‑Coupon Codes” table shows whatever CouponCodes are assigned to the user. If admins or agency/employee pools issued/assigned codes of value=750, those will appear.
+- Prime 750 approvals do not allocate codes; but other processes (e.g., e‑coupon orders for a 750 denomination product, or agency/employee assignment) can result in the user having ₹750 codes.
+
+D.3 Activation behavior for a ₹750 code
+
+- In ConsumerCoupon.jsx, Quick Activate maps:
+
+  - value <= 50 → type "50"
+  - value ~ 759 or ~ 750 → type "759"
+  - else → type "150"
+
+- jobs.handle_coupon_activate accepts type "750", but when type "759" is posted from UI, monthly commission distribution inside coupon_activate is triggered ONLY when the actual code value equals 759. The backend’s monthly handling block explicitly checks code_obj.value == 759 before running distribute_monthly_759_payouts.
+
+- Therefore, if a user owns a ₹750 code and clicks “Activate”:
+
+  - Frontend passes type "759".
+  - Backend detects the code value is 750 (not 759) → monthly_759 branch will NOT run.
+  - The backend falls back to the default ecoupon commission path (employee/agency fixed wallet credits) for non‑759 values.
+
+- Net: ₹750 codes are supported as a denomination, but they do not trigger monthly_759 payouts; they behave like “normal” e‑coupon activations unless custom logic is added server‑side.
+
+E. Direct sponsor amounts recap (defaults)
+
+- Per 150 unit activation: sponsor gets ₹2 (DIRECT_REF_BONUS).
+
+- Prime 750 (non‑wallet REDEEM): 5 × 150 activations → total sponsor ₹10.
+
+- Monthly 759:
+
+  - First month/first box: direct ₹250.
+  - Subsequent months per box: direct ₹50.
+  - L1..L5 fixed monthly payouts: [₹50, ₹10, ₹5, ₹5, ₹10].
+
+F. Answers to the specific questions
+
+1. On Prime package activation, what the user sees:
+
+   - Prime 750 with REDEEM:
+
+     - Reward Points credited ₹750.
+     - No new e‑coupon codes are allocated or shown (neither 150 nor 750) from this approval.
+     - 50 path is opened (matrix), and account is activated/unlocked.
+
+   - Prime 150:
+
+     - If choice is not EBOOK: user sees an allocated ₹150 e‑coupon (SOLD) in the list, and can activate it; additionally direct/self + 3/5 matrix payouts are processed (from both per‑coupon distribution and activate_150_active).
+     - If choice is EBOOK: no coupon allocated; only e‑book access is granted; account is activated.
+
+   - Monthly 759:
+     - For each paid box: user will see a ₹759 e‑coupon allocated to them. Monthly payouts for sponsor/upline run in background via jobs.
+
+2. “Coupon will be available?”
+
+   - Prime 150: Yes (unless EBOOK chosen).
+   - Prime 750: No (approval skips allocation entirely).
+   - Monthly 759: Yes (one ₹759 code per selected/paid box).
+
+3. What denominations can Admin create?
+
+   - Technically any decimal denomination (models support it), but business flows explicitly cover: 50, 150, 759; 750 is partially supported (eligibility/UI), not bound to the monthly payouts flow.
+   - The Store shows ECouponProduct items that admin has created and marked active; filter includes defaults ["150","750","759"] but product cards appear only for actual ECouponProduct rows.
+
+4. “750 is 5 × 150; why do I see a ₹750 coupon on the consumer screen?”
+
+   - Because:
+
+     - The Store filter includes “750” by default; and
+     - If an ECouponProduct with denomination=750 exists (admin‑configured), it is displayed as a product; and/or
+     - If the user has been assigned/allocated a ₹750 code (via orders/assignments), it appears in their “All My E‑Coupon Codes”.
+
+   - This is separate from Prime 750 approval logic, which processes 5 × 150 unit activations without allocating 150 codes or a 750 code.
+
+G. Important nuance about ₹750 code activation vs Monthly 759
+
+- Frontend maps a ₹750 code to activation type “759”, but server‑side monthly commissions run only when the code value equals 759. A ₹750 code activation will not execute monthly_759 payouts; it will go through the default e‑coupon commission split.
+
+- If the business intention is to treat ₹750 codes as monthly, either:
+
+  - Issue only ₹759 e‑coupons for monthly, or
+  - Extend backend to treat 750 and 759 equivalently for monthly in CouponActivate, or
+  - Change the store to not sell/assign 750 denomination for consumers unless intended.
+
+Summary
+
+- Prime 150: user sees an e‑coupon (unless EBOOK), and 150 activations/matrix/geo are applied.
+- Prime 750 (REDEEM): user sees Reward Points +750; no e‑coupon codes from this approval; units are not enqueued in wallet_only mode.
+- Monthly 759: user sees ₹759 codes equal to paid boxes; monthly payouts handled per box with first‑month direct=₹250, then ₹50/month.
+- Admin can create 50/150/759 products (and others), but monthly commission logic is tied to coupon.value == 759; 750 is supported in UI and eligibility but does not trigger monthly payouts.
+- Seeing “₹750 coupon” in the UI is expected if an ECouponProduct exists for it or codes of that denomination are assigned; it does not contradict Prime 750 = 5×150 units logic, which is a separate approval path that does not allocate codes by default.
+

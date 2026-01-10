@@ -670,7 +670,7 @@ export async function transferECoupon(codeId, { to_username, pincode = "", notes
 
 // Activation/Redeem using v1 endpoints with e‑coupon source context
 export async function activateECoupon150({ code }) {
-  const res = await API.post("/v1/coupon/activate/", {
+  const res = await API.post("/v1/coupon/activate/?async=1", {
     type: "150",
     source: { channel: "e_coupon", code },
   });

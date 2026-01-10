@@ -441,7 +441,7 @@ export default function ConsumerCoupon() {
       const ref = String(form.referral_id || "").trim();
       if (ref) src.referral_id = ref;
 
-      const res = await API.post("/v1/coupon/activate/", {
+      const res = await API.post("/v1/coupon/activate/?async=1", {
         type: t,
         source: src,
       });
@@ -624,7 +624,7 @@ export default function ConsumerCoupon() {
       // Physical/Lucky Draw coupons are not available on the consumer e‑coupon screen
       if (form.action === "ACTIVATE") {
         const t = form.coupon_type === "50" ? "50" : "150";
-        await API.post("/v1/coupon/activate/", {
+        await API.post("/v1/coupon/activate/?async=1", {
           type: t,
           source: {
             channel: "e_coupon",

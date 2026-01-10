@@ -245,6 +245,47 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
 
     # Bonuses
     base150 = _q2(cfg.prime_activation_amount or 150)
+    # Determine base amount for percent-based distributions and reward points
+    src_type_upper = (src_type or "").upper()
+    is_prime_750 = ("PRIME_750" in src_type_upper) and ("UNIT" not in src_type_upper)
+    base_product = _q2(750) if is_prime_750 else base150
+    # Resolve direct/self bonus amounts from config + product overrides
+    direct_amt = _q2(cfg.get_active_150_direct_bonus())
+    self_amt = _q2(cfg.get_active_150_self_bonus())
+    try:
+        master = dict(getattr(cfg, "master_commission_json", {}) or {})
+        # Preferred per-product mapping under master.direct_bonus, key derived from source
+        direct_all = dict(master.get("direct_bonus", {}) or {})
+        key = "750" if is_prime_750 else "150"
+        row = dict(direct_all.get(key, {}) or {})
+        product_set = False
+        if "sponsor" in row:
+            direct_amt = _q2(row.get("sponsor"))
+            product_set = True
+        if "self" in row:
+            self_amt = _q2(row.get("self"))
+            product_set = True
+        # Legacy/alternate: master.products.coupon150.direct_bonus (apply only for 150 flows)
+        if not product_set and key == "150":
+            products = dict(master.get("products", {}) or {})
+            coupon150 = dict(products.get("coupon150", {}) or {})
+            db = dict(coupon150.get("direct_bonus", {}) or {})
+            if "sponsor" in db:
+                direct_amt = _q2(db.get("sponsor"))
+                product_set = True
+            if "self" in db:
+                self_amt = _q2(db.get("self"))
+                product_set = True
+        # Fallback to legacy keys under active_150 when product override not set
+        if not product_set:
+            a150 = dict(master.get("active_150", {}) or {})
+            if isinstance(a150.get("direct_bonus", None), dict) and "sponsor" in a150.get("direct_bonus", {}):
+                direct_amt = _q2(a150.get("direct_bonus", {}).get("sponsor"))
+            if "self_bonus" in a150:
+                self_amt = _q2(a150.get("self_bonus"))
+    except Exception:
+        # best-effort: ignore bad master json
+        pass
     if base150 <= 0:
         timings["total"] = time.time() - t0
         try:
@@ -253,23 +294,23 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
             pass
         return created
 
-    # Direct sponsor bonus ₹2
+    # Direct sponsor bonus (configurable)
     sponsor = getattr(user, "registered_by", None)
-    if sponsor and _q2(cfg.active_direct_bonus_amount) > 0:
+    if sponsor and direct_amt > 0:
         _credit_wallet(
             sponsor,
-            _q2(cfg.active_direct_bonus_amount),
+            direct_amt,
             tx_type="DIRECT_REF_BONUS",
             meta={"source": "ACTIVE_150", "source_type": src_type, "source_id": src_id},
             source_type=src_type,
             source_id=src_id,
         )
 
-    # Self bonus ₹1
-    if _q2(cfg.active_self_bonus_amount) > 0:
+    # Self bonus (configurable)
+    if self_amt > 0:
         _credit_wallet(
             user,
-            _q2(cfg.active_self_bonus_amount),
+            self_amt,
             tx_type="SELF_BONUS_ACTIVE",
             meta={"source": "ACTIVE_150", "source_type": src_type, "source_id": src_id},
             source_type=src_type,
@@ -304,11 +345,11 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
     # Create 5-matrix and 3-matrix pool entries
     t_open_start = time.time()
     try:
-        AutoPoolAccount.create_five_150_for_user(user, amount=base150)
+        AutoPoolAccount.create_five_150_for_user(user, amount=base_product)
     except Exception:
         pass
     try:
-        AutoPoolAccount.place_three_150_for_user(user, amount=base150)
+        AutoPoolAccount.place_three_150_for_user(user, amount=base_product)
     except Exception:
         pass
     timings["open_accounts"] = time.time() - t_open_start
@@ -321,7 +362,8 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
     master = dict(getattr(cfg, "master_commission_json", {}) or {})
     cm5 = dict(master.get("consumer_matrix_5", {}) or {})
     cm3 = dict(master.get("consumer_matrix_3", {}) or {})
-    fixed_amounts5 = list((cm5.get("150", {}) or {}).get("fixed_amounts") or getattr(cfg, "five_matrix_amounts_json", []) or [])
+    key = "750" if is_prime_750 else "150"
+    fixed_amounts5 = list((cm5.get(key, {}) or {}).get("fixed_amounts") or getattr(cfg, "five_matrix_amounts_json", []) or [])
     if fixed_amounts5:
         for idx, recipient in enumerate(upline6):
             if idx >= len(fixed_amounts5):
@@ -342,10 +384,10 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
             _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_FIVE", meta=meta, source_type=src_type, source_id=src_id)
             _update_matrix_progress(recipient, pool_type="FIVE_150", level=idx + 1, amount=amt)
     else:
-        five_percents = _as_percents(((cm5.get("150", {}) or {}).get("percents") or getattr(cfg, "five_matrix_percents_json", []) or []), five_levels)
+        five_percents = _as_percents(((cm5.get(key, {}) or {}).get("percents") or getattr(cfg, "five_matrix_percents_json", []) or []), five_levels)
         _distribute_levels(
             upline6,
-            base_amount=base150,
+            base_amount=base_product,
             percents=five_percents,
             tx_type="AUTOPOOL_BONUS_FIVE",
             meta={"source": "FIVE_MATRIX_150", "source_type": src_type, "source_id": src_id},
@@ -359,7 +401,7 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
     upline15 = _resolve_upline(user, depth=three_levels)
 
     # Prefer fixed-amount overrides if configured, else fall back to percent distribution
-    fixed_amounts = list((cm3.get("150", {}) or {}).get("fixed_amounts") or getattr(cfg, "three_matrix_amounts_json", []) or [])
+    fixed_amounts = list((cm3.get(key, {}) or {}).get("fixed_amounts") or getattr(cfg, "three_matrix_amounts_json", []) or [])
     if fixed_amounts:
         for idx, recipient in enumerate(upline15):
             if idx >= len(fixed_amounts):
@@ -380,10 +422,10 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
             _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_THREE", meta=meta, source_type=src_type, source_id=src_id)
             _update_matrix_progress(recipient, pool_type="THREE_150", level=idx + 1, amount=amt)
     else:
-        three_percents = _as_percents(((cm3.get("150", {}) or {}).get("percents") or getattr(cfg, "three_matrix_percents_json", []) or []), three_levels)
+        three_percents = _as_percents(((cm3.get(key, {}) or {}).get("percents") or getattr(cfg, "three_matrix_percents_json", []) or []), three_levels)
         _distribute_levels(
             upline15,
-            base_amount=base150,
+            base_amount=base_product,
             percents=three_percents,
             tx_type="AUTOPOOL_BONUS_THREE",
             meta={"source": "THREE_MATRIX_150", "source_type": src_type, "source_id": src_id},
@@ -397,8 +439,8 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
         from business.models import distribute_auto_pool_commissions
         distribute_auto_pool_commissions(
             user,
-            base_amount=base150,
-            fixed_key="active_150",
+            base_amount=base_product,
+            fixed_key=("750" if is_prime_750 else "150"),
             source_type=src_type,
             source_id=src_id,
             extra_meta={"trigger": "ACTIVE_150"},
@@ -412,6 +454,22 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
     try:
         ensure_first_purchase_activation(user, source)
     except Exception:
+        pass
+    # Reward points for PRIME 150/750 activation (non-ECOUPON sources): add denomination as points
+    # Allow suppression via source flag or for PRODUCT flows.
+    try:
+        suppress_points = ("PRODUCT" in (src_type_upper or "")) or bool((source or {}).get("suppress_reward_points"))
+        if (str(src_type or "").upper() != "ECOUPON") and (base_product > 0) and not suppress_points:
+            from accounts.models import RewardPointsAccount
+            reason_name = "PRIME_750" if is_prime_750 else "PRIME_150"
+            RewardPointsAccount.credit_points(
+                user,
+                base_product,
+                reason=reason_name,
+                meta={"source_type": src_type, "source_id": src_id},
+            )
+    except Exception:
+        # best-effort
         pass
     timings["ensure_first"] = time.time() - t_first_start
     timings["total"] = time.time() - t0
@@ -694,6 +752,50 @@ def open_matrix_accounts_for_coupon(user: CustomUser, coupon_id: int | str, amou
             pass
         return
 
+    # Coupon-specific Direct/Self bonuses for 150 (prefer master.direct_bonus["150"], fallback to legacy products.coupon150)
+    try:
+        direct_amt = Decimal("0.00")
+        self_amt = Decimal("0.00")
+        master = dict(getattr(cfg, "master_commission_json", {}) or {})
+        # Preferred per-product mapping
+        direct_all = dict(master.get("direct_bonus", {}) or {})
+        row150 = dict(direct_all.get("150", {}) or {})
+        if "sponsor" in row150:
+            direct_amt = _q2(row150.get("sponsor"))
+        if "self" in row150:
+            self_amt = _q2(row150.get("self"))
+        # Fallback to legacy products.coupon150.direct_bonus if not provided above
+        if direct_amt == Decimal("0.00") and self_amt == Decimal("0.00"):
+            products = dict(master.get("products", {}) or {})
+            coupon150 = dict(products.get("coupon150", {}) or {})
+            db = dict(coupon150.get("direct_bonus", {}) or {})
+            if "sponsor" in db:
+                direct_amt = _q2(db.get("sponsor"))
+            if "self" in db:
+                self_amt = _q2(db.get("self"))
+        sponsor = getattr(user, "registered_by", None)
+        if sponsor and direct_amt > 0:
+            _credit_wallet(
+                sponsor,
+                direct_amt,
+                tx_type="DIRECT_REF_BONUS",
+                meta={"source": "ECOUPON_150", "source_type": src_type, "source_id": src_id},
+                source_type=src_type,
+                source_id=src_id,
+            )
+        if self_amt > 0:
+            _credit_wallet(
+                user,
+                self_amt,
+                tx_type="SELF_BONUS_ACTIVE",
+                meta={"source": "ECOUPON_150", "source_type": src_type, "source_id": src_id},
+                source_type=src_type,
+                source_id=src_id,
+            )
+    except Exception:
+        # best-effort
+        pass
+
     # Distribute 5-matrix (support fixed-amount overrides)
     try:
         five_levels = int(getattr(cfg, "five_matrix_levels", 6) or 6)
@@ -764,11 +866,18 @@ def open_matrix_accounts_for_coupon(user: CustomUser, coupon_id: int | str, amou
         distribute_auto_pool_commissions(
             user,
             base_amount=base150,
-            fixed_key="active_150",
+            fixed_key="150",
             source_type=src_type,
             source_id=src_id,
             extra_meta={"trigger": "ECOUPON_150"},
         )
+    except Exception:
+        pass
+
+    # Reward points: credit base amount equal to 150 for this e‑coupon distribution
+    # Do not credit reward points on e‑coupon activation; points are credited on purchase approval.
+    try:
+        pass
     except Exception:
         pass
 

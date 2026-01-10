@@ -24,6 +24,8 @@ from .views import (
     AdminPromoPurchaseRejectView,
     # Rewards points summary
     RewardPointsSummaryView,
+    # Promo 750 preview
+    Prime750PreviewView,
     # E‑Books
     EBookMyListView,
     # TRI Apps
@@ -67,6 +69,7 @@ urlpatterns = [
     path('admin/promo/purchases/', AdminPromoPurchaseListView.as_view(), name='admin_promo_purchases_list'),
     path('admin/promo/purchases/<int:pk>/approve/', AdminPromoPurchaseApproveView.as_view(), name='admin_promo_purchase_approve'),
     path('admin/promo/purchases/<int:pk>/reject/', AdminPromoPurchaseRejectView.as_view(), name='admin_promo_purchase_reject'),
+    path('promo/prime750/preview/', Prime750PreviewView.as_view(), name='promo_prime750_preview'),
 
     # TRI Apps (Holidays, EV, etc.)
     path('tri/apps/', TriAppListView.as_view(), name='tri_apps_list'),

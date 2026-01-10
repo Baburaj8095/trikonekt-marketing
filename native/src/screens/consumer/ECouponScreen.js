@@ -76,7 +76,7 @@ export default function ECouponScreen() {
       setSubmitting(true);
       if (action === 'ACTIVATE') {
         const t = couponType === '50' ? '50' : '150';
-        await API.post('v1/coupon/activate/', {
+        await API.post('v1/coupon/activate/?async=1', {
           type: t,
           source: {
             channel: 'e_coupon',

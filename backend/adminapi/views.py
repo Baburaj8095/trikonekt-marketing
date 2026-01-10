@@ -2385,6 +2385,31 @@ class AdminMasterCommissionConfig(APIView):
             payload["geo_fixed"] = {k: self._float(v) for k, v in geo_fixed.items()} if geo_fixed else {}
             payload["geo"] = ({k: self._float(v) for k, v in geo_pct.items()} if geo_pct else payload["geo"])
 
+            # Monthly 759 product-specific config (first-month vs subsequent months, levels, agency toggle, base amount)
+            if pk == "759":
+                m759 = dict(master.get("monthly_759", {}) or {})
+                def _f2(val, d=0):
+                    try:
+                        from decimal import Decimal as D
+                        return float(D(str(val)))
+                    except Exception:
+                        try:
+                            return float(val)
+                        except Exception:
+                            return float(d)
+                levels = m759.get("levels_fixed") or []
+                try:
+                    lvls = [_f2(x, 0) for x in levels]
+                except Exception:
+                    lvls = []
+                payload["monthly_759"] = {
+                    "direct_first_month": _f2(m759.get("direct_first_month", 250)),
+                    "direct_monthly": _f2(m759.get("direct_monthly", 50)),
+                    "levels_fixed": lvls,
+                    "agency_enabled": bool(m759.get("agency_enabled", True)),
+                    "base_amount": _f2(m759.get("base_amount", 759)),
+                }
+
         return Response(payload, status=200)
 
     def patch(self, request):
@@ -2530,6 +2555,62 @@ class AdminMasterCommissionConfig(APIView):
                         return Response({"detail": f"geo.{k} must be a number"}, status=400)
                 geo_pct_all[pk] = row
                 master["geo_percent"] = geo_pct_all
+
+            # Monthly 759 product-specific config (accept nested monthly_759 payload)
+            if pk == "759":
+                m759 = dict(master.get("monthly_759", {}) or {})
+                mm = data.get("monthly_759")
+                if isinstance(mm, dict):
+                    from decimal import Decimal as D
+                    # direct_first_month
+                    if "direct_first_month" in mm:
+                        try:
+                            v = D(str(mm.get("direct_first_month")))
+                            if v < 0:
+                                return Response({"detail": "monthly_759.direct_first_month must be >= 0"}, status=400)
+                            m759["direct_first_month"] = float(v)
+                        except Exception:
+                            return Response({"detail": "monthly_759.direct_first_month must be a number"}, status=400)
+                    # direct_monthly
+                    if "direct_monthly" in mm:
+                        try:
+                            v = D(str(mm.get("direct_monthly")))
+                            if v < 0:
+                                return Response({"detail": "monthly_759.direct_monthly must be >= 0"}, status=400)
+                            m759["direct_monthly"] = float(v)
+                        except Exception:
+                            return Response({"detail": "monthly_759.direct_monthly must be a number"}, status=400)
+                    # base_amount
+                    if "base_amount" in mm:
+                        try:
+                            v = D(str(mm.get("base_amount")))
+                            if v < 0:
+                                return Response({"detail": "monthly_759.base_amount must be >= 0"}, status=400)
+                            m759["base_amount"] = float(v)
+                        except Exception:
+                            return Response({"detail": "monthly_759.base_amount must be a number"}, status=400)
+                    # levels_fixed (limit to 5 entries)
+                    if "levels_fixed" in mm:
+                        lst = mm.get("levels_fixed")
+                        if lst is None:
+                            m759["levels_fixed"] = []
+                        elif isinstance(lst, (list, tuple)):
+                            new = []
+                            for x in lst[:5]:
+                                try:
+                                    v = D(str(x))
+                                    if v < 0:
+                                        v = D("0")
+                                    new.append(float(v))
+                                except Exception:
+                                    new.append(0.0)
+                            m759["levels_fixed"] = new
+                        else:
+                            return Response({"detail": "monthly_759.levels_fixed must be an array"}, status=400)
+                    # agency_enabled (boolean)
+                    if "agency_enabled" in mm:
+                        m759["agency_enabled"] = bool(mm.get("agency_enabled"))
+                master["monthly_759"] = m759
 
         cfg.master_commission_json = master
         try:

@@ -55,8 +55,10 @@ const isTourPackage = (pkg) => {
 };
 
 const getPlanOptions = (price) => {
-  if (approx(price, 150)) return ["Redeem points", "E‑book access"];
-  if (approx(price, 750)) return ["Redeem", "Exclusive products", "E‑Coupons"];
+  // Prime 150: remove e‑book flow (UI hint only shows redeem points)
+  if (approx(price, 150)) return ["Redeem points"];
+  // Prime 750: only two options — Redeem or Product (no separate E‑Coupons option)
+  if (approx(price, 750)) return ["Redeem", "Exclusive products"];
   if (approx(price, 759))
     return ["Electronics", "Home Appliances", "Furniture", "Travel & Tourism"];
   return [];

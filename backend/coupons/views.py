@@ -2854,29 +2854,52 @@ class CouponActivateView(APIView):
             pass
         if t not in ("150", "50", "750", "759"):
             return Response({"detail": "type must be '150', '50', '750' or '759'."}, status=status.HTTP_400_BAD_REQUEST)
-        # Async: enqueue background activation and return 200 immediately
+        # Async: enqueue background activation unless forced sync (dev) via ?sync=1.
+        # In dev (DEBUG=True), default is sync, but allow explicit override via ?async=1 to force queuing.
+        use_async = True
+        async_override = False
         try:
-            from jobs.models import BackgroundTask
-            code_or_id = str(source.get("id") or source.get("code") or "")
-            idem_key = f"coupon_activate:{request.user.id}:{t}:{code_or_id}"
-            task = BackgroundTask.enqueue(
-                task_type="coupon_activate",
-                payload={"user_id": int(request.user.id), "type": t, "source": source},
-                idempotency_key=idem_key,
-            )
-            try:
-                AuditTrail.objects.create(
-                    action="coupon_activate_enqueued",
-                    actor=request.user,
-                    notes=f"Activation queued type={t}",
-                    metadata={"type": t, "code": source.get("code"), "id": source.get("id"), "task_id": task.id},
-                )
-            except Exception:
-                pass
-            return Response({"status": "queued", "task_id": task.id, "detail": f"Coupon {t} activation queued."}, status=status.HTTP_200_OK)
+            sync_param = str(request.query_params.get("sync") or request.data.get("sync") or "").strip().lower()
+            if sync_param in ("1", "true", "yes", "sync"):
+                use_async = False
         except Exception:
-            # If enqueue fails, fall back to synchronous path below
             pass
+        try:
+            async_param = str(request.query_params.get("async") or request.data.get("async") or "").strip().lower()
+            if async_param in ("1", "true", "yes", "async"):
+                async_override = True
+                use_async = True
+        except Exception:
+            pass
+        try:
+            from django.conf import settings
+            if getattr(settings, "DEBUG", False) and not async_override:
+                use_async = False
+        except Exception:
+            pass
+        if use_async:
+            try:
+                from jobs.models import BackgroundTask
+                code_or_id = str(source.get("id") or source.get("code") or "")
+                idem_key = f"coupon_activate:{request.user.id}:{t}:{code_or_id}"
+                task = BackgroundTask.enqueue(
+                    task_type="coupon_activate",
+                    payload={"user_id": int(request.user.id), "type": t, "source": source},
+                    idempotency_key=idem_key,
+                )
+                try:
+                    AuditTrail.objects.create(
+                        action="coupon_activate_enqueued",
+                        actor=request.user,
+                        notes=f"Activation queued type={t}",
+                        metadata={"type": t, "code": source.get("code"), "id": source.get("id"), "task_id": task.id},
+                    )
+                except Exception:
+                    pass
+                return Response({"status": "queued", "task_id": task.id, "detail": f"Coupon {t} activation queued."}, status=status.HTTP_200_OK)
+            except Exception:
+                # If enqueue fails, fall back to synchronous path below
+                pass
         t_act = time.time()
         if t == "150":
             ok = activate_150_active(request.user, {"type": "coupon_150_activate", **source})
@@ -2932,6 +2955,7 @@ class CouponActivateView(APIView):
                                 actor=request.user,
                                 coupon_code__value=D("759")
                             ).exclude(coupon_code_id=code_obj.id).exists()
+                            dist_ok = False
                             try:
                                 from business.services.monthly import distribute_monthly_759_payouts
                                 distribute_monthly_759_payouts(
@@ -2939,61 +2963,71 @@ class CouponActivateView(APIView):
                                     is_first_month=(not prev_exists),
                                     source={"type": "ECOUPON_759", "id": code_obj.id, "code": code_obj.code},
                                 )
+                                dist_ok = True
                             except Exception:
-                                pass
-                            # Stamp audit so we don't double-pay for this code
-                            try:
-                                AuditTrail.objects.create(
-                                    action="monthly_759_distributed",
-                                    actor=request.user,
-                                    coupon_code=code_obj,
-                                    notes="Monthly 759 commission distribution applied",
-                                    metadata={"first_month": bool(not prev_exists)},
-                                )
-                            except Exception:
-                                pass
-                        # Skip generic 15/30 path for 759 as monthly plan handles distribution
-                    else:
-                        # Default e‑coupon activation commissions for other denominations
-                        # Idempotency guard: award only once per code
-                        if not AuditTrail.objects.filter(action="ecoupon_commission_awarded", coupon_code=code_obj).exists():
-                            from accounts.models import Wallet
-                            from decimal import Decimal
-                            awards = []
-                            # Employee assigned path: 15 to employee, 15 to agency/sub-franchise
-                            if code_obj.assigned_employee_id:
-                                if code_obj.assigned_employee:
-                                    awards.append(("employee", code_obj.assigned_employee, Decimal("15.00")))
-                                if code_obj.assigned_agency:
-                                    awards.append(("agency", code_obj.assigned_agency, Decimal("15.00")))
-                            # Agency direct path: 30 to agency
-                            elif code_obj.assigned_agency_id:
-                                if code_obj.assigned_agency:
-                                    awards.append(("agency", code_obj.assigned_agency, Decimal("30.00")))
-                            # Credit wallets
-                            for role, user_obj, amt in awards:
+                                # Do not stamp audit on failure so that a retry can re-attempt distribution
+                                dist_ok = False
+                            # Stamp audit so we don't double-pay for this code only on success
+                            if dist_ok:
                                 try:
-                                    w = Wallet.get_or_create_for_user(user_obj)
-                                    w.credit(
-                                        amt,
-                                        tx_type="COMMISSION_CREDIT",
-                                        meta={"role": role, "source": "ECOUPON_ACTIVATION", "code": code_obj.code},
-                                        source_type="ECOUPON_COMMISSION",
-                                        source_id=str(code_obj.id),
+                                    AuditTrail.objects.create(
+                                        action="monthly_759_distributed",
+                                        actor=request.user,
+                                        coupon_code=code_obj,
+                                        notes="Monthly 759 commission distribution applied",
+                                        metadata={"first_month": bool(not prev_exists)},
                                     )
                                 except Exception:
                                     pass
-                            # Audit award summary
-                            try:
-                                AuditTrail.objects.create(
-                                    action="ecoupon_commission_awarded",
-                                    actor=request.user,
-                                    coupon_code=code_obj,
-                                    notes="Activation commission split",
-                                    metadata={"awards": [{"role": r, "user": getattr(u, "username", None), "amount": str(a)} for (r, u, a) in awards]},
-                                )
-                            except Exception:
-                                pass
+                        # Skip generic 15/30 path for 759 as monthly plan handles distribution
+                    else:
+                        # New config-driven commission engine for Prime 150/750 activations (no hardcoded amounts).
+                        from decimal import Decimal as D
+                        # Idempotent per code and denomination
+                        if val == D("150"):
+                            if not AuditTrail.objects.filter(action="prime_150_distributed", coupon_code=code_obj).exists():
+                                try:
+                                    from business.services.prime import distribute_prime_150_payouts
+                                    distribute_prime_150_payouts(
+                                        request.user,
+                                        source={"type": "ECOUPON_150", "id": code_obj.id, "code": code_obj.code}
+                                    )
+                                except Exception:
+                                    pass
+                                try:
+                                    AuditTrail.objects.create(
+                                        action="prime_150_distributed",
+                                        actor=request.user,
+                                        coupon_code=code_obj,
+                                        notes="Prime 150 commission distribution applied",
+                                        metadata={"denomination": "150"},
+                                    )
+                                except Exception:
+                                    pass
+                        elif val == D("750"):
+                            if not AuditTrail.objects.filter(action="prime_750_distributed", coupon_code=code_obj).exists():
+                                try:
+                                    from business.services.prime import distribute_prime_750_payouts
+                                    distribute_prime_750_payouts(
+                                        request.user,
+                                        source={"type": "ECOUPON_750", "id": code_obj.id, "code": code_obj.code}
+                                    )
+                                except Exception:
+                                    pass
+                                try:
+                                    AuditTrail.objects.create(
+                                        action="prime_750_distributed",
+                                        actor=request.user,
+                                        coupon_code=code_obj,
+                                        notes="Prime 750 commission distribution applied",
+                                        metadata={"denomination": "750"},
+                                    )
+                                except Exception:
+                                    pass
+                        else:
+                            # For other denominations (e.g., 50), no commission is applied here.
+                            # 50 path is handled by activate_50 service earlier; skip any legacy fixed splits.
+                            pass
         except Exception:
             pass
 
@@ -3312,32 +3346,46 @@ class ECouponOrderViewSet(mixins.CreateModelMixin,
         if role not in ("consumer", "agency", "employee"):
             return Response({"detail": "Invalid role on order."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Async: enqueue background approval and return quickly, like activate API
+        # Async: enqueue background approval unless forced sync via ?sync=1 or settings.DEBUG
+        use_async = True
         try:
-            from jobs.models import BackgroundTask
-            idem_key = f"ecoupon_order_approve:{order.id}"
-            task = BackgroundTask.enqueue(
-                task_type="ecoupon_order_approve",
-                payload={
-                    "order_id": int(order.id),
-                    "reviewer_id": int(request.user.id) if request.user and getattr(request.user, 'id', None) else None,
-                    "review_note": str(request.data.get("review_note") or "").strip(),
-                },
-                idempotency_key=idem_key,
-            )
-            try:
-                AuditTrail.objects.create(
-                    action="store_order_approve_enqueued",
-                    actor=request.user,
-                    notes=f"Queued approval for order #{order.id}",
-                    metadata={"order_id": order.id, "task_id": task.id},
-                )
-            except Exception:
-                pass
-            return Response({"status": "queued", "task_id": task.id, "detail": f"Order {order.id} approval queued."}, status=status.HTTP_200_OK)
+            sync_param = str(request.query_params.get("sync") or request.data.get("sync") or "").strip().lower()
+            if sync_param in ("1", "true", "yes", "sync"):
+                use_async = False
         except Exception:
-            # Fallback to synchronous approval if enqueue fails
             pass
+        try:
+            from django.conf import settings
+            if getattr(settings, "DEBUG", False):
+                use_async = False
+        except Exception:
+            pass
+        if use_async:
+            try:
+                from jobs.models import BackgroundTask
+                idem_key = f"ecoupon_order_approve:{order.id}"
+                task = BackgroundTask.enqueue(
+                    task_type="ecoupon_order_approve",
+                    payload={
+                        "order_id": int(order.id),
+                        "reviewer_id": int(request.user.id) if request.user and getattr(request.user, 'id', None) else None,
+                        "review_note": str(request.data.get("review_note") or "").strip(),
+                    },
+                    idempotency_key=idem_key,
+                )
+                try:
+                    AuditTrail.objects.create(
+                        action="store_order_approve_enqueued",
+                        actor=request.user,
+                        notes=f"Queued approval for order #{order.id}",
+                        metadata={"order_id": order.id, "task_id": task.id},
+                    )
+                except Exception:
+                    pass
+                return Response({"status": "queued", "task_id": task.id, "detail": f"Order {order.id} approval queued."}, status=status.HTTP_200_OK)
+            except Exception:
+                # Fallback to synchronous approval if enqueue fails
+                pass
 
         with transaction.atomic():
             # First try product-scoped pool (coupon-specific)
