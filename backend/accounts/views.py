@@ -13,6 +13,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.db.models import Q, Sum, Count
+from django.db import transaction
 from locations.views import _build_district_index, india_place_variants
 from locations.models import State
 from django.http import HttpResponse
@@ -1249,10 +1250,6 @@ class WalletMe(APIView):
 
         w = Wallet.get_or_create_for_user(request.user)
         # Auto-apply any pending ₹1000 blocks on wallet fetch (idempotent via AuditTrail)
-        try:
-            w._apply_auto_block_rule(w)
-        except Exception:
-            pass
 
         # Enhanced wallet meta for UI (best-effort; all exceptions guarded)
         try:
@@ -1631,6 +1628,297 @@ class MyWithdrawalsListView(generics.ListAPIView):
 
 
 # ====================
+# Wallet History + Banks + Spend APIs
+# ====================
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from decimal import Decimal as D
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def wallet_me_history(request):
+    """
+    Grouped wallet history and top balances for the authenticated user.
+    """
+    user = request.user
+    w = Wallet.get_or_create_for_user(user)
+    # Ensure any pending ₹1k blocks are applied before reading history (idempotent via AuditTrail)
+    try:
+        from .models import RewardPointsAccount, RewardPointsTransaction
+        rpa = RewardPointsAccount.get_or_create_for_user(user)
+        rp_balance = str(rpa.balance_points or D("0.00"))
+    except Exception:
+        rp_balance = "0.00"
+
+    def txmap(tx):
+        try:
+            amt = str(tx.amount)
+        except Exception:
+            amt = "0.00"
+        return {
+            "id": tx.id,
+            "type": tx.type,
+            "amount": amt,
+            "created_at": tx.created_at.isoformat() if getattr(tx, "created_at", None) else None,
+            "status": "success",
+            "meta": tx.meta or {},
+            "source_type": tx.source_type or "",
+            "source_id": tx.source_id or "",
+        }
+
+    # Top summary
+    top = {
+        "main_income_balance": str(getattr(w, "main_balance", 0) or 0),
+        "self_account_balance": str(getattr(w, "self_account_balance", 0) or 0),
+        "withdrawable_balance": str(getattr(w, "withdrawable_balance", 0) or 0),
+        "shopping_rewards_points": rp_balance,
+        "redeem_points": rp_balance,
+    }
+
+    # Buckets
+    incoming_types = [
+        "INCOME_CREDIT_75",
+        "COMMISSION_CREDIT",
+        "DIRECT_REF_BONUS",
+        "LEVEL_BONUS",
+        "AUTOPOOL_BONUS_THREE",
+        "AUTOPOOL_BONUS_FIVE",
+        "FRANCHISE_INCOME",
+        "GLOBAL_ROYALTY",
+        "GLOBAL_ACTIVATION_CREDIT",
+        "PRIME_ACTIVATION_CREDIT",
+        "MONTHLY_759_DIRECT",
+        "MONTHLY_759_SELF",
+    ]
+    incoming_qs = WalletTransaction.objects.filter(user=user, type__in=incoming_types, amount__gt=0).order_by("-created_at")[:500]
+    self_qs = WalletTransaction.objects.filter(user=user, type__in=["SELF_ACCOUNT_CREDIT", "SELF_ACCOUNT_DEBIT"]).order_by("-created_at")[:500]
+    redeem_types = [
+        "AUTO_ECOUPON_ISSUED",
+        "AUTO_PURCHASE_DEBIT",
+        "ECOUPON_WALLET_DEBIT",
+        "COUPON_PURCHASE_CREDIT",
+        "REDEEM_ECOUPON_CREDIT",
+        "PRODUCT_WALLET_CREDIT",
+        "PRODUCT_PURCHASE_DEBIT",
+        "ADJUSTMENT_DEBIT",
+    ]
+    redeem_qs = WalletTransaction.objects.filter(user=user, type__in=redeem_types).order_by("-created_at")[:500]
+
+    # Reward points
+    cashback = []
+    redeem_points = []
+    try:
+        from .models import RewardPointsTransaction
+        rtx = RewardPointsTransaction.objects.filter(user=user).order_by("-created_at")[:500]
+        for x in rtx:
+            xtype = (x.type or "").upper()
+            row = {
+                "id": x.id,
+                "type": f"RP_{xtype}",
+                "amount": str(x.points),  # 1 point = ₹1
+                "created_at": x.created_at.isoformat() if getattr(x, "created_at", None) else None,
+                "status": "success",
+                "meta": x.meta or {},
+            }
+            if xtype == "EARN":
+                cashback.append(row)
+            elif xtype == "REDEEM":
+                redeem_points.append(row)
+    except Exception:
+        cashback = []
+        redeem_points = []
+
+    # Build lists + fallback classification if empty (for legacy data)
+    incoming_list = [txmap(x) for x in incoming_qs]
+    self_list = [txmap(x) for x in self_qs]
+    redeem_list = redeem_points
+
+    if not incoming_list and not self_list and not redeem_list:
+        fallback_qs = list(WalletTransaction.objects.filter(user=user).order_by("-created_at")[:200])
+        self_types = {"SELF_ACCOUNT_CREDIT", "SELF_ACCOUNT_DEBIT"}
+        redeem_extra_types = {
+            "AUTO_PURCHASE_DEBIT",
+            "ECOUPON_WALLET_DEBIT",
+            "PRODUCT_PURCHASE_DEBIT",
+            "WITHDRAWAL_DEBIT",
+            "ADJUSTMENT_DEBIT",
+        }
+        for tx in fallback_qs:
+            try:
+                amt = tx.amount
+            except Exception:
+                amt = 0
+            if tx.type in self_types:
+                self_list.append(txmap(tx))
+            elif tx.type in redeem_extra_types or (amt is not None and amt < 0):
+                redeem_list.append(txmap(tx))
+            else:
+                # Any positive or neutral credits go to Incoming
+                incoming_list.append(txmap(tx))
+
+    data = {
+        "top": top,
+        "incoming": incoming_list,
+        "self_account": self_list,
+        "cashback": cashback,
+        "redeem": redeem_list,
+    }
+    return Response(data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def wallet_me_banks(request):
+    """
+    Return bank options for withdrawal. Currently backed by KYC as a single bank option.
+    """
+    u = request.user
+    try:
+        from .models import UserKYC
+        kyc = UserKYC.objects.filter(user=u).first()
+    except Exception:
+        kyc = None
+
+    def mask_ac(n: str) -> str:
+        s = (n or "").strip()
+        if len(s) <= 4:
+            return s
+        return "X" * (len(s) - 4) + s[-4:]
+
+    banks = []
+    if kyc and (kyc.bank_name or kyc.bank_account_number or kyc.ifsc_code):
+        banks.append({
+            "id": "kyc",
+            "label": f"KYC • {kyc.bank_name or 'Bank'}",
+            "bank_name": kyc.bank_name or "",
+            "account_number_masked": mask_ac(kyc.bank_account_number or ""),
+            "ifsc": kyc.ifsc_code or "",
+            "is_default": True,
+        })
+
+    return Response({
+        "banks": banks,
+        "default_bank_id": "kyc" if banks else None,
+    })
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def wallet_purchase_ecoupon(request):
+    """
+    Spend main wallet to buy e-coupons (₹150 default).
+    Body: { "value": 150, "qty": 1 }
+    """
+    u = request.user
+    try:
+        value = D(str(request.data.get("value", "150")))
+    except Exception:
+        value = D("150.00")
+    try:
+        qty = int(request.data.get("qty", 1))
+    except Exception:
+        qty = 1
+    if qty <= 0 or value <= 0:
+        return Response({"detail": "Invalid value/qty."}, status=status.HTTP_400_BAD_REQUEST)
+
+    total = (value * D(str(qty))).quantize(D("0.01"))
+    w = Wallet.get_or_create_for_user(u)
+
+    # Pre-check sufficient main balance
+    if D(str(getattr(w, "main_balance", 0) or 0)) < total:
+        return Response({"detail": "Insufficient main wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        from coupons.models import CouponCode
+    except Exception:
+        return Response({"detail": "Coupons module unavailable."}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Check stock availability quickly
+    base_qs = CouponCode.objects.filter(
+        issued_channel="e_coupon",
+        value=value,
+        status="AVAILABLE",
+        assigned_agency__isnull=True,
+        assigned_employee__isnull=True,
+        assigned_consumer__isnull=True,
+    )
+    available = base_qs.count()
+    if available < qty:
+        return Response({"detail": f"Insufficient coupon stock. Available: {available}"}, status=status.HTTP_400_BAD_REQUEST)
+
+    codes = []
+    with transaction.atomic():
+        # Lock wallet
+        w = Wallet.objects.select_for_update().get(pk=w.pk)
+        if (w.main_balance or D("0")) < total:
+            return Response({"detail": "Insufficient main wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Debit once for all coupons
+        w.debit(total, tx_type="ECOUPON_WALLET_DEBIT", meta={"purchase_qty": qty, "unit_value": str(value)}, source_type="ECOUPON_PURCHASE", source_id="")
+
+        # Allocate coupons one-by-one under lock
+        for _ in range(qty):
+            try:
+                try:
+                    locking_qs = base_qs.select_for_update(skip_locked=True)
+                except Exception:
+                    locking_qs = base_qs
+                pick_ids = list(locking_qs.order_by("serial", "id").values_list("id", flat=True)[:1])
+                if not pick_ids:
+                    raise serializers.ValidationError("Ran out of stock while allocating.")
+                affected = (
+                    CouponCode.objects.filter(id__in=pick_ids)
+                    .filter(
+                        issued_channel="e_coupon",
+                        status="AVAILABLE",
+                        assigned_agency__isnull=True,
+                        assigned_employee__isnull=True,
+                        assigned_consumer__isnull=True,
+                    )
+                    .update(assigned_consumer_id=u.id, status="SOLD")
+                )
+                if not affected:
+                    raise serializers.ValidationError("Coupon allocation race; please retry.")
+                cobj = CouponCode.objects.filter(id=pick_ids[0]).only("code").first()
+                codes.append(getattr(cobj, "code", None))
+            except Exception as e:
+                raise
+
+    return Response({"codes": codes, "debited": str(total)}, status=status.HTTP_200_OK)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def wallet_purchase_product(request):
+    """
+    Spend main wallet to pay for a product/order.
+    Body: { "order_id": "<id>", "amount": "<number>" }
+    """
+    u = request.user
+    try:
+        amount = D(str(request.data.get("amount", "0")))
+    except Exception:
+        amount = D("0")
+    if amount <= 0:
+        return Response({"detail": "Invalid amount."}, status=status.HTTP_400_BAD_REQUEST)
+    order_id = str(request.data.get("order_id") or "")
+
+    w = Wallet.get_or_create_for_user(u)
+    # Enforce main-balance-only spend policy
+    if D(str(getattr(w, "main_balance", 0) or 0)) < amount:
+        return Response({"detail": "Insufficient main wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
+
+    with transaction.atomic():
+        w = Wallet.objects.select_for_update().get(pk=w.pk)
+        if (w.main_balance or D("0")) < amount:
+            return Response({"detail": "Insufficient main wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
+        w.debit(amount, tx_type="PRODUCT_PURCHASE_DEBIT", meta={"order_id": order_id}, source_type="PRODUCT_PURCHASE", source_id=str(order_id or ""))
+
+    return Response({"status": "ok", "debited": str(amount)}, status=status.HTTP_200_OK)
+
+
+# ====================
 # Support Portal (User)
 # ====================
 
@@ -1733,10 +2021,10 @@ class OfferLetterPDFView(APIView):
         city = getattr(getattr(user, "city", None), "name", "") or ""
         state_name = getattr(getattr(user, "state", None), "name", "") or ""
 
-        # Static logo path under /static/branding/trikonekt.png (optional).
+        # Static logo path under /static/branding/TRIKONEKT.jpeg (optional).
         # If not present, PDF will render without image.
         base_static_url = (getattr(settings, "STATIC_URL", None) or "/static/").rstrip("/") + "/"
-        logo_uri = f"{base_static_url}branding/trikonekt.png"
+        logo_uri = f"{base_static_url}branding/TRIKONEKT.jpeg"
 
         html = f"""<!DOCTYPE html>
 <html>

@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import V2PageContainer from "../V2PageContainer";
 import MyTeam from "../../team/MyTeam";
 
@@ -14,3 +14,4 @@ export default function MyTeam2() {
     </V2PageContainer>
   );
 }
+

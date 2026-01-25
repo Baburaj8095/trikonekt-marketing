@@ -1,0 +1,236 @@
+PHASE 1 — ANALYSIS (NO CODE CHANGES)
+
+Scope and references analyzed
+- PRIME purchase flow: backend/business/views.py → AdminPromoPurchaseApproveView.post()
+- Commission config and matrix eligibility: backend/business/models.py (CommissionConfig, is_matrix_eligible, distribute_auto_pool_commissions, AutoPoolAccount helpers)
+- E-Coupon store and activation: backend/coupons/views.py (ECouponOrderViewSet, CouponActivateView)
+- Helper scripts run: backend/scripts/configure_prime150_fixed.py and backend/scripts/configure_monthly_759_fixed.py (as per user run log)
+
+Current PRIME flow (end-to-end)
+
+1) PRIME purchase request creation
+- Endpoint: POST /api/business/promo/purchases/
+- Code: PromoPurchaseMeListCreateView.post()
+- Creates PromoPurchase(status=PENDING) with choices:
+  - PRIME150: prime150_choice = REDEEM or EBOOK
+  - PRIME750: prime750_choice = PRODUCT or REDEEM (COUPON is invalid in backend)
+  - PRIME759: monthly plan (no prime150/750 choices)
+
+2) Admin approval
+- Endpoint: POST /api/business/admin/promo/purchases/<pk>/approve/
+- Code: AdminPromoPurchaseApproveView.post()
+- Determines package by price/type:
+  - is_prime_150 ≈ 150
+  - is_prime_750 ≈ 750
+  - is_prime_759 ≈ 759
+- Enforces for 750: COUPON choice is rejected (HTTP 400).
+- skip_allocation = True → no e-coupons allocated for PRIME approvals (150/750/759).
+
+3) What happens after approval
+- PRIME 150:
+  - Calls business.services.prime.distribute_prime_150_payouts(user, source=...)
+  - No e-coupons assigned during approval.
+- PRIME 750:
+  - Calls business.services.prime.distribute_prime_750_payouts(user, source=...)
+  - If PRODUCT: creates PromoProductOrder (user, promo_purchase, selected_promo_product, shipping_address). Order starts PENDING for dispatch team.
+  - No e-coupons assigned.
+- PRIME 759:
+  - Creates Promo759Subscription (OneToOne to purchase)
+  - Calls business.services.monthly.distribute_monthly_759_payouts(user, is_first_month=True, source=...)
+- Account activation flags set idempotently (ensure_first_purchase_activation), and user.account_active is enforced true as needed.
+- Approval writes AuditTrail "promo_purchase_distributed" to guard idempotency.
+
+4) What payouts happen immediately vs later
+- PRIME 150 approval: immediate distribution (config-driven) during Admin approval.
+- PRIME 750 approval: immediate distribution (config-driven) during Admin approval.
+- PRIME 759 approval: triggers month-1 distributions immediately; remaining months are handled by monthly workflow.
+- Because skip_allocation=True, PRIME approvals do not create any 150/759 codes; no later activation step is required for these payouts.
+
+5) What coupons get assigned today (150/750/759)
+- PRIME approvals: none (skip_allocation=True).
+- Monthly per-box 759 allocation is disabled in code (guarded by if False).
+- Only the E-Coupon store path assigns codes.
+
+Current E-Coupon store flow
+
+1) Agency/Employee assigns coupons to user (optional manual)
+- Endpoints:
+  - POST /api/v1/coupon/codes/<id>/assign-consumer/
+  - POST /api/v1/coupon/codes/assign-consumer-count (supports value filter)
+- Effect: Ownership set to consumer, status=SOLD, lucky draw eligibility recorded.
+
+2) User buys coupons from store
+- Endpoint: POST /api/v1/ecoupon/orders/ (ECouponOrderViewSet.create)
+- Requires active ECouponPaymentConfig; creates ECouponOrder(status=SUBMITTED).
+
+3) Admin approves store order
+- Endpoint: POST /api/v1/ecoupon/orders/<id>/approve
+- Allocates AVAILABLE e-coupons by denomination_snapshot:
+  - consumer → assigned_consumer + status=SOLD
+  - agency → assigned_agency + status=ASSIGNED_AGENCY
+  - employee → assigned_employee + status=ASSIGNED_EMPLOYEE
+- For consumer 150 allocation: open_matrix_accounts_for_coupon(..., distribute=False), so accounts are created per code without immediate payouts. Payouts happen on activation.
+
+4) User activates coupon
+- Endpoint: POST /api/v1/coupon/activate/
+- Normalizes source (code/channel), idempotently stamps "coupon_activated".
+- E-coupon commission distribution branches by code.value:
+  - 759: business.services.monthly.distribute_monthly_759_payouts once per code; stamps "monthly_759_distributed".
+  - 150: business.services.prime.distribute_prime_150_payouts + open_matrix_accounts_for_coupon(..., distribute=True, include_direct_self=False, include_agency=False) + stamps "prime_150_distributed".
+  - 750: business.services.prime.distribute_prime_750_payouts + stamps "prime_750_distributed".
+- Idempotency is ensured using AuditTrail markers (per code).
+
+When payouts happen and what payouts happen (store)
+- Store order approval: only allocation (and matrix account creation for 150 with distribute=False). No payouts here for consumer purchases.
+- Activation:
+  - 150: Direct sponsor + Self bonus + Geo/Agency payouts + Matrix payouts (5 and 3) per config (consumer-only).
+  - 750: Direct sponsor + Self bonus + Geo payouts (no matrix).
+  - 759: Monthly plan distribution according to monthly config.
+
+Current Matrix flow
+
+1) How 5 matrix + 3 matrix accounts are created
+- Non-store 150 activation (general): business.services.activation.activate_150_active opens FIVE_150 and THREE_150 accounts (consumer-only).
+- Store flow:
+  - On order approval for consumer 150: open_matrix_accounts_for_coupon(... distribute=False) ensures accounts exist per code, but defers payouts to activation.
+  - On activation (coupon 150): open_matrix_accounts_for_coupon(... distribute=True) runs distributions.
+
+2) Placement logic order
+- Placement delegates to business.services.placement.GenericPlacement.place_account with deterministic TOP→DOWN→LEFT→RIGHT (forced-matrix) logic.
+
+3) Who is eligible for matrix placement + matrix payouts
+- Global gate: backend/business/models.py → is_matrix_eligible(u)
+  - category == "consumer"
+  - role not in {"agency","employee"}
+  - not staff/superuser
+- All account creation helpers (AutoPoolAccount.create_* and place_in_*), activate_150_active, and open_matrix_accounts_for_coupon enforce this. Non-consumers are skipped with clear logs.
+
+Payout sources (where each is calculated)
+
+- Direct sponsor bonus and Self bonus
+  - activate_150_active() (non-e-coupon paths) uses CommissionConfig.master_commission_json; for 750, fallback ×5 when specific 750 values are missing.
+  - E-coupon path delegates to services.prime.distribute_prime_150_payouts / distribute_prime_750_payouts (config-driven).
+  - Admin scripts have already seeded CommissionConfig for 150 and monthly 759.
+
+- Geo/Agency payout
+  - Function: distribute_auto_pool_commissions(payer_user, base_amount, fixed_key, ...)
+  - Modes:
+    - If master.geo_mode[fixed_key] == "fixed": distribute fixed rupee amounts from master.geo_fixed[fixed_key].
+    - Else percent mode: use CommissionConfig percents or overrides in master.geo/master.geo_percents/master.products[*].geo.
+  - Special rule: consumer category → skip Sub Franchise recipient (ambiguous multi-sf per pincode).
+  - Idempotency via Wallet.credit(source_type/source_id).
+
+- Matrix payout amounts + levels
+  - 5-matrix:
+    - Levels: CommissionConfig.get_matrix_five_levels()
+    - Amounts:
+      - Prefer master.consumer_matrix_5[KEY].fixed_amounts or .percents
+      - Fallback to CommissionConfig.five_matrix_amounts_json / five_matrix_percents_json
+  - 3-matrix:
+    - Levels: CommissionConfig.get_matrix_three_levels()
+    - Amounts:
+      - Prefer master.consumer_matrix_3[KEY].fixed_amounts or .percents
+      - Fallback to CommissionConfig.three_matrix_amounts_json / three_matrix_percents_json
+  - KEY used: "150" for 150 flows; for 750 activation variants, logic keys use "750" where applicable.
+
+Confirmation that payout values are config-driven (not hardcoded)
+- All amounts and levels are read from CommissionConfig.master_commission_json (Admin UI-driven) with legacy typed-field fallbacks in CommissionConfig.
+- For 750 multiplier fallback:
+  - Direct/self bonus: implemented as ×5 when 750 config is missing (in activation service logic).
+  - Geo: in percent mode, base_amount=750 naturally scales; in fixed mode, values come from master.geo_fixed[750] (admin supplies), or percent mode can be used instead.
+  - Matrix: fixed-amount 750 fallback to 150×5 is not yet explicit; see minimal change plan.
+
+Minimal change plan (no API breaking changes, minimal diffs)
+
+A) Add fixed-amount fallback ×5 for 750 matrices when only 150 fixed-amounts are configured
+- Why: RULE 2 requires 750 fallback to 150×5 when 750 values are not configured.
+- What:
+  - In five-matrix distribution path within activation logic: if consumer_matrix_5["750"].fixed_amounts empty and consumer_matrix_5["150"].fixed_amounts present, synthesize 750 fixed amounts as [x*5 for x in fixed_amounts_150].
+  - In three-matrix distribution path: same behavior using consumer_matrix_3 fixed amounts.
+- This maintains percent-mode behavior unchanged and only fills the fixed-amount gap for 750.
+
+B) Provide Admin screen backend for “Inventory / Product Orders” listing (for 750 PRODUCT)
+- Why: RULE 4 requires an Admin “Inventory / Product Orders” screen for dispatch team.
+- What (additive, no breaking changes):
+  - Serializer: PromoProductOrderSerializer (fields: id, user (id/username), promo_purchase id, package code/name via purchase, product id/name, shipping_address, status, created_at).
+  - View: AdminProductOrdersListView (GET /api/business/admin/promo/product-orders/)
+    - Filters: status (PENDING/DISPATCHED/CANCELLED), date_from/date_to, user filter
+    - Permission: IsAdminOrStaff + HasAdminModuleAccess("promo") (same as approve)
+  - URL: backend/business/urls.py route addition.
+- The creation of PromoProductOrder is already in place at approval of PRIME750 PRODUCT; this just exposes a list endpoint.
+
+C) Keep PRIME 750 UI choices limited to PRODUCT and REDEEM (backend already rejects COUPON)
+- No backend change needed; UI should remove COUPON option. Approvals already pay immediately and assign no coupons.
+
+D) Maintain and document payout execution order
+- Direct sponsor bonus → Self bonus → Geo/agency payout → Matrix payouts
+- This is already the order in activation service and e-coupon distribution helpers. No change required.
+
+E) No changes to matrix eligibility or idempotency logic
+- Eligibility is enforced globally for consumers only.
+- AuditTrail markers and model constraints (SubscriptionActivation, Promo759Subscription OneToOne) prevent duplicate payouts.
+- Geo payout is executed exactly once per event (single distribution call in each path).
+
+Exact functions/steps to change (implementation items)
+
+1) backend/business/services/activation.py
+- In the block(s) that compute 5-matrix fixed amounts for key "750":
+  - If fixed_amounts_750 is empty and fixed_amounts_150 is non-empty:
+    - fixed_amounts_750 = [x * 5 for x in fixed_amounts_150]
+- In the block(s) that compute 3-matrix fixed amounts for key "750":
+  - If fixed_amounts_750_3 is empty and fixed_amounts_150_3 is non-empty:
+    - fixed_amounts_750_3 = [x * 5 for x in fixed_amounts_150_3]
+- Do not change function signatures. Keep idempotency and role checks intact.
+
+2) backend/business/serializers.py
+- Add PromoProductOrderSerializer with minimal fields:
+  - id, promo_purchase (id), user (id, username), product (id, name), shipping_address, status, created_at
+  - optionally package code/name from promo_purchase.package
+
+3) backend/business/views.py
+- Add AdminProductOrdersListView:
+  - GET /api/business/admin/promo/product-orders/
+  - Permission: IsAdminOrStaff, HasAdminModuleAccess("promo")
+  - Query params: status, date_from, date_to, user (id or username partial)
+  - Returns serialized list ordered by -created_at
+
+4) backend/business/urls.py
+- Register the new list endpoint path under the business app.
+
+Test checklist (post-implementation)
+
+- Consumer activates Prime150 under root sponsor
+  - Create PromoPurchase(PRIME150, REDEEM). Approve.
+  - Verify: immediate payouts; no e-coupons assigned; AuditTrail promo_purchase_distributed present.
+
+- Consumer refers consumer and activates Prime150
+  - Downline 150 activation (store or approval path):
+    - Sponsor gets direct
+    - Self bonus applied to activator
+    - Geo payouts executed once
+    - Matrix payouts (5 & 3) distributed from consumer only
+
+- Merchant activates prime (matrix skipped)
+  - Purchase PRIME150/750 approval: direct/self/geo payouts occur
+  - Matrix placements/payouts skipped with log notes; no matrix credits to non-consumers
+
+- Employee activates prime (matrix skipped)
+  - Same as merchant; verify no matrix accounts/payouts
+
+- Prime750 PRODUCT approval: payout immediately + product order created + no coupons assigned
+  - Approve PRIME750 with PRODUCT
+  - Verify: PromoProductOrder exists; visible in new inventory endpoint; no e-coupons; immediate config-driven payouts
+
+- Prime750 REDEEM approval: payout immediately + no coupons assigned
+  - Verify: immediate payouts; no e-coupons created
+
+- Prime759 approval: monthly flow triggered separately
+  - Verify: Promo759Subscription created; month-1 distribution applied; no mixing with 150 logic
+
+- Idempotency
+  - Re-approve attempt or background retry: no duplicate payouts; AuditTrail guards in place
+  - Geo payout executed exactly once per event
+
+Notes
+- Matrix application is strictly consumer-only; non-consumer roles never get matrix placement or payouts (enforced globally).
+- All payout amounts and levels are read from Admin Commission Config UI (master_commission_json) with legacy typed field fallbacks. For 750 fallback behavior, added fixed-amount logic will derive values from 150 amounts × 5 only when 750-specific amounts are missing.

@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import V2PageContainer from "../V2PageContainer";
 import Profile from "../../Profile";
 
@@ -14,3 +14,4 @@ export default function Profile2() {
     </V2PageContainer>
   );
 }
+

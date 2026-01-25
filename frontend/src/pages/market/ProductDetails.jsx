@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Container,
@@ -101,11 +101,11 @@ export default function ProductDetails() {
             <Typography variant="body2" color="text.secondary">{data.category}</Typography>
 
             <Box sx={{ mt: 1, display: "flex", alignItems: "baseline", gap: 1 }}>
-              <Typography variant="h6" sx={{ fontWeight: 800 }}>₹{finalPrice.toFixed(2)}</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 800 }}>â‚¹{finalPrice.toFixed(2)}</Typography>
               {Number(data.discount || 0) > 0 && (
                 <>
                   <Typography variant="body2" color="text.secondary" sx={{ textDecoration: "line-through" }}>
-                    ₹{Number(data.price || 0).toFixed(2)}
+                    â‚¹{Number(data.price || 0).toFixed(2)}
                   </Typography>
                   <Chip label={`${Number(data.discount)}% OFF`} size="small" color="success" />
                 </>
@@ -213,3 +213,4 @@ export default function ProductDetails() {
     </Container>
   );
 }
+

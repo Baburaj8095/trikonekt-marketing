@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+﻿import React, { useMemo } from "react";
 import { Box, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import colors from "./theme/colors";
@@ -50,7 +50,7 @@ export default function Dashboard2Profile({ setTab, openScreen }) {
     {
       title: "Orders & Coupons",
       items: [
-        { label: "My E‑Coupons", screen: "my-e-coupons2" },
+        { label: "My Eâ€‘Coupons", screen: "my-e-coupons2" },
         { label: "My Orders", screen: "my-orders2" },
         { label: "Cart", screen: "cart2" },
       ],
@@ -108,7 +108,7 @@ export default function Dashboard2Profile({ setTab, openScreen }) {
                 }}
               >
                 <Typography sx={{ fontSize: 14, color: colors.textPrimary }}>{item.label}</Typography>
-                <Typography sx={{ fontSize: 12, color: colors.textSecondary }}>›</Typography>
+                <Typography sx={{ fontSize: 12, color: colors.textSecondary }}>â€º</Typography>
               </Box>
             ))}
           </V2SectionCard>
@@ -124,3 +124,4 @@ export default function Dashboard2Profile({ setTab, openScreen }) {
     </Box>
   );
 }
+

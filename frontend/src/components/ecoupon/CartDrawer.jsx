@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import {
   Drawer,
   Box,
@@ -126,10 +126,10 @@ export default function CartDrawer({ open, onClose, onCheckout }) {
               const details =
                 t === "ECOUPON"
                   ? it?.meta?.denomination != null
-                    ? `Denomination: ₹${it.meta.denomination}`
-                    : "E‑Coupon"
+                    ? `Denomination: â‚¹${it.meta.denomination}`
+                    : "Eâ€‘Coupon"
                   : t === "PROMO_PACKAGE"
-                  ? `Promo Package • ${String(it?.meta?.kind || "")}`
+                  ? `Promo Package â€¢ ${String(it?.meta?.kind || "")}`
                   : t;
 
               return (
@@ -160,7 +160,7 @@ export default function CartDrawer({ open, onClose, onCheckout }) {
                           fontWeight: 700,
                         }}
                       >
-                        ₹
+                        â‚¹
                       </Avatar>
                     )}
                   </ListItemAvatar>
@@ -217,13 +217,13 @@ export default function CartDrawer({ open, onClose, onCheckout }) {
                               Unit:
                             </Typography>
                             <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                              ₹{unit.toLocaleString("en-IN")}
+                              â‚¹{unit.toLocaleString("en-IN")}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
-                              • Subtotal:
+                              â€¢ Subtotal:
                             </Typography>
                             <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                              ₹{Number(subtotal).toLocaleString("en-IN")}
+                              â‚¹{Number(subtotal).toLocaleString("en-IN")}
                             </Typography>
                           </Stack>
                         </Stack>
@@ -243,14 +243,14 @@ export default function CartDrawer({ open, onClose, onCheckout }) {
                 Total
               </Typography>
               <Typography variant="h6" sx={{ fontWeight: 900 }}>
-                ₹{Number(total).toLocaleString("en-IN")}
+                â‚¹{Number(total).toLocaleString("en-IN")}
               </Typography>
             </Stack>
 
             {/* Hint - payment is manual for ecoupons today */}
             {ecouponItems.length > 0 ? (
               <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
-                E‑Coupons checkout is manual. You can review the QR and submit at Checkout.
+                Eâ€‘Coupons checkout is manual. You can review the QR and submit at Checkout.
               </Typography>
             ) : null}
 
@@ -285,3 +285,4 @@ export default function CartDrawer({ open, onClose, onCheckout }) {
     </Drawer>
   );
 }
+

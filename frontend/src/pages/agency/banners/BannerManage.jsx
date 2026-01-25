@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import {
   Box,
   Paper,
@@ -176,7 +176,7 @@ function BannerItemsDialog({ open, onClose, banner }) {
 
   return (
     <Dialog open={open} onClose={() => !saving && onClose()} maxWidth="md" fullWidth>
-      <DialogTitle>Manage Items — {banner?.title || ""}</DialogTitle>
+      <DialogTitle>Manage Items â€” {banner?.title || ""}</DialogTitle>
       <DialogContent dividers>
         {loading ? (
           <LinearProgress />
@@ -199,7 +199,7 @@ function BannerItemsDialog({ open, onClose, banner }) {
               <TextField label="Discount %%" name="discount" value={form.discount} onChange={onChange} fullWidth inputProps={{ inputMode: "decimal", min: 0, max: 100, step: "0.01" }} />
             </Grid>
             <Grid item xs={12} md={2}>
-              <TextField label="Selling ₹" value={computedSelling()} fullWidth InputProps={{ readOnly: true }} />
+              <TextField label="Selling â‚¹" value={computedSelling()} fullWidth InputProps={{ readOnly: true }} />
             </Grid>
 
             <Grid item xs={12} md={3}>
@@ -248,10 +248,10 @@ function BannerItemsDialog({ open, onClose, banner }) {
                 return (
                   <TableRow key={it.id}>
                     <TableCell>{it.name}</TableCell>
-                    <TableCell align="right">₹{fmtMoney(it.price)}</TableCell>
+                    <TableCell align="right">â‚¹{fmtMoney(it.price)}</TableCell>
                     <TableCell align="right">{Number(it.quantity || 0)}</TableCell>
                     <TableCell align="right">{fmtPct(it.discount)}</TableCell>
-                    <TableCell align="right">₹{fmtMoney(selling)}</TableCell>
+                    <TableCell align="right">â‚¹{fmtMoney(selling)}</TableCell>
                     <TableCell align="right">{fmtPct(it.coupon_redeem_percent)}</TableCell>
                     <TableCell align="right">{fmtPct(it.commission_pool_percent)}</TableCell>
                     <TableCell align="right">{it.gift || "-"}</TableCell>
@@ -504,7 +504,7 @@ export default function BannerManage() {
                   <CardContent sx={{ flexGrow: 1 }}>
                     <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{b.title}</Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                      {b.description || "—"}
+                      {b.description || "â€”"}
                     </Typography>
                     <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
                       <Chip size="small" label={b.is_active ? "ACTIVE" : "INACTIVE"} color={b.is_active ? "success" : "default"} />
@@ -572,3 +572,4 @@ export default function BannerManage() {
     </Box>
   );
 }
+

@@ -32,6 +32,8 @@ class CustomUser(AbstractUser):
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='user', db_index=True)
     # Specific registration category for username/ownership logic
     category = models.CharField(max_length=40, choices=CATEGORY_CHOICES, default='consumer', db_index=True)
+    # Admin RBAC Role (single role per admin user; null for non-admins)
+    admin_role = models.ForeignKey('adminapi.Role', null=True, blank=True, on_delete=models.SET_NULL, related_name='users')
 
     # 6-digit unique registration id
     unique_id = models.CharField(max_length=6, unique=True, blank=True, null=True, editable=False)
@@ -96,7 +98,7 @@ class CustomUser(AbstractUser):
         'consumer': 'TR',
         'employee': 'TREP',
         'business': 'TRBS',
-        'merchant': 'TRME',
+        'merchant': 'TRBS',
         'company': 'TR',
         'agency_state_coordinator': 'TRSC',
         'agency_state': 'TRST',
@@ -346,6 +348,7 @@ class Wallet(models.Model):
     # New dual-balance model
     main_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)         # Gross earnings (e.g., commissions)
     withdrawable_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0) # Net withdrawable after tax withholding
+    self_account_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)  # Streamed 25% reserve for auto-activation packs
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -370,6 +373,8 @@ class Wallet(models.Model):
         amt = D(amount or 0)
 
         meta = meta or {}
+        tx_name = str(tx_type or "")
+        tx_upper = tx_name.upper()
         COMMISSION_WITHHOLD_TYPES = {
             "COMMISSION_CREDIT",
             "DIRECT_REF_BONUS",
@@ -378,92 +383,69 @@ class Wallet(models.Model):
             "AUTOPOOL_BONUS_THREE",
             "FRANCHISE_INCOME",
             "GLOBAL_ROYALTY",
+            # Prime payouts (direct/self) should follow 75/25 streaming
+            "PRIME_150_DIRECT",
+            "PRIME_750_DIRECT",
+            "PRIME_150_SELF",
+            "PRIME_750_SELF",
+            # Monthly 759 payouts follow 75/25 streaming
+            "MONTHLY_759_DIRECT",
+            "MONTHLY_759_SELF",
         }
-        is_commission = (tx_type in COMMISSION_WITHHOLD_TYPES)
+        # Normalize tx type for classification to make PRIME streaming robust
+        is_commission = (tx_upper in COMMISSION_WITHHOLD_TYPES)
+        is_prime_tx = tx_upper.startswith("PRIME_") and (tx_upper.endswith("_DIRECT") or tx_upper.endswith("_SELF"))
         no_withhold = bool(meta.get("no_withhold"))
 
-        if is_commission and not no_withhold and amt > 0:
-            # Resolve tax percent and company recipient
-            try:
-                from business.models import CommissionConfig
-                cfg = CommissionConfig.get_solo()
-                tax_percent = D(getattr(cfg, "tax_percent", D("10.00")) or D("10.00"))
-                company_user = getattr(cfg, "tax_company_user", None)
-            except Exception:
-                cfg = None
-                tax_percent = D("10.00")
-                company_user = None
+        if (is_commission or is_prime_tx) and not no_withhold and amt > 0:
+            # 75/25 streaming model:
+            # - 75% -> income (main + withdrawable when active)
+            # - 25% -> self reserve (self_account_balance)
+            income = (amt * D("0.75")).quantize(D("0.01"))
+            self_part = (amt - income).quantize(D("0.01"))
+            if self_part < D("0.00"):
+                self_part = D("0.00")
 
-            if not company_user:
-                # Fallback: pick first 'company' category user or any superuser
-                try:
-                    company_user = CustomUser.objects.filter(category="company").first() or CustomUser.objects.filter(is_superuser=True).first()
-                except Exception:
-                    company_user = None
-
-            tax = (amt * tax_percent / D("100")).quantize(D("0.01"))
-            net = (amt - tax).quantize(D("0.01"))
-            if net < 0:
-                net = D("0.00")
-
-            # Update own wallet balances
-            w.main_balance = (w.main_balance or D("0")) + amt
-            if not inactive:
-                w.withdrawable_balance = (w.withdrawable_balance or D("0")) + net
+            # Update balances (streaming does NOT touch withdrawable_balance)
+            w.main_balance = (w.main_balance or D("0")) + income
+            w.self_account_balance = (w.self_account_balance or D("0")) + self_part
             w.balance = (w.balance or D("0")) + amt
-            fields_to_update = ["balance", "main_balance", "updated_at"]
-            if not inactive:
-                fields_to_update.insert(2, "withdrawable_balance")
-            w.save(update_fields=fields_to_update)
+            w.save(update_fields=["balance", "main_balance", "self_account_balance", "updated_at"])
 
-            # Record gross commission (main ledger)
-            meta_main = {**meta, "ledger": "MAIN", "gross": str(amt), "net": str(net), "tax": str(tax), "tax_percent": str(tax_percent)}
+            # Record 75% income credit (for visibility)
+            meta_main = {**(meta or {}), "ledger": "MAIN", "split": "STREAM_75_25", "gross": str(amt), "income_75": str(income), "self_25": str(self_part), "orig_type": str(tx_type)}
             if inactive:
                 meta_main["pending_due_to_inactive"] = True
             WalletTransaction.objects.create(
                 user=self.user,
-                amount=amt,
+                amount=income,
                 balance_after=w.balance,
-                type=tx_type,
+                type="INCOME_CREDIT_75",
                 source_type=source_type or '',
                 source_id=str(source_id) if source_id is not None else '',
                 meta=meta_main
             )
 
-            # Record net withdrawable component (only when active)
-            if (not inactive) and net > 0:
+
+            # 25% self reserve credit marker
+            if self_part > 0:
                 WalletTransaction.objects.create(
                     user=self.user,
-                    amount=net,
+                    amount=self_part,
                     balance_after=w.balance,
-                    type="WITHDRAWABLE_CREDIT",
+                    type="SELF_ACCOUNT_CREDIT",
                     source_type=source_type or '',
                     source_id=str(source_id) if source_id is not None else '',
-                    meta={**meta, "ledger": "WITHDRAWAL", "gross": str(amt), "net": str(net), "tax": str(tax), "tax_percent": str(tax_percent)}
+                    meta={**(meta or {}), "ledger": "SELF_ACCOUNT", "split": "STREAM_75_25", "orig_type": str(tx_type)}
                 )
 
-            # Route tax to company wallet (no recursive withholding)
-            if company_user and tax > 0:
-                try:
-                    cw = Wallet.get_or_create_for_user(company_user)
-                    # Use a non-commission type to avoid withholding
-                    cw.credit(
-                        tax,
-                        tx_type="TAX_POOL_CREDIT",
-                        meta={"from_user": getattr(self.user, "username", None), **meta},
-                        source_type=source_type or 'TAX_POOL',
-                        source_id=str(source_id) if source_id is not None else '',
-                    )
-                except Exception:
-                    # best-effort
-                    pass
-
-            # Auto-apply 1k block rule after commission credits (best-effort) only for active users
+            # Apply micro-packs (₹250) from self reserve for active users
             if not inactive:
                 try:
-                    self._apply_auto_block_rule(w)
+                    self._apply_self_account_rule(w)
                 except Exception:
                     pass
+
             return w.balance
 
         # Default: non-commission or withholding disabled
@@ -482,12 +464,6 @@ class Wallet(models.Model):
             source_id=str(source_id) if source_id is not None else '',
             meta=meta2
         )
-        # Auto-apply 1k block rule after non-commission credit (best-effort) only for active users
-        if not inactive:
-            try:
-                self._apply_auto_block_rule(w)
-            except Exception:
-                pass
         return w.balance
 
     @transaction.atomic
@@ -500,16 +476,15 @@ class Wallet(models.Model):
         w = Wallet.objects.select_for_update().get(pk=self.pk)
 
         if tx_type == "WITHDRAWAL_DEBIT":
-            # Debit specifically from withdrawable wallet
-            wd = (w.withdrawable_balance or D("0")) - amt
-            if wd < 0:
-                raise ValueError("Insufficient withdrawable balance.")
-            w.withdrawable_balance = wd
+            # Debit specifically from Main Wallet as per new policy
+            new_main = (w.main_balance or D("0")) - amt
+            if new_main < 0:
+                raise ValueError("Insufficient main wallet balance.")
+            w.main_balance = new_main
             w.balance = (w.balance or D("0")) - amt
             if w.balance < 0:
-                # Should not happen if balance tracks sum(main+withdrawable), but guard anyway
                 w.balance = D("0")
-            w.save(update_fields=['balance', 'withdrawable_balance', 'updated_at'])
+            w.save(update_fields=['balance', 'main_balance', 'updated_at'])
         else:
             # Generic debit from total; reduce main first
             new_main = (w.main_balance or D("0"))
@@ -607,45 +582,74 @@ class Wallet(models.Model):
         w, _ = cls.objects.get_or_create(user=user, defaults={'balance': Decimal('0.00')})
         return w
 
-    # Auto rule: for every ₹1000 accumulated in main_balance, apply a fixed deduction pack:
-    # - ₹150 auto e‑coupon buy for self (if available; skipped if no stock)
-    # - ₹50 fixed TDS routed to company tax wallet
-    # - ₹50 direct referral bonus to the direct sponsor (registered_by) if present
-    # Debits are recorded against user's withdrawable wallet and total balance.
-    # Idempotency is ensured via coupons.AuditTrail action="auto_1k_block_applied" per applied block.
-    def _apply_auto_block_rule(self, w: "Wallet"):
+
+    def _apply_self_account_rule(self, w: "Wallet"):
+        """
+        Consume self_account_balance in ₹250 micro-packs:
+          - ₹150 auto e‑coupon purchase for self (requires available coupon; if not available, stop)
+          - ₹50 direct sponsor bonus (to registered_by, or routed to company if no sponsor)
+          - ₹50 company/royalty credit
+        Effects per pack:
+          - self_account_balance -= 250
+          - balance -= 250
+          - Transactions:
+              SELF_ACCOUNT_DEBIT -250 (pack marker)
+              AUTO_PURCHASE_DEBIT -150 (if coupon allocated)
+              ADJUSTMENT_DEBIT -50 (user-side marker for company portion)
+              ADJUSTMENT_DEBIT -50 (user-side marker for sponsor portion)
+              Sponsor DIRECT_REF_BONUS +50 (no_withhold)
+              Company TAX_POOL_CREDIT +50 (no_withhold)
+          - AuditTrail: action="auto_250_self_pack_applied"
+        """
         from decimal import Decimal as D
         try:
             from coupons.models import AuditTrail, CouponCode
         except Exception:
-            return  # coupons app not available; skip
+            return  # coupons app not available
 
-        # Count already-applied blocks for this user
-        try:
-            blocks_applied = int(
-                AuditTrail.objects.filter(action="auto_1k_block_applied", actor=self.user).count()
-            )
-        except Exception:
-            blocks_applied = 0
+        # Helper: resolve company recipient
+        def _get_company_user():
+            try:
+                from business.models import CommissionConfig, RootConsumerConfig
+                cfg = CommissionConfig.get_solo()
+                # Prefer Root Consumer if configured, else tax_company_user
+                rc = RootConsumerConfig.get_solo().get_root_user()
+                cu = rc or getattr(cfg, "tax_company_user", None)
+            except Exception:
+                cu = None
+            if cu:
+                return cu
+            try:
+                return CustomUser.objects.filter(category="company").first() or CustomUser.objects.filter(is_superuser=True).first()
+            except Exception:
+                return None
 
-        # Compute eligible blocks from main_balance
+        # Strong lock on wallet row to serialize pack application
         try:
-            main = D(str(getattr(w, "main_balance", 0) or 0))
+            w = Wallet.objects.select_for_update().get(pk=w.pk)
         except Exception:
-            main = D("0")
-        total_blocks = int(main // D("1000"))
-        to_apply = max(0, int(total_blocks) - int(blocks_applied))
-        if to_apply <= 0:
-            return
+            pass
 
         sponsor = getattr(self.user, "registered_by", None)
+        company_user = _get_company_user()
 
-        for i in range(to_apply):
-            block_no = int(blocks_applied) + i + 1
+        # While we have at least one ₹250 pack, attempt to apply; bail if no coupon available
+        # Lock already held by caller (credit); proceed with safe loop bound
+        loops = 0
+        while True:
+            loops += 1
+            if loops > 50:
+                break  # hard safety
+            try:
+                cur_self = D(str(getattr(w, "self_account_balance", "0") or "0"))
+            except Exception:
+                cur_self = D("0")
+            if cur_self < D("250.00"):
+                break
+
+            # Try to allocate one ₹150 e‑coupon for this user; if none available, stop (retain reserve for later)
             coupon_applied = False
             coupon_code_val = None
-
-            # Try to allocate one ₹150 e‑coupon to this consumer
             try:
                 base_qs = CouponCode.objects.filter(
                     issued_channel="e_coupon",
@@ -660,138 +664,119 @@ class Wallet(models.Model):
                 except Exception:
                     locking_qs = base_qs
                 pick_ids = list(locking_qs.order_by("serial", "id").values_list("id", flat=True)[:1])
-                if pick_ids:
-                    affected = (
-                        CouponCode.objects.filter(id__in=pick_ids)
-                        .filter(
-                            issued_channel="e_coupon",
-                            status="AVAILABLE",
-                            assigned_agency__isnull=True,
-                            assigned_employee__isnull=True,
-                            assigned_consumer__isnull=True,
-                        )
-                        .update(assigned_consumer_id=self.user_id, status="SOLD")
+                if not pick_ids:
+                    break  # no coupon stock; stop applying further packs for now
+                affected = (
+                    CouponCode.objects.filter(id__in=pick_ids)
+                    .filter(
+                        issued_channel="e_coupon",
+                        status="AVAILABLE",
+                        assigned_agency__isnull=True,
+                        assigned_employee__isnull=True,
+                        assigned_consumer__isnull=True,
                     )
-                    if affected:
-                        coupon_applied = True
-                        try:
-                            cobj = CouponCode.objects.filter(id=pick_ids[0]).only("code").first()
-                            coupon_code_val = getattr(cobj, "code", None)
-                        except Exception:
-                            coupon_code_val = None
-            except Exception:
-                coupon_applied = False
-
-            tax_fixed = D("50.00")
-            sponsor_bonus = D("50.00") if sponsor else D("0.00")
-            coupon_cost = D("150.00") if coupon_applied else D("0.00")
-            total = (tax_fixed + sponsor_bonus + coupon_cost).quantize(D("0.01"))
-
-            # Credit net to withdrawable and debit total deductions from overall balance
-            net_block = (D("1000.00") - total).quantize(D("0.01"))
-            # Increase withdrawable by net (reclassification; do not touch main_balance)
-            w.withdrawable_balance = (w.withdrawable_balance or D("0")) + net_block
-            # Reduce overall balance by deductions that leave the user's wallet
-            w.balance = (w.balance or D("0")) - total
-            if w.balance < 0:
-                w.balance = D("0")
-            w.save(update_fields=["balance", "withdrawable_balance", "updated_at"])
-            # Record withdrawable credit transaction for visibility (no change to balance)
-            if net_block > 0:
-                WalletTransaction.objects.create(
-                    user=self.user,
-                    amount=net_block,
-                    balance_after=w.balance,
-                    type="WITHDRAWABLE_CREDIT",
-                    source_type="AUTO_1K_BLOCK",
-                    source_id=str(block_no),
-                    meta={"ledger": "WITHDRAWAL", "auto_rule": "AUTO_1K_BLOCK", "block_index": block_no},
+                    .update(assigned_consumer_id=self.user_id, status="SOLD")
                 )
+                if affected:
+                    coupon_applied = True
+                    try:
+                        cobj = CouponCode.objects.filter(id=pick_ids[0]).only("code").first()
+                        coupon_code_val = getattr(cobj, "code", None)
+                    except Exception:
+                        coupon_code_val = None
+            except Exception:
+                # On any error resolving coupon, stop to avoid partial consumption
+                break
 
-            # Record user-side debits
-            if coupon_applied and coupon_cost > 0:
+            # Deduct the pack from self-reserve and overall balance
+            w.self_account_balance = (w.self_account_balance or D("0")) - D("250.00")
+            if w.self_account_balance < D("0"):
+                w.self_account_balance = D("0")
+            w.balance = (w.balance or D("0")) - D("250.00")
+            if w.balance < D("0"):
+                w.balance = D("0")
+            w.save(update_fields=["balance", "self_account_balance", "updated_at"])
+
+            # Record SELF_ACCOUNT_DEBIT marker with breakdown and pack index
+            try:
+                existing = WalletTransaction.objects.filter(user=self.user, type="SELF_ACCOUNT_DEBIT", source_type="SELF_250_PACK").count()
+                pack_index = int(existing) + 1
+            except Exception:
+                pack_index = None
+
+            WalletTransaction.objects.create(
+                user=self.user,
+                amount=D("-250.00"),
+                balance_after=w.balance,
+                type="SELF_ACCOUNT_DEBIT",
+                source_type="SELF_250_PACK",
+                source_id="",
+                meta={
+                    "source_type": "SELF_250_PACK",
+                    "breakdown": {"coupon": 150, "sponsor": 50, "company": 50},
+                    "coupon_code": coupon_code_val,
+                    "sponsor_user_id": getattr(sponsor, "id", None) if sponsor else getattr(company_user, "id", None),
+                    "company_user_id": getattr(company_user, "id", None),
+                    "pack_index": pack_index,
+                }
+            )
+
+            # Record coupon issued marker if applied
+            if coupon_applied:
                 WalletTransaction.objects.create(
                     user=self.user,
                     amount=D("-150.00"),
                     balance_after=w.balance,
-                    type="AUTO_PURCHASE_DEBIT",
-                    source_type="AUTO_1K_BLOCK",
-                    source_id=str(block_no),
-                    meta={"reason": "AUTO_1K_BLOCK", "block_index": block_no, "coupon_code": coupon_code_val},
-                )
-            # Fixed TDS debit marker
-            WalletTransaction.objects.create(
-                user=self.user,
-                amount=D("-50.00"),
-                balance_after=w.balance,
-                type="ADJUSTMENT_DEBIT",
-                source_type="AUTO_1K_BLOCK",
-                source_id=str(block_no),
-                meta={"reason": "TDS_FIXED_AUTO", "block_index": block_no},
-            )
-            # Sponsor bonus debit marker (user-side visibility)
-            if sponsor_bonus > 0:
-                WalletTransaction.objects.create(
-                    user=self.user,
-                    amount=D("-50.00"),
-                    balance_after=w.balance,
-                    type="ADJUSTMENT_DEBIT",
-                    source_type="AUTO_1K_BLOCK",
-                    source_id=str(block_no),
-                    meta={"reason": "DIRECT_REF_BONUS_AUTO", "block_index": block_no, "to_user_id": getattr(sponsor, "id", None)},
+                    type="AUTO_ECOUPON_ISSUED",
+                    source_type="SELF_250_PACK",
+                    source_id="",
+                    meta={"source_type": "SELF_250_PACK", "coupon_code": coupon_code_val},
                 )
 
-            # Credit sponsor (no withholding)
-            if sponsor and sponsor_bonus > 0:
+            # Sponsor and company portions (₹50 each). If no sponsor, route sponsor portion to company.
+            sponsor_bonus = D("50.00")
+            company_share = D("50.00")
+            sponsor_recipient = sponsor if sponsor else company_user
+
+
+            # Credit sponsor/company wallets (no withholding)
+            if sponsor_recipient and sponsor_bonus > 0:
                 try:
-                    sw = Wallet.get_or_create_for_user(sponsor)
+                    sw = Wallet.get_or_create_for_user(sponsor_recipient)
                     sw.credit(
                         sponsor_bonus,
                         tx_type="DIRECT_REF_BONUS",
-                        meta={"from_user_id": self.user.id, "from_user": getattr(self.user, "username", None), "no_withhold": True, "auto_rule": "AUTO_1K_BLOCK", "block_index": block_no},
-                        source_type="AUTO_1K_BLOCK",
-                        source_id=str(block_no),
+                        meta={"from_user_id": self.user.id, "from_user": getattr(self.user, "username", None), "no_withhold": True, "auto_rule": "SELF_250_PACK"},
+                        source_type="SELF_250_PACK",
+                        source_id="",
                     )
                 except Exception:
                     pass
 
-            # Credit company tax wallet (no withholding)
-            try:
-                from business.models import CommissionConfig
-                cfg = CommissionConfig.get_solo()
-                company_user = getattr(cfg, "tax_company_user", None)
-            except Exception:
-                company_user = None
-            if not company_user:
-                try:
-                    company_user = CustomUser.objects.filter(category="company").first() or CustomUser.objects.filter(is_superuser=True).first()
-                except Exception:
-                    company_user = None
-            if company_user:
+            if company_user and company_share > 0:
                 try:
                     cw = Wallet.get_or_create_for_user(company_user)
                     cw.credit(
-                        tax_fixed,
+                        company_share,
                         tx_type="TAX_POOL_CREDIT",
-                        meta={"from_user_id": self.user.id, "from_user": getattr(self.user, "username", None), "no_withhold": True, "auto_rule": "AUTO_1K_BLOCK", "block_index": block_no},
-                        source_type="AUTO_1K_BLOCK",
-                        source_id=str(block_no),
+                        meta={"from_user_id": self.user.id, "from_user": getattr(self.user, "username", None), "no_withhold": True, "auto_rule": "SELF_250_PACK"},
+                        source_type="SELF_250_PACK",
+                        source_id="",
                     )
                 except Exception:
                     pass
 
-            # Audit for idempotency
+            # Audit pack application
             try:
                 AuditTrail.objects.create(
-                    action="auto_1k_block_applied",
+                    action="auto_250_self_pack_applied",
                     actor=self.user,
-                    notes=f"Applied auto block {block_no}",
+                    notes="Applied SELF_250_PACK",
                     metadata={
-                        "block_index": block_no,
                         "coupon_applied": bool(coupon_applied),
-                        "coupon_cost": str(coupon_cost),
-                        "tds_fixed": "50.00",
-                        "sponsor_bonus": str(sponsor_bonus),
+                        "coupon_code": coupon_code_val,
+                        "sponsor_id": getattr(sponsor_recipient, "id", None),
+                        "company_id": getattr(company_user, "id", None),
                     },
                 )
             except Exception:
@@ -830,6 +815,11 @@ class WalletTransaction(models.Model):
         ('ECOUPON_WALLET_DEBIT', 'E-Coupon Wallet Debit'),
         ('AUTO_PURCHASE_DEBIT', 'Auto Purchase Debit'),
         ('PRODUCT_WALLET_CREDIT', 'Product Wallet Credit'),
+        # Streaming 75/25 support
+        ('INCOME_CREDIT_75', 'Income Credit'),
+        ('SELF_ACCOUNT_CREDIT', 'Self Account Credit'),
+        ('SELF_ACCOUNT_DEBIT', 'Self Account Debit (250 Pack)'),
+        ('AUTO_ECOUPON_ISSUED', 'Auto E-Coupon Issued'),
     ]
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='wallet_transactions', db_index=True)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
@@ -1218,9 +1208,43 @@ def handle_new_user_post_save(sender, instance: CustomUser, created: bool, **kwa
     # Best-effort guard against import issues
     cfg = None
     try:
-        from business.models import CommissionConfig
+        from business.models import CommissionConfig, AutoPoolAccount
         cfg = CommissionConfig.get_solo()
     except Exception:
+        cfg = None
+
+    # Auto 5-matrix placement on consumer registration (config-driven)
+    # If CommissionConfig.autopool_trigger_on_direct_referral is True, place a FIVE_150 account for the new consumer
+    # and sync matrix fields (parent/matrix_position/depth) on the user for AdminMatrix5Tree.
+    try:
+        if (
+            created
+            and cfg
+            and getattr(cfg, "autopool_trigger_on_direct_referral", False)
+            and str(getattr(instance, "category", "")).lower() == "consumer"
+            and not getattr(instance, "is_staff", False)
+            and not getattr(instance, "is_superuser", False)
+        ):
+            acc = AutoPoolAccount.create_five_150_for_user(
+                instance,
+                amount=None,
+                source_type="REGISTRATION",
+                source_id=str(getattr(instance, "id", "")),
+            )
+            if acc and getattr(acc, "parent_account", None):
+                parent_owner = getattr(acc.parent_account, "owner", None)
+                pos = getattr(acc, "position", None)
+                lvl = int(getattr(acc, "level", 0) or 0)
+                if parent_owner and pos:
+                    try:
+                        instance.parent_id = parent_owner.id
+                        instance.matrix_position = int(pos)
+                        instance.depth = int(lvl)
+                        instance.save(update_fields=["parent", "matrix_position", "depth"])
+                    except Exception:
+                        pass
+    except Exception:
+        # best-effort; do not block user creation
         pass
 
     # DEFERRED: No referral/matrix payouts on registration.
@@ -1313,3 +1337,84 @@ class SupportTicketMessage(models.Model):
 
     def __str__(self) -> str:
         return f"Msg<{self.ticket_id} by {getattr(self.author, 'username', '')}>"
+
+
+# ==============================
+# Superuser → Consumer clone + Root Consumer auto-setup
+# ==============================
+def _generate_unique_consumer_username(base: str) -> str:
+    """
+    Generate a unique username based on base with '-consumer' suffix.
+    Falls back to '-consumer-2', '-consumer-3', ...
+    """
+    from django.utils.text import slugify
+    base = (base or "admin").strip()
+    base_cons = f"{base}-consumer"
+    uname = base_cons
+    i = 2
+    while CustomUser.objects.filter(username=uname).exists():
+        uname = f"{base_cons}-{i}"
+        i += 1
+    return uname
+
+
+def _clone_superuser_as_consumer(superuser: CustomUser) -> CustomUser | None:
+    """
+    Create a non-staff, non-superuser consumer clone of the given superuser.
+    Copies hashed password so creds are initially the same. Idempotent by username uniqueness.
+    Sets RootConsumerConfig.root_user if not configured yet.
+    """
+    try:
+        # Guard: do not clone if already a consumer clone exists with likely suffix
+        base = f"{getattr(superuser, 'username', 'admin')}-consumer"
+        exists = CustomUser.objects.filter(username__startswith=base).exists()
+        if exists:
+            consumer = CustomUser.objects.filter(username__startswith=base).order_by("id").first()
+        else:
+            uname = _generate_unique_consumer_username(getattr(superuser, "username", "admin"))
+            consumer = CustomUser.objects.create(
+                username=uname,
+                password=superuser.password,  # hashed password copied as-is
+                email=getattr(superuser, "email", "") or "",
+                full_name=getattr(superuser, "full_name", "") or "",
+                phone=getattr(superuser, "phone", "") or "",
+                country=getattr(superuser, "country", None),
+                state=getattr(superuser, "state", None),
+                city=getattr(superuser, "city", None),
+                pincode=getattr(superuser, "pincode", "") or "",
+                address=getattr(superuser, "address", "") or "",
+                role="user",
+                category="consumer",
+                is_staff=False,
+                is_superuser=False,
+                account_active=True,
+                registered_by=None,
+            )
+        # Attempt to set as Root Consumer if not set
+        try:
+            from business.models import RootConsumerConfig
+            cfg = RootConsumerConfig.get_solo()
+            if not cfg.get_root_user():
+                cfg.root_user = consumer
+                cfg.save(update_fields=["root_user", "updated_at"])
+        except Exception:
+            pass
+        return consumer
+    except Exception:
+        return None
+
+
+@receiver(post_save, sender=CustomUser)
+def ensure_consumer_clone_for_new_superuser(sender, instance: CustomUser, created: bool, **kwargs):
+    """
+    Whenever a new superuser is created, also create a consumer clone for domain usage,
+    and set it as Root Consumer if not already configured.
+    """
+    if not created:
+        return
+    try:
+        if getattr(instance, "is_superuser", False):
+            _clone_superuser_as_consumer(instance)
+    except Exception:
+        # best-effort; never block user creation
+        pass

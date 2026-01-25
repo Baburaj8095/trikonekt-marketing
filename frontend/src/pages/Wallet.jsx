@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+﻿import React, { useEffect, useState, useMemo } from "react";
 import {
   Box,
   Paper,
@@ -9,6 +9,10 @@ import {
   LinearProgress,
 } from "@mui/material";
 import { TextField, Button, Alert } from "@mui/material";
+import { Avatar, Chip } from "@mui/material";
+import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
+import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
+import PaymentsIcon from "@mui/icons-material/Payments";
 import API, { listMyPromoPurchases, getRewardPointsSummary, getMyECouponSummary } from "../api/api";
 import { alpha } from "@mui/material/styles";
 
@@ -105,7 +109,7 @@ export default function Wallet() {
   }, [directRefIncome, matrixIncome, globalTriIncome, globalTurnoverIncome, withdrawalBenefit, directRefWithdrawCommission]);
 
   const computedRewardsRedeemed = useMemo(() => {
-    // Spec: Redeemed = Total Reward Points − Money earned (wallet credits)
+    // Spec: Redeemed = Total Reward Points âˆ’ Money earned (wallet credits)
     // Use summed income buckets; fallback to backend totals.allEarnings if income buckets are zero.
     const total = Number(rewards.total || 0);
     const incomeSum = Number(grossMoneyIncome || 0);
@@ -156,7 +160,7 @@ export default function Wallet() {
 
   const disableReason = useMemo(() => {
     if (!kyc?.verified) return "KYC verification required";
-    if (Number(withdrawableBalance) < 500) return "Minimum withdrawable balance ₹500 required";
+    if (Number(withdrawableBalance) < 500) return "Minimum withdrawable balance â‚¹500 required";
     if (!windowInfo?.isOpen) return "Withdrawals are allowed only on Sunday 6:00 PM to 11:59 PM (IST)";
     if (inWindowCooldown) return "You have already requested a withdrawal in this week's window";
     return "";
@@ -303,7 +307,7 @@ export default function Wallet() {
     const perTxnCap = 750;
     const maxAvail = Math.min(Number(withdrawableBalance), perTxnCap);
     if (amtNum > maxAvail) {
-      setWdrErr(`Max per request is ₹${fmtAmount(perTxnCap)}. Available to withdraw now: ₹${fmtAmount(maxAvail)}.`);
+      setWdrErr(`Max per request is â‚¹${fmtAmount(perTxnCap)}. Available to withdraw now: â‚¹${fmtAmount(maxAvail)}.`);
       return;
     }
     const payload = {
@@ -412,262 +416,152 @@ export default function Wallet() {
         Earning Wallet
       </Typography>
 
-      {/* Earning summary grid - redesigned equal cards */}
-      <Box
-        sx={{
-          display: "grid",
-          gap: 1.5,
-          mb: 2,
-          gridTemplateColumns: {
-            xs: "repeat(2, minmax(0, 1fr))",
-            sm: "repeat(3, minmax(0, 1fr))",
-            md: "repeat(4, minmax(0, 1fr))",
-          },
-          alignItems: "stretch",
-        }}
-      >
-        <StatCard
-          title="Prime Package Active"
-          value={(primeInfo.has150 || primeInfo.has750) ? "Active" : "Inactive"}
-          hint={`Date: ${primeDateStr}`}
-        />
-        <StatCard
-          title="Monthly Prime Active"
-          value={primeInfo.hasMonthly ? "Active" : "Inactive"}
-          hint={`Date: ${monthlyDateStr}`}
-        />
-        <StatCard
-          title="Total Reward Points"
-          value={`${Number(rewards.total || 0).toLocaleString()}`}
-        />
-        <StatCard
-          title="Reward Redeemed Points"
-          value={`${Number(computedRewardsRedeemed || 0).toLocaleString()}`}
-        />
-        <StatCard
-          title="Today Earning"
-          value={`₹ ${fmtAmount(todayEarning)}`}
-        />
-        <StatCard
-          title="Spin and win coupon"
-          value="—"
-        />
-        <StatCard
-          title="Direct Refer Commission"
-          value={`₹ ${fmtAmount(directRefIncome)}`}
-        />
-        <StatCard
-          title="Matrix Level Income"
-          value={`₹ ${fmtAmount(matrixIncome)}`}
-        />
-        <StatCard
-          title="Global TRI income"
-          value={`₹ ${fmtAmount(globalTriIncome)}`}
-        />
-        <StatCard
-          title="Global turnover income"
-          value={`₹ ${fmtAmount(globalTurnoverIncome)}`}
-        />
-        <StatCard
-          title="Self coupon benefits (Activated coupon)"
-          value={`${Number(couponSummary.selfActivated || 0)}`}
-        />
-        <StatCard
-          title="Monthly self coupon benefits (Activated coupon)"
-          value={`${Number(couponSummary.monthlyActivated || 0)}`}
-        />
-        <Paper
-          variant="outlined"
-          sx={{
-            p: 1.5,
-            borderRadius: 2,
-            minHeight: 110,
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "space-between",
-            position: "relative",
-            overflow: "hidden",
-            background: "linear-gradient(180deg, #121826 0%, #0B1220 100%)",
-            borderColor: alpha("#f97316", 0.4),
-            boxShadow: "0 6px 20px rgba(2,6,23,0.35)",
-            "&::before": {
-              content: '""',
-              position: "absolute",
-              inset: 0,
-              background: `radial-gradient(120% 80% at 10% 10%, ${alpha("#f97316", 0.22)} 0%, transparent 55%)`,
-              pointerEvents: "none",
-            },
-          }}
-        >
-          <Typography variant="caption" sx={{ color: alpha("#FFFFFF", 0.75) }}>Withdrawal Limit</Typography>
-          <Stack direction="row" spacing={1.5} sx={{ mt: 1 }}>
-            <Box sx={{ flex: 1, p: 1, border: "1px dashed", borderColor: alpha("#FFFFFF", 0.2), borderRadius: 1 }}>
-              <Typography variant="caption" sx={{ color: alpha("#FFFFFF", 0.75) }}>Earn</Typography>
-              <Typography variant="h6" sx={{ fontWeight: 800, mt: 0.5, color: "#fff" }}>
-                ₹ {fmtAmount(nextBlock?.completed_in_current_block || "0")}
-              </Typography>
-            </Box>
-            <Box sx={{ flex: 1, p: 1, border: "1px dashed", borderColor: alpha("#FFFFFF", 0.2), borderRadius: 1 }}>
-              <Typography variant="caption" sx={{ color: alpha("#FFFFFF", 0.75) }}>Limit</Typography>
-              <Typography variant="h6" sx={{ fontWeight: 800, mt: 0.5, color: "#fff" }}>
-                ₹ 1000
-              </Typography>
-            </Box>
-          </Stack>
-        </Paper>
-        <StatCard
-          title="Withdrawal Wallet"
-          value={`₹ ${fmtAmount(blockMath.netPerBlock)}`}
-          hint="Net to Withdraw per ₹1000 block (auto-credited when limit reached)"
-        />
-        <StatCard
-          title="Direct Refer Withdraw Commission"
-          value={`₹ ${fmtAmount(directRefWithdrawCommission)}`}
-        />
-      </Box>
-
-      {/* <Paper elevation={3} sx={{ p: 2, borderRadius: 2, mb: 2 }}>
-        <Typography variant="subtitle2" sx={{ color: "text.secondary" }}>
-          Redeem Point Wallet
-        </Typography>
-        <Grid container spacing={1} sx={{ mt: 1 }}>
-          <Grid item xs={6}>
-            <Paper variant="outlined" sx={{ p: 1.5, textAlign: "center", borderRadius: 2 }}>
-              <Typography variant="caption" sx={{ color: "text.secondary" }}>Self</Typography>
-              <Typography variant="h6" sx={{ fontWeight: 800 }}>{Number(redeemPoints?.self || 0)}</Typography>
-            </Paper>
-          </Grid>
-          <Grid item xs={6}>
-            <Paper variant="outlined" sx={{ p: 1.5, textAlign: "center", borderRadius: 2 }}>
-              <Typography variant="caption" sx={{ color: "text.secondary" }}>Refer</Typography>
-              <Typography variant="h6" sx={{ fontWeight: 800 }}>{Number(redeemPoints?.refer || 0)}</Typography>
-            </Paper>
-          </Grid>
-        </Grid>
-      </Paper> */}
+    
 
       <Grid container spacing={{ xs: 2, sm: 2 }}>
-        <Grid item xs={12} md={4}>
-          <Paper
-            variant="outlined"
-            sx={{
-              p: 2,
-              borderRadius: 2,
-              position: "relative",
-              overflow: "hidden",
-              background: "linear-gradient(180deg, #121826 0%, #0B1220 100%)",
-              borderColor: alpha("#06b6d4", 0.4),
-              boxShadow: "0 6px 20px rgba(2,6,23,0.35)",
-              "&::before": {
-                content: '""',
-                position: "absolute",
-                inset: 0,
-                background: `radial-gradient(120% 80% at 10% 10%, ${alpha("#06b6d4", 0.22)} 0%, transparent 55%)`,
-                pointerEvents: "none",
-              },
-            }}
-          >
-            <Typography variant="subtitle2" sx={{ color: alpha("#FFFFFF", 0.75) }}>
-              Income Wallet
-            </Typography>
-            <Typography variant="h5" sx={{ fontWeight: 800, mt: 0.5, color: "#fff" }}>
-              ₹ {fmtAmount(mainBalance)}
-            </Typography>
-            {autoBlock ? (
-              <Box sx={{ mt: 1 }}>
-                <LinearProgress
-                  variant="determinate"
-                  value={Number(nextBlock?.progress_percent || 0)}
-                  sx={{ height: 6, bgcolor: alpha("#FFFFFF", 0.15), "& .MuiLinearProgress-bar": { backgroundColor: "#06b6d4" } }}
+        <Grid item xs={12} md={8}>
+          <Stack spacing={1.2}>
+            <Paper elevation={3} sx={{ p: 2, borderRadius: 2 }}>
+              <Typography variant="subtitle2" sx={{ color: "text.secondary", mb: 1 }}>
+                Request Withdrawal
+              </Typography>
+              {wdrErr ? <Alert severity="error" sx={{ mb: 1 }}>{wdrErr}</Alert> : null}
+              {!kyc?.verified ? (
+                <Alert severity="error" sx={{ mb: 1 }}>
+                  Please complete KYC in the KYC section.
+                </Alert>
+              ) : null}
+              {Number(withdrawableBalance) < 500 ? (
+                <Alert severity="warning" sx={{ mb: 1 }}>
+                  Minimum Balance to Withdraw 500
+                </Alert>
+              ) : null}
+              {!windowInfo?.isOpen ? (
+                <Alert severity="info" sx={{ mb: 1 }}>
+                  Withdrawals open on Sunday between 6:00 PM and 11:59 PM (IST).{" "}
+                </Alert>
+              ) : null}
+              {inWindowCooldown ? (
+                <Alert severity="warning" sx={{ mb: 1 }}>
+                  You have already requested a withdrawal in this week's window.
+                </Alert>
+              ) : null}
+            </Paper>
+
+            <Paper
+              elevation={0}
+              sx={{
+                p: 1.6,
+                borderRadius: 2.5,
+                border: "1px solid",
+                borderColor: "#EEF2F6",
+                bgcolor: "#fff",
+              }}
+            >
+              <Stack direction="row" spacing={1.2} alignItems="center">
+                <Avatar sx={{ bgcolor: "primary.light", color: "primary.dark", width: 38, height: 38 }}>
+                  <AccountBalanceWalletIcon fontSize="small" />
+                </Avatar>
+
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 800 }}>
+                    Withdrawable Balance
+                  </Typography>
+                  <Typography sx={{ fontSize: 24, fontWeight: 900, mt: 0.2 }}>
+                    â‚¹ {fmtAmount(mainBalance)}
+                  </Typography>
+                </Box>
+
+                <Chip
+                  label="Bank Transfer"
+                  sx={{
+                    bgcolor: "#F1F5F9",
+                    fontWeight: 900,
+                    color: "#0C2D48",
+                  }}
                 />
-                <Typography variant="caption" sx={{ color: alpha("#FFFFFF", 0.75), display: "block", mt: 0.5 }}>
-                  Completed in current ₹1000 block: ₹ {fmtAmount(nextBlock?.completed_in_current_block || "0")}
-                  {" • "}Remaining: ₹ {fmtAmount(nextBlock?.remaining_to_next_block || "1000")}
-                </Typography>
-                <Typography variant="caption" sx={{ color: alpha("#FFFFFF", 0.75), display: "block" }}>
-                  Blocks applied: {autoBlock?.applied_blocks || 0} / {autoBlock?.total_blocks || 0} • Pending: {autoBlock?.pending_blocks || 0}
-                </Typography>
-                <Divider sx={{ my: 1, borderColor: alpha("#FFFFFF", 0.12) }} />
-                <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5, color: "#fff" }}>Per ₹1000 block deductions</Typography>
-                <Stack direction="row" spacing={2} sx={{ flexWrap: "wrap" }}>
-                  <Typography variant="caption" sx={{ color: alpha("#FFFFFF", 0.8) }}>Self coupon: ₹{fmtAmount(breakdown?.coupon_cost || "150")}</Typography>
-                  <Typography variant="caption" sx={{ color: alpha("#FFFFFF", 0.8) }}>TDS: ₹{fmtAmount(breakdown?.tds || "50")}</Typography>
-                  <Typography variant="caption" sx={{ color: alpha("#FFFFFF", 0.8) }}>Direct refer bonus: ₹{fmtAmount(breakdown?.direct_ref_bonus || "50")}</Typography>
-                  <Typography variant="caption" sx={{ fontWeight: 700, color: "#fff" }}>
-                    Net to Withdraw: ₹{fmtAmount(1000 - Number(breakdown?.coupon_cost || 0) - Number(breakdown?.tds || 0) - Number(breakdown?.direct_ref_bonus || 0))}
+              </Stack>
+            </Paper>
+
+            <Paper
+              elevation={0}
+              sx={{
+                p: 1.4,
+                borderRadius: 2.5,
+                border: "1px solid",
+                borderColor: "#EEF2F6",
+                bgcolor: "#fff",
+              }}
+            >
+              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Avatar sx={{ bgcolor: "#F1F5F9", color: "#0C2D48", width: 34, height: 34 }}>
+                    <AccountBalanceIcon fontSize="small" />
+                  </Avatar>
+                  <Typography sx={{ fontWeight: 900 }}>Bank Account</Typography>
+                </Stack>
+              </Stack>
+
+              <Typography sx={{ color: "text.secondary", fontSize: 13 }}>
+                Bank details are captured in the KYC screen. Update them there.
+              </Typography>
+            </Paper>
+
+            <Paper
+              elevation={0}
+              sx={{
+                p: 1.4,
+                borderRadius: 2.5,
+                border: "1px solid",
+                borderColor: "#EEF2F6",
+                bgcolor: "#fff",
+              }}
+            >
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                <Avatar sx={{ bgcolor: "#F1F5F9", color: "#0C2D48", width: 34, height: 34 }}>
+                  <PaymentsIcon fontSize="small" />
+                </Avatar>
+                <Typography sx={{ fontWeight: 900 }}>Request Withdrawal</Typography>
+              </Stack>
+
+              <Box component="form" onSubmit={submitWithdrawal}>
+                <Stack spacing={1.2}>
+                  <TextField
+                    size="small"
+                    label="Amount"
+                    placeholder="Enter amount"
+                    name="amount"
+                    value={wdrForm.amount}
+                    onChange={onWdrChange}
+                    type="number"
+                    inputProps={{ inputMode: "decimal", max: Math.min(Number(mainBalance || 0), 750), step: "0.01" }}
+                    required
+                  />
+
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    disabled={Boolean(disableReason) || wdrSubmitting}
+                    sx={{
+                      fontWeight: 900,
+                      textTransform: "none",
+                      borderRadius: 2,
+                      py: 1.2,
+                    }}
+                  >
+                    {wdrSubmitting ? "Requesting..." : "Withdraw to Bank"}
+                  </Button>
+
+                  <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                    Note: Withdrawals are debited only from your Withdrawable Wallet (Net). Bank details are captured in the KYC screen.
                   </Typography>
                 </Stack>
               </Box>
-            ) : null}
-          </Paper>
-        </Grid>
-
-        <Grid item xs={12} md={8}>
-          <Paper elevation={3} sx={{ p: 2, borderRadius: 2, minHeight: 120 }}>
-            <Typography variant="subtitle2" sx={{ color: "text.secondary", mb: 1 }}>
-              Request Withdrawal
-            </Typography>
-            {wdrErr ? <Alert severity="error" sx={{ mb: 1 }}>{wdrErr}</Alert> : null}
-            {!kyc?.verified ? (
-              <Alert severity="error" sx={{ mb: 1 }}>
-                KYC verification required to request withdrawal. Please complete KYC in the KYC section.
-              </Alert>
-            ) : null}
-            {Number(withdrawableBalance) < 500 ? (
-              <Alert severity="warning" sx={{ mb: 1 }}>
-                Minimum withdrawable balance ₹500 required to enable withdrawals. Short by ₹{(Math.max(0, 500 - Number(withdrawableBalance))).toFixed(2)}
-              </Alert>
-            ) : null}
-            {!windowInfo?.isOpen ? (
-              <Alert severity="info" sx={{ mb: 1 }}>
-                Withdrawals open on Sunday between 6:00 PM and 11:59 PM (IST).{" "}
-                Next window: {windowInfo?.nextWindowAt ? windowInfo.nextWindowAt.toLocaleString() : "-"}
-              </Alert>
-            ) : null}
-            {inWindowCooldown ? (
-              <Alert severity="warning" sx={{ mb: 1 }}>
-                You have already requested a withdrawal in this week's window.
-              </Alert>
-            ) : null}
-            <Box component="form" onSubmit={submitWithdrawal} sx={{ mb: 2 }}>
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Amount (₹)"
-                  name="amount"
-                  value={wdrForm.amount}
-                  onChange={onWdrChange}
-                  type="number"
-                  inputProps={{ inputMode: "decimal", max: Math.min(Number(withdrawableBalance || 0), 750), step: "0.01" }}
-                  helperText={`Available this request: ₹ ${fmtAmount(Math.min(Number(withdrawableBalance || 0), 750))} (cap ₹750)`}
-                  required
-                />
-                {/* Method fixed to Bank; UPI removed */}
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Method"
-                  name="method"
-                  value="bank"
-                  disabled
-                />
-              </Stack>
-              <Alert severity="info" sx={{ mt: 1 }}>
-                Withdrawals are debited only from your Withdrawable Wallet (Net). Bank details are captured in the KYC screen.
-              </Alert>
-              <Button
-                type="submit"
-                variant="contained"
-                disabled={Boolean(disableReason) || wdrSubmitting}
-                sx={{ mt: 1 }}
-              >
-                {wdrSubmitting ? "Requesting..." : "Request Withdrawal"}
-              </Button>
-            </Box>
-          </Paper>
+            </Paper>
+          </Stack>
         </Grid>
       </Grid>
     </Box>
   );
 }
+

@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+﻿import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   AppBar,
@@ -23,7 +23,7 @@ import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import MenuIcon from "@mui/icons-material/Menu";
 import API from "../api/api";
-import LOGO from "../assets/TRIKONEKT.png";
+import LOGO from "../assets/TRIKONEKT.jpg";
 import ClubHeader from "../components/ecoupon/ClubHeader";
 
 const drawerWidth = 220;
@@ -380,9 +380,9 @@ export default function LuckyDraw({ embedded = false }) {
         ) : (
           <Box>
             <Typography variant="body2" sx={{ mb: 1, color: "text.secondary" }}>
-              {spinInfo.draw.title ? <strong>{spinInfo.draw.title}</strong> : null} • Window:&nbsp;
-              {spinInfo.draw.start_at ? new Date(spinInfo.draw.start_at).toLocaleString() : "-"} —{" "}
-              {spinInfo.draw.end_at ? new Date(spinInfo.draw.end_at).toLocaleString() : "-"} • Status: {spinInfo.draw.status}
+              {spinInfo.draw.title ? <strong>{spinInfo.draw.title}</strong> : null} â€¢ Window:&nbsp;
+              {spinInfo.draw.start_at ? new Date(spinInfo.draw.start_at).toLocaleString() : "-"} â€”{" "}
+              {spinInfo.draw.end_at ? new Date(spinInfo.draw.end_at).toLocaleString() : "-"} â€¢ Status: {spinInfo.draw.status}
             </Typography>
 
             {spinInfo.draw.status === "LIVE" ? (
@@ -417,7 +417,7 @@ export default function LuckyDraw({ embedded = false }) {
                       <Typography variant="body2">{spinInfo.attemptPayload.prize_description}</Typography>
                     ) : null}
                     {spinInfo.attemptPayload.prize_value ? (
-                      <Typography variant="body2">Value: ₹{spinInfo.attemptPayload.prize_value}</Typography>
+                      <Typography variant="body2">Value: â‚¹{spinInfo.attemptPayload.prize_value}</Typography>
                     ) : null}
                   </Box>
                 ) : null}
@@ -536,7 +536,7 @@ export default function LuckyDraw({ embedded = false }) {
                 onBlur={resolveTR}
                 required
                 error={Boolean(trError)}
-                helperText={trError ? trError : "Required — routes this submission to the specified TR."}
+                helperText={trError ? trError : "Required â€” routes this submission to the specified TR."}
                 disabled={!luckyEnabled}
               />
               <Button variant="outlined" size="small" onClick={resolveTR} disabled={!luckyEnabled || trResolving}>
@@ -614,9 +614,9 @@ export default function LuckyDraw({ embedded = false }) {
               return (
                 <li key={s.id} style={{ marginBottom: 8 }}>
                   <Typography variant="body2" sx={{ mb: 0.5 }}>
-                    <strong>SL:</strong> {s.sl_number} — <strong>Ledger:</strong> {s.ledger_number} — {s.pincode} — {meta.label}
-                    {s.assigned_tre_username ? ` — TRE: ${s.assigned_tre_username}` : ""}
-                    {s.created_at ? ` — ${new Date(s.created_at).toLocaleString()}` : ""}
+                    <strong>SL:</strong> {s.sl_number} â€” <strong>Ledger:</strong> {s.ledger_number} â€” {s.pincode} â€” {meta.label}
+                    {s.assigned_tre_username ? ` â€” TRE: ${s.assigned_tre_username}` : ""}
+                    {s.created_at ? ` â€” ${new Date(s.created_at).toLocaleString()}` : ""}
                   </Typography>
                   {s.image ? (
                     <a href={s.image} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
@@ -872,3 +872,5 @@ export default function LuckyDraw({ embedded = false }) {
     </Box>
   );
 }
+
+

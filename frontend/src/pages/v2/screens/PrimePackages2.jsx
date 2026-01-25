@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import V2PageContainer from "../V2PageContainer";
 import PromoPackages from "../../PromoPackages";
 
@@ -13,3 +13,4 @@ export default function PrimePackages2() {
     </V2PageContainer>
   );
 }
+

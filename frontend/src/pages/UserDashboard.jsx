@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import {
   AppBar,
   Toolbar,
@@ -24,7 +24,7 @@ import API, {
   listCategoryBanners,
 } from "../api/api";
 
-// IMAGE IMPORTS — fallbacks
+// IMAGE IMPORTS â€” fallbacks
 import heroImg from "../assets/Wealth_Galaxy.jpg";
 import promoImg1 from "../assets/spin1.png";
 import promoImg2 from "../assets/asst_2.png";
@@ -243,6 +243,39 @@ export default function UserDashboard({ embedded = false }) {
   }, [itemByKey]);
 
   // UI (unchanged)
+  const handleOpenWealthGalaxy = () => {
+    try {
+      const ua =
+        (typeof navigator !== "undefined" && (navigator.userAgent || navigator.vendor)) ||
+        "";
+      const isAndroid = /Android/i.test(ua);
+      const isIOS =
+        /iPad|iPhone|iPod/i.test(ua) ||
+        (typeof navigator !== "undefined" &&
+          navigator.platform === "MacIntel" &&
+          navigator.maxTouchPoints > 1);
+      const isMac = /Macintosh|Mac OS X/i.test(ua);
+
+      if (isAndroid) {
+        window.location.href =
+          "https://play.google.com/store/apps/details?id=com.mywealth.galaxy";
+        return;
+      }
+      if (isIOS || isMac) {
+        window.location.href =
+          "https://apps.apple.com/in/app/my-wealth-galaxy/id6473733826";
+        return;
+      }
+      // Fallback for other platforms (Windows/Linux/etc.): open Play Store web URL
+      window.location.href =
+        "https://play.google.com/store/apps/details?id=com.mywealth.galaxy";
+    } catch (_) {
+      // As a last resort, attempt Play Store web URL
+      window.location.href =
+        "https://play.google.com/store/apps/details?id=com.mywealth.galaxy";
+    }
+  };
+
   return (
     <Box sx={{ bgcolor: "#f1f5f9", minHeight: "100vh" }}>
       {/* HEADER */}
@@ -264,7 +297,7 @@ export default function UserDashboard({ embedded = false }) {
               color: "#64748b",
             }}
           >
-            Search products…
+            Search productsâ€¦
           </Box>
 
           <IconButton>
@@ -296,8 +329,9 @@ export default function UserDashboard({ embedded = false }) {
         <ProductStrip title="EV Vehicles" products={evProducts} />
 
         {/* BILLS */}
-        <BillsAndRecharge />
+        <BillsAndRecharge onItemClick={handleOpenWealthGalaxy} />
       </Box>
     </Box>
   );
 }
+

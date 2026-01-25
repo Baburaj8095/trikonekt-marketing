@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Container, Typography } from "@mui/material";
 import NavbarV2 from "./components/NavbarV2";
 import FooterV2 from "./components/FooterV2";
@@ -27,3 +27,4 @@ export default function TermsV2() {
     </Box>
   );
 }
+

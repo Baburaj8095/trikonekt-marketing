@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Typography } from "@mui/material";
 import SmartImage from "./SmartImage";
 
@@ -45,3 +45,4 @@ export default function AppIconTile({ label, image, onClick }) {
     </Box>
   );
 }
+

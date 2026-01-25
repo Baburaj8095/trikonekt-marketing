@@ -1,5 +1,5 @@
-import { Box, Typography } from "@mui/material";
-import SmartImage from "./SmartImage";
+﻿import { Box, Typography } from "@mui/material";
+import SmartPromoImage from "./SmartPromoImage";
 
 export default function PromoStrip({ promos }) {
   return (
@@ -23,26 +23,19 @@ export default function PromoStrip({ promos }) {
             key={i}
             sx={{
               minWidth: 280,
-              bgcolor: "#fff",
-              borderRadius: 2,
-              boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
+              maxWidth: 280,
+              borderRadius: 3,
+              boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
+              background: "#fff",
+              overflow: "hidden",
               p: 1,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
             }}
           >
-            {/* 🔥 NO HEIGHT CONSTRAINT */}
-            <SmartImage
-              type="promo"
-              src={p.image}
-              sx={{
-                width: "100%",
-              }}
-            />
+            <SmartPromoImage src={p.image} />
           </Box>
         ))}
       </Box>
     </Box>
   );
 }
+

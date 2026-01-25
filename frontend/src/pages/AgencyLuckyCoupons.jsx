@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import {
   Typography,
   Box,
@@ -629,12 +629,12 @@ export default function AgencyLuckyCoupons() {
               )}
             </Paper>
           </Grid>
-          {/* All My E‑Coupon Codes (full list with status) */}
+          {/* All My Eâ€‘Coupon Codes (full list with status) */}
           <Grid item xs={12}>
             <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mb: 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2, gap: 1, flexWrap: "wrap" }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>
-                  All My E‑Coupon Codes
+                  All My Eâ€‘Coupon Codes
                 </Typography>
                 <Stack
                   direction={{ xs: "column", sm: "row" }}
@@ -711,7 +711,7 @@ export default function AgencyLuckyCoupons() {
                         <TableRow key={c.id}>
                           <TableCell>{c.code}</TableCell>
                           <TableCell>{c.status}</TableCell>
-                          <TableCell>{typeof c.value !== "undefined" ? `₹${c.value}` : ""}</TableCell>
+                          <TableCell>{typeof c.value !== "undefined" ? `â‚¹${c.value}` : ""}</TableCell>
                           <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.assigned_employee_username || ""}</TableCell>
                           <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.assigned_consumer_username || ""}</TableCell>
                           <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.assigned_agency_username || ""}</TableCell>
@@ -722,7 +722,7 @@ export default function AgencyLuckyCoupons() {
                       <TableRow>
                         <TableCell colSpan={9}>
                           <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                            No e‑coupon codes found.
+                            No eâ€‘coupon codes found.
                           </Typography>
                         </TableCell>
                       </TableRow>
@@ -780,12 +780,12 @@ export default function AgencyLuckyCoupons() {
                     required
                   />
                   {bulkResolveLoading ? (
-                    <Typography variant="caption" color="text.secondary">Resolving username…</Typography>
+                    <Typography variant="caption" color="text.secondary">Resolving usernameâ€¦</Typography>
                   ) : bulkResolvedUser ? (
                     <Stack spacing={0.5}>
                       <Typography variant="caption" color="text.secondary">
-                        {bulkResolvedUser.full_name || bulkResolvedUser.username} · PIN {bulkResolvedUser.pincode || "-"}
-                        {bulkResolvedUser.city ? ` · ${bulkResolvedUser.city}` : ""}{bulkResolvedUser.state ? `, ${bulkResolvedUser.state}` : ""}
+                        {bulkResolvedUser.full_name || bulkResolvedUser.username} Â· PIN {bulkResolvedUser.pincode || "-"}
+                        {bulkResolvedUser.city ? ` Â· ${bulkResolvedUser.city}` : ""}{bulkResolvedUser.state ? `, ${bulkResolvedUser.state}` : ""}
                       </Typography>
                       {bulkSell.targetType && (
                         ((bulkSell.targetType === "employee" && !((bulkResolvedUser?.role === "employee") || (bulkResolvedUser?.category === "employee"))) ||
@@ -895,7 +895,7 @@ export default function AgencyLuckyCoupons() {
                   <TableRow key={c.id}>
                     <TableCell>{c.earned_at ? new Date(c.earned_at).toLocaleString() : ""}</TableCell>
                     <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.role}</TableCell>
-                    <TableCell>₹{c.amount}</TableCell>
+                    <TableCell>â‚¹{c.amount}</TableCell>
                     <TableCell>{c.status}</TableCell>
                     <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.coupon_code || ""}</TableCell>
                   </TableRow>
@@ -918,3 +918,4 @@ export default function AgencyLuckyCoupons() {
     </Container>
   );
 }
+

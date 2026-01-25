@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { useParams } from "react-router-dom";
 import ModelListSimple from "./ModelListSimple";
 
@@ -13,3 +13,4 @@ export default function ModelList() {
   const { app, model } = useParams();
   return <ModelListSimple app={app} model={model} />;
 }
+

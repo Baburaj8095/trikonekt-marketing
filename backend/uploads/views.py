@@ -491,6 +491,74 @@ class CategoryBannerList(generics.ListAPIView):
         return qs
 
 
+class CategoryBannerListCreateView(generics.ListCreateAPIView):
+    """
+    Public GET for listing active banners (optionally filter by ?keys= and ?is_active=),
+    Admin-only POST for creating new banners.
+    """
+    serializer_class = CategoryBannerSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        qs = CategoryBanner.objects.all()
+        # By default, only show active banners for public GETs.
+        is_active = self.request.query_params.get("is_active")
+        if is_active is None or is_active == "":
+            qs = qs.filter(is_active=True)
+        else:
+            val = str(is_active).lower()
+            if val in {"1", "true", "yes"}:
+                qs = qs.filter(is_active=True)
+            elif val in {"0", "false", "no"}:
+                qs = qs.filter(is_active=False)
+            elif val in {"all", "any"}:
+                pass
+            else:
+                qs = qs.filter(is_active=True)
+
+        # Optional: filter by a comma-separated list of keys
+        keys = (self.request.query_params.get("keys") or "").strip()
+        if keys:
+            parts = [k.strip() for k in keys.split(",") if k.strip()]
+            if parts:
+                qs = qs.filter(key__in=parts)
+        return qs.order_by("order", "-created_at")
+
+    def perform_create(self, serializer):
+        user = getattr(self.request, "user", None)
+        if not getattr(user, "is_authenticated", False) or not getattr(user, "is_staff", False):
+            raise PermissionDenied("Not permitted.")
+        serializer.save()
+
+
+class CategoryBannerDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Admin-only update/delete for a banner.
+    """
+    serializer_class = CategoryBannerSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    queryset = CategoryBanner.objects.all()
+
+    def update(self, request, *args, **kwargs):
+        user = request.user
+        if not getattr(user, "is_staff", False):
+            raise PermissionDenied("Not permitted.")
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        user = request.user
+        if not getattr(user, "is_staff", False):
+            raise PermissionDenied("Not permitted.")
+        kwargs["partial"] = True
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        user = request.user
+        if not getattr(user, "is_staff", False):
+            raise PermissionDenied("Not permitted.")
+        return super().destroy(request, *args, **kwargs)
+
+
 class LuckyDrawSubmissionView(generics.ListCreateAPIView):
     serializer_class = LuckyDrawSubmissionSerializer
     permission_classes = [permissions.AllowAny]

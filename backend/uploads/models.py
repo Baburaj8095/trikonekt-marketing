@@ -197,15 +197,10 @@ class Promotion(models.Model):
 
 class CategoryBanner(models.Model):
     """
-    Admin-provided banners for category rows in dashboard (Electronics, Furniture, EV).
-    Keys must match dashboard app keys to enable overrides without UI changes.
+    Admin-provided banners for category rows in dashboard (Electronics, Furniture, EV, etc).
+    Keys must match front-end category keys (e.g., 'electronics', 'furniture', 'ev-vehicles', 'holidays', ...).
     """
-    KEY_CHOICES = (
-        ("tri-electronics", "TRI Electronics"),
-        ("tri-furniture", "TRI Furniture"),
-        ("tri-ev", "TRI EV"),
-    )
-    key = models.CharField(max_length=50, choices=KEY_CHOICES)
+    key = models.SlugField(max_length=50, unique=True)
     label = models.CharField(max_length=150, blank=True)
     image = models.ImageField(upload_to="uploads/categories/", storage=MEDIA_STORAGE)
     order = models.PositiveIntegerField(default=0)
@@ -214,7 +209,6 @@ class CategoryBanner(models.Model):
 
     class Meta:
         ordering = ["order", "-created_at"]
-        unique_together = (("key",),)
 
     def __str__(self):
         return self.label or self.key

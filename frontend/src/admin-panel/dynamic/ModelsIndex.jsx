@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../api/client";
 import { getAdminMeta } from "../api/adminMeta";
@@ -25,7 +25,7 @@ export default function ModelsIndex() {
     };
   }, []);
 
-  if (loading) return <div style={{ color: "#64748b" }}>Loading models…</div>;
+  if (loading) return <div style={{ color: "#64748b" }}>Loading modelsâ€¦</div>;
   if (err) return <div style={{ color: "#dc2626" }}>{err}</div>;
   if (!models.length) return <div>No admin models available.</div>;
 
@@ -74,3 +74,4 @@ export default function ModelsIndex() {
     </div>
   );
 }
+

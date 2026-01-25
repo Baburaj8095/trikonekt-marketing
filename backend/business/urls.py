@@ -11,6 +11,7 @@ from .views import (
     AdminCreateAgencyPackagePaymentView,
     AgencyCreateMyAgencyPackagePaymentView,
     AgencyAssignPackageView,
+    AdminAssignAgencyPackageView,
     # Agency package payment requests
     AgencyCreatePaymentRequestView,
     AdminAgencyPaymentRequestListView,
@@ -31,9 +32,13 @@ from .views import (
     # TRI Apps
     TriAppListView,
     TriAppDetailView,
+    AdminTriAppListCreate,
+    AdminTriAppDetail,
     # Withdrawals
     WithdrawCommissionBreakdownView,
     AdminApplyWithdrawCommissionView,
+    # Root Consumer admin
+    AdminRootConsumerView,
 )
 
 urlpatterns = [
@@ -48,6 +53,7 @@ urlpatterns = [
     path('agency-packages/', AgencyPackagesMeView.as_view(), name='agency_packages_me'),
     path('agency-packages/catalog/', AgencyPackageCatalogView.as_view(), name='agency_packages_catalog'),
     path('agency-packages/assign/', AgencyAssignPackageView.as_view(), name='agency_package_assign'),
+    path('admin/agency-packages/assign/', AdminAssignAgencyPackageView.as_view(), name='admin_agency_package_assign'),
     path('agency-packages/<int:pk>/payments/', AdminCreateAgencyPackagePaymentView.as_view(), name='agency_package_payment_create'),
     path('agency-packages/<int:pk>/my-payments/', AgencyCreateMyAgencyPackagePaymentView.as_view(), name='agency_package_my_payment_create'),
     # Agency-submitted payment requests (create/list/approve/reject)
@@ -74,8 +80,12 @@ urlpatterns = [
     # TRI Apps (Holidays, EV, etc.)
     path('tri/apps/', TriAppListView.as_view(), name='tri_apps_list'),
     path('tri/apps/<slug:slug>/', TriAppDetailView.as_view(), name='tri_app_detail'),
+    path('admin/tri/apps/', AdminTriAppListCreate.as_view(), name='admin_tri_apps'),
+    path('admin/tri/apps/<int:pk>/', AdminTriAppDetail.as_view(), name='admin_tri_app_detail'),
 
     # Withdrawals: Direct Refer Commission
     path('withdrawals/breakdown/', WithdrawCommissionBreakdownView.as_view(), name='withdraw_commission_breakdown'),
     path('admin/withdrawals/apply/', AdminApplyWithdrawCommissionView.as_view(), name='admin_apply_withdraw_commission'),
+    # Root Consumer admin endpoints
+    path('admin/root-consumer/', AdminRootConsumerView.as_view(), name='admin_root_consumer'),
 ]

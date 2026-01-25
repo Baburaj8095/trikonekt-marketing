@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Container, Typography, Grid, Card, CardContent } from "@mui/material";
 import PublicNavbar from "../components/PublicNavbar";
 import Footer from "../components/Footer";
@@ -14,7 +14,7 @@ export default function BusinessPage() {
         </Typography>
 
         <Typography color="text.secondary" maxWidth={800} mb={3}>
-          Grow your business with Trikonekt — acquire customers, accept e‑payments, list your shop,
+          Grow your business with Trikonekt â€” acquire customers, accept eâ€‘payments, list your shop,
           and run targeted promotions across our network.
         </Typography>
 
@@ -40,3 +40,4 @@ export default function BusinessPage() {
     </Box>
   );
 }
+

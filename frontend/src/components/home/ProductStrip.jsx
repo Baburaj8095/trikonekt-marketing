@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Typography, Button } from "@mui/material";
 import ProductImageCard from "./ProductImageCard";
 
@@ -67,3 +67,4 @@ export default function ProductStrip({ title, items = [], onViewAll, renderItem 
     </Box>
   );
 }
+

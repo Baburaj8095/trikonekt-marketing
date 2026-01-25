@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import {
   Box,
   Paper,
@@ -73,7 +73,7 @@ function StatusChip({ status }) {
 export default function MyOrdersAll() {
   const [tab, setTab] = useState("ecoupons");
 
-  // E‑Coupon orders
+  // Eâ€‘Coupon orders
   const [ecOrders, setEcOrders] = useState([]);
   const [ecLoading, setEcLoading] = useState(false);
 
@@ -144,7 +144,7 @@ export default function MyOrdersAll() {
           allowScrollButtonsMobile
           variant="scrollable"
         >
-          <Tab label="E‑Coupons" value="ecoupons" />
+          <Tab label="Eâ€‘Coupons" value="ecoupons" />
           <Tab label="Promo Purchases" value="promo" />
           <Tab label="Products" value="products" />
           <Tab label="Marketplace" value="market" />
@@ -153,7 +153,7 @@ export default function MyOrdersAll() {
 
       {tab === "ecoupons" ? (
         <Section
-          title="E‑Coupon Orders"
+          title="Eâ€‘Coupon Orders"
           actions={
             <Button size="small" variant="outlined" onClick={loadEcOrders} disabled={ecLoading}>
               {ecLoading ? "Refreshing..." : "Refresh"}
@@ -176,7 +176,7 @@ export default function MyOrdersAll() {
                   <TableRow>
                     <TableCell colSpan={5}>
                       <Typography variant="body2" color="text.secondary">
-                        No E‑Coupon orders yet.
+                        No Eâ€‘Coupon orders yet.
                       </Typography>
                     </TableCell>
                   </TableRow>
@@ -243,7 +243,7 @@ export default function MyOrdersAll() {
                         <TableCell>{pkg.type || "-"}</TableCell>
                         <TableCell>{p.quantity || "-"}</TableCell>
                         <TableCell>
-                          {pkg.price != null ? `₹${Number(pkg.price).toLocaleString("en-IN")}` : "-"}
+                          {pkg.price != null ? `â‚¹${Number(pkg.price).toLocaleString("en-IN")}` : "-"}
                         </TableCell>
                         <TableCell>
                           <StatusChip status={p.status} />
@@ -298,7 +298,7 @@ export default function MyOrdersAll() {
                       <TableCell>{String(r.payment_method || "-").toUpperCase()}</TableCell>
                       <TableCell>
                         {r.reward_discount_amount != null
-                          ? `₹${Number(r.reward_discount_amount).toLocaleString("en-IN")}`
+                          ? `â‚¹${Number(r.reward_discount_amount).toLocaleString("en-IN")}`
                           : "-"}
                       </TableCell>
                       <TableCell><StatusChip status={r.status} /></TableCell>
@@ -356,3 +356,4 @@ export default function MyOrdersAll() {
     </Box>
   );
 }
+

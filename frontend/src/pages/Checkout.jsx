@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Paper,
@@ -47,7 +47,7 @@ export default function Checkout() {
   const [ecouponPayment, setEcouponPayment] = useState({
     utr: "",
     notes: "",
-    file: null, // optional global file to apply to each e‑coupon order if line.file not set
+    file: null, // optional global file to apply to each eâ€‘coupon order if line.file not set
   });
 
   // Sync cart snapshot
@@ -267,7 +267,7 @@ export default function Checkout() {
             msg:
               e?.response?.data?.detail ||
               e?.message ||
-              "Failed to submit e‑coupon order.",
+              "Failed to submit eâ€‘coupon order.",
           });
         }
       }
@@ -489,10 +489,10 @@ export default function Checkout() {
 
             <Stack direction="row" justifyContent="space-between" alignItems="center">
               <Typography variant="body2">
-                ₹{unit.toLocaleString("en-IN")}
+                â‚¹{unit.toLocaleString("en-IN")}
               </Typography>
               <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                ₹{Number(subtotal).toLocaleString("en-IN")}
+                â‚¹{Number(subtotal).toLocaleString("en-IN")}
               </Typography>
             </Stack>
 
@@ -660,7 +660,7 @@ export default function Checkout() {
             Total amount
           </Typography>
           <Typography variant="h6" sx={{ fontWeight: 800 }}>
-            ₹{Number(total).toLocaleString("en-IN")}
+            â‚¹{Number(total).toLocaleString("en-IN")}
           </Typography>
         </Stack>
       </Paper>
@@ -709,11 +709,11 @@ export default function Checkout() {
             <Typography variant="caption" color="text.secondary">
               Payee
             </Typography>
-            <div style={{ fontWeight: 800 }}>{payment.payee_name || "—"}</div>
+            <div style={{ fontWeight: 800 }}>{payment.payee_name || "â€”"}</div>
             <Typography variant="caption" color="text.secondary">
               UPI ID
             </Typography>
-            <div style={{ fontWeight: 800 }}>{payment.upi_id || "—"}</div>
+            <div style={{ fontWeight: 800 }}>{payment.upi_id || "â€”"}</div>
             <Typography variant="caption" color="text.secondary">
               Instructions
             </Typography>
@@ -724,7 +724,7 @@ export default function Checkout() {
           </Box>
         ) : (
           <Alert severity="warning" sx={{ mb: 1 }}>
-            Payments are temporarily unavailable or not configured for e‑coupons.
+            Payments are temporarily unavailable or not configured for eâ€‘coupons.
           </Alert>
         )}
 
@@ -831,7 +831,7 @@ export default function Checkout() {
                   Available
                 </Typography>
                 <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                  ₹{Number(availablePoints).toLocaleString("en-IN")}
+                  â‚¹{Number(availablePoints).toLocaleString("en-IN")}
                 </Typography>
               </Stack>
               <Stack direction="row" justifyContent="space-between">
@@ -839,12 +839,12 @@ export default function Checkout() {
                   Max this order (cap)
                 </Typography>
                 <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                  ₹{Number(orderRewardCap).toLocaleString("en-IN")}
+                  â‚¹{Number(orderRewardCap).toLocaleString("en-IN")}
                 </Typography>
               </Stack>
               <TextField
                 size="small"
-                label={`Redeem amount (₹, max ₹${Number(
+                label={`Redeem amount (â‚¹, max â‚¹${Number(
                   redeemMax
                 ).toLocaleString("en-IN")})`}
                 type="number"
@@ -865,7 +865,7 @@ export default function Checkout() {
               <Stack direction="row" justifyContent="space-between">
                 <Typography variant="body2">Payable</Typography>
                 <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                  ₹
+                  â‚¹
                   {Math.max(0, Number(total) - Number(redeemUse)).toLocaleString(
                     "en-IN"
                   )}
@@ -949,3 +949,4 @@ export default function Checkout() {
     </Box>
   );
 }
+

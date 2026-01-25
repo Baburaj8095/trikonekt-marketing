@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import API, { ensureFreshAccess } from "../api/api";
 
@@ -176,3 +176,4 @@ export default function ProtectedRoute({ children, allowedRoles }) {
 
   return children;
 }
+

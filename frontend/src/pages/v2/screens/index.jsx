@@ -1,4 +1,4 @@
-/**
+﻿/**
  * v2 Screens Aggregator
  * Re-exports each v2 screen from its own file so the factory can import from "./screens".
  * All originals remain untouched; each "2" component wraps the old page in the v2 layout.
@@ -17,3 +17,4 @@ export { default as MerchantMarketplace2 } from "./MerchantMarketplace2";
 export { default as Support2 } from "./Support2";
 export { default as Wallet2 } from "./Wallet2";
 export { default as History2 } from "./History2";
+

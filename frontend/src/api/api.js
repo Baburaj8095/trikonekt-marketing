@@ -1,4 +1,4 @@
-import axios from "axios";
+﻿import axios from "axios";
 import { incrementLoading, decrementLoading } from "../hooks/loadingStore";
 
 const rawBaseURL =
@@ -50,16 +50,36 @@ function makeRequestKey(cfg) {
 // Session namespace helpers: isolate tokens per role (admin, user, agency, employee, business)
 function currentNamespace() {
   try {
+    // Allow UI shells to override the namespace explicitly (e.g., AdminShell -> "admin")
+    if (typeof window !== "undefined" && window.__tk_force_namespace) {
+      return String(window.__tk_force_namespace);
+    }
+
     const p =
       typeof window !== "undefined" &&
       window.location &&
       typeof window.location.pathname === "string"
         ? window.location.pathname
         : "";
+
+    // Treat admin-prefixed routes as admin
     if (p.startsWith("/admin")) return "admin";
     if (p.startsWith("/agency")) return "agency";
     if (p.startsWith("/employee")) return "employee";
     if (p.startsWith("/business")) return "business";
+    if (p.startsWith("/merchant")) return "business";
+
+    // Legacy Admin RBAC routes without /admin prefix (ensure they use admin namespace)
+    if (
+      p === "/admin_user" ||
+      p === "/role" ||
+      p === "/permission" ||
+      p === "/permission_role" ||
+      p.startsWith("/permission_role/")
+    ) {
+      return "admin";
+    }
+
     return "user";
   } catch {
     return "user";
@@ -84,23 +104,8 @@ function readNamespaced(base) {
 function writeNamespaced(base, value) {
   const ns = currentNamespace();
   const k = nsKey(base, ns);
-  // Persist in the same bucket where a refresh exists; fallback to localStorage for "never expire"
-  const refreshKey = nsKey("refresh", ns);
-  const hasLocal =
-    typeof localStorage !== "undefined" &&
-    localStorage.getItem(refreshKey) !== null;
-  const hasSession =
-    typeof sessionStorage !== "undefined" &&
-    sessionStorage.getItem(refreshKey) !== null;
+  // Always persist to localStorage to keep session until explicit logout or cache clear
   try {
-    if (hasLocal) {
-      localStorage.setItem(k, value);
-      return;
-    }
-    if (hasSession) {
-      sessionStorage.setItem(k, value);
-      return;
-    }
     if (typeof localStorage !== "undefined") {
       localStorage.setItem(k, value);
     } else if (typeof sessionStorage !== "undefined") {
@@ -122,13 +127,35 @@ function clearNamespaced(base) {
   } catch (_) {}
 }
 
+// Per-namespace auth block to avoid wiping tokens globally
+function setAuthBlocked(blocked = true, ns = null) {
+  try {
+    if (typeof window === "undefined") return;
+    const key = "__tk_auth_blocked_ns";
+    const map = window[key] && typeof window[key] === "object" ? window[key] : {};
+    const nsEff = ns || currentNamespace();
+    map[nsEff] = !!blocked;
+    window[key] = map;
+  } catch (_) {}
+}
+
+function isAuthBlocked(ns = null) {
+  try {
+    if (typeof window === "undefined") return false;
+    const key = "__tk_auth_blocked_ns";
+    const map = window[key] && typeof window[key] === "object" ? window[key] : {};
+    const nsEff = ns || currentNamespace();
+    return !!map[nsEff];
+  } catch (_) {
+    return false;
+  }
+}
+
 function clearAllAuthForNamespace() {
   try {
-    clearNamespaced("token");
-    clearNamespaced("refresh");
-    if (typeof window !== "undefined") {
-      window.__tk_auth_blocked = true;
-    }
+    // Do NOT remove stored tokens automatically. Simply block attaching Authorization headers for this namespace.
+    // This preserves the session in storage until explicit logout or manual cache clear.
+    setAuthBlocked(true);
   } catch (_) {}
 }
 
@@ -192,13 +219,12 @@ async function refreshAccessToken() {
     if (newRefresh) {
       writeNamespaced("refresh", newRefresh);
     }
+    // On successful refresh, allow auth again for this namespace
+    try { setAuthBlocked(false); } catch (_) {}
     return access || null;
   } catch (err) {
-    // Refresh failed (400/401/expired/missing user): clear auth to avoid infinite refresh loops
+    // Refresh failed (400/401/expired/missing user): block auth to avoid infinite refresh loops
     clearAllAuthForNamespace();
-    try {
-      if (typeof window !== "undefined") window.__tk_auth_blocked = true;
-    } catch (_) {}
     return null;
   }
 }
@@ -368,6 +394,14 @@ API.interceptors.request.use(async (config) => {
   let token = await ensureFreshAccess();
   if (!token) token = getAccessToken();
 
+  // If UI has explicitly blocked auth (e.g., after refresh failure), skip attaching Authorization header.
+  // This prevents auto-clearing tokens and avoids infinite refresh loops while preserving stored session.
+  try {
+    if (isAuthBlocked()) {
+      return config;
+    }
+  } catch (_) {}
+
   // Do not attach Authorization header for public endpoints to avoid 401 on AllowAny views
   // when a stale/invalid token is present.
   const pathForAuth = String(config.url || "").replace(/^\//, "");
@@ -508,13 +542,8 @@ API.interceptors.response.use(
         return API(originalRequest);
       }
 
-      // No refresh available or refresh failed: clear tokens and signal UI to route to login
+      // No refresh available or refresh failed: block auth and signal UI to route to login
       clearAllAuthForNamespace();
-      try {
-        if (typeof window !== "undefined") {
-          window.__tk_auth_blocked = true;
-        }
-      } catch (_) {}
 
       try {
         if (originalRequest?._trackLoading) decrementLoading();
@@ -575,10 +604,10 @@ export async function assignEmployeeByCount(payload) {
 }
 
 /**
- * E‑Coupon Store APIs
+ * Eâ€‘Coupon Store APIs
  */
 
-// Bootstrap: role‑filtered products + active payment config (for create order screen)
+// Bootstrap: roleâ€‘filtered products + active payment config (for create order screen)
 export async function getEcouponStoreBootstrap() {
   const res = await API.get("/coupons/store/orders/bootstrap/", {
     // cache for short time to reduce flicker
@@ -588,7 +617,7 @@ export async function getEcouponStoreBootstrap() {
   return res?.data || res;
 }
 
-// Create an e‑coupon order (multipart). Fields: product, quantity, utr?, notes?, payment_proof_file?
+// Create an eâ€‘coupon order (multipart). Fields: product, quantity, utr?, notes?, payment_proof_file?
 export async function createEcouponOrder({ product, quantity, utr = "", notes = "", file = null }) {
   const fd = new FormData();
   fd.append("product", String(product));
@@ -653,7 +682,7 @@ export async function listCouponSeasons(params = {}) {
 }
 
 /**
- * Consumer e‑coupon wallet helpers
+ * Consumer eâ€‘coupon wallet helpers
  */
 export async function getMyECoupons(params = {}) {
   const res = await API.get("/coupons/codes/mine-consumer/", { params, dedupe: "cancelPrevious" });
@@ -668,7 +697,7 @@ export async function transferECoupon(codeId, { to_username, pincode = "", notes
   return res?.data || res;
 }
 
-// Activation/Redeem using v1 endpoints with e‑coupon source context
+// Activation/Redeem using v1 endpoints with eâ€‘coupon source context
 export async function activateECoupon150({ code }) {
   const res = await API.post("/v1/coupon/activate/?async=1", {
     type: "150",
@@ -1149,5 +1178,6 @@ export async function listCategoryBanners({ params = {} } = {}) {
   return res?.data || res;
 }
 
-export { ensureFreshAccess, getAccessToken, getRefreshToken };
+export { ensureFreshAccess, getAccessToken, getRefreshToken, setAuthBlocked, isAuthBlocked };
 export default API;
+

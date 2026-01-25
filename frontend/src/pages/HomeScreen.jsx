@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import {
   Box,
   Container,
@@ -157,7 +157,7 @@ export default function LandingPage() {
             </Typography>
 
             <Typography mt={2} color="text.secondary" maxWidth={700}>
-              Through our <strong>Connect → Earn → Grow</strong> model, everyday
+              Through our <strong>Connect â†’ Earn â†’ Grow</strong> model, everyday
               spending and interactions are transformed into meaningful income
               and long-term growth.
             </Typography>
@@ -185,7 +185,7 @@ export default function LandingPage() {
               "Designed for long-term value creation",
             ].map((point) => (
               <Grid item xs={12} sm={6} key={point}>
-                <Typography fontSize={15}>✔ {point}</Typography>
+                <Typography fontSize={15}>âœ” {point}</Typography>
               </Grid>
             ))}
           </Grid>
@@ -238,3 +238,4 @@ export default function LandingPage() {
     </Box>
   );
 }
+

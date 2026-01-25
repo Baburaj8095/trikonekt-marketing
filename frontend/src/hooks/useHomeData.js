@@ -1,4 +1,4 @@
-export default function useHomeData() {
+﻿export default function useHomeData() {
   return {
     heroBanners: ["/banner1.jpg", "/banner2.jpg"],
     categories: [
@@ -15,3 +15,4 @@ export default function useHomeData() {
     services: [{ label: "Orders" }, { label: "Wallet" }]
   };
 }
+

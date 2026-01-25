@@ -1,4 +1,4 @@
-import { Box } from "@mui/material";
+﻿import { Box } from "@mui/material";
 
 const MAP = {
   hero: {
@@ -47,10 +47,11 @@ export default function SmartImage2({ src, type = "product", sx = {} }) {
           width: "100%",
           height: "100%",
           maxHeight: "100%",
-          objectFit: cfg.fit, // 🔥 contain for promo
+          objectFit: cfg.fit, // ðŸ”¥ contain for promo
           display: "block",
         }}
       />
     </Box>
   );
 }
+

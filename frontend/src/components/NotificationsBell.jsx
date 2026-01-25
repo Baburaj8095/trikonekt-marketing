@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   IconButton,
   Badge,
@@ -18,6 +18,7 @@ import {
   notificationsPinned,
   notificationsInbox,
   notificationsMarkRead,
+  getAccessToken,
 } from "../api/api";
 
 /**
@@ -36,6 +37,12 @@ export default function NotificationsBell() {
 
   const loadUnread = useCallback(async () => {
     try {
+      const blocked = typeof window !== "undefined" && window.__tk_auth_blocked;
+      const token = typeof getAccessToken === "function" ? getAccessToken() : null;
+      if (!token || blocked) {
+        setUnread(0);
+        return;
+      }
       const res = await notificationsUnreadCount();
       const n = (res && (res.count ?? res.unread ?? 0)) || 0;
       setUnread(Number(n) || 0);
@@ -46,6 +53,12 @@ export default function NotificationsBell() {
 
   const loadPinned = useCallback(async () => {
     try {
+      const blocked = typeof window !== "undefined" && window.__tk_auth_blocked;
+      const token = typeof getAccessToken === "function" ? getAccessToken() : null;
+      if (!token || blocked) {
+        setPinned([]);
+        return;
+      }
       const res = await notificationsPinned();
       const list = Array.isArray(res) ? res : res?.results || [];
       setPinned(list.slice(0, 5));
@@ -55,8 +68,14 @@ export default function NotificationsBell() {
   }, []);
 
   const loadInbox = useCallback(async () => {
-    setLoading(true);
     try {
+      const blocked = typeof window !== "undefined" && window.__tk_auth_blocked;
+      const token = typeof getAccessToken === "function" ? getAccessToken() : null;
+      if (!token || blocked) {
+        setItems([]);
+        return;
+      }
+      setLoading(true);
       const res = await notificationsInbox({ page: 1, page_size: 10 });
       const list = Array.isArray(res) ? res : res?.results || [];
       setItems(list);
@@ -227,3 +246,4 @@ export default function NotificationsBell() {
     </>
   );
 }
+

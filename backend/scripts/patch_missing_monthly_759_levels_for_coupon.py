@@ -46,6 +46,10 @@ def _resolve_upline(user: CustomUser, depth: int):
 
 def main():
     out = {"ok": True, "now": timezone.now().isoformat()}
+    # POLICY: MONTHLY_759_LEVEL payouts disabled; skip any creation
+    out["note"] = "MONTHLY_759_LEVEL payouts are disabled; no level credits will be created."
+    print(json.dumps(out, default=str))
+    return
     try:
         coupon_id = int(sys.argv[1]) if len(sys.argv) > 1 else None
     except Exception:

@@ -1,4 +1,4 @@
-import { Box } from "@mui/material";
+﻿import { Box } from "@mui/material";
 import { useEffect, useState } from "react";
 
 export default function HeroCarousel({ banners = [] }) {
@@ -22,3 +22,4 @@ export default function HeroCarousel({ banners = [] }) {
     </Box>
   );
 }
+

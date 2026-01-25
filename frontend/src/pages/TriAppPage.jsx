@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -7,15 +7,24 @@ import {
   Button,
   Alert,
   CircularProgress,
+  Drawer,
+  IconButton,
+  InputAdornment,
+  Snackbar,
+  Dialog,
+  TextField,
+  Divider,
+  Stack,
 } from "@mui/material";
-import { getTriApp } from "../api/api";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import { getTriApp, getEcouponStoreBootstrap, createPromoPurchase } from "../api/api";
 import normalizeMediaUrl from "../utils/media";
 import { addProduct as addCartProduct } from "../store/cart";
 
-function Price({ value, currency = "₹" }) {
+function Price({ value, currency = "â‚¹" }) {
   const n = Number(value || 0);
   if (!isFinite(n) || n < 0) return null;
-  const sign = currency === "INR" ? "₹" : currency || "₹";
+  const sign = currency === "INR" ? "â‚¹" : currency || "â‚¹";
   return (
     <Typography sx={{ fontWeight: 800, fontSize: 14, color: "#0C2D48" }}>
       {sign}
@@ -24,6 +33,254 @@ function Price({ value, currency = "₹" }) {
   );
 }
 
+/* ======================================================================== */
+/* Payment Sheet (shared-style for Tri Holidays) */
+/* ======================================================================== */
+function PaymentSheet({ open, onClose, data, onSuccess }) {
+  const [txnId, setTxnId] = useState("");
+  const [file, setFile] = useState(null);
+  const [copied, setCopied] = useState(false);
+  const [payment, setPayment] = useState(null); // admin seeded payment config
+  const [zoomOpen, setZoomOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorOpen, setErrorOpen] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    if (open) {
+      (async () => {
+        try {
+          const boot = await getEcouponStoreBootstrap();
+          if (alive) setPayment(boot?.payment_config || null);
+        } catch {
+          if (alive) setPayment(null);
+        }
+      })();
+    }
+    return () => {
+      alive = false;
+    };
+  }, [open]);
+
+  if (!data) return null;
+
+  const summaryLines = (() => {
+    try {
+      const ui = data.uiMeta || {};
+      const lines = [];
+      if (ui.bonus150) lines.push("+ Bonus Wallet â‚¹150");
+      if (ui.primeChoice) lines.push(`Prime Choice: ${ui.primeChoice}`);
+      if (ui.selectedProductName) lines.push(`Product: ${ui.selectedProductName}`);
+      if (ui.plan) lines.push(`Plan: ${ui.plan}`);
+      if (ui.selectedSeason != null) lines.push(`Season: ${ui.selectedSeason}`);
+      if (Array.isArray(ui.selectedBoxes) && ui.selectedBoxes.length) {
+        lines.push(`Boxes: ${ui.selectedBoxes.sort((a, b) => a - b).join(", ")}`);
+      }
+      if (ui.destination) lines.push(`Destination: ${ui.destination}`);
+      if (ui.triApp) lines.push(`App: ${ui.triApp}`);
+      return lines;
+    } catch {
+      return [];
+    }
+  })();
+
+  return (
+    <>
+      <Drawer
+        anchor="bottom"
+        open={open}
+        onClose={onClose}
+        PaperProps={{
+          sx: {
+            borderTopLeftRadius: 16,
+            borderTopRightRadius: 16,
+            height: "88vh",
+            p: 2,
+          },
+        }}
+      >
+        {/* Handle bar */}
+        <Box sx={{ width: 40, height: 4, bgcolor: "divider", mx: "auto", mb: 1 }} />
+
+        <Typography fontWeight={900} fontSize={18} textAlign="center">
+          Complete Payment
+        </Typography>
+
+        {/* Summary */}
+        <Box
+          sx={{
+            p: 2,
+            mt: 2,
+            bgcolor: "grey.50",
+            borderRadius: 1.5,
+            border: "1px solid",
+            borderColor: "divider",
+          }}
+        >
+          <Typography fontWeight={700}>{data.pkg?.name || "Package"}</Typography>
+          {summaryLines.length > 0 ? (
+            <Box sx={{ mt: 0.5 }}>
+              {summaryLines.map((s, i) => (
+                <Typography key={i} fontSize={12} color="text.secondary">
+                  â€¢ {s}
+                </Typography>
+              ))}
+            </Box>
+          ) : null}
+          <Stack direction="row" justifyContent="space-between" mt={1}>
+            <Typography color="text.secondary">Total Amount</Typography>
+            <Typography fontWeight={900} fontSize={20}>
+              â‚¹{Number(data.amount || 0)}
+            </Typography>
+          </Stack>
+        </Box>
+        <Divider sx={{ my: 1.5 }} />
+
+        {/* UPI Section */}
+        <Box sx={{ p: 2, mt: 2 }}>
+          <Typography fontWeight={700} mb={1}>
+            UPI Payment
+          </Typography>
+
+          {payment?.upi_qr_image_url ? (
+            <Box
+              component="img"
+              src={normalizeMediaUrl(payment.upi_qr_image_url)}
+              alt="UPI QR"
+              sx={{
+                width: 180,
+                mx: "auto",
+                display: "block",
+                mb: 2,
+                cursor: "pointer",
+                borderRadius: 1,
+              }}
+              onClick={() => setZoomOpen(true)}
+            />
+          ) : null}
+
+          <TextField
+            label="UPI ID"
+            value={payment?.upi_id || ""}
+            fullWidth
+            onClick={() => {
+              const v = payment?.upi_id || "";
+              if (v) navigator.clipboard.writeText(v);
+              setCopied(true);
+            }}
+            InputProps={{
+              readOnly: true,
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() => {
+                      const v = payment?.upi_id || "";
+                      if (v) navigator.clipboard.writeText(v);
+                      setCopied(true);
+                    }}
+                  >
+                    <ContentCopyIcon fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+        </Box>
+
+        <Alert severity="info" sx={{ mt: 2 }}>
+          Amount is autoâ€‘calculated and locked. Pay the exact amount.
+        </Alert>
+
+        <TextField
+          label="Transaction / UTR ID"
+          fullWidth
+          required
+          sx={{ mt: 2 }}
+          value={txnId}
+          onChange={(e) => setTxnId(e.target.value)}
+        />
+
+        <Button component="label" sx={{ mt: 2 }}>
+          Upload Payment Screenshot
+          <input type="file" hidden onChange={(e) => setFile(e.target.files?.[0] || null)} />
+        </Button>
+
+        <Button
+          fullWidth
+          variant="contained"
+          sx={{ mt: 3, height: 52 }}
+          disabled={!txnId || submitting}
+          onClick={async () => {
+            setSubmitting(true);
+            setErrorMsg("");
+            try {
+              await createPromoPurchase({
+                package_id: data.pkg.id,
+                remarks: txnId,
+                file,
+                ...(data.purchasePayload || {}),
+              });
+              onClose();
+              onSuccess();
+              setTxnId("");
+              setFile(null);
+            } catch (e) {
+              const msg =
+                e?.response?.data?.detail ||
+                e?.message ||
+                "Failed to submit payment. Please try again.";
+              setErrorMsg(msg);
+              setErrorOpen(true);
+            } finally {
+              setSubmitting(false);
+            }
+          }}
+        >
+          {submitting ? "Submitting..." : "Submit Payment"}
+        </Button>
+
+        <Button fullWidth variant="text" sx={{ mt: 1 }} onClick={onClose}>
+          Cancel
+        </Button>
+      </Drawer>
+
+      <Dialog open={zoomOpen} onClose={() => setZoomOpen(false)}>
+        <Box sx={{ p: 2 }}>
+          {payment?.upi_qr_image_url ? (
+            <Box
+              component="img"
+              src={normalizeMediaUrl(payment.upi_qr_image_url)}
+              alt="UPI QR Large"
+              sx={{ width: { xs: 300, sm: 400 }, height: "auto" }}
+            />
+          ) : null}
+        </Box>
+      </Dialog>
+
+      <Snackbar
+        open={copied}
+        autoHideDuration={2000}
+        onClose={() => setCopied(false)}
+        message="UPI ID copied"
+      />
+      <Snackbar
+        open={errorOpen}
+        autoHideDuration={4000}
+        onClose={() => setErrorOpen(false)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert onClose={() => setErrorOpen(false)} severity="error" sx={{ width: "100%" }}>
+          {errorMsg || "Something went wrong. Please try again."}
+        </Alert>
+      </Snackbar>
+    </>
+  );
+}
+
+/* ======================================================================== */
+/* MAIN PAGE */
+/* ======================================================================== */
 export default function TriAppPage() {
   const { slug } = useParams();
   const navigate = useNavigate();
@@ -31,6 +288,11 @@ export default function TriAppPage() {
   const [loading, setLoading] = useState(true);
   const [app, setApp] = useState(null);
   const [error, setError] = useState("");
+
+  // Payment drawer state (Tri Holidays)
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [paymentData, setPaymentData] = useState(null);
+  const [paymentSuccessOpen, setPaymentSuccessOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -93,7 +355,7 @@ export default function TriAppPage() {
       {loading && (
         <Box sx={{ mb: 2, display: "flex", alignItems: "center", gap: 1 }}>
           <CircularProgress size={16} />
-          <Typography variant="body2">Loading…</Typography>
+          <Typography variant="body2">Loadingâ€¦</Typography>
         </Box>
       )}
 
@@ -202,43 +464,63 @@ export default function TriAppPage() {
                   Earn up to {p?.max_reward_points_percent || 0}% rewards
                 </Typography>
 
-                <Button
-                  variant="contained"
-                  size="small"
-                  fullWidth
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    try {
-                      addCartProduct({
-                        productId: p.id,
-                        name: p.name,
-                        unitPrice: Number(p.price || 0),
-                        qty: 1,
-                        shipping_address: "",
-                        image_url: p?.image_url || "",
-                        tri: true,
-                        max_reward_pct: Number(p?.max_reward_points_percent || 0),
-                        tri_app_slug: slug || "",
-                      });
-                    } catch {}
-                  }}
-                  sx={{ mt: 0.5, textTransform: "none", fontWeight: 800 }}
-                >
-                  Add to Cart
-                </Button>
+                {/* Conditional action: Tri Holidays = Buy Now (payment drawer); else Add to Cart */}
+                {String(slug) === "tri-holidays" ? (
+                  <Button
+                    variant="contained"
+                    size="small"
+                    fullWidth
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      try {
+                        setPaymentData({
+                          pkg: { id: p.id, name: p.name },
+                          amount: Number(p.price || 0),
+                          uiMeta: { triApp: slug || "tri-holidays", selectedProductName: p.name },
+                          purchasePayload: {
+                            // auxiliary fields to aid backend identification (non-breaking)
+                            product_id: p.id,
+                            tri_app_slug: slug || "",
+                            tri: true,
+                          },
+                        });
+                        setPaymentOpen(true);
+                      } catch {}
+                    }}
+                    sx={{ mt: 0.5, textTransform: "none", fontWeight: 800 }}
+                  >
+                    Buy Now
+                  </Button>
+                ) : (
+                  <Button
+                    variant="contained"
+                    size="small"
+                    fullWidth
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      try {
+                        addCartProduct({
+                          productId: p.id,
+                          name: p.name,
+                          unitPrice: Number(p.price || 0),
+                          qty: 1,
+                          shipping_address: "",
+                          image_url: p?.image_url || "",
+                          tri: true,
+                          max_reward_pct: Number(p?.max_reward_points_percent || 0),
+                          tri_app_slug: slug || "",
+                        });
+                      } catch {}
+                    }}
+                    sx={{ mt: 0.5, textTransform: "none", fontWeight: 800 }}
+                  >
+                    Add to Cart
+                  </Button>
+                )}
 
                 <Box sx={{ flexGrow: 1 }} />
-
-                {/* <Typography
-                  sx={{
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: "primary.main",
-                  }}
-                >
-                  View →
-                </Typography> */}
               </Box>
             </Paper>
           );
@@ -250,6 +532,32 @@ export default function TriAppPage() {
           No products available.
         </Alert>
       )}
+
+      {/* Payment Drawer for Tri Holidays */}
+      <PaymentSheet
+        open={paymentOpen}
+        onClose={() => setPaymentOpen(false)}
+        data={paymentData}
+        onSuccess={() => {
+          setPaymentSuccessOpen(true);
+        }}
+      />
+
+      {/* Payment success dialog */}
+      <Dialog open={paymentSuccessOpen} onClose={() => setPaymentSuccessOpen(false)}>
+        <Box sx={{ p: 3, textAlign: "center", minWidth: 280 }}>
+          <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>
+            Payment Request Submitted
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            We will review it shortly.
+          </Typography>
+          <Button variant="contained" sx={{ mt: 2 }} onClick={() => setPaymentSuccessOpen(false)}>
+            OK
+          </Button>
+        </Box>
+      </Dialog>
     </Box>
   );
 }
+

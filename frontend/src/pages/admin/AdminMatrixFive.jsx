@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import API from "../../api/api";
 
 function TextInput({ label, value, onChange, placeholder, type = "text", style }) {
@@ -54,7 +54,7 @@ function TreeNode({ node, depth = 0 }) {
   return (
     <div style={{ paddingLeft: pad, paddingTop: 6, paddingBottom: 6, borderBottom: "1px solid #f1f5f9" }}>
       <div style={{ fontWeight: 700, color: "#0f172a" }}>
-        {node.username} <span style={{ color: "#64748b", fontWeight: 500 }}>#{node.id} • {node.full_name || "—"}</span>
+        {node.username} <span style={{ color: "#64748b", fontWeight: 500 }}>#{node.id} â€¢ {node.full_name || "â€”"}</span>
       </div>
       {Array.isArray(node.children) && node.children.length > 0 ? (
         <div>
@@ -158,7 +158,7 @@ export default function AdminMatrixFive() {
         return;
       }
       const res = await API.get("/admin/matrix/tree5/", {
-        params: { root_user_id: rootId, max_depth: 6 },
+        params: { root_user_id: rootId, max_depth: 10 },
       });
       setTree(res?.data || null);
     } catch (e) {
@@ -333,16 +333,16 @@ export default function AdminMatrixFive() {
             >
               <div>{r.user_id}</div>
               <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.username}</div>
-              <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.full_name || "—"}</div>
+              <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.full_name || "â€”"}</div>
               <div>{r.pool_type}</div>
               <div>{r.level_reached ?? 0}</div>
               <div style={{ fontSize: 12, color: "#334155" }}>
-                {r.per_level_counts ? JSON.stringify(r.per_level_counts) : "—"}
+                {r.per_level_counts ? JSON.stringify(r.per_level_counts) : "â€”"}
               </div>
               <div style={{ fontSize: 12, color: "#334155" }}>
-                {r.per_level_earned ? JSON.stringify(r.per_level_earned) : "—"}
+                {r.per_level_earned ? JSON.stringify(r.per_level_earned) : "â€”"}
               </div>
-              <div>₹{Number(r.total_earned || 0).toFixed(2)}</div>
+              <div>â‚¹{Number(r.total_earned || 0).toFixed(2)}</div>
             </div>
           ))}
           {!loading && rows.length === 0 ? (
@@ -408,7 +408,7 @@ export default function AdminMatrixFive() {
                   color: "#0f172a",
                 }}
               >
-                Root: {tree.username} #{tree.id} • {tree.full_name || "—"}
+                Root: {tree.username} #{tree.id} â€¢ {tree.full_name || "â€”"}
               </div>
               <TreeNode node={tree} />
             </div>
@@ -416,9 +416,9 @@ export default function AdminMatrixFive() {
         </div>
       </div>
 
-      {/* 5‑Matrix Commission Table */}
+      {/* 5â€‘Matrix Commission Table */}
       <div style={{ marginTop: 24 }}>
-        <h3 style={{ margin: "12px 0 8px 0", color: "#0f172a" }}>5‑Matrix Commission</h3>
+        <h3 style={{ margin: "12px 0 8px 0", color: "#0f172a" }}>5â€‘Matrix Commission</h3>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
           <button
             onClick={fetchFiveTx}
@@ -482,12 +482,12 @@ export default function AdminMatrixFive() {
                 <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
                   {row.username} {row.prefixed_id ? <span style={{ color: "#64748b" }}>({row.prefixed_id})</span> : null}
                 </div>
-                <div>{row.sponsor_id || "—"}</div>
-                <div>₹{Number(row.amount || 0).toFixed(2)}</div>
-                <div>₹{Number(row.amount || 0).toFixed(2)}</div>
-                <div>₹{Number(row.net_amount || row.amount || 0).toFixed(2)}</div>
-                <div>{row.created_at || "—"}</div>
-                <div>{row.level_index != null ? row.level_index : "—"}</div>
+                <div>{row.sponsor_id || "â€”"}</div>
+                <div>â‚¹{Number(row.amount || 0).toFixed(2)}</div>
+                <div>â‚¹{Number(row.amount || 0).toFixed(2)}</div>
+                <div>â‚¹{Number(row.net_amount || row.amount || 0).toFixed(2)}</div>
+                <div>{row.created_at || "â€”"}</div>
+                <div>{row.level_index != null ? row.level_index : "â€”"}</div>
               </div>
             ))}
             {!txLoading && tx.length === 0 ? (
@@ -622,13 +622,13 @@ export default function AdminMatrixFive() {
                   {a.username} <span style={{ color: "#64748b" }}>#{a.owner_id}</span>
                 </div>
                 <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {a.parent_owner?.username ? `${a.parent_owner.username} #${a.parent_owner.id}` : "—"}
+                  {a.parent_owner?.username ? `${a.parent_owner.username} #${a.parent_owner.id}` : "â€”"}
                 </div>
-                <div>{a.level ?? "—"}</div>
-                <div>{a.position ?? "—"}</div>
-                <div>{a.source_type || "—"}</div>
-                <div>{a.source_id || "—"}</div>
-                <div>{a.created_at || "—"}</div>
+                <div>{a.level ?? "â€”"}</div>
+                <div>{a.position ?? "â€”"}</div>
+                <div>{a.source_type || "â€”"}</div>
+                <div>{a.source_id || "â€”"}</div>
+                <div>{a.created_at || "â€”"}</div>
               </div>
             ))}
             {!accLoading && accRows.length === 0 ? (
@@ -708,10 +708,10 @@ export default function AdminMatrixFive() {
           ) : (
             <div style={{ padding: 12 }}>
               <div style={{ marginBottom: 8, color: "#0f172a", fontWeight: 700 }}>
-                Total Transactions: {stats.tx_count} • Total Amount: ₹{Number(stats.total_amount || 0).toFixed(2)}
+                Total Transactions: {stats.tx_count} â€¢ Total Amount: â‚¹{Number(stats.total_amount || 0).toFixed(2)}
               </div>
               <div style={{ fontSize: 12, color: "#334155" }}>
-                {stats.per_level ? JSON.stringify(stats.per_level) : "—"}
+                {stats.per_level ? JSON.stringify(stats.per_level) : "â€”"}
               </div>
             </div>
           )}
@@ -721,3 +721,4 @@ export default function AdminMatrixFive() {
     </div>
   );
 }
+

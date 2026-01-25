@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import API from "../../api/api";
 
 // Lightweight landing page to accept ?access=&refresh= and store them
@@ -114,3 +114,4 @@ export default function ImpersonateLanding() {
     </div>
   );
 }
+

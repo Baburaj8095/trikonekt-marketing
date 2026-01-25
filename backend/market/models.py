@@ -297,12 +297,14 @@ class Shop(models.Model):
     shop_name = models.CharField(max_length=255)
     address = models.TextField(blank=True, default="")
     city = models.CharField(max_length=128, db_index=True)
+    pincode = models.CharField(max_length=10, blank=True, default="", db_index=True)
 
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, db_index=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, db_index=True)
 
     contact_number = models.CharField(max_length=20, blank=True, default="")
     shop_image = models.ImageField(upload_to='merchant/shops/', null=True, blank=True, storage=MEDIA_STORAGE)
+    tri_app = models.ForeignKey('business.TriApp', null=True, blank=True, on_delete=models.SET_NULL, related_name='shops', db_index=True)
 
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -313,6 +315,7 @@ class Shop(models.Model):
             models.Index(fields=['merchant', 'status']),
             models.Index(fields=['status', 'created_at']),
             models.Index(fields=['city']),
+            models.Index(fields=['pincode']),
         ]
 
     def __str__(self) -> str:

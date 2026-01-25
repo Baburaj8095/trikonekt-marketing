@@ -1,55 +1,43 @@
-/* eslint-disable @typescript-eslint/no-var-requires */
+﻿/* CRA dev proxy to backend Django server.
+   - Proxies all /api/* requests to http://localhost:8000/api/*
+   - Also proxies /media and /static for local asset access
+   Notes:
+   - Restart `npm start` after creating or changing this file.
+   - You can override target via REACT_APP_DEV_PROXY_TARGET.
+*/
 const { createProxyMiddleware } = require("http-proxy-middleware");
 
-/**
- * Ensure ALL /api/* and /media/* requests to the React dev server (localhost:3000)
- * are proxied to the Django backend (localhost:8000), even when the browser
- * is navigated directly to a URL like:
- *   http://localhost:3000/api/location/pincode/585101/
- *
- * This avoids CRA&#39;s default behavior of serving index.html for requests
- * that Accept: text/html (direct navigation), which would otherwise make it
- * look like the API is &#34;not working&#34;.
- */
 module.exports = function (app) {
-  // API endpoints
+  const target = process.env.REACT_APP_DEV_PROXY_TARGET || "http://localhost:8000";
+
+  // API proxy
   app.use(
     "/api",
     createProxyMiddleware({
-      target: "http://localhost:8000",
+      target,
       changeOrigin: true,
+      xfwd: true,
       secure: false,
-      // Disable WebSocket proxying unless your Django backend serves WS (channels/daphne/uvicorn).
-      // Avoids noisy [HPM] WebSocket ECONNRESET logs during backend reloads.
       ws: false,
-      logLevel: "error",
-      timeout: 300000,
-      proxyTimeout: 300000,
-      onError(err, req, res) {
-        try {
-          res.writeHead(502, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ detail: "Proxy error (backend offline or restarting)" }));
-        } catch (_) {}
+      // Keep /api prefix as-is
+      pathRewrite: {
+        "^/api": "/api",
       },
+      logLevel: "warn",
     })
   );
 
-  // Media files served by Django (useful in dev when components reference /media/*)
+  // Media (optional convenience) - DO NOT proxy /static in CRA dev; it breaks bundle.js
   app.use(
-    "/media",
+    ["/media"],
     createProxyMiddleware({
-      target: "http://localhost:8000",
+      target,
       changeOrigin: true,
+      xfwd: true,
       secure: false,
-      logLevel: "error",
-      timeout: 300000,
-      proxyTimeout: 300000,
-      onError(err, req, res) {
-        try {
-          res.writeHead(502, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ detail: "Proxy error (backend offline or restarting)" }));
-        } catch (_) {}
-      },
+      ws: false,
+      logLevel: "warn",
     })
   );
 };
+

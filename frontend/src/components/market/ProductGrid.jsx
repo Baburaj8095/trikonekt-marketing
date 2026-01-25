@@ -1,4 +1,4 @@
-import React, { memo } from "react";
+﻿import React, { memo } from "react";
 import { Grid, Paper, Typography, Box } from "@mui/material";
 import ProductCard from "./ProductCard";
 
@@ -62,3 +62,4 @@ function ProductGrid({
 }
 
 export default memo(ProductGrid);
+

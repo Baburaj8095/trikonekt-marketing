@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+﻿import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
   Box,
   Container,
@@ -87,7 +87,7 @@ function TicketList({ tickets, loading, selectedId, onSelect, onRefresh }) {
               {t.message ? (
                 <Typography variant="caption" sx={{ color: "text.secondary" }}>
                   {String(t.message).slice(0, 120)}
-                  {String(t.message).length > 120 ? "…" : ""}
+                  {String(t.message).length > 120 ? "â€¦" : ""}
                 </Typography>
               ) : null}
               <Typography variant="caption" sx={{ color: "text.disabled", display: "block" }}>
@@ -491,3 +491,4 @@ export default function Support() {
     </Container>
   );
 }
+

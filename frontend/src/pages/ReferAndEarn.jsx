@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Typography } from "@mui/material";
 import ReferAndEarn from "../components/ReferAndEarn";
 
@@ -12,3 +12,4 @@ export default function ReferAndEarnPage() {
     </Box>
   );
 }
+

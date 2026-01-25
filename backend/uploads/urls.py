@@ -4,7 +4,8 @@ from .views import (
     HomeCardList,
     HeroBannerList,
     PromotionList,
-    CategoryBannerList,
+    CategoryBannerListCreateView,
+    CategoryBannerDetailView,
     LuckyDrawSubmissionView,
     LuckyDrawHistoryTREView,
     LuckyDrawPendingTREView,
@@ -43,7 +44,8 @@ urlpatterns = [
     # New admin-driven dashboard media
     path('hero-banners/', HeroBannerList.as_view(), name='hero-banners'),
     path('promotions/', PromotionList.as_view(), name='promotions'),
-    path('category-banners/', CategoryBannerList.as_view(), name='category-banners'),
+    path('category-banners/', CategoryBannerListCreateView.as_view(), name='category-banners'),
+    path('category-banners/<int:pk>/', CategoryBannerDetailView.as_view(), name='category-banner-detail'),
     # Diagnostics (prod safe): verify storage backend and CLOUDINARY_URL usage
     path('debug/storage/', StorageInfoView.as_view(), name='storage-info'),
     path('files/', FileUploadView.as_view(), name='file-uploads'),

@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Card, CardActionArea, Box, Typography } from "@mui/material";
 import { styled, alpha } from "@mui/material/styles";
 import { Link as RouterLink } from "react-router-dom";
@@ -185,7 +185,7 @@ export default function DashboardCard({
                   lineHeight: 1.15,
                   color: "#fff",
                   textShadow: "0 1px 2px rgba(0,0,0,0.35)",
-                  // 2–3 words should fit comfortably on two lines
+                  // 2â€“3 words should fit comfortably on two lines
                   display: "-webkit-box",
                   WebkitLineClamp: 2,
                   WebkitBoxOrient: "vertical",
@@ -220,3 +220,4 @@ export default function DashboardCard({
     </StyledCard>
   );
 }
+

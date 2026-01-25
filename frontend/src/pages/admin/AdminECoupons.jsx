@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import API from "../../api/api";
 import normalizeMediaUrl from "../../utils/media";
 
@@ -267,7 +267,7 @@ export default function AdminECoupons() {
     enable_employee: false,
     is_active: true,
     max_per_order: "10",
-    display_title: "E‑Coupon",
+    display_title: "Eâ€‘Coupon",
     display_desc: "",
   });
 
@@ -288,6 +288,8 @@ export default function AdminECoupons() {
     try {
       const res = await API.get("/coupons/codes/admin-ecoupons-bootstrap/", {
         params: { page: assignPage, page_size: assignPageSize },
+        dedupe: "cancelPrevious",
+        cacheTTL: 5000,
       });
       const d = res?.data || {};
       setCoupons(Array.isArray(d.coupons) ? d.coupons : []);
@@ -390,10 +392,6 @@ export default function AdminECoupons() {
     }
   }
 
-  useEffect(() => {
-    if (!selectedBatch) return;
-    loadDashboard(false);
-  }, [selectedBatch]);
 
   useEffect(() => {
     if (!selectedBatch) return;
@@ -428,7 +426,7 @@ export default function AdminECoupons() {
     () =>
       agencies.map((u) => {
         const isSub = String(u?.category || "").toLowerCase().startsWith("agency") && String(u?.category || "").toLowerCase().includes("sub");
-        return { value: String(u.id), label: `${u.username} #${u.id}${isSub ? " [sub‑franchise]" : ""}` };
+        return { value: String(u.id), label: `${u.username} #${u.id}${isSub ? " [subâ€‘franchise]" : ""}` };
       }),
     [agencies]
   );
@@ -445,10 +443,10 @@ export default function AdminECoupons() {
           String(u?.category || "").toLowerCase().includes("sub");
         const name = String(u?.full_name || "").trim() || u.username;
         const pin = String(u?.pincode || "").trim();
-        const pinPart = pin ? ` • PIN ${pin}` : "";
+        const pinPart = pin ? ` â€¢ PIN ${pin}` : "";
         return {
           value: String(u.id),
-          label: `${name} (${u.username})${pinPart}${isSub ? " [sub‑franchise]" : ""}`,
+          label: `${name} (${u.username})${pinPart}${isSub ? " [subâ€‘franchise]" : ""}`,
         };
       }),
     [agencies]
@@ -500,7 +498,7 @@ export default function AdminECoupons() {
           const d = batchDenomCache[String(b.id)];
           return {
             value: String(b.id),
-            label: `#${b.id} ${b.prefix}${d ? ` • ₹${d}` : ""}${count ? ` (${count} codes)` : ""}`,
+            label: `#${b.id} ${b.prefix}${d ? ` â€¢ â‚¹${d}` : ""}${count ? ` (${count} codes)` : ""}`,
           };
         });
   }, [seasonBatches, batchDenomCache]);
@@ -583,7 +581,7 @@ export default function AdminECoupons() {
       await loadBootstrap();
       await preloadSeasonBatchDenoms(Number(seasonCouponId));
       await refreshSeasonAvailability(Number(seasonCouponId));
-      alert(`Created ${cnt} codes (₹${value}) for ${seasonLabel(season.number)}`);
+      alert(`Created ${cnt} codes (â‚¹${value}) for ${seasonLabel(season.number)}`);
     } catch (e) {
       const msg = e?.response?.data?.detail || "Failed to create batch";
       alert(msg);
@@ -938,7 +936,7 @@ export default function AdminECoupons() {
   async function loadPaymentConfigs() {
     setPcLoading(true);
     try {
-      const res = await API.get("/coupons/store/payment-configs/", { params: { page_size: 100 } });
+      const res = await API.get("/coupons/store/payment-configs/", { params: { page_size: 100 }, cacheTTL: 15000, dedupe: "cancelPrevious" });
       const items = res?.data?.results || res?.data || [];
       setPcItems(Array.isArray(items) ? items : []);
     } catch (_) {
@@ -988,7 +986,7 @@ export default function AdminECoupons() {
   async function loadStoreProducts() {
     setSpLoading(true);
     try {
-      const res = await API.get("/coupons/store/products/", { params: { page_size: 200 } });
+      const res = await API.get("/coupons/store/products/", { params: { page_size: 200 }, cacheTTL: 15000, dedupe: "cancelPrevious" });
       const items = res?.data?.results || res?.data || [];
       setSpItems(Array.isArray(items) ? items : []);
     } catch (_) {
@@ -1030,7 +1028,7 @@ export default function AdminECoupons() {
         ...f,
         price_per_unit: "",
         max_per_order: "10",
-        display_title: "E‑Coupon",
+        display_title: "Eâ€‘Coupon",
         display_desc: "",
       }));
     } catch (e) {
@@ -1066,7 +1064,7 @@ export default function AdminECoupons() {
           enable_employee: false,
           is_active: true,
           max_per_order: 10,
-          display_title: `E‑Coupon ₹${denom}`,
+          display_title: `Eâ€‘Coupon â‚¹${denom}`,
           display_desc: "",
         };
         try {
@@ -1106,64 +1104,13 @@ export default function AdminECoupons() {
   async function loadPendingOrders() {
     setPoLoading(true);
     try {
-      const res = await API.get("/coupons/store/orders/pending/", { params: { page_size: 50 } });
+      const res = await API.get("/coupons/store/orders/pending/", { params: { page_size: 50 }, cacheTTL: 5000, dedupe: "cancelPrevious" });
       const items = res?.data?.results || res?.data || [];
       const orders = Array.isArray(items) ? items : [];
       setPendingOrders(orders);
-      try {
-        const pairs = await Promise.all(
-          orders.map(async (o) => {
-            let couponId = null;
-            try {
-              const prodRes = await API.get(`/coupons/store/products/${o.product}/`);
-              couponId = prodRes?.data?.coupon || null;
-            } catch (_e) {}
-            let globalCount = 0;
-            let prodCount = 0;
-            try {
-              const params = {
-                issued_channel: "e_coupon",
-                status: "AVAILABLE",
-                page_size: 1,
-              };
-              const denom =
-                typeof o.denomination_snapshot !== "undefined" && o.denomination_snapshot !== null
-                  ? o.denomination_snapshot
-                  : null;
-              if (denom !== null) params.value = denom;
-              const invRes = await API.get("/coupons/codes/", { params });
-              globalCount =
-                typeof invRes?.data?.count === "number"
-                  ? invRes.data.count
-                  : Array.isArray(invRes?.data)
-                  ? invRes.data.length
-                  : 0;
-
-              if (couponId) {
-                const paramsProd = { ...params, coupon: couponId };
-                const invResProd = await API.get("/coupons/codes/", { params: paramsProd });
-                prodCount =
-                  typeof invResProd?.data?.count === "number"
-                    ? invResProd.data.count
-                    : Array.isArray(invResProd?.data)
-                    ? invResProd.data.length
-                    : 0;
-              }
-            } catch (_e2) {}
-            return [o.id, globalCount, prodCount];
-          })
-        );
-        const mapGlobal = {};
-        const mapProd = {};
-        for (const [id, g, p] of pairs) {
-          mapGlobal[id] = g;
-          mapProd[id] = p ?? 0;
-        }
-        setOrderAvail(mapGlobal);
-        setOrderProdAvail(mapProd);
-      } catch (_calcErr) {
-        setOrderAvail({});
-      }
+      // Skipping per-order inventory scans to reduce API chatter; compute on approval if needed.
+      setOrderAvail({});
+      setOrderProdAvail({});
     } catch (_) {
       setPendingOrders([]);
     } finally {
@@ -1177,77 +1124,12 @@ export default function AdminECoupons() {
     setOrderBusy((m) => ({ ...m, [id]: true }));
     try {
       const note = orderNotes[id] || "";
-
-      // Pre-check inventory for this denomination (and coupon if resolvable)
-      let couponId = null;
-      try {
-        const prodRes = await API.get(`/coupons/store/products/${order.product}/`);
-        couponId = prodRes?.data?.coupon || null;
-      } catch (_) {}
-
-      let availableGlobal = 0;
-      let availableProduct = 0;
-      let available = 0;
-      try {
-        const params = {
-          issued_channel: "e_coupon",
-          status: "AVAILABLE",
-          page_size: 1,
-        };
-        const denom =
-          typeof order.denomination_snapshot !== "undefined" && order.denomination_snapshot !== null
-            ? order.denomination_snapshot
-            : null;
-        if (denom !== null) params.value = denom;
-
-        const invResGlobal = await API.get("/coupons/codes/", { params });
-        availableGlobal =
-          typeof invResGlobal?.data?.count === "number"
-            ? invResGlobal.data.count
-            : Array.isArray(invResGlobal?.data)
-            ? invResGlobal.data.length
-            : 0;
-
-        if (couponId) {
-          const paramsProd = { ...params, coupon: couponId };
-          const invResProd = await API.get("/coupons/codes/", { params: paramsProd });
-          availableProduct =
-            typeof invResProd?.data?.count === "number"
-              ? invResProd.data.count
-              : Array.isArray(invResProd?.data)
-              ? invResProd.data.length
-              : 0;
-        }
-
-        available = Math.max(availableGlobal, availableProduct);
-      } catch (_) {}
-
-      const needed = Number(order.quantity || 0);
-      if (available < needed) {
-        const shortageGlobal = Math.max(0, needed - availableGlobal);
-        const shortageProduct = Math.max(0, needed - availableProduct);
-        const shortage = couponId ? shortageProduct : shortageGlobal;
-        try {
-          setActiveTab("inventory");
-          if (couponId) {
-            setSpForm((f) => ({ ...f, coupon_id: String(couponId) }));
-          }
-        } catch {}
-        alert(
-          `Insufficient inventory. Global denom: ${availableGlobal}, Product coupon: ${availableProduct}, Needed: ${needed}.`
-        );
-        return;
-      }
-
-      // Enough inventory, proceed with approval
       await API.post(`/coupons/store/orders/${id}/approve/`, { review_note: note });
       await loadPendingOrders();
       alert("Order approved and codes allocated.");
     } catch (e) {
-      const status = e?.response?.status;
-      const data = e?.response?.data || {};
-      const msg = data?.detail || "Approval failed";
-      alert(msg);
+      const msg = e?.response?.data?.detail || e?.message || "Approval failed";
+      alert(String(msg));
     } finally {
       setOrderBusy((m) => ({ ...m, [id]: false }));
     }
@@ -1281,9 +1163,9 @@ export default function AdminECoupons() {
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: 0, color: "#0f172a" }}>E‑Coupons</h2>
+        <h2 style={{ margin: 0, color: "#0f172a" }}>Eâ€‘Coupons</h2>
         <div style={{ color: "#64748b", fontSize: 13 }}>
-          Season-first creation. Create Season batches (₹150/₹759), assign by count to agencies/employees, manage store and view metrics.
+          Season-first creation. Create Season batches (â‚¹150/â‚¹759), assign by count to agencies/employees, manage store and view metrics.
         </div>
       </div>
 
@@ -1482,7 +1364,7 @@ export default function AdminECoupons() {
               gap: 10,
             }}
           >
-            <div style={{ fontWeight: 700, color: "#0f172a" }}>₹150</div>
+            <div style={{ fontWeight: 700, color: "#0f172a" }}>â‚¹150</div>
             <TextInput
               label="Count"
               type="number"
@@ -1524,7 +1406,7 @@ export default function AdminECoupons() {
               gap: 10,
             }}
           >
-            <div style={{ fontWeight: 700, color: "#0f172a" }}>₹759</div>
+            <div style={{ fontWeight: 700, color: "#0f172a" }}>â‚¹759</div>
             <TextInput
               label="Count"
               type="number"
@@ -1597,8 +1479,8 @@ export default function AdminECoupons() {
               setSeasonAssign((s) => ({ ...s, denom: v, batchId: "" }));
             }}
             options={[
-              { value: "150", label: "₹150" },
-              { value: "759", label: "₹759" },
+              { value: "150", label: "â‚¹150" },
+              { value: "759", label: "â‚¹759" },
             ]}
           />
           <Select
@@ -1626,7 +1508,7 @@ export default function AdminECoupons() {
               }))
             }
             options={[
-              { value: "agency", label: "Agency / Sub‑franchise" },
+              { value: "agency", label: "Agency / Subâ€‘franchise" },
               { value: "employee", label: "Employee (Admin direct)" },
             ]}
           />
@@ -1661,11 +1543,11 @@ export default function AdminECoupons() {
           />
         </div>
         <div style={{ display: "flex", gap: 12, marginTop: 10, flexWrap: "wrap", color: "#64748b", fontSize: 12 }}>
-          <div>Season Available ₹150: {seasonAvail["150"]}</div>
-          <div>Season Available ₹759: {seasonAvail["759"]}</div>
+          <div>Season Available â‚¹150: {seasonAvail["150"]}</div>
+          <div>Season Available â‚¹759: {seasonAvail["759"]}</div>
           {seasonAssign.batchId ? (
             <div>
-              Batch Available: {batchAvail[String(seasonAssign.batchId)] ?? "…"}
+              Batch Available: {batchAvail[String(seasonAssign.batchId)] ?? "â€¦"}
             </div>
           ) : null}
         </div>
@@ -1683,8 +1565,8 @@ export default function AdminECoupons() {
               onChange={(v) => setSeasonKpi((k) => ({ ...k, denom: v }))}
               options={[
                 { value: "all", label: "All" },
-                { value: "150", label: "₹150" },
-                { value: "759", label: "₹759" },
+                { value: "150", label: "â‚¹150" },
+                { value: "759", label: "â‚¹759" },
               ]}
             />
             <button
@@ -1763,8 +1645,8 @@ export default function AdminECoupons() {
             onChange={(v) => setAgencyHist((s) => ({ ...s, denom: v }))}
             options={[
               { value: "all", label: "All" },
-              { value: "150", label: "₹150" },
-              { value: "759", label: "₹759" },
+              { value: "150", label: "â‚¹150" },
+              { value: "759", label: "â‚¹759" },
             ]}
           />
           <TextInput
@@ -1796,8 +1678,8 @@ export default function AdminECoupons() {
           <MetricCard label="Redeemed" value={agencyHist.snapshot.redeemed} />
           <MetricCard label="Revoked" value={agencyHist.snapshot.revoked} />
           <MetricCard label="Total (Season)" value={agencyHist.snapshot.total} />
-          <MetricCard label="Total ₹150" value={agencyHist.snapshot.byDenom["150"]} />
-          <MetricCard label="Total ₹759" value={agencyHist.snapshot.byDenom["759"]} />
+          <MetricCard label="Total â‚¹150" value={agencyHist.snapshot.byDenom["150"]} />
+          <MetricCard label="Total â‚¹759" value={agencyHist.snapshot.byDenom["759"]} />
         </div>
 
         <div style={{ marginTop: 12, border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden", background: "#fff" }}>
@@ -1835,12 +1717,12 @@ export default function AdminECoupons() {
                     borderBottom: "1px solid #e2e8f0",
                   }}
                 >
-                  <div>₹{r.denom || "—"}</div>
-                  <div>{r.batch_display || "—"}</div>
-                  <div>{r.count ?? "—"}</div>
-                  <div style={{ textTransform: "capitalize" }}>{r.role || "—"}</div>
-                  <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.assigned_by || "—"}</div>
-                  <div>{r.assigned_at ? new Date(r.assigned_at).toLocaleString() : "—"}</div>
+                  <div>â‚¹{r.denom || "â€”"}</div>
+                  <div>{r.batch_display || "â€”"}</div>
+                  <div>{r.count ?? "â€”"}</div>
+                  <div style={{ textTransform: "capitalize" }}>{r.role || "â€”"}</div>
+                  <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.assigned_by || "â€”"}</div>
+                  <div>{r.assigned_at ? new Date(r.assigned_at).toLocaleString() : "â€”"}</div>
                 </div>
               ))}
               {!agencyHist.loading && (!agencyHist.rows || agencyHist.rows.length === 0) ? (
@@ -2013,7 +1895,7 @@ export default function AdminECoupons() {
             label="Display Title"
             value={spForm.display_title}
             onChange={(v) => setSpForm((f) => ({ ...f, display_title: v }))}
-            placeholder="e.g., E‑Coupon ₹150"
+            placeholder="e.g., Eâ€‘Coupon â‚¹150"
           />
           <TextInput
             label="Display Description"
@@ -2128,12 +2010,12 @@ export default function AdminECoupons() {
                     >
                       <div>#{o.id}</div>
                       <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {o.buyer_username || o.buyer || "—"}
+                        {o.buyer_username || o.buyer || "â€”"}
                       </div>
-                      <div>{o.role_at_purchase || "—"}</div>
+                      <div>{o.role_at_purchase || "â€”"}</div>
                       <div>{o.quantity || 0}</div>
-                      <div>₹{o.amount_total || 0}</div>
-                      <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{o.product_title || "—"}</div>
+                      <div>â‚¹{o.amount_total || 0}</div>
+                      <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{o.product_title || "â€”"}</div>
                       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                         <input
                           style={{ padding: 8, border: "1px solid #e2e8f0", borderRadius: 8, minWidth: 160 }}
@@ -2307,12 +2189,12 @@ export default function AdminECoupons() {
                       borderBottom: "1px solid #e2e8f0",
                     }}
                   >
-                    <div style={{ textTransform: "capitalize" }}>{role || "—"}</div>
-                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{assignee || "—"}</div>
+                    <div style={{ textTransform: "capitalize" }}>{role || "â€”"}</div>
+                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{assignee || "â€”"}</div>
                     <div>{info}</div>
-                    <div>{count ?? "—"}</div>
-                    <div>{batch || "—"}</div>
-                    <div>{at ? new Date(at).toLocaleString() : "—"}</div>
+                    <div>{count ?? "â€”"}</div>
+                    <div>{batch || "â€”"}</div>
+                    <div>{at ? new Date(at).toLocaleString() : "â€”"}</div>
                   </div>
                 );
               })}
@@ -2326,3 +2208,4 @@ export default function AdminECoupons() {
     </div>
   );
 }
+

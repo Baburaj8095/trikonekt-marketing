@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Container,
@@ -294,8 +294,8 @@ export default function AdminSupport() {
                 <StatusChip status={t.status} />
               </Stack>
               <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
-                {t.username ? `${t.username}${t.phone ? ` • ${t.phone}` : ""}` : ""}
-                {t.pincode ? ` • ${t.pincode}` : ""} {t.state_name ? ` • ${t.state_name}` : ""}
+                {t.username ? `${t.username}${t.phone ? ` â€¢ ${t.phone}` : ""}` : ""}
+                {t.pincode ? ` â€¢ ${t.pincode}` : ""} {t.state_name ? ` â€¢ ${t.state_name}` : ""}
               </Typography>
               <Typography variant="caption" sx={{ color: "text.disabled", display: "block" }}>
                 Updated: {t.updated_at ? new Date(t.updated_at).toLocaleString() : "-"}
@@ -350,12 +350,12 @@ export default function AdminSupport() {
 
         {/* Meta */}
         <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-          User: {detail.username} {detail.full_name ? `(${detail.full_name})` : ""} {detail.phone ? `• ${detail.phone}` : ""}
-          {detail.pincode ? ` • ${detail.pincode}` : ""} {detail.state_name ? ` • ${detail.state_name}` : ""}
+          User: {detail.username} {detail.full_name ? `(${detail.full_name})` : ""} {detail.phone ? `â€¢ ${detail.phone}` : ""}
+          {detail.pincode ? ` â€¢ ${detail.pincode}` : ""} {detail.state_name ? ` â€¢ ${detail.state_name}` : ""}
         </Typography>
         <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-          Assignee: {detail.admin_assignee_username ? detail.admin_assignee_username : "Unassigned"} • Created:{" "}
-          {detail.created_at ? new Date(detail.created_at).toLocaleString() : "-"} • Updated:{" "}
+          Assignee: {detail.admin_assignee_username ? detail.admin_assignee_username : "Unassigned"} â€¢ Created:{" "}
+          {detail.created_at ? new Date(detail.created_at).toLocaleString() : "-"} â€¢ Updated:{" "}
           {detail.updated_at ? new Date(detail.updated_at).toLocaleString() : "-"}
         </Typography>
 
@@ -390,7 +390,7 @@ export default function AdminSupport() {
               }}
             >
               <MenuItem value="">
-                <em>Select…</em>
+                <em>Selectâ€¦</em>
               </MenuItem>
               {STATUS_OPTIONS.map((s) => (
                 <MenuItem key={s.value} value={s.value}>
@@ -446,7 +446,7 @@ export default function AdminSupport() {
                 >
                   <Stack direction="row" alignItems="baseline" spacing={1}>
                     <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                      {m.author_username || "—"}
+                      {m.author_username || "â€”"}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                       {m.created_at ? new Date(m.created_at).toLocaleString() : ""}
@@ -466,7 +466,7 @@ export default function AdminSupport() {
           <TextField
             fullWidth
             size="small"
-            placeholder="Type an admin reply…"
+            placeholder="Type an admin replyâ€¦"
             value={reply}
             onChange={(e) => setReply(e.target.value)}
             onKeyDown={(e) => {
@@ -508,3 +508,4 @@ export default function AdminSupport() {
     </Container>
   );
 }
+

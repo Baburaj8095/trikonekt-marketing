@@ -1,11 +1,21 @@
-import React from "react";
+﻿import React from "react";
 import API from "../../../api/api";
 
 export default function AgencyPackageCardsPanel({ open, onClose, agencyId, username }) {
+  // Assigned package cards for this agency (assignments)
   const [cards, setCards] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
 
+  // Catalog of eligible packages for this agency (admin override)
+  const [catalog, setCatalog] = React.useState([]);
+  const [catLoading, setCatLoading] = React.useState(false);
+  const [catError, setCatError] = React.useState("");
+
+  // Assign in-flight
+  const [assigningId, setAssigningId] = React.useState(null);
+
+  // Payment modal state
   const [payOpen, setPayOpen] = React.useState(false);
   const [payForm, setPayForm] = React.useState({ assignmentId: null, amount: "", reference: "", notes: "", title: "" });
   const [payErr, setPayErr] = React.useState("");
@@ -17,29 +27,72 @@ export default function AgencyPackageCardsPanel({ open, onClose, agencyId, usern
     return "linear-gradient(135deg, #10b981 0%, #059669 100%)";
   };
 
+  const loadCatalog = React.useCallback(async () => {
+    if (!open || !agencyId) return;
+    try {
+      setCatLoading(true);
+      setCatError("");
+      const res = await API.get("/business/agency-packages/catalog/", {
+        params: { agency_id: agencyId },
+        retryAttempts: 1,
+        cacheTTL: 5000,
+      });
+      const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
+      setCatalog(arr || []);
+    } catch (e) {
+      const msg =
+        e?.response?.data?.detail ||
+        (typeof e?.response?.data === "string" ? e.response.data : "") ||
+        e?.message ||
+        "Failed to load catalog.";
+      setCatError(String(msg));
+      setCatalog([]);
+    } finally {
+      setCatLoading(false);
+    }
+  }, [open, agencyId]);
+
   const loadCards = React.useCallback(async () => {
     if (!open || !agencyId) return;
     try {
       setLoading(true);
       setError("");
-      const res = await API.get("/business/agency-packages/", { params: { agency_id: agencyId }, retryAttempts: 1 });
+      const res = await API.get("/business/agency-packages/", {
+        params: { agency_id: agencyId },
+        retryAttempts: 1,
+      });
       const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
       setCards(arr || []);
+      // If no assignments yet, also fetch catalog so admin can assign directly
+      if (!arr || arr.length === 0) {
+        await loadCatalog();
+      }
     } catch (e) {
       const msg =
         e?.response?.data?.detail ||
         (typeof e?.response?.data === "string" ? e.response.data : "") ||
         e?.message ||
         "Failed to load packages.";
-      setError(msg);
+      setError(String(msg));
       setCards([]);
+      // Try loading catalog even if assignments failed (best effort)
+      try {
+        await loadCatalog();
+      } catch (_) {}
     } finally {
       setLoading(false);
     }
-  }, [open, agencyId]);
+  }, [open, agencyId, loadCatalog]);
 
   React.useEffect(() => {
-    if (open) loadCards();
+    if (open) {
+      // Reset any stale state when opening for a different user
+      setError("");
+      setCatError("");
+      setCards([]);
+      setCatalog([]);
+      loadCards();
+    }
   }, [open, agencyId, loadCards]);
 
   const openPay = (assignmentId, title) => {
@@ -63,13 +116,42 @@ export default function AgencyPackageCardsPanel({ open, onClose, agencyId, usern
       });
       setPayOpen(false);
       await loadCards();
+      // Optional: toast/alert
+      try {
+        window.alert("Payment recorded.");
+      } catch {}
     } catch (e) {
       const data = e?.response?.data;
       const msg =
         (data && typeof data === "object" && Object.entries(data).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`).join("; ")) ||
         e?.message ||
         "Failed to add payment.";
-      setPayErr(msg);
+      setPayErr(String(msg));
+    }
+  };
+
+  const assignPackage = async (pkgId) => {
+    if (!agencyId || !pkgId) return;
+    try {
+      setAssigningId(pkgId);
+      await API.post("/business/admin/agency-packages/assign/", {
+        agency_id: agencyId,
+        package_id: pkgId,
+      });
+      // After assignment, reload cards; they should now appear and replace the catalog view
+      await loadCards();
+      try {
+        window.alert("Package assigned.");
+      } catch {}
+    } catch (e) {
+      const msg =
+        e?.response?.data?.detail ||
+        (typeof e?.response?.data === "string" ? e.response.data : "") ||
+        e?.message ||
+        "Failed to assign package.";
+      setCatError(String(msg));
+    } finally {
+      setAssigningId(null);
     }
   };
 
@@ -124,7 +206,7 @@ export default function AgencyPackageCardsPanel({ open, onClose, agencyId, usern
           }}
         >
           <div style={{ fontWeight: 900, color: "#0f172a" }}>
-            Packages — {username ? `${username}` : ""}{agencyId ? ` (#${agencyId})` : ""}
+            Packages â€” {username ? `${username}` : ""}{agencyId ? ` (#${agencyId})` : ""}
           </div>
           <button
             onClick={onClose}
@@ -144,13 +226,12 @@ export default function AgencyPackageCardsPanel({ open, onClose, agencyId, usern
 
         {/* Body */}
         <div style={{ padding: 12, overflow: "auto", flex: 1 }}>
+          {/* Assigned package cards (if any) */}
           {loading ? (
             <div style={{ color: "#64748b" }}>Loading packages...</div>
           ) : error ? (
             <div style={{ color: "#dc2626" }}>{error}</div>
-          ) : (cards || []).length === 0 ? (
-            <div style={{ color: "#64748b" }}>No package assigned for this agency.</div>
-          ) : (
+          ) : (cards || []).length > 0 ? (
             <div
               style={{
                 display: "grid",
@@ -164,7 +245,7 @@ export default function AgencyPackageCardsPanel({ open, onClose, agencyId, usern
                 const bg = statusBg(st);
                 const color = inactive ? "#fff" : "#0f172a";
                 const title = p?.package?.name || p?.package?.code || "Package";
-                const mark = inactive ? "✗" : "✓";
+                const mark = inactive ? "âœ—" : "âœ“";
                 const stText = inactive ? "Inactive" : st === "partial" ? "Partial" : "Active";
                 return (
                   <div
@@ -195,20 +276,20 @@ export default function AgencyPackageCardsPanel({ open, onClose, agencyId, usern
                     >
                       <div style={{ padding: 8, borderRadius: 8, background: "rgba(255,255,255,0.15)" }}>
                         <div style={{ fontSize: 12, opacity: 0.9, color: inactive ? "#f1f5f9" : "#0f172a" }}>Amount</div>
-                        <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a" }}>₹{p.total_amount || "0.00"}</div>
+                        <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a" }}>â‚¹{p.total_amount || "0.00"}</div>
                       </div>
                       <div style={{ padding: 8, borderRadius: 8, background: "rgba(255,255,255,0.15)" }}>
                         <div style={{ fontSize: 12, opacity: 0.9, color: inactive ? "#f1f5f9" : "#0f172a" }}>Paid</div>
-                        <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a" }}>₹{p.paid_amount || "0.00"}</div>
+                        <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a" }}>â‚¹{p.paid_amount || "0.00"}</div>
                       </div>
                       <div style={{ padding: 8, borderRadius: 8, background: "rgba(255,255,255,0.15)" }}>
                         <div style={{ fontSize: 12, opacity: 0.9, color: inactive ? "#f1f5f9" : "#0f172a" }}>Remaining</div>
-                        <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a" }}>₹{p.remaining_amount || "0.00"}</div>
+                        <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a" }}>â‚¹{p.remaining_amount || "0.00"}</div>
                       </div>
                     </div>
                     <div style={{ marginTop: 6, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                       <div style={{ fontSize: 12, fontWeight: 700 }}>
-                        Renewal: {typeof p.months_remaining === "number" ? `${p.months_remaining} month${p.months_remaining === 1 ? "" : "s"} remaining` : "—"}
+                        Renewal: {typeof p.months_remaining === "number" ? `${p.months_remaining} month${p.months_remaining === 1 ? "" : "s"} remaining` : "â€”"}
                       </div>
                       <button
                         onClick={() => openPay(p.id, title)}
@@ -229,6 +310,73 @@ export default function AgencyPackageCardsPanel({ open, onClose, agencyId, usern
                   </div>
                 );
               })}
+            </div>
+          ) : (
+            // No assignments â€” show catalog so admin can assign directly
+            <div>
+              <div style={{ marginBottom: 8, color: "#64748b" }}>No package assigned for this agency.</div>
+              {catLoading ? (
+                <div style={{ color: "#64748b" }}>Loading eligible packagesâ€¦</div>
+              ) : catError ? (
+                <div style={{ color: "#dc2626" }}>{catError}</div>
+              ) : (catalog || []).length === 0 ? (
+                <div style={{ color: "#64748b" }}>No eligible packages found for this agency's category.</div>
+              ) : (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                    gap: 10,
+                  }}
+                >
+                  {(catalog || []).map((c) => {
+                    const assigned = !!c.assigned;
+                    const amt = c.amount ? `â‚¹${c.amount}` : "â€”";
+                    return (
+                      <div
+                        key={c.id}
+                        style={{
+                          padding: 10,
+                          borderRadius: 10,
+                          background: "#f8fafc",
+                          color: "#0f172a",
+                          boxShadow: "0 6px 14px rgba(0,0,0,0.06)",
+                          border: "1px solid #e2e8f0",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 6,
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                          <div style={{ fontWeight: 900 }}>{c.name || c.code || `#${c.id}`}</div>
+                          <div style={{ fontSize: 12, fontWeight: 800, color: "#0f172a" }}>{amt}</div>
+                        </div>
+                        {c.description ? (
+                          <div style={{ fontSize: 12, color: "#334155" }}>{c.description}</div>
+                        ) : null}
+                        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
+                          <button
+                            onClick={() => assignPackage(c.id)}
+                            disabled={assigned || assigningId === c.id}
+                            style={{
+                              padding: "6px 10px",
+                              borderRadius: 8,
+                              border: "1px solid #0284c7",
+                              background: assigned ? "#94a3b8" : "#0ea5e9",
+                              color: "#fff",
+                              fontWeight: 800,
+                              cursor: assigned || assigningId === c.id ? "not-allowed" : "pointer",
+                            }}
+                            title={assigned ? "Already assigned" : "Assign this package to the agency"}
+                          >
+                            {assigned ? "Assigned" : assigningId === c.id ? "Assigningâ€¦" : "Assign"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -300,7 +448,7 @@ export default function AgencyPackageCardsPanel({ open, onClose, agencyId, usern
             }}
           >
             <div style={{ fontWeight: 900, color: "#0f172a", marginBottom: 8 }}>
-              Add Payment — {payForm.title || ""}
+              Add Payment â€” {payForm.title || ""}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -359,3 +507,4 @@ export default function AgencyPackageCardsPanel({ open, onClose, agencyId, usern
     </div>
   );
 }
+

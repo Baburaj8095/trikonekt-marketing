@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Trikonekt Motion System
  * ======================
  * Design principles:
@@ -144,10 +144,11 @@ export const viewportOnce = {
 /**
  * RULES (DO NOT IGNORE)
  * --------------------
- * ✔ Animate sections, cards, CTAs
- * ✖ Do NOT animate header, footer, background
- * ✖ Do NOT use bounce / spring
- * ✖ Do NOT animate everything
+ * âœ” Animate sections, cards, CTAs
+ * âœ– Do NOT animate header, footer, background
+ * âœ– Do NOT use bounce / spring
+ * âœ– Do NOT animate everything
  *
  * This is a business platform, not a gaming app.
  */
+

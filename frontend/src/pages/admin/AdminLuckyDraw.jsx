@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import API from "../../api/api";
 
 function TextInput({ label, value, onChange, placeholder, style }) {
@@ -234,7 +234,7 @@ export default function AdminLuckyDraw() {
     }
   }
 
-  // Seasons (Coupon masters) – code/title/campaign starting with "season"
+  // Seasons (Coupon masters) â€“ code/title/campaign starting with "season"
   async function fetchSeasons(q = "") {
     try {
       setSeasonsLoading(true);
@@ -340,7 +340,7 @@ export default function AdminLuckyDraw() {
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ margin: 0, color: "#0f172a" }}>Spin-based Lucky Draws</h2>
         <div style={{ color: "#64748b", fontSize: 13 }}>
-          Configure a spin window (start/end). Mark 1–10 usernames as winners, then Lock. Users can spin during the live window; only marked users will win.
+          Configure a spin window (start/end). Mark 1â€“10 usernames as winners, then Lock. Users can spin during the live window; only marked users will win.
         </div>
       </div>
 
@@ -422,7 +422,7 @@ export default function AdminLuckyDraw() {
                 <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
                   <div style={{ fontWeight: 700, color: "#0f172a" }}>{d.title || `#${d.id}`}</div>
                   <div style={{ fontSize: 12, color: "#475569" }}>
-                    Window: {humanDate(d.start_at)} — {humanDate(d.end_at)}
+                    Window: {humanDate(d.start_at)} â€” {humanDate(d.end_at)}
                   </div>
                   <div>
                     <span
@@ -435,7 +435,7 @@ export default function AdminLuckyDraw() {
                         border: d.status === "LIVE" ? "1px solid #10b98130" : "1px solid #e2e8f0",
                       }}
                     >
-                      {d.status || "DRAFT"} {d.locked ? " • LOCKED" : ""}
+                      {d.status || "DRAFT"} {d.locked ? " â€¢ LOCKED" : ""}
                     </span>
                   </div>
                   <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
@@ -471,8 +471,8 @@ export default function AdminLuckyDraw() {
                       {d.winners.map((w) => (
                         <div key={w.id} style={{ border: "1px solid #e2e8f0", borderRadius: 6, padding: 8 }}>
                           <div style={{ fontWeight: 600 }}>{w.username || `User #${w.user}`}</div>
-                          <div style={{ fontSize: 12, color: "#475569" }}>{w.prize_title || "—"}</div>
-                          <div style={{ fontSize: 12, color: "#64748b" }}>{w.prize_type}{w.prize_value ? ` • ₹${w.prize_value}` : ""}</div>
+                          <div style={{ fontSize: 12, color: "#475569" }}>{w.prize_title || "â€”"}</div>
+                          <div style={{ fontSize: 12, color: "#64748b" }}>{w.prize_type}{w.prize_value ? ` â€¢ â‚¹${w.prize_value}` : ""}</div>
                           <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
                             <button
                               onClick={() => removeWinner(w.id)}
@@ -500,7 +500,7 @@ export default function AdminLuckyDraw() {
                     label="Prize Title"
                     value={winForm.prize_title}
                     onChange={(v) => setWinForm((f) => ({ ...f, prize_title: v }))}
-                    placeholder="e.g., ₹100 Wallet Credit"
+                    placeholder="e.g., â‚¹100 Wallet Credit"
                   />
                   <TextInput
                     label="Prize Description"
@@ -552,7 +552,7 @@ export default function AdminLuckyDraw() {
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ margin: 0, color: "#0f172a" }}>Season Eligibility (Spin & Win)</h2>
         <div style={{ color: "#64748b", fontSize: 13 }}>
-          List of users eligible to participate in the Lucky Draw for a Season (Coupon master). Users are eligible when they have first-time purchases of both ₹150 and ₹759 within a Season.
+          List of users eligible to participate in the Lucky Draw for a Season (Coupon master). Users are eligible when they have first-time purchases of both â‚¹150 and â‚¹759 within a Season.
         </div>
       </div>
 
@@ -589,7 +589,7 @@ export default function AdminLuckyDraw() {
                 checked={!!eligFilters.eligible_only}
                 onChange={(e) => setEligFilters((f) => ({ ...f, eligible_only: !!e.target.checked }))}
               />
-              <span style={{ fontSize: 13, color: "#334155" }}>Show only users who have both ₹150 and ₹759</span>
+              <span style={{ fontSize: 13, color: "#334155" }}>Show only users who have both â‚¹150 and â‚¹759</span>
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "flex-end" }}>
@@ -634,11 +634,11 @@ export default function AdminLuckyDraw() {
             <div>User</div>
             <div>Phone</div>
             <div>Pincode</div>
-            <div>₹150</div>
-            <div>₹759</div>
+            <div>â‚¹150</div>
+            <div>â‚¹759</div>
             <div>Eligible</div>
-            <div>First ₹150 At</div>
-            <div>First ₹759 At</div>
+            <div>First â‚¹150 At</div>
+            <div>First â‚¹759 At</div>
           </div>
           <div>
             {eligLoading ? (
@@ -662,8 +662,8 @@ export default function AdminLuckyDraw() {
                   <div title={u.username || ""} style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
                     {u.username || `User #${u.user_id}`}
                   </div>
-                  <div>{u.phone || "—"}</div>
-                  <div>{u.pincode || "—"}</div>
+                  <div>{u.phone || "â€”"}</div>
+                  <div>{u.pincode || "â€”"}</div>
                   <div>{u.has_150 ? "Yes" : "No"}</div>
                   <div>{u.has_759 ? "Yes" : "No"}</div>
                   <div>
@@ -808,10 +808,10 @@ export default function AdminLuckyDraw() {
               >
                 <div>#{r.id}</div>
                 <div title={r.username || ""} style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {r.username || "—"}
+                  {r.username || "â€”"}
                 </div>
-                <div>{r.phone || "—"}</div>
-                <div>{r.pincode || "—"}</div>
+                <div>{r.phone || "â€”"}</div>
+                <div>{r.pincode || "â€”"}</div>
                 <div>
                   <span
                     style={{
@@ -838,13 +838,13 @@ export default function AdminLuckyDraw() {
                           : "1px solid #e2e8f0",
                     }}
                   >
-                    {r.status || "—"}
+                    {r.status || "â€”"}
                   </span>
                 </div>
-                <div>{r.sl_number || "—"}</div>
-                <div>{r.ledger_number || "—"}</div>
+                <div>{r.sl_number || "â€”"}</div>
+                <div>{r.ledger_number || "â€”"}</div>
                 <div title={r.agency_name || ""} style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {r.agency_name || "—"}
+                  {r.agency_name || "â€”"}
                 </div>
                 <div>{humanDate(r.created_at)}</div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -888,3 +888,4 @@ export default function AdminLuckyDraw() {
     </div>
   );
 }
+

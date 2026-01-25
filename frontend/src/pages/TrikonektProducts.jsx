@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import {
   Box,
   Container,
@@ -58,6 +58,15 @@ export default function TrikonektProducts() {
   const [promoItems, setPromoItems] = useState([]);
   const [loadingPromo, setLoadingPromo] = useState(false);
   const [addressDlg, setAddressDlg] = useState({ open: false, pkgId: null, product: null, address: "" });
+  // Optional category filter via ?category=slug
+  const [category, setCategory] = useState("");
+  useEffect(() => {
+    try {
+      const qs = new URLSearchParams(location.search || "");
+      const c = (qs.get("category") || "").trim();
+      setCategory(c);
+    } catch {}
+  }, [location.search]);
 
 
 
@@ -67,6 +76,7 @@ export default function TrikonektProducts() {
       setLoading(true);
       const params = {};
       if (sort) params.sort = sort;
+      if (category) params.category = category;
       const res = await API.get("/products", { params: { ...params, _: Date.now() } });
       const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
       setRows(arr);
@@ -125,7 +135,7 @@ export default function TrikonektProducts() {
   // Apply sorting automatically when changed
   useEffect(() => {
     fetchProducts();
-  }, [sort]);
+  }, [sort, category]);
 
   // Disabled auto-refresh on window focus to prevent reload when returning from new tab
   useEffect(() => {
@@ -153,12 +163,18 @@ export default function TrikonektProducts() {
   // Derived filtered list (client-side search)
   const filteredRows = React.useMemo(() => {
     const q = (search || "").trim().toLowerCase();
-    if (!q) return rows || [];
+    if (!q && !category) return rows || [];
     return (rows || []).filter((p) => {
       const hay = `${p?.name || ""} ${p?.category || ""} ${p?.city || ""} ${p?.state || ""}`.toLowerCase();
-      return hay.includes(q);
+      const matchesSearch = q ? hay.includes(q) : true;
+      if (!matchesSearch) return false;
+      if (category) {
+        const cat = String(p?.category || "").toLowerCase().trim();
+        if (cat !== category.toLowerCase()) return false;
+      }
+      return true;
     });
-  }, [rows, search]);
+  }, [rows, search, category]);
 
   // Add physical product to centralized cart (uses discount price if available)
   const handleAddToCart = (product) => {
@@ -182,6 +198,15 @@ export default function TrikonektProducts() {
     } catch {
       setSnack({ open: true, type: "error", msg: "Failed to add to cart." });
     }
+  };
+
+  const clearCategory = () => {
+    try {
+      const qs = new URLSearchParams(location.search || "");
+      qs.delete("category");
+      const query = qs.toString();
+      navigate(`${basePath}${query ? `?${query}` : ""}`);
+    } catch {}
   };
 
   const handleGoCheckout = () => {
@@ -273,6 +298,19 @@ export default function TrikonektProducts() {
                 border: `1px solid ${colors.primary}`,
               }}
             />
+            {category ? (
+              <Chip
+                size="small"
+                label={`Category: ${category}`}
+                onDelete={clearCategory}
+                sx={{
+                  fontWeight: 700,
+                  bgcolor: colors.white,
+                  color: colors.textPrimary,
+                  border: `1px solid ${colors.primary}`,
+                }}
+              />
+            ) : null}
           </Stack>
           <Box flex={{ md: 1 }} />
           <Stack direction="row" spacing={1}>
@@ -488,3 +526,4 @@ export default function TrikonektProducts() {
     </Container>
   );
 }
+

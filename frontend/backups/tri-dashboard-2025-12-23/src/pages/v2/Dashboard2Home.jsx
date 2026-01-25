@@ -14,7 +14,7 @@ import ConfirmationNumberRoundedIcon from "@mui/icons-material/ConfirmationNumbe
 import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
 
 // Assets for TRI Products posters (reuse existing images)
-import LOGO from "../../assets/TRIKONEKT.png";
+import LOGO from "../../assets/TRIKONEKT.jpeg";
 import banner_wg from "../../assets/Wealth_Galaxy.jpg";
 import imgGiftCards from "../../assets/gifts.jpg";
 import imgEcommerce from "../../assets/asst_1.png";

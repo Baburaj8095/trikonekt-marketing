@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Typography } from "@mui/material";
 import colors from "./theme/colors";
 import V2Card from "./components/V2Card";
@@ -24,3 +24,4 @@ export default function V2PageContainer({ title, children, flush = false, action
     </Box>
   );
 }
+

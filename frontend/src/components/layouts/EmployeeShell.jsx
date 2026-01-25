@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+﻿import React, { useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import ShellBase from "./ShellBase";
 
@@ -39,7 +39,7 @@ export default function EmployeeShell({ children }) {
     { to: "/employee/dashboard?tab=my_team", label: "Genealogy", icon: "tree" },
     { to: "/employee/dashboard?tab=refer_earn", label: "Refer & Earn", icon: "upload" },
     { to: "/employee/dashboard?tab=rewards", label: "Rewards", icon: "chart" },
-    { to: "/employee/dashboard?tab=e_coupons", label: "My E‑Coupons", icon: "ticket" },
+    { to: "/employee/dashboard?tab=e_coupons", label: "My Eâ€‘Coupons", icon: "ticket" },
     { to: "/employee/e-coupon-store", label: "E-Coupon Store", icon: "box" },
     { to: "/employee/cart", label: "Cart", icon: "orders" },
     { to: "/employee/trikonekt-products", label: "Trikonekt Products", icon: "box" },
@@ -86,3 +86,4 @@ export default function EmployeeShell({ children }) {
     </ShellBase>
   );
 }
+

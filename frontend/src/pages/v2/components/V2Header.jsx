@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import {
   Box,
   Avatar,
@@ -73,7 +73,7 @@ export default function V2Header({
 
       <Chip
         size="small"
-        label={isPrime ? "Prime" : "Non‑Prime"}
+        label={isPrime ? "Prime" : "Nonâ€‘Prime"}
         sx={{
           bgcolor: isPrime ? colors.success : colors.white,
           color: isPrime ? colors.textOnPrimary : colors.textPrimary,
@@ -126,3 +126,4 @@ export default function V2Header({
     </Box>
   );
 }
+

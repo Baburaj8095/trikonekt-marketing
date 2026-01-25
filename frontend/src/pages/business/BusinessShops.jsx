@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Typography,
@@ -25,7 +25,7 @@ function StatusChip({ status }) {
   if (s === "ACTIVE") color = "success";
   if (s === "PENDING") color = "warning";
   if (s === "REJECTED") color = "error";
-  return <Chip size="small" label={s || "—"} color={color} variant={s === "ACTIVE" ? "filled" : "outlined"} />;
+  return <Chip size="small" label={s || "â€”"} color={color} variant={s === "ACTIVE" ? "filled" : "outlined"} />;
 }
 
 export default function BusinessShops() {
@@ -282,7 +282,7 @@ export default function BusinessShops() {
           <Grid item xs={12}>
             <Box sx={{ display: "flex", gap: 1 }}>
               <Button type="submit" variant="contained" disabled={saving}>
-                {saving ? "Saving…" : form.id ? "Update Shop" : "Create Shop"}
+                {saving ? "Savingâ€¦" : form.id ? "Update Shop" : "Create Shop"}
               </Button>
               {form.id ? (
                 <Button type="button" variant="text" onClick={resetForm}>
@@ -301,7 +301,7 @@ export default function BusinessShops() {
       </Typography>
 
       {loading ? (
-        <Typography variant="body2" color="text.secondary">Loading…</Typography>
+        <Typography variant="body2" color="text.secondary">Loadingâ€¦</Typography>
       ) : shops.length === 0 ? (
         <Typography variant="body2" color="text.secondary">No shops yet. Create your first shop above.</Typography>
       ) : (
@@ -326,10 +326,10 @@ export default function BusinessShops() {
                     </Box>
                   ) : null}
                   <Typography variant="body2" color="text.secondary">
-                    {s.address || "—"}
+                    {s.address || "â€”"}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {s.city || "—"}
+                    {s.city || "â€”"}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
                     {s.latitude != null && s.longitude != null
@@ -337,7 +337,7 @@ export default function BusinessShops() {
                       : null}
                   </Typography>
                   <Box sx={{ mt: 0.75 }}>
-                    <Typography variant="body2"><b>Contact:</b> {s.contact_number || "—"}</Typography>
+                    <Typography variant="body2"><b>Contact:</b> {s.contact_number || "â€”"}</Typography>
                   </Box>
                 </CardContent>
                 <CardActions sx={{ justifyContent: "space-between" }}>
@@ -358,3 +358,4 @@ export default function BusinessShops() {
     </Box>
   );
 }
+

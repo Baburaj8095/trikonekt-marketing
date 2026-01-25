@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   Container,
@@ -99,7 +99,7 @@ export default function AdminTriAppManage() {
 
   const showSnack = (type, msg) => setSnack({ open: true, type, msg });
 
-  const currencyOptions = useMemo(() => ["INR", "₹", "USD", "EUR"], []);
+  const currencyOptions = useMemo(() => ["INR", "â‚¹", "USD", "EUR"], []);
 
   const loadApp = useCallback(async () => {
     if (!slug) return;
@@ -426,7 +426,7 @@ export default function AdminTriAppManage() {
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 2, md: 3 } }}>
       <Typography variant="h5" sx={{ fontWeight: 800, mb: 1, color: "#0C2D48" }}>
-        {appTitle} — Admin
+        {appTitle} â€” Admin
       </Typography>
       <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>
         Manage the catalog for this TRI app. Admin can control price visibility, add-to-cart and payment.
@@ -435,7 +435,7 @@ export default function AdminTriAppManage() {
       {/* App loader / create */}
       {appLoading ? (
         <Box sx={{ py: 2, display: "flex", alignItems: "center", gap: 1 }}>
-          <CircularProgress size={18} /> <Typography variant="body2">Loading app…</Typography>
+          <CircularProgress size={18} /> <Typography variant="body2">Loading appâ€¦</Typography>
         </Box>
       ) : null}
 
@@ -446,7 +446,7 @@ export default function AdminTriAppManage() {
       {!app && !appLoading ? (
         <Paper elevation={1} sx={{ p: 2, borderRadius: 2, mb: 3 }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
-            Create TRI App “{slug}”
+            Create TRI App â€œ{slug}â€
           </Typography>
           <Grid container spacing={2}>
             <Grid item xs={12} md={6}>
@@ -520,7 +520,7 @@ export default function AdminTriAppManage() {
                     onClick={uploadBanner}
                     disabled={!bannerFile || savingBanner}
                   >
-                    {savingBanner ? "Saving…" : "Save Banner"}
+                    {savingBanner ? "Savingâ€¦" : "Save Banner"}
                   </Button>
                 </Stack>
                 {app?.banner_image ? (
@@ -958,3 +958,4 @@ export default function AdminTriAppManage() {
     </Container>
   );
 }
+

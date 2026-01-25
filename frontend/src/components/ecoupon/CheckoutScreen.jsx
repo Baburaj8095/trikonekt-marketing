@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Paper, Typography, Stack, Button } from "@mui/material";
 import normalizeMediaUrl from "../../utils/media";
 
@@ -74,14 +74,14 @@ export default function CheckoutScreen({ paymentConfig, onUploadProof, onProceed
               Payee
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 800 }}>
-              {payment.payee_name || "—"}
+              {payment.payee_name || "â€”"}
             </Typography>
 
             <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
               UPI ID
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 800 }}>
-              {payment.upi_id || "—"}
+              {payment.upi_id || "â€”"}
             </Typography>
 
             <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
@@ -106,3 +106,4 @@ export default function CheckoutScreen({ paymentConfig, onUploadProof, onProceed
     </Paper>
   );
 }
+

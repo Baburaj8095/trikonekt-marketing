@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Container, Typography, Card, CardContent, Grid } from "@mui/material";
 import PublicNavbar from "../components/PublicNavbar";
 import Footer from "../components/Footer";
@@ -14,7 +14,7 @@ export default function PrimePage() {
         </Typography>
 
         <Typography color="text.secondary" maxWidth={800} mb={3}>
-          Unlock premium benefits with Trikonekt Prime — enhanced rewards, exclusive offers, and tools
+          Unlock premium benefits with Trikonekt Prime â€” enhanced rewards, exclusive offers, and tools
           designed to help you earn and grow faster.
         </Typography>
 
@@ -40,3 +40,4 @@ export default function PrimePage() {
     </Box>
   );
 }
+

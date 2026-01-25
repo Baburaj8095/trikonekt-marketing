@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import {
   Box,
   Card,
@@ -129,7 +129,7 @@ function SmartLocation() {
       <Card variant="outlined" sx={{ p: 2 }}>
         <CardContent>
           {/* <Typography variant="h5" gutterBottom>
-            📍 Smart Location Detector
+            ðŸ“ Smart Location Detector
           </Typography> */}
 
           {loading ? (
@@ -178,7 +178,7 @@ function SmartLocation() {
               {manualMode && (
                 <>
                   <Divider sx={{ my: 2 }} />
-                  <Typography variant="subtitle1">🔎 Manual Location Entry</Typography>
+                  <Typography variant="subtitle1">ðŸ”Ž Manual Location Entry</Typography>
 
                   <Box sx={{ display: "flex", gap: 1, mt: 1, mb: 2 }}>
                     <TextField
@@ -218,7 +218,7 @@ function SmartLocation() {
               {/* {finalLocation && (
                 <>
                   <Divider sx={{ my: 2 }} />
-                  <Typography variant="subtitle1">📦 Final Location</Typography>
+                  <Typography variant="subtitle1">ðŸ“¦ Final Location</Typography>
                   <Box
                     component="pre"
                     sx={{
@@ -242,3 +242,4 @@ function SmartLocation() {
 }
 
 export default SmartLocation;
+

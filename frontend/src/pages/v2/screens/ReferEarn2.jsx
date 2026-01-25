@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import V2PageContainer from "../V2PageContainer";
 import ReferAndEarn from "../../ReferAndEarn";
 
@@ -13,3 +13,4 @@ export default function ReferEarn2() {
     </V2PageContainer>
   );
 }
+

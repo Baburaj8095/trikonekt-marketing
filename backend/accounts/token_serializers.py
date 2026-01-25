@@ -8,31 +8,107 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
-        # Username-only login: do not resolve or infer by phone
+        # Flexible identifier resolution:
+        # - Accept exact username as-is
+        # - If a 10-digit number is provided, try to resolve to prefixed usernames (TRBS, TR, TREP, TRPN, TRSF, TRST, TRDT)
+        #   or plain digits (coordinators).
+        # - If multiple accounts resolve for the same phone, return 400 with multiple_accounts to let client disambiguate.
         initial = getattr(self, "initial_data", {}) or {}
-        username = (initial.get("username") or attrs.get("username") or "").strip()
+        raw_username = (initial.get("username") or attrs.get("username") or "").strip()
         password = (initial.get("password") or attrs.get("password") or "").strip()
 
-        if not username:
+        if not raw_username:
             raise serializers.ValidationError({"detail": "Username is required."})
-        attrs["username"] = username
+
+        def only_digits(s: str) -> str:
+            return "".join(c for c in (s or "") if c.isdigit())
+
+        digits = only_digits(raw_username)
+        candidates = [raw_username]
+
+        if digits and len(digits) >= 6:
+            # Known registration prefixes
+            prefixes = ["TRBS", "TR", "TREP", "TRPN", "TRSF", "TRST", "TRDT"]
+            for p in prefixes:
+                candidates.append(f"{p}{digits}")
+            # Coordinators use plain digits as username
+            candidates.append(digits)
+
+            # Deduplicate while preserving order
+            seen = set()
+            uniq = []
+            for c in candidates:
+                k = c.lower()
+                if k not in seen:
+                    seen.add(k)
+                    uniq.append(c)
+            candidates = uniq
+
+            # Resolve to existing accounts among candidates
+            User = get_user_model()
+            cond = Q()
+            for c in candidates:
+                cond |= Q(username__iexact=c)
+            matches = list(User.objects.filter(cond).only("id", "username", "role", "category"))
+
+            if len(matches) == 1:
+                attrs["username"] = matches[0].username
+            elif len(matches) > 1:
+                # Prefer exact typed username over other candidates
+                exact = next((u for u in matches if str(u.username).lower() == str(raw_username).lower()), None)
+                if exact:
+                    attrs["username"] = exact.username
+                else:
+                    # If client supplied target role, prefer the right category
+                    provided_role = (initial.get("role") or "").strip().lower()
+                    preferred = None
+                    if provided_role in ("business", "merchant"):
+                        preferred = [u for u in matches if str(getattr(u, "category", "")).lower() in ("business", "merchant")]
+                    elif provided_role == "employee":
+                        preferred = [u for u in matches if (str(getattr(u, "role", "")).lower() == "employee" or str(getattr(u, "category", "")).lower() == "employee")]
+                    elif provided_role == "agency":
+                        preferred = [u for u in matches if str(getattr(u, "category", "")).lower().startswith("agency")]
+                    elif provided_role == "user":
+                        preferred = [u for u in matches if str(getattr(u, "category", "")).lower() == "consumer"]
+
+                    if preferred and len(preferred) == 1:
+                        attrs["username"] = preferred[0].username
+                    else:
+                        # Ask client to select one explicit username
+                        raise serializers.ValidationError({
+                            "detail": "Multiple accounts found for this identifier. Please login with an exact username.",
+                            "multiple_accounts": [
+                                {"username": u.username, "category": u.category, "role": u.role} for u in matches
+                            ],
+                        })
+            else:
+                # No candidate matched; fall back to raw username
+                attrs["username"] = raw_username
+        else:
+            attrs["username"] = raw_username
 
         data = super().validate(attrs)
 
-        # Optional: if the client provides a role, ensure it matches the user's role
+        # Optional: if the client provides a role, ensure it matches the user's role.
+        # Skip strict role check when the user explicitly typed an exact username (to allow TRBS########## even if UI role defaulted to "user").
         provided_role = initial.get("role")
-        if provided_role:
+        exact_typed = str(raw_username or "").strip().lower() == str(attrs.get("username") or "").strip().lower()
+        if provided_role and not exact_typed:
             pr = str(provided_role).strip().lower()
             user_role = str(getattr(self.user, "role", "") or "").strip().lower()
             user_cat = str(getattr(self.user, "category", "") or "").strip().lower()
 
-            # Allow declared role OR special-case mapping:
-            # - "business" is valid when user's category is business (even if role is "user")
+            # Allow declared role OR special-case mappings:
+            # - "business" or "merchant" are valid when user's category is business or merchant (even if role is "user")
             # - "consumer" is valid when role is "user" and category is consumer (legacy)
+            # - "agency" is valid when role is "agency" or category starts with "agency_"
+            # - "employee" is valid when role == "employee" or category == "employee"
             allowed = (
                 pr == user_role
-                or (pr == "business" and user_cat == "business")
+                or (pr in ("business", "merchant") and user_cat in ("business", "merchant"))
                 or (pr == "consumer" and user_role == "user" and user_cat == "consumer")
+                or (pr == "agency" and (user_role == "agency" or user_cat.startswith("agency")))
+                or (pr == "employee" and (user_role == "employee" or user_cat == "employee"))
             )
             if not allowed:
                 raise serializers.ValidationError({"detail": "Role mismatch: not authorized for this role."})
@@ -48,7 +124,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['full_name'] = getattr(user, 'full_name', '') or ''
         token['category'] = getattr(user, 'category', '') or ''
         # Effective role for UI routing: treat business distinctly from generic "user"
-        token['role_effective'] = 'business' if (getattr(user, 'category', '') or '').lower() == 'business' else user.role
+        cat = (getattr(user, 'category', '') or '').lower()
+        token['role_effective'] = 'business' if cat in ('business', 'merchant') else user.role
         # Admin flags for guarding Admin UI routes
         token['is_staff'] = bool(getattr(user, 'is_staff', False))
         token['is_superuser'] = bool(getattr(user, 'is_superuser', False))
@@ -84,7 +161,8 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
                     access["username"] = user.username
                     access["full_name"] = getattr(user, "full_name", "") or ""
                     access["category"] = getattr(user, "category", "") or ""
-                    access["role_effective"] = "business" if (getattr(user, "category", "") or "").lower() == "business" else user.role
+                    cat = (getattr(user, "category", "") or "").lower()
+                    access["role_effective"] = "business" if cat in ("business", "merchant") else user.role
                     access["is_staff"] = bool(getattr(user, "is_staff", False))
                     access["is_superuser"] = bool(getattr(user, "is_superuser", False))
                     data["access"] = str(access)

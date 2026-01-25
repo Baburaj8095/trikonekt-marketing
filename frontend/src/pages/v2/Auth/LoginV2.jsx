@@ -1,5 +1,5 @@
-/**
- * LoginV2.jsx — UI-only refactor (NO logic changes)
+﻿/**
+ * LoginV2.jsx â€” UI-only refactor (NO logic changes)
  * - Fintech-grade, native app-style layout
  * - All auth logic, API calls, redirects, handlers, field names and labels preserved
  * - Primary CTA text unchanged: "Sign In"
@@ -32,7 +32,7 @@ import {
 } from "@mui/icons-material";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import API from "../../../api/api";
-import LOGO from "../../../assets/TRIKONEKT.png";
+import LOGO from "../../../assets/TRIKONEKT.jpg";
 // Removed NavbarV2 and FooterV2 (no website nav on this screen)
 import V2Button from "../components/V2Button";
 import "../styles/v2-theme.css";
@@ -91,14 +91,14 @@ export default function LoginV2() {
     try {
       const r = await API.get("/accounts/hierarchy/", { params: { username: String(uname || "").trim() } });
       const u = r?.data?.user || r?.data || {};
-      let ro = (u?.role || "").toLowerCase();
-      if (!ro) {
-        const c = (u?.category || "").toLowerCase();
-        if (c.startsWith("agency")) ro = "agency";
-        else if (c === "consumer") ro = "user";
-        else if (c === "employee") ro = "employee";
-        else if (c === "business") ro = "business";
-      }
+      const c = String(u?.category || "").toLowerCase();
+      // Prefer category over generic "role" to avoid misclassifying business/merchant as "user"
+      if (c.startsWith("agency")) return "agency";
+      if (c === "business" || c === "merchant") return "business";
+      if (c === "employee") return "employee";
+      if (c === "consumer") return "user";
+      // Fallback to role field if category didn't map
+      const ro = String(u?.role || "").toLowerCase();
       return ro || null;
     } catch {
       return null;
@@ -113,13 +113,14 @@ export default function LoginV2() {
 
     try {
       let username = (formData.username || "").trim();
-      const submitRole = role;
+      let submitRole = role;
 
-      // Role mismatch guard
+      // Role mismatch guard â€” auto-correct role based on registered category
       const resolved = await resolveRegisteredRole(username);
       if (resolved && resolved !== submitRole) {
-        setErrorMsg(`You are registered as ${prettyRole(resolved)} but trying to login as ${prettyRole(submitRole)}.`);
-        return;
+        submitRole = resolved;
+        try { setRole(resolved); } catch (_) {}
+        setSuccessMsg(`Detected account type ${prettyRole(resolved)}. Proceeding with ${prettyRole(resolved)} login.`);
       }
 
       const res = await API.post("/accounts/login/", {
@@ -144,7 +145,7 @@ export default function LoginV2() {
         (String(payload?.category || "").toLowerCase() === "business" ? "business" : tokenRole);
 
       const ns = (payload?.is_staff || payload?.is_superuser) ? "admin" : (roleEffective || tokenRole || "user");
-      const store = remember ? localStorage : sessionStorage;
+      const store = localStorage;
 
       // Clean old non-namespaced keys
       try {
@@ -489,3 +490,5 @@ export default function LoginV2() {
     </Box>
   );
 }
+
+

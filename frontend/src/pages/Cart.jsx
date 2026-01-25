@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import {
   Box,
   Paper,
@@ -138,7 +138,7 @@ export default function Cart() {
                     </Typography>
 
                     <Typography variant="body2" sx={{ color: "text.primary" }}>
-                      ₹{unit.toLocaleString("en-IN")}
+                      â‚¹{unit.toLocaleString("en-IN")}
                     </Typography>
 
                     <Stack
@@ -159,7 +159,7 @@ export default function Cart() {
                         }}
                         aria-label="decrease quantity"
                       >
-                        −
+                        âˆ’
                       </Button>
                       <Typography
                         variant="body2"
@@ -185,7 +185,7 @@ export default function Cart() {
                       <Box sx={{ flex: 1 }} />
 
                       <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                        ₹{Number(subtotal).toLocaleString("en-IN")}
+                        â‚¹{Number(subtotal).toLocaleString("en-IN")}
                       </Typography>
                     </Stack>
 
@@ -241,7 +241,7 @@ export default function Cart() {
               Subtotal
             </Typography>
             <Typography variant="h6" sx={{ fontWeight: 800 }}>
-              ₹{Number(total || 0).toLocaleString("en-IN")}
+              â‚¹{Number(total || 0).toLocaleString("en-IN")}
             </Typography>
           </Stack>
           <Divider />
@@ -260,3 +260,4 @@ export default function Cart() {
     </Box>
   );
 }
+

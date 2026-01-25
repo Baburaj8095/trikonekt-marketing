@@ -4,6 +4,9 @@ from market.models import PurchaseRequest, BannerPurchaseRequest
 from business.models import UserMatrixProgress, CommissionConfig, AutoPoolAccount
 from locations.models import Country, State, City
 from core.crypto import encrypt_string, decrypt_string
+from django.core.mail import send_mail
+from django.conf import settings
+from locations.views import PINCODES_OFFLINE, india_place_variants
 
 
 class AdminUserNodeSerializer(serializers.ModelSerializer):
@@ -26,6 +29,7 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
     password_plain = serializers.SerializerMethodField()
     activated_ecoupon_count = serializers.SerializerMethodField()
     last_promo_package = serializers.SerializerMethodField()
+    admin_role = serializers.SerializerMethodField()
 
     class Meta:
         model = CustomUser
@@ -47,6 +51,8 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
             "wallet_status",
             "avatar_url",
             "is_active",
+            "is_staff",
+            "is_superuser",
             "direct_count",
             "has_children",
             "has_usable_password",
@@ -59,6 +65,7 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
             "commission_level",
             "activated_ecoupon_count",
             "last_promo_package",
+            "admin_role",
             "account_active",
         ]
 
@@ -419,6 +426,16 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
         except Exception:
             return ""
 
+    def get_admin_role(self, obj):
+        try:
+            rid = getattr(obj, "admin_role_id", None)
+            if not rid:
+                return None
+            name = getattr(getattr(obj, "admin_role", None), "name", None)
+            return {"id": rid, "name": name}
+        except Exception:
+            return None
+
 class AdminKYCSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(source="user.id", read_only=True)
     username = serializers.CharField(source="user.username", read_only=True)
@@ -667,10 +684,16 @@ class AdminUserEditSerializer(serializers.ModelSerializer):
         ]
 
     def update(self, instance, validated_data):
-        # Pop password if provided and set via set_password
+        # Accept only whitelisted fields from admin edit dialog and grid toggles
         password = validated_data.pop("password", None)
 
-        # Only superuser can modify sponsor_id; strip whitespace
+        # Drop any keys not in allowed set (server-side enforcement)
+        allowed = {"sponsor_id", "phone", "pincode", "account_active"}
+        for k in list(validated_data.keys()):
+            if k not in allowed:
+                validated_data.pop(k, None)
+
+        # Permission: Only superuser can modify sponsor_id; strip whitespace
         request = getattr(self, "context", {}).get("request", None)
         if "sponsor_id" in validated_data:
             is_super = bool(getattr(getattr(request, "user", None), "is_superuser", False))
@@ -681,16 +704,121 @@ class AdminUserEditSerializer(serializers.ModelSerializer):
                 if isinstance(sid, str):
                     validated_data["sponsor_id"] = sid.strip()
 
+        # Normalize phone to digits and stage username update if phone provided
+        new_username = None
+        if "phone" in validated_data:
+            digits = "".join(ch for ch in str(validated_data.get("phone") or "") if ch.isdigit())
+            validated_data["phone"] = digits
+            if digits and digits != (instance.phone or ""):
+                # Propose username = phone; ensure global uniqueness
+                desired = digits
+                exists = CustomUser.objects.filter(username__iexact=desired).exclude(pk=instance.pk).exists()
+                if exists:
+                    desired = f"{digits}-{instance.id or ''}".strip("-")
+                    if CustomUser.objects.filter(username__iexact=desired).exclude(pk=instance.pk).exists():
+                        desired = f"{digits}-{instance.pk}"
+                new_username = desired
+
+        # Persist basic field updates (account_active, phone, pincode, sponsor_id)
         instance = super().update(instance, validated_data)
+
+        # If phone changed, also update username
+        if new_username and new_username != instance.username:
+            instance.username = new_username
+
+        # Handle pincode -> auto assign geo FKs
+        if "pincode" in validated_data:
+            pin = (instance.pincode or "").strip()
+            country_name = state_name = city_name = None
+            try:
+                # Offline fast path
+                offline = PINCODES_OFFLINE.get(pin)
+                if offline:
+                    country_name = (offline.get("country") or "India") or None
+                    state_name = offline.get("state") or None
+                    city_name = offline.get("district") or offline.get("city") or None
+                else:
+                    # Network fallback via India Post
+                    import requests
+                    r = requests.get(f"https://api.postalpincode.in/pincode/{pin}", timeout=12)
+                    if r.status_code == 200:
+                        arr = r.json() or []
+                        if isinstance(arr, list) and arr:
+                            entry = arr[0] or {}
+                            if entry.get("Status") == "Success":
+                                offices = entry.get("PostOffice") or []
+                                if offices:
+                                    po = offices[0]
+                                    country_name = po.get("Country") or "India"
+                                    state_name = po.get("State") or None
+                                    city_name = po.get("District") or po.get("Name") or None
+            except Exception:
+                pass
+
+            # Resolve/assign FKs best-effort (case-insensitive by name)
+            try:
+                if country_name:
+                    ctry = Country.objects.filter(name__iexact=country_name).first()
+                else:
+                    ctry = Country.objects.filter(name__iexact="India").first()
+                if ctry:
+                    instance.country = ctry
+                if state_name:
+                    st = State.objects.filter(name__iexact=state_name)
+                    if ctry:
+                        st = st.filter(country=ctry)
+                    st = st.first()
+                    if st:
+                        instance.state = st
+                        if city_name:
+                            ci = City.objects.filter(name__iexact=city_name, state=st).first()
+                            if not ci:
+                                try:
+                                    for v in (india_place_variants(city_name) or []):
+                                        ci = City.objects.filter(name__iexact=v, state=st).first()
+                                        if ci:
+                                            break
+                                except Exception:
+                                    ci = None
+                            if ci:
+                                instance.city = ci
+            except Exception:
+                # Do not block save on mapping errors
+                pass
+
+        # Handle password change: set and email plaintext to user
         if password:
             instance.set_password(password)
-            # Store encrypted reversible copy (visible only to superusers)
             try:
                 enc = encrypt_string(password)
                 instance.last_password_encrypted = enc
-                instance.save(update_fields=["password", "last_password_encrypted"])
             except Exception:
-                instance.save(update_fields=["password"])
+                pass
+            # Send email with plaintext password (per requirement)
+            try:
+                to = (instance.email or "").strip()
+                if to:
+                    subject = "Your password was changed"
+                    body_lines = [
+                        f"Hello {instance.full_name or instance.username},",
+                        "",
+                        "Your account password has been reset by an administrator.",
+                        f"Username: {instance.username}",
+                        f"New Password: {password}",
+                        "",
+                        "If you did not expect this change, please contact support immediately.",
+                    ]
+                    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", None) or "no-reply@localhost"
+                    send_mail(subject, "\n".join(body_lines), from_email, [to], fail_silently=True)
+            except Exception:
+                pass
+
+        # Persist all accumulated changes
+        try:
+            instance.save()
+        except Exception:
+            instance.save()
+
         return instance
 
 

@@ -192,17 +192,31 @@ class CommissionPolicy:
         """
         Determine if a consumer matrix (3 or 5) is effectively enabled for a product key
         by inspecting presence of non-empty arrays or positive 'levels' in master json.
+        Supports common product key aliases saved by AdminCommissionDistribute:
+          - 150: "150", "coupon150", "coupon_150", "prime150", "prime_150"
+          - 750: "750", "rs750", "prime750", "prime_750"
+          - 759: "759", "rs759", "prime759", "prime_759", "monthly_759", "monthly759"
         """
         cm_all = dict(master.get(key, {}) or {})
         candidates = []
+        # Always consider the exact key plus global/default
         for k in (product_key, "global", "default"):
             if k in cm_all:
                 candidates.append(cm_all.get(k))
-        # Alias support for product key "150"
+
+        # Alias support per product
+        aliases = []
         if product_key == "150":
-            for alias in ("coupon150", "coupon_150", "prime150", "prime_150"):
-                if alias in cm_all:
-                    candidates.append(cm_all.get(alias))
+            aliases = ["coupon150", "coupon_150", "prime150", "prime_150"]
+        elif product_key == "750":
+            aliases = ["rs750", "prime750", "prime_750"]
+        elif product_key == "759":
+            aliases = ["rs759", "prime759", "prime_759", "monthly_759", "monthly759"]
+
+        for alias in aliases:
+            if alias in cm_all:
+                candidates.append(cm_all.get(alias))
+
         for v in candidates:
             if isinstance(v, list) and len(v) > 0:
                 return True
@@ -218,6 +232,27 @@ class CommissionPolicy:
                                 return True
                         except Exception:
                             pass
+        # Fallback: if no per-product or explicit map found, consider global typed config on CommissionConfig
+        # For monthly 759, require explicit per-product override; do not enable from global typed fields
+        if product_key == "759":
+            return False
+        try:
+            from business.models import CommissionConfig as _Cfg
+            _cfg = _Cfg.get_solo()
+            if key == "consumer_matrix_5":
+                lv = int(getattr(_cfg, "five_matrix_levels", 0) or 0)
+                am = list(getattr(_cfg, "five_matrix_amounts_json", []) or [])
+                pc = list(getattr(_cfg, "five_matrix_percents_json", []) or [])
+                if (lv > 0) or (len(am) > 0) or (len(pc) > 0):
+                    return True
+            elif key == "consumer_matrix_3":
+                lv = int(getattr(_cfg, "three_matrix_levels", 0) or 0)
+                am = list(getattr(_cfg, "three_matrix_amounts_json", []) or [])
+                pc = list(getattr(_cfg, "three_matrix_percents_json", []) or [])
+                if (lv > 0) or (len(am) > 0) or (len(pc) > 0):
+                    return True
+        except Exception:
+            pass
         return False
 
     @classmethod
@@ -265,9 +300,18 @@ class CommissionPolicy:
         }
 
         # -------- prime_750 (policy ties to prime_150 via multiplier) --------
+        # Preserve existing commissions.prime_750 when provided; otherwise synthesize minimal with multiplier=1
+        existing_p750 = dict(existing_comm.get("prime_750", {}) or {})
+        base_pkg = str(existing_p750.get("base_package", "prime_150")).strip().lower()
+        try:
+            mval = int(existing_p750.get("multiplier", 1))
+            if mval <= 0:
+                mval = 1
+        except Exception:
+            mval = 1
         commissions["prime_750"] = {
-            "base_package": "prime_150",
-            "multiplier": 1,  # safe minimal default; admin can override later via explicit policy
+            "base_package": "prime_150",  # only allowed
+            "multiplier": mval if base_pkg == "prime_150" else 1,
         }
 
         # -------- monthly_759 (first vs recurring, matrix flags, activation amount) --------

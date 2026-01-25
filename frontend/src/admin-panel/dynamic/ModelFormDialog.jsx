@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import {
   Dialog,
   DialogTitle,
@@ -424,7 +424,7 @@ export default function ModelFormDialog({
                     size="small"
                   >
                     <MenuItem value="">
-                      <em>—</em>
+                      <em>â€”</em>
                     </MenuItem>
                     {f.choices.map(([v, text]) => (
                       <MenuItem key={String(v)} value={v}>
@@ -452,7 +452,7 @@ export default function ModelFormDialog({
                     SelectProps={{ onOpen: () => fetchRemoteOptions(f.name) }}
                   >
                     <MenuItem value="">
-                      <em>—</em>
+                      <em>â€”</em>
                     </MenuItem>
                     {(remoteOptions[f.name] || []).map((opt) => (
                       <MenuItem key={String(opt.value)} value={opt.value}>
@@ -494,3 +494,4 @@ export default function ModelFormDialog({
     </Dialog>
   );
 }
+

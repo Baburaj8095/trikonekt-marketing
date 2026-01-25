@@ -1,4 +1,4 @@
-// Login.jsx — Final polished wireframe UI (single-file).
+﻿// Login.jsx â€” Final polished wireframe UI (single-file).
 // NOTE: This file PRESERVES your original logic (API calls, geolocation, registration, dialogs).
 // Styling is done via MUI sx props. Requires @mui/material and @mui/icons-material v7.
 
@@ -53,7 +53,7 @@ import {
 
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import API from "../../api/api";
-import LOGO from "../../assets/TRIKONEKT.png";
+import LOGO from "../../assets/TRIKONEKT.jpg";
 import "./EnhancedLogin.css";
 
 
@@ -932,7 +932,7 @@ const Login = () => {
   }, [isAgency, selectedCity, selectedState]);
 
   const pincodeOptions = useMemo(() => {
-    // Sub‑Franchise should list all pincodes for the selected district irrespective of sponsor coverage
+    // Subâ€‘Franchise should list all pincodes for the selected district irrespective of sponsor coverage
     if (isSubFranchiseCat) {
       return Array.isArray(districtPincodes) ? districtPincodes : [];
     }
@@ -1312,7 +1312,7 @@ const Login = () => {
         });
         const uname = userResp?.data?.username || "(generated)";
 
-        // Step 2: Submit business details for admin review (best‑effort; non‑blocking)
+        // Step 2: Submit business details for admin review (bestâ€‘effort; nonâ€‘blocking)
         const brPayload = {
           full_name: formData.full_name || "",
           email: formData.email || "",
@@ -1561,7 +1561,7 @@ const Login = () => {
             {sponsorChecking && (
               <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
                 <CircularProgress size={16} />
-                <Typography variant="body2" color="text.secondary">Validating sponsor…</Typography>
+                <Typography variant="body2" color="text.secondary">Validating sponsorâ€¦</Typography>
               </Box>
             )}
             {sponsorValid === true && (
@@ -1570,9 +1570,9 @@ const Login = () => {
                   Sponsor verified
                 </Alert>
                 <Box sx={{ p: 1.5, borderRadius: 1, bgcolor: "#f5f9ff", border: "1px solid #e3f2fd" }}>
-                  <Typography variant="body2"><b>Sponsor ID:</b> {sponsorDisplay.username || normalizeSponsor(sponsorId) || "—"}</Typography>
-                  <Typography variant="body2"><b>Name:</b> {sponsorDisplay.name || "—"}</Typography>
-                  <Typography variant="body2"><b>Pincode:</b> {sponsorDisplay.pincode || "—"}</Typography>
+                  <Typography variant="body2"><b>Sponsor ID:</b> {sponsorDisplay.username || normalizeSponsor(sponsorId) || "â€”"}</Typography>
+                  <Typography variant="body2"><b>Name:</b> {sponsorDisplay.name || "â€”"}</Typography>
+                  <Typography variant="body2"><b>Pincode:</b> {sponsorDisplay.pincode || "â€”"}</Typography>
                 </Box>
               </Box>
             )}
@@ -2096,7 +2096,7 @@ const Login = () => {
                     {sponsorChecking && (
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
                         <CircularProgress size={16} />
-                        <Typography variant="body2" color="text.secondary">Validating sponsor…</Typography>
+                        <Typography variant="body2" color="text.secondary">Validating sponsorâ€¦</Typography>
                       </Box>
                     )}
                     {sponsorValid === true && (
@@ -2105,9 +2105,9 @@ const Login = () => {
                           Sponsor verified
                         </Alert>
                 <Box sx={{ p: 1.5, borderRadius: 1, bgcolor: "#f5f9ff", border: "1px solid #e3f2fd" }}>
-                  <Typography variant="body2"><b>Sponsor ID:</b> {sponsorDisplay.username || normalizeSponsor(sponsorId) || "—"}</Typography>
-                  <Typography variant="body2"><b>Name:</b> {sponsorDisplay.name || "—"}</Typography>
-                  <Typography variant="body2"><b>Pincode:</b> {sponsorDisplay.pincode || "—"}</Typography>
+                  <Typography variant="body2"><b>Sponsor ID:</b> {sponsorDisplay.username || normalizeSponsor(sponsorId) || "â€”"}</Typography>
+                  <Typography variant="body2"><b>Name:</b> {sponsorDisplay.name || "â€”"}</Typography>
+                  <Typography variant="body2"><b>Pincode:</b> {sponsorDisplay.pincode || "â€”"}</Typography>
                 </Box>
                       </Box>
                     )}
@@ -2125,7 +2125,7 @@ const Login = () => {
                     {autoLoading ? (
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
                         <CircularProgress size={18} />
-                        <Typography variant="body2" color="text.secondary">Detecting your location…</Typography>
+                        <Typography variant="body2" color="text.secondary">Detecting your locationâ€¦</Typography>
                       </Box>
                     ) : null}
 
@@ -2397,7 +2397,7 @@ const Login = () => {
 
       <Box sx={{ py: { xs: 2.5, md: 3 }, textAlign: "center", backgroundColor: "rgba(255,255,255,0.85) !important", color: "#000", boxShadow : "0 2px 10px rgba(0,0,0,0.06) !important" }}>
         <Typography variant="body2" sx={{ fontSize: { xs: 12, md: 14 } }}>
-          © {new Date().getFullYear()} Trikonekt. All rights reserved.
+          Â© {new Date().getFullYear()} Trikonekt. All rights reserved.
         </Typography>
       </Box>
     </Box>
@@ -2405,3 +2405,5 @@ const Login = () => {
 };
 
 export default Login;
+
+

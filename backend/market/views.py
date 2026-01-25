@@ -1,7 +1,7 @@
 from rest_framework import generics, permissions, parsers, status
 from rest_framework.response import Response
 from django.db import transaction
-from django.db.models import Q, F
+from django.db.models import Q, F, Case, When, IntegerField
 from rest_framework.views import APIView
 from django.http import HttpResponse
 from django.conf import settings
@@ -112,6 +112,59 @@ class ProductListCreate(generics.ListCreateAPIView):
         # default remains newest from initial order_by
 
         return qs
+
+    def list(self, request, *args, **kwargs):
+        app_slug = (request.query_params.get("app") or "").strip()
+        if app_slug:
+            try:
+                from business.models import TriApp, TriAppProduct
+                app = TriApp.objects.filter(slug=app_slug, is_active=True).first()
+                rows = []
+                if app:
+                    qs = TriAppProduct.objects.filter(app=app, is_active=True).order_by("display_order", "id")
+
+                    def _img_url(obj):
+                        try:
+                            f = getattr(obj, "image", None)
+                            if not f:
+                                return None
+                            url = f.url
+                            return request.build_absolute_uri(url) if (request and url and not str(url).startswith("http")) else url
+                        except Exception:
+                            return None
+
+                    for p in qs:
+                        rows.append(
+                            {
+                                "id": p.id,
+                                "name": p.name,
+                                "description": p.description or "",
+                                "price": p.price,
+                                "image_url": _img_url(p),
+                                "app": app.slug,
+                            }
+                        )
+                # If TriApp products exist, return them; otherwise fall back to market products by category
+                if rows:
+                    page = self.paginate_queryset(rows)
+                    if page is not None:
+                        return self.get_paginated_response(page)
+                    return Response(rows)
+            except Exception:
+                # On any error in TriApp branch, fall back to default behavior below
+                pass
+
+            # Fallback: interpret ?app=<slug> as market category filter
+            qs = self.get_queryset().filter(category__iexact=app_slug)
+            page = self.paginate_queryset(qs)
+            if page is not None:
+                ser = ProductSerializer(page, many=True, context={"request": request})
+                return self.get_paginated_response(ser.data)
+            ser = ProductSerializer(qs, many=True, context={"request": request})
+            return Response(ser.data)
+
+        # Default behavior (market products)
+        return super().list(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         serializer.save()  # created_by gets set in serializer.create()
@@ -373,6 +426,42 @@ class PurchaseRequestStatusUpdate(generics.UpdateAPIView):
         return Response(PurchaseRequestSerializer(instance, context={"request": request}).data, status=status.HTTP_200_OK)
 
 
+# ============================
+# Merchant Categories (public)
+# ============================
+class MerchantCategoryList(APIView):
+    """
+    GET /api/merchant/categories/ — Active categories ordered by sort_order, name
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, *args, **kwargs):
+        from business.models import MerchantCategory
+        rows = MerchantCategory.objects.filter(is_active=True).order_by("sort_order", "name")
+        data = [{"id": c.id, "name": c.name} for c in rows]
+        return Response(data)
+
+
+class MerchantSubCategoryList(APIView):
+    """
+    GET /api/merchant/subcategories/?category_id=<id> — Active subcategories for a category ordered by sort_order, name
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, *args, **kwargs):
+        from business.models import MerchantSubCategory
+        cid = request.query_params.get("category_id") or request.query_params.get("categoryId") or ""
+        try:
+            cid_int = int(str(cid).strip())
+        except Exception:
+            cid_int = None
+        qs = MerchantSubCategory.objects.filter(is_active=True)
+        if cid_int is not None:
+            qs = qs.filter(category_id=cid_int)
+        qs = qs.order_by("sort_order", "name")
+        data = [{"id": s.id, "name": s.name, "category_id": s.category_id} for s in qs]
+        return Response(data)
+
 # =====================
 # Merchant Shops
 # =====================
@@ -596,6 +685,107 @@ class ShopPublicDetail(generics.RetrieveAPIView):
     queryset = Shop.objects.select_related("merchant").filter(status=Shop.STATUS_ACTIVE)
 
 
+class ShopsNearbyView(APIView):
+    """
+    GET /api/shops/nearby/?lat=<lat>&lng=<lng>&radius_km=5&limit=20
+    Fallback: if no lat/lng, accept pincode=<pincode> and return same-pincode shops first.
+    Rules:
+    - Only approved/active merchants (Shop.status=ACTIVE)
+    - Sorted nearest first when lat/lng provided
+    - Each shop includes category_slug from TriApp
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        from math import radians, sin, cos, asin, sqrt
+
+        def haversine_km(lat1, lon1, lat2, lon2):
+            try:
+                lon1, lat1, lon2, lat2 = map(radians, [float(lon1), float(lat1), float(lon2), float(lat2)])
+                dlon = lon2 - lon1
+                dlat = lat2 - lat1
+                a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+                c = 2 * asin(sqrt(a))
+                r = 6371
+                return c * r
+            except Exception:
+                return None
+
+        params = request.query_params
+        lat = params.get("lat")
+        lng = params.get("lng")
+        try:
+            radius_km = float(params.get("radius_km")) if params.get("radius_km") is not None else 5.0
+        except Exception:
+            radius_km = 5.0
+        try:
+            limit = int(params.get("limit")) if params.get("limit") is not None else 20
+        except Exception:
+            limit = 20
+        pincode = (params.get("pincode") or "").strip()
+
+        base_qs = Shop.objects.select_related("merchant", "tri_app").filter(status=Shop.STATUS_ACTIVE)
+
+        def _img_url(obj):
+            try:
+                f = getattr(obj, "shop_image", None)
+                if not f:
+                    return None
+                url = f.url
+                return request.build_absolute_uri(url) if (request and url and not str(url).startswith("http")) else url
+            except Exception:
+                return None
+
+        # Lat/Lng near-me mode
+        if lat and lng:
+            candidates = list(base_qs.filter(latitude__isnull=False, longitude__isnull=False)[:1000])
+            out = []
+            for s in candidates:
+                d = haversine_km(lat, lng, s.latitude, s.longitude)
+                if d is None:
+                    continue
+                if radius_km is None or d <= float(radius_km):
+                    out.append((d, s))
+            out.sort(key=lambda pair: pair[0])
+            out = out[: max(0, int(limit))]
+            rows = []
+            for d, s in out:
+                rows.append({
+                    "id": s.id,
+                    "name": s.shop_name,
+                    "logo": _img_url(s),
+                    "category_slug": getattr(getattr(s, "tri_app", None), "slug", None),
+                    "distance_km": round(float(d), 2),
+                    "is_open": True,
+                    "address": s.address or "",
+                    "rating": None,
+                })
+            return Response(rows, status=status.HTTP_200_OK)
+
+        # Fallback: pincode-first ordering
+        qs = base_qs
+        if pincode:
+            qs = qs.annotate(
+                same_pin=Case(When(pincode__iexact=pincode, then=1), default=0, output_field=IntegerField())
+            ).order_by("-same_pin", "-created_at")
+        else:
+            qs = qs.order_by("-created_at")
+        qs = qs[: max(0, int(limit))]
+        rows = []
+        for s in qs:
+            rows.append({
+                "id": s.id,
+                "name": s.shop_name,
+                "logo": _img_url(s),
+                "category_slug": getattr(getattr(s, "tri_app", None), "slug", None),
+                "distance_km": None,
+                "is_open": True,
+                "address": s.address or "",
+                "rating": None,
+            })
+        return Response(rows, status=status.HTTP_200_OK)
+
+
 class ShopMineListCreate(generics.ListCreateAPIView):
     """
     GET /api/merchant/shops — list my shops (merchant only)
@@ -656,7 +846,7 @@ class PurchaseRequestInvoiceView(APIView):
         logo_uri = None
         try:
             # Try common branding filenames; use the first one that exists
-            candidates = ["logo.png", "logo.jpg", "logo.jpeg", "logo.svg", "trikonekt.png", "trikonekt.jpg"]
+            candidates = ["logo.png", "logo.jpg", "logo.jpeg", "logo.svg", "TRIKONEKT.jpeg", "trikonekt.jpg"]
             for fname in candidates:
                 fpath = os.path.join(branding_dir, fname)
                 if os.path.exists(fpath):

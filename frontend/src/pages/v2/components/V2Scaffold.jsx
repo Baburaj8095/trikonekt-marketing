@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+﻿import React, { useMemo } from "react";
 import { Box } from "@mui/material";
 import V2Header from "./V2Header";
 import V2BottomNav from "./V2BottomNav";
@@ -92,3 +92,4 @@ export default function V2Scaffold({
     </Box>
   );
 }
+

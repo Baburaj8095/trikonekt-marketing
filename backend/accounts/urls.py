@@ -27,6 +27,11 @@ from .views import (
     SupportTicketMessageCreate,
     # Offer letter
     OfferLetterPDFView,
+    # Wallet history/banks/spend
+    wallet_me_history,
+    wallet_me_banks,
+    wallet_purchase_ecoupon,
+    wallet_purchase_product,
 )
 from .token_serializers import CustomTokenRefreshView
 
@@ -51,6 +56,10 @@ urlpatterns = [
     # Wallet
     path('wallet/me/', WalletMe.as_view(), name='wallet_me'),
     path('wallet/me/transactions/', WalletTransactionsList.as_view(), name='wallet_transactions'),
+    path('wallet/me/history/', wallet_me_history, name='wallet_me_history'),
+    path('wallet/me/banks/', wallet_me_banks, name='wallet_me_banks'),
+    path('wallet/purchase/ecoupon/', wallet_purchase_ecoupon, name='wallet_purchase_ecoupon'),
+    path('wallet/purchase/product/', wallet_purchase_product, name='wallet_purchase_product'),
     # KYC + Withdrawals
     path('kyc/me/', UserKYCMeView.as_view(), name='kyc_me'),
     path('withdrawals/', WithdrawalCreateView.as_view(), name='withdrawals_create'),

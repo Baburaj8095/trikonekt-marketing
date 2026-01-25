@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import {
   Box,
   Grid,
@@ -25,10 +25,10 @@ import { useNavigate } from "react-router-dom";
 import { addAgencyPackage } from "../store/cart";
 
 /**
- * Sub‑franchise Packages + Rewards UI
+ * Subâ€‘franchise Packages + Rewards UI
  *
  * Enhancements:
- * - Dynamically lists all active Sub‑franchise (AG_SF*) packages returned by:
+ * - Dynamically lists all active Subâ€‘franchise (AG_SF*) packages returned by:
  *     GET /business/agency-packages/catalog/
  *   Each card shows name, amount, description and a Buy/Requested button.
  * - Buy posts to:
@@ -50,10 +50,10 @@ export default function SubFranchisePrimePricing({
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
   const [buyingId, setBuyingId] = React.useState(null);
-  // Per‑package custom amount input (₹)
+  // Perâ€‘package custom amount input (â‚¹)
   const [customAmounts, setCustomAmounts] = React.useState({});
 
-  // Payment drawer (UI only) — mirror consumer UX without changing backend flow
+  // Payment drawer (UI only) â€” mirror consumer UX without changing backend flow
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [selectedPkg, setSelectedPkg] = React.useState(null);
   const [txnId, setTxnId] = React.useState("");
@@ -124,10 +124,10 @@ export default function SubFranchisePrimePricing({
   const formatAmount = (amt) => {
     try {
       const n = Number(amt);
-      if (!isFinite(n)) return `₹${String(amt)}`;
-      return `₹${n.toLocaleString("en-IN")}`;
+      if (!isFinite(n)) return `â‚¹${String(amt)}`;
+      return `â‚¹${n.toLocaleString("en-IN")}`;
     } catch {
-      return `₹${String(amt)}`;
+      return `â‚¹${String(amt)}`;
     }
   };
 
@@ -144,17 +144,17 @@ export default function SubFranchisePrimePricing({
       let amount = Number(amountRaw);
       if (!isFinite(amount) || amount <= 0) {
         try {
-          amount = parseFloat(String(amountRaw).replace(/[,₹\s]/g, ""));
+          amount = parseFloat(String(amountRaw).replace(/[,â‚¹\s]/g, ""));
         } catch (_) {}
       }
       if (!isFinite(amount) || amount <= 0) amount = 0;
 
-      // If user typed a custom amount, prefer it (min ₹1). Server will clamp if needed.
+      // If user typed a custom amount, prefer it (min â‚¹1). Server will clamp if needed.
       let desired = customAmounts?.[pkg.id];
       let desiredNum = Number(desired);
       if (!isFinite(desiredNum) || desiredNum <= 0) {
         try {
-          desiredNum = parseFloat(String(desired).replace(/[,₹\s]/g, ""));
+          desiredNum = parseFloat(String(desired).replace(/[,â‚¹\s]/g, ""));
         } catch (_) {}
       }
       if (!isFinite(desiredNum) || desiredNum < 1) desiredNum = amount > 0 ? amount : 1;
@@ -218,7 +218,7 @@ export default function SubFranchisePrimePricing({
             </Typography>
           </Box>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Choose your Sub‑franchise Prime package. Click BUY to send a request; admin will verify and complete payment.
+            Choose your Subâ€‘franchise Prime package. Click BUY to send a request; admin will verify and complete payment.
           </Typography>
         </>
       )}
@@ -254,7 +254,7 @@ export default function SubFranchisePrimePricing({
                   >
                     <CardContent sx={{ display: "flex", flexDirection: "column", gap: 0.5, flex: 1 }}>
                       <Typography variant="overline" sx={{ letterSpacing: 1.5 }} color="text.secondary">
-                        SUB‑FRANCHISE PACKAGE
+                        SUBâ€‘FRANCHISE PACKAGE
                       </Typography>
                       <Typography variant="h6" sx={{ fontWeight: 900 }}>{pkg.name}</Typography>
                       <Typography variant="h4" sx={{ fontWeight: 900, lineHeight: 1.1 }}>
@@ -268,7 +268,7 @@ export default function SubFranchisePrimePricing({
                       <TextField
                         size="small"
                         type="number"
-                        label="Amount to Pay (₹)"
+                        label="Amount to Pay (â‚¹)"
                         value={customAmounts[pkg.id] ?? ""}
                         onChange={(e) =>
                           setCustomAmounts((s) => ({ ...s, [pkg.id]: e.target.value }))
@@ -338,7 +338,7 @@ export default function SubFranchisePrimePricing({
                   }}
                 />
                 <Typography variant="overline" sx={{ letterSpacing: 2 }} color="text.secondary">
-                  SUB‑FRANCHISE
+                  SUBâ€‘FRANCHISE
                 </Typography>
                 <Typography variant="h6" sx={{ fontWeight: 900, mt: 0.5 }}>
                   {r.title}
@@ -347,7 +347,7 @@ export default function SubFranchisePrimePricing({
                   Milestone
                 </Typography>
                 <Typography variant="h4" sx={{ fontWeight: 900, lineHeight: 1.1, mt: 0.5 }}>
-                  ₹{r.amount.toLocaleString("en-IN")}
+                  â‚¹{r.amount.toLocaleString("en-IN")}
                 </Typography>
               </CardContent>
             </Card>
@@ -391,11 +391,11 @@ export default function SubFranchisePrimePricing({
           <Stack direction="row" justifyContent="space-between" mt={1}>
             <Typography color="text.secondary">Total Amount</Typography>
             <Typography fontWeight={900} fontSize={20}>
-              ₹
+              â‚¹
               {(() => {
                 try {
                   const v = customAmounts?.[selectedPkg?.id];
-                  const parsed = parseFloat(String(v ?? "").replace(/[,₹\s]/g, ""));
+                  const parsed = parseFloat(String(v ?? "").replace(/[,â‚¹\s]/g, ""));
                   if (Number.isFinite(parsed) && parsed > 0) return parsed;
                   const n = Number(selectedPkg?.amount || 0);
                   return Number.isFinite(n) ? n : 0;
@@ -453,7 +453,7 @@ export default function SubFranchisePrimePricing({
         </Box>
 
         <Alert severity="info" sx={{ mt: 2 }}>
-          Amount is auto‑calculated/entered above. Pay the exact amount and enter the UTR below.
+          Amount is autoâ€‘calculated/entered above. Pay the exact amount and enter the UTR below.
         </Alert>
 
         <TextField
@@ -542,3 +542,4 @@ export default function SubFranchisePrimePricing({
     </Box>
   );
 }
+

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+﻿import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { DataGrid } from "@mui/x-data-grid";
 
 /**
@@ -25,7 +25,7 @@ export default function DataTable({
 }) {
   const [rows, setRows] = useState([]);
   const [rowCount, setRowCount] = useState(0);
-  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 25 });
+  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 100 });
   const [sortModel, setSortModel] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [search, setSearch] = useState("");
@@ -165,7 +165,7 @@ export default function DataTable({
           base.renderCell = (params) => {
             const row = params?.row || {};
             const v = getFieldValue(row, base.field);
-            if (v == null || v === "") return "—";
+            if (v == null || v === "") return "â€”";
             return String(v);
           };
         }
@@ -213,7 +213,7 @@ export default function DataTable({
       <div style={{ padding: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         {toolbar}
         <input
-          placeholder="Search…"
+          placeholder="Searchâ€¦"
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
           style={{ padding: 8, width: "min(280px, 100%)", borderRadius: 8, border: "1px solid #e5e7eb", backgroundColor: "#ffffff" }}
@@ -284,3 +284,4 @@ export default function DataTable({
     </div>
   );
 }
+

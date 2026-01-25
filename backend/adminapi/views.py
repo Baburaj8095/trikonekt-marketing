@@ -16,13 +16,13 @@ from coupons.models import Coupon, CouponCode, CouponSubmission, CouponBatch
 from uploads.models import FileUpload, DashboardCard, HomeCard, LuckyDrawSubmission
 from market.models import Product, PurchaseRequest, Banner, BannerItem, BannerPurchaseRequest
 from business.models import UserMatrixProgress, AutoPoolAccount, DailyReport, CommissionConfig, PromoPurchase
-from .permissions import IsAdminOrStaff
+from .permissions import IsAdminOrStaff, IsSuperAdmin, HasAdminModuleAccess, HasAnyPermission, has_admin_module_access, MODULE_KEYS
 from .serializers import AdminUserNodeSerializer, AdminKYCSerializer, AdminWithdrawalSerializer, AdminMatrixProgressSerializer, AdminSupportTicketSerializer, AdminSupportTicketMessageSerializer, AdminUserEditSerializer, AdminAutopoolTxnSerializer, AdminAutopoolConfigSerializer
 from .dynamic import field_meta_from_serializer
 
 
 class AdminMetricsView(APIView):
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_basic")]
 
     def get(self, request):
         today = timezone.now().date()
@@ -171,7 +171,7 @@ class AdminUserTreeRoot(APIView):
     Resolve a root user for the hierarchy tree.
     identifier can be: id (int), username, email, or unique_id.
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("users")]
 
     def get(self, request):
         identifier = (request.query_params.get("identifier") or "").strip()
@@ -232,14 +232,24 @@ class AdminUserTreeDefaultRoot(APIView):
     """
     Return default root user for hierarchy tree (first superuser by id; fallback to first staff; else earliest user).
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("users")]
 
     def get(self, request):
-        user = (
-            CustomUser.objects.filter(is_superuser=True).order_by("id").first()
-            or CustomUser.objects.filter(is_staff=True).order_by("id").first()
-            or CustomUser.objects.order_by("id").first()
-        )
+        user = None
+        try:
+            from business.models import RootConsumerConfig
+            cfg = RootConsumerConfig.get_solo()
+            user = cfg.get_root_user()
+        except Exception:
+            user = None
+
+        if not user:
+            user = (
+                CustomUser.objects.filter(is_superuser=True).order_by("id").first()
+                or CustomUser.objects.filter(is_staff=True).order_by("id").first()
+                or CustomUser.objects.order_by("id").first()
+            )
+
         if not user:
             return Response({"detail": "No users found"}, status=404)
 
@@ -270,7 +280,7 @@ class AdminUserTreeChildren(APIView):
     Return direct children for given userId (registered_by relationship).
     Supports pagination with page and page_size.
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("users")]
 
     def get(self, request):
         try:
@@ -287,7 +297,26 @@ class AdminUserTreeChildren(APIView):
             .order_by("-date_joined")
         )
 
-        total = qs.count()
+        # Fast count path to avoid heavy COUNT(*) over annotated/prefetched queryset
+        cat_param = (request.query_params.get("category") or "").strip()
+        if cat_param:
+            c_key = cat_param.lower().replace(" ", "_").replace("-", "_")
+            try:
+                if "cordinator" in c_key:
+                    c_key = c_key.replace("cordinator", "coordinator")
+                if "subfranchise" in c_key and "sub_franchise" not in c_key:
+                    c_key = c_key.replace("subfranchise", "sub_franchise")
+            except Exception:
+                pass
+            try:
+                cat_values = {str(k).lower(): k for k, _ in getattr(CustomUser, "CATEGORY_CHOICES", [])}
+                cat_labels = {str(v).lower().replace(" ", "_").replace("-", "_"): k for k, v in getattr(CustomUser, "CATEGORY_CHOICES", [])}
+                c_norm = cat_values.get(c_key) or cat_labels.get(c_key) or c_key
+            except Exception:
+                c_norm = c_key
+            total = CustomUser.objects.filter(category__iexact=c_norm).count()
+        else:
+            total = qs.count()
         start = (page - 1) * page_size
         end = start + page_size
         items = []
@@ -318,7 +347,7 @@ class AdminUsersList(ListAPIView):
     """
     Admin users list with powerful filters: role, phone, category, pincode, state, kyc.
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("users")]
     serializer_class = AdminUserNodeSerializer
 
     def get_queryset(self):
@@ -391,12 +420,22 @@ class AdminUsersList(ListAPIView):
         if category:
             c = str(category).strip()
             c_key = c.lower().replace(" ", "_").replace("-", "_")
+            # Fix common misspellings/synonyms to make URL query robust
+            try:
+                # Accept '*_cordinator' -> '*_coordinator'
+                if "cordinator" in c_key:
+                    c_key = c_key.replace("cordinator", "coordinator")
+                # Accept 'subfranchise' -> 'sub_franchise'
+                if "subfranchise" in c_key and "sub_franchise" not in c_key:
+                    c_key = c_key.replace("subfranchise", "sub_franchise")
+            except Exception:
+                pass
             try:
                 cat_values = {str(k).lower(): k for k, _ in getattr(CustomUser, "CATEGORY_CHOICES", [])}
                 cat_labels = {str(v).lower().replace(" ", "_").replace("-", "_"): k for k, v in getattr(CustomUser, "CATEGORY_CHOICES", [])}
-                c_norm = cat_values.get(c_key) or cat_labels.get(c_key) or c
+                c_norm = cat_values.get(c_key) or cat_labels.get(c_key) or c_key
             except Exception:
-                c_norm = c
+                c_norm = c_key
             qs = qs.filter(category__iexact=c_norm)
         if phone:
             qs = qs.filter(phone__icontains=phone)
@@ -453,7 +492,78 @@ class AdminUsersList(ListAPIView):
         page = max(1, page)
         page_size = max(1, min(page_size, 200))
 
-        total = qs.count()
+        # Compute total with a lightweight queryset (no prefetch/annotate) to avoid slow COUNT(*)
+        base = CustomUser.objects.all()
+        role = (request.query_params.get("role") or "").strip()
+        phone = (request.query_params.get("phone") or "").strip()
+        category = (request.query_params.get("category") or "").strip()
+        pincode = (request.query_params.get("pincode") or "").strip()
+        state_id = (request.query_params.get("state") or "").strip()
+        kyc = (request.query_params.get("kyc") or "").strip()
+        search = (request.query_params.get("search") or "").strip()
+        activated = (request.query_params.get("activated") or "").strip().lower()
+        account_active = (request.query_params.get("account_active") or "").strip().lower()
+
+        if role:
+            r = str(role).strip()
+            r_key = r.lower()
+            try:
+                role_keys = {str(k).lower(): k for k, _ in getattr(CustomUser, "ROLE_CHOICES", [])}
+                role_labels = {str(v).lower().replace(" ", "_").replace("-", "_"): k for k, v in getattr(CustomUser, "ROLE_CHOICES", [])}
+                r_norm = role_keys.get(r_key) or role_labels.get(r_key.replace(" ", "_").replace("-", "_")) or r
+            except Exception:
+                r_norm = r
+            base = base.filter(role__iexact=r_norm)
+
+        if category:
+            c = str(category).strip()
+            c_key = c.lower().replace(" ", "_").replace("-", "_")
+            try:
+                if "cordinator" in c_key:
+                    c_key = c_key.replace("cordinator", "coordinator")
+                if "subfranchise" in c_key and "sub_franchise" not in c_key:
+                    c_key = c_key.replace("subfranchise", "sub_franchise")
+            except Exception:
+                pass
+            try:
+                cat_values = {str(k).lower(): k for k, _ in getattr(CustomUser, "CATEGORY_CHOICES", [])}
+                cat_labels = {str(v).lower().replace(" ", "_").replace("-", "_"): k for k, v in getattr(CustomUser, "CATEGORY_CHOICES", [])}
+                c_norm = cat_values.get(c_key) or cat_labels.get(c_key) or c_key
+            except Exception:
+                c_norm = c_key
+            base = base.filter(category__iexact=c_norm)
+
+        if phone:
+            base = base.filter(phone__icontains=phone)
+        if pincode:
+            base = base.filter(pincode__icontains=pincode)
+        if state_id and state_id.isdigit():
+            base = base.filter(state_id=int(state_id))
+        if kyc:
+            if kyc == "pending":
+                base = base.filter(Q(kyc__verified=False) | Q(kyc__isnull=True))
+            elif kyc == "verified":
+                base = base.filter(kyc__verified=True)
+
+        if account_active in ("1", "true", "yes", "active"):
+            base = base.filter(account_active=True)
+        elif account_active in ("0", "false", "no", "inactive"):
+            base = base.filter(account_active=False)
+
+        if activated in ("1", "true", "yes", "activated"):
+            base = base.filter(first_purchase_activated_at__isnull=False)
+        elif activated in ("0", "false", "no", "inactive", "not_activated", "unactivated", "notactivated"):
+            base = base.filter(first_purchase_activated_at__isnull=True)
+
+        if search:
+            base = base.filter(
+                Q(username__icontains=search)
+                | Q(full_name__icontains=search)
+                | Q(email__icontains=search)
+                | Q(unique_id__icontains=search)
+            )
+
+        total = base.count()
         start = (page - 1) * page_size
         end = start + page_size
         serializer = self.get_serializer(qs[start:end], many=True)
@@ -472,6 +582,28 @@ class AdminUsersList(ListAPIView):
         )
 
 
+class AdminUserCategoryCountsView(APIView):
+    """
+    Aggregate user counts for key categories in a single request.
+    Returns a map of category -> count.
+    """
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("users")]
+
+    def get(self, request):
+        categories = [
+            "consumer",
+            "agency_state_coordinator",
+            "agency_state",
+            "agency_sub_franchise",
+            "employee",
+            "merchant",
+        ]
+        agg = CustomUser.objects.aggregate(
+            **{c: Count("id", filter=Q(category=c)) for c in categories}
+        )
+        return Response(agg, status=200)
+
+
 class AdminUsersExportXLSX(APIView):
     """
     Export Admin Users grid to XLSX with full details.
@@ -479,7 +611,7 @@ class AdminUsersExportXLSX(APIView):
     - Excludes usernames in the "9000000" series by default.
       Pass include_9000000=1 to include them.
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("users"), HasAnyPermission("manage_users", "show_users")]
 
     def get(self, request):
         # Lazy import so server still boots if openpyxl is missing
@@ -574,15 +706,14 @@ class AdminUserEditMetaView(APIView):
     """
     Return dynamic field metadata for Admin user edit dialog based on AdminUserEditSerializer.
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("users"), HasAnyPermission("manage_users", "show_users", "edit_users")]
 
     def get(self, request):
         from .serializers import AdminUserEditSerializer
         try:
             meta = field_meta_from_serializer(AdminUserEditSerializer) or []
 
-            # Normalize and enhance meta for UI
-            # - Ensure password is shown as PasswordField and not required
+            # Normalize base meta
             for f in meta:
                 name = f.get("name")
                 if name == "password":
@@ -596,21 +727,35 @@ class AdminUserEditMetaView(APIView):
                         f["help_text"] = f"{f['help_text']} | {hint}"
                     else:
                         f["help_text"] = hint
+
+            # Restrict to allowed fields only
+            allowed = {"phone", "pincode", "sponsor_id", "password"}
+            meta = [f for f in meta if f.get("name") in allowed]
+
+            # Reorder and add helpful labels/hints
+            order = ["phone", "pincode", "sponsor_id", "password"]
+            meta_map = {f["name"]: f for f in meta}
+            out = []
+            for key in order:
+                if key in meta_map:
+                    f = meta_map[key]
+                    if key == "phone":
+                        f["label"] = "Mobile"
+                        f["help_text"] = (f.get("help_text") or "").strip() or "Changing mobile will also change Username to the new mobile."
+                    if key == "pincode":
+                        f["label"] = "Pincode"
+                        help_msg = "Country/State/City will auto-update from this pincode on Save."
+                        f["help_text"] = (f.get("help_text") + " | " + help_msg).strip(" |") if f.get("help_text") else help_msg
+                    out.append(f)
+            meta = out
         except Exception:
-            # Fallback minimal meta
+            # Fallback minimal meta (restricted to allowed fields)
+            is_super = bool(getattr(request.user, "is_superuser", False))
             meta = [
-                {"name": "email", "type": "EmailField", "required": False, "label": "Email"},
-                {"name": "full_name", "type": "CharField", "required": False, "label": "Full Name"},
-                {"name": "phone", "type": "CharField", "required": False, "label": "Mobile"},
-                {"name": "pincode", "type": "CharField", "required": False, "label": "Pincode"},
-                {"name": "country", "type": "IntegerField", "required": False, "label": "Country (ID)"},
-                {"name": "state", "type": "IntegerField", "required": False, "label": "State (ID)"},
-                {"name": "city", "type": "IntegerField", "required": False, "label": "District/City (ID)"},
-                {"name": "role", "type": "CharField", "required": False, "label": "Role"},
-                {"name": "category", "type": "CharField", "required": False, "label": "Category"},
-                {"name": "is_active", "type": "BooleanField", "required": False, "label": "Active"},
+                {"name": "phone", "type": "CharField", "required": False, "label": "Mobile", "help_text": "Changing mobile will also change Username to the new mobile."},
+                {"name": "pincode", "type": "CharField", "required": False, "label": "Pincode", "help_text": "Country/State/City will auto-update from this pincode on Save."},
+                {"name": "sponsor_id", "type": "CharField", "required": False, "label": "Sponsor ID", "read_only": not is_super},
                 {"name": "password", "type": "PasswordField", "required": False, "label": "Set New Password"},
-                {"name": "sponsor_id", "type": "CharField", "required": False, "label": "Sponsor ID", "read_only": not getattr(request.user, "is_superuser", False)},
             ]
         return Response({"fields": meta}, status=200)
 
@@ -619,7 +764,7 @@ class AdminUserDetail(APIView):
     """
     Retrieve/Update admin-editable fields for a specific user.
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("users"), HasAnyPermission("manage_users", "show_users", "edit_users")]
 
     def get(self, request, pk: int):
         user = CustomUser.objects.filter(pk=pk).first()
@@ -632,6 +777,16 @@ class AdminUserDetail(APIView):
         user = CustomUser.objects.filter(pk=pk).first()
         if not user:
             return Response({"detail": "Not found"}, status=404)
+        # RBAC: edit requires edit_users or manage_users (superuser bypass)
+        try:
+            from .permissions import get_effective_permissions
+            u = request.user
+            if not getattr(u, "is_superuser", False):
+                perms = get_effective_permissions(u)
+                if "*" not in perms and (("edit_users" not in perms) and ("manage_users" not in perms)):
+                    return Response({"detail": "Forbidden"}, status=403)
+        except Exception:
+            return Response({"detail": "Forbidden"}, status=403)
         serializer = AdminUserEditSerializer(user, data=request.data, partial=True)
         if serializer.is_valid():
             obj = serializer.save()
@@ -645,6 +800,8 @@ class AdminUserDetail(APIView):
           - Cannot delete superuser
         Returns 204 No Content on success.
         """
+        if not getattr(request.user, "is_superuser", False):
+            return Response({"detail": "Only superuser can delete users."}, status=403)
         user = CustomUser.objects.filter(pk=pk).first()
         if not user:
             return Response({"detail": "Not found"}, status=404)
@@ -665,7 +822,7 @@ class AdminUserImpersonateView(APIView):
     """
     Admin-only: mint JWT tokens for a specific user to allow 'view as' login.
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsSuperAdmin]
 
     def post(self, request, pk: int):
         user = CustomUser.objects.filter(pk=pk).first()
@@ -691,7 +848,7 @@ class AdminUserSetTempPasswordView(APIView):
     and store an encrypted copy for display in Admin Users grid.
     Response: { "temp_password": "..." }
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsSuperAdmin]
 
     def post(self, request, pk: int):
         user = CustomUser.objects.filter(pk=pk).first()
@@ -737,7 +894,7 @@ class AdminUserWalletAdjustView(APIView):
     - Debits reduce balances using Wallet.debit rules.
     Response: { balance, main_balance, withdrawable_balance }
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsSuperAdmin]
 
     def post(self, request, pk: int):
         user = CustomUser.objects.filter(pk=pk).first()
@@ -795,7 +952,7 @@ class AdminECouponBulkCreateView(APIView):
     Bulk-generate E-Coupons with prefix (default 'ELC') and sequential serials.
     Creates CouponBatch for traceability and CouponCode rows with issued_channel='e_coupon'.
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("ecoupons")]
 
     def post(self, request):
         from django.db import transaction
@@ -905,7 +1062,7 @@ class AdminECouponAssignView(APIView):
       "entityId": 123
     }
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("ecoupons")]
 
     def post(self, request):
         from django.db import transaction
@@ -1020,7 +1177,7 @@ class AdminKYCList(ListAPIView):
       - pincode (contains)
       - date_from, date_to on updated_at
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("kyc")]
     serializer_class = AdminKYCSerializer
 
     def get_queryset(self):
@@ -1071,7 +1228,7 @@ class AdminKYCVerifyView(APIView):
     """
     Verify a user's KYC (sets verified=True, stamps verified_by/verified_at).
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("kyc")]
 
     def patch(self, request, user_id: int):
         kyc = UserKYC.objects.select_related("user").filter(user_id=user_id).first()
@@ -1091,7 +1248,7 @@ class AdminKYCRejectView(APIView):
     Reject KYC (currently sets verified=False). For explicit rejection tracking,
     extend the model with a 'status' field in a future migration.
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("kyc")]
 
     def patch(self, request, user_id: int):
         kyc = UserKYC.objects.select_related("user").filter(user_id=user_id).first()
@@ -1117,7 +1274,7 @@ class AdminWithdrawalList(ListAPIView):
       - method=upi|bank
       - ordering (default -requested_at)
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("withdrawals")]
     serializer_class = AdminWithdrawalSerializer
 
     def get_queryset(self):
@@ -1174,7 +1331,7 @@ class AdminWithdrawalApproveView(APIView):
     Approve a pending withdrawal and debit user's wallet atomically.
     Body: { "payout_ref": "optional reference", "note": "optional" }
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("withdrawals")]
 
     def patch(self, request, pk: int):
         obj = WithdrawalRequest.objects.select_related("user").filter(pk=pk).first()
@@ -1198,6 +1355,15 @@ class AdminPingView(APIView):
 
     def get(self, request):
         user = request.user
+        # Compute module access map (default-deny)
+        modules = {}
+        try:
+            if getattr(user, "is_superuser", False):
+                modules = {k: True for k in MODULE_KEYS}
+            else:
+                modules = {k: has_admin_module_access(user, k) for k in MODULE_KEYS}
+        except Exception:
+            modules = {k: False for k in MODULE_KEYS}
         return Response(
             {
                 "ok": True,
@@ -1205,6 +1371,7 @@ class AdminPingView(APIView):
                 "id": getattr(user, "id", None),
                 "is_staff": bool(getattr(user, "is_staff", False)),
                 "is_superuser": bool(getattr(user, "is_superuser", False)),
+                "modules": modules,
             },
             status=200,
         )
@@ -1223,7 +1390,7 @@ class AdminSupportTicketList(ListAPIView):
       - search: subject/message contains
       - ordering: default -updated_at
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("support")]
     serializer_class = AdminSupportTicketSerializer
 
     def get_queryset(self):
@@ -1264,7 +1431,7 @@ class AdminSupportTicketUpdate(APIView):
         "resolution_note": "text to append/replace"
       }
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("support")]
 
     def patch(self, request, pk: int):
         ticket = SupportTicket.objects.select_related("user").filter(pk=pk).first()
@@ -1302,7 +1469,7 @@ class AdminSupportTicketMessageCreate(APIView):
     Post an admin message to a ticket thread. Also moves status to in_progress when currently open.
     Body: { "message": "..." }
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("support")]
 
     def post(self, request, pk: int):
         ticket = SupportTicket.objects.select_related("user").filter(pk=pk).first()
@@ -1326,7 +1493,7 @@ class AdminSupportTicketApproveKYC(APIView):
       - Appends resolution note if provided
     Body: { "note": "optional" }
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("support")]
 
     def post(self, request, pk: int):
         ticket = SupportTicket.objects.select_related("user").filter(pk=pk).first()
@@ -1363,7 +1530,7 @@ class AdminMatrixProgressList(ListAPIView):
       - state (id), pincode (contains)
       - ordering (default -updated_at)
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("autopool")]
     serializer_class = AdminMatrixProgressSerializer
 
     def get_queryset(self):
@@ -1408,7 +1575,7 @@ class AdminMatrixTree(APIView):
     Response:
       { id, username, full_name, level, children:[...] }
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("autopool")]
 
     def get(self, request):
         try:
@@ -1467,7 +1634,7 @@ class AdminMatrixTree(APIView):
                 children_q = children_q | Q(sponsor_id__iexact=t)
 
             candidates = list(
-                CustomUser.objects.filter(children_q)
+                CustomUser.objects.filter(children_q, category="consumer")
                 .exclude(id=user.id)
                 .only("id", "username", "full_name", "registered_by_id", "sponsor_id")
                 .order_by("id")
@@ -1521,7 +1688,7 @@ class AdminMatrix5Tree(APIView):
     Response:
       { id, username, full_name, level, matrix_position?, depth?, children:[...] }
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("autopool")]
 
     def get(self, request):
         # sanitize identifier (strip any bracketed suffixes like " [sub franchise]" and trailing tokens)
@@ -1542,6 +1709,12 @@ class AdminMatrix5Tree(APIView):
         except Exception:
             max_depth = 6
         max_depth = max(1, min(max_depth, 20))
+
+        sponsor_wide = str(request.query_params.get("sponsor_wide") or "").strip().lower() in ("1", "true", "yes")
+
+        pool = (request.query_params.get("pool") or "").strip().upper()
+        if pool not in ("FIVE_150", "THREE_150", "THREE_50"):
+            pool = "FIVE_150"
 
         # Resolve root user
         user = None
@@ -1569,8 +1742,173 @@ class AdminMatrix5Tree(APIView):
         if not user:
             return Response({"detail": "Root user not found"}, status=404)
 
-        # Builders
-        def build_matrix(u, level: int):
+        # Builders with cycle guards and node budget to prevent runaway
+        node_budget = {"count": 0}
+        NODE_CAP = max(50, min(5000, 5 ** min(max_depth, 6)))  # safe cap
+
+        def build_matrix(u, level: int, visited=None):
+            # Batch BFS (one query per level), max 5 children per parent, with hard node cap.
+            root = {
+                "id": u.id,
+                "username": u.username,
+                "full_name": u.full_name,
+                "level": level,
+                "matrix_position": getattr(u, "matrix_position", None),
+                "depth": getattr(u, "depth", 0),
+                "children": [],
+            }
+            if max_depth <= 1:
+                return root
+
+            nodes_by_user = {u.id: root}
+            current_ids = [u.id]
+            current_level = level
+            total_nodes = 1  # counts nodes materialized in the tree (including root)
+
+            while current_ids and current_level < max_depth and total_nodes < NODE_CAP:
+                rows = list(
+                    CustomUser.objects.filter(parent_id__in=current_ids, category="consumer")
+                    .values("id", "username", "full_name", "matrix_position", "depth", "parent_id")
+                    .order_by("parent_id", "matrix_position", "id")
+                )
+                if not rows:
+                    break
+
+                per_parent_counts = {}
+                next_ids = []
+
+                for r in rows:
+                    pid = r.get("parent_id")
+                    # skip if parent pruned (e.g., due to cap)
+                    parent_node = nodes_by_user.get(pid)
+                    if not parent_node:
+                        continue
+                    if per_parent_counts.get(pid, 0) >= 5:
+                        continue
+                    if total_nodes >= NODE_CAP:
+                        break
+
+                    child_node = {
+                        "id": r["id"],
+                        "username": r["username"],
+                        "full_name": r["full_name"],
+                        "level": current_level + 1,
+                        "matrix_position": r.get("matrix_position"),
+                        "depth": r.get("depth", 0),
+                        "children": [],
+                    }
+                    parent_node["children"].append(child_node)
+                    nodes_by_user[r["id"]] = child_node
+                    per_parent_counts[pid] = per_parent_counts.get(pid, 0) + 1
+                    next_ids.append(r["id"])
+                    total_nodes += 1
+
+                current_ids = next_ids
+                current_level += 1
+
+            return root
+
+        def build_sponsor(u, level: int, visited=None):
+            if visited is None:
+                visited = set()
+            uid = getattr(u, "id", None)
+            if uid in visited:
+                return None
+            visited.add(uid)
+            node = {
+                "id": u.id,
+                "username": u.username,
+                "full_name": u.full_name,
+                "level": level,
+                "children": [],
+            }
+            if level >= max_depth:
+                return node
+
+            # Build children query
+            children_q = Q(registered_by_id=u.id)
+            tokens = set()
+            if sponsor_wide:
+                # Build robust sponsor tokens including dashless variant of prefixed_id
+                try:
+                    pid = (getattr(u, "prefixed_id", "") or "").strip()
+                    if pid:
+                        tokens.add(pid)
+                        tokens.add(pid.replace("-", ""))
+                    uname = (getattr(u, "username", "") or "").strip()
+                    if uname:
+                        tokens.add(uname)
+                    uid2 = (getattr(u, "unique_id", "") or "").strip()
+                    if uid2:
+                        tokens.add(uid2)
+                    phone_digits = "".join(ch for ch in str(getattr(u, "phone", "") or "") if ch.isdigit())
+                    if phone_digits:
+                        tokens.add(phone_digits)
+                except Exception:
+                    pass
+                for t in tokens:
+                    children_q = children_q | Q(sponsor_id__iexact=t)
+
+            candidates = list(
+                CustomUser.objects.filter(children_q, category="consumer")
+                .exclude(id=u.id)
+                .only("id", "username", "full_name", "registered_by_id", "sponsor_id")
+                .order_by("id")
+                .distinct()
+            )
+
+            children = []
+            if sponsor_wide:
+                owner_cache = {}
+                def _owner_id_by_token(token: str):
+                    if not token:
+                        return None
+                    tok = str(token).strip()
+                    if tok in owner_cache:
+                        return owner_cache[tok]
+                    q = Q(prefixed_id__iexact=tok) | Q(username__iexact=tok) | Q(unique_id__iexact=tok)
+                    t_no_dash = "".join(ch for ch in tok if ch.isalnum())
+                    if t_no_dash and t_no_dash != tok:
+                        q = q | Q(prefixed_id__iexact=t_no_dash)
+                    digits = "".join(ch for ch in tok if ch.isdigit())
+                    if digits:
+                        q = q | Q(phone__iexact=digits) | Q(username__iexact=digits)
+                    u2 = CustomUser.objects.filter(q).only("id").first()
+                    oid = getattr(u2, "id", None)
+                    owner_cache[tok] = oid
+                    return oid
+
+                for c in candidates:
+                    if getattr(c, "registered_by_id", None) == u.id:
+                        children.append(c)
+                    else:
+                        sid = (getattr(c, "sponsor_id", "") or "").strip()
+                        if _owner_id_by_token(sid) == u.id:
+                            children.append(c)
+            else:
+                # Fast path: strictly direct registrations only
+                for c in candidates:
+                    if getattr(c, "registered_by_id", None) == u.id:
+                        children.append(c)
+
+            for c in children:
+                cn = build_sponsor(c, level + 1, visited)
+                if cn:
+                    node["children"].append(cn)
+            return node
+
+        # Autopool fallback builder (uses AutoPoolAccount graph if CustomUser.parent tree is empty)
+        def build_autopool(u, level: int, pool_type="FIVE_150", visited=None):
+            if visited is None:
+                visited = set()
+            # Determine branching factor based on pool type
+            fanout = 5 if pool_type == "FIVE_150" else 3
+            uid = getattr(u, "id", None)
+            if uid in visited:
+                return None
+            visited.add(uid)
+
+            node_budget["count"] += 1
             node = {
                 "id": u.id,
                 "username": u.username,
@@ -1580,102 +1918,78 @@ class AdminMatrix5Tree(APIView):
                 "depth": getattr(u, "depth", 0),
                 "children": [],
             }
-            if level >= max_depth:
+            if level >= max_depth or node_budget["count"] >= NODE_CAP:
                 return node
-            children = list(
-                CustomUser.objects.filter(parent_id=u.id)
-                .only("id", "username", "full_name", "matrix_position", "depth")
-                .order_by("matrix_position", "id")
-            )
-            for ch in children:
-                node["children"].append(build_matrix(ch, level + 1))
-            return node
-
-        def build_sponsor(u, level: int, visited=None):
-            if visited is None:
-                visited = set()
-            if getattr(u, "id", None) in visited:
-                return None
-            visited.add(u.id)
-            node = {
-                "id": u.id,
-                "username": u.username,
-                "full_name": u.full_name,
-                "level": level,
-                "children": [],
-            }
-            if level >= max_depth:
-                return node
-            # Build robust sponsor tokens including dashless variant of prefixed_id
-            tokens = set()
             try:
-                pid = (getattr(u, "prefixed_id", "") or "").strip()
-                if pid:
-                    tokens.add(pid)
-                    tokens.add(pid.replace("-", ""))
-                uname = (getattr(u, "username", "") or "").strip()
-                if uname:
-                    tokens.add(uname)
-                uid = (getattr(u, "unique_id", "") or "").strip()
-                if uid:
-                    tokens.add(uid)
-                phone_digits = "".join(ch for ch in str(getattr(u, "phone", "") or "") if ch.isdigit())
-                if phone_digits:
-                    tokens.add(phone_digits)
+                from business.models import AutoPoolAccount
+                from business.services.placement import _ensure_sentinel_root
+                sentinel = _ensure_sentinel_root(pool_type)
             except Exception:
-                pass
+                sentinel = None
+                AutoPoolAccount = None  # type: ignore
 
-            children_q = Q(registered_by_id=u.id)
-            for t in tokens:
-                children_q = children_q | Q(sponsor_id__iexact=t)
-
-            candidates = list(
-                CustomUser.objects.filter(children_q)
-                .exclude(id=u.id)
-                .only("id", "username", "full_name", "registered_by_id", "sponsor_id")
-                .order_by("id")
-                .distinct()
-            )
-
-            def _owner_id_by_token(token: str):
-                if not token:
-                    return None
-                q = Q(prefixed_id__iexact=token) | Q(username__iexact=token) | Q(unique_id__iexact=token)
-                t_no_dash = "".join(ch for ch in str(token) if ch.isalnum())
-                if t_no_dash and t_no_dash != token:
-                    q = q | Q(prefixed_id__iexact=t_no_dash)
-                digits = "".join(ch for ch in str(token) if ch.isdigit())
-                if digits:
-                    q = q | Q(phone__iexact=digits) | Q(username__iexact=digits)
-                u2 = CustomUser.objects.filter(q).only("id").first()
-                return getattr(u2, "id", None)
-
-            children = []
-            for c in candidates:
-                if getattr(c, "registered_by_id", None) == u.id:
-                    children.append(c)
+            # Determine parent accounts for this user at this level
+            parent_acc_ids = []
+            try:
+                if sentinel and getattr(sentinel, "owner_id", None) == getattr(u, "id", None):
+                    parent_acc_ids = [int(sentinel.id)]
                 else:
-                    sid = (getattr(c, "sponsor_id", "") or "").strip()
-                    if _owner_id_by_token(sid) == u.id:
-                        children.append(c)
+                    parent_acc_ids = list(
+                        AutoPoolAccount.objects.filter(owner_id=u.id, pool_type=pool_type, status="ACTIVE")
+                        .values_list("id", flat=True)
+                    ) if AutoPoolAccount else []
+            except Exception:
+                parent_acc_ids = []
 
-            for c in children:
-                cn = build_sponsor(c, level + 1, visited)
+            if not parent_acc_ids or not AutoPoolAccount:
+                return node
+
+            # Find child accounts under these parent accounts and map to unique consumer owners in position order
+            try:
+                qs = (AutoPoolAccount.objects
+                      .select_related("owner")
+                      .filter(pool_type=pool_type, status="ACTIVE", parent_account_id__in=parent_acc_ids)
+                      .order_by("position", "id"))
+            except Exception:
+                qs = []
+
+            seen_level = set()
+            child_users = []
+            for a in qs:
+                ou = getattr(a, "owner", None)
+                oid = getattr(ou, "id", None)
+                cat = str(getattr(ou, "category", "") or "").lower()
+                if not oid or cat != "consumer":
+                    continue
+                if oid in seen_level:
+                    continue
+                seen_level.add(oid)
+                child_users.append(ou)
+                if len(child_users) >= fanout:
+                    break
+
+            for cu in child_users:
+                cn = build_autopool(cu, level + 1, visited)
                 if cn:
                     node["children"].append(cn)
             return node
 
         # Decide source
         if source == "matrix":
-            tree = build_matrix(user, 1)
+            tree = build_autopool(user, 1, pool_type=pool)
+            if not tree or not isinstance(tree.get("children", []), list) or len(tree["children"]) == 0:
+                tree = build_matrix(user, 1)
             return Response(tree, status=200)
         if source == "sponsor":
             tree = build_sponsor(user, 1)
             return Response(tree, status=200)
 
-        # auto: try matrix; if empty children at root, fall back to sponsor
+        # auto: try matrix; if empty children at root, fall back to autopool; then sponsor
         mx_tree = build_matrix(user, 1)
         if not mx_tree or not isinstance(mx_tree.get("children", []), list) or len(mx_tree["children"]) == 0:
+            ap_tree = build_autopool(user, 1, pool_type=pool)
+            if ap_tree and isinstance(ap_tree.get("children", []), list) and len(ap_tree["children"]) > 0:
+                return Response(ap_tree, status=200)
             sp_tree = build_sponsor(user, 1)
             return Response(sp_tree, status=200)
         return Response(mx_tree, status=200)
@@ -1685,7 +1999,7 @@ class AdminAutopoolSummary(APIView):
     """
     Summary for Auto Commission Pool and Matrix progress.
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("autopool")]
 
     def get(self, request):
         # Progress aggregates
@@ -1733,7 +2047,7 @@ class AdminAutopoolTransactionList(ListAPIView):
       - ordering: default -created_at
       - page, page_size: pagination
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("autopool")]
     serializer_class = AdminAutopoolTxnSerializer
 
     def get_queryset(self):
@@ -1814,7 +2128,7 @@ class AdminMatrixAccountsList(APIView):
       - ordering: -created_at (default) | created_at | level | -level | position | -position
       - page (default 1), page_size (default 25, max 200)
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("autopool")]
 
     def get(self, request):
         try:
@@ -1926,7 +2240,7 @@ class AdminMatrixAccountStats(APIView):
         "account": { ... }  // when account_id provided
       }
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("autopool")]
 
     def get(self, request):
         account_id = (request.query_params.get("account_id") or "").strip()
@@ -2014,7 +2328,7 @@ class AdminWithdrawalRejectView(APIView):
     Reject a pending withdrawal without wallet mutation.
     Body: { "reason": "required/optional" }
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("withdrawals")]
 
     def patch(self, request, pk: int):
         obj = WithdrawalRequest.objects.select_related("user").filter(pk=pk).first()
@@ -2037,7 +2351,7 @@ class AdminWithdrawalDistributionPreviewView(APIView):
       - amount: number (required)
     Response: same schema as business.services.withdrawals.compute_withdraw_distribution(...)
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("withdrawals")]
 
     def get(self, request):
         user_id = (request.query_params.get("user_id") or "").strip()
@@ -2081,7 +2395,7 @@ class AdminLevelCommissionView(APIView):
     PATCH: Update any subset of the above keys with numeric values
          Body e.g. { "direct": 15, "l1": 2, "l2": 1, "l3": 1, "l4": 0.5, "l5": 0.5 }
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("commissions")]
 
     def _serialize(self, cfg):
         fixed = dict(getattr(cfg, "referral_join_fixed_json", {}) or {})
@@ -2107,6 +2421,8 @@ class AdminLevelCommissionView(APIView):
         return Response(self._serialize(cfg), status=200)
 
     def patch(self, request):
+        if not getattr(request.user, "is_superuser", False):
+            return Response({"detail": "Only superuser can modify commission config."}, status=403)
         from decimal import Decimal as D
         cfg = CommissionConfig.get_solo()
         fixed = dict(getattr(cfg, "referral_join_fixed_json", {}) or {})
@@ -2134,9 +2450,11 @@ class AdminLevelCommissionSeedView(APIView):
     """
     POST: Reset Direct and L1..L5 to defaults {15, 2, 1, 1, 0.5, 0.5}
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("commissions")]
 
     def post(self, request):
+        if not getattr(request.user, "is_superuser", False):
+            return Response({"detail": "Only superuser can modify commission config."}, status=403)
         cfg = CommissionConfig.get_solo()
         cfg.referral_join_fixed_json = {
             "direct": 15,
@@ -2173,7 +2491,7 @@ class AdminMatrixCommissionConfig(APIView):
                             three_matrix_levels, three_matrix_amounts_json, three_matrix_percents_json.
         Arrays are coerced to 2 decimals; when levels provided, arrays are padded/truncated to match.
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("commissions")]
 
     def _product_key(self, request):
         p = (request.query_params.get("product") or "").strip().lower()
@@ -2223,6 +2541,8 @@ class AdminMatrixCommissionConfig(APIView):
         return Response(resp, status=200)
 
     def patch(self, request):
+        if not getattr(request.user, "is_superuser", False):
+            return Response({"detail": "Only superuser can modify commission config."}, status=403)
         cfg = CommissionConfig.get_solo()
         pk = self._product_key(request)
         if not pk:
@@ -2284,6 +2604,12 @@ class AdminMatrixCommissionConfig(APIView):
         cm3_all[pk] = cm3
         master["consumer_matrix_5"] = cm5_all
         master["consumer_matrix_3"] = cm3_all
+        # Keep commissions block in sync with master keys so policy.enable_3/enable_5 reflect latest changes
+        try:
+            from business.services.commission_policy import CommissionPolicy
+            master["commissions"] = CommissionPolicy._synth_from_master(master)
+        except Exception:
+            pass
         cfg.master_commission_json = master
         try:
             cfg.save(update_fields=["master_commission_json", "updated_at"])
@@ -2315,7 +2641,7 @@ class AdminMasterCommissionConfig(APIView):
           }
         Global keys (tax, withdrawal, upline) are also allowed and update as usual.
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("commissions")]
 
     def _float(self, v):
         from decimal import Decimal as D
@@ -2405,6 +2731,47 @@ class AdminMasterCommissionConfig(APIView):
                             payload["coupon_activation_count"] = 0
                 except Exception:
                     pass
+                # Expose matrix open config for 150
+                try:
+                    products_all = dict(master.get("products", {}) or {})
+                    row150 = dict(products_all.get("150", {}) or {})
+                    mode150 = str(row150.get("matrix_open_mode", "FIRST_TIME_ONLY") or "FIRST_TIME_ONLY").strip().upper()
+                    try:
+                        count150 = int(row150.get("matrix_open_count", 1))
+                    except Exception:
+                        count150 = 1
+                    payload["product_matrix_open_mode"] = mode150
+                    payload["product_matrix_open_count"] = max(0, int(count150))
+                except Exception:
+                    pass
+
+            if pk == "750":
+                try:
+                    products_all = dict(master.get("products", {}) or {})
+                    row750 = dict(products_all.get("750", {}) or {})
+                    aoc = row750.get("activation_open_count", None)
+                    if aoc is None:
+                        # Backward compatible top-level map support
+                        aoc_map = dict(master.get("activation_open_count", {}) or {})
+                        aoc = aoc_map.get("750", None)
+                    if aoc is not None:
+                        try:
+                            payload["activation_open_count"] = int(aoc)
+                        except Exception:
+                            payload["activation_open_count"] = 0
+                    # Also expose matrix open config for 750
+                    mode750 = str(row750.get("matrix_open_mode", "FIRST_TIME_ONLY") or "FIRST_TIME_ONLY").strip().upper()
+                    try:
+                        count750 = int(row750.get("matrix_open_count", row750.get("activation_open_count", 1)))
+                    except Exception:
+                        try:
+                            count750 = int(row750.get("activation_open_count", 1))
+                        except Exception:
+                            count750 = 1
+                    payload["product_matrix_open_mode"] = mode750
+                    payload["product_matrix_open_count"] = max(0, int(count750))
+                except Exception:
+                    pass
 
             # Monthly 759 product-specific config (first-month vs subsequent months, levels, agency toggle, base amount)
             if pk == "759":
@@ -2429,16 +2796,96 @@ class AdminMasterCommissionConfig(APIView):
                     "levels_fixed": lvls,
                     "agency_enabled": bool(m759.get("agency_enabled", True)),
                     "base_amount": _f2(m759.get("base_amount", 759)),
+                    "matrix_open_mode": str(m759.get("matrix_open_mode", "FIRST_MONTH_ONLY") or "FIRST_MONTH_ONLY").strip().upper(),
                 }
 
+        # Include minimal commissions.prime_150.rewards.points_amount and commissions.prime_750 for UI consumers
+        try:
+            master2 = dict(getattr(cfg, "master_commission_json", {}) or {})
+            comm_all2 = dict(master2.get("commissions", {}) or {})
+            # prime_150 rewards.points_amount
+            p150_2 = dict(comm_all2.get("prime_150", {}) or {})
+            rewards_2 = dict(p150_2.get("rewards", {}) or {})
+            # prime_750 (base_package + multiplier)
+            p750_2 = dict(comm_all2.get("prime_750", {}) or {})
+            base_pkg = str(p750_2.get("base_package", "prime_150") or "prime_150").strip().lower()
+            try:
+                mul_in = int(p750_2.get("multiplier", 1))
+                if mul_in <= 0:
+                    mul_in = 1
+            except Exception:
+                mul_in = 1
+            payload.setdefault("commissions", {})
+            payload["commissions"]["prime_150"] = {"rewards": {"points_amount": self._float(rewards_2.get("points_amount", 0))}}
+            payload["commissions"]["prime_750"] = {"base_package": "prime_150", "multiplier": int(mul_in) if base_pkg == "prime_150" else 1}
+        except Exception:
+            pass
         return Response(payload, status=200)
 
     def patch(self, request):
+        if not getattr(request.user, "is_superuser", False):
+            return Response({"detail": "Only superuser can modify commission config."}, status=403)
         from decimal import Decimal as D
         data = request.data or {}
         cfg = CommissionConfig.get_solo()
         master = dict(getattr(cfg, "master_commission_json", {}) or {})
         pk = self._product_key(request)
+
+        # Allow updating commissions.prime_150.rewards.points_amount directly from payload
+        cm = data.get("commissions")
+        if isinstance(cm, dict):
+            # commissions.prime_150.rewards.points_amount
+            try:
+                p150_in = dict(cm.get("prime_150", {}) or {})
+                r_in = p150_in.get("rewards")
+                if isinstance(r_in, dict) and "points_amount" in r_in:
+                    v = D(str(r_in.get("points_amount")))
+                    if v < 0:
+                        return Response({"detail": "commissions.prime_150.rewards.points_amount must be >= 0"}, status=400)
+                    # Merge into master["commissions"] so CommissionPolicy._synth_from_master preserves it
+                    comm = dict(master.get("commissions", {}) or {})
+                    p150_cur = dict(comm.get("prime_150", {}) or {})
+                    r_cur = dict(p150_cur.get("rewards", {}) or {})
+                    r_cur["points_amount"] = float(v)
+                    p150_cur["rewards"] = r_cur
+                    # Ensure keys exist to avoid later synthesis dropping structure
+                    if "direct" not in p150_cur:
+                        p150_cur["direct"] = p150_cur.get("direct", {"sponsor": 0, "self": 0})
+                    if "coupons" not in p150_cur:
+                        p150_cur["coupons"] = p150_cur.get("coupons", {})
+                    comm["prime_150"] = p150_cur
+                    master["commissions"] = comm
+            except Exception:
+                return Response({"detail": "commissions.prime_150.rewards.points_amount must be a number"}, status=400)
+
+            # commissions.prime_750 (base_package, multiplier)
+            p750_in = cm.get("prime_750")
+            if isinstance(p750_in, dict):
+                # base_package must be 'prime_150' (only allowed)
+                bp = str(p750_in.get("base_package", "prime_150") or "prime_150").strip().lower()
+                if bp not in ("prime_150", ""):
+                    return Response({"detail": "commissions.prime_750.base_package must be 'prime_150'"}, status=400)
+
+                mv = None
+                if "multiplier" in p750_in:
+                    try:
+                        mv = int(p750_in.get("multiplier"))
+                        if mv <= 0:
+                            return Response({"detail": "commissions.prime_750.multiplier must be a positive integer"}, status=400)
+                    except Exception:
+                        return Response({"detail": "commissions.prime_750.multiplier must be an integer"}, status=400)
+
+                comm2 = dict(master.get("commissions", {}) or {})
+                p750_cur = dict(comm2.get("prime_750", {}) or {})
+                # enforce allowed base_package
+                p750_cur["base_package"] = "prime_150"
+                if mv is not None:
+                    p750_cur["multiplier"] = int(mv)
+                elif "multiplier" not in p750_cur:
+                    # ensure there is a multiplier; default to 1 if absent
+                    p750_cur["multiplier"] = int(p750_cur.get("multiplier", 1) or 1)
+                comm2["prime_750"] = p750_cur
+                master["commissions"] = comm2
 
         # Global updates (always permitted)
         tax = data.get("tax")
@@ -2631,6 +3078,12 @@ class AdminMasterCommissionConfig(APIView):
                     # agency_enabled (boolean)
                     if "agency_enabled" in mm:
                         m759["agency_enabled"] = bool(mm.get("agency_enabled"))
+                    # matrix_open_mode (enum)
+                    if "matrix_open_mode" in mm:
+                        mv = str(mm.get("matrix_open_mode") or "").strip().upper()
+                        if mv not in ("FIRST_MONTH_ONLY", "EVERY_PURCHASE", "NEVER"):
+                            return Response({"detail": "monthly_759.matrix_open_mode must be FIRST_MONTH_ONLY, EVERY_PURCHASE, or NEVER"}, status=400)
+                        m759["matrix_open_mode"] = mv
                 # Persist back only when product=759 to avoid UnboundLocalError for other products
                 master["monthly_759"] = m759
 
@@ -2668,6 +3121,74 @@ class AdminMasterCommissionConfig(APIView):
                 except Exception:
                     return Response({"detail": "coupon_activation_count must be an integer"}, status=400)
 
+            # activation open count (only applicable for 750 product)
+            if "activation_open_count" in data and pk == "750":
+                try:
+                    iv = int(data.get("activation_open_count"))
+                    if iv < 0:
+                        return Response({"detail": "activation_open_count must be >= 0"}, status=400)
+                    pro_all = dict(master.get("products") or {})
+                    row = dict(pro_all.get(pk, {}) or {})
+                    row["activation_open_count"] = int(iv)
+                    pro_all[pk] = row
+                    master["products"] = pro_all
+                    # Optional: mirror under top-level map for backward compatibility
+                    aoc_map = dict(master.get("activation_open_count", {}) or {})
+                    aoc_map["750"] = int(iv)
+                    master["activation_open_count"] = aoc_map
+                except Exception:
+                    return Response({"detail": "activation_open_count must be an integer"}, status=400)
+
+            # matrix open controls (applicable for 150 and 750 products)
+            # Accept both product_matrix_open_* (preferred) and matrix_open_* (legacy UI) keys.
+            # Also normalize common alias/typo values to keep UI lenient (e.g., PURCHASE_EVERTIME -> EVERY_PURCHASE).
+            if pk in ("150", "750"):
+                mode_key = None
+                if "product_matrix_open_mode" in data:
+                    mode_key = "product_matrix_open_mode"
+                elif "matrix_open_mode" in data:
+                    mode_key = "matrix_open_mode"
+                if mode_key:
+                    raw = str(data.get(mode_key) or "")
+                    gm_in = raw.strip().upper().replace("-", "_").replace(" ", "_")
+                    aliases = {
+                        "PURCHASE_EVERYTIME": "EVERY_PURCHASE",
+                        "PURCHASE_EVERTIME": "EVERY_PURCHASE",
+                        "EVERYTIME_PURCHASE": "EVERY_PURCHASE",
+                        "EVERYTIME": "EVERY_PURCHASE",
+                        "EACH_PURCHASE": "EVERY_PURCHASE",
+                        "FIRST_TIME": "FIRST_TIME_ONLY",
+                        "FIRSTTIME_ONLY": "FIRST_TIME_ONLY",
+                        "FIRST": "FIRST_TIME_ONLY",
+                    }
+                    gm = aliases.get(gm_in, gm_in)
+                    allowed = ("FIRST_TIME_ONLY", "EVERY_PURCHASE", "NEVER")
+                    if gm not in allowed:
+                        return Response({"detail": f"{mode_key} must be FIRST_TIME_ONLY, EVERY_PURCHASE, or NEVER"}, status=400)
+                    pro_all = dict(master.get("products") or {})
+                    row = dict(pro_all.get(pk, {}) or {})
+                    row["matrix_open_mode"] = gm
+                    pro_all[pk] = row
+                    master["products"] = pro_all
+
+                count_key = None
+                if "product_matrix_open_count" in data:
+                    count_key = "product_matrix_open_count"
+                elif "matrix_open_count" in data:
+                    count_key = "matrix_open_count"
+                if count_key:
+                    try:
+                        iv = int(data.get(count_key))
+                    except Exception:
+                        return Response({"detail": f"{count_key} must be an integer"}, status=400)
+                    if iv < 0:
+                        return Response({"detail": f"{count_key} must be >= 0"}, status=400)
+                    pro_all = dict(master.get("products") or {})
+                    row = dict(pro_all.get(pk, {}) or {})
+                    row["matrix_open_count"] = int(iv)
+                    pro_all[pk] = row
+                    master["products"] = pro_all
+
         # keep commissions in sync with master keys
         try:
             from business.services.commission_policy import CommissionPolicy
@@ -2699,7 +3220,7 @@ class AdminRewardPointsConfig(APIView):
            - after.base_count: int >= max(tiers.count)
            - after.per_coupon: int >= 0
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("commissions")]
 
     def _default_config(self):
         return {
@@ -2748,6 +3269,8 @@ class AdminRewardPointsConfig(APIView):
         return Response(self._serialize(cfg), status=200)
 
     def patch(self, request):
+        if not getattr(request.user, "is_superuser", False):
+            return Response({"detail": "Only superuser can modify commission config."}, status=403)
         cfg = CommissionConfig.get_solo()
         existing = self._serialize(cfg)
         data = request.data or {}

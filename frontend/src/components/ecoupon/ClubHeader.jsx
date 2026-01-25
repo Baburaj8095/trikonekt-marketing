@@ -1,13 +1,13 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Paper, Tabs, Tab, Typography } from "@mui/material";
 import { useLocation, useNavigate } from "react-router-dom";
 
 /**
  * ClubHeader
- * Consistent header + tabbed navigation for "My E‑Coupon Club"
+ * Consistent header + tabbed navigation for "My Eâ€‘Coupon Club"
  * Tabs:
- *  - E‑Coupon (redeem / activate)
- *  - E‑Coupon Store
+ *  - Eâ€‘Coupon (redeem / activate)
+ *  - Eâ€‘Coupon Store
  *  - Manual Lucky Coupon
  *
  * Intended for consumer routes only (/user/...).
@@ -34,7 +34,7 @@ export default function ClubHeader() {
     </>
     // <Box sx={{ mb: 1.5 }}>
     //   <Typography variant="h6" sx={{ fontWeight: 900, color: "#0f172a", mb: 0.5 }}>
-    //     My E‑Coupon Club
+    //     My Eâ€‘Coupon Club
     //   </Typography>
     //   <Paper
     //     elevation={0}
@@ -53,11 +53,12 @@ export default function ClubHeader() {
     //       textColor="primary"
     //       indicatorColor="primary"
     //     >
-    //       {/* <Tab label="E‑Coupon" value="coupon" /> */}
-    //       {/* <Tab label="E‑Coupon Store" value="store" />
+    //       {/* <Tab label="Eâ€‘Coupon" value="coupon" /> */}
+    //       {/* <Tab label="Eâ€‘Coupon Store" value="store" />
     //       <Tab label="Manual Lucky Coupon" value="lucky" /> */}
     //     </Tabs>
     //   </Paper>
     // </Box>
   );
 }
+

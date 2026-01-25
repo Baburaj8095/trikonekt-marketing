@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import {
   Box,
   Paper,
@@ -91,7 +91,7 @@ export default function BusinessProfile() {
       <Paper elevation={2} sx={{ p: 2.5 }}>
         {loading ? (
           <Typography variant="body2" color="text.secondary">
-            Loading…
+            Loadingâ€¦
           </Typography>
         ) : (
           <Grid container spacing={2}>
@@ -144,7 +144,7 @@ export default function BusinessProfile() {
             <Grid item xs={12}>
               <Box sx={{ display: "flex", gap: 1 }}>
                 <Button variant="contained" onClick={handleSave} disabled={saving}>
-                  {saving ? "Saving…" : "Save Changes"}
+                  {saving ? "Savingâ€¦" : "Save Changes"}
                 </Button>
               </Box>
             </Grid>
@@ -154,3 +154,4 @@ export default function BusinessProfile() {
     </Box>
   );
 }
+

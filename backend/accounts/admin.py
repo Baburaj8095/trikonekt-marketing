@@ -291,9 +291,8 @@ class CustomUserAdmin(UserAdmin):
             fields = ('assign_districts',)
         elif cat == 'agency_pincode_coordinator':
             fields = ('assign_pincodes',)
-        elif obj is None:
-            # On add form, expose all to allow initial save + refresh workflow
-            fields = ('assign_states', 'assign_districts', 'assign_pincodes')
+        # Do NOT append custom non-model fields on the Add form because UserAdmin uses add_form,
+        # which will not include these extra fields, leading to FieldError.
         if fields:
             fs.append((
                 'Region Bulk Assignments',

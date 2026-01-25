@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { Box, Typography, Grid, Card, CardContent, Button } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { getMerchantProfile, listMyShops } from "../../api/api";
@@ -50,11 +50,11 @@ export default function BusinessDashboard() {
                 Merchant Profile
               </Typography>
               {loading ? (
-                <Typography variant="body2" color="text.secondary">Loading…</Typography>
+                <Typography variant="body2" color="text.secondary">Loadingâ€¦</Typography>
               ) : (
                 <>
-                  <Typography variant="body2"><b>Business Name:</b> {profile?.business_name || "—"}</Typography>
-                  <Typography variant="body2"><b>Mobile:</b> {profile?.mobile_number || "—"}</Typography>
+                  <Typography variant="body2"><b>Business Name:</b> {profile?.business_name || "â€”"}</Typography>
+                  <Typography variant="body2"><b>Mobile:</b> {profile?.mobile_number || "â€”"}</Typography>
                   <Typography variant="body2"><b>Verified:</b> {verified ? "Yes" : "No"}</Typography>
                   <Box sx={{ mt: 1.5 }}>
                     <Button variant="contained" size="small" onClick={() => navigate("/business/profile")}>
@@ -74,14 +74,14 @@ export default function BusinessDashboard() {
                 My Shops
               </Typography>
               {loading ? (
-                <Typography variant="body2" color="text.secondary">Loading…</Typography>
+                <Typography variant="body2" color="text.secondary">Loadingâ€¦</Typography>
               ) : (
                 <>
                   <Typography variant="body2"><b>Total:</b> {shops?.length || 0}</Typography>
                   {shops?.slice(0, 3).map((s) => (
                     <Box key={s.id} sx={{ mt: 0.75 }}>
                       <Typography variant="body2">
-                        {s.shop_name} — <i>{s.city || "—"}</i> [{s.status}]
+                        {s.shop_name} â€” <i>{s.city || "â€”"}</i> [{s.status}]
                       </Typography>
                     </Box>
                   ))}
@@ -95,6 +95,24 @@ export default function BusinessDashboard() {
                   </Box>
                 </>
               )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <Card elevation={2}>
+            <CardContent>
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
+                Prime Packages
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Join Trikonekt Prime packages to unlock exclusive benefits.
+              </Typography>
+              <Box sx={{ mt: 1.5 }}>
+                <Button variant="contained" size="small" onClick={() => navigate("/business/join-prime")}>
+                  Explore Packages
+                </Button>
+              </Box>
             </CardContent>
           </Card>
         </Grid>
@@ -120,3 +138,4 @@ export default function BusinessDashboard() {
     </Box>
   );
 }
+

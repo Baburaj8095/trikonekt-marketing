@@ -1,4 +1,4 @@
-/**
+﻿/**
  * v2 Theme - Typography (Inter/Poppins scale)
  */
 const typography = {
@@ -13,3 +13,4 @@ const typography = {
 };
 
 export default typography;
+

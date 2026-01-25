@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Typography } from "@mui/material";
 import SmartImage from "./SmartImage";
 
@@ -56,3 +56,4 @@ function CategoryStrip({ categories, onClick }) {
 }
 
 export default React.memo(CategoryStrip);
+

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Lightweight Checkout Store (namespace-aware, similar to cart store)
  * - Persists non-file checkout state across page reloads
  * - Ephemeral file (payment screenshot) kept in-memory
@@ -189,3 +189,4 @@ export function resetCheckout() {
   saveToStorage();
   notify();
 }
+

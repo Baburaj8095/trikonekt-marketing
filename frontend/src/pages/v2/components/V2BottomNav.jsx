@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Typography } from "@mui/material";
 import colors from "../theme/colors";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -110,3 +110,4 @@ export default function V2BottomNav({ items }) {
     </Box>
   );
 }
+

@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import V2PageContainer from "../V2PageContainer";
 import Marketplace from "../../market/Marketplace";
 
@@ -14,3 +14,4 @@ export default function MerchantMarketplace2() {
     </V2PageContainer>
   );
 }
+

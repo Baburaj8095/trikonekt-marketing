@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { Box, Typography, Chip, Button, Grid, Paper, Divider, Skeleton } from "@mui/material";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import NearMeIcon from "@mui/icons-material/NearMe";
@@ -134,7 +134,7 @@ export default function MerchantShopDetail() {
                       {shop.address}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {shop.city || "—"}
+                      {shop.city || "â€”"}
                     </Typography>
                   </Box>
                 </Box>
@@ -142,7 +142,7 @@ export default function MerchantShopDetail() {
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
                   <PlaceIcon fontSize="small" sx={{ color: "text.secondary" }} />
                   <Typography variant="body2" color="text.secondary">
-                    {shop.city || "—"}
+                    {shop.city || "â€”"}
                   </Typography>
                 </Box>
               )}
@@ -160,7 +160,7 @@ export default function MerchantShopDetail() {
               <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
                 <PhoneIphoneIcon fontSize="small" sx={{ color: "text.secondary" }} />
                 <Typography variant="body2" color="text.secondary">
-                  {shop.contact_number || "—"}
+                  {shop.contact_number || "â€”"}
                 </Typography>
               </Box>
 
@@ -181,7 +181,7 @@ export default function MerchantShopDetail() {
               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 <CalendarTodayIcon fontSize="small" sx={{ color: "text.secondary" }} />
                 <Typography variant="caption" color="text.secondary">
-                  Added on {shop.created_at ? new Date(shop.created_at).toLocaleString() : "—"}
+                  Added on {shop.created_at ? new Date(shop.created_at).toLocaleString() : "â€”"}
                 </Typography>
               </Box>
             </Paper>
@@ -191,3 +191,4 @@ export default function MerchantShopDetail() {
     </Box>
   );
 }
+

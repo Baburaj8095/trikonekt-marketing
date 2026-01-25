@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+﻿import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Container,
@@ -15,7 +15,7 @@ import StoreIcon from "@mui/icons-material/Store";
 import WorkIcon from "@mui/icons-material/Work";
 import BusinessIcon from "@mui/icons-material/Business";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
-import LOGO from "../../assets/TRIKONEKT.png";
+import LOGO from "../../assets/TRIKONEKT.jpg";
 
 const RoleCard = ({ icon, title, desc, onLogin, onRegister, colors, loginDisabled = false, isActive = false, onSelect }) => (
   <Card
@@ -253,7 +253,7 @@ export default function RoleSelect() {
             <RoleCard
               icon={<PersonIcon />}
               title="Consumer"
-              desc="Earn rewards and redeem e‑coupons."
+              desc="Earn rewards and redeem eâ€‘coupons."
               onLogin={() => navigate(buildUrl("user", "login"))}
               onRegister={() => navigate(buildUrl("user", "register"))}
               colors={palette.consumer}
@@ -266,7 +266,7 @@ export default function RoleSelect() {
             <RoleCard
               icon={<WorkIcon />}
               title="Employee"
-              desc="Review submissions and manage e‑coupons."
+              desc="Review submissions and manage eâ€‘coupons."
               onLogin={() => navigate(buildUrl("employee", "login"))}
               onRegister={() => navigate(buildUrl("employee", "register"))}
               colors={palette.employee}
@@ -311,3 +311,5 @@ export default function RoleSelect() {
     </Box>
   );
 }
+
+

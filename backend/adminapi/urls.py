@@ -5,6 +5,7 @@ from .views import (
     AdminUserTreeDefaultRoot,
     AdminUserTreeChildren,
     AdminUsersList,
+    AdminUserCategoryCountsView,
     AdminUserDetail,
     AdminUsersExportXLSX,
     AdminUserImpersonateView,
@@ -41,6 +42,22 @@ from .views import (
     AdminWithdrawalDistributionPreviewView,
 )
 from .dynamic import router as dynamic_router, admin_meta as dynamic_admin_meta, admin_meta_summary, admin_meta_fields
+# RBAC endpoints
+from .views_rbac import (
+    AdminMeView,
+    AdminUsersListCreate,
+    AdminUserActivateView,
+    AdminUserDeactivateView,
+    AdminUserAssignRoleView,
+    RoleListCreateView,
+    RoleDetailView,
+    PermissionListCreateView,
+    PermissionDetailView,
+    RolePermissionsListView,
+    RolePermissionsBulkAssignView,
+    RolePermissionsForRoleView,
+    AdminPermissionSeedDefaultsView,
+)
 
 urlpatterns = [
     path("metrics/", AdminMetricsView.as_view()),
@@ -48,7 +65,9 @@ urlpatterns = [
     path("users/tree/root/", AdminUserTreeRoot.as_view()),
     path("users/tree/default-root/", AdminUserTreeDefaultRoot.as_view()),
     path("users/tree/children/", AdminUserTreeChildren.as_view()),
-    path("users/", AdminUsersList.as_view()),
+    path("users/category-counts/", AdminUserCategoryCountsView.as_view()),
+    # Admin Users (list/search via existing view, plus POST create via RBAC wrapper)
+    path("users/", AdminUsersListCreate.as_view()),
     path("users/export-xlsx", AdminUsersExportXLSX.as_view()),
     path("users/edit-meta/", AdminUserEditMetaView.as_view()),
     path("users/<int:pk>/", AdminUserDetail.as_view()),
@@ -93,6 +112,26 @@ urlpatterns = [
     path("support/tickets/<int:pk>/", AdminSupportTicketUpdate.as_view()),
     path("support/tickets/<int:pk>/messages/", AdminSupportTicketMessageCreate.as_view()),
     path("support/tickets/<int:pk>/approve-kyc/", AdminSupportTicketApproveKYC.as_view()),
+
+    # ===== RBAC core =====
+    # Current admin info
+    path("me/", AdminMeView.as_view()),
+    # Admin user actions
+    path("users/<int:pk>/activate/", AdminUserActivateView.as_view()),
+    path("users/<int:pk>/deactivate/", AdminUserDeactivateView.as_view()),
+    path("users/<int:pk>/assign-role/", AdminUserAssignRoleView.as_view()),
+    # Roles
+    path("roles/", RoleListCreateView.as_view()),
+    path("roles/<int:pk>/", RoleDetailView.as_view()),
+    # Permissions
+    path("permissions/", PermissionListCreateView.as_view()),
+    path("permissions/seed-defaults/", AdminPermissionSeedDefaultsView.as_view()),
+    path("permissions/<int:pk>/", PermissionDetailView.as_view()),
+    # Role-Permission mapping
+    path("role-permissions/", RolePermissionsListView.as_view()),
+    path("role-permissions/bulk-assign/", RolePermissionsBulkAssignView.as_view()),
+    path("roles/<int:pk>/permissions/", RolePermissionsForRoleView.as_view()),
+
     # Dynamic admin models (auto-discovered)
     path("", include(dynamic_router.urls)),
     path("admin-meta/", dynamic_admin_meta),

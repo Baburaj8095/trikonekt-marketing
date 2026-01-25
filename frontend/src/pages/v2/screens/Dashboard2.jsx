@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Box, Typography, Grid, Card, CardContent } from "@mui/material";
 import V2Button from "../components/V2Button";
@@ -9,7 +9,7 @@ import shadows from "../theme/shadows";
 import API, { listMyPromoPurchases } from "../../../api/api";
 
 // Assets
-import LOGO from "../../../assets/TRIKONEKT.png";
+import LOGO from "../../../assets/TRIKONEKT.jpg";
 import banner_wg from "../../../assets/Wealth_Galaxy.jpg";
 import imgGiftCards from "../../../assets/gifts.jpg";
 import imgEcommerce from "../../../assets/ecommerce.jpg";
@@ -144,7 +144,7 @@ export default function Dashboard2() {
       { key: "wealth-galaxy", label: "Wealth Galaxy", route: "/user/wealth-galaxy", image: banner_wg },
       { key: "prime", label: "Prime", route: "/user/promo-packages", image: LOGO },
       { key: "bill-recharge", label: "Bill & Recharge", comingSoon: true, image: imgBillRecharge },
-      { key: "ecommerce", label: "E‑commerce", route: "/trikonekt-products", image: imgEcommerce },
+      { key: "ecommerce", label: "Eâ€‘commerce", route: "/trikonekt-products", image: imgEcommerce },
       { key: "tri-holidays", label: "TRI Holidays", route: "/user/tri/tri-holidays", image: imgHolidays },
       { key: "tri-furniture", label: "TRI Furniture", route: "/user/tri/tri-furniture", image: imgFurniture },
       { key: "tri-electronics", label: "TRI Electronics", route: "/user/tri/tri-electronics", image: imgPlaystoreScreen },
@@ -162,7 +162,7 @@ export default function Dashboard2() {
         it.key === "prime"
           ? {
               ...it,
-              badgeText: isPrime ? "Prime" : "Non‑Prime",
+              badgeText: isPrime ? "Prime" : "Nonâ€‘Prime",
               badgeBg: isPrime ? colors.success : colors.mutedBg,
               badgeFg: colors.textOnDark,
             }
@@ -279,7 +279,7 @@ export default function Dashboard2() {
           <Grid item xs={12} sm={4}>
             <V2SectionCard>
               <Typography sx={{ fontSize: 12, color: colors.textMuted }}>Main Wallet</Typography>
-              <Typography sx={{ fontSize: 18, fontWeight: 800, color: colors.textOnDark, mt: 0.5 }}>ADA —</Typography>
+              <Typography sx={{ fontSize: 18, fontWeight: 800, color: colors.textOnDark, mt: 0.5 }}>ADA â€”</Typography>
             </V2SectionCard>
           </Grid>
           <Grid item xs={12} sm={4}>
@@ -293,7 +293,7 @@ export default function Dashboard2() {
           <Grid item xs={12} sm={4}>
             <V2SectionCard>
               <Typography sx={{ fontSize: 12, color: colors.textMuted }}>Grade</Typography>
-              <Typography sx={{ fontSize: 18, fontWeight: 800, color: colors.textOnDark, mt: 0.5 }}>0 — Stars</Typography>
+              <Typography sx={{ fontSize: 18, fontWeight: 800, color: colors.textOnDark, mt: 0.5 }}>0 â€” Stars</Typography>
             </V2SectionCard>
           </Grid>
         </Grid>
@@ -391,7 +391,7 @@ export default function Dashboard2() {
         </V2SectionCard>
       </Box>
 
-      {/* App Hub and E‑Books */}
+      {/* App Hub and Eâ€‘Books */}
       <Box sx={{ pt: 2 }}>
         <Typography sx={{ fontSize: 14, fontWeight: 800, color: colors.textOnDark, mb: 1 }}>App Hub</Typography>
         <V2SectionCard>
@@ -400,7 +400,7 @@ export default function Dashboard2() {
       </Box>
 
       <Box sx={{ pt: 2 }}>
-        <Typography sx={{ fontSize: 14, fontWeight: 800, color: colors.textOnDark, mb: 1 }}>E‑Books</Typography>
+        <Typography sx={{ fontSize: 14, fontWeight: 800, color: colors.textOnDark, mb: 1 }}>Eâ€‘Books</Typography>
         <V2SectionCard>
           <EBooks />
         </V2SectionCard>
@@ -436,7 +436,7 @@ export default function Dashboard2() {
               }}
             >
               <Typography sx={{ fontSize: 14, color: colors.textPrimary }}>{item.label}</Typography>
-              <Typography sx={{ fontSize: 12, opacity: 0.6 }}>›</Typography>
+              <Typography sx={{ fontSize: 12, opacity: 0.6 }}>â€º</Typography>
             </Box>
           ))}
         </V2SectionCard>
@@ -444,3 +444,5 @@ export default function Dashboard2() {
     </V2Scaffold>
   );
 }
+
+

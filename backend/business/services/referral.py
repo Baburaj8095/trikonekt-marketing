@@ -11,6 +11,7 @@ from business.models import (
     AutoPoolAccount,
     ReferralJoinPayout,
     UserMatrixProgress,
+    is_matrix_eligible,
 )
 
 
@@ -89,9 +90,8 @@ def _distribute_three_matrix(user: CustomUser, base_amount: Decimal, source: Dic
     Distribute 15-level autopool income for THREE_50 using fixed amounts if configured,
     else fall back to percent-based distribution from CommissionConfig.
     """
-    cfg = CommissionConfig.get_solo()
-    src_type = str(source.get("type") or "")
-    src_id = str(source.get("id") or source.get("code") or "")
+    # THREE_50 disabled: no matrix creation or payouts on join
+    return
 
     # Ensure an autopool account exists for the user (simple placement)
     try:
@@ -236,7 +236,7 @@ def _distribute_five_matrix(new_user: CustomUser, source: Dict[str, Any]):
         return
     cfg = CommissionConfig.get_solo()
     try:
-        levels = int(getattr(cfg, "five_matrix_levels", 6) or 6)
+        levels = int(cfg.get_matrix_five_levels())
     except Exception:
         levels = 6
     fixed: list = getattr(cfg, "five_matrix_amounts_json", []) or []
@@ -253,8 +253,11 @@ def _distribute_five_matrix(new_user: CustomUser, source: Dict[str, Any]):
         amt = _q2(fixed[idx] or 0)
         if amt <= 0:
             continue
-        # Pay only to ACTIVE Agency/Employee/Business
-        if not (_is_aeb(recipient) and _is_active_user(recipient)):
+        # Pay only to eligible consumers; skip non-eligible (agency/employee/staff/superuser/company/etc.)
+        try:
+            if not is_matrix_eligible(recipient):
+                continue
+        except Exception:
             continue
         meta = {
             "source": "FIVE_MATRIX_FIXED",
@@ -293,9 +296,11 @@ def on_user_join(new_user: CustomUser, source: Dict[str, Any] | None = None) -> 
     except IntegrityError:
         return False
 
-    # 5-matrix placement under sponsor with spillover
+    # 5-matrix placement under sponsor with spillover (consumers only)
     try:
-        place_user_in_five_matrix(new_user)
+        from business.models import is_matrix_eligible as _is_mat_eligible
+        if _is_mat_eligible(new_user):
+            place_user_in_five_matrix(new_user)
     except Exception:
         # best-effort
         pass
@@ -312,9 +317,32 @@ def on_user_join(new_user: CustomUser, source: Dict[str, Any] | None = None) -> 
         _q2(fixed.get("l5", 0.5)),
     ]
 
-    # Direct sponsor bonus
+    # Direct sponsor bonus (suppress for PRIME 750 first activation via promo purchase)
+    suppress_direct = False
+    try:
+        st = str(src_type or "").strip().lower()
+        if st in ("promo_purchase", "promo_purchase_approval"):
+            try:
+                pid = int(src_id)
+            except Exception:
+                pid = None
+            if pid:
+                try:
+                    from decimal import Decimal as D
+                    from business.models import PromoPurchase
+                    pp = PromoPurchase.objects.select_related("package").filter(pk=pid).first()
+                    if pp:
+                        price = D(str(getattr(pp.package, "price", "0") or "0"))
+                        is_prime = str(getattr(pp.package, "type", "") or "").upper() == "PRIME"
+                        if is_prime and abs(price - D("750")) <= D("0.5"):
+                            suppress_direct = True
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
     sponsor = getattr(new_user, "registered_by", None)
-    if sponsor and direct_amt > 0:
+    if (not suppress_direct) and sponsor and direct_amt > 0:
         _credit_wallet(
             sponsor,
             direct_amt,
@@ -351,12 +379,13 @@ def on_user_join(new_user: CustomUser, source: Dict[str, Any] | None = None) -> 
 
     # 5-matrix genealogy benefit distribution (up to configured 6 levels)
     try:
-        _distribute_five_matrix(new_user, {"type": "JOIN_REFERRAL", "id": getattr(new_user, "id", "")})
+        if is_matrix_eligible(new_user):
+            _distribute_five_matrix(new_user, {"type": "JOIN_REFERRAL", "id": getattr(new_user, "id", "")})
     except Exception:
         pass
 
     # Optional autopool trigger on direct referral
-    if getattr(cfg, "autopool_trigger_on_direct_referral", True):
+    if False and getattr(cfg, "autopool_trigger_on_direct_referral", True):
         try:
             st = (src_type or "").lower()
             # Skip autopool here when join is executed as part of an activation flow to avoid double payouts

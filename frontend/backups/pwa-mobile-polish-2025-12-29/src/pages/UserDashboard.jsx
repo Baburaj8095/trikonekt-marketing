@@ -24,7 +24,7 @@ import {
   Avatar,
 } from "@mui/material";
 import API, { listMyPromoPurchases, listHeroBanners, listPromotions, listCategoryBanners } from "../api/api";
-import LOGO from "../assets/TRIKONEKT.png";
+import LOGO from "../assets/TRIKONEKT.jpeg";
 import banner_wg from "../assets/Wealth_Galaxy.jpg";
 import imgGiftCards from "../assets/gifts.jpg";
 import imgEcommerce from "../assets/ecommerce.jpg";

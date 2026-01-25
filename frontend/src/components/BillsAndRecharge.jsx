@@ -1,4 +1,4 @@
-import { Box, Typography } from "@mui/material";
+﻿import { Box, Typography } from "@mui/material";
 import PhoneAndroidIcon from "@mui/icons-material/PhoneAndroid";
 import TvIcon from "@mui/icons-material/Tv";
 import BoltIcon from "@mui/icons-material/Bolt";
@@ -13,7 +13,7 @@ const items = [
   { label: "Water", icon: <WaterDropIcon /> },
 ];
 
-export default function BillsAndRecharge() {
+export default function BillsAndRecharge({ onItemClick }) {
   return (
     <Box sx={{ mt: 3 }}>
       <Typography fontSize={16} fontWeight={700} mb={1}>
@@ -22,7 +22,20 @@ export default function BillsAndRecharge() {
 
       <Box sx={{ display: "flex", gap: 2 }}>
         {items.map((i) => (
-          <Box key={i.label} textAlign="center">
+          <Box
+            key={i.label}
+            textAlign="center"
+            role="button"
+            tabIndex={0}
+            onClick={() => onItemClick && onItemClick(i)}
+            onKeyDown={(e) => {
+              if ((e.key === "Enter" || e.key === " ") && onItemClick) {
+                e.preventDefault();
+                onItemClick(i);
+              }
+            }}
+            sx={{ cursor: "pointer" }}
+          >
             <Box
               sx={{
                 width: 56,
@@ -48,3 +61,4 @@ export default function BillsAndRecharge() {
     </Box>
   );
 }
+

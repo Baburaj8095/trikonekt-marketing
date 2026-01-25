@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Paper, Typography, Button, Stack } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 
@@ -66,3 +66,4 @@ export default function CheckoutSuccess() {
     </Box>
   );
 }
+

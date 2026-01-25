@@ -16,12 +16,15 @@ urlpatterns = [
     path('api/coupons/', include('coupons.urls')),
     path('api/location/', include('locations.urls')),
     path('api/business/', include('business.urls')),
+    # Public + Admin endpoints for Merchant Category/Subcategory
+    path('api/merchant/', include('business.urls_merchant')),
     path('api/admin/', include('adminapi.urls')),
     # Backward-compat alias for old clients that call /api/adminapi/*
     path('api/adminapi/', include('adminapi.urls')),
     path('api/company/', CompanyInfoView.as_view()),
     path('api/company/packages/', CompanyPackagesView.as_view()),
     path('api/', include('market.urls')),
+    path('api/ui/', include('ui.urls')),
     # v1 aliases and public endpoints
     path('api/v1/coupon/activate/', CouponActivateView.as_view()),
     path('api/v1/coupon/redeem/', CouponRedeemView.as_view()),

@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Typography } from "@mui/material";
 
 /**
@@ -23,3 +23,4 @@ export default function Section({ title, children, mb = { xs: 2, sm: 3 } }) {
     </Box>
   );
 }
+

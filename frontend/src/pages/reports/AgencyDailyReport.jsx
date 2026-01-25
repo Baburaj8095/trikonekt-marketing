@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+﻿import React, { useEffect, useState, useMemo } from "react";
 import {
   Box,
   Container,
@@ -166,7 +166,7 @@ export default function AgencyDailyReport() {
       { field: "wg_registered", headerName: "WG", minWidth: 80 },
       { field: "asia_pay_registered", headerName: "Asia Pay", minWidth: 110 },
       { field: "dm_account_registered", headerName: "DM Acc", minWidth: 110 },
-      { field: "e_coupon_issued", headerName: "E‑Coupon", minWidth: 110 },
+      { field: "e_coupon_issued", headerName: "Eâ€‘Coupon", minWidth: 110 },
       { field: "physical_coupon_issued", headerName: "Physical", minWidth: 110 },
       { field: "product_sold", headerName: "Products", minWidth: 110 },
       { field: "total_amount", headerName: "Total Amount", minWidth: 140 },
@@ -209,7 +209,7 @@ export default function AgencyDailyReport() {
       { field: "wg_registered", headerName: "WG", minWidth: 80 },
       { field: "asia_pay_registered", headerName: "Asia Pay", minWidth: 110 },
       { field: "dm_account_registered", headerName: "DM Acc", minWidth: 110 },
-      { field: "e_coupon_issued", headerName: "E‑Coupon", minWidth: 110 },
+      { field: "e_coupon_issued", headerName: "Eâ€‘Coupon", minWidth: 110 },
       { field: "physical_coupon_issued", headerName: "Physical", minWidth: 110 },
       { field: "product_sold", headerName: "Products", minWidth: 110 },
       { field: "total_amount", headerName: "Total Amount", minWidth: 140 },
@@ -305,7 +305,7 @@ export default function AgencyDailyReport() {
               <Grid item xs={12} sm={6} md={3}>
                 <TextField
                   size="small"
-                  label="E‑Coupon Issued"
+                  label="Eâ€‘Coupon Issued"
                   value={form.e_coupon_issued}
                   onChange={handleChange("e_coupon_issued")}
                   inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
@@ -335,7 +335,7 @@ export default function AgencyDailyReport() {
               <Grid item xs={12} sm={6} md={3}>
                 <TextField
                   size="small"
-                  label="Total Amount (₹)"
+                  label="Total Amount (â‚¹)"
                   value={form.total_amount}
                   onChange={handleChange("total_amount")}
                   inputProps={{ inputMode: "decimal" }}
@@ -440,7 +440,7 @@ export default function AgencyDailyReport() {
               >
                 <MenuItem value="">All</MenuItem>
                 <MenuItem value="EMPLOYEE">Employee</MenuItem>
-                <MenuItem value="SUBFRANCHISE">Sub‑Franchise</MenuItem>
+                <MenuItem value="SUBFRANCHISE">Subâ€‘Franchise</MenuItem>
               </TextField>
               <TextField
                 size="small"
@@ -466,3 +466,4 @@ export default function AgencyDailyReport() {
     </Container>
   );
 }
+

@@ -1,10 +1,10 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Typography } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
 import AppCard from "./ui/AppCard";
 
 /**
- * AppsRow — single-row horizontal scroller for compact cards
+ * AppsRow â€” single-row horizontal scroller for compact cards
  *
  * Props:
  * - items: Array<{
@@ -132,3 +132,4 @@ export default function AppsRow({ items = [], title = null, size = "sm", shape =
     </Box>
   );
 }
+

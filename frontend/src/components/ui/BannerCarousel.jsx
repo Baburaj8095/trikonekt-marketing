@@ -1,16 +1,16 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+﻿import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Box, CircularProgress, Typography } from "@mui/material";
 import API from "../../api/api";
 import normalizeMediaUrl from "../../utils/media";
 
 /**
- * BannerCarousel — BookMyShow-like hero slider
+ * BannerCarousel â€” BookMyShow-like hero slider
  *
  * Visual-only changes. Data/API unchanged.
- * - Auto-scroll 4–5s
+ * - Auto-scroll 4â€“5s
  * - Swipe gestures
  * - Pagination dots bottom-center
- * - Rounded slides (16–20dp)
+ * - Rounded slides (16â€“20dp)
  * - Side peek of next banner (10dp)
  * - Smooth easing animations
  */
@@ -285,3 +285,4 @@ export default function BannerCarousel({
     </Box>
   );
 }
+

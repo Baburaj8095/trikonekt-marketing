@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import API from "../api/api";
 
 const DEFAULT_GEO_OPTS = { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 };
@@ -267,3 +267,4 @@ export default function useGeoAddress(options = {}) {
 
   return { coords, address, loading, error, refresh, supported, resolveFromPincode, searchPostOffices };
 }
+

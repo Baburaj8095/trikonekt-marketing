@@ -10,7 +10,7 @@ import {
 import SearchIcon from "@mui/icons-material/Search";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import { useNavigate } from "react-router-dom";
-import LOGO from "../assets/TRIKONEKT.png";
+import LOGO from "../assets/TRIKONEKT.jpeg";
 
 export default function PublicNavbar() {
   const navigate = useNavigate();

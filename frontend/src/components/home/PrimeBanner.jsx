@@ -1,4 +1,4 @@
-import { Box, Typography, Button } from "@mui/material";
+﻿import { Box, Typography, Button } from "@mui/material";
 
 export default function PrimeBanner({ active }) {
   return (
@@ -14,3 +14,4 @@ export default function PrimeBanner({ active }) {
     </Box>
   );
 }
+

@@ -1,4 +1,4 @@
-import API, { ensureFreshAccess, getAccessToken } from "../../api/api";
+﻿import API, { ensureFreshAccess, getAccessToken } from "../../api/api";
 
 /**
  * Admin meta API helpers with caching and in-flight dedupe.
@@ -131,3 +131,4 @@ export function primeAdminMeta(data) {
   g.__ADMIN_META_CACHE__ = data || {};
   g.__ADMIN_META_CACHE_TS__ = Date.now();
 }
+

@@ -14,6 +14,7 @@ from business.models import (
     CommissionConfig,
     AutoPoolAccount,
     SubscriptionActivation,
+    is_matrix_eligible,
 )
 
 
@@ -78,7 +79,7 @@ def _allow_agency_in_matrix() -> bool:
     """
     Feature toggle from master_commission_json.general.allow_agency_in_matrix.
     When True, do not skip matrix payouts to agency/employee recipients.
-    Default behavior when not configured: ALLOW payouts (True).
+    Default behavior when not configured: DENY payouts (False).
     """
     try:
         cfg = CommissionConfig.get_solo()
@@ -86,10 +87,10 @@ def _allow_agency_in_matrix() -> bool:
         general = dict(master.get("general", {}) or {})
         if "allow_agency_in_matrix" in general:
             return bool(general.get("allow_agency_in_matrix"))
-        # If not explicitly set, allow agencies/employees to receive matrix payouts
-        return True
+        # If not explicitly set, deny agencies/employees from receiving matrix payouts
+        return False
     except Exception:
-        return True
+        return False
 
 
 def _update_matrix_progress(user: CustomUser, pool_type: str, level: int, amount: Decimal):
@@ -128,6 +129,9 @@ def _distribute_levels(upline: Iterable[CustomUser], base_amount: Decimal, perce
         pct = percents[idx] or Decimal("0")
         amt = _q2(base_q * pct / Decimal("100"))
         if amt <= 0:
+            continue
+        # Skip ineligible recipients (non-consumer/staff/superuser/agency/employee)
+        if tx_type in ("AUTOPOOL_BONUS_THREE", "AUTOPOOL_BONUS_FIVE") and not is_matrix_eligible(user):
             continue
         # Skip matrix payouts to agency/employee recipients
         if tx_type in ("AUTOPOOL_BONUS_THREE", "AUTOPOOL_BONUS_FIVE") and _is_agency_or_employee(user) and not _allow_agency_in_matrix():
@@ -281,6 +285,19 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
             pass
         return False
     timings["create_activation"] = time.time() - t_create_start
+    # Early guard: for e‑coupon channel, only mark activation and ensure_first then exit (payouts handled separately)
+    src_type_upper = (src_type or "").upper()
+    if ("ECOUPON" in src_type_upper) or (str((source or {}).get("channel", "")).lower().replace("-", "_") == "e_coupon"):
+        try:
+            ensure_first_purchase_activation(user, source)
+        except Exception:
+            pass
+        timings["total"] = time.time() - t0
+        try:
+            logger.info("activate_150_active early-exit for e-coupon", extra={"user_id": getattr(user, "id", None), "source_id": src_id})
+        except Exception:
+            pass
+        return created
 
     # Bonuses
     base150 = _q2(cfg.prime_activation_amount or 150)
@@ -325,6 +342,13 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
     except Exception:
         # best-effort: ignore bad master json
         pass
+    # PRIME 750 fallback: if 750-specific direct/self not configured, use 150 values × 5
+    try:
+        if is_prime_750 and not product_set:
+            direct_amt = _q2(Decimal(direct_amt) * Decimal("5"))
+            self_amt = _q2(Decimal(self_amt) * Decimal("5"))
+    except Exception:
+        pass
     if base150 <= 0:
         timings["total"] = time.time() - t0
         try:
@@ -367,14 +391,12 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
     except Exception:
         skip_matrix_parts = False
 
-    if skip_matrix_parts:
-        t_first_start = time.time()
+    if skip_matrix_parts or (not is_matrix_eligible(user)):
         try:
-            ensure_first_purchase_activation(user, source)
+            logger.info("matrix skipped: user not eligible", extra={"where": "activate_150_active", "user_id": getattr(user, "id", None), "source_id": src_id})
         except Exception:
             pass
-        timings["ensure_first"] = time.time() - t_first_start
-        # Optional geo payout on activation per config toggle
+        # Optional geo payout on activation per config toggle (moved before ensure_first to keep payout order)
         try:
             if getattr(cfg, "enable_geo_distribution_on_activation", False):
                 from business.models import distribute_auto_pool_commissions
@@ -388,12 +410,34 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
                 )
         except Exception:
             pass
+        t_first_start = time.time()
+        try:
+            ensure_first_purchase_activation(user, source)
+        except Exception:
+            pass
+        timings["ensure_first"] = time.time() - t_first_start
         timings["total"] = time.time() - t0
         try:
             logger.info("activate_150_active timings user=%s source_id=%s timings=%s", getattr(user, "id", None), src_id, timings)
         except Exception:
             pass
         return created
+
+    # Geo (Agency) configurable payout for 150 Active — moved before matrix per consistent order
+    t_geo_start = time.time()
+    try:
+        from business.models import distribute_auto_pool_commissions
+        distribute_auto_pool_commissions(
+            user,
+            base_amount=base_product,
+            fixed_key=("750" if is_prime_750 else "150"),
+            source_type=src_type,
+            source_id=src_id,
+            extra_meta={"trigger": "ACTIVE_150"},
+        )
+    except Exception:
+        pass
+    timings["geo"] = time.time() - t_geo_start
 
     # Create 5-matrix and 3-matrix pool entries
     t_open_start = time.time()
@@ -411,7 +455,7 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
 
     # Distribute 5-matrix (L6) with fixed-amount override support
     t5_start = time.time()
-    five_levels = int(getattr(cfg, "five_matrix_levels", 6) or 6)
+    five_levels = int(cfg.get_matrix_five_levels())
     upline6 = _matrix_ancestors(acc5, depth=five_levels) if 'acc5' in locals() and acc5 else []
     if not upline6:
         # Fallback to sponsor chain when genealogy has no ancestors yet
@@ -422,12 +466,27 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
     cm3 = dict(master.get("consumer_matrix_3", {}) or {})
     key = "750" if is_prime_750 else "150"
     fixed_amounts5 = list((cm5.get(key, {}) or {}).get("fixed_amounts") or getattr(cfg, "five_matrix_amounts_json", []) or [])
+    # Fallback for 750: if 750-specific fixed amounts are missing, derive from 150 fixed amounts ×5
+    if not fixed_amounts5 and key == "750":
+        try:
+            fa150 = list((cm5.get("150", {}) or {}).get("fixed_amounts") or getattr(cfg, "five_matrix_amounts_json", []) or [])
+            if fa150:
+                from decimal import Decimal as D
+                fixed_amounts5 = [D(str(x)) * D("5") for x in fa150]
+        except Exception:
+            pass
     if fixed_amounts5:
         for idx, recipient in enumerate(upline6):
             if idx >= len(fixed_amounts5):
                 break
             amt = _q2(fixed_amounts5[idx] or 0)
             if amt <= 0:
+                continue
+            # Skip ineligible recipients
+            try:
+                if not is_matrix_eligible(recipient):
+                    continue
+            except Exception:
                 continue
             # Skip matrix payout for agency/employee recipients
             if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
@@ -455,7 +514,7 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
 
     # Distribute 3-matrix (L15)
     t3_start = time.time()
-    three_levels = int(getattr(cfg, "three_matrix_levels", 15) or 15)
+    three_levels = int(cfg.get_matrix_three_levels())
     upline15 = _matrix_ancestors(acc3, depth=three_levels) if 'acc3' in locals() and acc3 else []
     if not upline15:
         # Fallback to sponsor chain when genealogy has no ancestors yet
@@ -463,12 +522,27 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
 
     # Prefer fixed-amount overrides if configured, else fall back to percent distribution
     fixed_amounts = list((cm3.get(key, {}) or {}).get("fixed_amounts") or getattr(cfg, "three_matrix_amounts_json", []) or [])
+    # Fallback for 750: if 750-specific fixed amounts are missing, derive from 150 fixed amounts ×5
+    if not fixed_amounts and key == "750":
+        try:
+            fa150_3 = list((cm3.get("150", {}) or {}).get("fixed_amounts") or getattr(cfg, "three_matrix_amounts_json", []) or [])
+            if fa150_3:
+                from decimal import Decimal as D
+                fixed_amounts = [D(str(x)) * D("5") for x in fa150_3]
+        except Exception:
+            pass
     if fixed_amounts:
         for idx, recipient in enumerate(upline15):
             if idx >= len(fixed_amounts):
                 break
             amt = _q2(fixed_amounts[idx] or 0)
             if amt <= 0:
+                continue
+            # Skip ineligible recipients
+            try:
+                if not is_matrix_eligible(recipient):
+                    continue
+            except Exception:
                 continue
             # Skip matrix payout for agency/employee recipients
             if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
@@ -494,21 +568,6 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
         )
     timings["distribute_three"] = time.time() - t3_start
 
-    # Geo (Agency) configurable payout for 150 Active
-    t_geo_start = time.time()
-    try:
-        from business.models import distribute_auto_pool_commissions
-        distribute_auto_pool_commissions(
-            user,
-            base_amount=base_product,
-            fixed_key=("750" if is_prime_750 else "150"),
-            source_type=src_type,
-            source_id=src_id,
-            extra_meta={"trigger": "ACTIVE_150"},
-        )
-    except Exception:
-        pass
-    timings["geo"] = time.time() - t_geo_start
 
     # Mark first purchase activation (idempotent)
     t_first_start = time.time()
@@ -652,7 +711,12 @@ def activate_50(user: CustomUser, source: Dict[str, Any], package_code: str = "G
             pass
         return False
 
-    base50 = _q2(cfg.global_activation_amount or 50)
+    # THREE_50 disabled: do not create matrix accounts or distribute payouts for 50 activation
+    try:
+        ensure_first_purchase_activation(user, source)
+    except Exception:
+        pass
+    return created
     try:
         AutoPoolAccount.place_three_50_for_user(user, amount=base50)
     except Exception:
@@ -671,7 +735,7 @@ def activate_50(user: CustomUser, source: Dict[str, Any], package_code: str = "G
     except Exception:
         pass
 
-    three_levels = int(getattr(cfg, "three_matrix_levels", 15) or 15)
+    three_levels = int(cfg.get_matrix_three_levels())
     upline15 = _resolve_upline(user, depth=three_levels)
     # Prefer admin master overrides for 50 path (consumer_matrix_3["50"])
     try:
@@ -752,6 +816,17 @@ def open_matrix_accounts_for_coupon(user: CustomUser, coupon_id: int | str, amou
     src_type = "ECOUPON"
     src_id = str(coupon_id or "")
     base150 = _q2(amount_150 if amount_150 is not None else (cfg.prime_activation_amount or 150))
+
+    # Eligibility gate: skip matrix accounts/payouts for ineligible users
+    try:
+        if not is_matrix_eligible(user):
+            try:
+                logger.info("matrix skipped: user not eligible", extra={"where": "open_matrix_accounts_for_coupon", "user_id": getattr(user, "id", None), "coupon_id": src_id})
+            except Exception:
+                pass
+            return
+    except Exception:
+        return
 
     # Idempotent account creation: FIVE_150
     try:
@@ -858,9 +933,24 @@ def open_matrix_accounts_for_coupon(user: CustomUser, coupon_id: int | str, amou
             # best-effort
             pass
 
+    # Geo (Agency) configurable payout for per-coupon 150 (ECOUPON) — execute before matrix payouts for consistent order
+    if include_agency:
+        try:
+            from business.models import distribute_auto_pool_commissions
+            distribute_auto_pool_commissions(
+                user,
+                base_amount=base150,
+                fixed_key="150",
+                source_type=src_type,
+                source_id=src_id,
+                extra_meta={"trigger": "ECOUPON_150"},
+            )
+        except Exception:
+            pass
+
     # Distribute 5-matrix (support fixed-amount overrides)
     try:
-        five_levels = int(getattr(cfg, "five_matrix_levels", 6) or 6)
+        five_levels = int(cfg.get_matrix_five_levels())
         # Use matrix genealogy: ancestors of the coupon-specific FIVE_150 account
         try:
             acc5 = AutoPoolAccount.objects.filter(
@@ -884,6 +974,12 @@ def open_matrix_accounts_for_coupon(user: CustomUser, coupon_id: int | str, amou
                 amt = _q2(fixed5[idx] or 0)
                 if amt <= 0:
                     continue
+                # Skip ineligible recipients
+                try:
+                    if not is_matrix_eligible(recipient):
+                        continue
+                except Exception:
+                    continue
                 if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
                     continue
                 meta = {"source": "FIVE_MATRIX_COUPON_FIXED", "source_type": src_type, "source_id": src_id, "level_index": idx + 1, "fixed": True, "trigger": trigger}
@@ -904,7 +1000,7 @@ def open_matrix_accounts_for_coupon(user: CustomUser, coupon_id: int | str, amou
 
     # Distribute 3-matrix (support fixed-amount overrides)
     try:
-        three_levels = int(getattr(cfg, "three_matrix_levels", 15) or 15)
+        three_levels = int(cfg.get_matrix_three_levels())
         # Use matrix genealogy: ancestors of the coupon-specific THREE_150 account
         try:
             acc3 = AutoPoolAccount.objects.filter(
@@ -924,6 +1020,12 @@ def open_matrix_accounts_for_coupon(user: CustomUser, coupon_id: int | str, amou
                 amt = _q2(fixed3[idx] or 0)
                 if amt <= 0:
                     continue
+                # Skip ineligible recipients
+                try:
+                    if not is_matrix_eligible(recipient):
+                        continue
+                except Exception:
+                    continue
                 if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
                     continue
                 meta = {"source": "THREE_MATRIX_COUPON_FIXED", "source_type": src_type, "source_id": src_id, "level_index": idx + 1, "fixed": True, "trigger": trigger}
@@ -942,20 +1044,6 @@ def open_matrix_accounts_for_coupon(user: CustomUser, coupon_id: int | str, amou
     except Exception:
         pass
 
-    # Geo (Agency) configurable payout for per-coupon 150 (ECOUPON)
-    if include_agency:
-        try:
-            from business.models import distribute_auto_pool_commissions
-            distribute_auto_pool_commissions(
-                user,
-                base_amount=base150,
-                fixed_key="150",
-                source_type=src_type,
-                source_id=src_id,
-                extra_meta={"trigger": "ECOUPON_150"},
-            )
-        except Exception:
-            pass
 
     # Reward points: credit base amount equal to 150 for this e‑coupon distribution
     # Do not credit reward points on e‑coupon activation; points are credited on purchase approval.

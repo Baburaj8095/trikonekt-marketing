@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import API from "../../api/api";
 
 function TextInput({ label, value, onChange, placeholder, type = "text", style }) {
@@ -262,8 +262,8 @@ export default function AdminWithdrawals() {
           Reset
         </button>
         <div style={{ marginLeft: "auto", color: "#334155", fontSize: 14 }}>
-          Pending: <b>{summary.pendingCount}</b> • Amount:{" "}
-          <b>₹{summary.pendingAmount.toFixed(2)}</b>
+          Pending: <b>{summary.pendingCount}</b> â€¢ Amount:{" "}
+          <b>â‚¹{summary.pendingAmount.toFixed(2)}</b>
         </div>
         {err ? <div style={{ color: "#dc2626" }}>{err}</div> : null}
       </div>
@@ -327,10 +327,10 @@ export default function AdminWithdrawals() {
                   {r.username}
                 </div>
                 <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {r.full_name || "—"}
+                  {r.full_name || "â€”"}
                 </div>
-                <div>₹{Number(r.amount || 0).toFixed(2)}</div>
-                <div>{r.method?.toUpperCase?.() || "—"}</div>
+                <div>â‚¹{Number(r.amount || 0).toFixed(2)}</div>
+                <div>{r.method?.toUpperCase?.() || "â€”"}</div>
                 <div>{statusBadge}</div>
                 <div>{new Date(r.requested_at).toLocaleString()}</div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -378,3 +378,4 @@ export default function AdminWithdrawals() {
     </div>
   );
 }
+

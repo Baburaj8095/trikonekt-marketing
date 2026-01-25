@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+﻿import React, { useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import V2WrapperFactory from "../../v2/V2WrapperFactory";
 
@@ -46,7 +46,7 @@ export default function Profile3() {
     {
       title: "Orders & Coupons",
       items: [
-        { label: "My E‑Coupons", screen: "my-e-coupons2" },
+        { label: "My Eâ€‘Coupons", screen: "my-e-coupons2" },
         { label: "My Orders", screen: "my-orders2" },
         { label: "Cart", screen: "cart2" },
       ],
@@ -74,7 +74,7 @@ export default function Profile3() {
               navigate("/v3/profile", { replace: true });
             }}
           >
-            ← Back
+            â† Back
           </button>
         </div>
         <div className="v3-card" style={{ padding: 8 }}>
@@ -116,11 +116,11 @@ export default function Profile3() {
                   }
                 }}
               >
-                <div className="v3-tile-icon">›</div>
+                <div className="v3-tile-icon">â€º</div>
                 <div>
                   <div className="v3-tile-title">{item.label}</div>
                 </div>
-                <div className="v3-tile-right">⟩</div>
+                <div className="v3-tile-right">âŸ©</div>
               </div>
             ))}
           </div>
@@ -136,3 +136,4 @@ export default function Profile3() {
     </div>
   );
 }
+

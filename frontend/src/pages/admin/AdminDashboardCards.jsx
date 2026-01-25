@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { useNavigate } from "react-router-dom";
 import { getAdminMeta } from "../../admin-panel/api/adminMeta";
 import ModelListSimple from "../../admin-panel/dynamic/ModelListSimple";
@@ -123,7 +123,7 @@ export default function AdminDashboardCards() {
             }}
           >
             Level Commission Master
-            <div style={{ fontSize: 12, color: "#166534", fontWeight: 600 }}>Direct + L1–L5 settings</div>
+            <div style={{ fontSize: 12, color: "#166534", fontWeight: 600 }}>Direct + L1â€“L5 settings</div>
           </div>
           <div
             role="button"
@@ -142,7 +142,7 @@ export default function AdminDashboardCards() {
             }}
           >
             Matrix Commission Master
-            <div style={{ fontSize: 12, color: "#1d4ed8", fontWeight: 600 }}>5‑Matrix & 3‑Matrix settings</div>
+            <div style={{ fontSize: 12, color: "#1d4ed8", fontWeight: 600 }}>5â€‘Matrix & 3â€‘Matrix settings</div>
           </div>
         </div>
       </Section>
@@ -151,7 +151,7 @@ export default function AdminDashboardCards() {
         title="Select Upload Model"
         extraRight={
           loading ? (
-            <div style={{ color: "#64748b", fontSize: 12 }}>Loading…</div>
+            <div style={{ color: "#64748b", fontSize: 12 }}>Loadingâ€¦</div>
           ) : error ? (
             <div style={{ color: "#dc2626", fontSize: 12 }}>{error}</div>
           ) : null
@@ -181,7 +181,7 @@ export default function AdminDashboardCards() {
               })}
             </select>
             <div style={{ color: "#64748b", fontSize: 12 }}>
-              Tip: We auto-select models containing “dashboard” and “card”.
+              Tip: We auto-select models containing â€œdashboardâ€ and â€œcardâ€.
             </div>
           </div>
         ) : loading ? null : (
@@ -199,7 +199,7 @@ export default function AdminDashboardCards() {
       >
         {!selected ? (
           <div style={{ padding: 12, color: "#64748b" }}>
-            {loading ? "Loading…" : error || "Select a model to manage dashboard cards."}
+            {loading ? "Loadingâ€¦" : error || "Select a model to manage dashboard cards."}
           </div>
         ) : (
           <div style={{ padding: 12 }}>
@@ -213,3 +213,4 @@ export default function AdminDashboardCards() {
     </div>
   );
 }
+

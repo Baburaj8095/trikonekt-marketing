@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+﻿import React, { useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import ShellBase from "./ShellBase";
 
@@ -66,3 +66,4 @@ export default function BusinessShell({ children }) {
     </ShellBase>
   );
 }
+

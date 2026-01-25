@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import {
   AppBar,
   Toolbar,
@@ -24,7 +24,7 @@ import API, {
   listCategoryBanners,
 } from "../api/api";
 
-// IMAGE IMPORTS — fallbacks
+// IMAGE IMPORTS â€” fallbacks
 import heroImg from "../assets/Wealth_Galaxy.jpg";
 import promoImg1 from "../assets/spin1.png";
 import promoImg2 from "../assets/asst_2.png";
@@ -265,7 +265,7 @@ export default function DashboardContent() {
               color: "#64748b",
             }}
           >
-            Search products…
+            Search productsâ€¦
           </Box>
 
           <IconButton>
@@ -302,3 +302,4 @@ export default function DashboardContent() {
     </Box>
   );
 }
+

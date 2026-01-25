@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+﻿import React, { useEffect, useState, useMemo } from "react";
 import {
   Box,
   Container,
@@ -249,10 +249,10 @@ export default function BannerDetails() {
                   return (
                     <TableRow key={it.id}>
                       <TableCell>{it.name}</TableCell>
-                      <TableCell align="right">₹{fmtMoney(it.price)}</TableCell>
+                      <TableCell align="right">â‚¹{fmtMoney(it.price)}</TableCell>
                       <TableCell align="right">{Number(it.quantity || 0)}</TableCell>
                       <TableCell align="right">{fmtPct(it.discount)}</TableCell>
-                      <TableCell align="right">₹{fmtMoney(selling)}</TableCell>
+                      <TableCell align="right">â‚¹{fmtMoney(selling)}</TableCell>
                       <TableCell align="right">{fmtPct(it.coupon_redeem_percent)}</TableCell>
                       <TableCell align="right">{fmtPct(it.commission_pool_percent)}</TableCell>
                       <TableCell align="right">{it.gift || "-"}</TableCell>
@@ -291,7 +291,7 @@ export default function BannerDetails() {
               {selectedItem?.name || ""}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Unit price: ₹{Number(selectedItem?.selling_price ?? (Number(selectedItem?.price || 0) * (1 - Number(selectedItem?.discount || 0) / 100))).toFixed(2)}
+              Unit price: â‚¹{Number(selectedItem?.selling_price ?? (Number(selectedItem?.price || 0) * (1 - Number(selectedItem?.discount || 0) / 100))).toFixed(2)}
             </Typography>
 
             <TextField
@@ -369,12 +369,12 @@ export default function BannerDetails() {
               return (
                 <Box sx={{ mt: 1 }}>
                   <Typography variant="body2">
-                    Total payable: ₹ {total.toFixed(2)}
+                    Total payable: â‚¹ {total.toFixed(2)}
                   </Typography>
                   {payMethod === "wallet" && (
                     <>
                       <Typography variant="body2">
-                        Wallet balance: ₹ {Number(walletBalance || 0).toFixed(2)}
+                        Wallet balance: â‚¹ {Number(walletBalance || 0).toFixed(2)}
                       </Typography>
                       {isLoggedIn && Number(walletBalance) < total && (
                         <Typography variant="caption" color="error">
@@ -418,3 +418,4 @@ export default function BannerDetails() {
     </Container>
   );
 }
+

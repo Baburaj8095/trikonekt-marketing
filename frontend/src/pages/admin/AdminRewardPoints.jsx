@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import { adminGetRewardPointsConfig, adminUpdateRewardPointsConfig } from "../../api/api";
 
 function Section({ title, subtitle, right, children }) {
@@ -293,7 +293,7 @@ export default function AdminRewardPoints() {
               style={{ padding: "8px 10px", border: "1px solid #e2e8f0", borderRadius: 8, width: 180 }}
             />
             <div style={{ color: "#94a3b8", fontSize: 12, marginTop: 4 }}>
-              Must be ≥ max tier count ({maxTierCount || 1})
+              Must be â‰¥ max tier count ({maxTierCount || 1})
             </div>
           </div>
           <div>
@@ -349,3 +349,4 @@ export default function AdminRewardPoints() {
     </div>
   );
 }
+

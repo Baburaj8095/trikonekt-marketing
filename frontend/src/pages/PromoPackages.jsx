@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Paper,
@@ -55,9 +55,9 @@ const isTourPackage = (pkg) => {
 };
 
 const getPlanOptions = (price) => {
-  // Prime 150: remove e‑book flow (UI hint only shows redeem points)
+  // Prime 150: remove eâ€‘book flow (UI hint only shows redeem points)
   if (approx(price, 150)) return ["Redeem points"];
-  // Prime 750: only two options — Redeem or Product (no separate E‑Coupons option)
+  // Prime 750: only two options â€” Redeem or Product (no separate Eâ€‘Coupons option)
   if (approx(price, 750)) return ["Redeem", "Exclusive products"];
   if (approx(price, 759))
     return ["Electronics", "Home Appliances", "Furniture", "Travel & Tourism"];
@@ -67,7 +67,7 @@ const getPlanOptions = (price) => {
 const monthShort = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13"];
 
 /* ======================================================================== */
-/* Payment Sheet (shared) — unchanged logic; UI summary added */
+/* Payment Sheet (shared) â€” unchanged logic; UI summary added */
 /* ======================================================================== */
 function PaymentSheet({ open, onClose, data, onSuccess }) {
   const [txnId, setTxnId] = useState("");
@@ -102,7 +102,7 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
     try {
       const ui = data.uiMeta || {};
       const lines = [];
-      if (ui.bonus150) lines.push("+ Bonus Wallet ₹150");
+      if (ui.bonus150) lines.push("+ Bonus Wallet â‚¹150");
       if (ui.primeChoice) lines.push(`Prime Choice: ${ui.primeChoice}`);
       if (ui.selectedProductName) lines.push(`Product: ${ui.selectedProductName}`);
       if (ui.plan) lines.push(`Plan: ${ui.plan}`);
@@ -146,7 +146,7 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
             <Box sx={{ mt: 0.5 }}>
               {summaryLines.map((s, i) => (
                 <Typography key={i} fontSize={12} color="text.secondary">
-                  • {s}
+                  â€¢ {s}
                 </Typography>
               ))}
             </Box>
@@ -154,7 +154,7 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
           <Stack direction="row" justifyContent="space-between" mt={1}>
             <Typography color="text.secondary">Total Amount</Typography>
             <Typography fontWeight={900} fontSize={20}>
-              ₹{Number(data.amount || 0)}
+              â‚¹{Number(data.amount || 0)}
             </Typography>
           </Stack>
         </Box>
@@ -205,7 +205,7 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
         </Box>
 
         <Alert severity="info" sx={{ mt: 2 }}>
-          Amount is auto‑calculated and locked. Pay the exact amount.
+          Amount is autoâ€‘calculated and locked. Pay the exact amount.
         </Alert>
 
         <TextField
@@ -299,9 +299,9 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
 /* ======================================================================== */
 
 /**
- * PrimeSection — membership-style UI
+ * PrimeSection â€” membership-style UI
  * - Requires choice: Redeem | Product
- * - Bonus ₹150 info is UI-only (no backend flag; reflected in uiMeta for summary)
+ * - Bonus â‚¹150 info is UI-only (no backend flag; reflected in uiMeta for summary)
  */
 function Prime750Section({ pkg, prime150Active, prime750Active, onBuy }) {
   const [choice, setChoice] = useState("");
@@ -320,7 +320,7 @@ function Prime750Section({ pkg, prime150Active, prime750Active, onBuy }) {
         Prime 750 {prime750Active ? <Chip size="small" color="success" sx={{ ml: 1 }} label="Active" /> : null}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Includes wallet bonus ₹150
+        Includes wallet bonus â‚¹150
       </Typography>
       <Box component="ul" sx={{ pl: 2, mt: 0 }}>
         {options.map((opt, i) => (
@@ -424,7 +424,7 @@ function Prime150Section({ reg150Pkg, prime150Active, onBuy }) {
       </Stack>
       <Stack direction="row" alignItems="center" justifyContent="space-between">
         <Typography>
-          Price: <b>₹150</b>
+          Price: <b>â‚¹150</b>
         </Typography>
         <Button
           variant="contained"
@@ -446,9 +446,9 @@ function Prime150Section({ reg150Pkg, prime150Active, onBuy }) {
 }
 
 /**
- * SeasonSection — Season-first flow
+ * SeasonSection â€” Season-first flow
  * - Season selector (Season 1 active; others locked unless admin exposes)
- * - Plan selector under Season 1: Registration ₹150 | Season Prime ₹759
+ * - Plan selector under Season 1: Registration â‚¹150 | Season Prime â‚¹759
  * - Box grid (4x3) visible only for Season Prime
  */
 function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, seasonsHints = [], seasonActive }) {
@@ -567,9 +567,9 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
         Choose a season and plan to get started.
       </Typography>
 
-      {/* ① Season selector */}
+      {/* â‘  Season selector */}
       <Typography variant="subtitle2" sx={{ mt: 1 }}>
-        ① Choose Season 
+        â‘  Choose Season 
       </Typography>
       <Box sx={{ display: "grid", gap: 1 }}>
         {seasonsToShow.map((n) => {
@@ -612,9 +612,9 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
 
       <Divider sx={{ my: 1.5 }} />
 
-      {/* ② Plan selector (Season 1 only) */}
+      {/* â‘¡ Plan selector (Season 1 only) */}
       <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-        ② Choose Plan
+        â‘¡ Choose Plan
       </Typography>
       {selectedSeason === 1 ? (
         <Box sx={{ mt: 1 }}>
@@ -623,7 +623,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
             control={<Checkbox size="small" checked disabled />}
             label={
               <Typography fontSize={14}>
-                {prime150Active ? "Registration ₹150 active" : "Registration ₹150 will be included"}
+                {prime150Active ? "Registration â‚¹150 active" : "Registration â‚¹150 will be included"}
               </Typography>
             }
           />
@@ -631,7 +631,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
             <FormControlLabel
               value="SEASON759"
               control={<Radio size="small" />}
-              label="Season Prime ₹759"
+              label="Season Prime â‚¹759"
             />
           </RadioGroup>
         </Box>
@@ -643,9 +643,9 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
 
       <Divider sx={{ my: 1.5 }} />
 
-      {/* ③ Month grid (only for Season Prime) */}
+      {/* â‘¢ Month grid (only for Season Prime) */}
       <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-        ③ Select Months
+        â‘¢ Select Months
       </Typography>
       {plan === "SEASON759" ? (
         <>
@@ -709,7 +709,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
           onBuy({
             pkg: seasonPkg,
             amount,
-            uiMeta: { plan: "Season Prime ₹759", selectedSeason, selectedBoxes },
+            uiMeta: { plan: "Season Prime â‚¹759", selectedSeason, selectedBoxes },
             purchasePayload: { package_number: selectedSeason, boxes: selectedBoxes },
           });
         }}
@@ -721,7 +721,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
 }
 
 /**
- * PromoSection — Monthly promotions & offers (grid 3 x 4 on mobile)
+ * PromoSection â€” Monthly promotions & offers (grid 3 x 4 on mobile)
  * - No season chooser, no membership info
  * - Uses current package_number from monthly_meta
  */
@@ -855,7 +855,7 @@ function PromoSection({ seasonPkg, history, onBuy, seasonActive }) {
 }
 
 /**
- * TourSection — sketch-compliant
+ * TourSection â€” sketch-compliant
  * - Static destinations with placeholders
  * - EXPLORE & BOOK -> Tri module (no duplication of booking logic)
  */
@@ -934,7 +934,7 @@ function TourSection({ triHolidays }) {
 /* ======================================================================== */
 /* MAIN */
 /* ======================================================================== */
-export default function PromoPackages() {
+export default function PromoPackages({ title = "Consumer Packages" } = {}) {
   const [packages, setPackages] = useState([]);
   const [history, setHistory] = useState([]);
   const [triHolidays, setTriHolidays] = useState(null);
@@ -1073,7 +1073,7 @@ export default function PromoPackages() {
                   </Typography>
                 </Box>
                 <Typography sx={{ fontWeight: 600, textAlign: "right", minWidth: 90 }}>
-                  ₹{Number(h?.amount || h?.package?.price || 0).toLocaleString("en-IN")}
+                  â‚¹{Number(h?.amount || h?.package?.price || 0).toLocaleString("en-IN")}
                 </Typography>
                 <Box sx={{ justifySelf: "end" }}>
                   <Box
@@ -1103,7 +1103,7 @@ export default function PromoPackages() {
   return (
     <Box p={2}>
       <Typography fontWeight={900} mb={1.5}>
-        Consumer Packages
+        {title}
       </Typography>
 
       {/* {(prime150Active || prime750Active || seasonActive) ? (
@@ -1152,7 +1152,7 @@ export default function PromoPackages() {
             )
           ) : null}
 
-          {/* SEASON: Guided steps ① ② ③ */}
+          {/* SEASON: Guided steps â‘  â‘¡ â‘¢ */}
           {mappedTab === 2 ? (
             seasonPkg ? (
               <SeasonSection
@@ -1205,3 +1205,4 @@ export default function PromoPackages() {
     </Box>
   );
 }
+

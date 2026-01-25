@@ -1,0 +1,98 @@
+{
+  "generated_at": "2026-01-19T18:55:53.449429Z",
+  "existence": {
+    "first_present": 20,
+    "first_missing": [],
+    "second_present": 35,
+    "second_missing": []
+  },
+  "root": {
+    "found": true,
+    "id": 32
+  },
+  "sponsorship": {
+    "direct_under_trikonekt_first_batch": 20,
+    "second_batch_distribution": {
+      "TR9000000001": {
+        "exists": true,
+        "id": 35,
+        "directs_count": 7
+      },
+      "TR9000000002": {
+        "exists": true,
+        "id": 36,
+        "directs_count": 7
+      },
+      "TR9000000003": {
+        "exists": true,
+        "id": 37,
+        "directs_count": 7
+      },
+      "TR9000000004": {
+        "exists": true,
+        "id": 38,
+        "directs_count": 7
+      },
+      "TR9000000005": {
+        "exists": true,
+        "id": 39,
+        "directs_count": 7
+      }
+    }
+  },
+  "pincode": {
+    "expected": "560001",
+    "first_ok": 20,
+    "first_bad": [],
+    "second_ok": 35,
+    "second_bad": []
+  },
+  "role_category": {
+    "first_role_user_ok": 20,
+    "first_role_bad": [],
+    "first_cat_consumer_ok": 20,
+    "first_cat_bad": [],
+    "second_role_user_ok": 35,
+    "second_role_bad": [],
+    "second_cat_consumer_ok": 35,
+    "second_cat_bad": []
+  },
+  "samples": [
+    {
+      "username": "TR9000000001",
+      "exists": true,
+      "sponsor": "TRIKONEKT",
+      "pincode": "560001"
+    },
+    {
+      "username": "TR9000000002",
+      "exists": true,
+      "sponsor": "TRIKONEKT",
+      "pincode": "560001"
+    },
+    {
+      "username": "TR9000000003",
+      "exists": true,
+      "sponsor": "TRIKONEKT",
+      "pincode": "560001"
+    },
+    {
+      "username": "TR9000000021",
+      "exists": true,
+      "sponsor": "TR9000000001",
+      "pincode": "560001"
+    },
+    {
+      "username": "TR9000000022",
+      "exists": true,
+      "sponsor": "TR9000000001",
+      "pincode": "560001"
+    },
+    {
+      "username": "TR9000000023",
+      "exists": true,
+      "sponsor": "TR9000000001",
+      "pincode": "560001"
+    }
+  ]
+}

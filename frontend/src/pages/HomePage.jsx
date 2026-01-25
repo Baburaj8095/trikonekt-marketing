@@ -1,4 +1,4 @@
-import { Box } from "@mui/material";
+﻿import { Box } from "@mui/material";
 import AppHeader from "../components/home/AppHeader";
 import HeroCarousel from "../components/home/HeroCarousel";
 import CategoryGrid from "../components/home/CategoryGrid";
@@ -26,3 +26,4 @@ export default function HomePage() {
     </Box>
   );
 }
+

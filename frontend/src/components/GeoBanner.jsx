@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { Box, Container, Typography, CircularProgress, Button, TextField, Autocomplete } from "@mui/material";
 import useGeoAddress from "../hooks/useGeoAddress";
 
@@ -59,7 +59,7 @@ export default function GeoBanner() {
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <CircularProgress size={18} />
               <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                Detecting your location…
+                Detecting your locationâ€¦
               </Typography>
             </Box>
           ) : error ? (
@@ -82,7 +82,7 @@ export default function GeoBanner() {
                   <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
                     <Typography variant="caption" sx={{ color: "text.secondary" }}>
                       Lat: {address.lat}, Lon: {address.lon}
-                      {typeof address.accuracy === "number" ? ` • ±${Math.round(address.accuracy)}m` : ""}
+                      {typeof address.accuracy === "number" ? ` â€¢ Â±${Math.round(address.accuracy)}m` : ""}
                     </Typography>
                     <a
                       href={`https://www.openstreetmap.org/?mlat=${address.lat}&mlon=${address.lon}#map=17/${address.lat}/${address.lon}`}
@@ -95,7 +95,7 @@ export default function GeoBanner() {
                   </Box>
                   {typeof address.accuracy === "number" && address.accuracy > 800 ? (
                     <Typography variant="caption" sx={{ color: "#b36b00" }}>
-                      Location seems approximate. Connect to Wi‑Fi and enable GPS, then tap Refresh to improve accuracy.
+                      Location seems approximate. Connect to Wiâ€‘Fi and enable GPS, then tap Refresh to improve accuracy.
                     </Typography>
                   ) : null}
                 </>
@@ -185,3 +185,4 @@ export default function GeoBanner() {
     </Container>
   );
 }
+

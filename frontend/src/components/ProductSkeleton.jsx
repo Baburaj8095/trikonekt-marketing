@@ -1,4 +1,4 @@
-import { Box, Skeleton } from "@mui/material";
+﻿import { Box, Skeleton } from "@mui/material";
 
 export default function ProductSkeleton() {
   return (
@@ -17,3 +17,4 @@ export default function ProductSkeleton() {
     </Box>
   );
 }
+

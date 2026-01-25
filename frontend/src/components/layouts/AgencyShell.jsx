@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+﻿import React, { useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import ShellBase from "./ShellBase";
 
@@ -61,7 +61,7 @@ export default function AgencyShell({ children }) {
       }}
       title={agencyCategory}
     >
-      {categoryLabel}{pincode ? ` • ${pincode}` : ""}
+      {categoryLabel}{pincode ? ` â€¢ ${pincode}` : ""}
     </span>
   ), [categoryLabel, pincode, agencyCategory]);
 
@@ -97,7 +97,7 @@ export default function AgencyShell({ children }) {
     // Genealogy
     { to: "/agency/my-team", label: "Genealogy", icon: "tree" },
 
-    // Coupons (3 tabs inside: E‑coupon, Store, Cart)
+    // Coupons (3 tabs inside: Eâ€‘coupon, Store, Cart)
     { to: "/agency/coupons", label: "Coupons", icon: "ticket" },
 
     // Reports
@@ -168,3 +168,4 @@ export default function AgencyShell({ children }) {
     </ShellBase>
   );
 }
+

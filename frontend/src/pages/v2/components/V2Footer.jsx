@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Typography, Link as MUILink } from "@mui/material";
 import colors from "../theme/colors";
 import spacing from "../theme/spacing";
@@ -39,7 +39,7 @@ export default function V2Footer() {
         }}
       >
         <Typography sx={{ fontSize: 12 }}>
-          © {new Date().getFullYear()} Trikonekt. All rights reserved.
+          Â© {new Date().getFullYear()} Trikonekt. All rights reserved.
         </Typography>
 
         <Box sx={{ display: "flex", gap: `${spacing.md}px` }}>
@@ -57,3 +57,4 @@ export default function V2Footer() {
     </Box>
   );
 }
+

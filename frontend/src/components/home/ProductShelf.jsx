@@ -1,4 +1,4 @@
-import { Box, Typography, Card, CardContent, Button } from "@mui/material";
+﻿import { Box, Typography, Card, CardContent, Button } from "@mui/material";
 import { useCartStore } from "../../store/cartStore";
 
 export default function ProductShelf({ title, items }) {
@@ -25,3 +25,4 @@ export default function ProductShelf({ title, items }) {
     </Box>
   );
 }
+

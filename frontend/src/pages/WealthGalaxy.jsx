@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import {
   Box,
   Typography,
@@ -102,3 +102,4 @@ export default function WealthGalaxy() {
     </Box>
   );
 }
+

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Media URL utilities to ensure images load across devices/environments.
  * - Normalizes relative paths like "/media/..." against backend origin
  * - Rewrites localhost/127.0.0.1 hosts to current backend origin (mobile fix)
@@ -69,3 +69,4 @@ export function normalizeMediaUrl(input) {
 }
 
 export default normalizeMediaUrl;
+

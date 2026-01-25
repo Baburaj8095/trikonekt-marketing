@@ -1,11 +1,23 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import API from "../../api/api";
+import API, { ensureFreshAccess, getAccessToken } from "../../api/api";
 import { getAdminMeta } from "../../admin-panel/api/adminMeta";
 
 export default function AdminShell({ children }) {
   const loc = useLocation();
   const navigate = useNavigate();
+
+  // Force API namespace to "admin" while inside AdminShell to ensure Authorization uses admin tokens
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") window.__tk_force_namespace = "admin";
+    } catch (_) {}
+    return () => {
+      try {
+        if (typeof window !== "undefined") delete window.__tk_force_namespace;
+      } catch (_) {}
+    };
+  }, []);
 
   // Responsive flags
   const [isMobile, setIsMobile] = useState(
@@ -77,13 +89,31 @@ export default function AdminShell({ children }) {
   // Admin auth ping removed to avoid extra network call
   const [authErr, setAuthErr] = useState("");
   const [adminInfo, setAdminInfo] = useState(null);
+  const [rbacPerms, setRbacPerms] = useState(null);
+
 
   // Ensure admin/staff auth; redirect to admin login on 401/403
   useEffect(() => {
     let cancelled = false;
     setAuthErr("");
-    API.get("admin/ping/", { timeout: 8000, retryAttempts: 0, dedupe: "cancelPrevious" })
-      .then((res) => {
+
+    async function run() {
+      try {
+        // Wait for any access token (namespaced or fallback) to exist, then refresh to mint admin namespace
+        let tries = 0;
+        while (!getAccessToken() && tries < 20) {
+          await new Promise((r) => setTimeout(r, 100));
+          tries += 1;
+        }
+        try { await ensureFreshAccess(); } catch (_) {}
+
+        // Ensure Authorization header explicitly using any available token
+        const __tk = (typeof getAccessToken === "function" ? getAccessToken() : null) || null;
+        const __cfg = { timeout: 8000, retryAttempts: 0, dedupe: "cancelPrevious" };
+        if (__tk) {
+          __cfg.headers = { Authorization: `Bearer ${__tk}` };
+        }
+        const res = await API.get("admin/ping/", __cfg);
         if (cancelled) return;
         const d = res?.data || {};
         if (!d?.is_staff && !d?.is_superuser) {
@@ -92,10 +122,9 @@ export default function AdminShell({ children }) {
             navigate("/admin/login", { replace: true, state: { from: { pathname: loc.pathname } } });
           } catch (_) {}
         } else {
-          setAdminInfo({ is_superuser: !!d.is_superuser, is_staff: !!d.is_staff, username: d.user });
+          setAdminInfo({ is_superuser: !!d.is_superuser, is_staff: !!d.is_staff, username: d.user, modules: d.modules || null });
         }
-      })
-      .catch((e) => {
+      } catch (e) {
         if (cancelled) return;
         const status = e?.response?.status;
         if (status === 401 || status === 403) {
@@ -107,11 +136,54 @@ export default function AdminShell({ children }) {
           // Soft network error: don't block page
           setAuthErr("");
         }
-      });
+      }
+    }
+
+    run();
     return () => { cancelled = true; };
   }, [loc.pathname, navigate]);
 
-  // Admin metrics for badges (KYC, Withdrawals) – fetch only on dashboard route
+  // Fetch RBAC permissions from /api/admin/me/ once adminInfo is available
+  useEffect(() => {
+    let cancelled = false;
+    if (!adminInfo) {
+      setRbacPerms(null);
+      return () => {};
+    }
+
+    async function fetchPerms() {
+      try {
+        // Wait for any access token then refresh to ensure Authorization header
+        let tries = 0;
+        while (!getAccessToken() && tries < 20) {
+          await new Promise((r) => setTimeout(r, 100));
+          tries += 1;
+        }
+        try { await ensureFreshAccess(); } catch (_) {}
+
+        // Ensure Authorization header explicitly using any available token
+        const __tk2 = (typeof getAccessToken === "function" ? getAccessToken() : null) || null;
+        const __cfg2 = { timeout: 8000, retryAttempts: 0 };
+        if (__tk2) {
+          __cfg2.headers = { Authorization: `Bearer ${__tk2}` };
+        }
+        const res = await API.get("admin/me/", __cfg2);
+        if (!cancelled) {
+          const perms = Array.isArray(res?.data?.permissions) ? res.data.permissions : [];
+          setRbacPerms(perms);
+        }
+      } catch {
+        if (!cancelled) setRbacPerms([]);
+      }
+    }
+
+    fetchPerms();
+    return () => {
+      cancelled = true;
+    };
+  }, [adminInfo]);
+
+  // Admin metrics for badges (KYC, Withdrawals) â€“ fetch only on dashboard route
   const [metrics, setMetrics] = useState(null);
   useEffect(() => {
     let cancelled = false;
@@ -302,6 +374,34 @@ export default function AdminShell({ children }) {
     }
   }
 
+  // Module gating: map routes to admin module keys returned by /api/admin/ping
+  function routeToModule(to) {
+    if (!to) return null;
+    if (to.startsWith("/admin/access-manager")) return "users";
+    if (to.startsWith("/admin/users") || to.startsWith("/admin/user-tree") || to.startsWith("/admin/dashboard/models/auth/")) return "users";
+    if (to.startsWith("/admin/e-coupons")) return "ecoupons";
+    if (to.startsWith("/admin/kyc")) return "kyc";
+    if (to.startsWith("/admin/withdrawals")) return "withdrawals";
+    if (to.startsWith("/admin/support")) return "support";
+    if (to.startsWith("/admin/autopool")) return "autopool";
+    if (to.startsWith("/admin/commissions")) return "commissions";
+    if (to.startsWith("/admin/reports") || to.startsWith("/admin/business")) return "reports_basic";
+    if (
+      to.startsWith("/admin/banners") ||
+      to.startsWith("/admin/packages") ||
+      to.startsWith("/admin/products") ||
+      to.startsWith("/admin/payments") ||
+      to.startsWith("/admin/agency-prime-requests") ||
+      to.startsWith("/admin/lucky-draw") ||
+      to.startsWith("/admin/promo-purchases") ||
+      to.startsWith("/admin/promo-package-products") ||
+      to.startsWith("/admin/tri/") ||
+      to.startsWith("/admin/dashboard/models/business/")
+    ) return "promo";
+    if (to.startsWith("/admin/notifications")) return "support";
+    return null;
+  }
+
   // Navigation groups
   const groups = [
     {
@@ -312,17 +412,43 @@ export default function AdminShell({ children }) {
         { to: "/admin/user-tree", label: "Genealogy", icon: "tree" },
       ],
     },
+     {
+      key: "administration",
+      label: "Administration",
+      items: [
+        { to: "/admin_user", label: "Admin Users", icon: "users", rbacAnyOf: ["manage_users", "show_users"] },
+        { to: "/role", label: "Roles", icon: "shield", rbacAnyOf: ["manage_roles", "show_roles"] },
+        { to: "/permission", label: "Permissions", icon: "shield", rbacAnyOf: ["manage_permissions", "show_permissions"] },
+        { to: "/user_permission", label: "User Permission Mapping", icon: "shield", rbacAnyOf: ["manage_roles", "manage_permissions", "show_roles", "show_permissions"] },
+      ],
+    },
+    {
+      key: "catalog",
+      label: "Catalog",
+      items: [
+        { to: "/admin/ecommerce-categories", label: "Categories", icon: "box" },
+        { to: "/admin/products", label: "Products", icon: "box" },
+        { to: "/admin/seed-demo", label: "Seed Demo Data", icon: "upload" }
+      ],
+    },
     {
       key: "ops",
       label: "Operations",
       items: [
         { to: "/admin/packages", label: "Packages", icon: "box" },
-        { to: "/admin/products", label: "Products", icon: "box" },
-        { to: "/admin/banners", label: "Banners", icon: "image" },
+        // { to: "/admin/banners", label: "Banners", icon: "image" },
         // { to: "/admin/orders", label: "Orders", icon: "orders" },
         { to: "/admin/payments", label: "Payments", icon: "wallet" },
         { to: "/admin/agency-prime-requests", label: "Agency Prime Requests", icon: "wallet" },
         // { to: "/admin/uploads", label: "Uploads", icon: "upload" },
+      ],
+    },
+    {
+      key: "merchant_config",
+      label: "Merchant Config",
+      items: [
+        { to: "/admin/merchant-categories", label: "Merchant Categories", icon: "box" },
+        { to: "/admin/merchant-subcategories", label: "Merchant Subcategories", icon: "box" },
       ],
     },
     {
@@ -339,13 +465,13 @@ export default function AdminShell({ children }) {
       label: "Promotions",
       items: [
         { to: "/admin/lucky-draw", label: "Lucky Draw", icon: "ticket" },
-        { to: "/admin/e-coupons", label: "E‑Coupons", icon: "ticket" },
+        { to: "/admin/e-coupons", label: "Eâ€‘Coupons", icon: "ticket" },
         // Promo packages and related admin models inside AdminShell
         { to: "/admin/dashboard/models/business/promopackage", label: "Promo Packages", icon: "box" },
-        { to: "/admin/dashboard/models/business/promoebook", label: "Promo E‑Books (Library)", icon: "box" },
-        { to: "/admin/dashboard/models/business/promopackageebook", label: "Package → E‑Books Mapping", icon: "box" },
-        { to: "/admin/promo-package-products", label: "Upload Promo Products (₹750)", icon: "upload" },
-        { to: "/admin/dashboard/models/business/promopackageproduct", label: "Promo Products (₹750)", icon: "box" },
+        // { to: "/admin/dashboard/models/business/promoebook", label: "Promo Eâ€‘Books (Library)", icon: "box" },
+        // { to: "/admin/dashboard/models/business/promopackageebook", label: "Package â†’ Eâ€‘Books Mapping", icon: "box" },
+        { to: "/admin/promo-package-products", label: "Upload Promo Products (â‚¹750)", icon: "upload" },
+        { to: "/admin/dashboard/models/business/promopackageproduct", label: "Promo Products (â‚¹750)", icon: "box" },
         { to: "/admin/dashboard/models/business/promomonthlypackage", label: "Season Numbers", icon: "box" },
         // Optional: inspect paid boxes if needed
         { to: "/admin/dashboard/models/business/promomonthlybox", label: "Season Boxes (Paid)", icon: "box" },
@@ -373,22 +499,13 @@ export default function AdminShell({ children }) {
         { to: "/admin/business", label: "Business", icon: "briefcase" },
       ],
     },
-    {
-      key: "administration",
-      label: "Administration",
-      items: [
-        { to: "/admin/dashboard/models/auth/user", label: "Admin Users", icon: "users" },
-        { to: "/admin/dashboard/models/auth/group", label: "Roles", icon: "shield" },
-        { to: "/admin/dashboard/models/auth/permission", label: "Permissions", icon: "shield" },
-        { to: "/admin/dashboard/models/auth/group", label: "Role Permissions", icon: "shield" }
-      ],
-    },
+   
     {
       key: "commissions",
       label: "Commissions & Matrix",
       items: [
-        // { to: "/admin/matrix/five", label: "5‑Matrix", icon: "matrix5" },
-        // { to: "/admin/matrix/three", label: "3‑Matrix", icon: "matrix3" },
+        // { to: "/admin/matrix/five", label: "5â€‘Matrix", icon: "matrix5" },
+        // { to: "/admin/matrix/three", label: "3â€‘Matrix", icon: "matrix3" },
         // { to: "/admin/commissions/matrix", label: "Matrix Commission", icon: "wallet" },
         // { to: "/admin/commissions/levels", label: "Level Commission", icon: "wallet" },
         { to: "/admin/commissions/distribute", label: "Commission Distribute", icon: "wallet" },
@@ -420,7 +537,28 @@ export default function AdminShell({ children }) {
     return groups.filter((g) => (g.requiresSuperuser ? !!adminInfo.is_superuser : true));
   }, [adminInfo]);
 
-  const flatItems = visibleGroups.flatMap((g) => g.items);
+  const flatItems = React.useMemo(() => {
+    const items = visibleGroups.flatMap((g) => g.items);
+    const mods = adminInfo && adminInfo.modules ? adminInfo.modules : null;
+    // Helper: RBAC check (any-of)
+    const allowRBAC = (it) => {
+      if (adminInfo?.is_superuser) return true;
+      const any = it?.rbacAnyOf;
+      if (!any || !Array.isArray(any) || any.length === 0) return true;
+      if (!Array.isArray(rbacPerms)) return false;
+      return any.some((c) => rbacPerms.includes(c));
+    };
+    if (!mods) {
+      // When modules map isn't available, filter by RBAC only (if loaded)
+      return items.filter((it) => allowRBAC(it));
+    }
+    return items.filter((it) => {
+      const mk = routeToModule(it.to);
+      const modOk = !mk || !!mods[mk];
+      if (!modOk) return false;
+      return allowRBAC(it);
+    });
+  }, [visibleGroups, adminInfo, rbacPerms]);
 
   function NavLink({ to, label, icon, compact, badge }) {
     const active = isRouteActive(to);
@@ -708,7 +846,25 @@ export default function AdminShell({ children }) {
                         </button>
                         {open ? (
                           <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 6 }}>
-                            {g.items.map((it) => (
+                            {(adminInfo && adminInfo.modules
+                              ? g.items.filter((it) => {
+                                  const mk = routeToModule(it.to);
+                                  const modOk = !mk || adminInfo.modules[mk];
+                                  if (!modOk) return false;
+                                  if (adminInfo?.is_superuser) return true;
+                                  const any = it?.rbacAnyOf;
+                                  if (!any || !Array.isArray(any) || any.length === 0) return true;
+                                  if (!Array.isArray(rbacPerms)) return false;
+                                  return any.some((c) => rbacPerms.includes(c));
+                                })
+                              : g.items.filter((it) => {
+                                  if (adminInfo?.is_superuser) return true;
+                                  const any = it?.rbacAnyOf;
+                                  if (!any || !Array.isArray(any) || any.length === 0) return true;
+                                  if (!Array.isArray(rbacPerms)) return false;
+                                  return any.some((c) => rbacPerms.includes(c));
+                                })
+                            ).map((it) => (
                               <NavLink key={it.to} to={it.to} label={it.label} icon={it.icon} compact={false} badge={getBadgeFor(it.to)} />
                             ))}
                           </div>
@@ -721,7 +877,7 @@ export default function AdminShell({ children }) {
 
               <div style={{ marginTop: 8, borderTop: "1px solid #0b1220" }} />
               <div style={{ color: "#64748b", fontSize: 11, padding: "8px 4px" }}>
-                © {new Date().getFullYear()} Admin Console
+                Â© {new Date().getFullYear()} Admin Console
               </div>
             </div>
           )}
@@ -760,3 +916,4 @@ export default function AdminShell({ children }) {
     </div>
   );
 }
+

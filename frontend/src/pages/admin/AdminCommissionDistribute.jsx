@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import {
   adminGetMasterCommission,
   adminUpdateMasterCommission,
@@ -92,6 +92,9 @@ const TABS = {
   WITHDRAW: "WITHDRAW",
 };
 
+const FIXED_FIVE_MATRIX_LEVELS = 10;
+const FIXED_THREE_MATRIX_LEVELS = 15;
+
 export default function AdminCommissionDistribute() {
   // Global page messages
   const [err, setErr] = useState("");
@@ -122,6 +125,10 @@ export default function AdminCommissionDistribute() {
     geo_state_coord: "",
     geo_employee: "",
     geo_royalty: "",
+    // Prime 150 reward points amount (drives 150 points and 750 = 5x)
+    prime150_reward_points_amount: "",
+    // Prime 750 multiplier (Ã—) relative to Prime 150
+    prime750_multiplier: "",
   });
 
   useEffect(() => {
@@ -137,6 +144,8 @@ export default function AdminCommissionDistribute() {
         const cuId = data?.company_user?.id ?? "";
         const up = data?.upline || {};
         const geo = data?.geo || {};
+        const mulRaw = Number(data?.commissions?.prime_750?.multiplier);
+        const mulNorm = Number.isFinite(mulRaw) && mulRaw > 0 ? Math.floor(mulRaw) : 1;
         const vals = {
           tax_percent: tax,
           withdrawal_sponsor_percent: wd,
@@ -155,11 +164,15 @@ export default function AdminCommissionDistribute() {
           geo_state_coord: toFixedStr(geo.state_coord ?? 0, 2),
           geo_employee: toFixedStr(geo.employee ?? 0, 2),
           geo_royalty: toFixedStr(geo.royalty ?? 0, 2),
+          prime150_reward_points_amount: toFixedStr((data?.commissions?.prime_150?.rewards?.points_amount) ?? 0, 2),
+          prime750_multiplier: String(mulNorm),
         };
         setMServer({
           tax_percent: toNum(vals.tax_percent),
           withdrawal_sponsor_percent: toNum(vals.withdrawal_sponsor_percent),
           tax_company_user_id: cuId ? Number(cuId) : null,
+          prime750_multiplier: mulNorm,
+          prime150_reward_points_amount: toNum(vals.prime150_reward_points_amount),
           upline: {
             l1: toNum(vals.upline_l1),
             l2: toNum(vals.upline_l2),
@@ -197,6 +210,11 @@ export default function AdminCommissionDistribute() {
       if (/^\d*$/.test(value)) setMForm((f) => ({ ...f, [name]: value }));
       return;
     }
+    if (name === "prime750_multiplier") {
+      const s = String(value);
+      if (/^\d*$/.test(s)) setMForm((f) => ({ ...f, [name]: s }));
+      return;
+    }
     // numeric with 2 decimals
     const cleaned = value.replace(/[^\d.]/g, "");
     const parts = cleaned.split(".");
@@ -227,6 +245,12 @@ export default function AdminCommissionDistribute() {
     if (neq(mForm.tax_percent, mServer.tax_percent)) add(out, "tax.percent", Number(Number(mForm.tax_percent).toFixed(2)));
     if (neq(mForm.withdrawal_sponsor_percent, mServer.withdrawal_sponsor_percent))
       add(out, "withdrawal.sponsor_percent", Number(Number(mForm.withdrawal_sponsor_percent).toFixed(2)));
+    if (neq(mForm.prime150_reward_points_amount, mServer.prime150_reward_points_amount))
+      add(out, "commissions.prime_150.rewards.points_amount", Number(Number(mForm.prime150_reward_points_amount).toFixed(2)));
+    const multCur = mForm.prime750_multiplier === "" ? null : Number(mForm.prime750_multiplier);
+    const multBase = Number(mServer.prime750_multiplier || 1);
+    if (multCur !== null && isFinite(multCur) && Math.floor(multCur) !== Math.floor(multBase))
+      add(out, "commissions.prime_750.multiplier", Math.floor(multCur));
 
     const curCompanyId = mServer.tax_company_user_id || null;
     const formCompanyId = mForm.tax_company_user_id === "" ? null : Number(mForm.tax_company_user_id);
@@ -282,6 +306,8 @@ export default function AdminCommissionDistribute() {
       const cuId = data?.company_user?.id ?? "";
       const up = data?.upline || {};
       const geo = data?.geo || {};
+      const mulRaw = Number(data?.commissions?.prime_750?.multiplier);
+      const mulNorm = Number.isFinite(mulRaw) && mulRaw > 0 ? Math.floor(mulRaw) : 1;
       const vals = {
         tax_percent: tax,
         withdrawal_sponsor_percent: wd,
@@ -300,11 +326,15 @@ export default function AdminCommissionDistribute() {
         geo_state_coord: toFixedStr(geo.state_coord ?? 0, 2),
         geo_employee: toFixedStr(geo.employee ?? 0, 2),
         geo_royalty: toFixedStr(geo.royalty ?? 0, 2),
+        prime150_reward_points_amount: toFixedStr((data?.commissions?.prime_150?.rewards?.points_amount) ?? 0, 2),
+        prime750_multiplier: String(mulNorm),
       };
       setMServer({
         tax_percent: toNum(vals.tax_percent),
         withdrawal_sponsor_percent: toNum(vals.withdrawal_sponsor_percent),
         tax_company_user_id: cuId ? Number(cuId) : null,
+        prime750_multiplier: mulNorm,
+        prime150_reward_points_amount: toNum(vals.prime150_reward_points_amount),
         upline: {
           l1: toNum(vals.upline_l1),
           l2: toNum(vals.upline_l2),
@@ -333,7 +363,7 @@ export default function AdminCommissionDistribute() {
     }
   }
 
-  // 2) Fixed Level Commission (rupees) — retained logic (not shown as separate UI tab; managed in separate page)
+  // 2) Fixed Level Commission (rupees) â€” retained logic (not shown as separate UI tab; managed in separate page)
   const [lLoading, setLLoading] = useState(true);
   const [lSaving, setLSaving] = useState(false);
   const [lSeeding, setLSeeding] = useState(false);
@@ -469,7 +499,7 @@ export default function AdminCommissionDistribute() {
     }
   }
 
-  // 3) Matrix Commission (GLOBAL) — used earlier for 750 read-only; kept for reference
+  // 3) Matrix Commission (GLOBAL) â€” used earlier for 750 read-only; kept for reference
   const [mxLoading, setMxLoading] = useState(true);
   const [mxSaving, setMxSaving] = useState(false);
   const [mxServer, setMxServer] = useState(null);
@@ -607,12 +637,12 @@ export default function AdminCommissionDistribute() {
     }
   }
 
-  // 3b) Product-specific Overrides — 150 Coupon (Direct + Geo + Matrix)
+  // 3b) Product-specific Overrides â€” 150 Coupon (Direct + Geo + Matrix)
   const [m150Loading, setM150Loading] = useState(true);
   const [m150Saving, setM150Saving] = useState(false);
   const [m150Server, setM150Server] = useState(null);
   const [m150Form, setM150Form] = useState({
-    // Direct referral bonuses (₹)
+    // Direct referral bonuses (â‚¹)
     direct_bonus_sponsor: "",
     direct_bonus_self: "",
     // Geo mode
@@ -627,7 +657,7 @@ export default function AdminCommissionDistribute() {
     geo_state_coord: "",
     geo_employee: "",
     geo_royalty: "",
-    // Geo fixed rupees (₹)
+    // Geo fixed rupees (â‚¹)
     geo_fixed_sub_franchise: "",
     geo_fixed_pincode: "",
     geo_fixed_pincode_coord: "",
@@ -640,6 +670,9 @@ export default function AdminCommissionDistribute() {
     // Product base & opening
     product_base_amount: "",
     coupon_activation_count: "",
+    // Matrix repetition (UI)
+    matrix_open_mode: "",
+    matrix_open_count: "",
   });
 
   useEffect(() => {
@@ -676,35 +709,42 @@ export default function AdminCommissionDistribute() {
           product_base_amount: toFixedStr(data?.product_base_amount ?? 0, 2),
           coupon_activation_count: String(data?.coupon_activation_count ?? ""),
         };
-        setM150Server({
-          direct_bonus: { sponsor: toNum(vals.direct_bonus_sponsor), self: toNum(vals.direct_bonus_self) },
-          geo_mode: vals.geo_mode || "",
-          geo: {
-            sub_franchise: toNum(vals.geo_sub_franchise),
-            pincode: toNum(vals.geo_pincode),
-            pincode_coord: toNum(vals.geo_pincode_coord),
-            district: toNum(vals.geo_district),
-            district_coord: toNum(vals.geo_district_coord),
-            state: toNum(vals.geo_state),
-            state_coord: toNum(vals.geo_state_coord),
-            employee: toNum(vals.geo_employee),
-            royalty: toNum(vals.geo_royalty),
-          },
-          geo_fixed: {
-            sub_franchise: toNum(vals.geo_fixed_sub_franchise),
-            pincode: toNum(vals.geo_fixed_pincode),
-            pincode_coord: toNum(vals.geo_fixed_pincode_coord),
-            district: toNum(vals.geo_fixed_district),
-            district_coord: toNum(vals.geo_fixed_district_coord),
-            state: toNum(vals.geo_fixed_state),
-            state_coord: toNum(vals.geo_fixed_state_coord),
-            employee: toNum(vals.geo_fixed_employee),
-            royalty: toNum(vals.geo_fixed_royalty),
-          },
-          product_base_amount: toNum(vals.product_base_amount),
-          coupon_activation_count: (vals.coupon_activation_count === "" ? null : Number(vals.coupon_activation_count)),
-        });
-        setM150Form(vals);
+      setM150Server({
+        direct_bonus: { sponsor: toNum(vals.direct_bonus_sponsor), self: toNum(vals.direct_bonus_self) },
+        geo_mode: vals.geo_mode || "",
+        geo: {
+          sub_franchise: toNum(vals.geo_sub_franchise),
+          pincode: toNum(vals.geo_pincode),
+          pincode_coord: toNum(vals.geo_pincode_coord),
+          district: toNum(vals.geo_district),
+          district_coord: toNum(vals.geo_district_coord),
+          state: toNum(vals.geo_state),
+          state_coord: toNum(vals.geo_state_coord),
+          employee: toNum(vals.geo_employee),
+          royalty: toNum(vals.geo_royalty),
+        },
+        geo_fixed: {
+          sub_franchise: toNum(vals.geo_fixed_sub_franchise),
+          pincode: toNum(vals.geo_fixed_pincode),
+          pincode_coord: toNum(vals.geo_fixed_pincode_coord),
+          district: toNum(vals.geo_fixed_district),
+          district_coord: toNum(vals.geo_fixed_district_coord),
+          state: toNum(vals.geo_fixed_state),
+          state_coord: toNum(vals.geo_fixed_state_coord),
+          employee: toNum(vals.geo_fixed_employee),
+          royalty: toNum(vals.geo_fixed_royalty),
+        },
+        product_base_amount: toNum(vals.product_base_amount),
+        coupon_activation_count: (vals.coupon_activation_count === "" ? null : Number(vals.coupon_activation_count)),
+        // Matrix repetition snapshot for diffing
+        matrix_open_mode: String((data?.matrix_open_mode || "")).toUpperCase() || "",
+        matrix_open_count: (String(data?.matrix_open_count ?? "") === "" ? null : Number(String(data?.matrix_open_count))),
+      });
+      setM150Form({
+        ...vals,
+        matrix_open_mode: String((data?.matrix_open_mode || "")).toUpperCase(),
+        matrix_open_count: String(data?.matrix_open_count ?? ""),
+      });
       })
       .catch((e) => setErr(parseError(e) || "Failed to load 150 Coupon Geo Commission"))
       .finally(() => mounted && setM150Loading(false));
@@ -721,6 +761,15 @@ export default function AdminCommissionDistribute() {
     if (name === "coupon_activation_count") {
       const s = String(value);
       if (/^\d*$/.test(s)) setM150Form((f) => ({ ...f, coupon_activation_count: s }));
+      return;
+    }
+    if (name === "matrix_open_mode") {
+      setM150Form((f) => ({ ...f, matrix_open_mode: String(value || "").toUpperCase() }));
+      return;
+    }
+    if (name === "matrix_open_count") {
+      const s = String(value);
+      if (/^\d*$/.test(s)) setM150Form((f) => ({ ...f, matrix_open_count: s }));
       return;
     }
     if (value === "") {
@@ -741,7 +790,7 @@ export default function AdminCommissionDistribute() {
   const m150ChangedPayload = useMemo(() => {
     if (!m150Server) return {};
     const out = {};
-    // direct bonus (₹)
+    // direct bonus (â‚¹)
     const sponsorCur = Number(Number(m150Form.direct_bonus_sponsor || 0).toFixed(2));
     const sponsorBase = Number(Number(m150Server.direct_bonus?.sponsor ?? 0).toFixed(2));
     const selfCur = Number(Number(m150Form.direct_bonus_self || 0).toFixed(2));
@@ -787,7 +836,7 @@ export default function AdminCommissionDistribute() {
       }
     });
 
-    // product base amount (₹)
+    // product base amount (â‚¹)
     const pbaCur = Number(Number(m150Form.product_base_amount || 0).toFixed(2));
     const pbaBase = Number(Number(m150Server.product_base_amount || 0).toFixed(2));
     if (pbaCur !== pbaBase) out.product_base_amount = pbaCur;
@@ -797,6 +846,16 @@ export default function AdminCommissionDistribute() {
     const actCur = actStr === "" ? null : Number(actStr);
     const actBase = (m150Server.coupon_activation_count == null ? null : Number(m150Server.coupon_activation_count));
     if (actCur !== null && actCur !== actBase) out.coupon_activation_count = actCur;
+
+    // matrix repetition
+    const modeCur = String(m150Form.matrix_open_mode || "").toUpperCase();
+    const modeBase = String(m150Server?.matrix_open_mode || "");
+    if (modeCur && modeCur !== modeBase) out.matrix_open_mode = modeCur;
+
+    const mCountStr = m150Form.matrix_open_count;
+    const mCountCur = mCountStr === "" ? null : Number(mCountStr);
+    const mCountBase = (m150Server?.matrix_open_count == null ? null : Number(m150Server.matrix_open_count));
+    if (mCountCur !== null && mCountCur !== mCountBase) out.matrix_open_count = mCountCur;
 
     return out;
   }, [m150Server, m150Form]);
@@ -882,7 +941,7 @@ export default function AdminCommissionDistribute() {
     }
   }
 
-  // Matrix overrides — 150 Coupon
+  // Matrix overrides â€” 150 Coupon
   const [mx150Loading, setMx150Loading] = useState(true);
   const [mx150Saving, setMx150Saving] = useState(false);
   const [mx150Server, setMx150Server] = useState(null);
@@ -917,10 +976,10 @@ export default function AdminCommissionDistribute() {
           three_matrix_percents_json: threePercs.map((x) => toNum(x)),
         });
         setMx150Form({
-          five_levels: String(fiveLevels || ""),
+          five_levels: String(FIXED_FIVE_MATRIX_LEVELS),
           five_amounts: fiveAmounts.map((x) => toFixedStr(x, 2)).join(", "),
           five_percents: fivePercs.map((x) => toFixedStr(x, 2)).join(", "),
-          three_levels: String(threeLevels || ""),
+          three_levels: String(FIXED_THREE_MATRIX_LEVELS),
           three_amounts: threeAmounts.map((x) => toFixedStr(x, 2)).join(", "),
           three_percents: threePercs.map((x) => toFixedStr(x, 2)).join(", "),
         });
@@ -1006,13 +1065,15 @@ export default function AdminCommissionDistribute() {
     }
   }
 
-  // 3c) Product-specific Overrides — ₹750 (Direct + Geo + Matrix)
+  // 3c) Product-specific Overrides â€” â‚¹750 (Direct + Geo + Matrix + Opening)
   const [m750Loading, setM750Loading] = useState(true);
   const [m750Saving, setM750Saving] = useState(false);
   const [m750Server, setM750Server] = useState(null);
-  const [m750Form, setM750Form] = useState({
+const [m750Form, setM750Form] = useState({
+    // Direct referral bonuses (â‚¹)
     direct_bonus_sponsor: "",
     direct_bonus_self: "",
+    // Geo mode
     geo_mode: "",
     // Geo percents
     geo_sub_franchise: "",
@@ -1024,7 +1085,7 @@ export default function AdminCommissionDistribute() {
     geo_state_coord: "",
     geo_employee: "",
     geo_royalty: "",
-    // Geo fixed rupees
+    // Geo fixed rupees (â‚¹)
     geo_fixed_sub_franchise: "",
     geo_fixed_pincode: "",
     geo_fixed_pincode_coord: "",
@@ -1034,6 +1095,13 @@ export default function AdminCommissionDistribute() {
     geo_fixed_state_coord: "",
     geo_fixed_employee: "",
     geo_fixed_royalty: "",
+    // Product base amount (â‚¹)
+    product_base_amount: "",
+    // 750 Opening (matrix account creation count)
+    activation_open_count: "",
+    // Matrix repetition (UI)
+    matrix_open_mode: "",
+    matrix_open_count: "",
   });
 
   useEffect(() => {
@@ -1043,7 +1111,7 @@ export default function AdminCommissionDistribute() {
       .then((data) => {
         if (!mounted) return;
         const geo = data?.geo || {};
-        const vals = {
+const vals = {
           direct_bonus_sponsor: toFixedStr(data?.direct_bonus?.sponsor ?? 0, 2),
           direct_bonus_self: toFixedStr(data?.direct_bonus?.self ?? 0, 2),
           geo_mode: String(data?.geo_mode || "").toLowerCase(),
@@ -1065,8 +1133,13 @@ export default function AdminCommissionDistribute() {
           geo_fixed_state_coord: toFixedStr(data?.geo_fixed?.state_coord ?? 0, 2),
           geo_fixed_employee: toFixedStr(data?.geo_fixed?.employee ?? 0, 2),
           geo_fixed_royalty: toFixedStr(data?.geo_fixed?.royalty ?? 0, 2),
+          product_base_amount: toFixedStr(data?.product_base_amount ?? 0, 2),
+          activation_open_count: String(data?.activation_open_count ?? ""),
+          // matrix repetition
+          matrix_open_mode: String((data?.matrix_open_mode || "")).toUpperCase(),
+          matrix_open_count: String(data?.matrix_open_count ?? ""),
         };
-        setM750Server({
+setM750Server({
           direct_bonus: { sponsor: toNum(vals.direct_bonus_sponsor), self: toNum(vals.direct_bonus_self) },
           geo_mode: vals.geo_mode || "",
           geo: {
@@ -1091,10 +1164,15 @@ export default function AdminCommissionDistribute() {
             employee: toNum(vals.geo_fixed_employee),
             royalty: toNum(vals.geo_fixed_royalty),
           },
+          product_base_amount: toNum(vals.product_base_amount),
+          activation_open_count: vals.activation_open_count === "" ? null : Number(vals.activation_open_count),
+          // Matrix repetition snapshot for diffing
+          matrix_open_mode: String((data?.matrix_open_mode || "")).toUpperCase() || "",
+          matrix_open_count: (String(data?.matrix_open_count ?? "") === "" ? null : Number(String(data?.matrix_open_count))),
         });
         setM750Form(vals);
       })
-      .catch((e) => setErr(parseError(e) || "Failed to load ₹750 Commission"))
+      .catch((e) => setErr(parseError(e) || "Failed to load â‚¹750 Commission"))
       .finally(() => mounted && setM750Loading(false));
     return () => {
       mounted = false;
@@ -1104,6 +1182,20 @@ export default function AdminCommissionDistribute() {
   function onM750Change(name, value) {
     if (name === "geo_mode") {
       setM750Form((f) => ({ ...f, geo_mode: String(value || "").toLowerCase() }));
+      return;
+    }
+    if (name === "activation_open_count") {
+      const s = String(value);
+      if (/^\d*$/.test(s)) setM750Form((f) => ({ ...f, activation_open_count: s }));
+      return;
+    }
+    if (name === "matrix_open_mode") {
+      setM750Form((f) => ({ ...f, matrix_open_mode: String(value || "").toUpperCase() }));
+      return;
+    }
+    if (name === "matrix_open_count") {
+      const s = String(value);
+      if (/^\d*$/.test(s)) setM750Form((f) => ({ ...f, matrix_open_count: s }));
       return;
     }
     if (value === "") {
@@ -1124,6 +1216,7 @@ export default function AdminCommissionDistribute() {
     if (!m750Server) return {};
     const out = {};
 
+    // direct bonuses
     const sponsorCur = Number(Number(m750Form.direct_bonus_sponsor || 0).toFixed(2));
     const sponsorBase = Number(Number(m750Server.direct_bonus?.sponsor ?? 0).toFixed(2));
     const selfCur = Number(Number(m750Form.direct_bonus_self || 0).toFixed(2));
@@ -1134,10 +1227,12 @@ export default function AdminCommissionDistribute() {
       if (selfCur !== selfBase) out.direct_bonus.self = selfCur;
     }
 
+    // geo mode
     const gmCur = (m750Form.geo_mode || "").toLowerCase();
     const gmBase = String(m750Server.geo_mode || "").toLowerCase();
     if (gmCur !== gmBase) out.geo_mode = gmCur;
 
+    // geo percents
     const gKeys = [
       "sub_franchise",
       "pincode",
@@ -1149,7 +1244,6 @@ export default function AdminCommissionDistribute() {
       "employee",
       "royalty",
     ];
-
     gKeys.forEach((k) => {
       const formV = Number(Number(m750Form[`geo_${k}`] || 0).toFixed(2));
       const baseV = Number(Number(m750Server.geo?.[k] ?? 0).toFixed(2));
@@ -1159,14 +1253,36 @@ export default function AdminCommissionDistribute() {
       }
     });
 
-    gKeys.forEach((k) => {
-      const formV = Number(Number(m750Form[`geo_fixed_${k}`] || 0).toFixed(2));
-      const baseV = Number(Number(m750Server.geo_fixed?.[k] ?? 0).toFixed(2));
-      if (formV !== baseV) {
-        out.geo_fixed = out.geo_fixed || {};
-        out.geo_fixed[k] = formV;
-      }
-    });
+  // geo fixed rupees
+  gKeys.forEach((k) => {
+    const formV = Number(Number(m750Form[`geo_fixed_${k}`] || 0).toFixed(2));
+    const baseV = Number(Number(m750Server.geo_fixed?.[k] ?? 0).toFixed(2));
+    if (formV !== baseV) {
+      out.geo_fixed = out.geo_fixed || {};
+      out.geo_fixed[k] = formV;
+    }
+  });
+
+  // product base amount (â‚¹) for 750
+  const pbaCur = Number(Number(m750Form.product_base_amount || 0).toFixed(2));
+  const pbaBase = Number(Number(m750Server.product_base_amount || 0).toFixed(2));
+  if (pbaCur !== pbaBase) out.product_base_amount = pbaCur;
+
+  // activation open count (int)
+  const actStr = m750Form.activation_open_count;
+    const actCur = actStr === "" ? null : Number(actStr);
+    const actBase = (m750Server.activation_open_count == null ? null : Number(m750Server.activation_open_count));
+    if (actCur !== null && actCur !== actBase) out.activation_open_count = actCur;
+
+    // matrix repetition
+    const modeCur = String(m750Form.matrix_open_mode || "").toUpperCase();
+    const modeBase = String(m750Server?.matrix_open_mode || "");
+    if (modeCur && modeCur !== modeBase) out.matrix_open_mode = modeCur;
+
+    const mCountStr = m750Form.matrix_open_count;
+    const mCountCur = mCountStr === "" ? null : Number(mCountStr);
+    const mCountBase = (m750Server?.matrix_open_count == null ? null : Number(m750Server.matrix_open_count));
+    if (mCountCur !== null && mCountCur !== mCountBase) out.matrix_open_count = mCountCur;
 
     return out;
   }, [m750Server, m750Form]);
@@ -1205,6 +1321,10 @@ export default function AdminCommissionDistribute() {
         geo_fixed_state_coord: toFixedStr(gf.state_coord ?? 0, 2),
         geo_fixed_employee: toFixedStr(gf.employee ?? 0, 2),
         geo_fixed_royalty: toFixedStr(gf.royalty ?? 0, 2),
+        product_base_amount: toFixedStr(data?.product_base_amount ?? 0, 2),
+        activation_open_count: String(data?.activation_open_count ?? ""),
+        matrix_open_mode: String((data?.matrix_open_mode || "")).toUpperCase(),
+        matrix_open_count: String(data?.matrix_open_count ?? ""),
       };
       setM750Server({
         direct_bonus: {
@@ -1234,17 +1354,21 @@ export default function AdminCommissionDistribute() {
           employee: toNum(vals.geo_fixed_employee),
           royalty: toNum(vals.geo_fixed_royalty),
         },
+        product_base_amount: toNum(vals.product_base_amount),
+        activation_open_count: (vals.activation_open_count === "" ? null : Number(vals.activation_open_count)),
+        matrix_open_mode: String((data?.matrix_open_mode || "")).toUpperCase() || "",
+        matrix_open_count: (String(data?.matrix_open_count ?? "") === "" ? null : Number(String(data?.matrix_open_count))),
       });
       setM750Form(vals);
-      setOk("₹750 Commission saved");
+      setOk("â‚¹750 Commission saved");
     } catch (e) {
-      setErr(parseError(e) || "Save failed (₹750 Commission)");
+      setErr(parseError(e) || "Save failed (â‚¹750 Commission)");
     } finally {
       setM750Saving(false);
     }
   }
 
-  // Matrix overrides — ₹750
+  // Matrix overrides â€” â‚¹750
   const [mx750Loading, setMx750Loading] = useState(true);
   const [mx750Saving, setMx750Saving] = useState(false);
   const [mx750Server, setMx750Server] = useState(null);
@@ -1278,15 +1402,15 @@ export default function AdminCommissionDistribute() {
           three_matrix_percents_json: threePercs.map((x) => toNum(x)),
         });
         setMx750Form({
-          five_levels: String(fiveLevels || ""),
+          five_levels: String(FIXED_FIVE_MATRIX_LEVELS),
           five_amounts: fiveAmounts.map((x) => toFixedStr(x, 2)).join(", "),
           five_percents: fivePercs.map((x) => toFixedStr(x, 2)).join(", "),
-          three_levels: String(threeLevels || ""),
+          three_levels: String(FIXED_THREE_MATRIX_LEVELS),
           three_amounts: threeAmounts.map((x) => toFixedStr(x, 2)).join(", "),
           three_percents: threePercs.map((x) => toFixedStr(x, 2)).join(", "),
         });
       })
-      .catch((e) => setErr(parseError(e) || "Failed to load ₹750 Matrix Commission"))
+      .catch((e) => setErr(parseError(e) || "Failed to load â‚¹750 Matrix Commission"))
       .finally(() => mounted && setMx750Loading(false));
     return () => {
       mounted = false;
@@ -1359,20 +1483,20 @@ export default function AdminCommissionDistribute() {
         three_amounts: threeAmounts.map((x) => toFixedStr(x, 2)).join(", "),
         three_percents: threePercs.map((x) => toFixedStr(x, 2)).join(", "),
       });
-      setOk("₹750 Matrix Commission saved");
+      setOk("â‚¹750 Matrix Commission saved");
     } catch (e) {
-      setErr(parseError(e) || "Save failed (₹750 Matrix Commission)");
+      setErr(parseError(e) || "Save failed (â‚¹750 Matrix Commission)");
     } finally {
       setMx750Saving(false);
     }
   }
 
-  // 3d) Product-specific Overrides — ₹759 (Direct + Geo + Matrix)
+  // 3d) Product-specific Overrides â€” â‚¹759 (Direct + Geo + Matrix)
   const [m759Loading, setM759Loading] = useState(true);
   const [m759Saving, setM759Saving] = useState(false);
   const [m759Server, setM759Server] = useState(null);
   const [m759Form, setM759Form] = useState({
-    // Direct referral bonuses (₹)
+    // Direct referral bonuses (â‚¹)
     direct_bonus_sponsor: "",
     direct_bonus_self: "",
     // Geo mode
@@ -1399,13 +1523,14 @@ export default function AdminCommissionDistribute() {
     geo_fixed_royalty: "",
   });
 
-  // ₹759 — Monthly config (first vs subsequent, levels, agency, base)
+  // â‚¹759 â€” Monthly config (first vs subsequent, levels, agency, base)
   const [m759MServer, setM759MServer] = useState(null);
   const [m759MForm, setM759MForm] = useState({
     monthly_direct_first: "",
     monthly_direct_monthly: "",
     monthly_base_amount: "",
     monthly_agency_enabled: "1",
+    monthly_matrix_open_mode: "",
     monthly_l1: "",
     monthly_l2: "",
     monthly_l3: "",
@@ -1416,6 +1541,10 @@ export default function AdminCommissionDistribute() {
   function onM759MonthlyChange(name, value) {
     if (name === "monthly_agency_enabled") {
       setM759MForm((f) => ({ ...f, monthly_agency_enabled: value === "1" ? "1" : "0" }));
+      return;
+    }
+    if (name === "monthly_matrix_open_mode") {
+      setM759MForm((f) => ({ ...f, monthly_matrix_open_mode: String(value || "").toUpperCase() }));
       return;
     }
     if (value === "") {
@@ -1502,6 +1631,7 @@ export default function AdminCommissionDistribute() {
           monthly_direct_monthly: toFixedStr(mm?.direct_monthly ?? 50, 2),
           monthly_base_amount: toFixedStr(mm?.base_amount ?? 759, 2),
           monthly_agency_enabled: (mm?.agency_enabled ? "1" : "0"),
+          monthly_matrix_open_mode: String((mm?.matrix_open_mode || "")).toUpperCase(),
           monthly_l1: toFixedStr(padded[0] ?? 0, 2),
           monthly_l2: toFixedStr(padded[1] ?? 0, 2),
           monthly_l3: toFixedStr(padded[2] ?? 0, 2),
@@ -1513,13 +1643,14 @@ export default function AdminCommissionDistribute() {
           direct_monthly: toNum(mvals.monthly_direct_monthly),
           base_amount: toNum(mvals.monthly_base_amount),
           agency_enabled: mvals.monthly_agency_enabled === "1",
+          monthly_matrix_open_mode: mvals.monthly_matrix_open_mode,
           levels_fixed: padded.map((x) => toNum(x)),
         });
         setM759MForm(mvals);
 
         setM759Form(vals);
       })
-      .catch((e) => setErr(parseError(e) || "Failed to load ₹759 Commission"))
+      .catch((e) => setErr(parseError(e) || "Failed to load â‚¹759 Commission"))
       .finally(() => mounted && setM759Loading(false));
     return () => {
       mounted = false;
@@ -1617,24 +1748,9 @@ export default function AdminCommissionDistribute() {
     const vAgencyBase = Boolean(m759MServer.agency_enabled);
     if (vAgency !== vAgencyBase) out.agency_enabled = vAgency;
 
-    const lvls = [
-      Number(Number(m759MForm.monthly_l1 || 0).toFixed(2)),
-      Number(Number(m759MForm.monthly_l2 || 0).toFixed(2)),
-      Number(Number(m759MForm.monthly_l3 || 0).toFixed(2)),
-      Number(Number(m759MForm.monthly_l4 || 0).toFixed(2)),
-      Number(Number(m759MForm.monthly_l5 || 0).toFixed(2)),
-    ];
-    const baseLvls = Array.isArray(m759MServer.levels_fixed) ? m759MServer.levels_fixed : [];
-    let levelsDiff = false;
-    for (let i = 0; i < 5; i++) {
-      const cur = Number(Number(lvls[i] || 0).toFixed(2));
-      const base = Number(Number(baseLvls[i] || 0).toFixed(2));
-      if (cur !== base) {
-        levelsDiff = true;
-        break;
-      }
-    }
-    if (levelsDiff) out.levels_fixed = lvls;
+    const mmModeCur = String(m759MForm.monthly_matrix_open_mode || "").toUpperCase();
+    const mmModeBase = String(m759MServer.monthly_matrix_open_mode || "");
+    if (mmModeCur && mmModeCur !== mmModeBase) out.matrix_open_mode = mmModeCur;
 
     return out;
   }, [m759MServer, m759MForm]);
@@ -1648,19 +1764,7 @@ export default function AdminCommissionDistribute() {
     try {
       const payload = { ...m759ChangedPayload };
       if (m759MonthlyDirty) {
-        payload.monthly_759 = {
-          direct_first_month: Number(Number(m759MForm.monthly_direct_first || 0).toFixed(2)),
-          direct_monthly: Number(Number(m759MForm.monthly_direct_monthly || 0).toFixed(2)),
-          base_amount: Number(Number(m759MForm.monthly_base_amount || 0).toFixed(2)),
-          agency_enabled: m759MForm.monthly_agency_enabled === "1",
-          levels_fixed: [
-            Number(Number(m759MForm.monthly_l1 || 0).toFixed(2)),
-            Number(Number(m759MForm.monthly_l2 || 0).toFixed(2)),
-            Number(Number(m759MForm.monthly_l3 || 0).toFixed(2)),
-            Number(Number(m759MForm.monthly_l4 || 0).toFixed(2)),
-            Number(Number(m759MForm.monthly_l5 || 0).toFixed(2)),
-          ],
-        };
+        payload.monthly_759 = { ...m759MonthlyChangedPayload };
       }
       const data = await adminUpdateMasterCommission(payload, PRODUCT_RS_759);
       const gm = String(data?.geo_mode || "").toLowerCase();
@@ -1728,6 +1832,7 @@ export default function AdminCommissionDistribute() {
         monthly_direct_monthly: toFixedStr(mm2?.direct_monthly ?? 50, 2),
         monthly_base_amount: toFixedStr(mm2?.base_amount ?? 759, 2),
         monthly_agency_enabled: (mm2?.agency_enabled ? "1" : "0"),
+        monthly_matrix_open_mode: String((mm2?.matrix_open_mode || "")).toUpperCase(),
         monthly_l1: toFixedStr(padded2[0] ?? 0, 2),
         monthly_l2: toFixedStr(padded2[1] ?? 0, 2),
         monthly_l3: toFixedStr(padded2[2] ?? 0, 2),
@@ -1739,20 +1844,21 @@ export default function AdminCommissionDistribute() {
         direct_monthly: toNum(mvals2.monthly_direct_monthly),
         base_amount: toNum(mvals2.monthly_base_amount),
         agency_enabled: mvals2.monthly_agency_enabled === "1",
+        monthly_matrix_open_mode: mvals2.monthly_matrix_open_mode,
         levels_fixed: padded2.map((x) => toNum(x)),
       });
       setM759MForm(mvals2);
 
       setM759Form(vals);
-      setOk("₹759 Commission saved");
+      setOk("â‚¹759 Commission saved");
     } catch (e) {
-      setErr(parseError(e) || "Save failed (₹759 Commission)");
+      setErr(parseError(e) || "Save failed (â‚¹759 Commission)");
     } finally {
       setM759Saving(false);
     }
   }
 
-  // Matrix overrides — ₹759
+  // Matrix overrides â€” â‚¹759
   const [mx759Loading, setMx759Loading] = useState(true);
   const [mx759Saving, setMx759Saving] = useState(false);
   const [mx759Server, setMx759Server] = useState(null);
@@ -1786,15 +1892,15 @@ export default function AdminCommissionDistribute() {
           three_matrix_percents_json: threePercs.map((x) => toNum(x)),
         });
         setMx759Form({
-          five_levels: String(fiveLevels || ""),
+          five_levels: String(FIXED_FIVE_MATRIX_LEVELS),
           five_amounts: fiveAmounts.map((x) => toFixedStr(x, 2)).join(", "),
           five_percents: fivePercs.map((x) => toFixedStr(x, 2)).join(", "),
-          three_levels: String(threeLevels || ""),
+          three_levels: String(FIXED_THREE_MATRIX_LEVELS),
           three_amounts: threeAmounts.map((x) => toFixedStr(x, 2)).join(", "),
           three_percents: threePercs.map((x) => toFixedStr(x, 2)).join(", "),
         });
       })
-      .catch((e) => setErr(parseError(e) || "Failed to load ₹759 Matrix Commission"))
+      .catch((e) => setErr(parseError(e) || "Failed to load â‚¹759 Matrix Commission"))
       .finally(() => mounted && setMx759Loading(false));
     return () => {
       mounted = false;
@@ -1867,9 +1973,9 @@ export default function AdminCommissionDistribute() {
         three_amounts: threeAmounts.map((x) => toFixedStr(x, 2)).join(", "),
         three_percents: threePercs.map((x) => toFixedStr(x, 2)).join(", "),
       });
-      setOk("₹759 Matrix Commission saved");
+      setOk("â‚¹759 Matrix Commission saved");
     } catch (e) {
-      setErr(parseError(e) || "Save failed (₹759 Matrix Commission)");
+      setErr(parseError(e) || "Save failed (â‚¹759 Matrix Commission)");
     } finally {
       setMx759Saving(false);
     }
@@ -1931,8 +2037,8 @@ export default function AdminCommissionDistribute() {
     return (
       <>
         <Section
-          title="₹150 Activation — Direct Referral Bonuses"
-          subtitle="Set sponsor/self direct bonuses specific to ₹150 activation."
+          title="â‚¹150 Activation â€” Direct Referral Bonuses"
+          subtitle="Set sponsor/self direct bonuses specific to â‚¹150 activation."
           right={
             <SaveBtn
               onClick={onM150Save}
@@ -1946,14 +2052,14 @@ export default function AdminCommissionDistribute() {
             <div style={{ color: "#64748b" }}>Loading...</div>
           ) : (
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
-              <Input label="Sponsor (₹)" value={m150Form.direct_bonus_sponsor} onChange={(v) => onM150Change("direct_bonus_sponsor", v)} />
-              <Input label="Self (₹)" value={m150Form.direct_bonus_self} onChange={(v) => onM150Change("direct_bonus_self", v)} />
+              <Input label="Sponsor (â‚¹)" value={m150Form.direct_bonus_sponsor} onChange={(v) => onM150Change("direct_bonus_sponsor", v)} />
+              <Input label="Self (â‚¹)" value={m150Form.direct_bonus_self} onChange={(v) => onM150Change("direct_bonus_self", v)} />
             </div>
           )}
         </Section>
 
         <Section
-          title="₹150 Activation — Base & Opening"
+          title="â‚¹150 Activation â€” Base & Opening"
           subtitle="Base used for geo percent splits; activation count opens N 5/3 matrix accounts per activation."
           right={
             <SaveBtn
@@ -1968,14 +2074,110 @@ export default function AdminCommissionDistribute() {
             <div style={{ color: "#64748b" }}>Loading...</div>
           ) : (
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
-              <Input label="Base Amount (₹)" value={m150Form.product_base_amount} onChange={(v) => onM150Change("product_base_amount", v)} />
+              <Input label="Base Amount (â‚¹)" value={m150Form.product_base_amount} onChange={(v) => onM150Change("product_base_amount", v)} />
               <Input label="Coupons Activation Count" type="text" step="1" min="0" placeholder="e.g. 1" value={m150Form.coupon_activation_count} onChange={(v) => onM150Change("coupon_activation_count", v)} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 220px" }}>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>Matrix Open Mode</label>
+                <select
+                  value={m150Form.matrix_open_mode || ""}
+                  onChange={(e) => onM150Change("matrix_open_mode", e.target.value)}
+                  style={{ height: 36, borderRadius: 8, border: "1px solid #e2e8f0", padding: "0 10px", fontWeight: 700 }}
+                >
+                  <option value="">â€”</option>
+                  <option value="FIRST_TIME_ONLY">FIRST_TIME_ONLY</option>
+                  <option value="EVERY_PURCHASE">EVERY_PURCHASE</option>
+                  <option value="NEVER">NEVER</option>
+                </select>
+              </div>
+              <Input label="Matrix Open Count" type="text" step="1" min="0" placeholder="e.g. 1" value={m150Form.matrix_open_count} onChange={(v) => onM150Change("matrix_open_count", v)} />
             </div>
           )}
         </Section>
 
         <Section
-          title="₹150 Activation — Geo (Agency)"
+          title="Prime 750 â€” Settings"
+          subtitle="Set 750Ã— multiplier that scales off Prime 150. Base package is fixed to Prime 150."
+          right={
+            <SaveBtn
+              onClick={() =>
+                onMasterSave({
+                  commissions: {
+                    prime_750: {
+                      multiplier: Math.max(1, Math.floor(Number(mForm.prime750_multiplier || 1))),
+                      base_package: "prime_150",
+                    },
+                  },
+                })
+              }
+              disabled={mLoading}
+              saving={mSaving}
+              dirty={Number(mForm.prime750_multiplier || 1) !== Number(mServer?.prime750_multiplier || 1)}
+            />
+          }
+        >
+          {mLoading ? (
+            <div style={{ color: "#64748b" }}>Loading...</div>
+          ) : (
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
+              <Input
+                label="Multiplier (Ã—)"
+                type="text"
+                step="1"
+                min="1"
+                placeholder="e.g. 5"
+                value={mForm.prime750_multiplier}
+                onChange={(v) => onMChange("prime750_multiplier", v)}
+              />
+            </div>
+          )}
+        </Section>
+
+        <Section
+          title="â‚¹150 Activation â€” Reward Points"
+          subtitle="Set points credited on â‚¹150 activation. Prime 750 uses the configured multiplier Ã— this value."
+          right={
+            <SaveBtn
+              onClick={() =>
+                onMasterSave({
+                  commissions: {
+                    prime_150: {
+                      rewards: {
+                        points_amount: Number(Number(mForm.prime150_reward_points_amount || 0).toFixed(2)),
+                      },
+                    },
+                  },
+                })
+              }
+              disabled={mLoading}
+              saving={mSaving}
+              dirty={
+                Number(Number(mForm.prime150_reward_points_amount || 0).toFixed(2)) !==
+                Number(Number(mServer?.prime150_reward_points_amount || 0).toFixed(2))
+              }
+            />
+          }
+        >
+          {mLoading ? (
+            <div style={{ color: "#64748b" }}>Loading...</div>
+          ) : (
+            <>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
+                <Input
+                  label="Reward Points (150)"
+                  value={mForm.prime150_reward_points_amount}
+                  onChange={(v) => onMChange("prime150_reward_points_amount", v)}
+                />
+              </div>
+              <div style={{ fontSize: 12, color: "#334155" }}>
+                Preview: 150 Reward Points = {toFixedStr(mForm.prime150_reward_points_amount || 0, 2)}; 750 Reward Points ={" "}
+                {toFixedStr(Number(mForm.prime150_reward_points_amount || 0) * Number(mForm.prime750_multiplier || mServer?.prime750_multiplier || 1), 2)}
+              </div>
+            </>
+          )}
+        </Section>
+
+        <Section
+          title="â‚¹150 Activation â€” Geo (Agency)"
           subtitle="Percent vs fixed mode per role. Empty values imply fallback to global defaults."
           right={
             <SaveBtn
@@ -2008,29 +2210,29 @@ export default function AdminCommissionDistribute() {
                   onChange={(e) => onM150Change("geo_mode", e.target.value)}
                   style={{ height: 36, borderRadius: 8, border: "1px solid #e2e8f0", padding: "0 10px", fontWeight: 700 }}
                 >
-                  <option value="">—</option>
+                  <option value="">â€”</option>
                   <option value="percent">Percent</option>
-                  <option value="fixed">Fixed (₹)</option>
+                  <option value="fixed">Fixed (â‚¹)</option>
                 </select>
               </div>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <Input label="Sub Franchise (₹)" value={m150Form.geo_fixed_sub_franchise} onChange={(v) => onM150Change("geo_fixed_sub_franchise", v)} />
-                <Input label="Pincode (₹)" value={m150Form.geo_fixed_pincode} onChange={(v) => onM150Change("geo_fixed_pincode", v)} />
-                <Input label="Pincode Coordinator (₹)" value={m150Form.geo_fixed_pincode_coord} onChange={(v) => onM150Change("geo_fixed_pincode_coord", v)} />
-                <Input label="District (₹)" value={m150Form.geo_fixed_district} onChange={(v) => onM150Change("geo_fixed_district", v)} />
-                <Input label="District Coordinator (₹)" value={m150Form.geo_fixed_district_coord} onChange={(v) => onM150Change("geo_fixed_district_coord", v)} />
-                <Input label="State (₹)" value={m150Form.geo_fixed_state} onChange={(v) => onM150Change("geo_fixed_state", v)} />
-                <Input label="State Coordinator (₹)" value={m150Form.geo_fixed_state_coord} onChange={(v) => onM150Change("geo_fixed_state_coord", v)} />
-                <Input label="Employee (₹)" value={m150Form.geo_fixed_employee} onChange={(v) => onM150Change("geo_fixed_employee", v)} />
-                <Input label="Admin (Company) (₹)" value={m150Form.geo_fixed_royalty} onChange={(v) => onM150Change("geo_fixed_royalty", v)} />
+                <Input label="Sub Franchise (â‚¹)" value={m150Form.geo_fixed_sub_franchise} onChange={(v) => onM150Change("geo_fixed_sub_franchise", v)} />
+                <Input label="Pincode (â‚¹)" value={m150Form.geo_fixed_pincode} onChange={(v) => onM150Change("geo_fixed_pincode", v)} />
+                <Input label="Pincode Coordinator (â‚¹)" value={m150Form.geo_fixed_pincode_coord} onChange={(v) => onM150Change("geo_fixed_pincode_coord", v)} />
+                <Input label="District (â‚¹)" value={m150Form.geo_fixed_district} onChange={(v) => onM150Change("geo_fixed_district", v)} />
+                <Input label="District Coordinator (â‚¹)" value={m150Form.geo_fixed_district_coord} onChange={(v) => onM150Change("geo_fixed_district_coord", v)} />
+                <Input label="State (â‚¹)" value={m150Form.geo_fixed_state} onChange={(v) => onM150Change("geo_fixed_state", v)} />
+                <Input label="State Coordinator (â‚¹)" value={m150Form.geo_fixed_state_coord} onChange={(v) => onM150Change("geo_fixed_state_coord", v)} />
+                <Input label="Employee (â‚¹)" value={m150Form.geo_fixed_employee} onChange={(v) => onM150Change("geo_fixed_employee", v)} />
+                <Input label="Admin (Company) (â‚¹)" value={m150Form.geo_fixed_royalty} onChange={(v) => onM150Change("geo_fixed_royalty", v)} />
               </div>
             </>
           )}
         </Section>
 
         <Section
-          title="₹150 Activation — Matrix Commission (5 & 3)"
-          subtitle="Per-package overrides for levels and arrays. Amounts in ₹, Percents in %."
+          title="â‚¹150 Activation â€” Matrix Commission (5 & 3)"
+          subtitle="Per-package overrides for levels and arrays. Amounts in â‚¹, Percents in %."
           right={
             <SaveBtn
               onClick={onMx150Save}
@@ -2045,9 +2247,9 @@ export default function AdminCommissionDistribute() {
           ) : (
             <>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
-                <Input label="5-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 6" value={mx150Form.five_levels} onChange={(v) => onMx150Change("five_levels", v)} />
+                <Input label="5-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 10" value={mx150Form.five_levels} onChange={(v) => onMx150Change("five_levels", v)} disabled />
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 380px" }}>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>5-Matrix Amounts (₹, CSV)</label>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>5-Matrix Amounts (â‚¹, CSV)</label>
                   <textarea
                     value={mx150Form.five_amounts}
                     onChange={(e) => onMx150Change("five_amounts", e.target.value)}
@@ -2083,9 +2285,9 @@ export default function AdminCommissionDistribute() {
               </div>
 
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <Input label="3-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 15" value={mx150Form.three_levels} onChange={(v) => onMx150Change("three_levels", v)} />
+                <Input label="3-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 15" value={mx150Form.three_levels} onChange={(v) => onMx150Change("three_levels", v)} disabled />
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 380px" }}>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>3-Matrix Amounts (₹, CSV)</label>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>3-Matrix Amounts (â‚¹, CSV)</label>
                   <textarea
                     value={mx150Form.three_amounts}
                     onChange={(e) => onMx150Change("three_amounts", e.target.value)}
@@ -2130,8 +2332,8 @@ export default function AdminCommissionDistribute() {
     return (
       <>
         <Section
-          title="₹750 Activation — Direct Referral Bonuses"
-          subtitle="Set sponsor/self direct bonuses specific to ₹750 activation."
+          title="â‚¹750 Activation â€” Direct Referral Bonuses"
+          subtitle="Set sponsor/self direct bonuses specific to â‚¹750 activation."
           right={
             <SaveBtn
               onClick={onM750Save}
@@ -2145,14 +2347,70 @@ export default function AdminCommissionDistribute() {
             <div style={{ color: "#64748b" }}>Loading...</div>
           ) : (
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
-              <Input label="Sponsor (₹)" value={m750Form.direct_bonus_sponsor} onChange={(v) => onM750Change("direct_bonus_sponsor", v)} />
-              <Input label="Self (₹)" value={m750Form.direct_bonus_self} onChange={(v) => onM750Change("direct_bonus_self", v)} />
+              <Input label="Sponsor (â‚¹)" value={m750Form.direct_bonus_sponsor} onChange={(v) => onM750Change("direct_bonus_sponsor", v)} />
+              <Input label="Self (â‚¹)" value={m750Form.direct_bonus_self} onChange={(v) => onM750Change("direct_bonus_self", v)} />
             </div>
           )}
         </Section>
 
         <Section
-          title="₹750 Activation — Geo (Agency)"
+          title="â‚¹750 Activation â€” Base & Opening"
+          subtitle="Set Base Amount used for geo percent splits and matrix payouts; optionally set how many 5/3 matrix accounts to open per 750 activation. If left empty, opening fallback = (150 Coupons Activation Count Ã— Prime 750 Multiplier)."
+          right={
+            <SaveBtn
+              onClick={onM750Save}
+              disabled={m750Loading}
+              saving={m750Saving}
+              dirty={m750Dirty}
+            />
+          }
+        >
+          {m750Loading ? (
+            <div style={{ color: "#64748b" }}>Loading...</div>
+          ) : (
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
+              <Input
+                label="Base Amount (â‚¹)"
+                value={m750Form.product_base_amount}
+                onChange={(v) => onM750Change("product_base_amount", v)}
+              />
+              <Input
+                label="Activation Open Count"
+                type="text"
+                step="1"
+                min="0"
+                placeholder="e.g. 5"
+                value={m750Form.activation_open_count}
+                onChange={(v) => onM750Change("activation_open_count", v)}
+              />
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 220px" }}>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>Matrix Open Mode</label>
+                <select
+                  value={m750Form.matrix_open_mode || ""}
+                  onChange={(e) => onM750Change("matrix_open_mode", e.target.value)}
+                  style={{ height: 36, borderRadius: 8, border: "1px solid #e2e8f0", padding: "0 10px", fontWeight: 700 }}
+                >
+                  <option value="">â€”</option>
+                  <option value="FIRST_TIME_ONLY">FIRST_TIME_ONLY</option>
+                  <option value="EVERY_PURCHASE">EVERY_PURCHASE</option>
+                  <option value="NEVER">NEVER</option>
+                </select>
+              </div>
+              <Input
+                label="Matrix Open Count"
+                type="text"
+                step="1"
+                min="0"
+                placeholder="e.g. 1"
+                value={m750Form.matrix_open_count}
+                onChange={(v) => onM750Change("matrix_open_count", v)}
+              />
+            </div>
+          )}
+        </Section>
+
+        <Section
+          title="â‚¹750 Activation â€” Geo (Agency)"
           subtitle="Percent vs fixed mode per role. Empty values imply fallback to global defaults."
           right={
             <SaveBtn
@@ -2185,29 +2443,29 @@ export default function AdminCommissionDistribute() {
                   onChange={(e) => onM750Change("geo_mode", e.target.value)}
                   style={{ height: 36, borderRadius: 8, border: "1px solid #e2e8f0", padding: "0 10px", fontWeight: 700 }}
                 >
-                  <option value="">—</option>
+                  <option value="">â€”</option>
                   <option value="percent">Percent</option>
-                  <option value="fixed">Fixed (₹)</option>
+                  <option value="fixed">Fixed (â‚¹)</option>
                 </select>
               </div>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <Input label="Sub Franchise (₹)" value={m750Form.geo_fixed_sub_franchise} onChange={(v) => onM750Change("geo_fixed_sub_franchise", v)} />
-                <Input label="Pincode (₹)" value={m750Form.geo_fixed_pincode} onChange={(v) => onM750Change("geo_fixed_pincode", v)} />
-                <Input label="Pincode Coordinator (₹)" value={m750Form.geo_fixed_pincode_coord} onChange={(v) => onM750Change("geo_fixed_pincode_coord", v)} />
-                <Input label="District (₹)" value={m750Form.geo_fixed_district} onChange={(v) => onM750Change("geo_fixed_district", v)} />
-                <Input label="District Coordinator (₹)" value={m750Form.geo_fixed_district_coord} onChange={(v) => onM750Change("geo_fixed_district_coord", v)} />
-                <Input label="State (₹)" value={m750Form.geo_fixed_state} onChange={(v) => onM750Change("geo_fixed_state", v)} />
-                <Input label="State Coordinator (₹)" value={m750Form.geo_fixed_state_coord} onChange={(v) => onM750Change("geo_fixed_state_coord", v)} />
-                <Input label="Employee (₹)" value={m750Form.geo_fixed_employee} onChange={(v) => onM750Change("geo_fixed_employee", v)} />
-                <Input label="Admin (Company) (₹)" value={m750Form.geo_fixed_royalty} onChange={(v) => onM750Change("geo_fixed_royalty", v)} />
+                <Input label="Sub Franchise (â‚¹)" value={m750Form.geo_fixed_sub_franchise} onChange={(v) => onM750Change("geo_fixed_sub_franchise", v)} />
+                <Input label="Pincode (â‚¹)" value={m750Form.geo_fixed_pincode} onChange={(v) => onM750Change("geo_fixed_pincode", v)} />
+                <Input label="Pincode Coordinator (â‚¹)" value={m750Form.geo_fixed_pincode_coord} onChange={(v) => onM750Change("geo_fixed_pincode_coord", v)} />
+                <Input label="District (â‚¹)" value={m750Form.geo_fixed_district} onChange={(v) => onM750Change("geo_fixed_district", v)} />
+                <Input label="District Coordinator (â‚¹)" value={m750Form.geo_fixed_district_coord} onChange={(v) => onM750Change("geo_fixed_district_coord", v)} />
+                <Input label="State (â‚¹)" value={m750Form.geo_fixed_state} onChange={(v) => onM750Change("geo_fixed_state", v)} />
+                <Input label="State Coordinator (â‚¹)" value={m750Form.geo_fixed_state_coord} onChange={(v) => onM750Change("geo_fixed_state_coord", v)} />
+                <Input label="Employee (â‚¹)" value={m750Form.geo_fixed_employee} onChange={(v) => onM750Change("geo_fixed_employee", v)} />
+                <Input label="Admin (Company) (â‚¹)" value={m750Form.geo_fixed_royalty} onChange={(v) => onM750Change("geo_fixed_royalty", v)} />
               </div>
             </>
           )}
         </Section>
 
         <Section
-          title="₹750 Activation — Matrix Commission (5 & 3)"
-          subtitle="Per-package overrides for levels and arrays. Amounts in ₹, Percents in %."
+          title="â‚¹750 Activation â€” Matrix Commission (5 & 3)"
+          subtitle="Per-package overrides for levels and arrays. Amounts in â‚¹, Percents in %."
           right={
             <SaveBtn
               onClick={onMx750Save}
@@ -2222,9 +2480,9 @@ export default function AdminCommissionDistribute() {
           ) : (
             <>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
-                <Input label="5-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 6" value={mx750Form.five_levels} onChange={(v) => onMx750Change("five_levels", v)} />
+                <Input label="5-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 6" value={mx750Form.five_levels} onChange={(v) => onMx750Change("five_levels", v)} disabled/>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 380px" }}>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>5-Matrix Amounts (₹, CSV)</label>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>5-Matrix Amounts (â‚¹, CSV)</label>
                   <textarea
                     value={mx750Form.five_amounts}
                     onChange={(e) => onMx750Change("five_amounts", e.target.value)}
@@ -2260,9 +2518,9 @@ export default function AdminCommissionDistribute() {
               </div>
 
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <Input label="3-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 15" value={mx750Form.three_levels} onChange={(v) => onMx750Change("three_levels", v)} />
+                <Input label="3-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 15" value={mx750Form.three_levels} onChange={(v) => onMx750Change("three_levels", v)} disabled/>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 380px" }}>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>3-Matrix Amounts (₹, CSV)</label>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>3-Matrix Amounts (â‚¹, CSV)</label>
                   <textarea
                     value={mx750Form.three_amounts}
                     onChange={(e) => onMx750Change("three_amounts", e.target.value)}
@@ -2307,8 +2565,8 @@ export default function AdminCommissionDistribute() {
     return (
       <>
         <Section
-          title="₹759 Activation — Direct Referral Bonuses"
-          subtitle="Set sponsor/self direct bonuses specific to ₹759 activation."
+          title="â‚¹759 Activation â€” Direct Referral Bonuses"
+          subtitle="Set sponsor/self direct bonuses specific to â‚¹759 activation."
           right={
             <SaveBtn
               onClick={onM759Save}
@@ -2322,15 +2580,46 @@ export default function AdminCommissionDistribute() {
             <div style={{ color: "#64748b" }}>Loading...</div>
           ) : (
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
-              <Input label="Sponsor (₹)" value={m759Form.direct_bonus_sponsor} onChange={(v) => onM759Change("direct_bonus_sponsor", v)} />
-              <Input label="Self (₹)" value={m759Form.direct_bonus_self} onChange={(v) => onM759Change("direct_bonus_self", v)} />
+              <Input label="Sponsor (â‚¹)" value={m759Form.direct_bonus_sponsor} onChange={(v) => onM759Change("direct_bonus_sponsor", v)} />
+              <Input label="Self (â‚¹)" value={m759Form.direct_bonus_self} onChange={(v) => onM759Change("direct_bonus_self", v)} />
             </div>
           )}
         </Section>
 
+        {/* Reward Points Base Section */}
         <Section
-          title="₹759 Monthly — Direct and Level Bonuses"
-          subtitle="Configure first-month vs subsequent-month sponsor bonus and fixed level payouts for ₹759 Prime/Coupon flow."
+          title="â‚¹759 Monthly â€” Reward Points (Base Amount)"
+          subtitle="Reward points credited each month equal this Base Amount."
+          right={
+            <SaveBtn
+              onClick={onM759Save}
+              disabled={m759Loading}
+              saving={m759Saving}
+              dirty={m759MonthlyDirty}
+            />
+          }
+        >
+          {m759Loading ? (
+            <div style={{ color: "#64748b" }}>Loading...</div>
+          ) : (
+            <>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
+                <Input
+                  label="Base Amount (â‚¹)"
+                  value={m759MForm.monthly_base_amount}
+                  onChange={(v) => onM759MonthlyChange("monthly_base_amount", v)}
+                />
+              </div>
+              <div style={{ fontSize: 12, color: "#334155" }}>
+                Wallet Reward Points (monthly) = Base Amount (â‚¹) = {toFixedStr(m759MForm.monthly_base_amount || 0, 2)}
+              </div>
+            </>
+          )}
+        </Section>
+
+        <Section
+          title="â‚¹759 Monthly â€” Direct Bonuses and Settings"
+          subtitle="Configure first-month vs subsequent-month sponsor bonus, base amount, and agency toggle for â‚¹759 flows. Level payouts are disabled."
           right={
             <SaveBtn
               onClick={onM759Save}
@@ -2345,9 +2634,12 @@ export default function AdminCommissionDistribute() {
           ) : (
             <>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
-                <Input label="First Month Sponsor (₹)" value={m759MForm.monthly_direct_first} onChange={(v) => onM759MonthlyChange("monthly_direct_first", v)} />
-                <Input label="Monthly Sponsor (₹)" value={m759MForm.monthly_direct_monthly} onChange={(v) => onM759MonthlyChange("monthly_direct_monthly", v)} />
-                <Input label="Base Amount (₹)" value={m759MForm.monthly_base_amount} onChange={(v) => onM759MonthlyChange("monthly_base_amount", v)} />
+                <Input label="First Month Sponsor (â‚¹)" value={m759MForm.monthly_direct_first} onChange={(v) => onM759MonthlyChange("monthly_direct_first", v)} />
+                <Input label="Monthly Sponsor (â‚¹)" value={m759MForm.monthly_direct_monthly} onChange={(v) => onM759MonthlyChange("monthly_direct_monthly", v)} />
+                <Input label="Base Amount (â‚¹)" value={m759MForm.monthly_base_amount} onChange={(v) => onM759MonthlyChange("monthly_base_amount", v)} />
+              </div>
+              <div style={{ fontSize: 12, color: "#334155" }}>
+                Reward Points (monthly) = Base Amount (â‚¹) = {toFixedStr(m759MForm.monthly_base_amount || 0, 2)}
               </div>
               <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 8 }}>
                 <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>Agency Enabled</label>
@@ -2360,19 +2652,28 @@ export default function AdminCommissionDistribute() {
                   <option value="0">Disabled</option>
                 </select>
               </div>
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <Input label="L1 (₹)" value={m759MForm.monthly_l1} onChange={(v) => onM759MonthlyChange("monthly_l1", v)} />
-                <Input label="L2 (₹)" value={m759MForm.monthly_l2} onChange={(v) => onM759MonthlyChange("monthly_l2", v)} />
-                <Input label="L3 (₹)" value={m759MForm.monthly_l3} onChange={(v) => onM759MonthlyChange("monthly_l3", v)} />
-                <Input label="L4 (₹)" value={m759MForm.monthly_l4} onChange={(v) => onM759MonthlyChange("monthly_l4", v)} />
-                <Input label="L5 (₹)" value={m759MForm.monthly_l5} onChange={(v) => onM759MonthlyChange("monthly_l5", v)} />
+              <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 8 }}>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>Monthly Matrix Open Mode</label>
+                <select
+                  value={m759MForm.monthly_matrix_open_mode || ""}
+                  onChange={(e) => onM759MonthlyChange("monthly_matrix_open_mode", e.target.value)}
+                  style={{ height: 36, borderRadius: 8, border: "1px solid #e2e8f0", padding: "0 10px", fontWeight: 700 }}
+                >
+                  <option value="">â€”</option>
+                  <option value="FIRST_MONTH_ONLY">FIRST_MONTH_ONLY</option>
+                  <option value="EVERY_PURCHASE">EVERY_PURCHASE</option>
+                  <option value="NEVER">NEVER</option>
+                </select>
+              </div>
+              <div style={{ fontSize: 12, color: "#64748b" }}>
+                Monthly L1â€“L5 level payouts are disabled and hidden from this screen.
               </div>
             </>
           )}
         </Section>
 
         <Section
-          title="₹759 Activation — Geo (Agency)"
+          title="â‚¹759 Activation â€” Geo (Agency)"
           subtitle="Percent vs fixed mode per role. Empty values imply fallback to global defaults."
           right={
             <SaveBtn
@@ -2405,29 +2706,29 @@ export default function AdminCommissionDistribute() {
                   onChange={(e) => onM759Change("geo_mode", e.target.value)}
                   style={{ height: 36, borderRadius: 8, border: "1px solid #e2e8f0", padding: "0 10px", fontWeight: 700 }}
                 >
-                  <option value="">—</option>
+                  <option value="">â€”</option>
                   <option value="percent">Percent</option>
-                  <option value="fixed">Fixed (₹)</option>
+                  <option value="fixed">Fixed (â‚¹)</option>
                 </select>
               </div>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <Input label="Sub Franchise (₹)" value={m759Form.geo_fixed_sub_franchise} onChange={(v) => onM759Change("geo_fixed_sub_franchise", v)} />
-                <Input label="Pincode (₹)" value={m759Form.geo_fixed_pincode} onChange={(v) => onM759Change("geo_fixed_pincode", v)} />
-                <Input label="Pincode Coordinator (₹)" value={m759Form.geo_fixed_pincode_coord} onChange={(v) => onM759Change("geo_fixed_pincode_coord", v)} />
-                <Input label="District (₹)" value={m759Form.geo_fixed_district} onChange={(v) => onM759Change("geo_fixed_district", v)} />
-                <Input label="District Coordinator (₹)" value={m759Form.geo_fixed_district_coord} onChange={(v) => onM759Change("geo_fixed_district_coord", v)} />
-                <Input label="State (₹)" value={m759Form.geo_fixed_state} onChange={(v) => onM759Change("geo_fixed_state", v)} />
-                <Input label="State Coordinator (₹)" value={m759Form.geo_fixed_state_coord} onChange={(v) => onM759Change("geo_fixed_state_coord", v)} />
-                <Input label="Employee (₹)" value={m759Form.geo_fixed_employee} onChange={(v) => onM759Change("geo_fixed_employee", v)} />
-                <Input label="Admin (Company) (₹)" value={m759Form.geo_fixed_royalty} onChange={(v) => onM759Change("geo_fixed_royalty", v)} />
+                <Input label="Sub Franchise (â‚¹)" value={m759Form.geo_fixed_sub_franchise} onChange={(v) => onM759Change("geo_fixed_sub_franchise", v)} />
+                <Input label="Pincode (â‚¹)" value={m759Form.geo_fixed_pincode} onChange={(v) => onM759Change("geo_fixed_pincode", v)} />
+                <Input label="Pincode Coordinator (â‚¹)" value={m759Form.geo_fixed_pincode_coord} onChange={(v) => onM759Change("geo_fixed_pincode_coord", v)} />
+                <Input label="District (â‚¹)" value={m759Form.geo_fixed_district} onChange={(v) => onM759Change("geo_fixed_district", v)} />
+                <Input label="District Coordinator (â‚¹)" value={m759Form.geo_fixed_district_coord} onChange={(v) => onM759Change("geo_fixed_district_coord", v)} />
+                <Input label="State (â‚¹)" value={m759Form.geo_fixed_state} onChange={(v) => onM759Change("geo_fixed_state", v)} />
+                <Input label="State Coordinator (â‚¹)" value={m759Form.geo_fixed_state_coord} onChange={(v) => onM759Change("geo_fixed_state_coord", v)} />
+                <Input label="Employee (â‚¹)" value={m759Form.geo_fixed_employee} onChange={(v) => onM759Change("geo_fixed_employee", v)} />
+                <Input label="Admin (Company) (â‚¹)" value={m759Form.geo_fixed_royalty} onChange={(v) => onM759Change("geo_fixed_royalty", v)} />
               </div>
             </>
           )}
         </Section>
 
         <Section
-          title="₹759 Activation — Matrix Commission (5 & 3)"
-          subtitle="Per-package overrides for levels and arrays. Amounts in ₹, Percents in %."
+          title="â‚¹759 Activation â€” Matrix Commission (5 & 3)"
+          subtitle="Per-package overrides for levels and arrays. Amounts in â‚¹, Percents in %."
           right={
             <SaveBtn
               onClick={onMx759Save}
@@ -2442,9 +2743,9 @@ export default function AdminCommissionDistribute() {
           ) : (
             <>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
-                <Input label="5-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 6" value={mx759Form.five_levels} onChange={(v) => onMx759Change("five_levels", v)} />
+                <Input label="5-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 6" value={mx759Form.five_levels} onChange={(v) => onMx759Change("five_levels", v)} disabled />
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 380px" }}>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>5-Matrix Amounts (₹, CSV)</label>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>5-Matrix Amounts (â‚¹, CSV)</label>
                   <textarea
                     value={mx759Form.five_amounts}
                     onChange={(e) => onMx759Change("five_amounts", e.target.value)}
@@ -2480,9 +2781,9 @@ export default function AdminCommissionDistribute() {
               </div>
 
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <Input label="3-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 15" value={mx759Form.three_levels} onChange={(v) => onMx759Change("three_levels", v)} />
+                <Input label="3-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 15" value={mx759Form.three_levels} onChange={(v) => onMx759Change("three_levels", v)} disabled />
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 380px" }}>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>3-Matrix Amounts (₹, CSV)</label>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>3-Matrix Amounts (â‚¹, CSV)</label>
                   <textarea
                     value={mx759Form.three_amounts}
                     onChange={(e) => onMx759Change("three_amounts", e.target.value)}
@@ -2573,7 +2874,7 @@ export default function AdminCommissionDistribute() {
         </Section>
 
         <Section
-          title="Direct Refer Withdraw — Distribution Preview"
+          title="Direct Refer Withdraw â€” Distribution Preview"
           subtitle="Enter a user (ID or username) and amount to see the sponsor bonus, TDS/company pool, and net to user."
           right={
             <button
@@ -2604,7 +2905,7 @@ export default function AdminCommissionDistribute() {
               value={pUser}
               onChange={setPUser}
             />
-            <Input label="Amount (₹)" value={pAmount} onChange={setPAmount} />
+            <Input label="Amount (â‚¹)" value={pAmount} onChange={setPAmount} />
           </div>
           {pData ? (
             <div style={{ marginTop: 10 }}>
@@ -2618,7 +2919,7 @@ export default function AdminCommissionDistribute() {
                 }}
               >
                 <div style={{ padding: 10, border: "1px solid #e2e8f0", borderRadius: 8 }}>
-                  <div style={{ fontSize: 12, color: "#64748b" }}>Gross (₹)</div>
+                  <div style={{ fontSize: 12, color: "#64748b" }}>Gross (â‚¹)</div>
                   <div style={{ fontWeight: 900 }}>{pData?.summary?.gross}</div>
                 </div>
                 <div style={{ padding: 10, border: "1px solid #e2e8f0", borderRadius: 8 }}>
@@ -2630,11 +2931,11 @@ export default function AdminCommissionDistribute() {
                   <div style={{ fontWeight: 900 }}>{pData?.summary?.tax_percent}</div>
                 </div>
                 <div style={{ padding: 10, border: "1px solid #e2e8f0", borderRadius: 8 }}>
-                  <div style={{ fontSize: 12, color: "#64748b" }}>Total Deductions (₹)</div>
+                  <div style={{ fontSize: 12, color: "#64748b" }}>Total Deductions (â‚¹)</div>
                   <div style={{ fontWeight: 900 }}>{pData?.summary?.total_deductions}</div>
                 </div>
                 <div style={{ padding: 10, border: "1px solid #e2e8f0", borderRadius: 8 }}>
-                  <div style={{ fontSize: 12, color: "#64748b" }}>Net to User (₹)</div>
+                  <div style={{ fontSize: 12, color: "#64748b" }}>Net to User (â‚¹)</div>
                   <div style={{ fontWeight: 900 }}>{pData?.summary?.net_to_user}</div>
                 </div>
               </div>
@@ -2645,7 +2946,7 @@ export default function AdminCommissionDistribute() {
                   <thead>
                     <tr>
                       <th style={{ textAlign: "left", borderBottom: "1px solid #e2e8f0", padding: 8 }}>Label</th>
-                      <th style={{ textAlign: "left", borderBottom: "1px solid #e2e8f0", padding: 8 }}>Amount (₹)</th>
+                      <th style={{ textAlign: "left", borderBottom: "1px solid #e2e8f0", padding: 8 }}>Amount (â‚¹)</th>
                       <th style={{ textAlign: "left", borderBottom: "1px solid #e2e8f0", padding: 8 }}>%</th>
                       <th style={{ textAlign: "left", borderBottom: "1px solid #e2e8f0", padding: 8 }}>Recipient</th>
                       <th style={{ textAlign: "left", borderBottom: "1px solid #e2e8f0", padding: 8 }}>Type</th>
@@ -2660,7 +2961,7 @@ export default function AdminCommissionDistribute() {
                         <td style={{ borderBottom: "1px solid #f1f5f9", padding: 8 }}>
                           {ln?.recipient?.username
                             ? `${ln.recipient.username} (${ln.recipient.id || "?"})`
-                            : "—"}
+                            : "â€”"}
                         </td>
                         <td style={{ borderBottom: "1px solid #f1f5f9", padding: 8 }}>{ln?.tx_type}</td>
                       </tr>
@@ -2696,9 +2997,9 @@ export default function AdminCommissionDistribute() {
       {/* Tabs */}
       <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
         {[
-          { key: TABS.ACT150, label: "₹150 Activation" },
-          { key: TABS.ACT750, label: "₹750 Activation" },
-          { key: TABS.ACT759, label: "₹759 Activation" },
+          { key: TABS.ACT150, label: "â‚¹150 Activation" },
+          { key: TABS.ACT750, label: "â‚¹750 Activation" },
+          { key: TABS.ACT759, label: "â‚¹759 Activation" },
           { key: TABS.WITHDRAW, label: "Withdrawal Commission" },
         ].map((t) => (
           <button
@@ -2764,3 +3065,4 @@ export default function AdminCommissionDistribute() {
     </div>
   );
 }
+

@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+﻿import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Login from "./pages/Auth/Login";
 import LuckyDraw from "./pages/LuckyDraw";
 import UserDashboard from "./pages/UserDashboard";
@@ -85,6 +85,12 @@ import RegisterV2 from "./pages/Auth/RegisterV2";
 import MyOrdersAll from "./pages/MyOrdersAll";
 import TriAppPage from "./pages/TriAppPage";
 import AdminTriAppManage from "./pages/admin/AdminTriAppManage";
+import AdminAccessManager from "./pages/admin/AdminAccessManager";
+import AdminAdminUsers from "./pages/admin/AdminAdminUsers";
+import RolesPage from "./pages/admin/RolesPage";
+import UserPermissionMap from "./pages/admin/UserPermissionMap";
+import AdminMerchantCategories from "./pages/admin/AdminMerchantCategories";
+import AdminMerchantSubcategories from "./pages/admin/AdminMerchantSubcategories";
 import BusinessShell from "./components/layouts/BusinessShell";
 import BusinessDashboard from "./pages/business/BusinessDashboard";
 import BusinessProfile from "./pages/business/BusinessProfile";
@@ -110,6 +116,11 @@ import AboutPage from "./pages/AboutPage";
 import PrimePage from "./pages/PrimePage";
 import BusinessPage from "./pages/BusinessPage";
 import DashboardContent from "./pages/DashboardContent";
+import EcommerceUser from "./pages/ecommerceUser";
+import AdminEcommerceCategories from "./pages/admin/AdminEcommerceCategories";
+import CategoryPage from "./pages/CategoryPage";
+import AdminUIConfig from "./pages/admin/AdminUIConfig";
+import AdminSeedDemoData from "./pages/admin/AdminSeedDemoData";
 
 function LegacyAuthEntry() {
   const location = useLocation();
@@ -144,6 +155,7 @@ function App() {
         <Route path="/about" element={<AboutPage />} />
         <Route path="/prime" element={<PrimePage />} />
         <Route path="/business" element={<BusinessPage />} />
+        <Route path="/c/:slug" element={<ConsumerShell><CategoryPage /></ConsumerShell>} />
         <Route path="/auth/select" element={<RoleSelect />} />
         <Route path="/login" element={<LegacyAuthEntry />} />
         <Route path="/register" element={<EnhancedLogin />} />
@@ -174,6 +186,16 @@ function App() {
             <ProtectedRoute allowedRoles={["user"]}>
               <ConsumerShell>
                 <UserDashboard embedded />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/ecommerce"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <EcommerceUser embedded />
               </ConsumerShell>
             </ProtectedRoute>
           }
@@ -492,7 +514,7 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["agency"]}>
               <AgencyShell>
-                <AgencyPrimePackage />
+                <AgencyPrimeApproval />
               </AgencyShell>
             </ProtectedRoute>
           }
@@ -589,6 +611,16 @@ function App() {
           }
         />
 
+        <Route
+          path="/agency/join-prime"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <PromoPackages title="Join Prime" />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
         {/* Employee Routes */}
         <Route
           path="/employee/dashboard"
@@ -843,6 +875,16 @@ function App() {
           }
         />
 
+        <Route
+          path="/employee/join-prime"
+          element={
+            <ProtectedRoute allowedRoles={["employee"]}>
+              <EmployeeShell>
+                <PromoPackages title="Join Prime" />
+              </EmployeeShell>
+            </ProtectedRoute>
+          }
+        />
         {/* Admin Routes */}
         <Route
           path="/admin/dashboard"
@@ -1075,6 +1117,36 @@ function App() {
           }
         />
         <Route
+          path="/admin/ecommerce-categories"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminEcommerceCategories />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/ui-config"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminUIConfig />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/seed-demo"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminSeedDemoData />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/dashboard-cards"
           element={
             <AdminProtectedRoute>
@@ -1166,6 +1238,58 @@ function App() {
         />
 
         <Route
+          path="/admin/access-manager"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminAccessManager />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        {/* RBAC Administration routes (as per required UI flow) */}
+        <Route
+          path="/admin_user"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminAdminUsers />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/role"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <RolesPage />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/permission"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <RolesPage />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/user_permission"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <UserPermissionMap />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+
+        <Route
           path="/admin/dashboard/models"
           element={
             <AdminProtectedRoute>
@@ -1201,6 +1325,26 @@ function App() {
             <AdminProtectedRoute>
               <AdminShell>
                 <ProductPage />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/merchant-categories"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminMerchantCategories />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/merchant-subcategories"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminMerchantSubcategories />
               </AdminShell>
             </AdminProtectedRoute>
           }
@@ -1247,6 +1391,16 @@ function App() {
           }
         />
 
+        <Route
+          path="/business/join-prime"
+          element={
+            <ProtectedRoute allowedRoles={["business"]}>
+              <BusinessShell>
+                <PromoPackages title="Join Prime" />
+              </BusinessShell>
+            </ProtectedRoute>
+          }
+        />
         {/* Merchant Marketplace (Public) */}
         <Route path="/merchant-marketplace" element={<ConsumerShell><MerchantShops /></ConsumerShell>} />
         <Route path="/merchant-marketplace/shops/:id" element={<ConsumerShell><MerchantShopDetail /></ConsumerShell>} />
@@ -1259,3 +1413,4 @@ function App() {
 }
 
 export default App;
+

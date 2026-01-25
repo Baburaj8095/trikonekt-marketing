@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import {
   Box,
   Typography,
@@ -8,7 +8,7 @@ import {
 } from "@mui/material";
 
 const apps = [
-  // 🛍️ Shopping
+  // ðŸ›ï¸ Shopping
   {
     name: "Amazon",
     appUrl: "amazon://",
@@ -45,7 +45,7 @@ const apps = [
     icon: "https://cdn.brandfetch.io/olx.in/logo/icon.svg",
   },
 
-  // 🚗 Travel & Mobility
+  // ðŸš— Travel & Mobility
   {
     name: "Ola",
     appUrl: "ola://",
@@ -68,7 +68,7 @@ const apps = [
     icon: "https://cdn.brandfetch.io/makemytrip.com/logo/icon.svg",
   },
 
-  // 💰 Finance
+  // ðŸ’° Finance
   {
     name: "PhonePe",
     appUrl: "phonepe://",
@@ -205,3 +205,4 @@ export default function AppHub() {
     </Box>
   );
 }
+

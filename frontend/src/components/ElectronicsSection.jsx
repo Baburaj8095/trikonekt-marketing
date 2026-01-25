@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Stack, Card, Typography } from "@mui/material";
 import SmartphoneIcon from "@mui/icons-material/Smartphone";
 import SatelliteAltIcon from "@mui/icons-material/SatelliteAlt";
@@ -373,7 +373,7 @@ const ElectronicsSection = () => {
                   sx={{ mt: "auto", color: "primary.main", fontWeight: 600, fontSize: 13, userSelect: "none" }}
                   aria-label={`View ${p.name}`}
                 >
-                  View →
+                  View â†’
                 </Typography>
               </Box>
             </Card>
@@ -385,3 +385,4 @@ const ElectronicsSection = () => {
 };
 
 export default ElectronicsSection;
+

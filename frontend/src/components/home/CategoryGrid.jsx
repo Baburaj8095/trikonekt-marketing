@@ -1,4 +1,4 @@
-import { Box, Typography } from "@mui/material";
+﻿import { Box, Typography } from "@mui/material";
 
 export default function CategoryGrid({ items }) {
   return (
@@ -21,3 +21,4 @@ export default function CategoryGrid({ items }) {
     </Box>
   );
 }
+

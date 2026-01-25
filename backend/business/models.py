@@ -11,6 +11,31 @@ except Exception:
     RAW_STORAGE = None
     MEDIA_STORAGE = None
 
+import logging
+logger = logging.getLogger(__name__)
+
+def is_matrix_eligible(u) -> bool:
+    """
+    Matrix Eligibility:
+    - category must be 'consumer'
+    - must NOT be staff or superuser
+    - role must NOT be 'agency' or 'employee'
+    """
+    try:
+        if not u:
+            return False
+        role = str(getattr(u, "role", "") or "").strip().lower()
+        category = str(getattr(u, "category", "") or "").strip().lower()
+        if getattr(u, "is_staff", False) or getattr(u, "is_superuser", False):
+            return False
+        if role in ("agency", "employee"):
+            return False
+        if category != "consumer":
+            return False
+        return True
+    except Exception:
+        return False
+
 
 class BusinessRegistration(models.Model):
     STATUS_PENDING = 'pending'
@@ -33,6 +58,9 @@ class BusinessRegistration(models.Model):
     # Business details
     business_name = models.CharField(max_length=255)
     business_category = models.CharField(max_length=100)
+    # New DB-driven category mapping (nullable for backward compatibility)
+    category = models.ForeignKey('business.MerchantCategory', null=True, blank=True, on_delete=models.SET_NULL, related_name='registrations')
+    subcategory = models.ForeignKey('business.MerchantSubCategory', null=True, blank=True, on_delete=models.SET_NULL, related_name='registrations')
     business_address = models.TextField()
 
     # Sponsorship and geo
@@ -75,6 +103,83 @@ class BusinessRegistration(models.Model):
             self.unique_id = self.generate_unique_id()
         super().save(*args, **kwargs)
 
+
+# ==============================
+# Merchant Category Management
+# ==============================
+class MerchantCategory(models.Model):
+    name = models.CharField(max_length=150, unique=True, db_index=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    sort_order = models.IntegerField(default=0, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["sort_order", "name"]
+        verbose_name = "Merchant Category"
+        verbose_name_plural = "Merchant Categories"
+
+    def __str__(self):
+        return self.name
+
+
+class MerchantSubCategory(models.Model):
+    category = models.ForeignKey(MerchantCategory, on_delete=models.CASCADE, related_name="subcategories")
+    name = models.CharField(max_length=150)
+    is_active = models.BooleanField(default=True, db_index=True)
+    sort_order = models.IntegerField(default=0, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["category_id", "sort_order", "name"]
+        verbose_name = "Merchant Subcategory"
+        verbose_name_plural = "Merchant Subcategories"
+        constraints = [
+            models.UniqueConstraint(fields=["category", "name"], name="uniq_merchant_subcategory_per_category")
+        ]
+
+    def __str__(self):
+        try:
+            return f"{getattr(self.category, 'name', 'Category')} → {self.name}"
+        except Exception:
+            return self.name
+
+# ==========================
+# Root Consumer Configuration
+# ==========================
+class RootConsumerConfig(models.Model):
+    """
+    Singleton config holding the single designated Root Consumer user.
+    Root user must be a consumer (category='consumer'), not staff/superuser and matrix-eligible.
+    """
+    root_user = models.OneToOneField(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="as_root_consumer")
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Root Consumer Config"
+        verbose_name_plural = "Root Consumer Config"
+
+    def __str__(self):
+        return f"RootConsumer<{getattr(self.root_user, 'username', None)}>"
+
+    @classmethod
+    def get_solo(cls) -> "RootConsumerConfig":
+        obj = cls.objects.first()
+        return obj or cls.objects.create()
+
+    def get_root_user(self):
+        u = getattr(self, "root_user", None)
+        try:
+            if u and is_matrix_eligible(u):
+                return u
+        except Exception:
+            pass
+        try:
+            if u and getattr(u, "category", "") == "consumer" and not getattr(u, "is_staff", False) and not getattr(u, "is_superuser", False):
+                return u
+        except Exception:
+            pass
+        return None
 
 # ==========================
 # Auto-Pool & Commission CFG
@@ -331,6 +436,57 @@ class CommissionConfig(models.Model):
             ]
         return arr
 
+    def get_upline_percents_dynamic(self) -> list[_D]:
+        """
+        Dynamic-length upline percent list.
+        Preference order:
+          1) master_commission_json["upline"]["percents"] -> list
+          2) master_commission_json["upline"] keys l1..lN (sorted by N)
+          3) typed fields l1_percent..l5_percent
+        """
+        m = self._m()
+        try:
+            u = dict(m.get("upline", {}) or {})
+        except Exception:
+            u = {}
+        # 1) Direct list form: percents
+        lst = u.get("percents")
+        if isinstance(lst, list) and lst:
+            out: list[CommissionConfig._D] = []
+            for v in lst:
+                try:
+                    out.append(self._D(str(v)))
+                except Exception:
+                    out.append(self._D("0"))
+            return out
+        # 2) Map form: l1..lN keys
+        try:
+            pairs = []
+            for k, v in u.items():
+                if isinstance(k, str):
+                    kl = k.lower()
+                    if kl.startswith("l") and kl[1:].isdigit():
+                        pairs.append((int(kl[1:]), v))
+            if pairs:
+                pairs.sort(key=lambda x: x[0])
+                out2: list[CommissionConfig._D] = []
+                for _, v in pairs:
+                    try:
+                        out2.append(self._D(str(v)))
+                    except Exception:
+                        out2.append(self._D("0"))
+                return out2
+        except Exception:
+            pass
+        # 3) Fallback to typed DB fields (L1..L5)
+        return [
+            self._D(str(self.l1_percent or "0")),
+            self._D(str(self.l2_percent or "0")),
+            self._D(str(self.l3_percent or "0")),
+            self._D(str(self.l4_percent or "0")),
+            self._D(str(self.l5_percent or "0")),
+        ]
+
     def get_geo_percents(self) -> dict:
         """
         Returns geo role percents as a dict. Keys:
@@ -510,21 +666,79 @@ class AutoPoolAccount(models.Model):
 
     @classmethod
     def create_five_150_for_user(cls, user, amount: Decimal | None = None, source_type: str = "", source_id: str = ""):
+        """
+        Deterministic forced-matrix placement for FIVE_150 using GenericPlacement.
+        """
+        # Eligibility gate
+        try:
+            if not is_matrix_eligible(user):
+                try:
+                    logger.info("matrix skipped: user not eligible", extra={"where": "create_five_150_for_user", "user_id": getattr(user, "id", None)})
+                except Exception:
+                    pass
+                return None
+        except Exception:
+            return None
         from decimal import Decimal as D
+        from business.services.placement import GenericPlacement
         amt = D(amount) if amount is not None else D("150.00")
-        return cls.place_in_five_pool(user, "FIVE_150", amt, source_type=source_type, source_id=source_id)
+        return GenericPlacement.place_account(
+            owner=user,
+            pool_type="FIVE_150",
+            amount=amt,
+            source_type=source_type or "",
+            source_id=source_id or "",
+        )
 
     @classmethod
-    def create_three_150_for_user(cls, user, amount: Decimal | None = None):
+    def create_three_150_for_user(cls, user, amount: Decimal | None = None, source_type: str = "SYSTEM", source_id: str = ""):
+        """
+        Deterministic forced-matrix placement for THREE_150 using GenericPlacement.
+        """
+        # Eligibility gate
+        try:
+            if not is_matrix_eligible(user):
+                try:
+                    logger.info("matrix skipped: user not eligible", extra={"where": "create_three_150_for_user", "user_id": getattr(user, "id", None)})
+                except Exception:
+                    pass
+                return None
+        except Exception:
+            return None
         from decimal import Decimal as D
+        from business.services.placement import GenericPlacement
         amt = D(amount) if amount is not None else D("150.00")
-        return cls.place_in_three_pool(user, "THREE_150", amt)
+        return GenericPlacement.place_account(
+            owner=user,
+            pool_type="THREE_150",
+            amount=amt,
+            source_type=source_type or "SYSTEM",
+            source_id=source_id or "",
+        )
 
     @classmethod
     def create_three_50_for_user(cls, user, amount: Decimal | None = None):
+        """
+        Deterministic forced-matrix placement for THREE_50 using GenericPlacement.
+        """
+        # Eligibility gate
+        try:
+            if not is_matrix_eligible(user):
+                try:
+                    logger.info("matrix skipped: user not eligible", extra={"where": "create_three_50_for_user", "user_id": getattr(user, "id", None)})
+                except Exception:
+                    pass
+                return None
+        except Exception:
+            return None
         from decimal import Decimal as D
+        from business.services.placement import GenericPlacement
         amt = D(amount) if amount is not None else D("50.00")
-        return cls.place_in_three_pool(user, "THREE_50", amt)
+        return GenericPlacement.place_account(
+            owner=user,
+            pool_type="THREE_50",
+            amount=amt,
+        )
 
     # ---------- 3-Matrix placement helpers ----------
     @classmethod
@@ -570,229 +784,62 @@ class AutoPoolAccount(models.Model):
     @classmethod
     def place_in_three_pool(cls, user, pool_type: str, amount: Decimal, source_type: str = "", source_id: str = ""):
         """
-        Preferred behavior:
-          - If user already has a base self account in this pool, place new self-accounts under that subtree (3-wide BFS).
-          - Else, fall back to upline BFS placement (legacy), which becomes the base.
+        DEPRECATED legacy behavior removed.
+        New behavior: deterministic forced-matrix placement (TOP→DOWN→LEFT→RIGHT) independent of sponsor/self.
         """
-        from collections import deque
+        # Eligibility gate
+        try:
+            if not is_matrix_eligible(user):
+                try:
+                    logger.info("matrix skipped: user not eligible", extra={"where": "place_in_three_pool", "user_id": getattr(user, "id", None), "pool_type": pool_type})
+                except Exception:
+                    pass
+                return None
+        except Exception:
+            return None
         from decimal import Decimal as D
-        from django.db import transaction as _tx
+        from business.services.placement import GenericPlacement
         amt = D(amount or 0)
-
-        with _tx.atomic():
-            base_self = cls._base_self_account(user, pool_type)
-            uname = cls._next_username_key(user, pool_type)
-
-            # If base exists, BFS within the user's own subtree (cluster under main)
-            if base_self:
-                q = deque([base_self])
-                while q:
-                    node = q.popleft()
-                    child_qs = cls.objects.filter(parent_account=node, pool_type=pool_type, status="ACTIVE").order_by("id")
-                    cnt = child_qs.count()
-                    if cnt < 3:
-                        return cls.objects.create(
-                            owner=user,
-                            username_key=uname,
-                            entry_amount=amt,
-                            pool_type=pool_type,
-                            status="ACTIVE",
-                            parent_account=node,
-                            level=(getattr(node, "level", 0) or 0) + 1,
-                            position=(cnt + 1),
-                            source_type=source_type or "",
-                            source_id=source_id or "",
-                        )
-                    for ch in child_qs:
-                        q.append(ch)
-
-                # Fallback: attach directly under base_self if traversal exhausted
-                child_qs2 = cls.objects.filter(parent_account=base_self, pool_type=pool_type, status="ACTIVE").order_by("id")
-                pos = child_qs2.count() + 1
-                return cls.objects.create(
-                    owner=user,
-                    username_key=uname,
-                    entry_amount=amt,
-                    pool_type=pool_type,
-                    status="ACTIVE",
-                    parent_account=base_self,
-                    level=(getattr(base_self, "level", 0) or 0) + 1,
-                    position=pos,
-                    source_type=source_type or "",
-                    source_id=source_id or "",
-                )
-
-            # No base exists yet: legacy placement under first upline account with capacity
-            root_acc = cls._first_upline_account(user, pool_type)
-
-            # If no upline account exists, create a root account (this becomes the base)
-            if not root_acc:
-                return cls.objects.create(
-                    owner=user,
-                    username_key=uname,
-                    entry_amount=amt,
-                    pool_type=pool_type,
-                    status="ACTIVE",
-                    parent_account=None,
-                    level=1,
-                    position=None,
-                    source_type=source_type or "",
-                    source_id=source_id or "",
-                )
-
-            # BFS to find first account with <3 children in same pool
-            q = deque([root_acc])
-            while q:
-                node = q.popleft()
-                child_qs = cls.objects.filter(parent_account=node, pool_type=pool_type, status="ACTIVE").order_by("id")
-                cnt = child_qs.count()
-                if cnt < 3:
-                    return cls.objects.create(
-                        owner=user,
-                        username_key=uname,
-                        entry_amount=amt,
-                        pool_type=pool_type,
-                        status="ACTIVE",
-                        parent_account=node,
-                        level=(getattr(node, "level", 0) or 0) + 1,
-                        position=(cnt + 1),
-                        source_type=source_type or "",
-                        source_id=source_id or "",
-                    )
-                for ch in child_qs:
-                    q.append(ch)
-
-            # Fallback: attach under root_acc
-            child_qs2 = cls.objects.filter(parent_account=root_acc, pool_type=pool_type, status="ACTIVE").order_by("id")
-            pos = child_qs2.count() + 1
-            return cls.objects.create(
-                owner=user,
-                username_key=uname,
-                entry_amount=amt,
-                pool_type=pool_type,
-                status="ACTIVE",
-                parent_account=root_acc,
-                level=(getattr(root_acc, "level", 0) or 0) + 1,
-                position=pos,
-                source_type=source_type or "",
-                source_id=source_id or "",
-            )
+        return GenericPlacement.place_account(
+            owner=user,
+            pool_type=pool_type,
+            amount=amt,
+            source_type=source_type or "",
+            source_id=source_id or "",
+        )
 
     @classmethod
     def place_in_five_pool(cls, user, pool_type: str, amount: Decimal, source_type: str = "", source_id: str = ""):
         """
-        Preferred behavior:
-          - If user already has a base self account in this pool, place new self-accounts under that subtree (5-wide BFS).
-          - Else, fall back to upline BFS placement (legacy), which becomes the base.
+        DEPRECATED legacy behavior removed.
+        New behavior: deterministic forced-matrix placement (TOP→DOWN→LEFT→RIGHT) independent of sponsor/self.
         """
-        from collections import deque
+        # Eligibility gate
+        try:
+            if not is_matrix_eligible(user):
+                try:
+                    logger.info("matrix skipped: user not eligible", extra={"where": "place_in_five_pool", "user_id": getattr(user, "id", None), "pool_type": pool_type})
+                except Exception:
+                    pass
+                return None
+        except Exception:
+            return None
         from decimal import Decimal as D
-        from django.db import transaction as _tx
+        from business.services.placement import GenericPlacement
         amt = D(amount or 0)
-
-        with _tx.atomic():
-            base_self = cls._base_self_account(user, pool_type)
-            uname = cls._next_username_key(user, pool_type)
-
-            # If base exists, BFS within the user's own subtree (cluster under main)
-            if base_self:
-                q = deque([base_self])
-                while q:
-                    node = q.popleft()
-                    child_qs = cls.objects.filter(parent_account=node, pool_type=pool_type, status="ACTIVE").order_by("id")
-                    cnt = child_qs.count()
-                    if cnt < 5:
-                        return cls.objects.create(
-                            owner=user,
-                            username_key=uname,
-                            entry_amount=amt,
-                            pool_type=pool_type,
-                            status="ACTIVE",
-                            parent_account=node,
-                            level=(getattr(node, "level", 0) or 0) + 1,
-                            position=(cnt + 1),
-                            source_type=source_type or "",
-                            source_id=source_id or "",
-                        )
-                    for ch in child_qs:
-                        q.append(ch)
-
-                # Fallback: attach directly under base_self if traversal exhausted
-                child_qs2 = cls.objects.filter(parent_account=base_self, pool_type=pool_type, status="ACTIVE").order_by("id")
-                pos = child_qs2.count() + 1
-                return cls.objects.create(
-                    owner=user,
-                    username_key=uname,
-                    entry_amount=amt,
-                    pool_type=pool_type,
-                    status="ACTIVE",
-                    parent_account=base_self,
-                    level=(getattr(base_self, "level", 0) or 0) + 1,
-                    position=pos,
-                    source_type=source_type or "",
-                    source_id=source_id or "",
-                )
-
-            # No base exists yet: legacy placement under first upline account with capacity
-            root_acc = cls._first_upline_account(user, pool_type)
-
-            # Root-level when no upline account exists
-            if not root_acc:
-                return cls.objects.create(
-                    owner=user,
-                    username_key=uname,
-                    entry_amount=amt,
-                    pool_type=pool_type,
-                    status="ACTIVE",
-                    parent_account=None,
-                    level=1,
-                    position=None,
-                    source_type=source_type or "",
-                    source_id=source_id or "",
-                )
-
-            q = deque([root_acc])
-            while q:
-                node = q.popleft()
-                child_qs = cls.objects.filter(parent_account=node, pool_type=pool_type, status="ACTIVE").order_by("id")
-                cnt = child_qs.count()
-                if cnt < 5:
-                    return cls.objects.create(
-                        owner=user,
-                        username_key=uname,
-                        entry_amount=amt,
-                        pool_type=pool_type,
-                        status="ACTIVE",
-                        parent_account=node,
-                        level=(getattr(node, "level", 0) or 0) + 1,
-                        position=(cnt + 1),
-                        source_type=source_type or "",
-                        source_id=source_id or "",
-                    )
-                for ch in child_qs:
-                    q.append(ch)
-
-            # Fallback under root (shouldn't happen with BFS)
-            child_qs2 = cls.objects.filter(parent_account=root_acc, pool_type=pool_type, status="ACTIVE").order_by("id")
-            pos = child_qs2.count() + 1
-            return cls.objects.create(
-                owner=user,
-                username_key=uname,
-                entry_amount=amt,
-                pool_type=pool_type,
-                status="ACTIVE",
-                parent_account=root_acc,
-                level=(getattr(root_acc, "level", 0) or 0) + 1,
-                position=pos,
-                source_type=source_type or "",
-                source_id=source_id or "",
-            )
+        return GenericPlacement.place_account(
+            owner=user,
+            pool_type=pool_type,
+            amount=amt,
+            source_type=source_type or "",
+            source_id=source_id or "",
+        )
 
     @classmethod
-    def place_three_150_for_user(cls, user, amount: Decimal | None = None):
+    def place_three_150_for_user(cls, user, amount: Decimal | None = None, source_type: str = "SYSTEM", source_id: str = ""):
         from decimal import Decimal as D
         amt = D(amount) if amount is not None else D("150.00")
-        return cls.place_in_three_pool(user, "THREE_150", amt)
+        return cls.place_in_three_pool(user, "THREE_150", amt, source_type=source_type or "SYSTEM", source_id=source_id or "")
 
     @classmethod
     def place_three_50_for_user(cls, user, amount: Decimal | None = None):
@@ -935,40 +982,42 @@ def distribute_auto_pool_commissions(payer_user, base_amount: Decimal, fixed_key
     st = source_type or "AUTO_POOL_GEO"
     sid = source_id or str(getattr(payer_user, "id", ""))
 
-    # Percentages mapping (L1..L5)
-    percents = [
-        ("L1", Decimal(cfg.l1_percent or 0)),
-        ("L2", Decimal(cfg.l2_percent or 0)),
-        ("L3", Decimal(cfg.l3_percent or 0)),
-        ("L4", Decimal(cfg.l4_percent or 0)),
-        ("L5", Decimal(cfg.l5_percent or 0)),
-    ]
-    upline = _resolve_upline(payer_user, depth=5)
+    # Percentages mapping (config-driven; dynamic length)
+    levels = cfg.get_upline_percents_dynamic()
+    labels = ["L{}".format(i + 1) for i in range(len(levels))]
+    percents = [(labels[i], Decimal(levels[i] or 0)) for i in range(len(levels))]
+    upline = _resolve_upline(payer_user, depth=len(levels))
 
     with transaction.atomic():
-        # Hierarchical L1..L5
-        for idx, (label, pct) in enumerate(percents):
-            if idx >= len(upline):
-                break
-            recipient = upline[idx]
-            amt = (Decimal(base_amount) * pct / Decimal("100")).quantize(Decimal("0.01"))
-            if amt <= 0:
-                continue
+        # Hierarchical L1..L5 (disabled for consumer payer to remove "level bonus")
+            is_consumer = False
             try:
-                w = Wallet.get_or_create_for_user(recipient)
-                w.credit(
-                    amt,
-                    tx_type="COMMISSION_CREDIT",
-                    meta={"level": label, "source": "AUTO_POOL", "payer": getattr(payer_user, "username", None)},
-                    source_type="AUTO_POOL",
-                    source_id=str(getattr(payer_user, "id", "")),
-                )
+                is_consumer = str(getattr(payer_user, "category", "") or "").strip().lower() == "consumer"
             except Exception:
-                # best-effort: don't block the main flow on one payout
-                continue
+                is_consumer = False
+            if not is_consumer:
+                for idx, (label, pct) in enumerate(percents):
+                    if idx >= len(upline):
+                        break
+                    recipient = upline[idx]
+                    amt = (Decimal(base_amount) * pct / Decimal("100")).quantize(Decimal("0.01"))
+                    if amt <= 0:
+                        continue
+                    try:
+                        w = Wallet.get_or_create_for_user(recipient)
+                        w.credit(
+                            amt,
+                            tx_type="COMMISSION_CREDIT",
+                            meta={"level": label, "source": "AUTO_POOL", "payer": getattr(payer_user, "username", None)},
+                            source_type="AUTO_POOL",
+                            source_id=str(getattr(payer_user, "id", "")),
+                        )
+                    except Exception:
+                        # best-effort: don't block the main flow on one payout
+                        continue
 
-        # Geo role distribution (best-effort; optional)
-        try:
+    # Geo role distribution (best-effort; optional)
+    try:
             if not cfg.enable_geo_distribution:
                 return
 
@@ -1048,6 +1097,13 @@ def distribute_auto_pool_commissions(payer_user, base_amount: Decimal, fixed_key
             # Royalty: pick first superuser (fallback to any staff)
             royalty = CustomUser.objects.filter(is_superuser=True).first() or CustomUser.objects.filter(is_staff=True).first()
             recipients["Royalty"] = royalty
+
+            # Rule: Skip Sub Franchise payout for consumer activations (ambiguous when multiple SF per pincode)
+            try:
+                if str(getattr(payer_user, "category", "") or "").lower() == "consumer":
+                    recipients["Sub Franchise"] = None
+            except Exception:
+                pass
 
             # Decide fixed vs percent based on master_commission_json and fixed_key
             master = dict(getattr(cfg, "master_commission_json", {}) or {})
@@ -1179,9 +1235,9 @@ def distribute_auto_pool_commissions(payer_user, base_amount: Decimal, fixed_key
                         )
                     except Exception:
                         continue
-        except Exception:
-            # Do not break the main flow due to geo failure
-            pass
+    except Exception:
+        # Do not break the main flow due to geo failure
+        pass
 
 
 class ReportMetric(models.Model):
@@ -1786,6 +1842,48 @@ class PromoPurchase(models.Model):
         super().save(*args, **kwargs)
 
 
+class PromoProductOrder(models.Model):
+    """
+    Minimal order record for PRIME 750 PRODUCT choice so admin can dispatch later.
+    Idempotent per PromoPurchase via OneToOne relation.
+    """
+    STATUS_CHOICES = (
+        ("PENDING", "PENDING"),
+        ("DISPATCHED", "DISPATCHED"),
+        ("CANCELLED", "CANCELLED"),
+    )
+    promo_purchase = models.OneToOneField("PromoPurchase", on_delete=models.CASCADE, related_name="product_order")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="promo_product_orders")
+    product = models.ForeignKey("PromoProduct", null=True, blank=True, on_delete=models.SET_NULL, related_name="orders")
+    shipping_address = models.TextField(blank=True)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="PENDING", db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return f"PromoProductOrder<{self.promo_purchase_id}:{getattr(self.product, 'id', None)}> {self.status}"
+
+
+class Promo759Subscription(models.Model):
+    """
+    Minimal subscription marker for PRIME_759 approvals.
+    Used to ensure idempotency and visibility of subscription activation for month-1 payout.
+    """
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="promo_759_subscriptions", db_index=True)
+    promo_purchase = models.OneToOneField("PromoPurchase", on_delete=models.CASCADE, related_name="subscription_759")
+    active_from = models.DateTimeField(auto_now_add=True, db_index=True)
+    status = models.CharField(max_length=16, default="ACTIVE", db_index=True)
+    metadata = models.JSONField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-active_from", "-id"]
+
+    def __str__(self):
+        return f"Promo759Subscription<{self.promo_purchase_id}:{self.user_id}> {self.status}"
+
+
 # ==============================
 # TRI Apps (Holidays, EV, etc.) — Admin-managed catalogs
 # ==============================
@@ -1798,6 +1896,8 @@ class TriApp(models.Model):
     name = models.CharField(max_length=150)
     description = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
+    # Sort order for category grid (admin-controlled)
+    sort_order = models.IntegerField(default=0, db_index=True)
 
     # UI capability toggles (admin-controlled)
     allow_price = models.BooleanField(default=False, help_text="If false, hide product prices to users.")
@@ -1805,12 +1905,13 @@ class TriApp(models.Model):
     allow_payment = models.BooleanField(default=False, help_text="If false, disable Checkout/Payment flows.")
 
     banner_image = models.ImageField(upload_to="uploads/tri_apps/banners/", null=True, blank=True, storage=MEDIA_STORAGE)
+    icon = models.ImageField(upload_to="uploads/tri_apps/icons/", null=True, blank=True, storage=MEDIA_STORAGE)
 
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["slug"]
+        ordering = ["sort_order", "slug"]
         verbose_name = "TRI App"
         verbose_name_plural = "TRI Apps"
 

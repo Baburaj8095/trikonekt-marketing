@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+﻿import React, { useCallback, useMemo, useState, useEffect } from "react";
 import API from "../../api/api";
 import DataTable from "../../admin-panel/components/data/DataTable";
 import {
@@ -12,7 +12,9 @@ import {
   Snackbar,
   Alert,
   Box,
+  MenuItem,
 } from "@mui/material";
+import { Autocomplete } from "@mui/material";
 
 function TextInput({ label, value, onChange, placeholder, style }) {
   return (
@@ -77,6 +79,38 @@ function CreateProductDialog({ open, onClose, onCreated }) {
       image: null,
     });
   const [saving, setSaving] = useState(false);
+  // Category options loaded from /uploads/category-banners/
+  const [catOptions, setCatOptions] = useState([]);
+  const [catsLoading, setCatsLoading] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    setCatsLoading(true);
+    API.get("/uploads/category-banners/", { params: { page_size: 500, is_active: true } })
+      .then((res) => {
+        if (!alive) return;
+        const arr = Array.isArray(res?.data) ? res.data : res?.data?.results || [];
+        const mapped = arr
+          .filter((it) => it && it.is_active !== false)
+          .map((it) => ({
+            value: String(it.key || it.slug || "").trim(),
+            label: String(it.label || it.name || it.key || it.slug || "").trim(),
+          }))
+          .filter((o) => o.value && o.label);
+        setCatOptions(mapped);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setCatOptions([]);
+      })
+      .finally(() => {
+        if (!alive) return;
+        setCatsLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [open]);
   const [errors, setErrors] = useState({});
   const [snack, setSnack] = useState({ open: false, type: "success", msg: "" });
 
@@ -168,15 +202,43 @@ function CreateProductDialog({ open, onClose, onCreated }) {
               error={!!errors.name}
               helperText={errors.name || " "}
             />
-            <TextField
-              label="Category"
-              value={form.category}
-              onChange={(e) => onChange("category", e.target.value)}
-              size="small"
-              required
-              error={!!errors.category}
-              helperText={errors.category || " "}
-            />
+            {catsLoading ? (
+              <TextField
+                label="Category"
+                value=""
+                size="small"
+                disabled
+                helperText="Loading categories..."
+              />
+            ) : catOptions.length ? (
+              <Autocomplete
+                options={catOptions}
+                value={catOptions.find((o) => o.value === form.category) || null}
+                onChange={(e, newVal) => onChange("category", newVal ? newVal.value : "")}
+                getOptionLabel={(o) => o.label}
+                isOptionEqualToValue={(o, v) => o.value === v.value}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Category"
+                    size="small"
+                    required
+                    error={!!errors.category}
+                    helperText={errors.category || "Select a category"}
+                  />
+                )}
+              />
+            ) : (
+              <TextField
+                label="Category"
+                value={form.category}
+                onChange={(e) => onChange("category", e.target.value)}
+                size="small"
+                required
+                error={!!errors.category}
+                helperText={errors.category || "No categories found. Create in Admin â†’ Eâ€‘commerce Categories or use Seed Demo Data."}
+              />
+            )}
             <TextField
               label="Price"
               value={form.price}
@@ -354,7 +416,7 @@ export default function AdminProducts() {
         minWidth: 120,
         renderCell: (params) => {
           const v = Number(params?.row?.price || 0);
-          return `₹${v.toFixed(2)}`;
+          return `â‚¹${v.toFixed(2)}`;
         }
       },
       { field: "quantity", headerName: "Quantity", minWidth: 100 },
@@ -551,3 +613,4 @@ export default function AdminProducts() {
     </div>
   );
 }
+

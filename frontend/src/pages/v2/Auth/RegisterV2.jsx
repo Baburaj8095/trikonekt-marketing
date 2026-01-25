@@ -1,5 +1,5 @@
-/**
- * RegisterV2 — UI-only refactor (step-based mobile flow)
+﻿/**
+ * RegisterV2 â€” UI-only refactor (step-based mobile flow)
  * STRICT: No functional changes made.
  * - All logic, API calls, validations, field names, sponsor logic, and payloads are preserved.
  * - Only the layout is restructured into 3 visual steps with mobile-first styling.
@@ -45,9 +45,9 @@ import "../styles/v2-theme.css";
 
 /**
  * Visual-only refactor to a 3-step, mobile-first layout:
- * Step 1 — Basic Info (+ Role Select dropdown + Sponsor)
- * Step 2 — Location (and Agency territory/assignment where applicable)
- * Step 3 — Account Security (Password/Confirm + Submit)
+ * Step 1 â€” Basic Info (+ Role Select dropdown + Sponsor)
+ * Step 2 â€” Location (and Agency territory/assignment where applicable)
+ * Step 3 â€” Account Security (Password/Confirm + Submit)
  *
  * Important:
  * - All business/agency logic, effects and API payloads remain intact.
@@ -1187,7 +1187,7 @@ const RegisterV2 = () => {
   };
   const sectionTitleSx = { fontSize: 13, fontWeight: 600, color: "#6B7280", mb: 1 };
 
-  // Stepper config — UI only
+  // Stepper config â€” UI only
   const STEPS = ["Basic Info", "Location", "Security"];
 
   function DotStepIcon(props) {
@@ -1222,7 +1222,7 @@ const RegisterV2 = () => {
     },
   }));
 
-  // Step header component (Stepper + Section meta) — UI-only
+  // Step header component (Stepper + Section meta) â€” UI-only
   const StepHeader = ({ stepNum }) => {
     const active = Math.max(0, Math.min(2, Number(stepNum) - 1));
     const sectionTitle = active === 0 ? "Basic Info" : active === 1 ? "Location" : "Account Security";
@@ -1277,7 +1277,7 @@ const RegisterV2 = () => {
     </Box>
   );
 
-  // Step 0 — Role selection cards (UI only, no logic change)
+  // Step 0 â€” Role selection cards (UI only, no logic change)
   const Step0 = () => {
     const roles = [
       { key: "user", title: "Consumer", desc: "Shop, earn rewards, and enjoy benefits" },
@@ -1321,7 +1321,7 @@ const RegisterV2 = () => {
           <Card key={r.key} k={r.key} title={r.title} desc={r.desc} />
         ))}
         <Typography sx={{ fontSize: 12, color: "#6B7280", mt: 0.5, mb: 1 }}>
-          You can’t change this later
+          You canâ€™t change this later
         </Typography>
         <Box
           sx={{
@@ -1353,7 +1353,7 @@ const RegisterV2 = () => {
     );
   };
 
-  // Step 1 — Register (Basic Info + Sponsor)
+  // Step 1 â€” Register (Basic Info + Sponsor)
   const Step1 = () => (
     <Box>
       {/* Selected role info (read-only) */}
@@ -1384,7 +1384,7 @@ const RegisterV2 = () => {
       {/* Subtle inline messages (no big success card) */}
       {sponsorChecking && (
         <Typography variant="body2" sx={{ color: "#6B7280", mb: 1, display: "flex", alignItems: "center", gap: 1 }}>
-          <CircularProgress size={14} /> Validating sponsor…
+          <CircularProgress size={14} /> Validating sponsorâ€¦
         </Typography>
       )}
       {sponsorValid === true && (
@@ -1478,7 +1478,7 @@ const RegisterV2 = () => {
         </>
       )}
 
-      {/* Agency — Registration Type is applicant info (keep in Step 1) */}
+      {/* Agency â€” Registration Type is applicant info (keep in Step 1) */}
       {role === "agency" && (
         <>
           <Typography sx={{ ...sectionTitleSx, mt: 1 }}>Registration Type</Typography>
@@ -1535,7 +1535,7 @@ const RegisterV2 = () => {
     </Box>
   );
 
-  // Step 2 — Location + Agency territory/assignment
+  // Step 2 â€” Location + Agency territory/assignment
   const Step2 = () => (
     <Box>
       <Typography sx={sectionTitleSx}>Location</Typography>
@@ -1898,7 +1898,7 @@ const RegisterV2 = () => {
     </Box>
   );
 
-  // Step 3 — Account Security + Submit
+  // Step 3 â€” Account Security + Submit
   const Step3 = () => (
     <Box>
       <Typography sx={sectionTitleSx}>Account Security</Typography>
@@ -2051,7 +2051,7 @@ const RegisterV2 = () => {
             </Alert>
           )}
 
-          {/* Form wrapper — only Step 3 submit triggers handleSubmit */}
+          {/* Form wrapper â€” only Step 3 submit triggers handleSubmit */}
           <Box component="form" noValidate onSubmit={handleSubmit}>
             {step === 0 && <Step0 />}
             {step === 1 && <Step1 />}
@@ -2088,3 +2088,4 @@ const RegisterV2 = () => {
 };
 
 export default RegisterV2;
+

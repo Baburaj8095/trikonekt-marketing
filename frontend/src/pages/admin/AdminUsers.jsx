@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState, useEffect } from "react";
+﻿import React, { useCallback, useMemo, useState, useEffect } from "react";
 import API from "../../api/api";
 import normalizeMediaUrl from "../../utils/media";
 import DataTable from "../../admin-panel/components/data/DataTable";
@@ -59,6 +59,7 @@ export default function AdminUsers() {
     // Initialize from URL so first request uses the correct filters, avoiding an initial unfiltered call
     let activated = "";
     let account_active = "";
+    let category = "";
     try {
       const qs = typeof window !== "undefined" ? (window.location.search || "") : "";
       const params = new URLSearchParams(qs);
@@ -70,11 +71,13 @@ export default function AdminUsers() {
       account_active = ["1","true","yes","active"].includes(rawAccountActive)
         ? "1"
         : (["0","false","no","inactive"].includes(rawAccountActive) ? "0" : "");
+      const rawCategory = params.get("category") || "";
+      category = String(rawCategory || "").toLowerCase().replace(/cordinator\b/g, "coordinator");
     } catch (_) {}
     return {
       role: "",
       phone: "",
-      category: "",
+      category,
       pincode: "",
       state: "",
       kyc: "",
@@ -137,6 +140,24 @@ export default function AdminUsers() {
       setSelected(row);
       setEditOpen(true);
     }
+  }, []);
+
+  // Create-new helpers (pre-fill sensible defaults)
+  const openCreate = useCallback((defaults = {}) => {
+    setSelected({ ...defaults });
+    setEditOpen(true);
+  }, []);
+  const newConsumer = useCallback(() => {
+    try {
+      window.open("/auth/register-v2/user", "_blank");
+    } catch (_) {}
+  }, []);
+  const newEmployee = useCallback(() => openCreate({ role: "employee", category: "employee" }), [openCreate]);
+  const newMerchant = useCallback(() => openCreate({ role: "user", category: "merchant" }), [openCreate]);
+  const newAgency = useCallback(() => {
+    try {
+      window.open("/auth/register-v2/agency", "_blank");
+    } catch (_) {}
   }, []);
 
   // Dynamic admin edit fields: default fallback + fetch from backend meta
@@ -206,7 +227,7 @@ export default function AdminUsers() {
     (async () => {
       try {
         const res = await API.get("/admin/users/edit-meta/", {
-          timeout: 12000,
+          timeout: 30000,
           retryAttempts: 1,
           dedupe: "none",
           signal: controller ? controller.signal : undefined,
@@ -231,7 +252,7 @@ export default function AdminUsers() {
     };
   }, []);
 
-  // Sync '?activated=1|0|true|false' and '?account_active=1|0|true|false|active|inactive' from URL
+  // Sync URL query filters (activated, account_active, category) from location
   const location = useLocation();
   useEffect(() => {
     const params = new URLSearchParams(location.search || "");
@@ -243,6 +264,8 @@ export default function AdminUsers() {
     const normAccountActive = ["1","true","yes","active"].includes(rawAccountActive)
       ? "1"
       : (["0","false","no","inactive"].includes(rawAccountActive) ? "0" : "");
+    const rawCategory = params.get("category") || "";
+    const normCategory = String(rawCategory || "").toLowerCase().replace(/cordinator\b/g, "coordinator");
     setFilters((f) => {
       let next = f;
       if ((f.activated || "") !== normActivated) {
@@ -250,6 +273,9 @@ export default function AdminUsers() {
       }
       if ((f.account_active || "") !== normAccountActive) {
         next = { ...next, account_active: normAccountActive };
+      }
+      if ((f.category || "") !== normCategory) {
+        next = { ...next, category: normCategory };
       }
       return next;
     });
@@ -289,6 +315,7 @@ export default function AdminUsers() {
       { value: "", label: "Any category" },
       { value: "consumer", label: "consumer" },
       { value: "employee", label: "employee" },
+      { value: "merchant", label: "merchant" },
       { value: "agency_state_coordinator", label: "agency_state_coordinator" },
       { value: "agency_state", label: "agency_state" },
       { value: "agency_district_coordinator", label: "agency_district_coordinator" },
@@ -323,7 +350,7 @@ export default function AdminUsers() {
         flex: 1,
         renderCell: (params) => {
           const row = params?.row || {};
-          const uname = row.username || "—";
+          const uname = row.username || "â€”";
           return (
             <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
               <button
@@ -394,7 +421,7 @@ export default function AdminUsers() {
           const role = String(row.role || "").toLowerCase();
           const cat = String(row.category || "").toLowerCase();
           const isAgency = role === "agency" || cat.startsWith("agency");
-          if (!isAgency) return "—";
+          if (!isAgency) return "â€”";
           const onOpen = (e) => {
             e?.stopPropagation?.();
             setPkgUser({ id: row.id, username: row.username, full_name: row.full_name });
@@ -433,7 +460,7 @@ export default function AdminUsers() {
           const c = String(row.category || "").toLowerCase();
           const isAgency = r === "agency" || c.startsWith("agency");
           const isEmployee = r === "employee" || c === "employee";
-          if (!isAgency && !isEmployee) return "—";
+          if (!isAgency && !isEmployee) return "â€”";
           const onOpen = (e) => {
             e?.stopPropagation?.();
             const roleParam = isAgency ? "agency" : "employee";
@@ -467,7 +494,7 @@ export default function AdminUsers() {
       { field: "email", headerName: "Email", minWidth: 200, flex: 1 },
       {
         field: "activated_ecoupon_count",
-        headerName: "E‑Coupons (Activated)",
+        headerName: "Eâ€‘Coupons (Activated)",
         minWidth: 170,
         renderCell: (params) => {
           const n = Number(params?.row?.activated_ecoupon_count ?? 0);
@@ -576,7 +603,7 @@ export default function AdminUsers() {
                 }}
                 title="No level"
               >
-                —
+                â€”
               </div>
             );
           }
@@ -808,7 +835,7 @@ export default function AdminUsers() {
         const res = await API.get("/admin/users/", {
           params,
           dedupe: "none",
-          timeout: 12000,
+          timeout: 30000,
           retryAttempts: 1,
           cacheTTL: 8000, // short-lived cache to avoid repeat hits during quick UI changes
         });
@@ -905,7 +932,7 @@ export default function AdminUsers() {
           ["Category", (r) => r.category ?? ""],
           ["KYC Status", (r) => (r.kyc_verified ? "Verified" : (r.kyc_status || "Pending"))],
           ["KYC Verified At", (r) => r.kyc_verified_at ?? ""],
-          ["E‑Coupons Activated", (r) => r.activated_ecoupon_count ?? ""],
+          ["Eâ€‘Coupons Activated", (r) => r.activated_ecoupon_count ?? ""],
           ["Promo Package", (r) => r.last_promo_package ?? ""],
           ["Sponsor ID", (r) => r.sponsor_id ?? ""],
           ["Pincode", (r) => r.pincode ?? ""],
@@ -1019,6 +1046,72 @@ export default function AdminUsers() {
             Compact
           </button>
         </div>
+      </div>
+      <div style={{ display: "inline-flex", gap: 8 }}>
+        <button
+          onClick={newConsumer}
+          style={{
+            padding: "8px 12px",
+            borderRadius: 8,
+            border: "1px solid #0ea5e9",
+            background: "#0ea5e9",
+            color: "#fff",
+            cursor: "pointer",
+            fontWeight: 700,
+          }}
+          title="Create a new Consumer user"
+        >
+          New Consumer
+        </button>
+        <button
+          onClick={(e) => e.preventDefault()}
+          disabled
+          style={{
+            padding: "8px 12px",
+            borderRadius: 8,
+            border: "1px solid #e5e7eb",
+            background: "#f8fafc",
+            color: "#94a3b8",
+            cursor: "not-allowed",
+            fontWeight: 600,
+            opacity: 0.7,
+          }}
+          title="Employee creation is disabled for now"
+        >
+          New Employee
+        </button>
+        <button
+          onClick={(e) => e.preventDefault()}
+          disabled
+          style={{
+            padding: "8px 12px",
+            borderRadius: 8,
+            border: "1px solid #e5e7eb",
+            background: "#f8fafc",
+            color: "#94a3b8",
+            cursor: "not-allowed",
+            fontWeight: 600,
+            opacity: 0.7,
+          }}
+          title="Merchant creation is disabled for now"
+        >
+          New Merchant
+        </button>
+        <button
+          onClick={newAgency}
+          style={{
+            padding: "8px 12px",
+            borderRadius: 8,
+            border: "1px solid #eab308",
+            background: "#fef08a",
+            color: "#92400e",
+            cursor: "pointer",
+            fontWeight: 700,
+          }}
+          title="Create a new Agency (defaults to Subâ€‘Franchise; you can change the category in the form)"
+        >
+          New Agency
+        </button>
       </div>
       <button
         onClick={handleExport}
@@ -1174,7 +1267,7 @@ export default function AdminUsers() {
         record={selected}
         fields={editFieldsWithNames}
         onSaved={() => setReloadKey((k) => k + 1)}
-        title={selected ? `Edit ${selected.username || selected.full_name || selected.id}` : "Edit User"}
+        title={selected?.id ? `Edit ${selected.username || selected.full_name || selected.id}` : "Create User"}
       />
 
       <AgencyPackageCardsPanel
@@ -1186,3 +1279,4 @@ export default function AdminUsers() {
     </div>
   );
 }
+

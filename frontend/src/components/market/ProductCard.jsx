@@ -1,4 +1,4 @@
-import React, { memo } from "react";
+﻿import React, { memo } from "react";
 import {
   Card,
   CardActionArea,
@@ -190,7 +190,7 @@ function ProductCard({ product, onSelect, onQuickView, onAddToCart, showAddToCar
         {/* Price row */}
         <Stack direction="row" spacing={1} alignItems="baseline" sx={{ mt: 0.75 }}>
           <Typography variant="body2" sx={{ fontWeight: 800 }}>
-            ₹{isFinite(finalPrice) ? finalPrice.toFixed(2) : "0.00"}
+            â‚¹{isFinite(finalPrice) ? finalPrice.toFixed(2) : "0.00"}
           </Typography>
           {discount > 0 && (
             <Typography
@@ -198,7 +198,7 @@ function ProductCard({ product, onSelect, onQuickView, onAddToCart, showAddToCar
               color="text.secondary"
               sx={{ textDecoration: "line-through" }}
             >
-              ₹{isFinite(price) ? price.toFixed(2) : "0.00"}
+              â‚¹{isFinite(price) ? price.toFixed(2) : "0.00"}
             </Typography>
           )}
         </Stack>
@@ -294,3 +294,4 @@ function ProductCard({ product, onSelect, onQuickView, onAddToCart, showAddToCar
 }
 
 export default memo(ProductCard);
+

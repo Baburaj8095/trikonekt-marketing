@@ -110,10 +110,69 @@ class PromotionSerializer(serializers.ModelSerializer):
 
 class CategoryBannerSerializer(serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField()
+    # Accept and ignore extra fields used by older/seed UIs
+    route = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    home_limit = serializers.IntegerField(required=False, write_only=True)
+    show_on_home = serializers.BooleanField(required=False, write_only=True)
+    hide_when_empty = serializers.BooleanField(required=False, write_only=True)
+    name = serializers.CharField(required=False, allow_blank=True, write_only=True)
 
     class Meta:
         model = CategoryBanner
-        fields = ["id", "key", "label", "image", "image_url", "order", "is_active", "created_at"]
+        fields = [
+            "id",
+            "key",
+            "label",
+            "image",
+            "image_url",
+            "order",
+            "is_active",
+            "created_at",
+            # write-only extras (ignored on save)
+            "route",
+            "home_limit",
+            "show_on_home",
+            "hide_when_empty",
+            "name",
+        ]
+
+    def create(self, validated_data):
+        # Drop non-model hints; fallback: label from 'name' if missing
+        for k in ["route", "home_limit", "show_on_home", "hide_when_empty"]:
+            validated_data.pop(k, None)
+        name = validated_data.pop("name", "")
+        if not validated_data.get("label") and name:
+            validated_data["label"] = name
+
+        # Idempotent upsert by key to avoid 400 on repeated seeds
+        key = validated_data.get("key")
+        if not key:
+            # Let DRF handle required field errors
+            return super().create(validated_data)
+
+        obj, created = CategoryBanner.objects.get_or_create(key=key, defaults=validated_data)
+        if created:
+            return obj
+
+        # If already exists, update provided fields (label/image/order/is_active)
+        changed = False
+        for field in ["label", "image", "order", "is_active"]:
+            if field in validated_data:
+                setattr(obj, field, validated_data[field])
+                changed = True
+        if changed:
+            update_fields = [f for f in ["label", "image", "order", "is_active"] if f in validated_data]
+            try:
+                obj.save(update_fields=update_fields)
+            except Exception:
+                obj.save()
+        return obj
+
+    def update(self, instance, validated_data):
+        # Ignore extras on update as well
+        for k in ["route", "home_limit", "show_on_home", "hide_when_empty", "name"]:
+            validated_data.pop(k, None)
+        return super().update(instance, validated_data)
 
     def get_image_url(self, obj):
         f = getattr(obj, "image", None)

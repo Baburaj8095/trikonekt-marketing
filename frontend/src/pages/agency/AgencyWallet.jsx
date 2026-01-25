@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Paper,
@@ -191,7 +191,7 @@ export default function AgencyWallet() {
   const disableReason = useMemo(() => {
     if (!kyc?.verified) return "KYC verification required";
     if (Number(displayWithdrawWallet) < 500)
-      return "Minimum withdrawable balance ₹500 required";
+      return "Minimum withdrawable balance â‚¹500 required";
     if (!windowInfo?.isOpen)
       return "Withdrawals are allowed only on Sunday 6:00 PM to 11:59 PM (IST)";
     if (inWindowCooldown)
@@ -436,9 +436,9 @@ export default function AgencyWallet() {
     const maxAvail = Math.min(Number(displayWithdrawWallet), perTxnCap);
     if (amtNum > maxAvail) {
       setWdrErr(
-        `Max per request is ₹${fmtAmount(
+        `Max per request is â‚¹${fmtAmount(
           perTxnCap
-        )}. Available to withdraw now: ₹${fmtAmount(maxAvail)}.`
+        )}. Available to withdraw now: â‚¹${fmtAmount(maxAvail)}.`
       );
       return;
     }
@@ -582,24 +582,24 @@ export default function AgencyWallet() {
         />
         <StatCard
           title="Direct Referral Withdrawal Commission"
-          value={`₹ ${fmtAmount(directRefWithdrawCommission)}`}
+          value={`â‚¹ ${fmtAmount(directRefWithdrawCommission)}`}
         />
 
         {/* Row 3 */}
-        <StatCard title="Today Earning" value={`₹ ${fmtAmount(todayEarning)}`} />
+        <StatCard title="Today Earning" value={`â‚¹ ${fmtAmount(todayEarning)}`} />
         <StatCard
           title="Direct Agency Referral Commission"
-          value={`₹ ${fmtAmount(directRefIncome)}`}
+          value={`â‚¹ ${fmtAmount(directRefIncome)}`}
         />
 
         {/* Row 4 */}
         <StatCard
           title="Agency Level Income"
-          value={`₹ ${fmtAmount(matrixIncome)}`}
+          value={`â‚¹ ${fmtAmount(matrixIncome)}`}
         />
         <StatCard
           title="Direct Referral Consumer Coupon Commission"
-          value={`₹ ${fmtAmount(directRefCouponCommission)}`}
+          value={`â‚¹ ${fmtAmount(directRefCouponCommission)}`}
         />
 
         {/* Row 5 */}
@@ -616,7 +616,7 @@ export default function AgencyWallet() {
         {/* Row 6 */}
         <StatCard
           title="Global Turnover Income"
-          value={`₹ ${fmtAmount(globalTurnoverIncome)}`}
+          value={`â‚¹ ${fmtAmount(globalTurnoverIncome)}`}
         />
         <Paper
           variant="outlined"
@@ -646,7 +646,7 @@ export default function AgencyWallet() {
                 Earn
               </Typography>
               <Typography variant="h6" sx={{ fontWeight: 800, mt: 0.5 }}>
-                ₹ {fmtAmount(nextBlock?.completed_in_current_block || "0")}
+                â‚¹ {fmtAmount(nextBlock?.completed_in_current_block || "0")}
               </Typography>
             </Box>
             <Box
@@ -662,7 +662,7 @@ export default function AgencyWallet() {
                 Limit
               </Typography>
               <Typography variant="h6" sx={{ fontWeight: 800, mt: 0.5 }}>
-                ₹ 1000
+                â‚¹ 1000
               </Typography>
             </Box>
           </Stack>
@@ -671,33 +671,33 @@ export default function AgencyWallet() {
         {/* Row 7 */}
         <StatCard
           title="Withdrawal Wallet"
-          value={`₹ ${fmtAmount(displayWithdrawWallet)}`}
+          value={`â‚¹ ${fmtAmount(displayWithdrawWallet)}`}
           hint="Net available to withdraw now"
         />
         <StatCard
           title="Income Wallet"
-          value={`₹ ${fmtAmount(mainBalance)}`}
-          hint={`Completed ₹ ${fmtAmount(nextBlock?.completed_in_current_block || "0")} • Remaining ₹ ${fmtAmount(nextBlock?.remaining_to_next_block || "1000")}`}
+          value={`â‚¹ ${fmtAmount(mainBalance)}`}
+          hint={`Completed â‚¹ ${fmtAmount(nextBlock?.completed_in_current_block || "0")} â€¢ Remaining â‚¹ ${fmtAmount(nextBlock?.remaining_to_next_block || "1000")}`}
         />
 
         {/* Row 8 */}
         <StatCard
           title="Product Sell Income"
-          value={`₹ ${fmtAmount(productSellIncome)}`}
+          value={`â‚¹ ${fmtAmount(productSellIncome)}`}
         />
         <StatCard
           title="App Download"
-          value={`₹ ${fmtAmount(appDownloadIncome)}`}
+          value={`â‚¹ ${fmtAmount(appDownloadIncome)}`}
         />
 
         {/* Row 9 */}
         <StatCard
           title="Shop Tieup"
-          value={`₹ ${fmtAmount(shopTieupIncome)}`}
+          value={`â‚¹ ${fmtAmount(shopTieupIncome)}`}
         />
         <StatCard
           title="Employee Sponsor Benefit"
-          value={`₹ ${fmtAmount(employeeSponsorBenefit)}`}
+          value={`â‚¹ ${fmtAmount(employeeSponsorBenefit)}`}
         />
       </Box>
 
@@ -724,8 +724,8 @@ export default function AgencyWallet() {
             ) : null}
             {Number(displayWithdrawWallet) < 500 ? (
               <Alert severity="warning" sx={{ mb: 1 }}>
-                Minimum withdrawable balance ₹500 required to enable
-                withdrawals. Short by ₹
+                Minimum withdrawable balance â‚¹500 required to enable
+                withdrawals. Short by â‚¹
                 {Math.max(0, 500 - Number(displayWithdrawWallet)).toFixed(2)}
               </Alert>
             ) : null}
@@ -748,7 +748,7 @@ export default function AgencyWallet() {
                 <TextField
                   fullWidth
                   size="small"
-                  label="Amount (₹)"
+                  label="Amount (â‚¹)"
                   name="amount"
                   value={wdrForm.amount}
                   onChange={onWdrChange}
@@ -758,9 +758,9 @@ export default function AgencyWallet() {
                     max: Math.min(Number(displayWithdrawWallet || 0), 750),
                     step: "0.01",
                   }}
-                  helperText={`Available this request: ₹ ${fmtAmount(
+                  helperText={`Available this request: â‚¹ ${fmtAmount(
                     Math.min(Number(displayWithdrawWallet || 0), 750)
-                  )} (cap ₹750)`}
+                  )} (cap â‚¹750)`}
                   required
                 />
                 <TextField
@@ -791,3 +791,4 @@ export default function AgencyWallet() {
     </Box>
   );
 }
+

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Centralized Cart Store
  * - Supports mixed item types: ECOUPON, PROMO_PACKAGE, PRODUCT (future)
  * - Persistent per role/namespace (user/agency/employee/admin/business) via localStorage
@@ -280,7 +280,7 @@ export function setItemMeta(key, partial = {}) {
 export function setItemUnitPrice(key, unitPrice) {
   ensureLoaded();
   const p = asNumber(unitPrice, 0);
-  const v = Math.max(1, Number.isFinite(p) ? p : 1); // enforce minimum ₹1
+  const v = Math.max(1, Number.isFinite(p) ? p : 1); // enforce minimum â‚¹1
   const next = (state.items || []).map((x) =>
     x.key === key ? { ...x, unitPrice: v } : x
   );
@@ -289,7 +289,7 @@ export function setItemUnitPrice(key, unitPrice) {
 
 /** Convenience helpers to add mapped item types */
 
-export function addEcoupon({ productId, title = "E‑Coupon", unitPrice = 0, qty = 1, denomination = null }) {
+export function addEcoupon({ productId, title = "Eâ€‘Coupon", unitPrice = 0, qty = 1, denomination = null }) {
   return addItem({
     type: "ECOUPON",
     id: productId,
@@ -396,3 +396,4 @@ export function addAgencyPackage({
     meta: { reference, notes },
   });
 }
+

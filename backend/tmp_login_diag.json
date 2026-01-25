@@ -1,0 +1,10 @@
+{
+  "exists": true,
+  "username": "admin",
+  "email": "baburajnk19@gmail.com",
+  "is_active": true,
+  "is_staff": true,
+  "is_superuser": true,
+  "pwd_ok": false,
+  "auth_ok": false
+}

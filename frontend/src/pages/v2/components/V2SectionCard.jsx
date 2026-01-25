@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import V2Card from "./V2Card";
 
 /**
@@ -13,3 +13,4 @@ export default function V2SectionCard({ children, sx = {}, hover = true, ...rest
     </V2Card>
   );
 }
+

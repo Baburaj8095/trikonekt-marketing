@@ -7,7 +7,7 @@ from django import forms
 from decimal import Decimal
 import json
 
-from .models import BusinessRegistration, CommissionConfig, AutoPoolAccount, RewardProgress, RewardRedemption, UserMatrixProgress, ReferralJoinPayout, FranchisePayout, DailyReport, WithholdingReserve, Package, AgencyPackageAssignment, AgencyPackagePayment, PromoPackage, PromoProduct, PromoPurchase, PromoPackageProduct, PromoMonthlyPackage, PromoMonthlyBox, PromoEBook, PromoPackageEBook, EBookAccess, TriApp, TriAppProduct
+from .models import BusinessRegistration, MerchantCategory, MerchantSubCategory, CommissionConfig, RootConsumerConfig, AutoPoolAccount, RewardProgress, RewardRedemption, UserMatrixProgress, ReferralJoinPayout, FranchisePayout, DailyReport, WithholdingReserve, Package, AgencyPackageAssignment, AgencyPackagePayment, PromoPackage, PromoProduct, PromoPurchase, PromoPackageProduct, PromoMonthlyPackage, PromoMonthlyBox, PromoEBook, PromoPackageEBook, EBookAccess, TriApp, TriAppProduct
 from accounts.models import CustomUser
 
 
@@ -92,7 +92,6 @@ class CommissionConfigForm(forms.ModelForm):
     # Monthly 759 (admin-friendly fields mapped to master_commission_json["monthly_759"])
     monthly_759_direct_first_month = forms.DecimalField(required=False, min_value=0, label="Monthly 759: Direct (first month)")
     monthly_759_direct_monthly = forms.DecimalField(required=False, min_value=0, label="Monthly 759: Direct (subsequent months)")
-    monthly_759_levels_fixed = forms.CharField(required=False, label="Monthly 759: Levels fixed (comma-separated 5 values)", widget=forms.Textarea(attrs={"rows": 2}))
     monthly_759_agency_enabled = forms.BooleanField(required=False, label="Monthly 759: Agency distribution enabled")
 
     # Geo overrides for Active 150 (mapped to master_commission_json['geo_mode']['active_150'] and ['geo_fixed']['active_150'])
@@ -168,11 +167,6 @@ class CommissionConfigForm(forms.ModelForm):
         m759 = dict(master.get("monthly_759", {}) or {})
         self.fields["monthly_759_direct_first_month"].initial = m759.get("direct_first_month", 250)
         self.fields["monthly_759_direct_monthly"].initial = m759.get("direct_monthly", 50)
-        levels = m759.get("levels_fixed") or [50, 10, 5, 5, 10]
-        try:
-            self.fields["monthly_759_levels_fixed"].initial = ", ".join(str(x) for x in levels[:5])
-        except Exception:
-            self.fields["monthly_759_levels_fixed"].initial = "50, 10, 5, 5, 10"
         self.fields["monthly_759_agency_enabled"].initial = bool(m759.get("agency_enabled", True))
 
         # Geo mode/fixed for Active 150
@@ -233,7 +227,6 @@ class CommissionConfigForm(forms.ModelForm):
         m759 = dict(master.get("monthly_759", {}) or {})
         dfm = self.cleaned_data.get("monthly_759_direct_first_month")
         dm = self.cleaned_data.get("monthly_759_direct_monthly")
-        levels_raw = (self.cleaned_data.get("monthly_759_levels_fixed") or "").strip()
         agency_enabled = bool(self.cleaned_data.get("monthly_759_agency_enabled"))
 
         if dfm is not None:
@@ -245,14 +238,6 @@ class CommissionConfigForm(forms.ModelForm):
             try:
                 m759["direct_monthly"] = float(Decimal(str(dm)))
             except Exception:
-                pass
-        if levels_raw:
-            try:
-                parts = [p.strip() for p in levels_raw.replace("\n", ",").split(",") if p.strip()]
-                vals = [float(Decimal(p)) for p in parts][:5]
-                m759["levels_fixed"] = vals
-            except Exception:
-                # keep existing if parsing fails
                 pass
         m759["agency_enabled"] = agency_enabled
         master["monthly_759"] = m759
@@ -416,7 +401,6 @@ class CommissionConfigAdmin(admin.ModelAdmin):
         ("Monthly 759 (Admin Config)", {"fields": (
             "monthly_759_direct_first_month",
             "monthly_759_direct_monthly",
-            "monthly_759_levels_fixed",
             "monthly_759_agency_enabled",
         )}),
 
@@ -462,6 +446,13 @@ class CommissionConfigAdmin(admin.ModelAdmin):
         ("Audit", {"fields": ("updated_at", "created_at")}),
     )
 
+
+# Root Consumer admin registration
+@admin.register(RootConsumerConfig)
+class RootConsumerConfigAdmin(admin.ModelAdmin):
+    list_display = ("root_user", "updated_at", "created_at")
+    raw_id_fields = ("root_user",)
+    readonly_fields = ("created_at", "updated_at")
 
 @admin.register(AutoPoolAccount)
 class AutoPoolAccountAdmin(admin.ModelAdmin):
@@ -876,6 +867,33 @@ class TriAppProductAdmin(admin.ModelAdmin):
     raw_id_fields = ("app",)
     ordering = ("app", "display_order", "id")
 
+
+# ==============================
+# Merchant Categories (Admin)
+# ==============================
+class MerchantSubCategoryInline(admin.TabularInline):
+    model = MerchantSubCategory
+    extra = 0
+    fields = ("name", "is_active", "sort_order")
+    ordering = ("sort_order", "name")
+
+
+@admin.register(MerchantCategory)
+class MerchantCategoryAdmin(admin.ModelAdmin):
+    list_display = ("name", "is_active", "sort_order", "created_at")
+    list_editable = ("is_active", "sort_order")
+    search_fields = ("name",)
+    ordering = ("sort_order", "name")
+    inlines = [MerchantSubCategoryInline]
+
+
+@admin.register(MerchantSubCategory)
+class MerchantSubCategoryAdmin(admin.ModelAdmin):
+    list_display = ("name", "category", "is_active", "sort_order", "created_at")
+    list_filter = ("category", "is_active")
+    list_editable = ("is_active", "sort_order")
+    search_fields = ("name", "category__name")
+    ordering = ("category", "sort_order", "name")
 
 # ======================
 # Prune Business admin: keep only CommissionConfig and DailyReport

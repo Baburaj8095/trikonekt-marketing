@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import V2PageContainer from "../V2PageContainer";
 import ConsumerKYC from "../../ConsumerKYC";
 
@@ -13,3 +13,4 @@ export default function KYC2() {
     </V2PageContainer>
   );
 }
+

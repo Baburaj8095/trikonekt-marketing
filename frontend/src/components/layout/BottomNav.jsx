@@ -1,4 +1,4 @@
-import { BottomNavigation, BottomNavigationAction, Paper } from "@mui/material";
+﻿import { BottomNavigation, BottomNavigationAction, Paper } from "@mui/material";
 import HomeIcon from "@mui/icons-material/Home";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 
@@ -12,3 +12,4 @@ export default function BottomNav() {
     </Paper>
   );
 }
+

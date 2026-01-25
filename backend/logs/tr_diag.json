@@ -1,0 +1,164 @@
+{
+  "generated_at": "2026-01-19T18:51:38.343882Z",
+  "trikonekt": {
+    "found": true,
+    "id": 32,
+    "username": "TRIKONEKT"
+  },
+  "sentinel": {
+    "id": 609,
+    "owner_id": 32,
+    "owner_username": "TRIKONEKT",
+    "level": 0,
+    "parent_account_id": null,
+    "position": null
+  },
+  "level1_under_sentinel": {
+    "count": 0,
+    "owners": []
+  },
+  "matrix_children_under_trikonekt": {
+    "count": 0,
+    "sample": []
+  },
+  "sponsor_directs_under_trikonekt": {
+    "count": 22,
+    "sample": [
+      {
+        "id": 33,
+        "username": "TR3095918105"
+      },
+      {
+        "id": 34,
+        "username": "TR4095918105"
+      },
+      {
+        "id": 35,
+        "username": "TR9000000001"
+      },
+      {
+        "id": 36,
+        "username": "TR9000000002"
+      },
+      {
+        "id": 37,
+        "username": "TR9000000003"
+      },
+      {
+        "id": 38,
+        "username": "TR9000000004"
+      },
+      {
+        "id": 39,
+        "username": "TR9000000005"
+      },
+      {
+        "id": 40,
+        "username": "TR9000000006"
+      },
+      {
+        "id": 41,
+        "username": "TR9000000007"
+      },
+      {
+        "id": 42,
+        "username": "TR9000000008"
+      },
+      {
+        "id": 43,
+        "username": "TR9000000009"
+      },
+      {
+        "id": 44,
+        "username": "TR9000000010"
+      },
+      {
+        "id": 45,
+        "username": "TR9000000011"
+      },
+      {
+        "id": 46,
+        "username": "TR9000000012"
+      },
+      {
+        "id": 47,
+        "username": "TR9000000013"
+      },
+      {
+        "id": 48,
+        "username": "TR9000000014"
+      },
+      {
+        "id": 49,
+        "username": "TR9000000015"
+      },
+      {
+        "id": 50,
+        "username": "TR9000000016"
+      },
+      {
+        "id": 51,
+        "username": "TR9000000017"
+      },
+      {
+        "id": 52,
+        "username": "TR9000000018"
+      },
+      {
+        "id": 53,
+        "username": "TR9000000019"
+      },
+      {
+        "id": 54,
+        "username": "TR9000000020"
+      }
+    ]
+  },
+  "seed_first5": [
+    {
+      "username": "TR9000000001",
+      "exists": true,
+      "user_id": 35,
+      "matrix_parent_id": null,
+      "matrix_position": null,
+      "autopool_active": false,
+      "autopool_parent_owner": null
+    },
+    {
+      "username": "TR9000000002",
+      "exists": true,
+      "user_id": 36,
+      "matrix_parent_id": null,
+      "matrix_position": null,
+      "autopool_active": false,
+      "autopool_parent_owner": null
+    },
+    {
+      "username": "TR9000000003",
+      "exists": true,
+      "user_id": 37,
+      "matrix_parent_id": null,
+      "matrix_position": null,
+      "autopool_active": false,
+      "autopool_parent_owner": null
+    },
+    {
+      "username": "TR9000000004",
+      "exists": true,
+      "user_id": 38,
+      "matrix_parent_id": null,
+      "matrix_position": null,
+      "autopool_active": false,
+      "autopool_parent_owner": null
+    },
+    {
+      "username": "TR9000000005",
+      "exists": true,
+      "user_id": 39,
+      "matrix_parent_id": null,
+      "matrix_position": null,
+      "autopool_active": false,
+      "autopool_parent_owner": null
+    }
+  ]
+}

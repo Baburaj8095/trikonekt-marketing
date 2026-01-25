@@ -13,9 +13,12 @@ from .views import (
     BannerPurchaseRequestStatusUpdate,
     BannerPurchaseRequestAllList,
     # Merchant marketplace (new)
+    MerchantCategoryList,
+    MerchantSubCategoryList,
     MerchantProfileMe,
     ShopPublicList,
     ShopPublicDetail,
+    ShopsNearbyView,
     ShopMineListCreate,
     ShopOwnerDetail,
 )
@@ -47,7 +50,12 @@ urlpatterns = [
     # Merchant marketplace (new)
     # ============================
 
+    # Merchant categories (public)
+    re_path(r"^merchant/categories/?$", MerchantCategoryList.as_view(), name="merchant-category-list"),
+    re_path(r"^merchant/subcategories/?$", MerchantSubCategoryList.as_view(), name="merchant-subcategory-list"),
+
     # Public shops (ACTIVE only)
+    re_path(r"^shops/nearby/?$", ShopsNearbyView.as_view(), name="shops-nearby"),
     re_path(r"^shops/?$", ShopPublicList.as_view(), name="shop-public-list"),
     re_path(r"^shops/(?P<pk>\d+)/?$", ShopPublicDetail.as_view(), name="shop-public-detail"),
 

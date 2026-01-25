@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { Box, Container, Paper, Tabs, Tab, Typography } from "@mui/material";
 import { useLocation, useNavigate } from "react-router-dom";
 import AgencyLuckyCoupons from "../AgencyLuckyCoupons";
@@ -8,8 +8,8 @@ import Cart from "../Cart";
 /**
  * AgencyCoupons
  * Unified coupons screen for Agency role with in-page tabs:
- *  - E‑Coupon (agency operations & summary)
- *  - E‑Coupon Store (browse/buy/assign)
+ *  - Eâ€‘Coupon (agency operations & summary)
+ *  - Eâ€‘Coupon Store (browse/buy/assign)
  *  - Cart (centralized checkout cart)
  *
  * Deep link: ?tab=ecoupon|store|cart
@@ -56,8 +56,8 @@ export default function AgencyCoupons() {
           textColor="primary"
           indicatorColor="primary"
         >
-          <Tab value={TABS.ECOUPON} label="E‑Coupon Store" />
-          {/* <Tab value={TABS.STORE} label="E‑Coupon Store" /> */}
+          <Tab value={TABS.ECOUPON} label="Eâ€‘Coupon Store" />
+          {/* <Tab value={TABS.STORE} label="Eâ€‘Coupon Store" /> */}
           <Tab value={TABS.CART} label="Cart" />
         </Tabs>
       </Paper>
@@ -68,3 +68,4 @@ export default function AgencyCoupons() {
     </Container>
   );
 }
+

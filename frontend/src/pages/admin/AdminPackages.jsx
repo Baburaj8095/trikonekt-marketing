@@ -1,5 +1,5 @@
-import React from "react";
-import API from "../../api/api";
+﻿import React from "react";
+import API, { adminListAgencyPackagePaymentRequests, adminApproveAgencyPackagePaymentRequest, adminRejectAgencyPackagePaymentRequest } from "../../api/api";
 import ModelListSimple from "../../admin-panel/dynamic/ModelListSimple";
 
 function Section({ title, children, right }) {
@@ -54,6 +54,11 @@ export default function AdminPackages() {
   const [payForm, setPayForm] = React.useState({ assignmentId: null, amount: "", reference: "", notes: "", title: "" });
   const [payErr, setPayErr] = React.useState("");
 
+  // Pending payment requests for this agency (admin approval inline)
+  const [reqsLoading, setReqsLoading] = React.useState(false);
+  const [reqsError, setReqsError] = React.useState("");
+  const [pendingReqs, setPendingReqs] = React.useState([]);
+
   const resolveAgencyId = async (q) => {
     const s = String(q || "").trim();
     if (!s) throw new Error("Enter agency username or numeric ID");
@@ -77,6 +82,7 @@ export default function AdminPackages() {
       const found = await resolveAgencyId(agencyQuery);
       const id = found.id;
       setResolvedAgency(found);
+      await loadPendingRequests(found);
       const res = await API.get("/business/agency-packages/", { params: { agency_id: id }, retryAttempts: 1 });
       const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
       setPkgCards(arr || []);
@@ -135,6 +141,72 @@ export default function AdminPackages() {
         e?.message ||
         "Failed to add payment.";
       setPayErr(msg);
+    }
+  };
+
+  // Load pending payment requests for this agency (status=PENDING)
+  const loadPendingRequests = React.useCallback(async (agency) => {
+    if (!agency || !agency.id) {
+      setPendingReqs([]);
+      return;
+    }
+    try {
+      setReqsLoading(true);
+      setReqsError("");
+      const data = await adminListAgencyPackagePaymentRequests({ status: "PENDING" });
+      const list = Array.isArray(data) ? data : data?.results || [];
+      const uname = String(agency.username || "").toLowerCase();
+      const aid = agency.id;
+      const filtered = (list || []).filter((r) => {
+        const rU = String(r?.agency_username || "").toLowerCase();
+        const rId = r?.agency_id || r?.agency?.id || r?.agency_pk;
+        return (rId === aid) || (!!uname && rU === uname);
+      });
+      setPendingReqs(filtered);
+    } catch (e) {
+      const msg =
+        e?.response?.data?.detail ||
+        (typeof e?.response?.data === "string" ? e.response.data : "") ||
+        e?.message ||
+        "Failed to load payment requests.";
+      setReqsError(String(msg));
+      setPendingReqs([]);
+    } finally {
+      setReqsLoading(false);
+    }
+  }, []);
+
+  const approveRequest = async (id) => {
+    try {
+      const notes = window.prompt("Admin notes (optional):", "") || "";
+      await adminApproveAgencyPackagePaymentRequest(id, notes);
+      try { window.alert("Approved."); } catch {}
+      await loadPendingRequests(resolvedAgency || {});
+      await loadAgencyCards();
+    } catch (e) {
+      const msg =
+        e?.response?.data?.detail ||
+        (typeof e?.response?.data === "string" ? e.response.data : "") ||
+        e?.message ||
+        "Failed to approve.";
+      window.alert(String(msg));
+    }
+  };
+
+  const rejectRequest = async (id) => {
+    try {
+      const notes = window.prompt("Reason / Admin notes (optional):", "") || "";
+      await adminRejectAgencyPackagePaymentRequest(id, notes);
+      try { window.alert("Rejected."); } catch {}
+      await loadPendingRequests(resolvedAgency || {});
+      await loadAgencyCards();
+    } catch (e) {
+      const msg =
+        e?.response?.data?.detail ||
+        (typeof e?.response?.data === "string" ? e.response.data : "") ||
+        e?.message ||
+        "Failed to reject.";
+      window.alert(String(msg));
     }
   };
 
@@ -220,7 +292,7 @@ export default function AdminPackages() {
               const bg = statusBg(st);
               const color = inactive ? "#fff" : "#0f172a";
               const title = p?.package?.name || p?.package?.code || "Package";
-              const mark = inactive ? "✗" : "✓";
+              const mark = inactive ? "âœ—" : "âœ“";
               const stText = inactive ? "Inactive" : st === "partial" ? "Partial" : "Active";
               return (
                 <div
@@ -258,20 +330,20 @@ export default function AdminPackages() {
                   >
                     <div style={{ padding: 8, borderRadius: 8, background: "rgba(255,255,255,0.15)" }}>
                       <div style={{ fontSize: 12, opacity: 0.9, color: inactive ? "#f1f5f9" : "#0f172a" }}>Amount</div>
-                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a" }}>₹{p.total_amount || "0.00"}</div>
+                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a" }}>â‚¹{p.total_amount || "0.00"}</div>
                     </div>
                     <div style={{ padding: 8, borderRadius: 8, background: "rgba(255,255,255,0.15)" }}>
                       <div style={{ fontSize: 12, opacity: 0.9, color: inactive ? "#f1f5f9" : "#0f172a" }}>Paid</div>
-                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a" }}>₹{p.paid_amount || "0.00"}</div>
+                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a" }}>â‚¹{p.paid_amount || "0.00"}</div>
                     </div>
                     <div style={{ padding: 8, borderRadius: 8, background: "rgba(255,255,255,0.15)" }}>
                       <div style={{ fontSize: 12, opacity: 0.9, color: inactive ? "#f1f5f9" : "#0f172a" }}>Remaining</div>
-                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a" }}>₹{p.remaining_amount || "0.00"}</div>
+                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a" }}>â‚¹{p.remaining_amount || "0.00"}</div>
                     </div>
                   </div>
                   <div style={{ marginTop: 6, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                     <div style={{ fontSize: 12, fontWeight: 700 }}>
-                      Renewal: {typeof p.months_remaining === "number" ? `${p.months_remaining} month${p.months_remaining === 1 ? "" : "s"} remaining` : "—"}
+                      Renewal: {typeof p.months_remaining === "number" ? `${p.months_remaining} month${p.months_remaining === 1 ? "" : "s"} remaining` : "â€”"}
                     </div>
                     <div style={{ display: "flex", gap: 6 }}>
                       <button
@@ -313,6 +385,96 @@ export default function AdminPackages() {
         ) : (
           <div style={{ color: "#64748b" }}>No package assigned for this agency.</div>
         )}
+
+        {/* Pending payment requests for this agency */}
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 800, color: "#0f172a", marginBottom: 8 }}>Pending Payment Requests</div>
+          {resolvedAgency ? (
+            reqsLoading ? (
+              <div style={{ color: "#64748b" }}>Loading pending requests...</div>
+            ) : reqsError ? (
+              <div style={{ color: "#dc2626" }}>{reqsError}</div>
+            ) : (pendingReqs || []).length === 0 ? (
+              <div style={{ color: "#64748b" }}>No pending requests for this agency.</div>
+            ) : (
+              <div style={{ display: "grid", gap: 8 }}>
+                {(pendingReqs || []).map((r) => {
+                  const pkgName =
+                    r?.package?.name ||
+                    r?.package?.code ||
+                    `#${r?.package?.id || ""}`;
+                  const proofUrl = r?.payment_proof_url || "";
+                  return (
+                    <div
+                      key={r.id}
+                      style={{
+                        border: "1px solid #e2e8f0",
+                        borderRadius: 8,
+                        padding: 10,
+                        background: "#ffffff",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <div style={{ fontWeight: 900, color: "#0f172a" }}>{pkgName}</div>
+                        <div style={{ fontSize: 12, color: "#64748b" }}>
+                          Amount: <b>â‚¹{r.amount}</b> â€¢ Method: <b>{r.method || "UPI"}</b> â€¢ UTR: <b>{r.utr || "â€”"}</b>
+                        </div>
+                        <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+                          <a
+                            href={proofUrl || "#"}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(e) => { if (!proofUrl) e.preventDefault(); }}
+                            style={{
+                              fontSize: 12,
+                              color: proofUrl ? "#0f172a" : "#94a3b8",
+                              textDecoration: proofUrl ? "underline" : "none",
+                              marginRight: 8,
+                            }}
+                          >
+                            {proofUrl ? "View Payment Proof" : "No proof"}
+                          </a>
+                          <button
+                            onClick={() => approveRequest(r.id)}
+                            style={{
+                              padding: "6px 10px",
+                              borderRadius: 8,
+                              border: "1px solid #16a34a",
+                              background: "#16a34a",
+                              color: "#fff",
+                              fontWeight: 800,
+                              cursor: "pointer",
+                            }}
+                            title="Approve and record payment"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => rejectRequest(r.id)}
+                            style={{
+                              padding: "6px 10px",
+                              borderRadius: 8,
+                              border: "1px solid #b91c1c",
+                              background: "#b91c1c",
+                              color: "#fff",
+                              fontWeight: 800,
+                              cursor: "pointer",
+                            }}
+                            title="Reject"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          ) : (
+            <div style={{ color: "#64748b" }}>Enter an agency and click Load to view pending requests.</div>
+          )}
+        </div>
       </Section>
 
       {/* Tabs */}
@@ -359,7 +521,7 @@ export default function AdminPackages() {
         right={
           <div style={{ color: "#64748b", fontSize: 12 }}>
             {activeTab.key === "packages"
-              ? "Define package name, code, and amount here. Toggle default to auto‑assign to agencies."
+              ? "Define package name, code, and amount here. Toggle default to autoâ€‘assign to agencies."
               : activeTab.key === "assignments"
               ? "Assign packages to agencies. One (agency, package) per row."
               : "Record payments for a specific assignment (amount, reference, notes)."}
@@ -375,9 +537,9 @@ export default function AdminPackages() {
           <li>The Agency Dashboard shows assigned Packages as cards with Amount, Paid, and Remaining.</li>
           <li>Status shows:
             <ul style={{ margin: 0, paddingLeft: 18 }}>
-              <li>Inactive (✗) when paid amount is 0</li>
-              <li>Partial (✓) when paid is greater than 0 but less than total</li>
-              <li>Active (✓) when fully paid</li>
+              <li>Inactive (âœ—) when paid amount is 0</li>
+              <li>Partial (âœ“) when paid is greater than 0 but less than total</li>
+              <li>Active (âœ“) when fully paid</li>
             </ul>
           </li>
           <li>Admins set package amounts here and can add payments under the Payments tab or via inline forms.</li>
@@ -410,7 +572,7 @@ export default function AdminPackages() {
             }}
           >
             <div style={{ fontWeight: 900, color: "#0f172a", marginBottom: 8 }}>
-              Add Payment — {payForm.title || ""}
+              Add Payment â€” {payForm.title || ""}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -469,3 +631,4 @@ export default function AdminPackages() {
     </div>
   );
 }
+

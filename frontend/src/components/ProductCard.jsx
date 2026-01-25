@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Card, Box, Typography, Button } from "@mui/material";
 import SmartImage from "./SmartImage";
 
@@ -40,13 +40,13 @@ function ProductCard({ product }) {
 
         <Box display="flex" gap={0.5} alignItems="center">
           <Typography fontWeight={700} color="#16a34a">
-            ₹{product.price}
+            â‚¹{product.price}
           </Typography>
           <Typography
             fontSize={12}
             sx={{ textDecoration: "line-through", color: "#64748b" }}
           >
-            ₹{product.mrp}
+            â‚¹{product.mrp}
           </Typography>
         </Box>
 
@@ -64,3 +64,4 @@ function ProductCard({ product }) {
 }
 
 export default React.memo(ProductCard);
+

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+﻿import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AppBar,
   Toolbar,
@@ -50,7 +50,7 @@ import {
 
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import API from "../../api/api";
-import LOGO from "../../assets/TRIKONEKT.png";
+import LOGO from "../../assets/TRIKONEKT.jpg";
 
 // New, standalone registration page that preserves existing registration logic and APIs
 // while providing a clean, isolated UI for testing safely.
@@ -77,6 +77,12 @@ const RegisterV2 = () => {
     business_category: "",
     address: "",
   });
+  // Merchant categories (public) + dependent subcategories
+  const [mCategories, setMCategories] = useState([]);
+  const [mSubcategories, setMSubcategories] = useState([]);
+  const [mCatId, setMCatId] = useState("");
+  const [mSubcatId, setMSubcatId] = useState("");
+  const [mLoading, setMLoading] = useState({ cats: false, subs: false });
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -296,6 +302,46 @@ const RegisterV2 = () => {
       }
     })();
   }, []);
+
+  // Merchant Categories (public)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setMLoading((s) => ({ ...s, cats: true }));
+      try {
+        const res = await API.get("/merchant/categories/", { cacheTTL: 10000, dedupe: "cancelPrevious" });
+        const arr = Array.isArray(res?.data) ? res.data : (res?.data?.results || []);
+        if (!cancelled) setMCategories(Array.isArray(arr) ? arr : []);
+      } catch (_) {
+        if (!cancelled) setMCategories([]);
+      } finally {
+        if (!cancelled) setMLoading((s) => ({ ...s, cats: false }));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Merchant Subcategories (public) when Category changes
+  useEffect(() => {
+    let cancelled = false;
+    setMSubcategories([]);
+    setMSubcatId("");
+    const cid = String(mCatId || "");
+    if (!cid) return;
+    (async () => {
+      setMLoading((s) => ({ ...s, subs: true }));
+      try {
+        const res = await API.get("/merchant/subcategories/", { params: { category_id: cid }, dedupe: "cancelPrevious" });
+        const arr = Array.isArray(res?.data) ? res.data : (res?.data?.results || []);
+        if (!cancelled) setMSubcategories(Array.isArray(arr) ? arr : []);
+      } catch (_) {
+        if (!cancelled) setMSubcategories([]);
+      } finally {
+        if (!cancelled) setMLoading((s) => ({ ...s, subs: false }));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [mCatId]);
 
   const loadStates = async (countryId) => {
     try {
@@ -1357,15 +1403,34 @@ const RegisterV2 = () => {
               <InputLabel>Category</InputLabel>
               <Select
                 label="Category"
-                value={formData.business_category}
-                onChange={(e) => setFormData({ ...formData, business_category: e.target.value })}
+                value={mCatId}
+                onChange={(e) => {
+                  const id = String(e.target.value);
+                  setMCatId(id);
+                  try {
+                    const nm = (mCategories || []).find((c) => String(c.id) === id)?.name || "";
+                    setFormData((fd) => ({ ...fd, business_category: nm }));
+                  } catch (_) {}
+                }}
                 required
               >
-                <MenuItem value="Food/Education">Food/Education</MenuItem>
-                <MenuItem value="Accounting">Accounting</MenuItem>
-                <MenuItem value="Beauty & Store">Beauty & Store</MenuItem>
-                <MenuItem value="Retail">Retail</MenuItem>
-                <MenuItem value="Health">Health</MenuItem>
+                <MenuItem value="">-- Select --</MenuItem>
+                {(mCategories || []).map((c) => (
+                  <MenuItem key={c.id} value={String(c.id)}>{c.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth sx={{ mb: 2 }} disabled={!mCatId}>
+              <InputLabel>Subcategory</InputLabel>
+              <Select
+                label="Subcategory"
+                value={mSubcatId}
+                onChange={(e) => setMSubcatId(String(e.target.value))}
+              >
+                <MenuItem value="">-- Select --</MenuItem>
+                {(mSubcategories || []).map((s) => (
+                  <MenuItem key={s.id} value={String(s.id)}>{s.name}</MenuItem>
+                ))}
               </Select>
             </FormControl>
             <TextField
@@ -1966,7 +2031,7 @@ const RegisterV2 = () => {
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
                   <CircularProgress size={16} />
                   <Typography variant="body2" color="text.secondary">
-                    Validating sponsor…
+                    Validating sponsorâ€¦
                   </Typography>
                 </Box>
               )}
@@ -1980,10 +2045,10 @@ const RegisterV2 = () => {
                       <b>Sponsor ID:</b> {sponsorDisplay.username || sponsorId}
                     </Typography>
                     <Typography variant="body2">
-                      <b>Name:</b> {sponsorDisplay.name || "—"}
+                      <b>Name:</b> {sponsorDisplay.name || "â€”"}
                     </Typography>
                     <Typography variant="body2">
-                      <b>Pincode:</b> {sponsorDisplay.pincode || "—"}
+                      <b>Pincode:</b> {sponsorDisplay.pincode || "â€”"}
                     </Typography>
                   </Box>
                 </Box>
@@ -2129,10 +2194,12 @@ const RegisterV2 = () => {
           boxShadow: "0 0px 15px rgba(0,0,0,0.08) !important",
         }}
       >
-        <Typography variant="body2">© {new Date().getFullYear()} Trikonekt. All rights reserved.</Typography>
+        <Typography variant="body2">Â© {new Date().getFullYear()} Trikonekt. All rights reserved.</Typography>
       </Box>
     </Box>
   );
 };
 
 export default RegisterV2;
+
+

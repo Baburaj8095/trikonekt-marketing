@@ -4,8 +4,59 @@ from decimal import Decimal
 from typing import Dict, Any, List, Optional
 
 from accounts.models import Wallet, CustomUser
-from business.models import CommissionConfig
+from business.models import CommissionConfig, AutoPoolAccount
 from .commission_policy import CommissionPolicy, ConfigurationError
+from .activation import _is_agency_or_employee, _allow_agency_in_matrix, _update_matrix_progress
+
+import logging
+logger = logging.getLogger(__name__)
+
+def _monthly_open_mode(cfg: CommissionConfig) -> str:
+    """
+    Read UI flag monthly_759.matrix_open_mode: FIRST_MONTH_ONLY | EVERY_PURCHASE | NEVER.
+    Default FIRST_MONTH_ONLY.
+    """
+    try:
+        master = dict(getattr(cfg, "master_commission_json", {}) or {})
+        mode = str((master.get("monthly_759", {}) or {}).get("matrix_open_mode", "FIRST_MONTH_ONLY")).strip().upper()
+        return mode if mode in {"FIRST_MONTH_ONLY", "EVERY_PURCHASE", "NEVER"} else "FIRST_MONTH_ONLY"
+    except Exception:
+        return "FIRST_MONTH_ONLY"
+
+def _matrix_audit_exists_for_purchase(src_type: str, src_id: str, product_key: str) -> bool:
+    try:
+        from coupons.models import AuditTrail
+        return AuditTrail.objects.filter(
+            action="matrix_distributed",
+            metadata__source_type=str(src_type or ""),
+            metadata__source_id=str(src_id or ""),
+            metadata__product_key=str(product_key),
+        ).exists()
+    except Exception:
+        return False
+
+def _matrix_mark_distributed(consumer: CustomUser, src_type: str, src_id: str, product_key: str) -> None:
+    try:
+        from coupons.models import AuditTrail
+        AuditTrail.objects.create(
+            action="matrix_distributed",
+            actor=consumer,
+            notes=f"Matrix distributed for {product_key} purchase {src_id}",
+            metadata={
+                "purchase_id": str(src_id or ""),
+                "product_key": str(product_key),
+                "source_type": str(src_type or ""),
+                "source_id": str(src_id or ""),
+            },
+        )
+    except Exception:
+        try:
+            logger.exception(
+                "matrix audit mark failed",
+                extra={"product": product_key, "user_id": getattr(consumer, "id", None), "source_id": src_id},
+            )
+        except Exception:
+            pass
 
 
 def _q2(x) -> Decimal:
@@ -53,6 +104,38 @@ def _resolve_upline(user: CustomUser, depth: int) -> List[CustomUser]:
     return chain
 
 
+def _as_percents(lst, length: int) -> List[Decimal]:
+    out: List[Decimal] = []
+    try:
+        for i in range(length):
+            v = Decimal(str((lst or [])[i])) if (lst and i < len(lst)) else Decimal("0")
+            out.append(v)
+    except Exception:
+        out = [Decimal("0") for _ in range(length)]
+    return out
+
+
+def _matrix_ancestors(acc, depth: int) -> List[CustomUser]:
+    """
+    Walk AutoPoolAccount parent chain to collect ancestor owners up to `depth`.
+    Returns list of CustomUser recipients in order [L1..Ldepth] for matrix payouts.
+    """
+    chain: List[CustomUser] = []
+    try:
+        seen = set()
+        node = getattr(acc, "parent_account", None)
+        while node and len(chain) < max(0, depth):
+            owner = getattr(node, "owner", None)
+            oid = getattr(owner, "id", None) if owner else None
+            if owner and oid and oid not in seen:
+                chain.append(owner)
+                seen.add(oid)
+            node = getattr(node, "parent_account", None)
+    except Exception:
+        chain = []
+    return chain
+
+
 def _load_monthly_759_runtime_cfg(cfg: CommissionConfig) -> Dict[str, Any]:
     """
     Strict loader for CommissionConfig.master_commission_json['monthly_759'] without defaults.
@@ -88,19 +171,19 @@ def _load_monthly_759_runtime_cfg(cfg: CommissionConfig) -> Dict[str, Any]:
         else:
             raise ConfigurationError("Invalid boolean at commissions.monthly_759.agency_enabled")
 
-    if "levels_fixed" not in block or not isinstance(block["levels_fixed"], list) or len(block["levels_fixed"]) == 0:
-        raise ConfigurationError("Missing or invalid commissions.monthly_759.levels_fixed (expect non-empty list)")
-
-    levels_src = block["levels_fixed"]
     levels_q: List[Decimal] = []
-    try:
-        for x in levels_src:
-            levels_q.append(_q2(x))
-    except Exception:
-        raise ConfigurationError("Invalid number in commissions.monthly_759.levels_fixed")
-
-    # Only first 5 are used (L1..L5)
-    levels_q = levels_q[:5]
+    if "levels_fixed" in block and isinstance(block["levels_fixed"], list) and len(block["levels_fixed"]) > 0:
+        levels_src = block["levels_fixed"]
+        try:
+            for x in levels_src:
+                levels_q.append(_q2(x))
+        except Exception:
+            raise ConfigurationError("Invalid number in commissions.monthly_759.levels_fixed")
+        # Only first 5 are used (L1..L5)
+        levels_q = levels_q[:5]
+    else:
+        # No monthly fixed level payouts when not configured or empty
+        levels_q = []
 
     return {
         "base_amount": base_amount,
@@ -192,26 +275,6 @@ def distribute_monthly_759_payouts(
     runtime = _load_monthly_759_runtime_cfg(cfg)
     levels_q: List[Decimal] = runtime["levels_fixed"]
 
-    upline = _resolve_upline(consumer, depth=5)
-    for idx, recipient in enumerate(upline):
-        if idx >= len(levels_q):
-            break
-        amt = _q2(levels_q[idx])
-        if amt <= 0:
-            continue
-        _credit_wallet(
-            recipient,
-            amt,
-            tx_type="MONTHLY_759_LEVEL",
-            meta={
-                "source": "MONTHLY_759",
-                "level": idx + 1,
-                "is_first_month": bool(is_first_month),
-                "fixed": True,
-            },
-            source_type=src_type,
-            source_id=src_id,
-        )
 
     # 3) Agency distribution via auto-pool (STRICT: must be configured)
     if runtime["agency_enabled"]:
@@ -227,6 +290,172 @@ def distribute_monthly_759_payouts(
             source_id=src_id,
             extra_meta={"trigger": "MONTHLY_759", "is_first_month": bool(is_first_month)},
         )
+
+    # 3b) Matrix account creation/payouts with monthly open mode
+    try:
+        base_amt = _q2(runtime["base_amount"])
+        cfg_mode = _monthly_open_mode(CommissionConfig.get_solo())  # FIRST_MONTH_ONLY | EVERY_PURCHASE | NEVER
+        already_for_purchase = _matrix_audit_exists_for_purchase(src_type, src_id, "759")
+        if already_for_purchase:
+            try:
+                logger.info("matrix skip: already distributed for purchase", extra={"product": "759", "user_id": getattr(consumer, "id", None), "source_id": src_id})
+            except Exception:
+                pass
+        # Determine if matrix should open now (matrix-only behavior)
+        should_open = False
+        if not already_for_purchase and base_amt > 0:
+            if cfg_mode == "NEVER":
+                should_open = False
+            elif cfg_mode == "FIRST_MONTH_ONLY":
+                should_open = bool(is_first_month)
+            elif cfg_mode == "EVERY_PURCHASE":
+                # treat every purchase as first-month for matrix part only
+                should_open = True
+
+        opened_any = False
+        if should_open:
+            # Use first-box matrix enable flags when in EVERY_PURCHASE mode to avoid recurring overrides
+            first_box_cfg = CommissionPolicy.load().monthly759_first()
+            effective_enable5 = bool(first_box_cfg.enable_5_matrix) if cfg_mode == "EVERY_PURCHASE" else bool(getattr(box_cfg, "enable_5_matrix", False))
+            effective_enable3 = bool(first_box_cfg.enable_3_matrix) if cfg_mode == "EVERY_PURCHASE" else bool(getattr(box_cfg, "enable_3_matrix", False))
+            acc5 = None
+            acc3 = None
+
+            if effective_enable5:
+                try:
+                    exists5 = AutoPoolAccount.objects.filter(
+                        owner=consumer, pool_type="FIVE_150", status="ACTIVE",
+                        source_type=src_type, source_id=src_id
+                    ).exists()
+                except Exception:
+                    exists5 = False
+                if not exists5:
+                    try:
+                        acc5 = AutoPoolAccount.place_in_five_pool(
+                            consumer, "FIVE_150", base_amt, source_type=src_type, source_id=src_id
+                        )
+                        opened_any = True
+                    except Exception:
+                        acc5 = None
+
+            if effective_enable3:
+                try:
+                    exists3 = AutoPoolAccount.objects.filter(
+                        owner=consumer, pool_type="THREE_150", status="ACTIVE",
+                        source_type=src_type, source_id=src_id
+                    ).exists()
+                except Exception:
+                    exists3 = False
+                if not exists3:
+                    try:
+                        acc3 = AutoPoolAccount.place_in_three_pool(
+                            consumer, "THREE_150", base_amt, source_type=src_type, source_id=src_id
+                        )
+                        opened_any = True
+                    except Exception:
+                        acc3 = None
+
+            cfg2 = CommissionConfig.get_solo()
+            master = dict(getattr(cfg2, "master_commission_json", {}) or {})
+            cm5 = dict(master.get("consumer_matrix_5", {}) or {})
+            cm3 = dict(master.get("consumer_matrix_3", {}) or {})
+
+            if effective_enable5:
+                cm5_759 = (cm5.get("759", {}) or cm5.get("rs759", {}) or cm5.get("prime759", {}) or cm5.get("prime_759", {}) or cm5.get("monthly_759", {}) or cm5.get("monthly759", {}) or {})
+                five_levels = int((cm5_759.get("levels") or cfg2.get_matrix_five_levels()))
+                upline6 = _matrix_ancestors(acc5, depth=five_levels) if acc5 else _resolve_upline(consumer, depth=five_levels)
+                fixed5 = list(cm5_759.get("fixed_amounts") or getattr(cfg2, "five_matrix_amounts_json", []) or [])
+                if fixed5:
+                    for idx, recipient in enumerate(upline6):
+                        if idx >= len(fixed5):
+                            break
+                        amt = _q2(fixed5[idx] or 0)
+                        if amt <= 0:
+                            continue
+                        try:
+                            from business.models import is_matrix_eligible as _elig
+                            if not _elig(recipient):
+                                continue
+                        except Exception:
+                            continue
+                        if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
+                            continue
+                        meta = {"source": "FIVE_MATRIX_759_FIXED", "source_type": src_type, "source_id": src_id, "level_index": idx + 1, "fixed": True, "trigger": "MONTHLY_759"}
+                        _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_FIVE", meta=meta, source_type=src_type, source_id=src_id)
+                        _update_matrix_progress(recipient, pool_type="FIVE_150", level=idx + 1, amount=amt)
+                else:
+                    five_percents = _as_percents((cm5_759.get("percents") or getattr(cfg2, "five_matrix_percents_json", []) or []), five_levels)
+                    for idx, recipient in enumerate(upline6):
+                        if idx >= len(five_percents):
+                            break
+                        pct = five_percents[idx] or Decimal("0")
+                        amt = _q2(base_amt * pct / Decimal("100"))
+                        if amt <= 0:
+                            continue
+                        try:
+                            from business.models import is_matrix_eligible as _elig
+                            if not _elig(recipient):
+                                continue
+                        except Exception:
+                            continue
+                        if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
+                            continue
+                        meta = {"source": "FIVE_MATRIX_759", "source_type": src_type, "source_id": src_id, "level_index": idx + 1, "percent": str(pct), "trigger": "MONTHLY_759"}
+                        _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_FIVE", meta=meta, source_type=src_type, source_id=src_id)
+                        _update_matrix_progress(recipient, pool_type="FIVE_150", level=idx + 1, amount=amt)
+
+            if effective_enable3:
+                cm3_759 = (cm3.get("759", {}) or cm3.get("rs759", {}) or cm3.get("prime759", {}) or cm3.get("prime_759", {}) or cm3.get("monthly_759", {}) or cm3.get("monthly759", {}) or {})
+                three_levels = int((cm3_759.get("levels") or cfg2.get_matrix_three_levels()))
+                upline15 = _matrix_ancestors(acc3, depth=three_levels) if acc3 else _resolve_upline(consumer, depth=three_levels)
+                fixed3 = list(cm3_759.get("fixed_amounts") or getattr(cfg2, "three_matrix_amounts_json", []) or [])
+                if fixed3:
+                    for idx, recipient in enumerate(upline15):
+                        if idx >= len(fixed3):
+                            break
+                        amt = _q2(fixed3[idx] or 0)
+                        if amt <= 0:
+                            continue
+                        try:
+                            from business.models import is_matrix_eligible as _elig
+                            if not _elig(recipient):
+                                continue
+                        except Exception:
+                            continue
+                        if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
+                            continue
+                        meta = {"source": "THREE_MATRIX_759_FIXED", "source_type": src_type, "source_id": src_id, "level_index": idx + 1, "fixed": True, "trigger": "MONTHLY_759"}
+                        _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_THREE", meta=meta, source_type=src_type, source_id=src_id)
+                        _update_matrix_progress(recipient, pool_type="THREE_150", level=idx + 1, amount=amt)
+                else:
+                    three_percents = _as_percents((cm3_759.get("percents") or getattr(cfg2, "three_matrix_percents_json", []) or []), three_levels)
+                    for idx, recipient in enumerate(upline15):
+                        if idx >= len(three_percents):
+                            break
+                        pct = three_percents[idx] or Decimal("0")
+                        amt = _q2(base_amt * pct / Decimal("100"))
+                        if amt <= 0:
+                            continue
+                        try:
+                            from business.models import is_matrix_eligible as _elig
+                            if not _elig(recipient):
+                                continue
+                        except Exception:
+                            continue
+                        if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
+                            continue
+                        meta = {"source": "THREE_MATRIX_759", "source_type": src_type, "source_id": src_id, "level_index": idx + 1, "percent": str(pct), "trigger": "MONTHLY_759"}
+                        _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_THREE", meta=meta, source_type=src_type, source_id=src_id)
+                        _update_matrix_progress(recipient, pool_type="THREE_150", level=idx + 1, amount=amt)
+
+        if opened_any:
+            _matrix_mark_distributed(consumer, src_type, src_id, "759")
+    except ConfigurationError:
+        # propagate configuration errors (stop payout)
+        raise
+    except Exception:
+        # best-effort; matrix payouts should not block the monthly flow
+        pass
 
     # 4) Reward points equal to configured base amount (STRICT: requires base_amount)
     try:

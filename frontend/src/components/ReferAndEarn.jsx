@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+﻿import React, { useMemo, useState } from "react";
 import { Box, Paper, Typography, Stack, Button, Alert } from "@mui/material";
 
 export default function ReferAndEarn({ title = "Refer & Earn", onlyConsumer = false, sponsorUsername = "" }) {
@@ -87,12 +87,40 @@ export default function ReferAndEarn({ title = "Refer & Earn", onlyConsumer = fa
   const isSubFranchise =
     appRole === "agency" && (userCategory === "agency_sub_franchise" || userCategory === "sub_franchise");
 
-  // Visibility flags
-  // Employees and Sub‑Franchise should also get Consumer and Sub‑Franchise links
-  const showEmployeeLink = !onlyConsumer && (isEmployee || isSubFranchise);
-  const showConsumerLink = onlyConsumer || isEmployee || isSubFranchise || (!isEmployee && !isSubFranchise);
-  const showSubFranchiseLink = !onlyConsumer && (isEmployee || isSubFranchise);
-  const showMerchantLink = !onlyConsumer && (isEmployee || isAgency || isSubFranchise);
+  // Additional role flags
+  const isMerchant = appRole === "merchant" || appRole === "business";
+  const isConsumerRole = appRole === "consumer" || appRole === "user";
+
+  // Restricted agency hierarchy (no refer links)
+  const isRestrictedAgency =
+    isAgency &&
+    ["pincode", "pincode_coordinator", "district", "district_coordinator", "state", "state_coordinator"].includes(
+      userCategory
+    );
+
+  // Visibility flags based on finalized rules:
+  // - consumer: Consumer only
+  // - merchant: Consumer only
+  // - employee: Merchant only
+  // - agency (sub_franchise): Sub-franchise + Merchant
+  // - agency (pincode/district/state + coordinators): no links
+  const allowedTypes = useMemo(() => {
+    if (onlyConsumer) return new Set(["consumer"]);
+    if (isMerchant) return new Set(["consumer"]);
+    if (isEmployee) return new Set(["merchant"]);
+    if (isAgency) {
+      if (isSubFranchise) return new Set(["sub_franchise", "merchant"]);
+      if (isRestrictedAgency) return new Set([]);
+      return new Set([]); // default for other agency types: no links
+    }
+    if (isConsumerRole) return new Set(["consumer"]);
+    return new Set([]);
+  }, [onlyConsumer, isMerchant, isEmployee, isAgency, isSubFranchise, isRestrictedAgency, isConsumerRole]);
+
+  const showEmployeeLink = allowedTypes.has("employee"); // intentionally false for all roles per spec
+  const showConsumerLink = allowedTypes.has("consumer");
+  const showSubFranchiseLink = allowedTypes.has("sub_franchise");
+  const showMerchantLink = allowedTypes.has("merchant");
 
   const getLink = (role, extra = {}) => {
     const params = new URLSearchParams({
@@ -259,11 +287,11 @@ export default function ReferAndEarn({ title = "Refer & Earn", onlyConsumer = fa
               sx={{ textTransform: "none" }}
               onClick={() =>
                 sponsorId
-                  ? shareNative(links.subFranchise, buildShareText("Sub‑Franchise"))
+                  ? shareNative(links.subFranchise, buildShareText("Subâ€‘Franchise"))
                   : setMsg("Sponsor ID missing. Please re-login.")
               }
             >
-              Share Sub‑Franchise
+              Share Subâ€‘Franchise
             </Button>
           </Stack>
         )}
@@ -293,3 +321,4 @@ export default function ReferAndEarn({ title = "Refer & Earn", onlyConsumer = fa
     </Paper>
   );
 }
+

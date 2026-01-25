@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import BusinessRegistration, DailyReport, TriApp, TriAppProduct
+from .models import BusinessRegistration, DailyReport, TriApp, TriAppProduct, MerchantCategory, MerchantSubCategory
 from locations.models import Country, State, City
 
 
@@ -16,13 +16,28 @@ class BusinessRegistrationSerializer(serializers.ModelSerializer):
 
     # Accept "address" alias for business_address from some UIs
     address = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    # New: DB-driven category/subcategory (write-only IDs)
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=MerchantCategory.objects.filter(is_active=True),
+        required=False,
+        allow_null=True,
+        write_only=True,
+        source="category",
+    )
+    subcategory_id = serializers.PrimaryKeyRelatedField(
+        queryset=MerchantSubCategory.objects.filter(is_active=True),
+        required=False,
+        allow_null=True,
+        write_only=True,
+        source="subcategory",
+    )
 
     class Meta:
         model = BusinessRegistration
         fields = [
             'id', 'unique_id',
             'full_name', 'email', 'phone',
-            'business_name', 'business_category', 'business_address', 'address',
+            'business_name', 'business_category', 'business_address', 'address', 'category_id', 'subcategory_id',
             'sponsor_id',
             'country', 'state', 'city', 'pincode',
             'country_name', 'country_code', 'state_name', 'state_code', 'city_name',
@@ -116,13 +131,35 @@ class BusinessRegistrationSerializer(serializers.ModelSerializer):
         # Required fields for a business registration
         bn = (attrs.get('business_name') or '').strip()
         bc = (attrs.get('business_category') or '').strip()
+        category_obj = attrs.get('category')
+        subcategory_obj = attrs.get('subcategory')
         ba = (attrs.get('business_address') or attrs.get('address') or '').strip()
         sponsor = (attrs.get('sponsor_id') or '').strip()
         missing = {}
         if not bn:
             missing['business_name'] = 'Business name is required.'
-        if not bc:
+        # Category/Subcategory validation (DB-driven)
+        if category_obj is None and not bc:
+            # Backward-compat: accept legacy business_category string when IDs not provided
             missing['business_category'] = 'Business category is required.'
+        if category_obj is not None:
+            # Ensure active category
+            try:
+                if not getattr(category_obj, 'is_active', True):
+                    missing['category_id'] = 'Selected category is inactive.'
+            except Exception:
+                pass
+            # Require subcategory when category provided
+            if subcategory_obj is None:
+                missing['subcategory_id'] = 'Subcategory is required for the selected category.'
+            else:
+                try:
+                    if not getattr(subcategory_obj, 'is_active', True):
+                        missing['subcategory_id'] = 'Selected subcategory is inactive.'
+                    elif getattr(subcategory_obj, 'category_id', None) != getattr(category_obj, 'id', None):
+                        missing['subcategory_id'] = 'Subcategory does not belong to the selected category.'
+                except Exception:
+                    pass
         if not ba:
             missing['business_address'] = 'Business address is required.'
         if not sponsor:
@@ -204,12 +241,25 @@ class BusinessRegistrationSerializer(serializers.ModelSerializer):
         # Resolve location FKs
         country, state, city = self._resolve_locations(validated_data)
 
+        # Pop DB-driven category/subcategory (if provided)
+        category_obj = validated_data.pop('category', None)
+        subcategory_obj = validated_data.pop('subcategory', None)
+
+        # Backward-compat: if business_category empty but category provided, fill with category name
+        if not business_category and category_obj:
+            try:
+                business_category = getattr(category_obj, "name", "") or ""
+            except Exception:
+                business_category = ""
+
         reg = BusinessRegistration.objects.create(
             full_name=full_name,
             email=email,
             phone=phone,
             business_name=business_name,
             business_category=business_category,
+            category=category_obj,
+            subcategory=subcategory_obj,
             business_address=business_address,
             sponsor_id=sponsor_id,
             pincode=pincode,
@@ -431,7 +481,7 @@ class AgencyPackageAssignmentSerializer(serializers.ModelSerializer):
 # ==============================
 # Consumer Promo Packages (Prime/Monthly)
 # ==============================
-from .models import PromoPackage, PromoPurchase, PromoPackageProduct, PromoEBook, EBookAccess, PromoProduct
+from .models import PromoPackage, PromoPurchase, PromoPackageProduct, PromoEBook, EBookAccess, PromoProduct, PromoProductOrder
 
 
 class PromoPackageSerializer(serializers.ModelSerializer):
@@ -864,12 +914,12 @@ class PromoPurchaseSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError({"prime150_choice": "Select EBOOK or REDEEM."})
                 attrs["prime150_choice"] = choice
 
-            # PRIME 750 flow: PRODUCT | REDEEM | COUPON
+            # PRIME 750 flow: PRODUCT | REDEEM (COUPON removed)
             if is_prime_750:
                 choice_raw = attrs.get("prime750_choice") or getattr(self.instance, "prime750_choice", "") or "PRODUCT"
                 choice = str(choice_raw).strip().upper()
-                if choice not in {"PRODUCT", "REDEEM", "COUPON"}:
-                    choice = "PRODUCT"
+                if choice not in {"PRODUCT", "REDEEM"}:
+                    raise serializers.ValidationError({"prime750_choice": "Invalid choice for PRIME 750. Allowed choices: PRODUCT or REDEEM."})
                 attrs["prime750_choice"] = choice
 
                 if choice == "PRODUCT":
@@ -884,7 +934,7 @@ class PromoPurchaseSerializer(serializers.ModelSerializer):
                     if not ship:
                         raise serializers.ValidationError({"shipping_address": "Shipping address is required for product delivery."})
                 else:
-                    # REDEEM/COUPON do not require a product selection or shipping
+                    # REDEEM does not require a product selection or shipping
                     pass
 
         return attrs
@@ -976,6 +1026,52 @@ class EBookAccessSerializer(serializers.ModelSerializer):
     class Meta:
         model = EBookAccess
         fields = ["id", "ebook", "granted_at"]
+
+
+class PromoProductOrderSerializer(serializers.ModelSerializer):
+    promo_purchase_id = serializers.IntegerField(source="promo_purchase.id", read_only=True)
+    user_id = serializers.IntegerField(source="user.id", read_only=True)
+    product_id = serializers.IntegerField(source="product.id", read_only=True)
+    product_name = serializers.SerializerMethodField()
+    ui_status = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PromoProductOrder
+        fields = [
+            "id",
+            "promo_purchase_id",
+            "user_id",
+            "product_id",
+            "product_name",
+            "shipping_address",
+            "status",
+            "ui_status",
+            "created_at",
+        ]
+        read_only_fields = [
+            "id",
+            "promo_purchase_id",
+            "user_id",
+            "product_id",
+            "product_name",
+            "ui_status",
+            "created_at",
+        ]
+
+    def get_product_name(self, obj):
+        try:
+            p = getattr(obj, "product", None)
+            return getattr(p, "name", None)
+        except Exception:
+            return None
+
+    def get_ui_status(self, obj):
+        # Map backend statuses to UI-friendly labels
+        mapping = {"PENDING": "PENDING_DISPATCH", "DISPATCHED": "SHIPPED", "CANCELLED": "CANCELLED"}
+        try:
+            return mapping.get(str(getattr(obj, "status", "") or ""), getattr(obj, "status", ""))
+        except Exception:
+            return getattr(obj, "status", "")
 
 
 # ==============================

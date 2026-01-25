@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import API from "../../api/api";
 
 function TextInput({ label, value, onChange, placeholder, style }) {
@@ -239,10 +239,10 @@ export default function AdminBanners() {
             >
               <div>{b.id}</div>
               <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                {b.title || "—"}
+                {b.title || "â€”"}
               </div>
-              <div>{b.state || "—"}</div>
-              <div>{b.pincode || "—"}</div>
+              <div>{b.state || "â€”"}</div>
+              <div>{b.pincode || "â€”"}</div>
               <div>{Array.isArray(b.items) ? b.items.length : 0}</div>
               <div>
                 <span
@@ -268,3 +268,4 @@ export default function AdminBanners() {
     </div>
   );
 }
+

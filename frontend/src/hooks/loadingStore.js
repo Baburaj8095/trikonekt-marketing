@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Simple global loading store for tracking in-flight API calls.
  * - incrementLoading(): increment counter
  * - decrementLoading(): decrement counter (never below 0)
@@ -42,3 +42,4 @@ export function subscribe(listener) {
     listeners.delete(listener);
   };
 }
+

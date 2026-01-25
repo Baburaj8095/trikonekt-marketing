@@ -1,4 +1,4 @@
-/**
+﻿/**
  * v2 Theme - Colors (Design System: Light, Gold-centric)
  * Single source of truth. No inline hex values in screens/components.
  *
@@ -59,3 +59,4 @@ colors.success = colors.successBright;
 colors.borderWeak = colors.borderLight;
 
 export default colors;
+

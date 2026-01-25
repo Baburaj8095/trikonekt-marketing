@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import {
   AppBar,
   Toolbar,
@@ -13,7 +13,7 @@ import {
 import MenuIcon from "@mui/icons-material/Menu";
 import CloseIcon from "@mui/icons-material/Close";
 import { useNavigate, useLocation } from "react-router-dom";
-import LOGO from "../assets/TRIKONEKT.png";
+import LOGO from "../assets/TRIKONEKT.jpg";
 
 export default function PublicNavbar() {
   const navigate = useNavigate();
@@ -184,3 +184,5 @@ export default function PublicNavbar() {
     </>
   );
 }
+
+

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   AppBar,
@@ -30,7 +30,7 @@ import {
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import MenuIcon from "@mui/icons-material/Menu";
-import LOGO from "../assets/TRIKONEKT.png";
+import LOGO from "../assets/TRIKONEKT.jpg";
 import API from "../api/api";
 import RewardsTargetCard from "../components/RewardsTargetCard";
 import ReferAndEarn from "../components/ReferAndEarn";
@@ -437,7 +437,7 @@ export default function EmployeeDashboard({ embedded = false }) {
     }
   };
 
-  // My E‑Coupon codes (assigned to me)
+  // My Eâ€‘Coupon codes (assigned to me)
   const [codes, setCodes] = useState([]);
   const [codesLoading, setCodesLoading] = useState(false);
   const [codesError, setCodesError] = useState("");
@@ -450,14 +450,14 @@ export default function EmployeeDashboard({ embedded = false }) {
       const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
       setCodes(arr || []);
     } catch (e) {
-      setCodesError("Failed to load my e‑coupon codes.");
+      setCodesError("Failed to load my eâ€‘coupon codes.");
       setCodes([]);
     } finally {
       setCodesLoading(false);
     }
   };
 
-  // Assign e‑coupon to consumer (employee flow)
+  // Assign eâ€‘coupon to consumer (employee flow)
   const [assign, setAssign] = useState({ codeId: "", consumerUsername: "" });
   const [assignBusy, setAssignBusy] = useState(false);
   const doAssign = async () => {
@@ -470,7 +470,7 @@ export default function EmployeeDashboard({ embedded = false }) {
       await API.post(`/coupons/codes/${assign.codeId}/assign-consumer/`, {
         consumer_username: String(assign.consumerUsername).trim(),
       });
-      alert("E‑Coupon assigned to consumer.");
+      alert("Eâ€‘Coupon assigned to consumer.");
       setAssign({ codeId: "", consumerUsername: "" });
       await loadCodes();
       await loadMyCommissions();
@@ -484,7 +484,7 @@ export default function EmployeeDashboard({ embedded = false }) {
     }
   };
 
-  // Pending E‑Coupon submissions awaiting my (employee) approval
+  // Pending Eâ€‘Coupon submissions awaiting my (employee) approval
   const [pendingSubs, setPendingSubs] = useState([]);
   const [pendingLoading, setPendingLoading] = useState(false);
   const [pendingError, setPendingError] = useState("");
@@ -498,7 +498,7 @@ export default function EmployeeDashboard({ embedded = false }) {
       const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
       setPendingSubs(arr || []);
     } catch (e) {
-      setPendingError("Failed to load pending e‑coupon submissions.");
+      setPendingError("Failed to load pending eâ€‘coupon submissions.");
       setPendingSubs([]);
     } finally {
       setPendingLoading(false);
@@ -856,7 +856,7 @@ export default function EmployeeDashboard({ embedded = false }) {
           }}>
           <KpiCard
             title="Wallet Commission (Coupon Sales)"
-            value={`₹${luckyCommissionTotal.toFixed(2)}`}
+            value={`â‚¹${luckyCommissionTotal.toFixed(2)}`}
             subtitle="Commission from Coupon Sales"
             palette="amber"
           />
@@ -872,7 +872,7 @@ export default function EmployeeDashboard({ embedded = false }) {
           }}>
           <KpiCard
             title="Coupon Commission"
-            value={`₹${referralCommissionTotal.toFixed(2)}`}
+            value={`â‚¹${referralCommissionTotal.toFixed(2)}`}
             subtitle="Coupon commissions"
             palette="green"
           />
@@ -888,7 +888,7 @@ export default function EmployeeDashboard({ embedded = false }) {
           }}>
           <KpiCard
             title="Direct Referral Commission"
-            value={`₹${walletDirectReferralTotal.toFixed(2)}`}
+            value={`â‚¹${walletDirectReferralTotal.toFixed(2)}`}
             subtitle="Wallet earnings from direct referrals"
             palette="green"
           />
@@ -954,12 +954,20 @@ export default function EmployeeDashboard({ embedded = false }) {
           }}>
           <KpiCard
             title="Wallet Balance"
-            value={`₹${wallet.balance}`}
+            value={`â‚¹${wallet.balance}`}
             subtitle="Current Balance"
             palette="cyan"
           />
         </Grid>
       </Grid>
+
+      <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff", mt: 2 }}>
+        <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>Prime Packages</Typography>
+        <Typography variant="body2" color="text.secondary">Join Trikonekt Prime packages to unlock exclusive benefits.</Typography>
+        <Button sx={{ mt: 1 }} variant="contained" onClick={() => navigate("/employee/join-prime")}>
+          Explore Packages
+        </Button>
+      </Paper>
 
       {/* Assign E-Coupon Section */}
       
@@ -985,10 +993,10 @@ export default function EmployeeDashboard({ embedded = false }) {
                   Manual Coupon Submissions Awaiting My Approval
                 </Typography>
                 <Box sx={{ mb: 2 }}>
-                  <Alert severity="info">My reviews — Approved: {luckyStats.approved} | Rejected: {luckyStats.rejected}</Alert>
+                  <Alert severity="info">My reviews â€” Approved: {luckyStats.approved} | Rejected: {luckyStats.rejected}</Alert>
                 </Box>
                 <Box sx={{ mb: 2 }}>
-                  <Alert severity="success">My commission earned: ₹{commissionTotal.toFixed(2)}</Alert>
+                  <Alert severity="success">My commission earned: â‚¹{commissionTotal.toFixed(2)}</Alert>
                 </Box>
                 {luckyLoading ? (
                   <Box sx={{ py: 3, display: "flex", alignItems: "center", gap: 1 }}>
@@ -1108,14 +1116,14 @@ export default function EmployeeDashboard({ embedded = false }) {
             <Grid container spacing={2} sx={{ width: "100%", minWidth: 0, boxSizing: "border-box" }}>
             <Grid item xs={12} sx={{ width: "100%"}}>
               <Paper elevation={3} sx={{width:"100%", p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff", width: "100%" }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My E‑Coupon Codes</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My Eâ€‘Coupon Codes</Typography>
 
-                {/* Pending E‑Coupon submissions awaiting my approval */}
+                {/* Pending Eâ€‘Coupon submissions awaiting my approval */}
                 {/* <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2, bgcolor: "#fff" }}>
-                  <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Pending E‑Coupon Submissions Awaiting My Approval</Typography>
+                  <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Pending Eâ€‘Coupon Submissions Awaiting My Approval</Typography>
                   {pendingLoading ? (
                     <Box sx={{ py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
-                      <CircularProgress size={18} /> <Typography variant="body2">Loading…</Typography>
+                      <CircularProgress size={18} /> <Typography variant="body2">Loadingâ€¦</Typography>
                     </Box>
                   ) : pendingError ? (
                     <Alert severity="error">{pendingError}</Alert>
@@ -1155,7 +1163,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                           <TableRow>
                             <TableCell colSpan={6}>
                               <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                                No pending e‑coupon submissions.
+                                No pending eâ€‘coupon submissions.
                               </Typography>
                             </TableCell>
                           </TableRow>
@@ -1167,7 +1175,7 @@ export default function EmployeeDashboard({ embedded = false }) {
 
                 {/* Assign to Consumer */}
                 <Paper variant="outlined" xs={12} sm={12} md={6} sx={{ width:"100%", p: 2, borderRadius: 2, mb: 2, bgcolor: "#fbfdff" }}>
-                  <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Assign E‑Coupon to Consumer</Typography>
+                  <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Assign Eâ€‘Coupon to Consumer</Typography>
                   <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                     <TextField
                       select
@@ -1182,7 +1190,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                       .filter((c) => c.status === "ASSIGNED_EMPLOYEE")
                       .map((c) => (
                         <MenuItem key={c.id} value={c.id}>
-                          {c.code} {c.value !== undefined ? ` (₹${c.value}) ` : ""}
+                          {c.code} {c.value !== undefined ? ` (â‚¹${c.value}) ` : ""}
                         </MenuItem>
                       ))}
                       {(!codes || codes.length === 0) && (
@@ -1214,8 +1222,8 @@ export default function EmployeeDashboard({ embedded = false }) {
                               <Typography variant="caption" sx={{ color: "text.secondary" }}>{c.status}</Typography>
                             </Stack>
                             <Stack direction="row" spacing={1} sx={{ mt: 0.5, color: "text.secondary" }}>
-                              <Typography variant="caption">{c.value !== undefined ? `₹${c.value}` : ""}</Typography>
-                              <Typography variant="caption">• {c.created_at ? new Date(c.created_at).toLocaleString() : ""}</Typography>
+                              <Typography variant="caption">{c.value !== undefined ? `â‚¹${c.value}` : ""}</Typography>
+                              <Typography variant="caption">â€¢ {c.created_at ? new Date(c.created_at).toLocaleString() : ""}</Typography>
                             </Stack>
                             {(c.batch || c.serial || c.assigned_agency_username) ? (
                               <Typography variant="caption" sx={{ display: "block", mt: 0.5, color: "text.secondary" }}>
@@ -1248,7 +1256,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                                   <TableCell sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>{c.code}</TableCell>
                                   <TableCell>{c.status}</TableCell>
                                   
-                                  <TableCell>{c.value !== undefined ? `₹${c.value}` : ""}</TableCell>
+                                  <TableCell>{c.value !== undefined ? `â‚¹${c.value}` : ""}</TableCell>
                                   <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.assigned_agency_username || ""}</TableCell>
                                   <TableCell>{c.created_at ? new Date(c.created_at).toLocaleString() : ""}</TableCell>
                                 </TableRow>
@@ -1275,7 +1283,7 @@ export default function EmployeeDashboard({ embedded = false }) {
             <Grid item xs={12}>
               <Paper elevation={3} sx={{width:"100%", p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My Commissions</Typography>
-                <Alert severity="success" sx={{ mb: 2 }}>Commission earned (lifetime): ₹{commissionTotal.toFixed(2)}</Alert>
+                <Alert severity="success" sx={{ mb: 2 }}>Commission earned (lifetime): â‚¹{commissionTotal.toFixed(2)}</Alert>
                 <Table size="small">
                   <TableHead>
                     <TableRow>
@@ -1290,7 +1298,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                     {(commissions || []).map((c) => (
                       <TableRow key={c.id}>
                         <TableCell>{c.earned_at ? new Date(c.earned_at).toLocaleString() : ""}</TableCell>
-                        <TableCell>₹{c.amount}</TableCell>
+                        <TableCell>â‚¹{c.amount}</TableCell>
                         <TableCell>{c.status}</TableCell>
                         <TableCell>{c.role}</TableCell>
                         <TableCell>{c.coupon_code || ""}</TableCell>
@@ -1314,7 +1322,7 @@ export default function EmployeeDashboard({ embedded = false }) {
               <Grid container spacing={2} sx={{ width: "100%", minWidth: 0, boxSizing: "border-box" }}>
             <Grid item xs={12}>
               <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>My Team (5‑Matrix)</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>My Team (5â€‘Matrix)</Typography>
                 <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden", background: "#fff", padding: 12 }}>
                   <TreeReferralGalaxy mode="self" />
                 </div>
@@ -1340,7 +1348,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                   <Alert severity="error">{walletError}</Alert>
                 ) : (
                   <Alert severity="info" sx={{ mb: 2 }}>
-                    Balance: ₹{wallet.balance} {wallet.updated_at ? `— updated ${new Date(wallet.updated_at).toLocaleString()}` : ""}
+                    Balance: â‚¹{wallet.balance} {wallet.updated_at ? `â€” updated ${new Date(wallet.updated_at).toLocaleString()}` : ""}
                   </Alert>
                 )}
 
@@ -1353,7 +1361,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                 ) : null}
                 <Box component="form" onSubmit={submitWithdrawal} sx={{ mb: 2 }}>
                   <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                    <TextField fullWidth size="small" label="Amount (₹)" name="amount" value={wdrForm.amount} onChange={(e) => setWdrForm((f) => ({ ...f, amount: e.target.value }))} inputProps={{ inputMode: "decimal" }} required />
+                    <TextField fullWidth size="small" label="Amount (â‚¹)" name="amount" value={wdrForm.amount} onChange={(e) => setWdrForm((f) => ({ ...f, amount: e.target.value }))} inputProps={{ inputMode: "decimal" }} required />
                     {/* Method fixed to Bank; UPI removed */}
                     <TextField fullWidth size="small" label="Method" name="method" value="bank" disabled />
                   </Stack>
@@ -1389,8 +1397,8 @@ export default function EmployeeDashboard({ embedded = false }) {
                         <TableRow key={t.id}>
                           <TableCell>{t.created_at ? new Date(t.created_at).toLocaleString() : ""}</TableCell>
                           <TableCell>{t.type}</TableCell>
-                          <TableCell>₹{t.amount}</TableCell>
-                          <TableCell>₹{t.balance_after}</TableCell>
+                          <TableCell>â‚¹{t.amount}</TableCell>
+                          <TableCell>â‚¹{t.balance_after}</TableCell>
                           <TableCell>
                             {t.source_type || ""} {t.source_id ? `(${t.source_id})` : ""}
                           </TableCell>
@@ -1486,7 +1494,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                 <Grid item xs={12} sm={6} md={3}>
                   <KpiCard
                     title="Wallet Commission (Coupon Sales)"
-                    value={`₹${luckyCommissionTotal.toFixed(2)}`}
+                    value={`â‚¹${luckyCommissionTotal.toFixed(2)}`}
                     subtitle="Commission from Coupon Sales"
                     palette="amber"
                   />
@@ -1494,7 +1502,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                 <Grid item xs={12} sm={6} md={3}>
                   <KpiCard
                     title="Coupon Commission"
-                    value={`₹${referralCommissionTotal.toFixed(2)}`}
+                    value={`â‚¹${referralCommissionTotal.toFixed(2)}`}
                     subtitle="Coupon commissions"
                     palette="green"
                   />
@@ -1502,7 +1510,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                 <Grid item xs={12} sm={6} md={3}>
                   <KpiCard
                     title="Direct Referral Commission"
-                    value={`₹${walletDirectReferralTotal.toFixed(2)}`}
+                    value={`â‚¹${walletDirectReferralTotal.toFixed(2)}`}
                     subtitle="Wallet earnings from direct referrals"
                     palette="green"
                   />
@@ -1534,12 +1542,20 @@ export default function EmployeeDashboard({ embedded = false }) {
                 <Grid item xs={12} sm={6} md={3}>
                   <KpiCard
                     title="Wallet Balance"
-                    value={`₹${wallet.balance}`}
+                    value={`â‚¹${wallet.balance}`}
                     subtitle="Current Balance"
                     palette="cyan"
                   />
                 </Grid>
               </Grid>
+
+              <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff", mt: 2 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>Prime Packages</Typography>
+                <Typography variant="body2" color="text.secondary">Join Trikonekt Prime packages to unlock exclusive benefits.</Typography>
+                <Button sx={{ mt: 1 }} variant="contained" onClick={() => navigate("/employee/join-prime")}>
+                  Explore Packages
+                </Button>
+              </Paper>
 
               <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff", mt: 2 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>Employment Offer Letter</Typography>
@@ -1552,7 +1568,7 @@ export default function EmployeeDashboard({ embedded = false }) {
               </Paper>
 
               <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mt: 2, bgcolor: "#fbfdff" }}>
-                <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Assign E‑Coupon to Consumer</Typography>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Assign Eâ€‘Coupon to Consumer</Typography>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                   <TextField
                     select
@@ -1567,7 +1583,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                       .filter((c) => c.status === "ASSIGNED_EMPLOYEE")
                       .map((c) => (
                         <MenuItem key={c.id} value={c.id}>
-                          {c.code} {c.value !== undefined ? ` (₹${c.value}) ` : ""}
+                          {c.code} {c.value !== undefined ? ` (â‚¹${c.value}) ` : ""}
                         </MenuItem>
                       ))}
                     {(!codes || codes.length === 0) && (
@@ -1608,10 +1624,10 @@ export default function EmployeeDashboard({ embedded = false }) {
                     Manual Coupon Submissions Awaiting My Approval
                   </Typography>
                   <Box sx={{ mb: 2 }}>
-                    <Alert severity="info">My reviews — Approved: {luckyStats.approved} | Rejected: {luckyStats.rejected}</Alert>
+                    <Alert severity="info">My reviews â€” Approved: {luckyStats.approved} | Rejected: {luckyStats.rejected}</Alert>
                   </Box>
                   <Box sx={{ mb: 2 }}>
-                    <Alert severity="success">My commission earned: ₹{commissionTotal.toFixed(2)}</Alert>
+                    <Alert severity="success">My commission earned: â‚¹{commissionTotal.toFixed(2)}</Alert>
                   </Box>
                   {luckyLoading ? (
                     <Box sx={{ py: 3, display: "flex", alignItems: "center", gap: 1 }}>
@@ -1795,14 +1811,14 @@ export default function EmployeeDashboard({ embedded = false }) {
             <Grid container spacing={2}>
               <Grid item xs={12}>
                 <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My E‑Coupon Codes</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My Eâ€‘Coupon Codes</Typography>
 
-                  {/* Pending E‑Coupon submissions awaiting my approval */}
+                  {/* Pending Eâ€‘Coupon submissions awaiting my approval */}
                   <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2, bgcolor: "#fff" }}>
-                    <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Pending E‑Coupon Submissions Awaiting My Approval</Typography>
+                    <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Pending Eâ€‘Coupon Submissions Awaiting My Approval</Typography>
                     {pendingLoading ? (
                       <Box sx={{ py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
-                        <CircularProgress size={18} /> <Typography variant="body2">Loading…</Typography>
+                        <CircularProgress size={18} /> <Typography variant="body2">Loadingâ€¦</Typography>
                       </Box>
                     ) : pendingError ? (
                       <Alert severity="error">{pendingError}</Alert>
@@ -1841,7 +1857,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                           {(!pendingSubs || pendingSubs.length === 0) && (
                             <TableRow>
                               <TableCell colSpan={6}>
-                                <Typography variant="body2" sx={{ color: "text.secondary" }}>No pending e‑coupon submissions.</Typography>
+                                <Typography variant="body2" sx={{ color: "text.secondary" }}>No pending eâ€‘coupon submissions.</Typography>
                               </TableCell>
                             </TableRow>
                           )}
@@ -1852,7 +1868,7 @@ export default function EmployeeDashboard({ embedded = false }) {
 
                   {/* Assign to Consumer */}
                   <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2, bgcolor: "#fbfdff" }}>
-                    <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Assign E‑Coupon to Consumer</Typography>
+                    <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Assign Eâ€‘Coupon to Consumer</Typography>
                     <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                       <TextField
                         select
@@ -1867,7 +1883,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                           .filter((c) => c.status === "ASSIGNED_EMPLOYEE")
                           .map((c) => (
                             <MenuItem key={c.id} value={c.id}>
-                              {c.code} {c.value !== undefined ? ` (₹${c.value}) ` : ""}
+                              {c.code} {c.value !== undefined ? ` (â‚¹${c.value}) ` : ""}
                             </MenuItem>
                           ))}
                         {(!codes || codes.length === 0) && (
@@ -1910,8 +1926,8 @@ export default function EmployeeDashboard({ embedded = false }) {
                               <Typography variant="caption" sx={{ color: "text.secondary" }}>{c.status}</Typography>
                             </Stack>
                             <Stack direction="row" spacing={1} sx={{ mt: 0.5, color: "text.secondary" }}>
-                              <Typography variant="caption">{c.value !== undefined ? `₹${c.value}` : ""}</Typography>
-                              <Typography variant="caption">• {c.created_at ? new Date(c.created_at).toLocaleString() : ""}</Typography>
+                              <Typography variant="caption">{c.value !== undefined ? `â‚¹${c.value}` : ""}</Typography>
+                              <Typography variant="caption">â€¢ {c.created_at ? new Date(c.created_at).toLocaleString() : ""}</Typography>
                             </Stack>
                             {(c.batch || c.serial || c.assigned_agency_username) ? (
                               <Typography variant="caption" sx={{ display: "block", mt: 0.5, color: "text.secondary" }}>
@@ -1942,7 +1958,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                                 <TableRow key={c.id}>
                                   <TableCell sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>{c.code}</TableCell>
                                   <TableCell>{c.status}</TableCell>
-                                  <TableCell>{c.value !== undefined ? `₹${c.value}` : ""}</TableCell>
+                                  <TableCell>{c.value !== undefined ? `â‚¹${c.value}` : ""}</TableCell>
                                   <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.assigned_agency_username || ""}</TableCell>
                                   <TableCell>{c.created_at ? new Date(c.created_at).toLocaleString() : ""}</TableCell>
                                 </TableRow>
@@ -1967,7 +1983,7 @@ export default function EmployeeDashboard({ embedded = false }) {
               <Grid item xs={12}>
                 <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
                   <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My Commissions</Typography>
-                  <Alert severity="success" sx={{ mb: 2 }}>Commission earned (lifetime): ₹{commissionTotal.toFixed(2)}</Alert>
+                  <Alert severity="success" sx={{ mb: 2 }}>Commission earned (lifetime): â‚¹{commissionTotal.toFixed(2)}</Alert>
                   <Table size="small">
                     <TableHead>
                       <TableRow>
@@ -1982,7 +1998,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                       {(commissions || []).map((c) => (
                         <TableRow key={c.id}>
                           <TableCell>{c.earned_at ? new Date(c.earned_at).toLocaleString() : ""}</TableCell>
-                          <TableCell>₹{c.amount}</TableCell>
+                          <TableCell>â‚¹{c.amount}</TableCell>
                           <TableCell>{c.status}</TableCell>
                           <TableCell>{c.role}</TableCell>
                           <TableCell>{c.coupon_code || ""}</TableCell>
@@ -2005,7 +2021,7 @@ export default function EmployeeDashboard({ embedded = false }) {
             <Grid container spacing={2}>
               <Grid item xs={12}>
                 <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>My Team (5‑Matrix)</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>My Team (5â€‘Matrix)</Typography>
                   <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden", background: "#fff", padding: 12 }}>
                     <TreeReferralGalaxy mode="self" />
                   </div>
@@ -2030,7 +2046,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                     <Alert severity="error">{walletError}</Alert>
                   ) : (
                     <Alert severity="info" sx={{ mb: 2 }}>
-                      Balance: ₹{wallet.balance} {wallet.updated_at ? `— updated ${new Date(wallet.updated_at).toLocaleString()}` : ""}
+                      Balance: â‚¹{wallet.balance} {wallet.updated_at ? `â€” updated ${new Date(wallet.updated_at).toLocaleString()}` : ""}
                     </Alert>
                   )}
 
@@ -2043,7 +2059,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                   ) : null}
                   <Box component="form" onSubmit={submitWithdrawal} sx={{ mb: 2 }}>
                     <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                      <TextField fullWidth size="small" label="Amount (₹)" name="amount" value={wdrForm.amount} onChange={(e) => setWdrForm((f) => ({ ...f, amount: e.target.value }))} inputProps={{ inputMode: "decimal" }} required />
+                      <TextField fullWidth size="small" label="Amount (â‚¹)" name="amount" value={wdrForm.amount} onChange={(e) => setWdrForm((f) => ({ ...f, amount: e.target.value }))} inputProps={{ inputMode: "decimal" }} required />
                       {/* Method fixed to Bank; UPI removed */}
                       <TextField fullWidth size="small" label="Method" name="method" value="bank" disabled />
                     </Stack>
@@ -2079,8 +2095,8 @@ export default function EmployeeDashboard({ embedded = false }) {
                           <TableRow key={t.id}>
                             <TableCell>{t.created_at ? new Date(t.created_at).toLocaleString() : ""}</TableCell>
                             <TableCell>{t.type}</TableCell>
-                            <TableCell>₹{t.amount}</TableCell>
-                            <TableCell>₹{t.balance_after}</TableCell>
+                            <TableCell>â‚¹{t.amount}</TableCell>
+                            <TableCell>â‚¹{t.balance_after}</TableCell>
                             <TableCell>
                               {t.source_type || ""} {t.source_id ? `(${t.source_id})` : ""}
                             </TableCell>
@@ -2106,3 +2122,5 @@ export default function EmployeeDashboard({ embedded = false }) {
     </Box>
   );
 }
+
+

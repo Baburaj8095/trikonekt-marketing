@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+﻿import React, { useEffect, useRef, useState } from "react";
 import { Box, Stack, Typography, Avatar, LinearProgress, CircularProgress } from "@mui/material";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
@@ -79,7 +79,7 @@ function TxItem({ tx }) {
             {Math.abs(amount).toFixed(4)}
           </Typography>
           <Typography sx={{ fontSize: 12, color: tintColor }}>
-            ₹ {fmtAmount(Math.abs(amount))}
+            â‚¹ {fmtAmount(Math.abs(amount))}
           </Typography>
         </Box>
       </Stack>
@@ -268,3 +268,4 @@ export default function History2() {
     </V2PageContainer>
   );
 }
+

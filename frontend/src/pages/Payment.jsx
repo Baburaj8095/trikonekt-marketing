@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Paper,
@@ -245,8 +245,8 @@ export default function Payment() {
                 <TableCell>{String(it.type || "").toUpperCase()}</TableCell>
                 <TableCell>{it.name}</TableCell>
                 <TableCell>{qty}</TableCell>
-                <TableCell>₹{unit.toLocaleString("en-IN")}</TableCell>
-                <TableCell>₹{Number(subtotal).toLocaleString("en-IN")}</TableCell>
+                <TableCell>â‚¹{unit.toLocaleString("en-IN")}</TableCell>
+                <TableCell>â‚¹{Number(subtotal).toLocaleString("en-IN")}</TableCell>
               </TableRow>
             );
           })}
@@ -255,7 +255,7 @@ export default function Payment() {
               Total
             </TableCell>
             <TableCell style={{ fontWeight: 800 }}>
-              ₹{Number(total).toLocaleString("en-IN")}
+              â‚¹{Number(total).toLocaleString("en-IN")}
             </TableCell>
           </TableRow>
         </TableBody>
@@ -352,13 +352,13 @@ export default function Payment() {
       }
     }
 
-    // For e‑coupon orders paid via Manual UPI, enforce UTR + screenshot
+    // For eâ€‘coupon orders paid via Manual UPI, enforce UTR + screenshot
     if ((grouped.ECOUPON || []).length > 0 && paymentMethod === "MANUAL") {
       const hasUtr = String(ecouponPayment.utr || "").trim().length > 0;
       const hasFile = !!ecouponPayment.file;
       if (!hasUtr || !hasFile) {
         try {
-          alert("Enter UTR and attach payment screenshot for e‑coupon orders.");
+          alert("Enter UTR and attach payment screenshot for eâ€‘coupon orders.");
         } catch {}
         return;
       }
@@ -387,7 +387,7 @@ export default function Payment() {
             msg:
               e?.response?.data?.detail ||
               e?.message ||
-              "Failed to submit e‑coupon order.",
+              "Failed to submit eâ€‘coupon order.",
           });
         }
       }
@@ -572,7 +572,7 @@ export default function Payment() {
           <Chip
             size="small"
             color="primary"
-            label={`Total: ₹${Number(total || 0).toLocaleString("en-IN")}`}
+            label={`Total: â‚¹${Number(total || 0).toLocaleString("en-IN")}`}
           />
         </Stack>
       </Stack>
@@ -686,11 +686,11 @@ export default function Payment() {
                     <Grid container spacing={1}>
                       <Grid item xs={12} sm={6} md={4}>
                         <Typography variant="caption" color="text.secondary">Payee</Typography>
-                        <div style={{ fontWeight: 800 }}>{payment.payee_name || "—"}</div>
+                        <div style={{ fontWeight: 800 }}>{payment.payee_name || "â€”"}</div>
                       </Grid>
                       <Grid item xs={12} sm={6} md={4}>
                         <Typography variant="caption" color="text.secondary">UPI ID</Typography>
-                        <div style={{ fontWeight: 800 }}>{payment.upi_id || "—"}</div>
+                        <div style={{ fontWeight: 800 }}>{payment.upi_id || "â€”"}</div>
                       </Grid>
                       <Grid item xs={12}>
                         <Typography variant="caption" color="text.secondary">Instructions</Typography>
@@ -780,11 +780,11 @@ export default function Payment() {
                   <Stack spacing={0.75}>
                     <Stack direction="row" justifyContent="space-between">
                       <Typography variant="caption" color="text.secondary">Available</Typography>
-                      <Typography variant="caption">₹{Number(availablePoints).toLocaleString("en-IN")}</Typography>
+                      <Typography variant="caption">â‚¹{Number(availablePoints).toLocaleString("en-IN")}</Typography>
                     </Stack>
                     <Stack direction="row" justifyContent="space-between">
                       <Typography variant="caption" color="text.secondary">Max this order</Typography>
-                      <Typography variant="caption">₹{Number(redeemMax).toLocaleString("en-IN")}</Typography>
+                      <Typography variant="caption">â‚¹{Number(redeemMax).toLocaleString("en-IN")}</Typography>
                     </Stack>
                   </Stack>
 
@@ -805,7 +805,7 @@ export default function Payment() {
                   <TextField
                     size="small"
                     type="number"
-                    label="Redeem (₹)"
+                    label="Redeem (â‚¹)"
                     value={redeemUse}
                     inputProps={{ min: 0, max: Math.max(0, Math.floor(redeemMax * 100) / 100), step: "1" }}
                     onChange={(e) => {
@@ -830,7 +830,7 @@ export default function Payment() {
                   <Divider sx={{ my: 1 }} />
                   <Stack direction="row" justifyContent="space-between">
                     <Typography variant="body2" color="success.main">Reward Discount</Typography>
-                    <Typography variant="body2" color="success.main">-₹{Number(redeemUse).toLocaleString("en-IN")}</Typography>
+                    <Typography variant="body2" color="success.main">-â‚¹{Number(redeemUse).toLocaleString("en-IN")}</Typography>
                   </Stack>
                 </>
               ) : (
@@ -843,7 +843,7 @@ export default function Payment() {
               <Stack direction="row" justifyContent="space-between" sx={{ alignItems: "center" }}>
                 <Typography variant="body2" sx={{ fontWeight: 800 }}>Total</Typography>
                 <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                  ₹{Math.max(0, Number(total) - Number(redeemUse)).toLocaleString("en-IN")}
+                  â‚¹{Math.max(0, Number(total) - Number(redeemUse)).toLocaleString("en-IN")}
                 </Typography>
               </Stack>
 
@@ -886,3 +886,4 @@ export default function Payment() {
     </Box>
   );
 }
+

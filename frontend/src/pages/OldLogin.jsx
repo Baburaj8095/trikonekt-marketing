@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../api/api";
 import {
@@ -212,14 +212,14 @@ export default function Login() {
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
             <CircularProgress size={18} />
             <Typography variant="body2" color="text.secondary">
-              Detecting your location…
+              Detecting your locationâ€¦
             </Typography>
           </Box>
         ) : null}
 
         {!autoLoading && typeof accuracy === "number" && accuracy > 800 ? (
           <Alert severity="warning" sx={{ mb: 1 }}>
-            GPS accuracy is low (±{Math.round(accuracy)}m). Select your branch manually.
+            GPS accuracy is low (Â±{Math.round(accuracy)}m). Select your branch manually.
           </Alert>
         ) : null}
 
@@ -322,3 +322,4 @@ export default function Login() {
     </Container>
   );
 }
+

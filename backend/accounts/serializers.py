@@ -582,6 +582,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         - Pincode Agency: TRPN+phone
         - State Agency: TRST+phone
         - District Agency: TRDT+phone
+        - Merchant: TRBS+phone
         - Business: TRBS+phone
         - Coordinators (state/district/pincode): unchanged scheme -> use phone only (no prefix)
         """
@@ -601,6 +602,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             'agency_state': 'TRST',
             'agency_district': 'TRDT',
             'business': 'TRBS',
+            'merchant': 'TRBS',
         }
 
         if category in coordinator_cats:

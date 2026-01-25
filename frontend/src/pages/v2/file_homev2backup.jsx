@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import {
   AppBar,
   Toolbar,
@@ -62,7 +62,7 @@ export default function HomeV2() {
             Turn Everyday Spending Into Earnings
           </Typography>
           <Typography sx={{ color: "#666", mt: 1 }}>
-            Shop · Connect · Earn · Grow
+            Shop Â· Connect Â· Earn Â· Grow
           </Typography>
 
           <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
@@ -190,9 +190,9 @@ export default function HomeV2() {
 
         <Box sx={{ display: "flex", gap: 2, overflowX: "auto" }}>
           {[
-            { title: "PRIME", price: "₹150", cta: "Join Prime" },
-            { title: "PROMO", price: "₹750", cta: "Join Promo" },
-            { title: "MONTHLY", price: "₹759", cta: "Subscribe" }
+            { title: "PRIME", price: "â‚¹150", cta: "Join Prime" },
+            { title: "PROMO", price: "â‚¹750", cta: "Join Promo" },
+            { title: "MONTHLY", price: "â‚¹759", cta: "Subscribe" }
           ].map((pkg, i) => (
             <Card
               key={i}
@@ -228,10 +228,10 @@ export default function HomeV2() {
         <Divider sx={{ mb: 2 }} />
         <Typography fontWeight={700}>TRIKONEKT</Typography>
         <Typography fontSize={14} color="text.secondary">
-          About · Support · Terms · Privacy
+          About Â· Support Â· Terms Â· Privacy
         </Typography>
         <Typography fontSize={12} color="text.secondary" mt={1}>
-          © 2025 TRIKONEKT
+          Â© 2025 TRIKONEKT
         </Typography>
       </Container>
 
@@ -254,3 +254,4 @@ export default function HomeV2() {
     </Box>
   );
 }
+

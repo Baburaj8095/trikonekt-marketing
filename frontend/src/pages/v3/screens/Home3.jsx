@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API, { listMyPromoPurchases } from "../../../api/api";
 import AppsGrid from "../../../components/AppsGrid";
 
 // Assets (reuse same ones as v2)
-import LOGO from "../../../assets/TRIKONEKT.png";
+import LOGO from "../../../assets/TRIKONEKT.jpg";
 import banner_wg from "../../../assets/Wealth_Galaxy.jpg";
 import imgGiftCards from "../../../assets/gifts.jpg";
 import imgEcommerce from "../../../assets/ecommerce.jpg";
@@ -97,7 +97,7 @@ export default function Home3() {
       { key: "wealth-galaxy", label: "Wealth Galaxy", route: "/user/wealth-galaxy", image: banner_wg },
       { key: "prime", label: "Prime", route: "/user/promo-packages", image: LOGO },
       { key: "bill-recharge", label: "Bill & Recharge", comingSoon: true, image: imgBillRecharge },
-      { key: "ecommerce", label: "E‑commerce", route: "/trikonekt-products", image: imgEcommerce },
+      { key: "ecommerce", label: "Eâ€‘commerce", route: "/trikonekt-products", image: imgEcommerce },
       { key: "tri-holidays", label: "TRI Holidays", route: "/user/tri/tri-holidays", image: imgHolidays },
       { key: "tri-furniture", label: "TRI Furniture", route: "/user/tri/tri-furniture", image: imgFurniture },
       { key: "tri-electronics", label: "TRI Electronics", route: "/user/tri/tri-electronics", image: imgPlaystoreScreen },
@@ -115,7 +115,7 @@ export default function Home3() {
         it.key === "prime"
           ? {
               ...it,
-              badgeText: isPrime ? "Prime" : "Non‑Prime",
+              badgeText: isPrime ? "Prime" : "Nonâ€‘Prime",
               badgeBg: isPrime ? "#16a34a" : "#6b7280",
               badgeFg: "#fff",
             }
@@ -197,3 +197,5 @@ export default function Home3() {
     </div>
   );
 }
+
+

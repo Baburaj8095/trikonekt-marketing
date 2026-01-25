@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import {
   Box,
   Container,
@@ -39,13 +39,26 @@ export default function AgencyPrimeApproval() {
   const [payFile, setPayFile] = React.useState(null);
   const [submitting, setSubmitting] = React.useState(false);
 
+  // Catalog of allowed packages for this agency category
+  const [catalog, setCatalog] = React.useState([]);
+  const [catalogLoading, setCatalogLoading] = React.useState(false);
+  const [catalogError, setCatalogError] = React.useState("");
+
   const loadAssignments = async () => {
     try {
       setLoading(true);
       setError("");
-      const res = await API.get("/business/agency-packages/", { retryAttempts: 1, cacheTTL: 3000 });
+      setCatalogLoading(true);
+      setCatalogError("");
+      const nowTs = Date.now();
+      const [res, catRes] = await Promise.all([
+        API.get("/business/agency-packages/", { params: { include_inactive: "false", _ts: nowTs }, retryAttempts: 1 }),
+        API.get("/business/agency-packages/catalog/", { params: { _ts: nowTs }, retryAttempts: 1 }),
+      ]);
       const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
       setAssignments(arr || []);
+      const cat = Array.isArray(catRes.data) ? catRes.data : catRes.data?.results || [];
+      setCatalog(cat || []);
     } catch (e) {
       const msg =
         e?.response?.data?.detail ||
@@ -54,8 +67,17 @@ export default function AgencyPrimeApproval() {
         "Failed to load Agency Prime Package requests.";
       setError(String(msg));
       setAssignments([]);
+
+      const cmsg =
+        e?.response?.data?.detail ||
+        (typeof e?.response?.data === "string" ? e.response.data : "") ||
+        e?.message ||
+        "Failed to load available packages.";
+      setCatalogError(String(cmsg));
+      setCatalog([]);
     } finally {
       setLoading(false);
+      setCatalogLoading(false);
     }
   };
 
@@ -66,10 +88,10 @@ export default function AgencyPrimeApproval() {
   const fmt = (n) => {
     try {
       const x = Number(n);
-      if (!isFinite(x)) return `₹${String(n || 0)}`;
-      return `₹${x.toLocaleString("en-IN")}`;
+      if (!isFinite(x)) return `â‚¹${String(n || 0)}`;
+      return `â‚¹${x.toLocaleString("en-IN")}`;
     } catch {
-      return `₹${String(n || 0)}`;
+      return `â‚¹${String(n || 0)}`;
     }
   };
 
@@ -77,7 +99,7 @@ export default function AgencyPrimeApproval() {
     setSelected(assn);
     // default amount = remaining amount on the assignment
     let rem = assn?.remaining_amount;
-    let num = parseFloat(String(rem || "").replace(/[,₹\s]/g, ""));
+    let num = parseFloat(String(rem || "").replace(/[,â‚¹\s]/g, ""));
     setPayAmount(Number.isFinite(num) && num > 0 ? String(num) : "");
     setPayUTR("");
     setPayFile(null);
@@ -94,7 +116,7 @@ export default function AgencyPrimeApproval() {
     try {
       setSubmitting(true);
       // Basic validations
-      const amtNum = parseFloat(String(payAmount || "").replace(/[,₹\s]/g, ""));
+      const amtNum = parseFloat(String(payAmount || "").replace(/[,â‚¹\s]/g, ""));
       if (!Number.isFinite(amtNum) || amtNum <= 0) {
         window.alert("Enter a valid amount (> 0).");
         setSubmitting(false);
@@ -151,6 +173,22 @@ export default function AgencyPrimeApproval() {
     }
   };
 
+  // Select an available package (creates assignment) then refresh lists
+  const assignPackage = async (pkgId) => {
+    try {
+      await API.post("/business/agency-packages/assign/", { package_id: pkgId });
+      await loadAssignments();
+      try { window.alert("Package selected."); } catch {}
+    } catch (e) {
+      const msg =
+        e?.response?.data?.detail ||
+        (typeof e?.response?.data === "string" ? e.response.data : "") ||
+        e?.message ||
+        "Failed to select package.";
+      window.alert(String(msg));
+    }
+  };
+
   const goToPrimePackages = () => navigate("/agency/prime-package");
 
   const statusChip = (status) => {
@@ -163,6 +201,24 @@ export default function AgencyPrimeApproval() {
     if (s === "pending") color = "info";
     return <Chip size="small" label={label} color={color} />;
   };
+
+  // Derived: package IDs already assigned to this user
+  const assignedPkgIds = React.useMemo(() => {
+    const s = new Set();
+    (assignments || []).forEach((a) => {
+      const pid = a?.package?.id;
+      if (pid) s.add(pid);
+    });
+    return s;
+  }, [assignments]);
+
+  // Only show assignments whose package is still active (hide when admin disables the package)
+  const displayedAssignments = React.useMemo(() => {
+    return (assignments || []).filter((a) => {
+      const v = a?.package?.is_active;
+      return v === true || String(v).toLowerCase() === "true";
+    });
+  }, [assignments]);
 
   return (
     <Container maxWidth="lg" sx={{ px: { xs: 0, md: 0 } }}>
@@ -179,7 +235,7 @@ export default function AgencyPrimeApproval() {
         Review your Prime Package requests. Submit payment details for admin approval.
       </Typography>
 
-      <Box sx={{ mb: 2 }}>
+      {/* <Box sx={{ mb: 2 }}>
         <Button
           variant="contained"
           onClick={goToPrimePackages}
@@ -187,16 +243,16 @@ export default function AgencyPrimeApproval() {
         >
           Add/Change Package
         </Button>
-      </Box>
+      </Box> */}
 
       {error ? <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert> : null}
       {loading ? (
         <Box sx={{ py: 4, display: "flex", justifyContent: "center" }}>
           <CircularProgress size={24} />
         </Box>
-      ) : (assignments || []).length > 0 ? (
+      ) : (displayedAssignments || []).length > 0 ? (
         <Grid container spacing={2}>
-          {(assignments || []).map((a) => {
+          {(displayedAssignments || []).map((a) => {
             const pkgName = a?.package?.name || a?.package?.code || "Prime Package";
             const st = a?.status || "Pending";
             return (
@@ -215,7 +271,7 @@ export default function AgencyPrimeApproval() {
                 >
                   <CardContent sx={{ display: "flex", flexDirection: "column", gap: 1, flex: 1 }}>
                     <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 1.5 }}>
-                      SUB‑FRANCHISE
+                      SUBâ€‘FRANCHISE
                     </Typography>
                     <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
                       <Typography variant="h6" sx={{ fontWeight: 900 }}>{pkgName}</Typography>
@@ -250,13 +306,13 @@ export default function AgencyPrimeApproval() {
                       >
                         Submit Payment
                       </Button>
-                      <Button
+                      {/* <Button
                         variant="outlined"
                         sx={{ fontWeight: 800, borderRadius: 2 }}
                         onClick={() => requestAdminApproval(a)}
                       >
                         Request Admin Approval
-                      </Button>
+                      </Button> */}
                     </Box>
                   </CardContent>
                 </Card>
@@ -269,6 +325,86 @@ export default function AgencyPrimeApproval() {
           No Prime Package requests found. Click "Add/Change Package" to create a new request.
         </Alert>
       )}
+
+      {/* Available packages for this agency role */}
+      <Box sx={{ mt: 3 }}>
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>Available Packages</Typography>
+          <Button variant="outlined" size="small" onClick={loadAssignments}>Refresh</Button>
+        </Box>
+        {catalogLoading ? (
+          <Box sx={{ py: 3, display: "flex", justifyContent: "center" }}>
+            <CircularProgress size={20} />
+          </Box>
+        ) : catalogError ? (
+          <Alert severity="error">{catalogError}</Alert>
+        ) : (
+          (() => {
+            const available = (catalog || []).filter((p) => {
+              if (!p) return false;
+              const active = p.is_active === true || String(p.is_active).toLowerCase() === "true";
+              return active && !assignedPkgIds.has(p.id);
+            });
+            if (available.length === 0) {
+              return <Alert severity="info">No additional packages available for your role.</Alert>;
+            }
+            return (
+              <Grid container spacing={2}>
+                {available.map((p) => (
+                  <Grid item xs={12} md={6} lg={4} key={p.id}>
+                    <Card
+                      elevation={0}
+                      sx={{
+                        height: "100%",
+                        borderRadius: 3,
+                        border: "1px solid #e5e7eb",
+                        background: "linear-gradient(180deg,#ffffff 0%, #f8fafc 100%)",
+                        display: "flex",
+                        flexDirection: "column",
+                      }}
+                    >
+                      <CardContent sx={{ display: "flex", flexDirection: "column", gap: 1, flex: 1 }}>
+                        <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 1.5 }}>
+                          PRIME PACKAGE
+                        </Typography>
+                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+                          <Typography variant="h6" sx={{ fontWeight: 900 }}>{p.name || p.code}</Typography>
+                          <Chip size="small" label={p.assigned ? "Assigned" : "Available"} color={p.assigned ? "success" : "default"} />
+                        </Box>
+                        <Grid container spacing={1}>
+                          <Grid item xs={6}>
+                            <Box sx={{ p: 1, borderRadius: 1, background: "#f1f5f9" }}>
+                              <Typography variant="caption" color="text.secondary">Amount</Typography>
+                              <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>{fmt(p.amount)}</Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={6}>
+                            <Box sx={{ p: 1, borderRadius: 1, background: "#f1f5f9" }}>
+                              <Typography variant="caption" color="text.secondary">Code</Typography>
+                              <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>{p.code}</Typography>
+                            </Box>
+                          </Grid>
+                        </Grid>
+                        <Box sx={{ mt: "auto", display: "flex", gap: 1, flexWrap: "wrap" }}>
+                          {p.assigned ? (
+                            <Button variant="contained" disabled sx={{ fontWeight: 800, borderRadius: 2 }}>
+                              Already Assigned
+                            </Button>
+                          ) : (
+                            <Button variant="contained" sx={{ fontWeight: 800, borderRadius: 2 }} onClick={() => assignPackage(p.id)}>
+                              Select Package
+                            </Button>
+                          )}
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            );
+          })()
+        )}
+      </Box>
 
       <Dialog open={payDialogOpen} onClose={closePayDialog} fullWidth maxWidth="sm">
         <DialogTitle>Submit Payment for Prime Package</DialogTitle>
@@ -305,7 +441,7 @@ export default function AgencyPrimeApproval() {
               </Typography>
               <Stack direction="row" spacing={1} alignItems="center">
                 <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
-                  {selected?.package?.upi_id || "—"}
+                  {selected?.package?.upi_id || "â€”"}
                 </Typography>
                 {selected?.package?.upi_id ? (
                   <Tooltip title="Copy UPI ID">
@@ -330,7 +466,7 @@ export default function AgencyPrimeApproval() {
 
           <Stack spacing={2}>
             <TextField
-              label="Amount Paid (₹)"
+              label="Amount Paid (â‚¹)"
               value={payAmount}
               onChange={(e) => setPayAmount(e.target.value)}
               fullWidth
@@ -377,3 +513,4 @@ export default function AgencyPrimeApproval() {
     </Container>
   );
 }
+

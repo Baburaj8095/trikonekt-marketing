@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Typography, Button } from "@mui/material";
 import ProductCard from "./ProductCard";
 import ProductSkeleton from "./ProductSkeleton";
@@ -37,3 +37,4 @@ function ProductStrip({ title, products }) {
 }
 
 export default React.memo(ProductStrip);
+

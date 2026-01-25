@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Container, Typography } from "@mui/material";
 import PublicNavbar from "../components/PublicNavbar";
 import Footer from "../components/Footer";
@@ -15,14 +15,14 @@ export default function AboutPage() {
 
         <Typography color="text.secondary" maxWidth={800}>
           Trikonekt is a smart digital platform built to connect people, businesses, and
-          opportunities into one powerful network. Through our Connect → Earn → Grow model,
+          opportunities into one powerful network. Through our Connect â†’ Earn â†’ Grow model,
           everyday spending and interactions are transformed into meaningful income and
-          long‑term growth.
+          longâ€‘term growth.
         </Typography>
 
         <Typography mt={3} color="text.secondary" maxWidth={800}>
-          Explore shopping, services, rewards, and business tools — all in a single unified
-          ecosystem designed for transparency and long‑term value creation.
+          Explore shopping, services, rewards, and business tools â€” all in a single unified
+          ecosystem designed for transparency and longâ€‘term value creation.
         </Typography>
       </Container>
 
@@ -30,3 +30,4 @@ export default function AboutPage() {
     </Box>
   );
 }
+

@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+﻿import React, { useMemo, useState, useEffect } from "react";
 import {
   AppBar,
   Toolbar,
@@ -12,7 +12,7 @@ import {
   Alert,
 } from "@mui/material";
 import API from "../api/api";
-import LOGO from "../assets/TRIKONEKT.png";
+import LOGO from "../assets/TRIKONEKT.jpg";
 
 export default function RedeemCoupon() {
   const storedUser = useMemo(() => {
@@ -211,8 +211,8 @@ export default function RedeemCoupon() {
                 {(mySubs || []).map((s) => (
                   <li key={s.id} style={{ marginBottom: 8 }}>
                     <Typography variant="body2">
-                      <strong>Code:</strong> {s.coupon_code} — <strong>Status:</strong> {statusLabel(s.status)}{" "}
-                      {s.created_at ? `— ${new Date(s.created_at).toLocaleString()}` : ""}
+                      <strong>Code:</strong> {s.coupon_code} â€” <strong>Status:</strong> {statusLabel(s.status)}{" "}
+                      {s.created_at ? `â€” ${new Date(s.created_at).toLocaleString()}` : ""}
                     </Typography>
                   </li>
                 ))}
@@ -224,3 +224,5 @@ export default function RedeemCoupon() {
     </Box>
   );
 }
+
+

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+﻿import React, { useCallback, useMemo, useState } from "react";
 import {
   Container,
   Paper,
@@ -35,7 +35,7 @@ export default function AdminReports() {
       { field: "wg_registered", headerName: "WG", minWidth: 80 },
       { field: "asia_pay_registered", headerName: "Asia Pay", minWidth: 110 },
       { field: "dm_account_registered", headerName: "DM Acc", minWidth: 110 },
-      { field: "e_coupon_issued", headerName: "E‑Coupon", minWidth: 110 },
+      { field: "e_coupon_issued", headerName: "Eâ€‘Coupon", minWidth: 110 },
       { field: "physical_coupon_issued", headerName: "Physical", minWidth: 110 },
       { field: "product_sold", headerName: "Products", minWidth: 110 },
       { field: "total_amount", headerName: "Total Amount", minWidth: 140 },
@@ -157,7 +157,7 @@ export default function AdminReports() {
                 >
                   <MenuItem value="ALL">All</MenuItem>
                   <MenuItem value="EMPLOYEE">Employee</MenuItem>
-                  <MenuItem value="SUBFRANCHISE">Sub‑Franchise</MenuItem>
+                  <MenuItem value="SUBFRANCHISE">Subâ€‘Franchise</MenuItem>
                 </Select>
               </FormControl>
               <TextField
@@ -210,3 +210,4 @@ export default function AdminReports() {
     </Container>
   );
 }
+

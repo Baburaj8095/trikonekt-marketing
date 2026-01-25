@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Box } from "@mui/material";
 import cardTokens from "../theme/card";
 
@@ -37,3 +37,4 @@ export default function V2Card({ children, sx = {}, hover = true, ...rest }) {
     </Box>
   );
 }
+

@@ -59,7 +59,7 @@ import {
 
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import API from "../../api/api";
-import LOGO from "../../assets/TRIKONEKT.png";
+import LOGO from "../../assets/TRIKONEKT.jpeg";
 
 const Login = () => {
   // === LOGIC STATES (kept from original) ===

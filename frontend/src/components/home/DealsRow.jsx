@@ -1,4 +1,4 @@
-import { Box, Typography } from "@mui/material";
+﻿import { Box, Typography } from "@mui/material";
 
 export default function DealsRow({ items }) {
   return (
@@ -20,3 +20,4 @@ export default function DealsRow({ items }) {
     </Box>
   );
 }
+

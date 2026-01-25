@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { listMyPromoPurchases } from "../../api/api";
 import "./V3Theme.css";
@@ -104,7 +104,7 @@ export default function UserDashboard3Shell() {
             <div className="v3-muted" style={{ fontSize: 12 }}>Welcome back</div>
           </div>
           <div className="v3-balance-pill">
-            {isPrime ? "Prime" : "Non‑Prime"}
+            {isPrime ? "Prime" : "Nonâ€‘Prime"}
           </div>
         </div>
 
@@ -120,7 +120,7 @@ export default function UserDashboard3Shell() {
             onClick={() => go("home")}
             aria-label="Dashboard"
           >
-            <div>🏠</div>
+            <div>ðŸ </div>
             <div>Dashboard</div>
           </button>
           <button
@@ -128,7 +128,7 @@ export default function UserDashboard3Shell() {
             onClick={() => go("wallet")}
             aria-label="Wallet"
           >
-            <div>💳</div>
+            <div>ðŸ’³</div>
             <div>Wallet</div>
           </button>
           <button
@@ -136,7 +136,7 @@ export default function UserDashboard3Shell() {
             onClick={() => go("history")}
             aria-label="History"
           >
-            <div>📜</div>
+            <div>ðŸ“œ</div>
             <div>History</div>
           </button>
           <button
@@ -144,7 +144,7 @@ export default function UserDashboard3Shell() {
             onClick={() => go("orders")}
             aria-label="Orders"
           >
-            <div>🧾</div>
+            <div>ðŸ§¾</div>
             <div>Orders</div>
           </button>
           <button
@@ -152,7 +152,7 @@ export default function UserDashboard3Shell() {
             onClick={() => go("profile")}
             aria-label="Profile"
           >
-            <div>👤</div>
+            <div>ðŸ‘¤</div>
             <div>Profile</div>
           </button>
         </div>
@@ -160,3 +160,4 @@ export default function UserDashboard3Shell() {
     </div>
   );
 }
+

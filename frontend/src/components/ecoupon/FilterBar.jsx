@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import {
   Box,
   Stack,
@@ -88,7 +88,7 @@ export default function FilterBar({
         >
           {denomOptions.map((d) => (
             <option key={d} value={d}>
-              {d === "all" ? "All" : `₹${d}`}
+              {d === "all" ? "All" : `â‚¹${d}`}
             </option>
           ))}
         </TextField>
@@ -112,7 +112,7 @@ export default function FilterBar({
             />
             <Chip
               size="small"
-              label={`₹${Math.round(priceRange[0])} - ₹${Math.round(priceRange[1])}`}
+              label={`â‚¹${Math.round(priceRange[0])} - â‚¹${Math.round(priceRange[1])}`}
               variant="outlined"
             />
           </Stack>
@@ -134,3 +134,4 @@ export default function FilterBar({
     </Box>
   );
 }
+

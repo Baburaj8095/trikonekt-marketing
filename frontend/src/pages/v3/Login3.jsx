@@ -1,4 +1,4 @@
-// Login3.jsx — v3 Dark + Teal UX (logic preserved from Auth/Login.jsx)
+﻿// Login3.jsx â€” v3 Dark + Teal UX (logic preserved from Auth/Login.jsx)
 // Notes:
 // - All logic, state, API calls, and flows are kept the same as src/pages/Auth/Login.jsx
 // - Only the UI/UX styling is changed to match the attached dark sketch
@@ -61,7 +61,7 @@ import {
 
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import API from "../../api/api";
-import LOGO from "../../assets/TRIKONEKT.png";
+import LOGO from "../../assets/TRIKONEKT.jpg";
 import "./V3Theme.css";
 
 const Login3 = () => {
@@ -1134,14 +1134,12 @@ const Login3 = () => {
     try {
       const r = await API.get("/accounts/hierarchy/", { params: { username: String(uname || "").trim() } });
       const u = r?.data?.user || r?.data || {};
-      let ro = (u?.role || "").toLowerCase();
-      if (!ro) {
-        const c = (u?.category || "").toLowerCase();
-        if (c.startsWith("agency")) ro = "agency";
-        else if (c === "consumer") ro = "user";
-        else if (c === "employee") ro = "employee";
-        else if (c === "business") ro = "business";
-      }
+      const c = String(u?.category || "").toLowerCase();
+      if (c.startsWith("agency")) return "agency";
+      if (c === "business" || c === "merchant") return "business";
+      if (c === "employee") return "employee";
+      if (c === "consumer") return "user";
+      const ro = String(u?.role || "").toLowerCase();
       return ro || null;
     } catch {
       return null;
@@ -1152,12 +1150,13 @@ const Login3 = () => {
     e.preventDefault();
     try {
       let username = (formData.username || "").trim();
-      const submitRole = role;
+      let submitRole = role;
 
       const resolved = await resolveRegisteredRole(username);
       if (resolved && resolved !== submitRole) {
-        setErrorMsg(`You are registered as ${prettyRole(resolved)} but trying to login as ${prettyRole(submitRole)}.`);
-        return;
+        submitRole = resolved;
+        try { setRole(resolved); } catch (_) {}
+        setSuccessMsg(`Detected account type ${prettyRole(resolved)}. Proceeding with ${prettyRole(resolved)} login.`);
       }
 
       const res = await API.post("/accounts/login/", {
@@ -1181,7 +1180,7 @@ const Login3 = () => {
         (String(payload?.category || "").toLowerCase() === "business" ? "business" : tokenRole);
 
       const ns = (payload?.is_staff || payload?.is_superuser) ? "admin" : (roleEffective || tokenRole || "user");
-      const store = remember ? localStorage : sessionStorage;
+      const store = localStorage;
 
       try {
         localStorage.removeItem("token");
@@ -2031,7 +2030,7 @@ const Login3 = () => {
                     {sponsorChecking && (
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
                         <CircularProgress size={16} />
-                        <Typography variant="body2" color="text.secondary">Validating sponsor…</Typography>
+                        <Typography variant="body2" color="text.secondary">Validating sponsorâ€¦</Typography>
                       </Box>
                     )}
                     {sponsorValid === true && (
@@ -2175,7 +2174,7 @@ const Login3 = () => {
 
       {/* Footer */}
       <Box sx={{ py: 2.5, textAlign: "center", background: "var(--v3-bg)", borderTop: "1px solid var(--v3-border)", color: "var(--v3-muted)" }}>
-        <Typography variant="body2">© {new Date().getFullYear()} Trikonekt. All rights reserved.</Typography>
+        <Typography variant="body2">Â© {new Date().getFullYear()} Trikonekt. All rights reserved.</Typography>
         <Typography variant="body2" sx={{ mt: 1 }}>
           Contact us:{" "}
           <Link
@@ -2193,3 +2192,5 @@ const Login3 = () => {
 };
 
 export default Login3;
+
+

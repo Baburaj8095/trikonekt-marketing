@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import ModelListSimple from "../dynamic/ModelListSimple";
 
 /**
@@ -8,3 +8,4 @@ import ModelListSimple from "../dynamic/ModelListSimple";
 export default function UsersPage() {
   return <ModelListSimple app="accounts" model="customuser" />;
 }
+

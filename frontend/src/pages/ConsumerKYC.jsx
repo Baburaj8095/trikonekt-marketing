@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import {
   Typography,
   Box,
@@ -240,3 +240,4 @@ export default function ConsumerKYC() {
     </Container>
   );
 }
+

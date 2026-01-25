@@ -1,4 +1,4 @@
-// src/components/Auth/Register.js
+﻿// src/components/Auth/Register.js
 import React, { useState, useEffect } from "react";
 import {
   TextField,
@@ -244,3 +244,4 @@ const Register = () => {
 };
 
 export default Register;
+

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+﻿import React, { useMemo, useState } from "react";
 import {
   Box,
   Paper,
@@ -130,7 +130,7 @@ export default function OrdersList({
                     </Stack>
 
                     <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                      {o.product_title || o.product || "E‑Coupon"}
+                      {o.product_title || o.product || "Eâ€‘Coupon"}
                     </Typography>
 
                     <Stack
@@ -143,7 +143,7 @@ export default function OrdersList({
                         Denomination:
                       </Typography>
                       <Typography variant="caption" sx={{ fontWeight: 800 }}>
-                        ₹{o.denomination_snapshot}
+                        â‚¹{o.denomination_snapshot}
                       </Typography>
 
                       <Typography variant="caption" color="text.secondary">
@@ -157,7 +157,7 @@ export default function OrdersList({
                         Total:
                       </Typography>
                       <Typography variant="caption" sx={{ fontWeight: 800 }}>
-                        ₹{Number(o.amount_total || 0).toLocaleString("en-IN")}
+                        â‚¹{Number(o.amount_total || 0).toLocaleString("en-IN")}
                       </Typography>
                     </Stack>
 
@@ -168,7 +168,7 @@ export default function OrdersList({
                       <Typography variant="caption">
                         {o.reviewed_at
                           ? new Date(o.reviewed_at).toLocaleString()
-                          : "—"}
+                          : "â€”"}
                       </Typography>
                     </Stack>
 
@@ -210,3 +210,4 @@ export default function OrdersList({
     </Paper>
   );
 }
+

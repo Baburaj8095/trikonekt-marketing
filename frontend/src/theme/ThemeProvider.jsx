@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { ThemeProvider as MuiThemeProvider, createTheme } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 
@@ -217,3 +217,4 @@ export default function ThemeProvider({ children }) {
     </MuiThemeProvider>
   );
 }
+

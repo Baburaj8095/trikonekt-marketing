@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../../api/api";
 import { getAdminMeta } from "../../admin-panel/api/adminMeta";
+import RequirePermission from "../../components/admin/RequirePermission";
 
 function paletteStyles(key) {
   // Solid, high-contrast gradients for colored cards with elevated shadows
@@ -195,7 +196,7 @@ function Card({ title, value, subtitle, onClick, palette = "blue" }) {
  * AdminDashboard
  * - Merged overview counters and Admin Models into a single responsive card grid.
  * - Keeps only the requested account counters: Users, Withdrawal Requests, User KYC, Wallets, Transactions.
- * - Removed Quick Actions and Recent E‑Coupon Assignments sections as requested.
+ * - Removed Quick Actions and Recent Eâ€‘Coupon Assignments sections as requested.
  */
 export default function AdminDashboard() {
   const [data, setData] = useState(null);
@@ -207,6 +208,7 @@ export default function AdminDashboard() {
   const [modelsErr, setModelsErr] = useState("");
   const nav = useNavigate();
   const didRunRef = React.useRef(false);
+
 
   // Admin: Agency Package Cards
   const [agencyQuery, setAgencyQuery] = useState("");
@@ -322,9 +324,40 @@ export default function AdminDashboard() {
     };
   }, []);
 
+
+
   const users = data?.users || {};
   const wallets = data?.wallets || {};
   const withdrawals = data?.withdrawals || {};
+
+  // User category KPI counts
+  const [catCounts, setCatCounts] = useState({});
+  const [catErr, setCatErr] = useState("");
+  const [catLoading, setCatLoading] = useState(false);
+
+  // Load user category counts (aggregated endpoint)
+  useEffect(() => {
+    let mounted = true;
+    async function loadCounts() {
+      try {
+        setCatLoading(true);
+        setCatErr("");
+        const res = await API.get("admin/users/category-counts/", { timeout: 8000, retryAttempts: 0 });
+        if (!mounted) return;
+        const obj = res?.data || {};
+        setCatCounts(obj);
+      } catch (_e) {
+        if (mounted) {
+          setCatErr("Failed to load category counts");
+          setCatCounts({});
+        }
+      } finally {
+        if (mounted) setCatLoading(false);
+      }
+    }
+    loadCounts();
+    return () => { mounted = false; };
+  }, []);
 
   // Group models by app with de-duplication
   const modelsByApp = React.useMemo(() => {
@@ -344,7 +377,8 @@ export default function AdminDashboard() {
   }, [modelsMeta]);
 
   return (
-    <div>
+    <RequirePermission anyOf={["reports_basic", "manage_dashboard", "show_dashboard"]}>
+      <div>
       {/* Page heading */}
       <div
         style={{
@@ -405,7 +439,7 @@ export default function AdminDashboard() {
                 const bg = statusBg(st);
                 const color = inactive ? "#fff" : "#0f172a";
                 const title = p?.package?.name || p?.package?.code || "Package";
-                const mark = inactive ? "✗" : "✓";
+                const mark = inactive ? "âœ—" : "âœ“";
                 const stText = inactive ? "Inactive" : st === "partial" ? "Partial" : "Active";
                 return (
                   <div key={p.id} style={{ padding: 12, borderRadius: 12, background: bg, color, boxShadow: "0 8px 18px rgba(0,0,0,0.12)", border: "1px solid rgba(0,0,0,0.05)", boxSizing: "border-box", minWidth: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%" }}>
@@ -419,19 +453,19 @@ export default function AdminDashboard() {
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 8, marginTop: 8, width: "100%", minWidth: 0 }}>
                       <div style={{ padding: 8, borderRadius: 8, background: "rgba(255,255,255,0.15)", minWidth: 0 }}>
                       <div style={{ fontSize: 12, opacity: 0.9, color: inactive ? "#f1f5f9" : "#0f172a" }}>Amount</div>
-                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a", whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere", minWidth: 0 }}>₹{p.total_amount || "0.00"}</div>
+                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a", whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere", minWidth: 0 }}>â‚¹{p.total_amount || "0.00"}</div>
                       </div>
                       <div style={{ padding: 8, borderRadius: 8, background: "rgba(255,255,255,0.15)", minWidth: 0 }}>
                       <div style={{ fontSize: 12, opacity: 0.9, color: inactive ? "#f1f5f9" : "#0f172a" }}>Paid</div>
-                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a", whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere", minWidth: 0 }}>₹{p.paid_amount || "0.00"}</div>
+                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a", whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere", minWidth: 0 }}>â‚¹{p.paid_amount || "0.00"}</div>
                       </div>
                       <div style={{ padding: 8, borderRadius: 8, background: "rgba(255,255,255,0.15)", minWidth: 0 }}>
                       <div style={{ fontSize: 12, opacity: 0.9, color: inactive ? "#f1f5f9" : "#0f172a" }}>Remaining</div>
-                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a", whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere", minWidth: 0 }}>₹{p.remaining_amount || "0.00"}</div>
+                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a", whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere", minWidth: 0 }}>â‚¹{p.remaining_amount || "0.00"}</div>
                       </div>
                     </div>
                     <div style={{ marginTop: 6, fontSize: 12, fontWeight: 700, whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere" }}>
-                      Renewal: {typeof p.months_remaining === "number" ? `${p.months_remaining} month${p.months_remaining === 1 ? "" : "s"} remaining` : "—"}
+                      Renewal: {typeof p.months_remaining === "number" ? `${p.months_remaining} month${p.months_remaining === 1 ? "" : "s"} remaining` : "â€”"}
                     </div>
                   </div>
                 );
@@ -457,35 +491,53 @@ export default function AdminDashboard() {
               gap: 12,
             }}
           >
+            {/* User category KPIs */}
+            <>
+              <Card
+                title="Consumers"
+                value={(catCounts.consumer ?? 0)}
+                subtitle=""
+                onClick={() => nav("/admin/users?category=consumer")}
+                palette="blue"
+              />
+              <Card
+                title="State Coordinators"
+                value={(catCounts.agency_state_coordinator ?? 0)}
+                subtitle=""
+                onClick={() => nav("/admin/users?category=agency_state_coordinator")}
+                palette="purple"
+              />
+              <Card
+                title="States"
+                value={(catCounts.agency_state ?? 0)}
+                subtitle=""
+                onClick={() => nav("/admin/users?category=agency_state")}
+                palette="indigo"
+              />
+              <Card
+                title="Subâ€‘Franchises"
+                value={(catCounts.agency_sub_franchise ?? 0)}
+                subtitle=""
+                onClick={() => nav("/admin/users?category=agency_sub_franchise")}
+                palette="amber"
+              />
+              <Card
+                title="Employees"
+                value={(catCounts.employee ?? 0)}
+                subtitle=""
+                onClick={() => nav("/admin/users?category=employee")}
+                palette="teal"
+              />
+              <Card
+                title="Merchants"
+                value={(catCounts.merchant ?? 0)}
+                subtitle=""
+                onClick={() => nav("/admin/users?category=merchant")}
+                palette="green"
+              />
+            </>
+
             {/* Required account counters */}
-            <Card
-              title="Accounts Total"
-              value={(users.total ?? 0)}
-              subtitle=""
-              onClick={() => nav("/admin/users")}
-              palette="blue"
-            />
-            <Card
-              title="Accounts Active"
-              value={(users.active ?? 0)}
-              subtitle=""
-              onClick={() => nav("/admin/users?account_active=1")}
-              palette="green"
-            />
-            <Card
-              title="Accounts Inactive"
-              value={(users.inactive ?? ((users.total ?? 0) - (users.active ?? 0)))}
-              subtitle=""
-              onClick={() => nav("/admin/users?account_active=0")}
-              palette="red"
-            />
-            <Card
-              title="Withdrawal Requests"
-              value={(withdrawals.totalCount ?? withdrawals.pendingCount ?? 0)}
-              subtitle=""
-              onClick={() => nav("/admin/withdrawals")}
-              palette="red"
-            />
             <Card
               title="Wallets"
               value={(wallets.count ?? 0)}
@@ -494,74 +546,25 @@ export default function AdminDashboard() {
               palette="green"
             />
             <Card
-              title="Transactions"
-              value={(wallets.transactionsTotal ?? wallets.transactionsToday ?? 0)}
+              title="KYC Pending"
+              value={(users.kycPending ?? 0)}
               subtitle=""
-              onClick={() => nav("/admin/users")}
-              palette="amber"
+              onClick={() => nav("/admin/kyc?status=pending")}
+              palette="red"
             />
             <Card
-              title="E‑Coupons"
+              title="Genealogy"
+              value={"Tree"}
+              subtitle=""
+              onClick={() => nav("/admin/user-tree")}
+              palette="cyan"
+            />
+            <Card
+              title="Eâ€‘Coupons"
               value={(data?.coupons?.total ?? 0)}
               subtitle=""
               onClick={() => nav("/admin/e-coupons")}
               palette="purple"
-            />
-            <Card
-              title="Daily Reports"
-              value={(data?.reports?.dailyReportsToday ?? 0)}
-              subtitle=""
-              onClick={() => nav("/admin/reports")}
-              palette="indigo"
-            />
-            <Card
-              title="Auto Pool"
-              value={(data?.autopool?.total ?? 0)}
-              subtitle=""
-              onClick={() => nav("/admin/autopool")}
-              palette="cyan"
-            />
-            <Card
-              title="Commission Master"
-              value={(data?.commission?.configs ?? 0)}
-              subtitle=""
-              onClick={() => nav("/admin/dashboard/models/business/commissionconfig")}
-              palette="pink"
-            />
-            <Card
-              title="Level Commission Master"
-              value={"Direct + L1–L5"}
-              subtitle=""
-              onClick={() => nav("/admin/commissions/levels")}
-              palette="lime"
-            />
-            <Card
-              title="Matrix Commission Master"
-              value={"5 & 3 Matrix"}
-              subtitle=""
-              onClick={() => nav("/admin/commissions/matrix")}
-              palette="lime"
-            />
-            <Card
-              title="Rewards Points Config"
-              value={"Tiers + After"}
-              subtitle=""
-              onClick={() => nav("/admin/rewards/points")}
-              palette="cyan"
-            />
-            <Card
-              title="Trikonekt Products"
-              value={(data?.market?.products ?? 0)}
-              subtitle=""
-              onClick={() => nav("/admin/products")}
-              palette="teal"
-            />
-            <Card
-              title="Upload Cards"
-              value={((data?.uploadsModels?.dashboardCards ?? 0) + (data?.uploadsModels?.homeCards ?? 0))}
-              subtitle=""
-              onClick={() => nav("/admin/dashboard-cards")}
-              palette="orange"
             />
 
             <Card
@@ -573,7 +576,7 @@ export default function AdminDashboard() {
             />
 
             {/* Admin models as cards (flattened) */}
-            {([])
+            {false && Object.keys(modelsByApp)
               .sort()
               .flatMap((appLabel) =>
                 (modelsByApp[appLabel] || [])
@@ -624,11 +627,13 @@ export default function AdminDashboard() {
           </div>
 
           {/* Model meta load error (non-blocking) */}
-          {modelsErr ? (
+          {false && modelsErr ? (
             <div style={{ marginTop: 8, color: "#94a3b8", fontSize: 12 }}>{modelsErr}</div>
           ) : null}
         </>
       </>
     </div>
+    </RequirePermission>
   );
 }
+

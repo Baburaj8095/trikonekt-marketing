@@ -1,4 +1,4 @@
-// Login.jsx — Final polished wireframe UI (single-file).
+﻿// Login.jsx â€” Final polished wireframe UI (single-file).
 // NOTE: This file PRESERVES your original logic (API calls, geolocation, registration, dialogs).
 // Styling is done via MUI sx props. Requires @mui/material and @mui/icons-material v7.
 
@@ -59,7 +59,7 @@ import {
 
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import API from "../../api/api";
-import LOGO from "../../assets/TRIKONEKT.png";
+import LOGO from "../../assets/TRIKONEKT.jpg";
 
 const Login = () => {
   // === LOGIC STATES (kept from original) ===
@@ -1210,14 +1210,12 @@ const pincodeOptionsConsumer = useMemo(() => {
     try {
       const r = await API.get("/accounts/hierarchy/", { params: { username: String(uname || "").trim() } });
       const u = r?.data?.user || r?.data || {};
-      let ro = (u?.role || "").toLowerCase();
-      if (!ro) {
-        const c = (u?.category || "").toLowerCase();
-        if (c.startsWith("agency")) ro = "agency";
-        else if (c === "consumer") ro = "user";
-        else if (c === "employee") ro = "employee";
-        else if (c === "business") ro = "business";
-      }
+      const c = String(u?.category || "").toLowerCase();
+      if (c.startsWith("agency")) return "agency";
+      if (c === "business" || c === "merchant") return "business";
+      if (c === "employee") return "employee";
+      if (c === "consumer") return "user";
+      const ro = String(u?.role || "").toLowerCase();
       return ro || null;
     } catch {
       return null;
@@ -1229,13 +1227,14 @@ const pincodeOptionsConsumer = useMemo(() => {
     try {
         // Accept username or phone; backend resolves and disambiguates if needed
         let username = (formData.username || "").trim();
-        const submitRole = role;
+        let submitRole = role;
 
-        // Preflight: resolve user's registered role and show a targeted mismatch error
+        // Role mismatch guard â€” auto-correct role based on registered category
         const resolved = await resolveRegisteredRole(username);
         if (resolved && resolved !== submitRole) {
-          setErrorMsg(`You are registered as ${prettyRole(resolved)} but trying to login as ${prettyRole(submitRole)}.`);
-          return;
+          submitRole = resolved;
+          try { setRole(resolved); } catch (_) {}
+          setSuccessMsg(`Detected account type ${prettyRole(resolved)}. Proceeding with ${prettyRole(resolved)} login.`);
         }
 
         const res = await API.post("/accounts/login/", {
@@ -1261,7 +1260,7 @@ const pincodeOptionsConsumer = useMemo(() => {
           (String(payload?.category || "").toLowerCase() === "business" ? "business" : tokenRole);
 
         const ns = (payload?.is_staff || payload?.is_superuser) ? "admin" : (roleEffective || tokenRole || "user");
-        const store = remember ? localStorage : sessionStorage;
+        const store = localStorage;
 
         // Clean legacy non-namespaced keys to avoid cross-role collisions
         try {
@@ -2224,7 +2223,7 @@ const pincodeOptionsConsumer = useMemo(() => {
                     {sponsorChecking && (
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
                         <CircularProgress size={16} />
-                        <Typography variant="body2" color="text.secondary">Validating sponsor…</Typography>
+                        <Typography variant="body2" color="text.secondary">Validating sponsorâ€¦</Typography>
                       </Box>
                     )}
                     {sponsorValid === true && (
@@ -2432,7 +2431,7 @@ const pincodeOptionsConsumer = useMemo(() => {
           color: "#000",
           boxShadow: "0 0px 15px rgba(0,0,0,0.08) !important", }}>
         <Typography variant="body2">
-                    © {new Date().getFullYear()} Trikonekt. All rights reserved.
+                    Â© {new Date().getFullYear()} Trikonekt. All rights reserved.
                   </Typography>
                   <Typography variant="body2" sx={{ mt: 1 }}>
                     Contact us:{" "}
@@ -2451,3 +2450,5 @@ const pincodeOptionsConsumer = useMemo(() => {
 };
 
 export default Login;
+
+

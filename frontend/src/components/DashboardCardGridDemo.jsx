@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Grid, Box } from "@mui/material";
 import DashboardCard from "./DashboardCard";
 
@@ -22,7 +22,7 @@ export default function DashboardCardGridDemo() {
       <Grid container spacing={2}>
         <Grid item xs={6} sm={4} md={3}>
           <DashboardCard
-            title="E‑commerce"
+            title="Eâ€‘commerce"
             subtitle="Exclusive partner deals"
             image={imgEcommerce}
             to="/trikonekt-products"
@@ -83,3 +83,4 @@ export default function DashboardCardGridDemo() {
     </Box>
   );
 }
+

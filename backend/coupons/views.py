@@ -3383,18 +3383,30 @@ class ECouponOrderViewSet(mixins.CreateModelMixin,
         if role not in ("consumer", "agency", "employee"):
             return Response({"detail": "Invalid role on order."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Async by default; allow ?sync=1 to force sync, and ?async=1 to force async. Do not force sync in DEBUG.
+        # Async by default; allow ?sync=1 to force sync, and ?async=1 to force async.
+        # In DEBUG (local/dev) default to synchronous unless ?async=1 is explicitly provided.
         use_async = True
+        sync_param_set = False
+        async_param_set = False
         try:
             sync_param = str(request.query_params.get("sync") or request.data.get("sync") or "").strip().lower()
             if sync_param in ("1", "true", "yes", "sync"):
                 use_async = False
+                sync_param_set = True
         except Exception:
             pass
         try:
             async_param = str(request.query_params.get("async") or request.data.get("async") or "").strip().lower()
             if async_param in ("1", "true", "yes", "async"):
                 use_async = True
+                async_param_set = True
+        except Exception:
+            pass
+        # Default to synchronous in DEBUG when no explicit async override is provided
+        try:
+            from django.conf import settings
+            if getattr(settings, "DEBUG", False) and not async_param_set and not sync_param_set:
+                use_async = False
         except Exception:
             pass
         if use_async:

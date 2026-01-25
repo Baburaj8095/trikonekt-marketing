@@ -1,7 +1,7 @@
-import React from "react";
+﻿import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Box } from "@mui/material";
-import LOGO from "../../../assets/TRIKONEKT.png";
+import LOGO from "../../../assets/TRIKONEKT.jpg";
 import "../styles/v2-theme.css";
 
 export default function NavbarV2() {
@@ -33,3 +33,5 @@ export default function NavbarV2() {
     </Box>
   );
 }
+
+

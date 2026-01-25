@@ -1,1 +1,2 @@
-export { default } from "./V2Footer";
+﻿export { default } from "./V2Footer";
+

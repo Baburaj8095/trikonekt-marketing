@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Stack,
@@ -17,7 +17,7 @@ import CurrencyRupeeIcon from "@mui/icons-material/CurrencyRupee";
  * AssignCouponsForm
  * - Modernized input fields with icons
  * - Used for:
- *    * variant="consumer"  -> Send E‑Coupons to Consumer (by Count)
+ *    * variant="consumer"  -> Send Eâ€‘Coupons to Consumer (by Count)
  *    * variant="employee"  -> Distribute to Employee (by Count)
  *
  * Props:
@@ -93,7 +93,7 @@ export default function AssignCouponsForm({
       if (selectedAvail !== null && selectedAvail >= 0 && c > selectedAvail) {
         try {
           alert(
-            `Requested count exceeds availability for ₹${selectedDenom}. Available: ${selectedAvail}.`
+            `Requested count exceeds availability for â‚¹${selectedDenom}. Available: ${selectedAvail}.`
           );
         } catch {}
         return;
@@ -151,7 +151,7 @@ export default function AssignCouponsForm({
         const a = Number(availByDenom?.[String(d)] ?? 0);
         return {
           value: d,
-          label: `₹${d}${Number.isFinite(a) ? ` (${a} available)` : ""}`,
+          label: `â‚¹${d}${Number.isFinite(a) ? ` (${a} available)` : ""}`,
           disabled: !hideZeroDenoms && a <= 0,
         };
       });
@@ -254,9 +254,9 @@ export default function AssignCouponsForm({
 
         {hasDenoms && selectedDenom ? (
           <Typography variant="caption" color="text.secondary">
-            Selected: ₹{selectedDenom}
+            Selected: â‚¹{selectedDenom}
             {selectedAvail !== null && selectedAvail >= 0
-              ? ` — ${selectedAvail} available`
+              ? ` â€” ${selectedAvail} available`
               : ""}
           </Typography>
         ) : null}
@@ -280,3 +280,4 @@ export default function AssignCouponsForm({
     </Box>
   );
 }
+

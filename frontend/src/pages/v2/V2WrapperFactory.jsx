@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Box } from "@mui/material";
 import colors from "./theme/colors";
 
@@ -57,3 +57,4 @@ export default function V2WrapperFactory({ name }) {
     </Box>
   );
 }
+

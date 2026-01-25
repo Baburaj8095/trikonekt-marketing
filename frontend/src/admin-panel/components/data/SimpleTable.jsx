@@ -1,7 +1,7 @@
-import React from "react";
+﻿import React from "react";
 
 /**
- * SimpleTable — minimal, dependency-free table for admin listings with enhanced admin UX.
+ * SimpleTable â€” minimal, dependency-free table for admin listings with enhanced admin UX.
  *
  * Props:
  * - columns: Array<{
@@ -124,7 +124,7 @@ export default function SimpleTable({
     if (!active || !dir) return null;
     return (
       <span style={{ fontSize: 10, color: "#64748b", marginLeft: 6 }}>
-        {dir === "asc" ? "▲" : "▼"}
+        {dir === "asc" ? "â–²" : "â–¼"}
       </span>
     );
   }
@@ -207,7 +207,7 @@ export default function SimpleTable({
 
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <input
-              placeholder="Search…"
+              placeholder="Searchâ€¦"
               value={search}
               onChange={(e) => onSearch?.(e.target.value)}
               style={{ padding: 8, width: "min(280px, 100%)", borderRadius: 8, border: "1px solid #e5e7eb", backgroundColor: "#ffffff" }}
@@ -261,7 +261,7 @@ export default function SimpleTable({
             {loading ? (
               <tr>
                 <td colSpan={columns.length} style={{ padding: 16, color: "#64748b" }}>
-                  Loading…
+                  Loadingâ€¦
                 </td>
               </tr>
             ) : rows.length === 0 ? (
@@ -336,9 +336,10 @@ export default function SimpleTable({
           Next
         </button>
         <div style={{ color: "#64748b", marginLeft: 8 }}>
-          Page {page} of {totalPages} • Total {total}
+          Page {page} of {totalPages} â€¢ Total {total}
         </div>
       </div>
     </div>
   );
 }
+

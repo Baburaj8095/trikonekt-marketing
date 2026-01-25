@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import {
   AppBar,
   Toolbar,
@@ -57,7 +57,7 @@ export default function UserApp() {
           >
             <SearchIcon sx={{ color: "#6b7280" }} />
             <InputBase
-              placeholder="Search for products, brands…"
+              placeholder="Search for products, brandsâ€¦"
               sx={{ ml: 1, flex: 1 }}
             />
           </Box>
@@ -91,3 +91,4 @@ export default function UserApp() {
     </Box>
   );
 }
+

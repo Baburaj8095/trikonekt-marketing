@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { Box, Paper, Typography, Snackbar, Alert } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import NorthEastIcon from "@mui/icons-material/NorthEast";
@@ -575,3 +575,4 @@ export default function AppsGrid({
     </Box>
   );
 }
+

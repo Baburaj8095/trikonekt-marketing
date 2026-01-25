@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+﻿import React, { useEffect, useState, useMemo } from "react";
 import {
   Box,
   Grid,
@@ -16,7 +16,7 @@ import {
   Dialog,
 } from "@mui/material";
 import LockRoundedIcon from "@mui/icons-material/LockRounded";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy"; // ⭐
+import ContentCopyIcon from "@mui/icons-material/ContentCopy"; // â­
 import dayjs from "dayjs";
 import normalizeMediaUrl from "../utils/media";
 import {
@@ -42,7 +42,7 @@ const isSeasonPackage = (pkg) => {
   if (type === "MONTHLY") return true;
   // If backend sends monthly_meta, consider it season package.
   if (pkg && pkg.monthly_meta) return true;
-  // Fallback: legacy detection by price≈759
+  // Fallback: legacy detection by priceâ‰ˆ759
   return approx(pkg?.price, 759);
 };
 
@@ -168,7 +168,7 @@ function PackageCard({ pkg, onProceed, prime150Active, prime150Pending, seasons 
     <Paper sx={{ p: 2, borderRadius: 2 }}>
       <Typography fontWeight={800}>{pkg.name}</Typography>
       <Typography fontSize={22} fontWeight={900}>
-        ₹{pkg.price}
+        â‚¹{pkg.price}
       </Typography>
 
       <Box component="ul" sx={{ pl: 2, mt: 1 }}>
@@ -333,7 +333,7 @@ function PackageCard({ pkg, onProceed, prime150Active, prime150Pending, seasons 
 function PaymentSheet({ open, onClose, data, onSuccess }) {
   const [txnId, setTxnId] = useState("");
   const [file, setFile] = useState(null);
-  const [copied, setCopied] = useState(false); // ⭐
+  const [copied, setCopied] = useState(false); // â­
   const [payment, setPayment] = useState(null); // admin seeded payment config
   const [zoomOpen, setZoomOpen] = useState(false);
 
@@ -384,7 +384,7 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
           <Stack direction="row" justifyContent="space-between" mt={1}>
             <Typography color="text.secondary">Total Amount</Typography>
             <Typography fontWeight={900} fontSize={20}>
-              ₹{data.amount}
+              â‚¹{data.amount}
             </Typography>
           </Stack>
         </Paper>
@@ -555,3 +555,4 @@ export default function PromoPackages() {
     </Box>
   );
 }
+

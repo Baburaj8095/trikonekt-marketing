@@ -1,9 +1,9 @@
-import React from "react";
+﻿import React from "react";
 import { Card, Box, Typography } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
 
 /**
- * Unified AppCard — solid background, text on clean surface
+ * Unified AppCard â€” solid background, text on clean surface
  *
  * Props:
  * - title: string (required, 1 line)
@@ -192,3 +192,4 @@ export default function AppCard({
     </Card>
   );
 }
+

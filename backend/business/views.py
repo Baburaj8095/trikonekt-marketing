@@ -1,5 +1,6 @@
 from rest_framework import generics, permissions, status
 from rest_framework.permissions import IsAdminUser
+from adminapi.permissions import IsAdminOrStaff, HasAdminModuleAccess
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.db import transaction
@@ -12,6 +13,8 @@ import logging
 import os
 from .models import (
     BusinessRegistration,
+    MerchantCategory,
+    MerchantSubCategory,
     RewardProgress,
     RewardRedemption,
     DailyReport,
@@ -366,8 +369,9 @@ from .serializers import (
     PromoEBookSerializer,
     EBookAccessSerializer,
     TriAppSerializer,
+    PromoProductOrderSerializer,
 )
-from .models import PromoPackage, PromoPurchase, EBookAccess, TriApp
+from .models import PromoPackage, PromoPurchase, EBookAccess, TriApp, PromoProductOrder
 from .services.withdrawals import compute_withdraw_distribution, apply_withdraw_distribution
 
 
@@ -415,7 +419,7 @@ class AdminPromoPurchaseListView(APIView):
     GET /api/business/admin/promo/purchases/?status=PENDING|APPROVED|REJECTED|CANCELLED
     Admin-only list of promo purchases (defaults to PENDING).
     """
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("promo")]
 
     def get(self, request):
         status_in = (request.query_params.get("status") or "PENDING").strip().upper()
@@ -434,7 +438,7 @@ class AdminPromoPurchaseApproveView(APIView):
       - MONTHLY: calendar month (year/month on record) or per-box access (no active window)
       - PRIME: active_from = today; active_to = null
     """
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("promo")]
 
     def post(self, request, pk: int):
         """
@@ -491,12 +495,16 @@ class AdminPromoPurchaseApproveView(APIView):
         prime750_choice = str(getattr(obj, "prime750_choice", "") or "").strip().upper()
         redeem750_choice = prime750_choice == "REDEEM"
         is_prime_759 = str(getattr(obj.package, "type", "")) == "PRIME" and abs(price - D("759")) <= D("0.75")
+        # Backend enforcement: PRIME 750 allows only PRODUCT or REDEEM (reject COUPON)
+        if is_prime_750 and prime750_choice == "COUPON":
+            return Response({"detail": "Invalid choice for PRIME 750. Allowed choices: PRODUCT or REDEEM."}, status=status.HTTP_400_BAD_REQUEST)
 
         # Allocation rules (updated):
         # - PRIME150 (non‑EBOOK): allocate 150 e‑coupon(s)
         # - PRIME750: allocate 5×150 per unit (based on price/₹150), irrespective of choice
         # - PRIME759 and MONTHLY: do not allocate 150 codes here (handled separately)
-        skip_allocation = not ((is_prime_150 and not ebook_choice) or is_prime_750)
+        # OVERRIDE: Do not allocate any 150-coupons for PRIME approvals (150/750/759).
+        skip_allocation = True
         # If skipping generic 150 allocation, set required 150-codes to 0 so audit reflects truth.
         if skip_allocation:
             need = 0
@@ -602,7 +610,7 @@ class AdminPromoPurchaseApproveView(APIView):
                         pass
 
             # Allocate ₹759 e‑coupon(s) for PRIME 759 (one per quantity)
-            if is_prime_759:
+            if False and is_prime_759:
                 try:
                     from coupons.models import CouponCode
                     denom_759 = D("759.00")
@@ -698,20 +706,7 @@ class AdminPromoPurchaseApproveView(APIView):
             credited_750 = False
             credited_150_redeem = False
             try:
-                # 750 REDEEM: credit full 750 as Reward Points (not money wallet)
-                if is_prime_750 and redeem750_choice:
-                    from accounts.models import RewardPointsAccount
-                    from decimal import Decimal as Dp
-                    try:
-                        RewardPointsAccount.credit_points(
-                            obj.user,
-                            Dp("750.00"),
-                            reason="REDEEM_750",
-                            meta={"purchase_id": obj.id, "package": getattr(obj.package, "code", None)},
-                        )
-                        credited_750 = True
-                    except Exception:
-                        pass
+                # For PRIME 750, rely on policy-driven points in distribute_prime_750_payouts; no extra credit here.
                 # 150 REDEEM: use existing redeem flow (credits configured 150 by default into points)
                 if is_prime_150 and redeem150_choice:
                     from business.services.activation import redeem_150 as _redeem_150
@@ -721,7 +716,7 @@ class AdminPromoPurchaseApproveView(APIView):
                 pass
             # Ensure PRIME 150 adds reward points on approval (e‑book removed)
             try:
-                if is_prime_150 and not credited_150_redeem:
+                if False and is_prime_150 and not credited_150_redeem:
                     from accounts.models import RewardPointsAccount
                     from decimal import Decimal as Dp5
                     RewardPointsAccount.credit_points(
@@ -891,10 +886,93 @@ class AdminPromoPurchaseApproveView(APIView):
 
             obj.save(update_fields=fields_to_update)
 
+            # PRIME promo payouts at approval time (config-driven, idempotent)
+            try:
+                from coupons.models import AuditTrail
+                distributed = AuditTrail.objects.filter(
+                    action="promo_purchase_distributed",
+                    metadata__purchase_id=obj.id
+                ).exists()
+            except Exception:
+                distributed = False
+            if not distributed:
+                try:
+                    if is_prime_150:
+                        from .services.prime import distribute_prime_150_payouts
+                        distribute_prime_150_payouts(
+                            obj.user,
+                            source={"type": "PROMO_PURCHASE_APPROVAL", "id": obj.id},
+                        )
+                    elif is_prime_750:
+                        from .services.prime import distribute_prime_750_payouts
+                        distribute_prime_750_payouts(
+                            obj.user,
+                            source={"type": "PROMO_PURCHASE_APPROVAL", "id": obj.id},
+                        )
+                        # Create ProductOrder for PRODUCT choice
+                        if prime750_choice == "PRODUCT":
+                            try:
+                                from .models import PromoProductOrder
+                                PromoProductOrder.objects.get_or_create(
+                                    promo_purchase=obj,
+                                    defaults={
+                                        "user": obj.user,
+                                        "product": getattr(obj, "selected_promo_product", None),
+                                        "shipping_address": getattr(obj, "shipping_address", ""),
+                                    },
+                                )
+                            except Exception:
+                                pass
+                    elif is_prime_759:
+                        # Create subscription marker and trigger month-1 payout (matrix repetition per config)
+                        is_first_flag = False
+                        try:
+                            from .models import Promo759Subscription
+                            # Determine if this is the user's first-ever 759 subscription BEFORE creating purchase-linked marker
+                            prev_exists = Promo759Subscription.objects.filter(user=obj.user).exists()
+                            sub, _ = Promo759Subscription.objects.get_or_create(
+                                promo_purchase=obj,
+                                defaults={"user": obj.user, "metadata": {"source": "PROMO_PURCHASE_APPROVAL"}}
+                            )
+                            is_first_flag = not prev_exists
+                        except Exception:
+                            try:
+                                logger.exception("prime_759 subscription ensure failed", extra={"purchase_id": obj.id, "user_id": getattr(obj.user, "id", None)})
+                            except Exception:
+                                pass
+                            is_first_flag = False
+                        # Trigger monthly payouts with matrix opening decided inside service based on UI mode:
+                        # - FIRST_MONTH_ONLY: open matrix only when is_first_flag is True
+                        # - EVERY_PURCHASE: service treats every purchase as first-month for matrix part only
+                        try:
+                            from .services.monthly import distribute_monthly_759_payouts
+                            distribute_monthly_759_payouts(
+                                obj.user,
+                                is_first_month=bool(is_first_flag),
+                                source={"type": "PROMO_PURCHASE_APPROVAL", "id": obj.id},
+                            )
+                        except Exception:
+                            try:
+                                logger.exception("prime_759 monthly payout failed", extra={"purchase_id": obj.id, "user_id": getattr(obj.user, "id", None), "is_first_month": bool(is_first_flag)})
+                            except Exception:
+                                pass
+                    # Stamp audit to guard idempotency
+                    try:
+                        AuditTrail.objects.create(
+                            action="promo_purchase_distributed",
+                            actor=request.user,
+                            notes=f"Promo purchase #{obj.id} payouts done",
+                            metadata={"purchase_id": obj.id, "package": getattr(obj.package, "code", None)},
+                        )
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+
             # Activate account on any promo package approval (e.g., 150, 750, 759)
             try:
                 from decimal import Decimal as D3
-                from .services.activation import activate_150_active, activate_50, ensure_first_purchase_activation
+                from .services.activation import activate_150_active, ensure_first_purchase_activation
                 from jobs.models import enqueue_prime_150_units
                 pkg_price = D3(str(getattr(obj.package, "price", "0") or "0"))
                 src = {"type": "promo_purchase", "id": obj.id}
@@ -902,13 +980,6 @@ class AdminPromoPurchaseApproveView(APIView):
                 activated50 = False
                 prime_units_enqueued = False
 
-                # Always open ₹50 path when price >= 50 (idempotent)
-                if pkg_price >= D3("50"):
-                    try:
-                        activate_50(obj.user, src, package_code="GLOBAL_50")
-                        activated50 = True
-                    except Exception:
-                        pass
 
                 # Decide 150 activations by package type
                 is_prime_pkg = str(getattr(obj.package, "type", "") or "") == "PRIME"
@@ -921,14 +992,8 @@ class AdminPromoPurchaseApproveView(APIView):
                     # Allocation: 1x ₹150 e‑coupon is provided and commissions will run on coupon activation.
                     activated150_active = False
                 elif is_prime_750_now:
-                    # PRODUCT flow: open 5/3 matrix directly, no e‑coupon allocation, no reward points
-                    if str(prime750_choice).upper() != "REDEEM":
-                        try:
-                            from .services.activation import activate_150_active
-                            src2 = {"type": "PRIME_750_PRODUCT", "id": obj.id, "suppress_reward_points": True}
-                            activate_150_active(obj.user, src2)
-                        except Exception:
-                            pass
+                    # PRIME 750: do not auto-activate 150 here; payouts handled by promo approval engine
+                    pass
                 elif is_monthly_pkg:
                     # Open 150 Active only on the very first 759 approval for this user/package
                     try:
@@ -1024,7 +1089,7 @@ class AdminPromoPurchaseRejectView(APIView):
     POST /api/business/admin/promo/purchases/<pk>/reject/
     Body: { "reason": "optional" }
     """
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("promo")]
 
     def post(self, request, pk: int):
         obj = PromoPurchase.objects.select_related("package", "user").filter(pk=pk).first()
@@ -1043,9 +1108,48 @@ class AdminPromoPurchaseRejectView(APIView):
         return Response(PromoPurchaseSerializer(obj, context={"request": request}).data, status=status.HTTP_200_OK)
 
 
+class AdminProductOrdersListView(APIView):
+    """
+    GET /api/business/admin/promo/product-orders/?status=PENDING|DISPATCHED|CANCELLED&from=YYYY-MM-DD&to=YYYY-MM-DD&user_id=PK
+    Admin-only listing for Promo 750 PRODUCT orders (Inventory/Dispatch queue).
+    """
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("promo")]
+
+    def get(self, request):
+        status_in = (request.query_params.get("status") or "").strip().upper()
+        valid = {"PENDING", "DISPATCHED", "CANCELLED"}
+        qs = (
+            PromoProductOrder.objects
+            .select_related("promo_purchase", "user", "product", "promo_purchase__package")
+            .order_by("-created_at", "-id")
+        )
+        if status_in in valid:
+            qs = qs.filter(status=status_in)
+        uid = request.query_params.get("user_id")
+        if uid:
+            try:
+                qs = qs.filter(user_id=int(uid))
+            except Exception:
+                pass
+        d_from = request.query_params.get("from")
+        d_to = request.query_params.get("to")
+        if d_from:
+            try:
+                qs = qs.filter(created_at__date__gte=d_from)
+            except Exception:
+                pass
+        if d_to:
+            try:
+                qs = qs.filter(created_at__date__lte=d_to)
+            except Exception:
+                pass
+        ser = PromoProductOrderSerializer(qs, many=True, context={"request": request})
+        return Response(ser.data, status=status.HTTP_200_OK)
+
+
 class Prime750PreviewView(APIView):
     """
-    GET /api/business/promo/prime750/preview/?choice=REDEEM|PRODUCT|COUPON[&quantity=1]
+    GET /api/business/promo/prime750/preview/?choice=REDEEM|PRODUCT[&quantity=1]
     Returns what will happen for a PRIME 750 purchase based on the user's choice.
     """
     permission_classes = [permissions.IsAuthenticated]
@@ -1079,12 +1183,8 @@ class Prime750PreviewView(APIView):
             reward_points_credit = 0
             prime_150_units = units
             delivery_by_days = 30
-        elif choice == "COUPON":
-            reward_points_credit = 0
-            prime_150_units = units
-            lucky_draw_tokens = int(quantity)
         else:
-            return Response({"detail": "Invalid or missing choice. Use REDEEM, PRODUCT or COUPON."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Invalid or missing choice. Use REDEEM or PRODUCT."}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(
             {
@@ -1304,6 +1404,57 @@ class RewardPointsSummaryView(APIView):
 
 
 # =======================
+# Root Consumer Admin (set/get)
+# =======================
+class AdminRootConsumerView(APIView):
+    """
+    GET /api/business/admin/root-consumer/ -> {user: {id, username, prefixed_id}} or {user: null}
+    POST /api/business/admin/root-consumer/ { "user_id": PK }
+      - Sets the singleton RootConsumerConfig.root_user to the given consumer user.
+      - Validations:
+          * Must be category='consumer'
+          * Must NOT be staff or superuser
+    """
+    permission_classes = [IsAdminOrStaff]
+
+    def get(self, request):
+        try:
+            from .models import RootConsumerConfig
+            cfg = RootConsumerConfig.get_solo()
+            u = cfg.get_root_user()
+            if not u:
+                return Response({"user": None}, status=status.HTTP_200_OK)
+            return Response({"user": {"id": u.id, "username": u.username, "prefixed_id": getattr(u, "prefixed_id", None)}}, status=status.HTTP_200_OK)
+        except Exception:
+            return Response({"user": None}, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        uid = request.data.get("user_id")
+        if uid is None:
+            return Response({"detail": "user_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            from accounts.models import CustomUser
+            user = CustomUser.objects.get(pk=int(uid))
+        except Exception:
+            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Validate consumer + non-staff/non-superuser
+        cat = (getattr(user, "category", "") or "").lower()
+        if cat != "consumer" or getattr(user, "is_staff", False) or getattr(user, "is_superuser", False):
+            return Response({"detail": "Root Consumer must be a non-staff, non-superuser consumer."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            from .models import RootConsumerConfig
+            cfg = RootConsumerConfig.get_solo()
+            cfg.root_user = user
+            cfg.save(update_fields=["root_user", "updated_at"])
+        except Exception:
+            return Response({"detail": "Failed to set Root Consumer."}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({"user": {"id": user.id, "username": user.username, "prefixed_id": getattr(user, "prefixed_id", None)}}, status=status.HTTP_200_OK)
+
+
+# =======================
 # Packages: Agency + Admin
 # =======================
 
@@ -1318,24 +1469,40 @@ class AgencyPackageCatalogView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        user = request.user
-        # Must be an agency account
+        # Admin override: allow listing catalog for a specific agency via ?agency_id=PK
+        target_user = request.user
+        agency_id = request.query_params.get("agency_id")
+        if agency_id and (getattr(request.user, "is_staff", False) or getattr(request.user, "is_superuser", False)):
+            try:
+                from accounts.models import CustomUser
+                target_user = CustomUser.objects.get(pk=int(agency_id))
+            except Exception:
+                return Response([], status=status.HTTP_200_OK)
+
+        # Must be an agency account (target)
         try:
-            role = str(getattr(user, "role", "") or "").lower()
-            cat = str(getattr(user, "category", "") or "").lower()
+            role = str(getattr(target_user, "role", "") or "").lower()
+            cat = str(getattr(target_user, "category", "") or "").lower()
             is_agency = (role == "agency") or cat.startswith("agency")
         except Exception:
             is_agency = False
         if not is_agency:
+            # No catalog for other categories
             return Response([], status=status.HTTP_200_OK)
 
         # Determine allowed prefix by category
         prefix = None
         try:
-            if cat == "agency_sub_franchise":
-                prefix = "AG_SF"
-            elif cat == "agency_pincode":
-                prefix = "AG_PIN"
+            mapping = {
+                "agency_sub_franchise": "AG_SF",
+                "agency_pincode": "AG_PIN",
+                "agency_pincode_coordinator": "AG_PIN_CRD",
+                "agency_state_coordinator": "AG_ST_CRD",
+                "agency_state": "AG_ST",
+                "agency_district_coordinator": "AG_DST_CRD",
+                "agency_district": "AG_DST",
+            }
+            prefix = mapping.get(cat)
         except Exception:
             prefix = None
 
@@ -1344,10 +1511,23 @@ class AgencyPackageCatalogView(APIView):
             return Response([], status=status.HTTP_200_OK)
 
         # Query allowed active packages and compute assigned flag
-        pkgs_qs = Package.objects.filter(is_active=True, code__istartswith=prefix).order_by("amount", "code")
+        base_qs = Package.objects.filter(is_active=True)
+        if prefix in {"AG_PIN", "AG_DST", "AG_ST"}:
+            # Exclude coordinator variants for base roles, e.g., AG_PIN should not see AG_PIN_CRD*
+            pkgs_qs = (
+                base_qs.filter(code__istartswith=prefix)
+                .exclude(code__istartswith=f"{prefix}_CRD")
+                .order_by("amount", "code")
+            )
+        elif prefix in {"AG_PIN_CRD", "AG_DST_CRD", "AG_ST_CRD"}:
+            # Coordinators see only their CRD-prefixed packages
+            pkgs_qs = base_qs.filter(code__istartswith=prefix).order_by("amount", "code")
+        else:
+            # Other categories (e.g., AG_SF) retain simple prefix filter
+            pkgs_qs = base_qs.filter(code__istartswith=prefix).order_by("amount", "code")
         pkg_ids = list(pkgs_qs.values_list("id", flat=True))
         assigned_ids = set(
-            AgencyPackageAssignment.objects.filter(agency=user, package_id__in=pkg_ids).values_list("package_id", flat=True)
+            AgencyPackageAssignment.objects.filter(agency=target_user, package_id__in=pkg_ids).values_list("package_id", flat=True)
         )
 
         out = []
@@ -1402,25 +1582,89 @@ class AgencyPackagesMeView(APIView):
             # Return empty list for non-agency users; no auto-assignment
             return Response([], status=status.HTTP_200_OK)
 
-        # Auto-assign default packages to the target agency if missing
+        # Auto-assign default packages to the target agency if missing (category-scoped)
+        # Requirement: packages should be visible by default right after registering.
+        # Strategy:
+        #   1) Prefer is_default=True packages matching the category prefix.
+        #   2) If none configured, fall back to a single best candidate for that prefix:
+        #      - Prefer code containing "PRIME" (case-insensitive), lowest amount first
+        #      - Else pick the lowest-amount package for that prefix
         try:
-            defaults_qs = Package.objects.filter(is_active=True, is_default=True)
-            existing_pkg_ids = set(
-                AgencyPackageAssignment.objects.filter(agency=target_user, package__in=defaults_qs).values_list("package_id", flat=True)
-            )
-            to_create = [AgencyPackageAssignment(agency=target_user, package=p) for p in defaults_qs if p.id not in existing_pkg_ids]
-            if to_create:
-                # Avoid bulk_create pitfalls; save one-by-one to trigger validations
-                for obj in to_create:
-                    try:
-                        obj.save()
-                    except Exception:
-                        continue
+            # Determine category->prefix mapping similar to AgencyPackageCatalogView
+            cat = str(getattr(target_user, "category", "") or "").lower()
+            mapping = {
+                "agency_sub_franchise": "AG_SF",
+                "agency_pincode": "AG_PIN",
+                "agency_pincode_coordinator": "AG_PIN_CRD",
+                "agency_state_coordinator": "AG_ST_CRD",
+                "agency_state": "AG_ST",
+                "agency_district_coordinator": "AG_DST_CRD",
+                "agency_district": "AG_DST",
+            }
+            pref = mapping.get(cat)
+
+            base_defaults = Package.objects.filter(is_active=True, is_default=True)
+            if pref in {"AG_PIN", "AG_DST", "AG_ST"}:
+                # Base roles should not get coordinator default packages
+                defaults_qs = (
+                    base_defaults.filter(code__istartswith=pref)
+                    .exclude(code__istartswith=f"{pref}_CRD")
+                )
+            elif pref in {"AG_PIN_CRD", "AG_DST_CRD", "AG_ST_CRD"}:
+                # Coordinators get only their CRD-prefixed defaults
+                defaults_qs = base_defaults.filter(code__istartswith=pref)
+            elif pref in {"AG_SF"}:
+                defaults_qs = base_defaults.filter(code__istartswith=pref)
+            else:
+                # Fallback to previous behavior (assign all defaults) to avoid breaking existing flows
+                defaults_qs = base_defaults
+
+            default_packages = list(defaults_qs)
+
+            # If no explicit defaults exist for this category, pick a best-effort fallback
+            if not default_packages and pref:
+                base_qs = Package.objects.filter(is_active=True, code__istartswith=pref)
+                if pref in {"AG_PIN", "AG_DST", "AG_ST"}:
+                    base_qs = base_qs.exclude(code__istartswith=f"{pref}_CRD")
+                # Prefer variant codes (exclude bare prefix) where possible
+                variants_qs = base_qs.exclude(code__iexact=pref)
+                # Prefer "PRIME" in code or name among variants
+                prime_variants = variants_qs.filter(Q(code__icontains="PRIME") | Q(name__icontains="PRIME"))
+                candidate = prime_variants.order_by("amount", "code").first() or variants_qs.order_by("amount", "code").first()
+                if not candidate:
+                    # fallback to any base_qs with PRIME in code/name, else any by lowest amount
+                    prime_any = base_qs.filter(Q(code__icontains="PRIME") | Q(name__icontains="PRIME")).order_by("amount", "code").first()
+                    candidate = prime_any or base_qs.order_by("amount", "code").first()
+                if candidate:
+                    default_packages = [candidate]
+
+            if default_packages:
+                pkg_ids = [p.id for p in default_packages]
+                existing_pkg_ids = set(
+                    AgencyPackageAssignment.objects.filter(agency=target_user, package_id__in=pkg_ids).values_list("package_id", flat=True)
+                )
+                to_create = [AgencyPackageAssignment(agency=target_user, package=p) for p in default_packages if p.id not in existing_pkg_ids]
+                if to_create:
+                    # Avoid bulk_create pitfalls; save one-by-one to trigger validations
+                    for obj in to_create:
+                        try:
+                            obj.save()
+                        except Exception:
+                            continue
         except Exception:
             # best-effort; do not block response on auto-assign failure
             pass
 
-        qs = AgencyPackageAssignment.objects.filter(agency=target_user).select_related("package").prefetch_related("payments")
+        include_inactive = str(request.query_params.get("include_inactive") or "").lower() in {"1", "true", "yes"}
+        qs = (
+            AgencyPackageAssignment.objects
+            .filter(agency=target_user)
+            .select_related("package")
+            .prefetch_related("payments")
+        )
+        # Hide inactive packages by default for all users (including staff) unless explicitly requested
+        if not include_inactive:
+            qs = qs.filter(package__is_active=True)
         ser = AgencyPackageAssignmentSerializer(qs, many=True)
         return Response(ser.data, status=status.HTTP_200_OK)
 
@@ -1475,19 +1719,26 @@ class AgencyAssignPackageView(APIView):
         # Category/prefix guard: restrict package purchase by agency category
         try:
             cat = str(getattr(user, "category", "") or "").lower()
-
-            def _allowed_prefix(c):
-                if c == "agency_sub_franchise":
-                    return "AG_SF"
-                if c == "agency_pincode":
-                    return "AG_PIN"
-                return None
-
-            pref = _allowed_prefix(cat)
+            mapping = {
+                "agency_sub_franchise": "AG_SF",
+                "agency_pincode": "AG_PIN",
+                "agency_pincode_coordinator": "AG_PIN_CRD",
+                "agency_district": "AG_DST",
+                "agency_district_coordinator": "AG_DST_CRD",
+                "agency_state": "AG_ST",
+                "agency_state_coordinator": "AG_ST_CRD",
+            }
+            pref = mapping.get(cat)
+            code_val = str(getattr(pkg, "code", "") or "").upper()
             if pref:
-                code_val = str(getattr(pkg, "code", "") or "")
-                if not code_val.upper().startswith(pref.upper()):
-                    return Response({"detail": "Package not allowed for your category."}, status=status.HTTP_403_FORBIDDEN)
+                if pref in {"AG_PIN", "AG_DST", "AG_ST"}:
+                    # Base roles cannot select coordinator variants
+                    if (not code_val.startswith(pref)) or code_val.startswith(f"{pref}_CRD"):
+                        return Response({"detail": "Package not allowed for your category."}, status=status.HTTP_403_FORBIDDEN)
+                else:
+                    # Coordinators and AG_SF must match exact category prefix
+                    if not code_val.startswith(pref):
+                        return Response({"detail": "Package not allowed for your category."}, status=status.HTTP_403_FORBIDDEN)
         except Exception:
             # best-effort guard; do not block the flow on failure
             pass
@@ -1549,13 +1800,77 @@ class AgencyAssignPackageView(APIView):
             }
         return Response(data, status=status.HTTP_201_CREATED if (pay_obj or created) else status.HTTP_200_OK)
 
+class AdminAssignAgencyPackageView(APIView):
+    """
+    POST /api/business/admin/agency-packages/assign/
+    Body: { "agency_id": PK, "package_id": PK }
+    Admin-only: ensure an assignment exists for the target agency and package.
+    """
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("promo")]
+
+    def post(self, request):
+        agency_id = request.data.get("agency_id")
+        package_id = request.data.get("package_id")
+        if agency_id is None or package_id is None:
+            return Response({"detail": "agency_id and package_id are required."}, status=status.HTTP_400_BAD_REQUEST)
+        # Load target agency
+        try:
+            from accounts.models import CustomUser
+            target_user = CustomUser.objects.get(pk=int(agency_id))
+        except Exception:
+            return Response({"detail": "Agency not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Validate agency role/category
+        try:
+            role = str(getattr(target_user, "role", "") or "").lower()
+            cat = str(getattr(target_user, "category", "") or "").lower()
+            is_agency = (role == "agency") or cat.startswith("agency")
+        except Exception:
+            is_agency = False
+        if not is_agency:
+            return Response({"detail": "Target user is not an agency account."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Load package
+        try:
+            pkg = Package.objects.get(pk=int(package_id), is_active=True)
+        except Exception:
+            return Response({"detail": "Package not found or inactive."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Enforce category/prefix compatibility
+        try:
+            mapping = {
+                "agency_sub_franchise": "AG_SF",
+                "agency_pincode": "AG_PIN",
+                "agency_pincode_coordinator": "AG_PIN_CRD",
+                "agency_state_coordinator": "AG_ST_CRD",
+                "agency_state": "AG_ST",
+                "agency_district_coordinator": "AG_DST_CRD",
+                "agency_district": "AG_DST",
+            }
+            pref = mapping.get(cat)
+            if pref:
+                code_val = str(getattr(pkg, "code", "") or "")
+                if not code_val.upper().startswith(pref.upper()):
+                    return Response({"detail": "Package not allowed for this agency category."}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            pass
+
+        # Ensure assignment
+        try:
+            assignment, _ = AgencyPackageAssignment.objects.get_or_create(agency=target_user, package=pkg)
+        except Exception:
+            return Response({"detail": "Failed to assign package."}, status=status.HTTP_400_BAD_REQUEST)
+
+        ser = AgencyPackageAssignmentSerializer(assignment)
+        return Response(ser.data, status=status.HTTP_201_CREATED)
+
 class AdminCreateAgencyPackagePaymentView(APIView):
     """
     POST /api/business/agency-packages/{pk}/payments/
     Body: { "amount": <number>, "reference": "optional", "notes": "optional" }
     Admin-only: records a payment against an agency's package assignment.
     """
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("promo")]
 
     def post(self, request, pk):
         from decimal import Decimal
@@ -1597,6 +1912,29 @@ class AdminCreateAgencyPackagePaymentView(APIView):
             reference=reference,
             notes=notes,
         )
+        # First-payment activation: if this is the first payment for this assignment, activate the account
+        try:
+            from decimal import Decimal as D
+            if (paid_sum or D("0")) == D("0") and (amount or D("0")) > D("0"):
+                # Mark user active (green in admin list)
+                try:
+                    if not bool(getattr(assignment.agency, "account_active", False)):
+                        assignment.agency.account_active = True
+                        assignment.agency.save(update_fields=["account_active"])
+                except Exception:
+                    pass
+                # Stamp first purchase activation flags (idempotent)
+                try:
+                    from .services.activation import ensure_first_purchase_activation
+                    ensure_first_purchase_activation(
+                        assignment.agency,
+                        {"type": "agency_prime_first_payment_admin", "assignment_id": assignment.id, "payment_id": pay.id},
+                    )
+                except Exception:
+                    pass
+        except Exception:
+            # best-effort; do not block admin payment if activation hook fails
+            pass
         # Minimal response (intentionally not using serializer to avoid N+1 on admin bulk ops)
         return Response(
             {
@@ -1738,7 +2076,7 @@ class AdminAgencyPaymentRequestListView(APIView):
     GET /api/business/admin/agency-packages/payment-requests/?status=PENDING|APPROVED|REJECTED
     Admin-only list of agency payment requests. Defaults to PENDING.
     """
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("promo")]
 
     def get(self, request):
         status_in = (request.query_params.get("status") or "PENDING").strip().upper()
@@ -1750,6 +2088,12 @@ class AdminAgencyPaymentRequestListView(APIView):
         )
         if status_in in valid:
             qs = qs.filter(status=status_in)
+        agency_id = request.query_params.get("agency_id")
+        if agency_id:
+            try:
+                qs = qs.filter(agency_id=int(agency_id))
+            except Exception:
+                pass
         ser = AgencyPackagePaymentRequestSerializer(qs, many=True, context={"request": request})
         return Response(ser.data, status=status.HTTP_200_OK)
 
@@ -1760,7 +2104,7 @@ class AdminApproveAgencyPaymentRequestView(APIView):
     Body: { "admin_notes": "optional" }
     Marks the request APPROVED and stamps approver. Payment row creation is handled by model signal.
     """
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("promo")]
 
     def post(self, request, pk: int):
         obj = AgencyPackagePaymentRequest.objects.select_related("assignment", "package", "agency").filter(pk=pk).first()
@@ -1809,6 +2153,25 @@ class AdminApproveAgencyPaymentRequestView(APIView):
                             reference=ref[:100],
                             notes=(obj.notes or "")[:1000],
                         )
+                        # First-payment activation: if this is the first approved payment for this assignment, activate account
+                        try:
+                            if (paid_sum or D("0")) == D("0") and (pay_amount or D("0")) > D("0"):
+                                # Mark user active (green in admin list)
+                                try:
+                                    if not bool(getattr(obj.agency, "account_active", False)):
+                                        obj.agency.account_active = True
+                                        obj.agency.save(update_fields=["account_active"])
+                                except Exception:
+                                    pass
+                                # Stamp first purchase activation flags (idempotent)
+                                try:
+                                    from .services.activation import ensure_first_purchase_activation
+                                    ensure_first_purchase_activation(obj.agency, {"type": "agency_prime_first_payment", "id": obj.id})
+                                except Exception:
+                                    pass
+                        except Exception:
+                            # best-effort; do not block approval if activation hook fails
+                            pass
             except Exception:
                 # best-effort; do not block approval if payment row creation fails
                 pass
@@ -1822,7 +2185,7 @@ class AdminRejectAgencyPaymentRequestView(APIView):
     POST /api/business/admin/agency-packages/payment-requests/<pk>/reject/
     Body: { "admin_notes": "optional" }
     """
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("promo")]
 
     def post(self, request, pk: int):
         obj = AgencyPackagePaymentRequest.objects.select_related("assignment", "package", "agency").filter(pk=pk).first()
@@ -1918,10 +2281,10 @@ class TriAppListView(APIView):
     GET /api/business/tri/apps/
     List active TRI apps with capability flags and banner URL.
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-        qs = TriApp.objects.filter(is_active=True).order_by("slug")
+        qs = TriApp.objects.filter(is_active=True).order_by("sort_order", "slug")
         ser = TriAppSerializer(qs, many=True, context={"request": request})
         return Response(ser.data, status=status.HTTP_200_OK)
 
@@ -1932,7 +2295,7 @@ class TriAppDetailView(APIView):
     Retrieve a TRI app with active products (image URLs) and admin-controlled flags:
       - allow_price, allow_add_to_cart, allow_payment
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def get(self, request, slug):
         obj = TriApp.objects.filter(slug=slug, is_active=True).first()
@@ -1941,6 +2304,164 @@ class TriAppDetailView(APIView):
         ser = TriAppSerializer(obj, context={"request": request})
         return Response(ser.data, status=status.HTTP_200_OK)
 
+
+# ==============================
+# Admin TRI Apps CRUD
+# ==============================
+from rest_framework.parsers import MultiPartParser, FormParser
+
+class AdminTriAppListCreate(APIView):
+    """
+    Admin-only CRUD for TRI Apps (categories grid source).
+    GET /api/business/admin/tri/apps/
+    POST /api/business/admin/tri/apps/ (multipart: slug, name, description?, is_active?, allow_*?, banner_image?)
+    """
+    permission_classes = [IsAdminOrStaff]
+    parser_classes = (MultiPartParser, FormParser)
+
+    def get(self, request):
+        qs = TriApp.objects.all().order_by("sort_order", "slug")
+        out = []
+        for obj in qs:
+            try:
+                banner_url = None
+                f = getattr(obj, "banner_image", None)
+                if f:
+                    url = f.url
+                    banner_url = request.build_absolute_uri(url) if (request and not str(url).startswith("http")) else url
+            except Exception:
+                banner_url = None
+            try:
+                icon_url = None
+                f2 = getattr(obj, "icon", None)
+                if f2:
+                    url2 = f2.url
+                    icon_url = request.build_absolute_uri(url2) if (request and not str(url2).startswith("http")) else url2
+            except Exception:
+                icon_url = None
+            out.append({
+                "id": obj.id,
+                "slug": obj.slug,
+                "name": obj.name,
+                "description": obj.description or "",
+                "is_active": bool(obj.is_active),
+                "allow_price": bool(obj.allow_price),
+                "allow_add_to_cart": bool(obj.allow_add_to_cart),
+                "allow_payment": bool(obj.allow_payment),
+                "sort_order": int(getattr(obj, "sort_order", 0) or 0),
+                "banner_url": banner_url,
+                "icon_url": icon_url,
+            })
+        return Response(out, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        slug = str(request.data.get("slug") or "").strip()
+        name = str(request.data.get("name") or "").strip()
+        description = str(request.data.get("description") or "").strip()
+        is_active = str(request.data.get("is_active") or "true").strip().lower() in ("1", "true", "yes")
+        allow_price = str(request.data.get("allow_price") or "false").strip().lower() in ("1", "true", "yes")
+        allow_add_to_cart = str(request.data.get("allow_add_to_cart") or "false").strip().lower() in ("1", "true", "yes")
+        allow_payment = str(request.data.get("allow_payment") or "false").strip().lower() in ("1", "true", "yes")
+        banner = request.FILES.get("banner_image") or request.FILES.get("banner")
+        # optional fields
+        try:
+            sort_order = int(str(request.data.get("sort_order") or 0) or 0)
+        except Exception:
+            sort_order = 0
+        icon = request.FILES.get("icon")
+
+        if not slug or not name:
+            return Response({"slug": ["slug is required."], "name": ["name is required."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        if TriApp.objects.filter(slug__iexact=slug).exists():
+            return Response({"slug": ["slug must be unique."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        obj = TriApp.objects.create(
+            slug=slug,
+            name=name,
+            description=description,
+            is_active=is_active,
+            allow_price=allow_price,
+            allow_add_to_cart=allow_add_to_cart,
+            allow_payment=allow_payment,
+            sort_order=sort_order,
+            banner_image=banner,
+            icon=icon,
+        )
+        return Response({"id": obj.id, "slug": obj.slug, "name": obj.name}, status=status.HTTP_201_CREATED)
+
+
+class AdminTriAppDetail(APIView):
+    """
+    Admin-only: GET/PATCH/DELETE /api/business/admin/tri/apps/<int:pk>/
+    """
+    permission_classes = [IsAdminOrStaff]
+    parser_classes = (MultiPartParser, FormParser)
+
+    def get_object(self, pk: int):
+        return TriApp.objects.filter(pk=pk).first()
+
+    def get(self, request, pk: int):
+        obj = self.get_object(pk)
+        if not obj:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            f = getattr(obj, "banner_image", None)
+            url = f.url if f else None
+            banner_url = request.build_absolute_uri(url) if (request and url and not str(url).startswith("http")) else url
+        except Exception:
+            banner_url = None
+        try:
+            f2 = getattr(obj, "icon", None)
+            url2 = f2.url if f2 else None
+            icon_url = request.build_absolute_uri(url2) if (request and url2 and not str(url2).startswith("http")) else url2
+        except Exception:
+            icon_url = None
+        return Response({
+            "id": obj.id,
+            "slug": obj.slug,
+            "name": obj.name,
+            "description": obj.description or "",
+            "is_active": bool(obj.is_active),
+            "allow_price": bool(obj.allow_price),
+            "allow_add_to_cart": bool(obj.allow_add_to_cart),
+            "allow_payment": bool(obj.allow_payment),
+            "sort_order": int(getattr(obj, "sort_order", 0) or 0),
+            "banner_url": banner_url,
+            "icon_url": icon_url,
+        }, status=status.HTTP_200_OK)
+
+    def patch(self, request, pk: int):
+        obj = self.get_object(pk)
+        if not obj:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        fields = ("slug", "name", "description", "is_active", "allow_price", "allow_add_to_cart", "allow_payment")
+        for f in fields:
+            if f in request.data:
+                val = request.data.get(f)
+                if f in ("is_active", "allow_price", "allow_add_to_cart", "allow_payment"):
+                    val = str(val).strip().lower() in ("1", "true", "yes")
+                setattr(obj, f, val if f != "description" else (val or ""))
+        if "sort_order" in request.data:
+            try:
+                obj.sort_order = int(str(request.data.get("sort_order") or 0))
+            except Exception:
+                pass
+        banner = request.FILES.get("banner_image") or request.FILES.get("banner")
+        if banner is not None:
+            obj.banner_image = banner
+        icon = request.FILES.get("icon")
+        if icon is not None:
+            obj.icon = icon
+        obj.save()
+        return Response({"id": obj.id, "slug": obj.slug, "name": obj.name}, status=status.HTTP_200_OK)
+
+    def delete(self, request, pk: int):
+        obj = self.get_object(pk)
+        if not obj:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        obj.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 # ==============================
 # Withdrawals: Direct Refer Commission Breakdown + Apply (Admin)
@@ -1992,7 +2513,7 @@ class AdminApplyWithdrawCommissionView(APIView):
     Body: { "user_id": PK, "amount": 123.45, "source_type": "WITHDRAWAL", "source_id": "ref-123" }
     Admin-only: applies the distribution by crediting sponsor/company wallets.
     """
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("withdrawals")]
 
     def post(self, request):
         uid = request.data.get("user_id")

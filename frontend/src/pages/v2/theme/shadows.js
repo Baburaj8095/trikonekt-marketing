@@ -1,4 +1,4 @@
-/**
+﻿/**
  * v2 Theme - Shadows
  */
 const shadows = {
@@ -8,3 +8,4 @@ const shadows = {
 };
 
 export default shadows;
+

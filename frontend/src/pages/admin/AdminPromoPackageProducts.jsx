@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import {
   Container,
   Paper,
@@ -253,7 +253,7 @@ export default function AdminPromoPackageProducts() {
               ) : (
                 packages.map((pkg) => (
                   <MenuItem key={pkg.id} value={String(pkg.id)}>
-                    {pkg.code} — {pkg.name} (₹{pkg.price})
+                    {pkg.code} â€” {pkg.name} (â‚¹{pkg.price})
                   </MenuItem>
                 ))
               )}
@@ -274,7 +274,7 @@ export default function AdminPromoPackageProducts() {
               fullWidth
               size="small"
               type="number"
-              label="Price (₹)"
+              label="Price (â‚¹)"
               value={ppPrice}
               onChange={(e) => setPpPrice(e.target.value)}
               inputProps={{ min: 0, step: "0.01" }}
@@ -485,3 +485,4 @@ export default function AdminPromoPackageProducts() {
     </Container>
   );
 }
+

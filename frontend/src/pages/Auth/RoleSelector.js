@@ -1,4 +1,4 @@
-// src/components/Auth/RoleSelector.js
+﻿// src/components/Auth/RoleSelector.js
 import React from "react";
 import { MenuItem, Select, FormControl, InputLabel } from "@mui/material";
 
@@ -21,3 +21,4 @@ const RoleSelector = ({ role, setRole }) => {
 };
 
 export default RoleSelector;
+
