@@ -139,8 +139,8 @@ SIMPLE_JWT = {
 }
 
 # CORS configuration
-CORS_ALLOWED_ORIGINS = _csv_env('CORS_ALLOWED_ORIGINS', '')
-CORS_ALLOWED_ORIGIN_REGEXES = _csv_env('CORS_ALLOWED_ORIGIN_REGEXES', '')
+CORS_ALLOWED_ORIGINS = _csv_env('CORS_ALLOWED_ORIGINS', 'https://trikonekt.com,https://www.trikonekt.com')
+CORS_ALLOWED_ORIGIN_REGEXES = _csv_env('CORS_ALLOWED_ORIGIN_REGEXES', '^https://.*\\.vercel\\.app$')
 CORS_ALLOW_ALL_ORIGINS = False if (CORS_ALLOWED_ORIGINS or CORS_ALLOWED_ORIGIN_REGEXES) else True
 CORS_ALLOW_CREDENTIALS = False
 CORS_ALLOW_HEADERS = [
@@ -179,7 +179,7 @@ if os.environ.get('CLOUDINARY_URL'):
 # CSRF trusted origins for local frontend dev
 # This allows POST/PUT/PATCH/DELETE from the React dev server at port 3000
 # without failing the CSRF Origin check.
-CSRF_TRUSTED_ORIGINS = _csv_env('CSRF_TRUSTED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000')
+CSRF_TRUSTED_ORIGINS = _csv_env('CSRF_TRUSTED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,https://trikonekt.com,https://www.trikonekt.com,https://trikonekt.vercel.app')
 
 # Email configuration (env-driven with safe defaults)
 MAIL_ENABLED = os.environ.get('MAIL_ENABLED', '').lower() in ('1', 'true', 'yes')
