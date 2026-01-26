@@ -46,7 +46,7 @@ class AdminMerchantCategoryListCreate(APIView):
         rows = (
             MerchantCategory.objects.all()
             .order_by("sort_order", "name")
-            .values("id", "name", "is_active", "sort_order", "created_at")
+            .values("id", "name", "is_active", "sort_order", "audience", "created_at")
         )
         return Response(list(rows), status=status.HTTP_200_OK)
 
@@ -58,18 +58,21 @@ class AdminMerchantCategoryListCreate(APIView):
             sort_order = int(sort_order)
         except Exception:
             sort_order = 0
+        aud_raw = str(request.data.get("audience") or "").strip().upper()
+        audience = "CONSUMER" if aud_raw not in {"CONSUMER", "MERCHANT"} else aud_raw
         if not name:
             return Response({"name": ["This field is required."]}, status=status.HTTP_400_BAD_REQUEST)
         obj, created = MerchantCategory.objects.get_or_create(
             name=name,
-            defaults={"is_active": is_active, "sort_order": sort_order},
+            defaults={"is_active": is_active, "sort_order": sort_order, "audience": audience},
         )
         if not created:
             # Update if exists
             obj.is_active = is_active
             obj.sort_order = sort_order
-            obj.save(update_fields=["is_active", "sort_order"])
-        return Response({"id": obj.id, "name": obj.name, "is_active": obj.is_active, "sort_order": obj.sort_order}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+            obj.audience = audience
+            obj.save(update_fields=["is_active", "sort_order", "audience"])
+        return Response({"id": obj.id, "name": obj.name, "is_active": obj.is_active, "sort_order": obj.sort_order, "audience": obj.audience}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
 
 class AdminMerchantCategoryDetail(APIView):
@@ -82,7 +85,7 @@ class AdminMerchantCategoryDetail(APIView):
         obj = self.get_object(pk)
         if not obj:
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
-        data = {"id": obj.id, "name": obj.name, "is_active": obj.is_active, "sort_order": obj.sort_order, "created_at": obj.created_at}
+        data = {"id": obj.id, "name": obj.name, "is_active": obj.is_active, "sort_order": obj.sort_order, "audience": obj.audience, "created_at": obj.created_at}
         return Response(data, status=status.HTTP_200_OK)
 
     def patch(self, request, pk: int):
@@ -102,8 +105,12 @@ class AdminMerchantCategoryDetail(APIView):
                 obj.sort_order = int(request.data.get("sort_order"))
             except Exception:
                 pass
+        if "audience" in request.data:
+            aud_raw = str(request.data.get("audience") or "").strip().upper()
+            if aud_raw in {"CONSUMER", "MERCHANT"}:
+                obj.audience = aud_raw
         obj.save()
-        return Response({"id": obj.id, "name": obj.name, "is_active": obj.is_active, "sort_order": obj.sort_order}, status=status.HTTP_200_OK)
+        return Response({"id": obj.id, "name": obj.name, "is_active": obj.is_active, "sort_order": obj.sort_order, "audience": obj.audience}, status=status.HTTP_200_OK)
 
     def delete(self, request, pk: int):
         obj = self.get_object(pk)
@@ -120,7 +127,7 @@ class AdminMerchantSubCategoryListCreate(APIView):
         qs = (
             MerchantSubCategory.objects.select_related("category")
             .order_by("category_id", "sort_order", "name")
-            .values("id", "name", "is_active", "sort_order", "category_id", "created_at")
+            .values("id", "name", "is_active", "sort_order", "audience", "category_id", "created_at")
         )
         return Response(list(qs), status=status.HTTP_200_OK)
 
@@ -133,6 +140,8 @@ class AdminMerchantSubCategoryListCreate(APIView):
             sort_order = int(sort_order)
         except Exception:
             sort_order = 0
+        aud_raw = str(request.data.get("audience") or "").strip().upper()
+        audience = "CONSUMER" if aud_raw not in {"CONSUMER", "MERCHANT"} else aud_raw
         try:
             cid = int(category_id)
         except Exception:
@@ -146,15 +155,16 @@ class AdminMerchantSubCategoryListCreate(APIView):
             obj, created = MerchantSubCategory.objects.get_or_create(
                 category=cat,
                 name=name,
-                defaults={"is_active": is_active, "sort_order": sort_order},
+                defaults={"is_active": is_active, "sort_order": sort_order, "audience": audience},
             )
             if not created:
                 obj.is_active = is_active
                 obj.sort_order = sort_order
-                obj.save(update_fields=["is_active", "sort_order"])
+                obj.audience = audience
+                obj.save(update_fields=["is_active", "sort_order", "audience"])
         except Exception as e:
             return Response({"detail": "Failed to create subcategory."}, status=status.HTTP_400_BAD_REQUEST)
-        return Response({"id": obj.id, "name": obj.name, "is_active": obj.is_active, "sort_order": obj.sort_order, "category_id": obj.category_id}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+        return Response({"id": obj.id, "name": obj.name, "is_active": obj.is_active, "sort_order": obj.sort_order, "audience": obj.audience, "category_id": obj.category_id}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
 
 class AdminMerchantSubCategoryDetail(APIView):
@@ -167,7 +177,7 @@ class AdminMerchantSubCategoryDetail(APIView):
         obj = self.get_object(pk)
         if not obj:
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
-        data = {"id": obj.id, "name": obj.name, "is_active": obj.is_active, "sort_order": obj.sort_order, "category_id": obj.category_id, "created_at": obj.created_at}
+        data = {"id": obj.id, "name": obj.name, "is_active": obj.is_active, "sort_order": obj.sort_order, "audience": obj.audience, "category_id": obj.category_id, "created_at": obj.created_at}
         return Response(data, status=status.HTTP_200_OK)
 
     def patch(self, request, pk: int):
@@ -195,8 +205,12 @@ class AdminMerchantSubCategoryDetail(APIView):
             if not cat:
                 return Response({"category_id": ["Category not found."]}, status=status.HTTP_404_NOT_FOUND)
             obj.category = cat
+        if "audience" in request.data:
+            aud_raw = str(request.data.get("audience") or "").strip().upper()
+            if aud_raw in {"CONSUMER", "MERCHANT"}:
+                obj.audience = aud_raw
         obj.save()
-        return Response({"id": obj.id, "name": obj.name, "is_active": obj.is_active, "sort_order": obj.sort_order, "category_id": obj.category_id}, status=status.HTTP_200_OK)
+        return Response({"id": obj.id, "name": obj.name, "is_active": obj.is_active, "sort_order": obj.sort_order, "audience": obj.audience, "category_id": obj.category_id}, status=status.HTTP_200_OK)
 
     def delete(self, request, pk: int):
         obj = self.get_object(pk)

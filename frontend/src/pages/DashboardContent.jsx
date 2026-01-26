@@ -24,7 +24,7 @@ import API, {
   listCategoryBanners,
 } from "../api/api";
 
-// IMAGE IMPORTS â€” fallbacks
+// IMAGE IMPORTS ”” fallbacks
 import heroImg from "../assets/Wealth_Galaxy.jpg";
 import promoImg1 from "../assets/spin1.png";
 import promoImg2 from "../assets/asst_2.png";
@@ -265,7 +265,7 @@ export default function DashboardContent() {
               color: "#64748b",
             }}
           >
-            Search productsâ€¦
+            Search products”¦
           </Box>
 
           <IconButton>

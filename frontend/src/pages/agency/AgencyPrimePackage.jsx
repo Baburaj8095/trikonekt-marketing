@@ -6,9 +6,9 @@ import SubFranchisePrimePricing from "../../components/SubFranchisePrimePricing"
 /**
  * AgencyPrimePackage
  * - Tab 1: My Packages (fetched for the logged-in agency)
- * - Tab 2: Subâ€‘franchise Rewards (static milestones per sketch)
+ * - Tab 2: Sub”‘franchise Rewards (static milestones per sketch)
  *
- * "My Packages" replicates the compact cards UX used in admin (readâ€‘only here).
+ * "My Packages" replicates the compact cards UX used in admin (read”‘only here).
  */
 export default function AgencyPrimePackage() {
   const [tab, setTab] = useState("my");
@@ -69,7 +69,7 @@ export default function AgencyPrimePackage() {
           indicatorColor="primary"
         >
           <Tab value="my" label="My Packages" />
-          <Tab value="subfranchise" label="Subâ€‘franchise Rewards" />
+          <Tab value="subfranchise" label="Sub”‘franchise Rewards" />
         </Tabs>
       </Paper>
 
@@ -88,7 +88,7 @@ export default function AgencyPrimePackage() {
                   st === "PARTIAL" ? "warning" :
                   st === "PENDING" ? "info" : "default";
                 const toINR = (x) => {
-                  try { const n = Number(x); return isFinite(n) ? `â‚¹${n.toLocaleString("en-IN")}` : `â‚¹${String(x)}`; } catch { return `â‚¹${String(x)}`; }
+                  try { const n = Number(x); return isFinite(n) ? `₹${n.toLocaleString("en-IN")}` : `₹${String(x)}`; } catch { return `₹${String(x)}`; }
                 };
                 return (
                   <Grid item xs={12} sm={6} md={4} key={a.id}>
@@ -119,7 +119,7 @@ export default function AgencyPrimePackage() {
               })}
             </Grid>
           ) : (
-            <Typography color="text.secondary">No packages yet. Go to Subâ€‘franchise tab to purchase.</Typography>
+            <Typography color="text.secondary">No packages yet. Go to Sub”‘franchise tab to purchase.</Typography>
           )}
         </Box>
       )}

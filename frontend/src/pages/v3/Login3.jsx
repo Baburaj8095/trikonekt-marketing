@@ -1,4 +1,4 @@
-﻿// Login3.jsx â€” v3 Dark + Teal UX (logic preserved from Auth/Login.jsx)
+﻿// Login3.jsx ”” v3 Dark + Teal UX (logic preserved from Auth/Login.jsx)
 // Notes:
 // - All logic, state, API calls, and flows are kept the same as src/pages/Auth/Login.jsx
 // - Only the UI/UX styling is changed to match the attached dark sketch
@@ -2030,7 +2030,7 @@ const Login3 = () => {
                     {sponsorChecking && (
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
                         <CircularProgress size={16} />
-                        <Typography variant="body2" color="text.secondary">Validating sponsorâ€¦</Typography>
+                        <Typography variant="body2" color="text.secondary">Validating sponsor”¦</Typography>
                       </Box>
                     )}
                     {sponsorValid === true && (
@@ -2174,7 +2174,7 @@ const Login3 = () => {
 
       {/* Footer */}
       <Box sx={{ py: 2.5, textAlign: "center", background: "var(--v3-bg)", borderTop: "1px solid var(--v3-border)", color: "var(--v3-muted)" }}>
-        <Typography variant="body2">Â© {new Date().getFullYear()} Trikonekt. All rights reserved.</Typography>
+        <Typography variant="body2">© {new Date().getFullYear()} Trikonekt. All rights reserved.</Typography>
         <Typography variant="body2" sx={{ mt: 1 }}>
           Contact us:{" "}
           <Link

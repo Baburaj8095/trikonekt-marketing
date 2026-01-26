@@ -40,13 +40,13 @@ function ProductCard({ product }) {
 
         <Box display="flex" gap={0.5} alignItems="center">
           <Typography fontWeight={700} color="#16a34a">
-            â‚¹{product.price}
+            ₹{product.price}
           </Typography>
           <Typography
             fontSize={12}
             sx={{ textDecoration: "line-through", color: "#64748b" }}
           >
-            â‚¹{product.mrp}
+            ₹{product.mrp}
           </Typography>
         </Box>
 

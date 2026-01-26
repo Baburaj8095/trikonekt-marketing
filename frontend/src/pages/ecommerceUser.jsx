@@ -170,7 +170,7 @@ export default function EcommerceUser({ embedded = false }) {
               size="small"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search for products, shopsâ€¦"
+              placeholder="Search for products, shops”¦"
               fullWidth
               sx={{
                 "& .MuiOutlinedInput-root": {

@@ -1,5 +1,6 @@
 ﻿import axios from "axios";
 import { incrementLoading, decrementLoading } from "../hooks/loadingStore";
+import { deepFixMojibake, fixMojibakeString } from "../utils/encodingFix";
 
 const rawBaseURL =
   process.env.REACT_APP_API_URL ||
@@ -450,6 +451,15 @@ API.interceptors.response.use(
     try {
       if (res?.config?._trackLoading) decrementLoading();
     } catch (_) {}
+    // Attempt to repair mojibake in response payloads (strings and JSON objects)
+    try {
+      const d = res?.data;
+      if (typeof d === "string") {
+        res.data = fixMojibakeString(d);
+      } else if (d && typeof d === "object") {
+        res.data = deepFixMojibake(d);
+      }
+    } catch (_) {}
     // Cache GET responses and clear inflight tracking
     try {
       const cfg = res?.config || {};
@@ -604,10 +614,10 @@ export async function assignEmployeeByCount(payload) {
 }
 
 /**
- * Eâ€‘Coupon Store APIs
+ * E”‘Coupon Store APIs
  */
 
-// Bootstrap: roleâ€‘filtered products + active payment config (for create order screen)
+// Bootstrap: role”‘filtered products + active payment config (for create order screen)
 export async function getEcouponStoreBootstrap() {
   const res = await API.get("/coupons/store/orders/bootstrap/", {
     // cache for short time to reduce flicker
@@ -617,7 +627,7 @@ export async function getEcouponStoreBootstrap() {
   return res?.data || res;
 }
 
-// Create an eâ€‘coupon order (multipart). Fields: product, quantity, utr?, notes?, payment_proof_file?
+// Create an e”‘coupon order (multipart). Fields: product, quantity, utr?, notes?, payment_proof_file?
 export async function createEcouponOrder({ product, quantity, utr = "", notes = "", file = null }) {
   const fd = new FormData();
   fd.append("product", String(product));
@@ -682,7 +692,7 @@ export async function listCouponSeasons(params = {}) {
 }
 
 /**
- * Consumer eâ€‘coupon wallet helpers
+ * Consumer e”‘coupon wallet helpers
  */
 export async function getMyECoupons(params = {}) {
   const res = await API.get("/coupons/codes/mine-consumer/", { params, dedupe: "cancelPrevious" });
@@ -697,7 +707,7 @@ export async function transferECoupon(codeId, { to_username, pincode = "", notes
   return res?.data || res;
 }
 
-// Activation/Redeem using v1 endpoints with eâ€‘coupon source context
+// Activation/Redeem using v1 endpoints with e”‘coupon source context
 export async function activateECoupon150({ code }) {
   const res = await API.post("/v1/coupon/activate/?async=1", {
     type: "150",
@@ -1051,6 +1061,16 @@ export async function getShopDetail(id) {
   return res?.data || res;
 }
 
+export async function getNearbyShops(params = {}) {
+  const cfg = {
+    params: { limit: 5, ...params },
+    dedupe: "cancelPrevious",
+    cacheTTL: 10_000,
+  };
+  const res = await API.get("/shops/nearby/", cfg);
+  return res?.data || res;
+}
+
 // Merchant profile (auto-created on first access)
 export async function getMerchantProfile() {
   const res = await API.get("/merchant/profile/", { dedupe: "cancelPrevious" });
@@ -1180,4 +1200,3 @@ export async function listCategoryBanners({ params = {} } = {}) {
 
 export { ensureFreshAccess, getAccessToken, getRefreshToken, setAuthBlocked, isAuthBlocked };
 export default API;
-

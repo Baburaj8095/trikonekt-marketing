@@ -196,7 +196,7 @@ function Card({ title, value, subtitle, onClick, palette = "blue" }) {
  * AdminDashboard
  * - Merged overview counters and Admin Models into a single responsive card grid.
  * - Keeps only the requested account counters: Users, Withdrawal Requests, User KYC, Wallets, Transactions.
- * - Removed Quick Actions and Recent Eâ€‘Coupon Assignments sections as requested.
+ * - Removed Quick Actions and Recent E”‘Coupon Assignments sections as requested.
  */
 export default function AdminDashboard() {
   const [data, setData] = useState(null);
@@ -453,19 +453,19 @@ export default function AdminDashboard() {
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 8, marginTop: 8, width: "100%", minWidth: 0 }}>
                       <div style={{ padding: 8, borderRadius: 8, background: "rgba(255,255,255,0.15)", minWidth: 0 }}>
                       <div style={{ fontSize: 12, opacity: 0.9, color: inactive ? "#f1f5f9" : "#0f172a" }}>Amount</div>
-                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a", whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere", minWidth: 0 }}>â‚¹{p.total_amount || "0.00"}</div>
+                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a", whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere", minWidth: 0 }}>₹{p.total_amount || "0.00"}</div>
                       </div>
                       <div style={{ padding: 8, borderRadius: 8, background: "rgba(255,255,255,0.15)", minWidth: 0 }}>
                       <div style={{ fontSize: 12, opacity: 0.9, color: inactive ? "#f1f5f9" : "#0f172a" }}>Paid</div>
-                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a", whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere", minWidth: 0 }}>â‚¹{p.paid_amount || "0.00"}</div>
+                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a", whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere", minWidth: 0 }}>₹{p.paid_amount || "0.00"}</div>
                       </div>
                       <div style={{ padding: 8, borderRadius: 8, background: "rgba(255,255,255,0.15)", minWidth: 0 }}>
                       <div style={{ fontSize: 12, opacity: 0.9, color: inactive ? "#f1f5f9" : "#0f172a" }}>Remaining</div>
-                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a", whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere", minWidth: 0 }}>â‚¹{p.remaining_amount || "0.00"}</div>
+                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a", whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere", minWidth: 0 }}>₹{p.remaining_amount || "0.00"}</div>
                       </div>
                     </div>
                     <div style={{ marginTop: 6, fontSize: 12, fontWeight: 700, whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere" }}>
-                      Renewal: {typeof p.months_remaining === "number" ? `${p.months_remaining} month${p.months_remaining === 1 ? "" : "s"} remaining` : "â€”"}
+                      Renewal: {typeof p.months_remaining === "number" ? `${p.months_remaining} month${p.months_remaining === 1 ? "" : "s"} remaining` : "””"}
                     </div>
                   </div>
                 );
@@ -515,7 +515,7 @@ export default function AdminDashboard() {
                 palette="indigo"
               />
               <Card
-                title="Subâ€‘Franchises"
+                title="Sub”‘Franchises"
                 value={(catCounts.agency_sub_franchise ?? 0)}
                 subtitle=""
                 onClick={() => nav("/admin/users?category=agency_sub_franchise")}
@@ -560,7 +560,7 @@ export default function AdminDashboard() {
               palette="cyan"
             />
             <Card
-              title="Eâ€‘Coupons"
+              title="E”‘Coupons"
               value={(data?.coupons?.total ?? 0)}
               subtitle=""
               onClick={() => nav("/admin/e-coupons")}

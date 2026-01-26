@@ -109,7 +109,7 @@ export default function AdminHomeCards() {
         title="Select Upload Model"
         extraRight={
           loading ? (
-            <div style={{ color: "#64748b", fontSize: 12 }}>Loadingâ€¦</div>
+            <div style={{ color: "#64748b", fontSize: 12 }}>Loading”¦</div>
           ) : error ? (
             <div style={{ color: "#dc2626", fontSize: 12 }}>{error}</div>
           ) : null
@@ -139,7 +139,7 @@ export default function AdminHomeCards() {
               })}
             </select>
             <div style={{ color: "#64748b", fontSize: 12 }}>
-              Tip: We auto-select models containing â€œhomeâ€ and one of â€œcardâ€/â€œbannerâ€.
+              Tip: We auto-select models containing “home” and one of “card”/“banner”.
             </div>
           </div>
         ) : loading ? null : (
@@ -157,7 +157,7 @@ export default function AdminHomeCards() {
       >
         {!selected ? (
           <div style={{ padding: 12, color: "#64748b" }}>
-            {loading ? "Loadingâ€¦" : error || "Select a model to manage home cards/banners."}
+            {loading ? "Loading”¦" : error || "Select a model to manage home cards/banners."}
           </div>
         ) : (
           <div style={{ padding: 12 }}>

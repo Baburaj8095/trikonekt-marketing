@@ -36,7 +36,7 @@ export default function ECouponProductCard({ product, available = null, onAddToC
   const total = unit * q;
   const outOfStock = Number.isFinite(available) ? Number(available) <= 0 : false;
 
-  const title = product?.display_title || "Eâ€‘Coupon";
+  const title = product?.display_title || "E”‘Coupon";
   const desc = product?.display_desc || "";
 
   const handleDec = () => setQty((x) => Math.max(1, parseInt(x || 1, 10) - 1));
@@ -80,10 +80,10 @@ export default function ECouponProductCard({ product, available = null, onAddToC
             src={"data:image/svg+xml;utf8," + encodeURIComponent(`
               <svg xmlns='http://www.w3.org/2000/svg' width='600' height='400'>
                 <rect width='100%' height='100%' fill='#f1f5f9'/>
-                <text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='Montserrat,Arial' font-size='72' fill='#94a3b8'>â‚¹</text>
+                <text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='Montserrat,Arial' font-size='72' fill='#94a3b8'>₹</text>
               </svg>
             `)}
-            alt="Eâ€‘Coupon"
+            alt="E”‘Coupon"
             loading="lazy"
             style={{ width: "100%", aspectRatio: dense ? "1 / 1" : "4 / 3", objectFit: "cover" }}
           />
@@ -130,7 +130,7 @@ export default function ECouponProductCard({ product, available = null, onAddToC
               Denomination
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 900 }}>
-              â‚¹{product?.denomination}
+              ₹{product?.denomination}
             </Typography>
           </Stack>
           <Stack spacing={0.25}>
@@ -138,7 +138,7 @@ export default function ECouponProductCard({ product, available = null, onAddToC
               Unit Price
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 900 }}>
-              â‚¹{isFinite(unit) ? unit.toFixed(2) : "0.00"}
+              ₹{isFinite(unit) ? unit.toFixed(2) : "0.00"}
             </Typography>
           </Stack>
           <Stack spacing={0.25}>
@@ -146,7 +146,7 @@ export default function ECouponProductCard({ product, available = null, onAddToC
               Available
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 900 }}>
-              {Number.isFinite(available) ? available : "â€”"}
+              {Number.isFinite(available) ? available : "””"}
             </Typography>
           </Stack>
         </Stack>
@@ -197,7 +197,7 @@ export default function ECouponProductCard({ product, available = null, onAddToC
             Total:
           </Typography>
           <Typography variant="body1" sx={{ fontWeight: 900 }}>
-            â‚¹{isFinite(total) ? total.toFixed(2) : "0.00"}
+            ₹{isFinite(total) ? total.toFixed(2) : "0.00"}
           </Typography>
         </Stack>
       </CardContent>

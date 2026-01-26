@@ -165,7 +165,7 @@ export default function DataTable({
           base.renderCell = (params) => {
             const row = params?.row || {};
             const v = getFieldValue(row, base.field);
-            if (v == null || v === "") return "â€”";
+            if (v == null || v === "") return "””";
             return String(v);
           };
         }
@@ -213,7 +213,7 @@ export default function DataTable({
       <div style={{ padding: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         {toolbar}
         <input
-          placeholder="Searchâ€¦"
+          placeholder="Search”¦"
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
           style={{ padding: 8, width: "min(280px, 100%)", borderRadius: 8, border: "1px solid #e5e7eb", backgroundColor: "#ffffff" }}

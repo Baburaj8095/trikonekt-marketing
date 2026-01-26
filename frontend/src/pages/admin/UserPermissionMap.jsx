@@ -196,7 +196,7 @@ export default function UserPermissionMap() {
                 onChange={(e) => setSelectedUserId(e.target.value)}
                 style={{ width: "100%", padding: "8px 10px", border: "1px solid #e2e8f0", borderRadius: 8, background: "#fff" }}
               >
-                <option value="">â€” Select Admin User â€”</option>
+                <option value="">”” Select Admin User ””</option>
                 {adminUsers.map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.full_name || u.username} ({u.username})
@@ -220,7 +220,7 @@ export default function UserPermissionMap() {
                 onChange={(e) => setSelectedRoleId(e.target.value)}
                 style={{ width: "100%", padding: "8px 10px", border: "1px solid #e2e8f0", borderRadius: 8, background: "#fff" }}
               >
-                <option value="">â€” Select Role/Group â€”</option>
+                <option value="">”” Select Role/Group ””</option>
                 {roles.map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.name}{r.is_super ? " (SUPER)" : ""}

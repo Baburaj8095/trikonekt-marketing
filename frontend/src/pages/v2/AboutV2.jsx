@@ -37,7 +37,7 @@ export default function About() {
               TRIKONEKT is a smart digital platform built to connect people,
               businesses, and opportunities in one powerful network.
               <br /><br />
-              We believe that every connection creates value â€” and that value
+              We believe that every connection creates value ”” and that value
               should be shared with everyone.
             </Typography>
           </CardContent>
@@ -84,7 +84,7 @@ export default function About() {
         <Card sx={{ borderRadius: 3, mb: 3 }}>
           <CardContent>
             <Typography variant="body2" color="text.secondary">
-              This innovative model, â€œincome through spending,â€ enables users
+              This innovative model, “income through spending,” enables users
               to become partners in wealth creation.
               <br /><br />
               By simply purchasing goods and services they need, users earn a
@@ -93,7 +93,7 @@ export default function About() {
               <br /><br />
               TRIKONEKT operates as a marketplace connecting users with
               businesses. As users shop, a portion of the profit generated from
-              each transaction is shared with them â€” turning everyday spending
+              each transaction is shared with them ”” turning everyday spending
               into income.
             </Typography>
           </CardContent>
@@ -145,30 +145,30 @@ export default function About() {
         <Stack spacing={2} mb={3}>
           <Card sx={{ borderRadius: 3 }}>
             <CardContent>
-              <Typography fontWeight={800}>PRIME PACKAGE â€“ â‚¹150</Typography>
-              <Typography variant="body2">â€¢ E-Book</Typography>
-              <Typography variant="body2">â€¢ Redeem Amount</Typography>
+              <Typography fontWeight={800}>PRIME PACKAGE ”“ ₹150</Typography>
+              <Typography variant="body2">”¢ E-Book</Typography>
+              <Typography variant="body2">”¢ Redeem Amount</Typography>
             </CardContent>
           </Card>
 
           <Card sx={{ borderRadius: 3 }}>
             <CardContent>
-              <Typography fontWeight={800}>PROMO PACKAGE â€“ â‚¹750</Typography>
-              <Typography variant="body2">â€¢ Product</Typography>
-              <Typography variant="body2">â€¢ Redeem Amount</Typography>
-              <Typography variant="body2">â€¢ E-Coupons (Lucky Dip)</Typography>
+              <Typography fontWeight={800}>PROMO PACKAGE ”“ ₹750</Typography>
+              <Typography variant="body2">”¢ Product</Typography>
+              <Typography variant="body2">”¢ Redeem Amount</Typography>
+              <Typography variant="body2">”¢ E-Coupons (Lucky Dip)</Typography>
             </CardContent>
           </Card>
 
           <Card sx={{ borderRadius: 3 }}>
             <CardContent>
               <Typography fontWeight={800}>
-                MONTHLY PROMO PACKAGE â€“ â‚¹759
+                MONTHLY PROMO PACKAGE ”“ ₹759
               </Typography>
-              <Typography variant="body2">â€¢ Electronics</Typography>
-              <Typography variant="body2">â€¢ Home Appliances</Typography>
-              <Typography variant="body2">â€¢ Furniture</Typography>
-              <Typography variant="body2">â€¢ Holiday Packages</Typography>
+              <Typography variant="body2">”¢ Electronics</Typography>
+              <Typography variant="body2">”¢ Home Appliances</Typography>
+              <Typography variant="body2">”¢ Furniture</Typography>
+              <Typography variant="body2">”¢ Holiday Packages</Typography>
             </CardContent>
           </Card>
         </Stack>
@@ -181,20 +181,20 @@ export default function About() {
         <Card sx={{ borderRadius: 3, mb: 3 }}>
           <CardContent>
             <Typography fontWeight={700}>Agency</Typography>
-            <Typography variant="body2">â€¢ Products</Typography>
-            <Typography variant="body2">â€¢ Redeem Amount</Typography>
+            <Typography variant="body2">”¢ Products</Typography>
+            <Typography variant="body2">”¢ Redeem Amount</Typography>
 
             <Divider sx={{ my: 2 }} />
 
             <Typography fontWeight={700}>Employee Job Promo</Typography>
-            <Typography variant="body2">â€¢ Marketing</Typography>
-            <Typography variant="body2">â€¢ Training</Typography>
+            <Typography variant="body2">”¢ Marketing</Typography>
+            <Typography variant="body2">”¢ Training</Typography>
 
             <Divider sx={{ my: 2 }} />
 
             <Typography fontWeight={700}>Merchant Business Promo</Typography>
-            <Typography variant="body2">â€¢ Ads</Typography>
-            <Typography variant="body2">â€¢ Promotion</Typography>
+            <Typography variant="body2">”¢ Ads</Typography>
+            <Typography variant="body2">”¢ Promotion</Typography>
           </CardContent>
         </Card>
 
@@ -206,10 +206,10 @@ export default function About() {
               purchases, services, and business interactions into meaningful
               income.
               <br /><br />
-              Users are not just customers â€” they are growth partners in a
+              Users are not just customers ”” they are growth partners in a
               transparent and trustworthy system.
               <br /><br />
-              <strong>TRIKONEKT â€“ Where Connections Create Growth.</strong>
+              <strong>TRIKONEKT ”“ Where Connections Create Growth.</strong>
             </Typography>
           </CardContent>
         </Card>

@@ -8,7 +8,7 @@ import normalizeMediaUrl from "../../utils/media";
  * used across:
  *  - Cart
  *  - Checkout
- *  - Eâ€‘Coupon Store
+ *  - E”‘Coupon Store
  */
 function TextInput({ label, value, onChange, placeholder, type = "text", style }) {
   return (
@@ -137,7 +137,7 @@ export default function AdminPayments() {
       <div style={{ marginBottom: 12 }}>
         <h2 style={{ margin: 0, color: "#0f172a" }}>Payment Configure</h2>
         <div style={{ color: "#64748b", fontSize: 13 }}>
-          Configure a global UPI payment method. The active configuration will be shown in Cart, Checkout, and Eâ€‘Coupon store.
+          Configure a global UPI payment method. The active configuration will be shown in Cart, Checkout, and E”‘Coupon store.
         </div>
       </div>
 
@@ -284,11 +284,11 @@ export default function AdminPayments() {
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 220 }}>
                   <div style={{ fontWeight: 700 }}>{c.title || `#${c.id}`}</div>
-                  <div style={{ color: "#64748b", fontSize: 12 }}>{c.payee_name || "â€”"}</div>
+                  <div style={{ color: "#64748b", fontSize: 12 }}>{c.payee_name || "””"}</div>
                   <div style={{ color: "#64748b", fontSize: 12 }}>{c.upi_id || ""}</div>
                 </div>
                 <div style={{ color: "#64748b", fontSize: 12, maxWidth: "100%", whiteSpace: "normal", wordBreak: "break-word", overflow: "visible", textOverflow: "clip", flex: "1 1 240px" }}>
-                  {c.instructions || "â€”"}
+                  {c.instructions || "””"}
                 </div>
                 <div style={{ color: c.is_active ? "#16a34a" : "#64748b", fontWeight: 700, marginLeft: 8 }}>
                   {c.is_active ? "ACTIVE" : "INACTIVE"}

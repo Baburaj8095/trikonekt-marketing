@@ -8,8 +8,8 @@ import Cart from "../Cart";
 /**
  * AgencyCoupons
  * Unified coupons screen for Agency role with in-page tabs:
- *  - Eâ€‘Coupon (agency operations & summary)
- *  - Eâ€‘Coupon Store (browse/buy/assign)
+ *  - E”‘Coupon (agency operations & summary)
+ *  - E”‘Coupon Store (browse/buy/assign)
  *  - Cart (centralized checkout cart)
  *
  * Deep link: ?tab=ecoupon|store|cart
@@ -56,8 +56,8 @@ export default function AgencyCoupons() {
           textColor="primary"
           indicatorColor="primary"
         >
-          <Tab value={TABS.ECOUPON} label="Eâ€‘Coupon Store" />
-          {/* <Tab value={TABS.STORE} label="Eâ€‘Coupon Store" /> */}
+          <Tab value={TABS.ECOUPON} label="E”‘Coupon Store" />
+          {/* <Tab value={TABS.STORE} label="E”‘Coupon Store" /> */}
           <Tab value={TABS.CART} label="Cart" />
         </Tabs>
       </Paper>

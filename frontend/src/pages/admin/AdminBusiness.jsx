@@ -94,7 +94,7 @@ export default function AdminBusiness() {
         title="Select Model"
         extraRight={
           loading ? (
-            <div style={{ color: "#64748b", fontSize: 12 }}>Loadingâ€¦</div>
+            <div style={{ color: "#64748b", fontSize: 12 }}>Loading”¦</div>
           ) : error ? (
             <div style={{ color: "#dc2626", fontSize: 12 }}>{error}</div>
           ) : null
@@ -139,7 +139,7 @@ export default function AdminBusiness() {
       >
         {!selected ? (
           <div style={{ padding: 12, color: "#64748b" }}>
-            {loading ? "Loadingâ€¦" : error || "Select a model to view registrations."}
+            {loading ? "Loading”¦" : error || "Select a model to view registrations."}
           </div>
         ) : (
           <div style={{ padding: 12 }}>

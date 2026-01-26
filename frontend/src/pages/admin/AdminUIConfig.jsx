@@ -149,7 +149,7 @@ function EditModal({ row, onClose, onSaved }) {
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000 }}>
       <div style={{ width: "98%", maxWidth: 900, background: "#fff", borderRadius: 12, overflow: "hidden", boxShadow: "0 10px 30px rgba(0,0,0,0.2)" }}>
         <div style={{ padding: 12, fontWeight: 800, borderBottom: "1px solid #e2e8f0", background: "#f8fafc" }}>
-          Edit UI Config â€” {row?.key}
+          Edit UI Config ”” {row?.key}
         </div>
         <div style={{ padding: 12, display: "grid", gap: 12 }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
@@ -319,7 +319,7 @@ export default function AdminUIConfig() {
               }}
               style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", color: "#0f172a" }}
             >
-              <option value="__none__">Templatesâ€¦</option>
+              <option value="__none__">Templates”¦</option>
               <option value="home">Ecommerce Home</option>
               <option value="category">Category Default</option>
             </select>
@@ -423,7 +423,7 @@ export default function AdminUIConfig() {
             >
               <div>#{r.id}</div>
               <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.key}</div>
-              <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.title || "â€”"}</div>
+              <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.title || "””"}</div>
               <div>{r.version ?? 1}</div>
               <div>
                 <button

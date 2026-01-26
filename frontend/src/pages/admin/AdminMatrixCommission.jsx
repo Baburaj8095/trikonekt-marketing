@@ -195,7 +195,7 @@ export default function AdminMatrixCommission() {
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ margin: 0, color: "#0f172a" }}>Matrix Commission</h2>
         <div style={{ color: "#64748b", fontSize: 13 }}>
-          Configure 5â€‘Matrix (FIVE_150) and 3â€‘Matrix (THREE_50/THREE_150) level-wise payouts. Amount arrays override percents when present.
+          Configure 5”‘Matrix (FIVE_150) and 3”‘Matrix (THREE_50/THREE_150) level-wise payouts. Amount arrays override percents when present.
         </div>
       </div>
 
@@ -233,7 +233,7 @@ export default function AdminMatrixCommission() {
       </div>
 
       <Section
-        title="5â€‘Matrix (FIVE_150)"
+        title="5”‘Matrix (FIVE_150)"
         extraRight={
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <Pill>Levels: {fiveLevels || "-"}</Pill>
@@ -249,7 +249,7 @@ export default function AdminMatrixCommission() {
             type="number"
           />
           <TextInput
-            label="Fixed Amounts per level (â‚¹) [overrides percents]"
+            label="Fixed Amounts per level (₹) [overrides percents]"
             value={fiveAmounts}
             onChange={setFiveAmounts}
             placeholder={`e.g. ${examples.fiveAmounts}`}
@@ -267,7 +267,7 @@ export default function AdminMatrixCommission() {
       </Section>
 
       <Section
-        title="3â€‘Matrix (THREE_50 / THREE_150)"
+        title="3”‘Matrix (THREE_50 / THREE_150)"
         extraRight={
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <Pill>Levels: {threeLevels || "-"}</Pill>
@@ -283,7 +283,7 @@ export default function AdminMatrixCommission() {
             type="number"
           />
           <TextInput
-            label="Fixed Amounts per level (â‚¹) [overrides percents]"
+            label="Fixed Amounts per level (₹) [overrides percents]"
             value={threeAmounts}
             onChange={setThreeAmounts}
             placeholder="e.g. 5, 3, 2, 2, 1, 1, 1, 0.5, ..."

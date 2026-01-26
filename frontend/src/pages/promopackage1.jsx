@@ -168,7 +168,7 @@ function PackageCard({ pkg, onProceed, prime150Active, prime150Pending, seasons 
     <Paper sx={{ p: 2, borderRadius: 2 }}>
       <Typography fontWeight={800}>{pkg.name}</Typography>
       <Typography fontSize={22} fontWeight={900}>
-        â‚¹{pkg.price}
+        ₹{pkg.price}
       </Typography>
 
       <Box component="ul" sx={{ pl: 2, mt: 1 }}>
@@ -384,7 +384,7 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
           <Stack direction="row" justifyContent="space-between" mt={1}>
             <Typography color="text.secondary">Total Amount</Typography>
             <Typography fontWeight={900} fontSize={20}>
-              â‚¹{data.amount}
+              ₹{data.amount}
             </Typography>
           </Stack>
         </Paper>

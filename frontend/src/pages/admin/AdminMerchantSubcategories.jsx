@@ -53,7 +53,7 @@ export default function AdminMerchantSubcategories() {
   // Create/Edit dialog
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ name: "", category_id: "", is_active: true, sort_order: 0 });
+  const [form, setForm] = useState({ name: "", category_id: "", is_active: true, sort_order: 0, audience: "CONSUMER" });
 
   // Infer if list returns category object or id
   function getRowCategoryId(row) {
@@ -67,12 +67,12 @@ export default function AdminMerchantSubcategories() {
     return "";
   }
   function getRowCategoryName(row) {
-    if (!row) return "â€”";
+    if (!row) return "””";
     if (row.category && typeof row.category === "object") {
-      return row.category.name || "â€”";
+      return row.category.name || "””";
     }
     const cid = getRowCategoryId(row);
-    if (!cid) return "â€”";
+    if (!cid) return "””";
     const m = (cats || []).find((c) => String(c.id) === String(cid));
     return m ? (m.name || `#${cid}`) : `#${cid}`;
   }
@@ -124,7 +124,7 @@ export default function AdminMerchantSubcategories() {
 
   function openAdd() {
     setEditing(null);
-    setForm({ name: "", category_id: filterCat || "", is_active: true, sort_order: 0 });
+    setForm({ name: "", category_id: filterCat || "", is_active: true, sort_order: 0, audience: "CONSUMER" });
     setDialogOpen(true);
   }
   function openEdit(row) {
@@ -134,6 +134,7 @@ export default function AdminMerchantSubcategories() {
       category_id: getRowCategoryId(row) || "",
       is_active: !!row?.is_active,
       sort_order: Number(row?.sort_order || 0),
+      audience: String(row?.audience || "CONSUMER"),
     });
     setDialogOpen(true);
   }
@@ -189,6 +190,7 @@ export default function AdminMerchantSubcategories() {
       is_active: !!form.is_active,
       sort_order: Number(form.sort_order || 0),
       category: categoryId,
+      audience: String(form.audience || "CONSUMER"),
     };
     try {
       await createOrUpdateSubcategory(payload, editing ? editing.id : null);
@@ -263,7 +265,7 @@ export default function AdminMerchantSubcategories() {
           </FormControl>
           <TextField
             size="small"
-            placeholder="Search by nameâ€¦"
+            placeholder="Search by name”¦"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -288,6 +290,7 @@ export default function AdminMerchantSubcategories() {
                 <TableCell>Name</TableCell>
                 <TableCell>Category</TableCell>
                 <TableCell>Active</TableCell>
+                <TableCell>Audience</TableCell>
                 <TableCell>Sort Order</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
@@ -300,6 +303,7 @@ export default function AdminMerchantSubcategories() {
                   <TableCell>
                     <Switch checked={!!row.is_active} onChange={(e) => handleToggleActive(row, e.target.checked)} />
                   </TableCell>
+                  <TableCell>{row?.audience || "CONSUMER"}</TableCell>
                   <TableCell sx={{ width: 140 }}>
                     <TextField
                       size="small"
@@ -326,7 +330,7 @@ export default function AdminMerchantSubcategories() {
               ))}
               {!loading && (filtered || []).length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} align="center" sx={{ py: 4, color: "text.secondary" }}>
+                  <TableCell colSpan={6} align="center" sx={{ py: 4, color: "text.secondary" }}>
                     No subcategories found
                   </TableCell>
                 </TableRow>
@@ -376,6 +380,18 @@ export default function AdminMerchantSubcategories() {
               />
               <Typography>Active</Typography>
             </Box>
+            <FormControl fullWidth>
+              <InputLabel>Audience</InputLabel>
+              <Select
+                label="Audience"
+                value={form.audience}
+                onChange={(e) => setForm((f) => ({ ...f, audience: e.target.value }))}
+                required
+              >
+                <MenuItem value="CONSUMER">Consumer</MenuItem>
+                <MenuItem value="MERCHANT">Merchant</MenuItem>
+              </Select>
+            </FormControl>
           </Box>
         </DialogContent>
         <DialogActions>
@@ -399,4 +415,3 @@ export default function AdminMerchantSubcategories() {
     </Box>
   );
 }
-

@@ -138,7 +138,7 @@ export default function Cart() {
                     </Typography>
 
                     <Typography variant="body2" sx={{ color: "text.primary" }}>
-                      â‚¹{unit.toLocaleString("en-IN")}
+                      ₹{unit.toLocaleString("en-IN")}
                     </Typography>
 
                     <Stack
@@ -185,7 +185,7 @@ export default function Cart() {
                       <Box sx={{ flex: 1 }} />
 
                       <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                        â‚¹{Number(subtotal).toLocaleString("en-IN")}
+                        ₹{Number(subtotal).toLocaleString("en-IN")}
                       </Typography>
                     </Stack>
 
@@ -241,7 +241,7 @@ export default function Cart() {
               Subtotal
             </Typography>
             <Typography variant="h6" sx={{ fontWeight: 800 }}>
-              â‚¹{Number(total || 0).toLocaleString("en-IN")}
+              ₹{Number(total || 0).toLocaleString("en-IN")}
             </Typography>
           </Stack>
           <Divider />

@@ -231,7 +231,7 @@ export default function ECouponStore() {
       const q = Math.max(1, parseInt(qty || "1", 10));
       addEcoupon({
         productId: pid,
-        title: product?.display_title || "Eâ€‘Coupon",
+        title: product?.display_title || "E”‘Coupon",
         unitPrice: Number(product?.price_per_unit || 0),
         qty: q,
         denomination: product?.denomination ?? null,
@@ -286,7 +286,7 @@ export default function ECouponStore() {
     const after = Number(res?.available_after || 0);
     const samples = Array.isArray(res?.sample_codes) ? res.sample_codes : [];
     try { await computeMyPoolAvailabilities(denomOptions.filter((d) => d !== "all")); } catch {}
-    return { message: `Assigned ${assigned}${body.value ? ` (â‚¹${body.value})` : ""}. Remaining in your pool: ${after}. Samples: ${samples.join(", ")}` };
+    return { message: `Assigned ${assigned}${body.value ? ` (₹${body.value})` : ""}. Remaining in your pool: ${after}. Samples: ${samples.join(", ")}` };
   };
 
   const onAssignEmployee = async ({ username, count, notes, value }) => {
@@ -304,7 +304,7 @@ export default function ECouponStore() {
     const after = Number(res?.available_after || 0);
     const samples = Array.isArray(res?.sample_codes) ? res.sample_codes : [];
     try { await computeMyPoolAvailabilities(denomOptions.filter((d) => d !== "all")); } catch {}
-    return { message: `Assigned ${assigned}${body.value ? ` (â‚¹${body.value})` : ""} to ${username}. Remaining in agency pool: ${after}. Samples: ${samples.join(", ")}` };
+    return { message: `Assigned ${assigned}${body.value ? ` (₹${body.value})` : ""} to ${username}. Remaining in agency pool: ${after}. Samples: ${samples.join(", ")}` };
   };
 
   return (
@@ -315,7 +315,7 @@ export default function ECouponStore() {
         <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
           <Box>
             <Typography variant="h6" sx={{ fontWeight: 900, color: "#0f172a" }}>
-              Eâ€‘Coupon Store
+              E”‘Coupon Store
             </Typography>
             <Typography variant="caption" color="text.secondary">
               Role: {roleHint}. Add items to cart and checkout via UPI QR.
@@ -398,7 +398,7 @@ export default function ECouponStore() {
         <Accordion defaultExpanded sx={{ mb: 1.5 }}>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
             <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "#0f172a" }}>
-              Send Eâ€‘Coupons to Consumer (by Count)
+              Send E”‘Coupons to Consumer (by Count)
             </Typography>
           </AccordionSummary>
           <AccordionDetails>

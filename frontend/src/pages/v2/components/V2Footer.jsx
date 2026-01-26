@@ -39,7 +39,7 @@ export default function V2Footer() {
         }}
       >
         <Typography sx={{ fontSize: 12 }}>
-          Â© {new Date().getFullYear()} Trikonekt. All rights reserved.
+          © {new Date().getFullYear()} Trikonekt. All rights reserved.
         </Typography>
 
         <Box sx={{ display: "flex", gap: `${spacing.md}px` }}>

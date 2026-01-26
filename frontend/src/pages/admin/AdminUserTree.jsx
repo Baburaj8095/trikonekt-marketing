@@ -55,7 +55,7 @@ export default function AdminUserTree() {
           indicatorColor="primary"
         >
           <Tab label="5 Matrix (Matrix Placement)" />
-          <Tab label="3 Matrix (Matrix Placement)" />
+          {/* <Tab label="3 Matrix (Matrix Placement)" /> */}
         </Tabs>
       </Box>
 

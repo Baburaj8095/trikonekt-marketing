@@ -79,7 +79,7 @@ function TxItem({ tx }) {
             {Math.abs(amount).toFixed(4)}
           </Typography>
           <Typography sx={{ fontSize: 12, color: tintColor }}>
-            â‚¹ {fmtAmount(Math.abs(amount))}
+            ₹ {fmtAmount(Math.abs(amount))}
           </Typography>
         </Box>
       </Stack>

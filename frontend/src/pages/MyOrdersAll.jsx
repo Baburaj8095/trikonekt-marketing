@@ -73,7 +73,7 @@ function StatusChip({ status }) {
 export default function MyOrdersAll() {
   const [tab, setTab] = useState("ecoupons");
 
-  // Eâ€‘Coupon orders
+  // E”‘Coupon orders
   const [ecOrders, setEcOrders] = useState([]);
   const [ecLoading, setEcLoading] = useState(false);
 
@@ -144,7 +144,7 @@ export default function MyOrdersAll() {
           allowScrollButtonsMobile
           variant="scrollable"
         >
-          <Tab label="Eâ€‘Coupons" value="ecoupons" />
+          <Tab label="E”‘Coupons" value="ecoupons" />
           <Tab label="Promo Purchases" value="promo" />
           <Tab label="Products" value="products" />
           <Tab label="Marketplace" value="market" />
@@ -153,7 +153,7 @@ export default function MyOrdersAll() {
 
       {tab === "ecoupons" ? (
         <Section
-          title="Eâ€‘Coupon Orders"
+          title="E”‘Coupon Orders"
           actions={
             <Button size="small" variant="outlined" onClick={loadEcOrders} disabled={ecLoading}>
               {ecLoading ? "Refreshing..." : "Refresh"}
@@ -176,7 +176,7 @@ export default function MyOrdersAll() {
                   <TableRow>
                     <TableCell colSpan={5}>
                       <Typography variant="body2" color="text.secondary">
-                        No Eâ€‘Coupon orders yet.
+                        No E”‘Coupon orders yet.
                       </Typography>
                     </TableCell>
                   </TableRow>
@@ -243,7 +243,7 @@ export default function MyOrdersAll() {
                         <TableCell>{pkg.type || "-"}</TableCell>
                         <TableCell>{p.quantity || "-"}</TableCell>
                         <TableCell>
-                          {pkg.price != null ? `â‚¹${Number(pkg.price).toLocaleString("en-IN")}` : "-"}
+                          {pkg.price != null ? `₹${Number(pkg.price).toLocaleString("en-IN")}` : "-"}
                         </TableCell>
                         <TableCell>
                           <StatusChip status={p.status} />
@@ -298,7 +298,7 @@ export default function MyOrdersAll() {
                       <TableCell>{String(r.payment_method || "-").toUpperCase()}</TableCell>
                       <TableCell>
                         {r.reward_discount_amount != null
-                          ? `â‚¹${Number(r.reward_discount_amount).toLocaleString("en-IN")}`
+                          ? `₹${Number(r.reward_discount_amount).toLocaleString("en-IN")}`
                           : "-"}
                       </TableCell>
                       <TableCell><StatusChip status={r.status} /></TableCell>

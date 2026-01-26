@@ -128,7 +128,7 @@ export default function AdminAutopool() {
             />
             <Card
               title="Total Earned"
-              value={`â‚¹${totals.earned.toFixed(2)}`}
+              value={`₹${totals.earned.toFixed(2)}`}
               subtitle="Sum of earnings across pools"
               color="#059669"
             />
@@ -200,7 +200,7 @@ export default function AdminAutopool() {
                   <div>
                     <div style={{ color: "#64748b", fontSize: 12 }}>Total Earned</div>
                     <div style={{ fontWeight: 800, color: "#0f172a" }}>
-                      â‚¹{Number(p.total_earned || 0).toFixed(2)}
+                      ₹{Number(p.total_earned || 0).toFixed(2)}
                     </div>
                   </div>
                   <div>
@@ -332,10 +332,10 @@ export default function AdminAutopool() {
                           <td style={{ padding: 8, fontSize: 12, color: "#0f172a", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>{t?.username || ""}</td>
                           <td style={{ padding: 8, fontSize: 12, color: "#0f172a", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>{t?.sponsor_id || ""}</td>
                           <td style={{ padding: 8, fontSize: 12, color: "#0f172a", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>{typeLabel}</td>
-                          <td style={{ padding: 8, fontSize: 12, color: "#0f172a", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap", textAlign: "right" }}>â‚¹{amount.toFixed(2)}</td>
-                          <td style={{ padding: 8, fontSize: 12, color: "#0f172a", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap", textAlign: "right" }}>â‚¹{net.toFixed(2)}</td>
+                          <td style={{ padding: 8, fontSize: 12, color: "#0f172a", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap", textAlign: "right" }}>₹{amount.toFixed(2)}</td>
+                          <td style={{ padding: 8, fontSize: 12, color: "#0f172a", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap", textAlign: "right" }}>₹{net.toFixed(2)}</td>
                           <td style={{ padding: 8, fontSize: 12, color: "#0f172a", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap", textAlign: "right" }}>
-                            {mainBal == null ? "-" : `â‚¹${mainBal.toFixed(2)}`}
+                            {mainBal == null ? "-" : `₹${mainBal.toFixed(2)}`}
                           </td>
                           <td style={{ padding: 8, fontSize: 12, color: "#0f172a", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>
                             {dt ? dt.toLocaleString() : ""}

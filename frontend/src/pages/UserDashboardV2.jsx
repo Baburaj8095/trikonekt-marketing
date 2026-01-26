@@ -364,7 +364,7 @@ export default function UserDashboard({ embedded = false }) {
       { key: "prime", label: "Prime", icon: StarIcon, route: "/user/promo-packages", image: LOGO },
       { key: "gift-cards", label: "Gift Cards", icon: CardGiftcardIcon, comingSoon: true, image: imgGiftCards },
       { key: "bill-recharge", label: "Bill & Recharge", icon: ReceiptLongIcon, comingSoon: true, image: imgBillRecharge },
-      { key: "ecommerce", label: "Eâ€‘commerce", icon: ShoppingCartIcon, route: "/trikonekt-products", image: imgEcommerce },
+      { key: "ecommerce", label: "E”‘commerce", icon: ShoppingCartIcon, route: "/trikonekt-products", image: imgEcommerce },
       { key: "tri-holidays", label: "TRI Holidays", icon: BeachAccessIcon, route: "/user/tri/tri-holidays", image: imgHolidays },
       { key: "tri-furniture", label: "TRI Furniture", icon: WeekendIcon, route: "/user/tri/tri-furniture", image: imgFurniture },
       { key: "tri-electronics", label: "TRI Electronics", icon: DevicesOtherIcon, route: "/user/tri/tri-electronics", image: imgPlaystoreScreen },
@@ -385,7 +385,7 @@ export default function UserDashboard({ embedded = false }) {
         it.key === "prime"
           ? {
               ...it,
-              badgeText: isPrime ? "Prime" : "Nonâ€‘Prime",
+              badgeText: isPrime ? "Prime" : "Non”‘Prime",
               badgeBg: isPrime ? "#16a34a" : "#6b7280",
               badgeFg: "#fff",
             }
@@ -620,7 +620,7 @@ export default function UserDashboard({ embedded = false }) {
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <Chip size="small" color="success" label="Prime Active" />
             <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              Youâ€™re enjoying Prime benefits.
+              You’re enjoying Prime benefits.
             </Typography>
           </Box>
         ) : (
@@ -804,7 +804,7 @@ export default function UserDashboard({ embedded = false }) {
       title === "Electronics"
         ? ["Smart 4K TV", "Bluetooth Speaker"]
         : title === "EV Vehicles"
-        ? ["Eâ€‘Bike", "Eâ€‘Scooter"]
+        ? ["E”‘Bike", "E”‘Scooter"]
         : ["Modern Sofa", "Dining Set"];
 
     const reward =
@@ -932,7 +932,7 @@ export default function UserDashboard({ embedded = false }) {
           "Bookshelf",
           "Coffee Table",
         ]),
-        ev: make("ev", "/user/tri/tri-ev", ["Eâ€‘Bike", "Eâ€‘Scooter", "EV Charger", "Eâ€‘Cycle", "Battery Pack", "Helmet"]),
+        ev: make("ev", "/user/tri/tri-ev", ["E”‘Bike", "E”‘Scooter", "EV Charger", "E”‘Cycle", "Battery Pack", "Helmet"]),
       };
     }, [catImages]);
 
@@ -1102,7 +1102,7 @@ export default function UserDashboard({ embedded = false }) {
 
     const services = [
       { label: "App Hub", onClick: () => setSelectedMenu("apphub") },
-      { label: "Eâ€‘Book", onClick: () => setSelectedMenu("ebooks") },
+      { label: "E”‘Book", onClick: () => setSelectedMenu("ebooks") },
       itemByKey["tri-saving"]
         ? {
             label: itemByKey["tri-saving"].label,
@@ -1589,7 +1589,7 @@ onClick={() => ev.route && navigate(ev.route)}
                 setMobileOpen(false);
               }}
             >
-              <ListItemText primary="Eâ€‘Book" />
+              <ListItemText primary="E”‘Book" />
             </ListItemButton>
           </List>
           <Divider />
@@ -1666,7 +1666,7 @@ onClick={() => ev.route && navigate(ev.route)}
               sx={{ "&.Mui-selected": { backgroundColor: "#E3F2FD", color: "#0C2D48" } }}
               onClick={() => setSelectedMenu("ebooks")}
             >
-              <ListItemText primary="Eâ€‘Book" />
+              <ListItemText primary="E”‘Book" />
             </ListItemButton>
           </List>
           <Divider />
@@ -1713,7 +1713,7 @@ onClick={() => ev.route && navigate(ev.route)}
             <Tab label="Dashboard" value="dashboard" />
             <Tab label="MarketPlace" value="marketplace" />
             <Tab label="App Hub" value="apphub" />
-            <Tab label="Eâ€‘Book" value="ebooks" />
+            <Tab label="E”‘Book" value="ebooks" />
           </Tabs>
         </Box>
 

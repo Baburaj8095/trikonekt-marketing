@@ -87,7 +87,7 @@ function TicketList({ tickets, loading, selectedId, onSelect, onRefresh }) {
               {t.message ? (
                 <Typography variant="caption" sx={{ color: "text.secondary" }}>
                   {String(t.message).slice(0, 120)}
-                  {String(t.message).length > 120 ? "â€¦" : ""}
+                  {String(t.message).length > 120 ? "”¦" : ""}
                 </Typography>
               ) : null}
               <Typography variant="caption" sx={{ color: "text.disabled", display: "block" }}>

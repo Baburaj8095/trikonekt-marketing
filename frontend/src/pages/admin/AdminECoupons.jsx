@@ -267,7 +267,7 @@ export default function AdminECoupons() {
     enable_employee: false,
     is_active: true,
     max_per_order: "10",
-    display_title: "Eâ€‘Coupon",
+    display_title: "E”‘Coupon",
     display_desc: "",
   });
 
@@ -426,7 +426,7 @@ export default function AdminECoupons() {
     () =>
       agencies.map((u) => {
         const isSub = String(u?.category || "").toLowerCase().startsWith("agency") && String(u?.category || "").toLowerCase().includes("sub");
-        return { value: String(u.id), label: `${u.username} #${u.id}${isSub ? " [subâ€‘franchise]" : ""}` };
+        return { value: String(u.id), label: `${u.username} #${u.id}${isSub ? " [sub”‘franchise]" : ""}` };
       }),
     [agencies]
   );
@@ -443,10 +443,10 @@ export default function AdminECoupons() {
           String(u?.category || "").toLowerCase().includes("sub");
         const name = String(u?.full_name || "").trim() || u.username;
         const pin = String(u?.pincode || "").trim();
-        const pinPart = pin ? ` â€¢ PIN ${pin}` : "";
+        const pinPart = pin ? ` ”¢ PIN ${pin}` : "";
         return {
           value: String(u.id),
-          label: `${name} (${u.username})${pinPart}${isSub ? " [subâ€‘franchise]" : ""}`,
+          label: `${name} (${u.username})${pinPart}${isSub ? " [sub”‘franchise]" : ""}`,
         };
       }),
     [agencies]
@@ -498,7 +498,7 @@ export default function AdminECoupons() {
           const d = batchDenomCache[String(b.id)];
           return {
             value: String(b.id),
-            label: `#${b.id} ${b.prefix}${d ? ` â€¢ â‚¹${d}` : ""}${count ? ` (${count} codes)` : ""}`,
+            label: `#${b.id} ${b.prefix}${d ? ` ”¢ ₹${d}` : ""}${count ? ` (${count} codes)` : ""}`,
           };
         });
   }, [seasonBatches, batchDenomCache]);
@@ -581,7 +581,7 @@ export default function AdminECoupons() {
       await loadBootstrap();
       await preloadSeasonBatchDenoms(Number(seasonCouponId));
       await refreshSeasonAvailability(Number(seasonCouponId));
-      alert(`Created ${cnt} codes (â‚¹${value}) for ${seasonLabel(season.number)}`);
+      alert(`Created ${cnt} codes (₹${value}) for ${seasonLabel(season.number)}`);
     } catch (e) {
       const msg = e?.response?.data?.detail || "Failed to create batch";
       alert(msg);
@@ -1028,7 +1028,7 @@ export default function AdminECoupons() {
         ...f,
         price_per_unit: "",
         max_per_order: "10",
-        display_title: "Eâ€‘Coupon",
+        display_title: "E”‘Coupon",
         display_desc: "",
       }));
     } catch (e) {
@@ -1064,7 +1064,7 @@ export default function AdminECoupons() {
           enable_employee: false,
           is_active: true,
           max_per_order: 10,
-          display_title: `Eâ€‘Coupon â‚¹${denom}`,
+          display_title: `E”‘Coupon ₹${denom}`,
           display_desc: "",
         };
         try {
@@ -1163,9 +1163,9 @@ export default function AdminECoupons() {
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: 0, color: "#0f172a" }}>Eâ€‘Coupons</h2>
+        <h2 style={{ margin: 0, color: "#0f172a" }}>E”‘Coupons</h2>
         <div style={{ color: "#64748b", fontSize: 13 }}>
-          Season-first creation. Create Season batches (â‚¹150/â‚¹759), assign by count to agencies/employees, manage store and view metrics.
+          Season-first creation. Create Season batches (₹150/₹759), assign by count to agencies/employees, manage store and view metrics.
         </div>
       </div>
 
@@ -1364,7 +1364,7 @@ export default function AdminECoupons() {
               gap: 10,
             }}
           >
-            <div style={{ fontWeight: 700, color: "#0f172a" }}>â‚¹150</div>
+            <div style={{ fontWeight: 700, color: "#0f172a" }}>₹150</div>
             <TextInput
               label="Count"
               type="number"
@@ -1406,7 +1406,7 @@ export default function AdminECoupons() {
               gap: 10,
             }}
           >
-            <div style={{ fontWeight: 700, color: "#0f172a" }}>â‚¹759</div>
+            <div style={{ fontWeight: 700, color: "#0f172a" }}>₹759</div>
             <TextInput
               label="Count"
               type="number"
@@ -1479,8 +1479,8 @@ export default function AdminECoupons() {
               setSeasonAssign((s) => ({ ...s, denom: v, batchId: "" }));
             }}
             options={[
-              { value: "150", label: "â‚¹150" },
-              { value: "759", label: "â‚¹759" },
+              { value: "150", label: "₹150" },
+              { value: "759", label: "₹759" },
             ]}
           />
           <Select
@@ -1508,7 +1508,7 @@ export default function AdminECoupons() {
               }))
             }
             options={[
-              { value: "agency", label: "Agency / Subâ€‘franchise" },
+              { value: "agency", label: "Agency / Sub”‘franchise" },
               { value: "employee", label: "Employee (Admin direct)" },
             ]}
           />
@@ -1543,11 +1543,11 @@ export default function AdminECoupons() {
           />
         </div>
         <div style={{ display: "flex", gap: 12, marginTop: 10, flexWrap: "wrap", color: "#64748b", fontSize: 12 }}>
-          <div>Season Available â‚¹150: {seasonAvail["150"]}</div>
-          <div>Season Available â‚¹759: {seasonAvail["759"]}</div>
+          <div>Season Available ₹150: {seasonAvail["150"]}</div>
+          <div>Season Available ₹759: {seasonAvail["759"]}</div>
           {seasonAssign.batchId ? (
             <div>
-              Batch Available: {batchAvail[String(seasonAssign.batchId)] ?? "â€¦"}
+              Batch Available: {batchAvail[String(seasonAssign.batchId)] ?? "”¦"}
             </div>
           ) : null}
         </div>
@@ -1565,8 +1565,8 @@ export default function AdminECoupons() {
               onChange={(v) => setSeasonKpi((k) => ({ ...k, denom: v }))}
               options={[
                 { value: "all", label: "All" },
-                { value: "150", label: "â‚¹150" },
-                { value: "759", label: "â‚¹759" },
+                { value: "150", label: "₹150" },
+                { value: "759", label: "₹759" },
               ]}
             />
             <button
@@ -1645,8 +1645,8 @@ export default function AdminECoupons() {
             onChange={(v) => setAgencyHist((s) => ({ ...s, denom: v }))}
             options={[
               { value: "all", label: "All" },
-              { value: "150", label: "â‚¹150" },
-              { value: "759", label: "â‚¹759" },
+              { value: "150", label: "₹150" },
+              { value: "759", label: "₹759" },
             ]}
           />
           <TextInput
@@ -1678,8 +1678,8 @@ export default function AdminECoupons() {
           <MetricCard label="Redeemed" value={agencyHist.snapshot.redeemed} />
           <MetricCard label="Revoked" value={agencyHist.snapshot.revoked} />
           <MetricCard label="Total (Season)" value={agencyHist.snapshot.total} />
-          <MetricCard label="Total â‚¹150" value={agencyHist.snapshot.byDenom["150"]} />
-          <MetricCard label="Total â‚¹759" value={agencyHist.snapshot.byDenom["759"]} />
+          <MetricCard label="Total ₹150" value={agencyHist.snapshot.byDenom["150"]} />
+          <MetricCard label="Total ₹759" value={agencyHist.snapshot.byDenom["759"]} />
         </div>
 
         <div style={{ marginTop: 12, border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden", background: "#fff" }}>
@@ -1717,12 +1717,12 @@ export default function AdminECoupons() {
                     borderBottom: "1px solid #e2e8f0",
                   }}
                 >
-                  <div>â‚¹{r.denom || "â€”"}</div>
-                  <div>{r.batch_display || "â€”"}</div>
-                  <div>{r.count ?? "â€”"}</div>
-                  <div style={{ textTransform: "capitalize" }}>{r.role || "â€”"}</div>
-                  <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.assigned_by || "â€”"}</div>
-                  <div>{r.assigned_at ? new Date(r.assigned_at).toLocaleString() : "â€”"}</div>
+                  <div>₹{r.denom || "””"}</div>
+                  <div>{r.batch_display || "””"}</div>
+                  <div>{r.count ?? "””"}</div>
+                  <div style={{ textTransform: "capitalize" }}>{r.role || "””"}</div>
+                  <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.assigned_by || "””"}</div>
+                  <div>{r.assigned_at ? new Date(r.assigned_at).toLocaleString() : "””"}</div>
                 </div>
               ))}
               {!agencyHist.loading && (!agencyHist.rows || agencyHist.rows.length === 0) ? (
@@ -1895,7 +1895,7 @@ export default function AdminECoupons() {
             label="Display Title"
             value={spForm.display_title}
             onChange={(v) => setSpForm((f) => ({ ...f, display_title: v }))}
-            placeholder="e.g., Eâ€‘Coupon â‚¹150"
+            placeholder="e.g., E”‘Coupon ₹150"
           />
           <TextInput
             label="Display Description"
@@ -2010,12 +2010,12 @@ export default function AdminECoupons() {
                     >
                       <div>#{o.id}</div>
                       <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {o.buyer_username || o.buyer || "â€”"}
+                        {o.buyer_username || o.buyer || "””"}
                       </div>
-                      <div>{o.role_at_purchase || "â€”"}</div>
+                      <div>{o.role_at_purchase || "””"}</div>
                       <div>{o.quantity || 0}</div>
-                      <div>â‚¹{o.amount_total || 0}</div>
-                      <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{o.product_title || "â€”"}</div>
+                      <div>₹{o.amount_total || 0}</div>
+                      <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{o.product_title || "””"}</div>
                       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                         <input
                           style={{ padding: 8, border: "1px solid #e2e8f0", borderRadius: 8, minWidth: 160 }}
@@ -2189,12 +2189,12 @@ export default function AdminECoupons() {
                       borderBottom: "1px solid #e2e8f0",
                     }}
                   >
-                    <div style={{ textTransform: "capitalize" }}>{role || "â€”"}</div>
-                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{assignee || "â€”"}</div>
+                    <div style={{ textTransform: "capitalize" }}>{role || "””"}</div>
+                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{assignee || "””"}</div>
                     <div>{info}</div>
-                    <div>{count ?? "â€”"}</div>
-                    <div>{batch || "â€”"}</div>
-                    <div>{at ? new Date(at).toLocaleString() : "â€”"}</div>
+                    <div>{count ?? "””"}</div>
+                    <div>{batch || "””"}</div>
+                    <div>{at ? new Date(at).toLocaleString() : "””"}</div>
                   </div>
                 );
               })}

@@ -74,7 +74,7 @@ export default function RewardsTargetCard({ role = "employee", variant = "paper"
         errors.push(e1?.response?.data?.detail || e1?.message || "submissions failed");
       }
 
-      // 2) Eâ€‘coupon sales this month via AuditTrail, filtered to current actor
+      // 2) E”‘coupon sales this month via AuditTrail, filtered to current actor
       const myId = me?.id;
       if (myId && (role === "agency" || role === "employee")) {
         const fromISO = start.toISOString();
@@ -155,9 +155,9 @@ export default function RewardsTargetCard({ role = "employee", variant = "paper"
               <Typography variant="caption" sx={{ opacity: 0.95 }}>Approved sales this month</Typography>
               <Typography variant="h6" sx={{ fontWeight: 900 }}>{countApproved}</Typography>
             </Box>
-            <TargetRow label="600 â€” Resort Trip / Mobile Fund" value={countApproved} target={600} />
-            <TargetRow label="1500 â€” Bike Fund" value={countApproved} target={1500} />
-            <TargetRow label="2800 â€” Thailand Trip" value={countApproved} target={2800} />
+            <TargetRow label="600 ”” Resort Trip / Mobile Fund" value={countApproved} target={600} />
+            <TargetRow label="1500 ”” Bike Fund" value={countApproved} target={1500} />
+            <TargetRow label="2800 ”” Thailand Trip" value={countApproved} target={2800} />
           </Box>
         )}
       </Box>
@@ -178,9 +178,9 @@ export default function RewardsTargetCard({ role = "employee", variant = "paper"
             <Alert severity="info" sx={{ mb: 2 }}>
               Approved sales this month: {countApproved}
             </Alert>
-            <TargetRow label="600 â€” Resort Trip / Mobile Fund" value={countApproved} target={600} />
-            <TargetRow label="1500 â€” Bike Fund" value={countApproved} target={1500} />
-            <TargetRow label="2800 â€” Thailand Trip" value={countApproved} target={2800} />
+            <TargetRow label="600 ”” Resort Trip / Mobile Fund" value={countApproved} target={600} />
+            <TargetRow label="1500 ”” Bike Fund" value={countApproved} target={1500} />
+            <TargetRow label="2800 ”” Thailand Trip" value={countApproved} target={2800} />
           </Box>
         )}
       </Paper>

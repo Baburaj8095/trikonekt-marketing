@@ -131,7 +131,7 @@ export default function AdminKYC() {
         minWidth: 200,
         renderCell: (params) => {
           const r = params?.row || {};
-          return r.bank_name ? `${r.bank_name} (${r.ifsc_code})` : "â€”";
+          return r.bank_name ? `${r.bank_name} (${r.ifsc_code})` : "””";
         },
         valueGetter: (_, row) => {
           if (!row) return "";
@@ -145,9 +145,9 @@ export default function AdminKYC() {
         renderCell: (params) => {
           const v = params?.row?.bank_account_number || "";
           const s = String(v || "");
-          if (!s) return "â€”";
+          if (!s) return "””";
           if (s.length <= 4) return s;
-          return "â€¢â€¢â€¢â€¢ " + s.slice(-4);
+          return "”¢”¢”¢”¢ " + s.slice(-4);
         },
         valueGetter: (_, row) => (row && row.bank_account_number) || "",
       },

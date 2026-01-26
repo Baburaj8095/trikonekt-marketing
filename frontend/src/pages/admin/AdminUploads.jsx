@@ -408,10 +408,10 @@ export default function AdminUploads() {
                     }}
                   >
                     <div>#{u.id}</div>
-                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{u.title || "â€”"}</div>
-                    <div>{u.user ?? "â€”"}</div>
+                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{u.title || "””"}</div>
+                    <div>{u.user ?? "””"}</div>
                     <div>
-                      {(u.user_pincode || "â€”")}{u.user_state ? ` â€¢ ${u.user_state}` : ""}
+                      {(u.user_pincode || "””")}{u.user_state ? ` ”¢ ${u.user_state}` : ""}
                     </div>
                     <div>{humanDate(u.created_at)}</div>
                     <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
@@ -479,10 +479,10 @@ export default function AdminUploads() {
                     <div style={{ fontWeight: 900, color: "#0f172a" }}>#{u.id}</div>
                     <div style={{ color: "#64748b", fontSize: 12 }}>{humanDate(u.created_at)}</div>
                   </div>
-                  <div style={{ color: "#0f172a", fontWeight: 700 }}>{u.title || "â€”"}</div>
-                  <div style={{ color: "#64748b", fontSize: 12 }}>User: {u.user ?? "â€”"}</div>
+                  <div style={{ color: "#0f172a", fontWeight: 700 }}>{u.title || "””"}</div>
+                  <div style={{ color: "#64748b", fontSize: 12 }}>User: {u.user ?? "””"}</div>
                   <div style={{ color: "#64748b", fontSize: 12 }}>
-                    {u.user_pincode || "â€”"}{u.user_state ? ` â€¢ ${u.user_state}` : ""}
+                    {u.user_pincode || "””"}{u.user_state ? ` ”¢ ${u.user_state}` : ""}
                   </div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     {href ? (
@@ -535,7 +535,7 @@ export default function AdminUploads() {
       {/* Pagination */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
         <div style={{ color: "#64748b", fontSize: 12 }}>
-          {count} total â€¢ page {page} of {totalPages}
+          {count} total ”¢ page {page} of {totalPages}
         </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           <button
@@ -543,28 +543,28 @@ export default function AdminUploads() {
             disabled={loading || page <= 1}
             style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", cursor: page <= 1 ? "not-allowed" : "pointer" }}
           >
-            Â« First
+            « First
           </button>
           <button
             onClick={() => goto(page - 1)}
             disabled={loading || page <= 1}
             style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", cursor: page <= 1 ? "not-allowed" : "pointer" }}
           >
-            â€¹ Prev
+            ”¹ Prev
           </button>
           <button
             onClick={() => goto(page + 1)}
             disabled={loading || page >= totalPages}
             style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", cursor: page >= totalPages ? "not-allowed" : "pointer" }}
           >
-            Next â€º
+            Next ”º
           </button>
           <button
             onClick={() => goto(totalPages)}
             disabled={loading || page >= totalPages}
             style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", cursor: page >= totalPages ? "not-allowed" : "pointer" }}
           >
-            Last Â»
+            Last »
           </button>
         </div>
       </div>

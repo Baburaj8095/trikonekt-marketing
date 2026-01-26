@@ -463,7 +463,7 @@ function ProductGrid({ section, context }) {
                   </Typography>
                   {price != null ? (
                     <Typography sx={{ fontSize: 12, color: DS.subtext }}>
-                      â‚¹{price}
+                      ₹{price}
                     </Typography>
                   ) : null}
                 </Box>

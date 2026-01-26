@@ -104,7 +104,7 @@ export default function UserDashboard3Shell() {
             <div className="v3-muted" style={{ fontSize: 12 }}>Welcome back</div>
           </div>
           <div className="v3-balance-pill">
-            {isPrime ? "Prime" : "Nonâ€‘Prime"}
+            {isPrime ? "Prime" : "Non”‘Prime"}
           </div>
         </div>
 

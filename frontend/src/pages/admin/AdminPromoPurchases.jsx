@@ -194,7 +194,7 @@ export default function AdminPromoPurchases() {
           <span style={{ color: "#64748b", fontSize: 12 }}>No file</span>
         )}
         <div style={{ fontSize: 12, color: "#0f172a" }}>
-          <div><span style={{ color: "#64748b" }}>UTR:</span> {guessedUtr || "â€”"}</div>
+          <div><span style={{ color: "#64748b" }}>UTR:</span> {guessedUtr || "””"}</div>
           {remarks ? (
             <div style={{ color: "#475569", whiteSpace: "pre-wrap", marginTop: 2, maxWidth: 260, wordBreak: "break-word" }}>
               {remarks}
@@ -248,12 +248,12 @@ export default function AdminPromoPurchases() {
         <div>
           {rows.map((r) => {
             const pkg = r.package || {};
-            const requestedAt = r.requested_at ? new Date(r.requested_at).toLocaleString() : "â€”";
+            const requestedAt = r.requested_at ? new Date(r.requested_at).toLocaleString() : "””";
             const proofUrl = r.payment_proof || "";
             const isMonthly = (pkg.type || "") === "MONTHLY";
-            const monText = isMonthly ? ` â€¢ ${String(r.year || "")}-${String(r.month || "").toString().padStart(2, "0")}` : "";
-            const userLabel = r.user_username ? r.user_username : (r.user_id ? `#${r.user_id}` : "â€”");
-            const pkgName = pkg.name || pkg.code || "â€”";
+            const monText = isMonthly ? ` ”¢ ${String(r.year || "")}-${String(r.month || "").toString().padStart(2, "0")}` : "";
+            const userLabel = r.user_username ? r.user_username : (r.user_id ? `#${r.user_id}` : "””");
+            const pkgName = pkg.name || pkg.code || "””";
             const pkgPrice = Number(pkg.price || 0);
             const amountPaid = Number(r.amount_paid || 0);
 
@@ -277,13 +277,13 @@ export default function AdminPromoPurchases() {
                 <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
                   <div style={{ fontWeight: 700, color: "#0f172a" }}>{pkgName}</div>
                   <div style={{ fontSize: 12, color: "#64748b" }}>
-                    â‚¹{pkgPrice.toFixed(2)}{monText}
+                    ₹{pkgPrice.toFixed(2)}{monText}
                   </div>
                 </div>
 
-                <div>{pkg.type || "â€”"}</div>
+                <div>{pkg.type || "””"}</div>
                 <div>{r.quantity ?? 1}</div>
-                <div>â‚¹{amountPaid.toFixed(2)}</div>
+                <div>₹{amountPaid.toFixed(2)}</div>
                 <div>{renderStatusBadge(r.status)}</div>
                 <div style={{ fontSize: 12 }}>{requestedAt}</div>
 
@@ -341,12 +341,12 @@ export default function AdminPromoPurchases() {
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {rows.map((r) => {
           const pkg = r.package || {};
-          const requestedAt = r.requested_at ? new Date(r.requested_at).toLocaleString() : "â€”";
+          const requestedAt = r.requested_at ? new Date(r.requested_at).toLocaleString() : "””";
           const proofUrl = r.payment_proof || "";
           const isMonthly = (pkg.type || "") === "MONTHLY";
-          const monText = isMonthly ? ` â€¢ ${String(r.year || "")}-${String(r.month || "").toString().padStart(2, "0")}` : "";
-          const userLabel = r.user_username ? r.user_username : (r.user_id ? `#${r.user_id}` : "â€”");
-          const pkgName = pkg.name || pkg.code || "â€”";
+          const monText = isMonthly ? ` ”¢ ${String(r.year || "")}-${String(r.month || "").toString().padStart(2, "0")}` : "";
+          const userLabel = r.user_username ? r.user_username : (r.user_id ? `#${r.user_id}` : "””");
+          const pkgName = pkg.name || pkg.code || "””";
           const pkgPrice = Number(pkg.price || 0);
           const amountPaid = Number(r.amount_paid || 0);
 
@@ -374,14 +374,14 @@ export default function AdminPromoPurchases() {
               <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>Package</div>
               <div style={{ fontWeight: 700, color: "#0f172a" }}>{pkgName}</div>
               <div style={{ fontSize: 12, color: "#475569" }}>
-                Type: {pkg.type || "â€”"} â€¢ Price: â‚¹{pkgPrice.toFixed(2)}{monText}
+                Type: {pkg.type || "””"} ”¢ Price: ₹{pkgPrice.toFixed(2)}{monText}
               </div>
 
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 4 }}>
                 <div style={{ fontSize: 12, color: "#64748b" }}>Qty</div>
                 <div style={{ fontWeight: 600 }}>{r.quantity ?? 1}</div>
                 <div style={{ fontSize: 12, color: "#64748b" }}>Amount</div>
-                <div style={{ fontWeight: 600 }}>â‚¹{amountPaid.toFixed(2)}</div>
+                <div style={{ fontWeight: 600 }}>₹{amountPaid.toFixed(2)}</div>
               </div>
 
               <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>Requested</div>

@@ -206,7 +206,7 @@ export default function AgencyPackageCardsPanel({ open, onClose, agencyId, usern
           }}
         >
           <div style={{ fontWeight: 900, color: "#0f172a" }}>
-            Packages â€” {username ? `${username}` : ""}{agencyId ? ` (#${agencyId})` : ""}
+            Packages ”” {username ? `${username}` : ""}{agencyId ? ` (#${agencyId})` : ""}
           </div>
           <button
             onClick={onClose}
@@ -276,20 +276,20 @@ export default function AgencyPackageCardsPanel({ open, onClose, agencyId, usern
                     >
                       <div style={{ padding: 8, borderRadius: 8, background: "rgba(255,255,255,0.15)" }}>
                         <div style={{ fontSize: 12, opacity: 0.9, color: inactive ? "#f1f5f9" : "#0f172a" }}>Amount</div>
-                        <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a" }}>â‚¹{p.total_amount || "0.00"}</div>
+                        <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a" }}>₹{p.total_amount || "0.00"}</div>
                       </div>
                       <div style={{ padding: 8, borderRadius: 8, background: "rgba(255,255,255,0.15)" }}>
                         <div style={{ fontSize: 12, opacity: 0.9, color: inactive ? "#f1f5f9" : "#0f172a" }}>Paid</div>
-                        <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a" }}>â‚¹{p.paid_amount || "0.00"}</div>
+                        <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a" }}>₹{p.paid_amount || "0.00"}</div>
                       </div>
                       <div style={{ padding: 8, borderRadius: 8, background: "rgba(255,255,255,0.15)" }}>
                         <div style={{ fontSize: 12, opacity: 0.9, color: inactive ? "#f1f5f9" : "#0f172a" }}>Remaining</div>
-                        <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a" }}>â‚¹{p.remaining_amount || "0.00"}</div>
+                        <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a" }}>₹{p.remaining_amount || "0.00"}</div>
                       </div>
                     </div>
                     <div style={{ marginTop: 6, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                       <div style={{ fontSize: 12, fontWeight: 700 }}>
-                        Renewal: {typeof p.months_remaining === "number" ? `${p.months_remaining} month${p.months_remaining === 1 ? "" : "s"} remaining` : "â€”"}
+                        Renewal: {typeof p.months_remaining === "number" ? `${p.months_remaining} month${p.months_remaining === 1 ? "" : "s"} remaining` : "””"}
                       </div>
                       <button
                         onClick={() => openPay(p.id, title)}
@@ -312,11 +312,11 @@ export default function AgencyPackageCardsPanel({ open, onClose, agencyId, usern
               })}
             </div>
           ) : (
-            // No assignments â€” show catalog so admin can assign directly
+            // No assignments ”” show catalog so admin can assign directly
             <div>
               <div style={{ marginBottom: 8, color: "#64748b" }}>No package assigned for this agency.</div>
               {catLoading ? (
-                <div style={{ color: "#64748b" }}>Loading eligible packagesâ€¦</div>
+                <div style={{ color: "#64748b" }}>Loading eligible packages”¦</div>
               ) : catError ? (
                 <div style={{ color: "#dc2626" }}>{catError}</div>
               ) : (catalog || []).length === 0 ? (
@@ -331,7 +331,7 @@ export default function AgencyPackageCardsPanel({ open, onClose, agencyId, usern
                 >
                   {(catalog || []).map((c) => {
                     const assigned = !!c.assigned;
-                    const amt = c.amount ? `â‚¹${c.amount}` : "â€”";
+                    const amt = c.amount ? `₹${c.amount}` : "””";
                     return (
                       <div
                         key={c.id}
@@ -369,7 +369,7 @@ export default function AgencyPackageCardsPanel({ open, onClose, agencyId, usern
                             }}
                             title={assigned ? "Already assigned" : "Assign this package to the agency"}
                           >
-                            {assigned ? "Assigned" : assigningId === c.id ? "Assigningâ€¦" : "Assign"}
+                            {assigned ? "Assigned" : assigningId === c.id ? "Assigning”¦" : "Assign"}
                           </button>
                         </div>
                       </div>
@@ -448,7 +448,7 @@ export default function AgencyPackageCardsPanel({ open, onClose, agencyId, usern
             }}
           >
             <div style={{ fontWeight: 900, color: "#0f172a", marginBottom: 8 }}>
-              Add Payment â€” {payForm.title || ""}
+              Add Payment ”” {payForm.title || ""}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>

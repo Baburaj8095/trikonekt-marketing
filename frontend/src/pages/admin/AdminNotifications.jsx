@@ -23,7 +23,7 @@ function TabButton({ active, children, onClick }) {
 }
 
 /**
- * AdminNotifications â€” Unified Notifications console
+ * AdminNotifications ”” Unified Notifications console
  * - Templates: create/edit Notification Event Templates
  * - Dispatch: guidance + quick links to dispatch via Templates ("Dispatch now" action)
  * - Activity: monitor Batches and the Notifications Log
@@ -104,7 +104,7 @@ export default function AdminNotifications() {
           </div>
           <div style={{ color: "#334155", lineHeight: 1.5 }}>
             Use your configured Event Templates to broadcast to Consumers, Agencies, Employees, and Merchants.
-            Select the template(s) and run the â€œDispatch nowâ€ action. Dedupe, pinning and channels are respected.
+            Select the template(s) and run the “Dispatch now” action. Dedupe, pinning and channels are respected.
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button
@@ -148,7 +148,7 @@ export default function AdminNotifications() {
             }}
           >
             Tip: Audience roles support "consumer", "agency", "employee", "merchant" (business), "company", or "all".
-            Set pinned_until to surface important announcements. Enable channels.in_app=true for inâ€‘app delivery.
+            Set pinned_until to surface important announcements. Enable channels.in_app=true for in”‘app delivery.
           </div>
         </div>
       ) : null}

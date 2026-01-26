@@ -321,11 +321,11 @@ display: "grid",
                     onClick={() => openEdit(r)}
                     style={{ background: "transparent", border: 0, color: "#0ea5e9", cursor: "pointer", padding: 0, fontWeight: 700 }}
                   >
-                    {r.full_name || "â€”"}
+                    {r.full_name || "””"}
                   </button>
                 </div>
-                <div>{r.email || "â€”"}</div>
-                <div>{r.username || "â€”"}</div>
+                <div>{r.email || "””"}</div>
+                <div>{r.username || "””"}</div>
                 <div>
                   <select
                     value={r.admin_role?.id || ""}
@@ -333,7 +333,7 @@ display: "grid",
                     style={{ padding: "6px 8px", border: "1px solid #e2e8f0", borderRadius: 8, background: "#fff", minWidth: 160 }}
                     title="Assign role"
                   >
-                    <option value="">â€” None â€”</option>
+                    <option value="">”” None ””</option>
                     {roles.map((x) => (
                       <option key={x.id} value={x.id}>
                         {x.name}{x.is_super ? " (SUPER)" : ""}
@@ -392,13 +392,13 @@ display: "grid",
       {/* View Admin User */}
       <Modal open={viewOpen} title="View Admin User" onClose={() => setViewOpen(false)}>
         <div style={{ display: "grid", gap: 10 }}>
-          <Field label="Name">{(viewRow && (viewRow.full_name || [viewRow.first_name, viewRow.last_name].filter(Boolean).join(" "))) || "â€”"}</Field>
-          <Field label="Email">{viewRow?.email || "â€”"}</Field>
-          <Field label="Username">{viewRow?.username || "â€”"}</Field>
-          <Field label="Role">{(viewRow && viewRow.admin_role && viewRow.admin_role.name) ? viewRow.admin_role.name : "â€”"}</Field>
+          <Field label="Name">{(viewRow && (viewRow.full_name || [viewRow.first_name, viewRow.last_name].filter(Boolean).join(" "))) || "””"}</Field>
+          <Field label="Email">{viewRow?.email || "””"}</Field>
+          <Field label="Username">{viewRow?.username || "””"}</Field>
+          <Field label="Role">{(viewRow && viewRow.admin_role && viewRow.admin_role.name) ? viewRow.admin_role.name : "””"}</Field>
           <Field label="Active">{viewRow?.is_active ? "Yes" : "No"}</Field>
           <Field label="Date">
-            {viewRow?.date_joined ? (() => { try { return new Date(viewRow.date_joined).toLocaleString(); } catch { return String(viewRow.date_joined); } })() : "â€”"}
+            {viewRow?.date_joined ? (() => { try { return new Date(viewRow.date_joined).toLocaleString(); } catch { return String(viewRow.date_joined); } })() : "””"}
           </Field>
         </div>
       </Modal>
@@ -440,7 +440,7 @@ display: "grid",
               onChange={(e) => setCreateForm((f) => ({ ...f, role_id: e.target.value }))}
               style={{ padding: "8px 10px", border: "1px solid #e2e8f0", borderRadius: 8, width: "100%", background: "#fff" }}
             >
-              <option value="">â€” None â€”</option>
+              <option value="">”” None ””</option>
               {roles.map((x) => (
                 <option key={x.id} value={x.id}>
                   {x.name}{x.is_super ? " (SUPER)" : ""}
@@ -490,7 +490,7 @@ display: "grid",
               onChange={(e) => setEditForm((f) => ({ ...f, role_id: e.target.value }))}
               style={{ padding: "8px 10px", border: "1px solid #e2e8f0", borderRadius: 8, width: "100%", background: "#fff" }}
             >
-              <option value="">â€” None â€”</option>
+              <option value="">”” None ””</option>
               {roles.map((x) => (
                 <option key={x.id} value={x.id}>
                   {x.name}{x.is_super ? " (SUPER)" : ""}

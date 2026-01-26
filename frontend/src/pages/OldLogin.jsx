@@ -212,14 +212,14 @@ export default function Login() {
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
             <CircularProgress size={18} />
             <Typography variant="body2" color="text.secondary">
-              Detecting your locationâ€¦
+              Detecting your location”¦
             </Typography>
           </Box>
         ) : null}
 
         {!autoLoading && typeof accuracy === "number" && accuracy > 800 ? (
           <Alert severity="warning" sx={{ mb: 1 }}>
-            GPS accuracy is low (Â±{Math.round(accuracy)}m). Select your branch manually.
+            GPS accuracy is low (±{Math.round(accuracy)}m). Select your branch manually.
           </Alert>
         ) : null}
 

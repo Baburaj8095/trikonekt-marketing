@@ -218,7 +218,7 @@ export default function AdminLevelCommission() {
         <div>
           <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a" }}>Master Level Commission</div>
           <div style={{ fontSize: 12, color: "#64748b" }}>
-            Configure fixed rupee amounts for Direct and L1â€“L5. Applies on referral join payouts.
+            Configure fixed rupee amounts for Direct and L1”“L5. Applies on referral join payouts.
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
@@ -303,18 +303,18 @@ export default function AdminLevelCommission() {
         ) : (
           <>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              <Field label="Direct (â‚¹)" name="direct" />
-              <Field label="Level 1 (â‚¹)" name="l1" />
-              <Field label="Level 2 (â‚¹)" name="l2" />
-              <Field label="Level 3 (â‚¹)" name="l3" />
-              <Field label="Level 4 (â‚¹)" name="l4" />
-              <Field label="Level 5 (â‚¹)" name="l5" />
+              <Field label="Direct (₹)" name="direct" />
+              <Field label="Level 1 (₹)" name="l1" />
+              <Field label="Level 2 (₹)" name="l2" />
+              <Field label="Level 3 (₹)" name="l3" />
+              <Field label="Level 4 (₹)" name="l4" />
+              <Field label="Level 5 (₹)" name="l5" />
             </div>
             <div style={{ marginTop: 10, fontSize: 12, color: "#64748b" }}>
               Last updated:{" "}
               {server?.updated_at
                 ? new Date(server.updated_at).toLocaleString()
-                : "â€”"}
+                : "””"}
             </div>
           </>
         )}

@@ -179,7 +179,7 @@ export default function CustomUserListSimple() {
     }
   };
 
-  if (loadingMeta) return <div style={{ color: "#64748b" }}>Loadingâ€¦</div>;
+  if (loadingMeta) return <div style={{ color: "#64748b" }}>Loading”¦</div>;
   if (error) return <div style={{ color: "#dc2626" }}>{error}</div>;
   if (!meta) return null;
 
@@ -248,7 +248,7 @@ export default function CustomUserListSimple() {
         header: name === "__str__" ? (meta.verbose_name_singular || "Repr") : name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
         renderCell: (row) => {
           const v = getFieldValue(row, name);
-          return v == null || v === "" ? "â€”" : String(v);
+          return v == null || v === "" ? "””" : String(v);
         },
       };
     });

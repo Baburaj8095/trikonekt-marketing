@@ -236,7 +236,7 @@ function CreateProductDialog({ open, onClose, onCreated }) {
                 size="small"
                 required
                 error={!!errors.category}
-                helperText={errors.category || "No categories found. Create in Admin â†’ Eâ€‘commerce Categories or use Seed Demo Data."}
+                helperText={errors.category || "No categories found. Create in Admin â†’ E”‘commerce Categories or use Seed Demo Data."}
               />
             )}
             <TextField
@@ -416,7 +416,7 @@ export default function AdminProducts() {
         minWidth: 120,
         renderCell: (params) => {
           const v = Number(params?.row?.price || 0);
-          return `â‚¹${v.toFixed(2)}`;
+          return `₹${v.toFixed(2)}`;
         }
       },
       { field: "quantity", headerName: "Quantity", minWidth: 100 },

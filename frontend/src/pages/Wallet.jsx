@@ -160,7 +160,7 @@ export default function Wallet() {
 
   const disableReason = useMemo(() => {
     if (!kyc?.verified) return "KYC verification required";
-    if (Number(withdrawableBalance) < 500) return "Minimum withdrawable balance â‚¹500 required";
+    if (Number(withdrawableBalance) < 500) return "Minimum withdrawable balance ₹500 required";
     if (!windowInfo?.isOpen) return "Withdrawals are allowed only on Sunday 6:00 PM to 11:59 PM (IST)";
     if (inWindowCooldown) return "You have already requested a withdrawal in this week's window";
     return "";
@@ -307,7 +307,7 @@ export default function Wallet() {
     const perTxnCap = 750;
     const maxAvail = Math.min(Number(withdrawableBalance), perTxnCap);
     if (amtNum > maxAvail) {
-      setWdrErr(`Max per request is â‚¹${fmtAmount(perTxnCap)}. Available to withdraw now: â‚¹${fmtAmount(maxAvail)}.`);
+      setWdrErr(`Max per request is ₹${fmtAmount(perTxnCap)}. Available to withdraw now: ₹${fmtAmount(maxAvail)}.`);
       return;
     }
     const payload = {
@@ -468,7 +468,7 @@ export default function Wallet() {
                     Withdrawable Balance
                   </Typography>
                   <Typography sx={{ fontSize: 24, fontWeight: 900, mt: 0.2 }}>
-                    â‚¹ {fmtAmount(mainBalance)}
+                    ₹ {fmtAmount(mainBalance)}
                   </Typography>
                 </Box>
 

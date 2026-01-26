@@ -185,7 +185,7 @@ export default function DashboardCard({
                   lineHeight: 1.15,
                   color: "#fff",
                   textShadow: "0 1px 2px rgba(0,0,0,0.35)",
-                  // 2â€“3 words should fit comfortably on two lines
+                  // 2”“3 words should fit comfortably on two lines
                   display: "-webkit-box",
                   WebkitLineClamp: 2,
                   WebkitBoxOrient: "vertical",

@@ -144,7 +144,7 @@ export default function PermissionsPage() {
             rows.map((r) => (
               <div key={r.id} style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr", padding: "10px 12px", borderTop: "1px solid #e2e8f0", alignItems: "center" }}>
                 <div>{r.code}</div>
-                <div>{r.label || "â€”"}</div>
+                <div>{r.label || "””"}</div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button onClick={() => openEdit(r)} style={{ padding: "6px 10px", borderRadius: 8, background: "#0ea5e9", border: "1px solid #0284c7", color: "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
                     Edit

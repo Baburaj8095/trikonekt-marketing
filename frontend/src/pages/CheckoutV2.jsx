@@ -47,7 +47,7 @@ export default function CheckoutV2() {
   const [ecouponPayment, setEcouponPayment] = useState({
     utr: "",
     notes: "",
-    file: null, // optional global file to apply to each eâ€‘coupon order if line.file not set
+    file: null, // optional global file to apply to each e”‘coupon order if line.file not set
   });
 
   // Sync cart snapshot
@@ -267,7 +267,7 @@ export default function CheckoutV2() {
             msg:
               e?.response?.data?.detail ||
               e?.message ||
-              "Failed to submit eâ€‘coupon order.",
+              "Failed to submit e”‘coupon order.",
           });
         }
       }
@@ -489,10 +489,10 @@ export default function CheckoutV2() {
 
             <Stack direction="row" justifyContent="space-between" alignItems="center">
               <Typography variant="body2">
-                â‚¹{unit.toLocaleString("en-IN")}
+                ₹{unit.toLocaleString("en-IN")}
               </Typography>
               <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                â‚¹{Number(subtotal).toLocaleString("en-IN")}
+                ₹{Number(subtotal).toLocaleString("en-IN")}
               </Typography>
             </Stack>
 
@@ -663,7 +663,7 @@ export default function CheckoutV2() {
             Total amount
           </Typography>
           <Typography variant="h6" sx={{ fontWeight: 800 }}>
-            â‚¹{Number(total).toLocaleString("en-IN")}
+            ₹{Number(total).toLocaleString("en-IN")}
           </Typography>
         </Stack>
       </Paper>
@@ -712,11 +712,11 @@ export default function CheckoutV2() {
             <Typography variant="caption" color="text.secondary">
               Payee
             </Typography>
-            <div style={{ fontWeight: 800 }}>{payment.payee_name || "â€”"}</div>
+            <div style={{ fontWeight: 800 }}>{payment.payee_name || "””"}</div>
             <Typography variant="caption" color="text.secondary">
               UPI ID
             </Typography>
-            <div style={{ fontWeight: 800 }}>{payment.upi_id || "â€”"}</div>
+            <div style={{ fontWeight: 800 }}>{payment.upi_id || "””"}</div>
             <Typography variant="caption" color="text.secondary">
               Instructions
             </Typography>
@@ -727,7 +727,7 @@ export default function CheckoutV2() {
           </Box>
         ) : (
           <Alert severity="warning" sx={{ mb: 1 }}>
-            Payments are temporarily unavailable or not configured for eâ€‘coupons.
+            Payments are temporarily unavailable or not configured for e”‘coupons.
           </Alert>
         )}
 
@@ -834,7 +834,7 @@ export default function CheckoutV2() {
                   Available
                 </Typography>
                 <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                  â‚¹{Number(availablePoints).toLocaleString("en-IN")}
+                  ₹{Number(availablePoints).toLocaleString("en-IN")}
                 </Typography>
               </Stack>
               <Stack direction="row" justifyContent="space-between">
@@ -842,12 +842,12 @@ export default function CheckoutV2() {
                   Max this order (cap)
                 </Typography>
                 <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                  â‚¹{Number(orderRewardCap).toLocaleString("en-IN")}
+                  ₹{Number(orderRewardCap).toLocaleString("en-IN")}
                 </Typography>
               </Stack>
               <TextField
                 size="small"
-                label={`Redeem amount (â‚¹, max â‚¹${Number(
+                label={`Redeem amount (₹, max ₹${Number(
                   redeemMax
                 ).toLocaleString("en-IN")})`}
                 type="number"
@@ -868,7 +868,7 @@ export default function CheckoutV2() {
               <Stack direction="row" justifyContent="space-between">
                 <Typography variant="body2">Payable</Typography>
                 <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                  â‚¹
+                  ₹
                   {Math.max(0, Number(total) - Number(redeemUse)).toLocaleString(
                     "en-IN"
                   )}

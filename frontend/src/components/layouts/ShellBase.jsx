@@ -40,7 +40,7 @@ export default function ShellBase({
   const [sidebarOpen, setSidebarOpen] = useState(
     typeof window !== "undefined" ? window.innerWidth >= 1024 : true
   );
-  // Collapsible sections state (e.g. "My Eâ€‘Coupon Club")
+  // Collapsible sections state (e.g. "My E‑Coupon Club")
   const [openSections, setOpenSections] = useState({});
 
   useEffect(() => {
@@ -317,8 +317,8 @@ export default function ShellBase({
         cursor: "pointer",
         justifySelf: "start",
       }}
-    >
-      â˜°
+      >
+      ☰
     </button>
   ) : (
     <button
@@ -333,8 +333,8 @@ export default function ShellBase({
         cursor: "pointer",
         justifySelf: "start",
       }}
-    >
-      â†
+      >
+      ←
     </button>
   )}
 
@@ -521,7 +521,7 @@ export default function ShellBase({
                                 lineHeight: 1,
                               }}
                             >
-                              {open ? "â–¾" : "â–¸"}
+                              {open ? "▾" : "▸"}
                             </button>
                           ) : null}
                         </div>
@@ -559,7 +559,7 @@ export default function ShellBase({
               <div style={{ marginTop: 8, borderTop: "1px solid #0b1220" }} />
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "8px 4px" }}>
                 <div style={{ color: "#64748b", fontSize: 11 }}>
-                  {footerText || `Â© ${new Date().getFullYear()}`}
+                  {footerText || `© ${new Date().getFullYear()}`}
                 </div>
                 {onLogout ? (
                   <button
@@ -637,4 +637,3 @@ export default function ShellBase({
     </div>
   );
 }
-

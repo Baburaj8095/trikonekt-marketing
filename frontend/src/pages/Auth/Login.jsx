@@ -1,4 +1,4 @@
-﻿// Login.jsx â€” Final polished wireframe UI (single-file).
+﻿// Login.jsx ”” Final polished wireframe UI (single-file).
 // NOTE: This file PRESERVES your original logic (API calls, geolocation, registration, dialogs).
 // Styling is done via MUI sx props. Requires @mui/material and @mui/icons-material v7.
 
@@ -1229,7 +1229,7 @@ const pincodeOptionsConsumer = useMemo(() => {
         let username = (formData.username || "").trim();
         let submitRole = role;
 
-        // Role mismatch guard â€” auto-correct role based on registered category
+        // Role mismatch guard ”” auto-correct role based on registered category
         const resolved = await resolveRegisteredRole(username);
         if (resolved && resolved !== submitRole) {
           submitRole = resolved;
@@ -2223,7 +2223,7 @@ const pincodeOptionsConsumer = useMemo(() => {
                     {sponsorChecking && (
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
                         <CircularProgress size={16} />
-                        <Typography variant="body2" color="text.secondary">Validating sponsorâ€¦</Typography>
+                        <Typography variant="body2" color="text.secondary">Validating sponsor”¦</Typography>
                       </Box>
                     )}
                     {sponsorValid === true && (
@@ -2431,7 +2431,7 @@ const pincodeOptionsConsumer = useMemo(() => {
           color: "#000",
           boxShadow: "0 0px 15px rgba(0,0,0,0.08) !important", }}>
         <Typography variant="body2">
-                    Â© {new Date().getFullYear()} Trikonekt. All rights reserved.
+                    © {new Date().getFullYear()} Trikonekt. All rights reserved.
                   </Typography>
                   <Typography variant="body2" sx={{ mt: 1 }}>
                     Contact us:{" "}

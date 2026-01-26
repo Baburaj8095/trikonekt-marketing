@@ -8,7 +8,7 @@ import ConsumerCoupon from "../../ConsumerCoupon";
  */
 export default function ECoupons2() {
   return (
-    <V2PageContainer title="My Eâ€‘Coupons" flush>
+    <V2PageContainer title="My E”‘Coupons" flush>
       <ConsumerCoupon />
     </V2PageContainer>
   );

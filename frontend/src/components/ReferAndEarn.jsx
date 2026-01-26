@@ -287,11 +287,11 @@ export default function ReferAndEarn({ title = "Refer & Earn", onlyConsumer = fa
               sx={{ textTransform: "none" }}
               onClick={() =>
                 sponsorId
-                  ? shareNative(links.subFranchise, buildShareText("Subâ€‘Franchise"))
+                  ? shareNative(links.subFranchise, buildShareText("Sub”‘Franchise"))
                   : setMsg("Sponsor ID missing. Please re-login.")
               }
             >
-              Share Subâ€‘Franchise
+              Share Sub”‘Franchise
             </Button>
           </Stack>
         )}

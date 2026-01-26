@@ -89,7 +89,7 @@ function QuickViewModal({ open, product, onClose, onGoToDetails }) {
 
             <Stack direction="row" spacing={1} alignItems="baseline" sx={{ mb: 1 }}>
               <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                â‚¹{isFinite(finalPrice) ? finalPrice.toFixed(2) : "0.00"}
+                ₹{isFinite(finalPrice) ? finalPrice.toFixed(2) : "0.00"}
               </Typography>
               {discount > 0 && (
                 <Typography
@@ -97,7 +97,7 @@ function QuickViewModal({ open, product, onClose, onGoToDetails }) {
                   color="text.secondary"
                   sx={{ textDecoration: "line-through" }}
                 >
-                  â‚¹{isFinite(price) ? price.toFixed(2) : "0.00"}
+                  ₹{isFinite(price) ? price.toFixed(2) : "0.00"}
                 </Typography>
               )}
             </Stack>

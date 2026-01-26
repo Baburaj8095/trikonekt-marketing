@@ -44,8 +44,8 @@ const ACTIONS = [
 ];
 
 const COUPON_TYPES = [
-  { value: "150", label: "â‚¹150 Coupon" },
-  { value: "50", label: "â‚¹50 Coupon" },
+  { value: "150", label: "₹150 Coupon" },
+  { value: "50", label: "₹50 Coupon" },
 ];
 
 export default function ConsumerCoupon() {
@@ -82,7 +82,7 @@ export default function ConsumerCoupon() {
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [errorSummary, setErrorSummary] = useState("");
 
-  // My owned Eâ€‘Coupons (direct assignments)
+  // My owned E”‘Coupons (direct assignments)
   const [myCodes, setMyCodes] = useState([]);
   const [codesLoading, setCodesLoading] = useState(false);
   const [codesError, setCodesError] = useState("");
@@ -346,7 +346,7 @@ export default function ConsumerCoupon() {
       setMyCodes(arr || []);
     } catch (e) {
       setMyCodes([]);
-      setCodesError("Failed to load my eâ€‘coupons.");
+      setCodesError("Failed to load my e”‘coupons.");
     } finally {
       setCodesLoading(false);
     }
@@ -424,7 +424,7 @@ export default function ConsumerCoupon() {
       }
     } catch (e) {
       setErrorSummary("Failed to load summary.");
-      setCodesError("Failed to load my eâ€‘coupons.");
+      setCodesError("Failed to load my e”‘coupons.");
       setMySummary(null);
       setMyCodes([]);
     } finally {
@@ -484,7 +484,7 @@ export default function ConsumerCoupon() {
     return { id: taskId, status: "TIMEOUT" };
   };
 
-  // Quick Activate button per owned eâ€‘coupon
+  // Quick Activate button per owned e”‘coupon
   const handleActivateCode = async (code) => {
     if (!code?.id) return;
     const codeId = code.id;
@@ -667,7 +667,7 @@ export default function ConsumerCoupon() {
       return false;
     }
     if (form.action === "REDEEM" && form.coupon_type === "50") {
-      alert("â‚¹50 coupon cannot be redeemed. Choose Activate.");
+      alert("₹50 coupon cannot be redeemed. Choose Activate.");
       return false;
     }
     return true;
@@ -681,7 +681,7 @@ export default function ConsumerCoupon() {
       setSubmitting(true);
       setWalletMsg("");
 
-      // Physical/Lucky Draw coupons are not available on the consumer eâ€‘coupon screen
+      // Physical/Lucky Draw coupons are not available on the consumer e”‘coupon screen
       if (form.action === "ACTIVATE") {
         const t = form.coupon_type === "50" ? "50" : "150";
         await API.post("/v1/coupon/activate/?async=1", {
@@ -703,7 +703,7 @@ export default function ConsumerCoupon() {
           },
         });
         await loadWallet();
-        setWalletMsg("â‚¹140 has been credited to your wallet.");
+        setWalletMsg("₹140 has been credited to your wallet.");
         alert("Redeem successful. Wallet credited.");
       }
 
@@ -723,7 +723,7 @@ export default function ConsumerCoupon() {
       <ClubHeader />
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2, flexWrap: "wrap", gap: 1 }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>
-          My Eâ€‘Coupons
+          My E”‘Coupons
         </Typography>
         <Typography variant="caption" color="text.secondary">
           {displayName}
@@ -739,7 +739,7 @@ export default function ConsumerCoupon() {
           textColor="primary"
           indicatorColor="primary"
         >
-          <Tab label="Eâ€‘Coupon Store" value="store" />
+          <Tab label="E”‘Coupon Store" value="store" />
           <Tab label="Manual Lucky Coupon" value="manual" />
           <Tab label="Coupon Summary" value="summary" />
         </Tabs>
@@ -889,7 +889,7 @@ export default function ConsumerCoupon() {
                 name="action"
                 value={form.action}
                 onChange={onChange}
-                helperText={form.coupon_type === "50" && form.action === "REDEEM" ? "â‚¹50 cannot be redeemed" : ""}
+                helperText={form.coupon_type === "50" && form.action === "REDEEM" ? "₹50 cannot be redeemed" : ""}
                 error={form.coupon_type === "50" && form.action === "REDEEM"}
               >
                 {ACTIONS.map((a) => (
@@ -1147,7 +1147,7 @@ export default function ConsumerCoupon() {
                 {Object.entries(mySummary.by_value).map(([v, ent]) => (
                   <Grid item xs={12} sm={6} md={4} key={v}>
                     <Box sx={{ p: 2, borderRadius: 2, border: "1px solid #e2e8f0", bgcolor: "#fff" }}>
-                      <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>â‚¹{v}</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>₹{v}</Typography>
                       <Stack direction="row" spacing={1} flexWrap="wrap">
                         <Chip size="small" label={`Avail ${ent.available ?? 0}`} color="primary" variant="outlined" />
                         <Chip size="small" label={`Act ${ent.activated ?? 0}`} color="success" variant="outlined" />
@@ -1170,7 +1170,7 @@ export default function ConsumerCoupon() {
       <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mb: 2 }}>
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
           <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>
-            All My Eâ€‘Coupon Codes
+            All My E”‘Coupon Codes
           </Typography>
           <Button size="small" variant="outlined" onClick={loadCombined}>Refresh</Button>
         </Box>
@@ -1201,7 +1201,7 @@ export default function ConsumerCoupon() {
           <Alert severity="error">{codesError}</Alert>
         ) : filteredCodes.length === 0 ? (
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            No eâ€‘coupon entries.
+            No e”‘coupon entries.
           </Typography>
         ) : (
           <>
@@ -1228,7 +1228,7 @@ export default function ConsumerCoupon() {
                       <Chip size="small" label={c.display_status || c.status} color={chipColor} />
                     </Box>
                     <Typography variant="caption" color="text.secondary">
-                      {typeof c.value !== "undefined" ? `â‚¹${c.value}` : ""}{c.created_at ? ` â€¢ ${new Date(c.created_at).toLocaleString()}` : ""}
+                      {typeof c.value !== "undefined" ? `₹${c.value}` : ""}{c.created_at ? ` ”¢ ${new Date(c.created_at).toLocaleString()}` : ""}
                     </Typography>
                     {!isRedeemed ? (
                       <Stack direction="row" spacing={1}>
@@ -1317,7 +1317,7 @@ export default function ConsumerCoupon() {
                   <TableRow key={c.id}>
                     <TableCell>{c.code}</TableCell>
                     <TableCell>{c.display_status || c.status}</TableCell>
-                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{typeof c.value !== "undefined" ? `â‚¹${c.value}` : ""}</TableCell>
+                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{typeof c.value !== "undefined" ? `₹${c.value}` : ""}</TableCell>
                     <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.assigned_agency_username || ""}</TableCell>
                     <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{c.created_at ? new Date(c.created_at).toLocaleString() : ""}</TableCell>
                     <TableCell>
@@ -1405,8 +1405,8 @@ export default function ConsumerCoupon() {
                 <li key={s.id} style={{ marginBottom: 12, listStyle: "none" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <Typography variant="body2" sx={{ mr: 1 }}>
-                      <strong>Code:</strong> {s.coupon_code} â€” <strong>Status:</strong> {statusLabel(s.status)}{" "}
-                      {s.created_at ? `â€” ${new Date(s.created_at).toLocaleString()}` : ""}
+                      <strong>Code:</strong> {s.coupon_code} ”” <strong>Status:</strong> {statusLabel(s.status)}{" "}
+                      {s.created_at ? `”” ${new Date(s.created_at).toLocaleString()}` : ""}
                     </Typography>
                     <Button size="small" variant="outlined" onClick={() => useSubmissionCode(s)}>
                       Use

@@ -179,7 +179,7 @@ export default function RolePermissionCreate() {
               onChange={(e) => setRoleId(e.target.value)}
               style={{ padding: "8px 10px", border: "1px solid #e2e8f0", borderRadius: 8, minWidth: 260, background: "#fff" }}
             >
-              <option value="">â€” Select Role â€”</option>
+              <option value="">”” Select Role ””</option>
               {roles.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.name}{r.is_super ? " (SUPER)" : ""}

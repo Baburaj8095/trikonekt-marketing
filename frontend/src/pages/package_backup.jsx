@@ -48,7 +48,7 @@ function approx(a, b, eps = 0.5) {
 function isSeasonPackage(pkg) {
   const t = String(pkg?.type || "");
   const price = Number(pkg?.price || 0);
-  // Treat MONTHLY and PRIME â‰ˆ â‚¹759 as Season packages
+  // Treat MONTHLY and PRIME â‰ˆ ₹759 as Season packages
   return t === "MONTHLY" || (t === "PRIME" && approx(price, 759));
 }
 function inferPlanKind(pkg) {
@@ -419,7 +419,7 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
               {getDisplayName(pkg)}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              Code: {pkg.code} â€¢ Type: {getDisplayType(pkg)}
+              Code: {pkg.code} ”¢ Type: {getDisplayType(pkg)}
             </Typography>
           </Box>
 
@@ -444,7 +444,7 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
                   color: "#0f172a",
                 }}
               >
-                â‚¹{(hasDiscount ? discountPrice : price).toLocaleString("en-IN")}
+                ₹{(hasDiscount ? discountPrice : price).toLocaleString("en-IN")}
               </Typography>
               {hasDiscount && (
                 <Typography
@@ -452,7 +452,7 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
                   color="text.secondary"
                   sx={{ textDecoration: "line-through", fontWeight: 700 }}
                 >
-                  â‚¹{price.toLocaleString("en-IN")}
+                  ₹{price.toLocaleString("en-IN")}
                 </Typography>
               )}
             </Stack>
@@ -465,7 +465,7 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
                 sx={{ justifyContent: "flex-end", mt: 0.75 }}
               >
                 <Typography variant="caption" sx={{ fontWeight: 700 }}>
-                  Get at â‚¹{discountPrice.toLocaleString("en-IN")}
+                  Get at ₹{discountPrice.toLocaleString("en-IN")}
                 </Typography>
                 <Button
                   size="small"
@@ -473,7 +473,7 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
                   color="success"
                   sx={{ textTransform: "none", py: 0.25, minWidth: 0 }}
                 >
-                  Extra â‚¹{savings.toLocaleString("en-IN")} OFF
+                  Extra ₹{savings.toLocaleString("en-IN")} OFF
                 </Button>
               </Stack>
             ) : null}
@@ -624,8 +624,8 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
                     />
                   </RadioGroup>
                   <Typography variant="caption" color="text.secondary">
-                    Choose Eâ€‘Book to access it in your dashboard or Redeem to
-                    follow eâ€‘coupon allocation flow with reward credit.
+                    Choose E”‘Book to access it in your dashboard or Redeem to
+                    follow e”‘coupon allocation flow with reward credit.
                   </Typography>
                 </Box>
               ) : null}
@@ -657,7 +657,7 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
                     <FormControlLabel
                       value="COUPON"
                       control={<Radio size="small" />}
-                      label="Eâ€‘Coupon"
+                      label="E”‘Coupon"
                     />
                   </RadioGroup>
 
@@ -780,7 +780,7 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
                   ) : (
                     <Typography variant="caption" color="text.secondary">
                       {prime750Choice === "REDEEM"
-                        ? "You will receive eâ€‘coupon allocation on approval."
+                        ? "You will receive e”‘coupon allocation on approval."
                         : "You will be eligible for Lucky Draw on approval."}
                     </Typography>
                   )}
@@ -1336,7 +1336,7 @@ export default function PromoPackages() {
                         </Typography>
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        Paid: â‚¹
+                        Paid: ₹
                         {Number(pp.amount_paid || 0).toLocaleString("en-IN")}
                       </Typography>
                     </Box>

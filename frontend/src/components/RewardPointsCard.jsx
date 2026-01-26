@@ -61,14 +61,14 @@ export default function RewardPointsCard({ compact = false }) {
         ) : (
           <>
             <Typography variant="h5" sx={{ fontWeight: 900, mb: 0.5 }}>
-              â‚¹{points.toLocaleString("en-IN")}
+              ₹{points.toLocaleString("en-IN")}
             </Typography>
             <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
               Activated coupons: {count}
             </Typography>
             <LinearProgress variant="determinate" value={pct} sx={{ height: 8, borderRadius: 6, mb: 0.75 }} />
             <Typography variant="caption" color="text.secondary">
-              Next milestone: {nextTarget} coupons â†’ â‚¹{nextPoints.toLocaleString("en-IN")}
+              Next milestone: {nextTarget} coupons â†’ ₹{nextPoints.toLocaleString("en-IN")}
             </Typography>
           </>
         )}
@@ -95,10 +95,10 @@ export default function RewardPointsCard({ compact = false }) {
         <Box>
           <Box sx={{ mb: 1.5 }}>
             <Typography variant="body2" color="text.secondary">
-              Available (â‚¹)
+              Available (₹)
             </Typography>
             <Typography variant="h4" sx={{ fontWeight: 900 }}>
-              â‚¹{points.toLocaleString("en-IN")}
+              ₹{points.toLocaleString("en-IN")}
             </Typography>
           </Box>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 1.5 }}>
@@ -108,7 +108,7 @@ export default function RewardPointsCard({ compact = false }) {
             </Box>
             <Box sx={{ flex: 2 }}>
               <Typography variant="caption" color="text.secondary">
-                Progress to next milestone: {nextTarget} coupons â†’ â‚¹{nextPoints.toLocaleString("en-IN")}
+                Progress to next milestone: {nextTarget} coupons â†’ ₹{nextPoints.toLocaleString("en-IN")}
               </Typography>
               <LinearProgress variant="determinate" value={pct} sx={{ height: 10, borderRadius: 6, mt: 0.5 }} />
             </Box>

@@ -46,7 +46,7 @@ export default function Profile3() {
     {
       title: "Orders & Coupons",
       items: [
-        { label: "My Eâ€‘Coupons", screen: "my-e-coupons2" },
+        { label: "My E”‘Coupons", screen: "my-e-coupons2" },
         { label: "My Orders", screen: "my-orders2" },
         { label: "Cart", screen: "cart2" },
       ],
@@ -116,7 +116,7 @@ export default function Profile3() {
                   }
                 }}
               >
-                <div className="v3-tile-icon">â€º</div>
+                <div className="v3-tile-icon">”º</div>
                 <div>
                   <div className="v3-tile-title">{item.label}</div>
                 </div>

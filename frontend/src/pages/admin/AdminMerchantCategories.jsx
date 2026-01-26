@@ -20,6 +20,10 @@ import {
   Tooltip,
   Snackbar,
   Alert,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, Refresh as RefreshIcon } from "@mui/icons-material";
 import API from "../../api/api";
@@ -45,7 +49,7 @@ export default function AdminMerchantCategories() {
   // Create/Edit dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null); // row or null
-  const [form, setForm] = useState({ name: "", is_active: true, sort_order: 0, icon_like: "" });
+  const [form, setForm] = useState({ name: "", is_active: true, sort_order: 0, icon_like: "", audience: "CONSUMER" });
 
   const iconFieldKey = useMemo(() => {
     // Attempt to detect optional icon/image field to support UI hinting if backend provides it
@@ -96,7 +100,7 @@ export default function AdminMerchantCategories() {
 
   function openAdd() {
     setEditing(null);
-    setForm({ name: "", is_active: true, sort_order: 0, icon_like: "" });
+    setForm({ name: "", is_active: true, sort_order: 0, icon_like: "", audience: "CONSUMER" });
     setDialogOpen(true);
   }
   function openEdit(row) {
@@ -106,6 +110,7 @@ export default function AdminMerchantCategories() {
       is_active: !!row?.is_active,
       sort_order: Number(row?.sort_order || 0),
       icon_like: iconFieldKey ? String(row?.[iconFieldKey] || "") : "",
+      audience: String(row?.audience || "CONSUMER"),
     });
     setDialogOpen(true);
   }
@@ -118,6 +123,7 @@ export default function AdminMerchantCategories() {
       name: String(form.name || "").trim(),
       is_active: !!form.is_active,
       sort_order: Number(form.sort_order || 0),
+      audience: String(form.audience || "CONSUMER"),
     };
     if (!payload.name) {
       setError("Name is required");
@@ -191,7 +197,7 @@ export default function AdminMerchantCategories() {
         <Box sx={{ display: "flex", gap: 1 }}>
           <TextField
             size="small"
-            placeholder="Search by nameâ€¦"
+            placeholder="Search by name”¦"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -216,6 +222,7 @@ export default function AdminMerchantCategories() {
                 <TableCell>Name</TableCell>
                 {iconFieldKey ? <TableCell>Icon</TableCell> : null}
                 <TableCell>Active</TableCell>
+                <TableCell>Audience</TableCell>
                 <TableCell>Sort Order</TableCell>
                 <TableCell>Created At</TableCell>
                 <TableCell align="right">Actions</TableCell>
@@ -232,7 +239,7 @@ export default function AdminMerchantCategories() {
                           {String(row[iconFieldKey]).slice(0, 48)}
                         </a>
                       ) : (
-                        "â€”"
+                        "””"
                       )}
                     </TableCell>
                   ) : null}
@@ -242,6 +249,7 @@ export default function AdminMerchantCategories() {
                       onChange={(e) => handleToggleActive(row, e.target.checked)}
                     />
                   </TableCell>
+                  <TableCell>{row?.audience || "CONSUMER"}</TableCell>
                   <TableCell sx={{ width: 140 }}>
                     <TextField
                       size="small"
@@ -253,7 +261,7 @@ export default function AdminMerchantCategories() {
                     />
                   </TableCell>
                   <TableCell>
-                    {row?.created_at ? new Date(row.created_at).toLocaleString() : "â€”"}
+                    {row?.created_at ? new Date(row.created_at).toLocaleString() : "””"}
                   </TableCell>
                   <TableCell align="right">
                     <Tooltip title="Edit">
@@ -271,7 +279,7 @@ export default function AdminMerchantCategories() {
               ))}
               {!loading && (filtered || []).length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4, color: "text.secondary" }}>
+                  <TableCell colSpan={7} align="center" sx={{ py: 4, color: "text.secondary" }}>
                     No categories found
                   </TableCell>
                 </TableRow>
@@ -308,6 +316,17 @@ export default function AdminMerchantCategories() {
               />
               <Typography>Active</Typography>
             </Box>
+            <FormControl fullWidth>
+              <InputLabel>Audience</InputLabel>
+              <Select
+                label="Audience"
+                value={form.audience}
+                onChange={(e) => setForm((f) => ({ ...f, audience: e.target.value }))}
+              >
+                <MenuItem value="CONSUMER">Consumer</MenuItem>
+                <MenuItem value="MERCHANT">Merchant</MenuItem>
+              </Select>
+            </FormControl>
             {iconFieldKey ? (
               <TextField
                 label={iconFieldKey.replaceAll("_", " ").toUpperCase()}
@@ -340,4 +359,3 @@ export default function AdminMerchantCategories() {
     </Box>
   );
 }
-

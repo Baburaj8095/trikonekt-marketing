@@ -50,7 +50,7 @@ export default function Dashboard2Profile({ setTab, openScreen }) {
     {
       title: "Orders & Coupons",
       items: [
-        { label: "My Eâ€‘Coupons", screen: "my-e-coupons2" },
+        { label: "My E”‘Coupons", screen: "my-e-coupons2" },
         { label: "My Orders", screen: "my-orders2" },
         { label: "Cart", screen: "cart2" },
       ],
@@ -108,7 +108,7 @@ export default function Dashboard2Profile({ setTab, openScreen }) {
                 }}
               >
                 <Typography sx={{ fontSize: 14, color: colors.textPrimary }}>{item.label}</Typography>
-                <Typography sx={{ fontSize: 12, color: colors.textSecondary }}>â€º</Typography>
+                <Typography sx={{ fontSize: 12, color: colors.textSecondary }}>”º</Typography>
               </Box>
             ))}
           </V2SectionCard>

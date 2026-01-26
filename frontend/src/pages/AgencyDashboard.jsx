@@ -61,13 +61,13 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
   const [luckyLoading, setLuckyLoading] = useState(false);
   const [luckyError, setLuckyError] = useState("");
   const [commissionTotal, setCommissionTotal] = useState(0);
-  // Eâ€‘Coupon summary for Agency
+  // E”‘Coupon summary for Agency
   const [ecSummary, setEcSummary] = useState(null);
   const [ecSummaryLoading, setEcSummaryLoading] = useState(false);
   const [ecSummaryError, setEcSummaryError] = useState("");
 
 
-  // Agency Eâ€‘Coupon codes (history)
+  // Agency E”‘Coupon codes (history)
   const [agencyCodes, setAgencyCodes] = useState([]);
   const [agencyCodesLoading, setAgencyCodesLoading] = useState(false);
   const [agencyCodesError, setAgencyCodesError] = useState("");
@@ -81,7 +81,7 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
   const [walletLoading, setWalletLoading] = useState(false);
   const [walletError, setWalletError] = useState("");
   const [me, setMe] = useState(null);
-  // Agency Packages (assigned) â€” used for non-subfranchise; also for computing subfranchise status
+  // Agency Packages (assigned) ”” used for non-subfranchise; also for computing subfranchise status
   const [packages, setPackages] = useState([]);
   const [packagesLoading, setPackagesLoading] = useState(false);
   const [packagesError, setPackagesError] = useState("");
@@ -167,7 +167,7 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
     }
   };
 
-  // Load agency Eâ€‘Coupon summary (available, assigned to employee, sold, redeemed, total)
+  // Load agency E”‘Coupon summary (available, assigned to employee, sold, redeemed, total)
   const loadEcSummary = async () => {
     try {
       setEcSummaryLoading(true);
@@ -176,7 +176,7 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
       setEcSummary(res?.data || null);
     } catch (e) {
       setEcSummary(null);
-      setEcSummaryError("Failed to load Eâ€‘Coupon summary.");
+      setEcSummaryError("Failed to load E”‘Coupon summary.");
     } finally {
       setEcSummaryLoading(false);
     }
@@ -214,7 +214,7 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
   };
   
 
-  // Load agency's own Eâ€‘Coupon codes (assigned_agency = me)
+  // Load agency's own E”‘Coupon codes (assigned_agency = me)
   const loadAgencyCodes = async () => {
     try {
       setAgencyCodesLoading(true);
@@ -232,7 +232,7 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
       setAgencyCodesTotal(Array.isArray(data) ? (arr || []).length : (data?.count || (arr || []).length));
     } catch (e) {
       setAgencyCodes([]);
-      setAgencyCodesError("Failed to load Eâ€‘Coupon codes.");
+      setAgencyCodesError("Failed to load E”‘Coupon codes.");
     } finally {
       setAgencyCodesLoading(false);
     }
@@ -318,7 +318,7 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
   const [assignErrors, setAssignErrors] = useState({});
   const [quota, setQuota] = useState({ quota: 0, assigned: 0, remaining: 0, updated_at: null });
 
-  // My 5â€‘Matrix tree (spillover-based)
+  // My 5”‘Matrix tree (spillover-based)
   const [myTree, setMyTree] = useState(null);
   const [myTreeLoading, setMyTreeLoading] = useState(false);
   const [myTreeErr, setMyTreeErr] = useState("");
@@ -410,7 +410,7 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
     return (
       <div style={{ paddingLeft: pad, paddingTop: 6, paddingBottom: 6, borderBottom: "1px solid #f1f5f9" }}>
         <div style={{ fontWeight: 700, color: "#0f172a" }}>
-          {node.username} <span style={{ color: "#64748b", fontWeight: 500 }}>#{node.id} â€¢ {node.full_name || "â€”"}</span>
+          {node.username} <span style={{ color: "#64748b", fontWeight: 500 }}>#{node.id} ”¢ {node.full_name || "””"}</span>
         </div>
         {Array.isArray(node.children) && node.children.length > 0 ? (
           <div>
@@ -470,7 +470,7 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
                 <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, flexWrap: "wrap" }}>
                   <Box sx={{ flex: 1, minWidth: 220 }}>
                     <Typography variant="subtitle2" color="text.secondary" sx={{ letterSpacing: 1.5 }}>
-                      SUBâ€‘FRANCHISE
+                      SUB”‘FRANCHISE
                     </Typography>
                     <Typography variant="h6" sx={{ fontWeight: 900 }}>
                       Join Agency Prime Package
@@ -503,7 +503,7 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
       {/* <Box sx={{ mb: 2 }}> 
         <ReferAndEarn title="Refer & Earn" sponsorUsername={sponsorUsername} />
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          Share your referral links to invite Consumers, Employees, Subâ€‘Franchise agencies, and Merchants. Sponsor ID will be auto-filled.
+          Share your referral links to invite Consumers, Employees, Sub”‘Franchise agencies, and Merchants. Sponsor ID will be auto-filled.
         </Typography>
       </Box> */}
 
@@ -517,10 +517,10 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
         </Grid>
       </Box>
 
-      {/* Eâ€‘Coupon Summary */}
+      {/* E”‘Coupon Summary */}
       <Box sx={{ mb: 2 }}>
         {ecSummaryLoading ? (
-          <Typography variant="body2">Loading Eâ€‘Coupon summary...</Typography>
+          <Typography variant="body2">Loading E”‘Coupon summary...</Typography>
         ) : ecSummaryError ? (
           <Alert severity="error">{ecSummaryError}</Alert>
         ) : ecSummary ? (
@@ -628,7 +628,7 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
         </Grid>
       </Box>
 
-      {/* Prime Package Buy (only for Subâ€‘franchise) or Assigned Packages (others) */}
+      {/* Prime Package Buy (only for Sub”‘franchise) or Assigned Packages (others) */}
       <Box sx={{ mb: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>
           My Packages
@@ -691,7 +691,7 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
                             Amount
                           </Typography>
                           <Typography variant="subtitle1" sx={{ fontWeight: 900, color: fg }}>
-                            â‚¹{p.total_amount || "0.00"}
+                            ₹{p.total_amount || "0.00"}
                           </Typography>
                         </Box>
                       </Grid>
@@ -701,7 +701,7 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
                             Paid
                           </Typography>
                           <Typography variant="subtitle1" sx={{ fontWeight: 900, color: fg }}>
-                            â‚¹{p.paid_amount || "0.00"}
+                            ₹{p.paid_amount || "0.00"}
                           </Typography>
                         </Box>
                       </Grid>
@@ -711,7 +711,7 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
                             Remaining
                           </Typography>
                           <Typography variant="subtitle1" sx={{ fontWeight: 900, color: fg }}>
-                            â‚¹{p.remaining_amount || "0.00"}
+                            ₹{p.remaining_amount || "0.00"}
                           </Typography>
                         </Box>
                       </Grid>
@@ -752,12 +752,12 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
           
           {/* <Box sx={{ mb: 2 }}>
             <Alert severity="success">
-              My commission earned: â‚¹{commissionTotal.toFixed(2)}
+              My commission earned: ₹{commissionTotal.toFixed(2)}
             </Alert>
           </Box> */}
           <Box sx={{ mb: 2 }}>
             {ecSummaryLoading ? (
-              <Typography variant="body2">Loading Eâ€‘Coupon summary...</Typography>
+              <Typography variant="body2">Loading E”‘Coupon summary...</Typography>
             ) : ecSummaryError ? (
               <Alert severity="error">{ecSummaryError}</Alert>
             ) : ecSummary ? (
@@ -802,7 +802,7 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
             ) : null}
           </Box>
 
-          {/* Agency Eâ€‘Coupon Codes (history) */}
+          {/* Agency E”‘Coupon Codes (history) */}
           
 
           {luckyLoading ? (
@@ -915,7 +915,7 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
               >
                 {(assignableEmployees || []).map((emp) => (
                   <MenuItem key={emp.id} value={emp.id}>
-                    {emp.username} â€” {emp.full_name || ""} â€” {emp.phone || ""} â€” {emp.email || ""}
+                    {emp.username} ”” {emp.full_name || ""} ”” {emp.phone || ""} ”” {emp.email || ""}
                   </MenuItem>
                 ))}
               </TextField>
@@ -1045,11 +1045,11 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
                               {u.username}
                             </Typography>
                             <Typography variant="body2" sx={{ color: "text.secondary", overflow: "hidden", textOverflow: "ellipsis" }}>
-                              {u.full_name || "â€”"}
+                              {u.full_name || "””"}
                             </Typography>
                             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mt: 0.5 }}>
-                              <Typography variant="caption" sx={{ color: "text.secondary" }}>ðŸ“ž {u.phone || "â€”"}</Typography>
-                              <Typography variant="caption" sx={{ color: "text.secondary" }}>âœ‰ï¸ {u.email || "â€”"}</Typography>
+                              <Typography variant="caption" sx={{ color: "text.secondary" }}>ðŸ“ž {u.phone || "””"}</Typography>
+                              <Typography variant="caption" sx={{ color: "text.secondary" }}>âœ‰ï¸ {u.email || "””"}</Typography>
                             </Box>
                             <Typography variant="caption" sx={{ display: "block", color: "text.secondary", mt: 0.5 }}>
                               {(u.pincode || "")}{u.city ? `, ${u.city}` : ""}{u.state ? `, ${u.state}` : ""}{u.country ? `, ${u.country}` : ""}
@@ -1142,10 +1142,10 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
           )}
         </Paper>
       )}
-      {/* My 5â€‘Matrix Team (click child card to drill down) */}
+      {/* My 5”‘Matrix Team (click child card to drill down) */}
       {/* <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mt: 2, backgroundColor: '#fce4ec' }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
-          My Team (5â€‘Matrix)
+          My Team (5”‘Matrix)
         </Typography>
         <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden", background: "#fff", padding: 12 }}>
           <TreeReferralGalaxy mode="self" />

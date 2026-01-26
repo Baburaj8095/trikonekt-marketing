@@ -63,7 +63,7 @@ export default function CategoryPage() {
   if (state.loading) {
     return (
       <Box sx={{ p: 2 }}>
-        <Typography variant="h6" sx={{ mb: 1 }}>Loadingâ€¦</Typography>
+        <Typography variant="h6" sx={{ mb: 1 }}>Loading”¦</Typography>
         <CircularProgress size={20} />
       </Box>
     );

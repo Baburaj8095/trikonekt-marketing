@@ -37,7 +37,7 @@ function humanizeType(t) {
     AUTOPOOL_BONUS_THREE: "Autopool Bonus",
     INCOME_CREDIT_75: "Income Credited",
     SELF_ACCOUNT_CREDIT: "Self Account Saved",
-    SELF_ACCOUNT_DEBIT: "Self Account Allocation (â‚¹250)",
+    SELF_ACCOUNT_DEBIT: "Self Account Allocation (₹250)",
     AUTO_ECOUPON_ISSUED: "E-Coupon Issued",
     AUTO_PURCHASE_DEBIT: "E-Coupon Issued",
   };
@@ -157,7 +157,7 @@ function AmountBadge({ value }) {
         letterSpacing: 0.2,
       }}
     >
-      {isCredit ? "+" : "-"}â‚¹ {fmtAmount(Math.abs(num))}
+      {isCredit ? "+" : "-"}₹ {fmtAmount(Math.abs(num))}
     </Typography>
   );
 }
@@ -292,7 +292,7 @@ function HistoryRow({ tx, onClick }) {
           </Typography>
 
           <Typography sx={{ fontSize: 12, color: "text.secondary", mt: 0.25 }}>
-            {dateStr} {timeStr ? `â€¢ ${timeStr}` : ""}
+            {dateStr} {timeStr ? `”¢ ${timeStr}` : ""}
           </Typography>
         </Box>
 
@@ -482,7 +482,7 @@ export default function History() {
                 mt: 0.2,
               }}
             >
-              â‚¹ {fmtAmount(top.main_income_balance)}
+              ₹ {fmtAmount(top.main_income_balance)}
             </Typography>
           </Box>
         </Stack>
@@ -503,13 +503,13 @@ export default function History() {
       >
         <MiniCard
           title="Income Wallet"
-          value={`â‚¹ ${fmtAmount(top.main_income_balance)}`}
+          value={`₹ ${fmtAmount(top.main_income_balance)}`}
           icon={<SavingsIcon fontSize="small" />}
           color="success"
         />
         <MiniCard
           title="Self Account"
-          value={`â‚¹ ${fmtAmount(top.self_account_balance)}`}
+          value={`₹ ${fmtAmount(top.self_account_balance)}`}
           icon={<AccountBalanceWalletIcon fontSize="small" />}
           color="warning"
         />

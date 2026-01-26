@@ -201,7 +201,7 @@ export default function ProductList() {
                 </TableCell>
                 <TableCell>{p.name}</TableCell>
                 <TableCell>{p.category}</TableCell>
-                <TableCell>â‚¹{Number(p.price || 0).toFixed(2)}</TableCell>
+                <TableCell>₹{Number(p.price || 0).toFixed(2)}</TableCell>
                 <TableCell>{p.quantity}</TableCell>
                 <TableCell>{Number(p.discount || 0)}%</TableCell>
                 <TableCell>{[p.city, p.state, p.country, p.pincode].filter(Boolean).join(", ")}</TableCell>

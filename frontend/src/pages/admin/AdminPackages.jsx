@@ -330,20 +330,20 @@ export default function AdminPackages() {
                   >
                     <div style={{ padding: 8, borderRadius: 8, background: "rgba(255,255,255,0.15)" }}>
                       <div style={{ fontSize: 12, opacity: 0.9, color: inactive ? "#f1f5f9" : "#0f172a" }}>Amount</div>
-                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a" }}>â‚¹{p.total_amount || "0.00"}</div>
+                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a" }}>₹{p.total_amount || "0.00"}</div>
                     </div>
                     <div style={{ padding: 8, borderRadius: 8, background: "rgba(255,255,255,0.15)" }}>
                       <div style={{ fontSize: 12, opacity: 0.9, color: inactive ? "#f1f5f9" : "#0f172a" }}>Paid</div>
-                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a" }}>â‚¹{p.paid_amount || "0.00"}</div>
+                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a" }}>₹{p.paid_amount || "0.00"}</div>
                     </div>
                     <div style={{ padding: 8, borderRadius: 8, background: "rgba(255,255,255,0.15)" }}>
                       <div style={{ fontSize: 12, opacity: 0.9, color: inactive ? "#f1f5f9" : "#0f172a" }}>Remaining</div>
-                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a" }}>â‚¹{p.remaining_amount || "0.00"}</div>
+                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a" }}>₹{p.remaining_amount || "0.00"}</div>
                     </div>
                   </div>
                   <div style={{ marginTop: 6, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                     <div style={{ fontSize: 12, fontWeight: 700 }}>
-                      Renewal: {typeof p.months_remaining === "number" ? `${p.months_remaining} month${p.months_remaining === 1 ? "" : "s"} remaining` : "â€”"}
+                      Renewal: {typeof p.months_remaining === "number" ? `${p.months_remaining} month${p.months_remaining === 1 ? "" : "s"} remaining` : "””"}
                     </div>
                     <div style={{ display: "flex", gap: 6 }}>
                       <button
@@ -417,7 +417,7 @@ export default function AdminPackages() {
                       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                         <div style={{ fontWeight: 900, color: "#0f172a" }}>{pkgName}</div>
                         <div style={{ fontSize: 12, color: "#64748b" }}>
-                          Amount: <b>â‚¹{r.amount}</b> â€¢ Method: <b>{r.method || "UPI"}</b> â€¢ UTR: <b>{r.utr || "â€”"}</b>
+                          Amount: <b>₹{r.amount}</b> ”¢ Method: <b>{r.method || "UPI"}</b> ”¢ UTR: <b>{r.utr || "””"}</b>
                         </div>
                         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
                           <a
@@ -521,7 +521,7 @@ export default function AdminPackages() {
         right={
           <div style={{ color: "#64748b", fontSize: 12 }}>
             {activeTab.key === "packages"
-              ? "Define package name, code, and amount here. Toggle default to autoâ€‘assign to agencies."
+              ? "Define package name, code, and amount here. Toggle default to auto”‘assign to agencies."
               : activeTab.key === "assignments"
               ? "Assign packages to agencies. One (agency, package) per row."
               : "Record payments for a specific assignment (amount, reference, notes)."}
@@ -572,7 +572,7 @@ export default function AdminPackages() {
             }}
           >
             <div style={{ fontWeight: 900, color: "#0f172a", marginBottom: 8 }}>
-              Add Payment â€” {payForm.title || ""}
+              Add Payment ”” {payForm.title || ""}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>

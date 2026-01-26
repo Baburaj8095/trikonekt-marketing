@@ -2031,7 +2031,7 @@ const RegisterV2 = () => {
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
                   <CircularProgress size={16} />
                   <Typography variant="body2" color="text.secondary">
-                    Validating sponsorâ€¦
+                    Validating sponsor”¦
                   </Typography>
                 </Box>
               )}
@@ -2045,10 +2045,10 @@ const RegisterV2 = () => {
                       <b>Sponsor ID:</b> {sponsorDisplay.username || sponsorId}
                     </Typography>
                     <Typography variant="body2">
-                      <b>Name:</b> {sponsorDisplay.name || "â€”"}
+                      <b>Name:</b> {sponsorDisplay.name || "””"}
                     </Typography>
                     <Typography variant="body2">
-                      <b>Pincode:</b> {sponsorDisplay.pincode || "â€”"}
+                      <b>Pincode:</b> {sponsorDisplay.pincode || "””"}
                     </Typography>
                   </Box>
                 </Box>
@@ -2194,7 +2194,7 @@ const RegisterV2 = () => {
           boxShadow: "0 0px 15px rgba(0,0,0,0.08) !important",
         }}
       >
-        <Typography variant="body2">Â© {new Date().getFullYear()} Trikonekt. All rights reserved.</Typography>
+        <Typography variant="body2">© {new Date().getFullYear()} Trikonekt. All rights reserved.</Typography>
       </Box>
     </Box>
   );

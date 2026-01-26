@@ -25,7 +25,7 @@ export default function ModelsIndex() {
     };
   }, []);
 
-  if (loading) return <div style={{ color: "#64748b" }}>Loading modelsâ€¦</div>;
+  if (loading) return <div style={{ color: "#64748b" }}>Loading models”¦</div>;
   if (err) return <div style={{ color: "#dc2626" }}>{err}</div>;
   if (!models.length) return <div>No admin models available.</div>;
 

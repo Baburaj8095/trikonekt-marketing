@@ -253,7 +253,7 @@ export default function AdminPromoPackageProducts() {
               ) : (
                 packages.map((pkg) => (
                   <MenuItem key={pkg.id} value={String(pkg.id)}>
-                    {pkg.code} â€” {pkg.name} (â‚¹{pkg.price})
+                    {pkg.code} ”” {pkg.name} (₹{pkg.price})
                   </MenuItem>
                 ))
               )}
@@ -274,7 +274,7 @@ export default function AdminPromoPackageProducts() {
               fullWidth
               size="small"
               type="number"
-              label="Price (â‚¹)"
+              label="Price (₹)"
               value={ppPrice}
               onChange={(e) => setPpPrice(e.target.value)}
               inputProps={{ min: 0, step: "0.01" }}

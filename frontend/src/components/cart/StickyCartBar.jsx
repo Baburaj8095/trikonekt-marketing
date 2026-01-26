@@ -9,7 +9,7 @@ export default function StickyCartBar() {
 
   return (
     <Box sx={{ position: "fixed", bottom: 56, left: 0, right: 0, bgcolor: "#145DA0", p: 1 }}>
-      <Typography color="#fff">Total: â‚¹{total}</Typography>
+      <Typography color="#fff">Total: ₹{total}</Typography>
       <Button variant="contained">View Cart</Button>
     </Box>
   );

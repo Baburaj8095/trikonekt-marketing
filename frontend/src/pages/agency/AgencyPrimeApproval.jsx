@@ -88,10 +88,10 @@ export default function AgencyPrimeApproval() {
   const fmt = (n) => {
     try {
       const x = Number(n);
-      if (!isFinite(x)) return `â‚¹${String(n || 0)}`;
-      return `â‚¹${x.toLocaleString("en-IN")}`;
+      if (!isFinite(x)) return `₹${String(n || 0)}`;
+      return `₹${x.toLocaleString("en-IN")}`;
     } catch {
-      return `â‚¹${String(n || 0)}`;
+      return `₹${String(n || 0)}`;
     }
   };
 
@@ -99,7 +99,7 @@ export default function AgencyPrimeApproval() {
     setSelected(assn);
     // default amount = remaining amount on the assignment
     let rem = assn?.remaining_amount;
-    let num = parseFloat(String(rem || "").replace(/[,â‚¹\s]/g, ""));
+    let num = parseFloat(String(rem || "").replace(/[,₹\s]/g, ""));
     setPayAmount(Number.isFinite(num) && num > 0 ? String(num) : "");
     setPayUTR("");
     setPayFile(null);
@@ -116,7 +116,7 @@ export default function AgencyPrimeApproval() {
     try {
       setSubmitting(true);
       // Basic validations
-      const amtNum = parseFloat(String(payAmount || "").replace(/[,â‚¹\s]/g, ""));
+      const amtNum = parseFloat(String(payAmount || "").replace(/[,₹\s]/g, ""));
       if (!Number.isFinite(amtNum) || amtNum <= 0) {
         window.alert("Enter a valid amount (> 0).");
         setSubmitting(false);
@@ -271,7 +271,7 @@ export default function AgencyPrimeApproval() {
                 >
                   <CardContent sx={{ display: "flex", flexDirection: "column", gap: 1, flex: 1 }}>
                     <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 1.5 }}>
-                      SUBâ€‘FRANCHISE
+                      SUB”‘FRANCHISE
                     </Typography>
                     <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
                       <Typography variant="h6" sx={{ fontWeight: 900 }}>{pkgName}</Typography>
@@ -441,7 +441,7 @@ export default function AgencyPrimeApproval() {
               </Typography>
               <Stack direction="row" spacing={1} alignItems="center">
                 <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
-                  {selected?.package?.upi_id || "â€”"}
+                  {selected?.package?.upi_id || "””"}
                 </Typography>
                 {selected?.package?.upi_id ? (
                   <Tooltip title="Copy UPI ID">
@@ -466,7 +466,7 @@ export default function AgencyPrimeApproval() {
 
           <Stack spacing={2}>
             <TextField
-              label="Amount Paid (â‚¹)"
+              label="Amount Paid (₹)"
               value={payAmount}
               onChange={(e) => setPayAmount(e.target.value)}
               fullWidth

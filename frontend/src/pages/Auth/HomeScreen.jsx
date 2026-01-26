@@ -62,7 +62,7 @@ export default function HomeV2() {
             Turn Everyday Spending Into Earnings
           </Typography>
           <Typography sx={{ color: "#666", mt: 1 }}>
-            Shop Â· Connect Â· Earn Â· Grow
+            Shop · Connect · Earn · Grow
           </Typography>
 
           <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
@@ -197,9 +197,9 @@ export default function HomeV2() {
 
         <Box sx={{ display: "flex", gap: 2, overflowX: "auto", pb: 1, scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
           {[
-            { title: "PRIME", price: "â‚¹150", cta: "Join Prime" },
-            { title: "PROMO", price: "â‚¹750", cta: "Join Promo" },
-            { title: "MONTHLY", price: "â‚¹759", cta: "Subscribe" }
+            { title: "PRIME", price: "₹150", cta: "Join Prime" },
+            { title: "PROMO", price: "₹750", cta: "Join Promo" },
+            { title: "MONTHLY", price: "₹759", cta: "Subscribe" }
           ].map((pkg, i) => (
             <Card
               key={i}
@@ -248,7 +248,7 @@ export default function HomeV2() {
           About | Support | Terms | Privacy
         </Typography>
         <Typography fontSize={12} color="text.secondary" mt={1}>
-          Â© 2025 TRIKONEKT
+          © 2025 TRIKONEKT
         </Typography>
       </Container>
 

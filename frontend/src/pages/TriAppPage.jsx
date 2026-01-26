@@ -21,10 +21,10 @@ import { getTriApp, getEcouponStoreBootstrap, createPromoPurchase } from "../api
 import normalizeMediaUrl from "../utils/media";
 import { addProduct as addCartProduct } from "../store/cart";
 
-function Price({ value, currency = "â‚¹" }) {
+function Price({ value, currency = "₹" }) {
   const n = Number(value || 0);
   if (!isFinite(n) || n < 0) return null;
-  const sign = currency === "INR" ? "â‚¹" : currency || "â‚¹";
+  const sign = currency === "INR" ? "₹" : currency || "₹";
   return (
     <Typography sx={{ fontWeight: 800, fontSize: 14, color: "#0C2D48" }}>
       {sign}
@@ -69,7 +69,7 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
     try {
       const ui = data.uiMeta || {};
       const lines = [];
-      if (ui.bonus150) lines.push("+ Bonus Wallet â‚¹150");
+      if (ui.bonus150) lines.push("+ Bonus Wallet ₹150");
       if (ui.primeChoice) lines.push(`Prime Choice: ${ui.primeChoice}`);
       if (ui.selectedProductName) lines.push(`Product: ${ui.selectedProductName}`);
       if (ui.plan) lines.push(`Plan: ${ui.plan}`);
@@ -123,7 +123,7 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
             <Box sx={{ mt: 0.5 }}>
               {summaryLines.map((s, i) => (
                 <Typography key={i} fontSize={12} color="text.secondary">
-                  â€¢ {s}
+                  ”¢ {s}
                 </Typography>
               ))}
             </Box>
@@ -131,7 +131,7 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
           <Stack direction="row" justifyContent="space-between" mt={1}>
             <Typography color="text.secondary">Total Amount</Typography>
             <Typography fontWeight={900} fontSize={20}>
-              â‚¹{Number(data.amount || 0)}
+              ₹{Number(data.amount || 0)}
             </Typography>
           </Stack>
         </Box>
@@ -189,7 +189,7 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
         </Box>
 
         <Alert severity="info" sx={{ mt: 2 }}>
-          Amount is autoâ€‘calculated and locked. Pay the exact amount.
+          Amount is auto”‘calculated and locked. Pay the exact amount.
         </Alert>
 
         <TextField
@@ -355,7 +355,7 @@ export default function TriAppPage() {
       {loading && (
         <Box sx={{ mb: 2, display: "flex", alignItems: "center", gap: 1 }}>
           <CircularProgress size={16} />
-          <Typography variant="body2">Loadingâ€¦</Typography>
+          <Typography variant="body2">Loading”¦</Typography>
         </Box>
       )}
 

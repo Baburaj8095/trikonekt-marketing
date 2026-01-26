@@ -105,19 +105,7 @@ export default function AdminUsers() {
 
   // Hide less important columns on small screens for better readability
   const mobileHiddenCols = useMemo(
-    () =>
-      isMobile
-        ? {
-            email: false,
-            sponsor_id: false,
-            country_name: false,
-            district_name: false,
-            state_name: false,
-            wallet_status: false,
-            kyc_verified_at: false,
-            pincode: false,
-          }
-        : {},
+    () => ({}),
     [isMobile]
   );
   const [colVis, setColVis] = useState({});
@@ -350,7 +338,7 @@ export default function AdminUsers() {
         flex: 1,
         renderCell: (params) => {
           const row = params?.row || {};
-          const uname = row.username || "â€”";
+          const uname = row.username || "””";
           return (
             <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
               <button
@@ -421,7 +409,7 @@ export default function AdminUsers() {
           const role = String(row.role || "").toLowerCase();
           const cat = String(row.category || "").toLowerCase();
           const isAgency = role === "agency" || cat.startsWith("agency");
-          if (!isAgency) return "â€”";
+          if (!isAgency) return "””";
           const onOpen = (e) => {
             e?.stopPropagation?.();
             setPkgUser({ id: row.id, username: row.username, full_name: row.full_name });
@@ -460,7 +448,7 @@ export default function AdminUsers() {
           const c = String(row.category || "").toLowerCase();
           const isAgency = r === "agency" || c.startsWith("agency");
           const isEmployee = r === "employee" || c === "employee";
-          if (!isAgency && !isEmployee) return "â€”";
+          if (!isAgency && !isEmployee) return "””";
           const onOpen = (e) => {
             e?.stopPropagation?.();
             const roleParam = isAgency ? "agency" : "employee";
@@ -494,7 +482,7 @@ export default function AdminUsers() {
       { field: "email", headerName: "Email", minWidth: 200, flex: 1 },
       {
         field: "activated_ecoupon_count",
-        headerName: "Eâ€‘Coupons (Activated)",
+        headerName: "E Coupons (Activated)",
         minWidth: 170,
         renderCell: (params) => {
           const n = Number(params?.row?.activated_ecoupon_count ?? 0);
@@ -603,7 +591,7 @@ export default function AdminUsers() {
                 }}
                 title="No level"
               >
-                â€”
+                ””
               </div>
             );
           }
@@ -932,7 +920,7 @@ export default function AdminUsers() {
           ["Category", (r) => r.category ?? ""],
           ["KYC Status", (r) => (r.kyc_verified ? "Verified" : (r.kyc_status || "Pending"))],
           ["KYC Verified At", (r) => r.kyc_verified_at ?? ""],
-          ["Eâ€‘Coupons Activated", (r) => r.activated_ecoupon_count ?? ""],
+          ["E”‘Coupons Activated", (r) => r.activated_ecoupon_count ?? ""],
           ["Promo Package", (r) => r.last_promo_package ?? ""],
           ["Sponsor ID", (r) => r.sponsor_id ?? ""],
           ["Pincode", (r) => r.pincode ?? ""],
@@ -1108,7 +1096,7 @@ export default function AdminUsers() {
             cursor: "pointer",
             fontWeight: 700,
           }}
-          title="Create a new Agency (defaults to Subâ€‘Franchise; you can change the category in the form)"
+          title="Create a new Agency (defaults to Sub”‘Franchise; you can change the category in the form)"
         >
           New Agency
         </button>
@@ -1279,4 +1267,3 @@ export default function AdminUsers() {
     </div>
   );
 }
-

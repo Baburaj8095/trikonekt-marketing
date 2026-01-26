@@ -6,9 +6,12 @@ import {
   Typography,
   Box,
   Badge,
+  Button,
+  Grid,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
+import StorefrontIcon from "@mui/icons-material/Storefront";
 import { useNavigate } from "react-router-dom";
 
 import PromoStrip from "../components/PromoStrip";
@@ -22,9 +25,10 @@ import API, {
   listHeroBanners,
   listPromotions,
   listCategoryBanners,
+  getNearbyShops,
 } from "../api/api";
 
-// IMAGE IMPORTS â€” fallbacks
+// IMAGE IMPORTS ”” fallbacks
 import heroImg from "../assets/Wealth_Galaxy.jpg";
 import promoImg1 from "../assets/spin1.png";
 import promoImg2 from "../assets/asst_2.png";
@@ -101,6 +105,8 @@ export default function UserDashboard({ embedded = false }) {
   const [heroBannersAdmin, setHeroBannersAdmin] = useState([]);
   const [promotionsAdmin, setPromotionsAdmin] = useState({});
   const [categoryBannersAdmin, setCategoryBannersAdmin] = useState({});
+  // Nearby consumer-visible shops (ACTIVE)
+  const [nearbyShops, setNearbyShops] = useState([]);
 
   useEffect(() => {
     let alive = true;
@@ -156,6 +162,36 @@ export default function UserDashboard({ embedded = false }) {
       alive = false;
     };
   }, [resolveImage]);
+
+  // Load 5 nearby shops (best-effort geolocation; fallback to recent shops)
+  useEffect(() => {
+    let alive = true;
+    async function load(params = {}) {
+      try {
+        const res = await getNearbyShops({ limit: 5, ...params });
+        const arr = Array.isArray(res) ? res : res?.results || [];
+        if (alive) setNearbyShops(arr);
+      } catch (_) {
+        if (alive) setNearbyShops([]);
+      }
+    }
+    try {
+      if (typeof navigator !== "undefined" && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => load({ lat: pos.coords.latitude, lng: pos.coords.longitude, radius_km: 5 }),
+          () => load(),
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+        );
+      } else {
+        load();
+      }
+    } catch (_) {
+      load();
+    }
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // Base app items (only categories and holidays needed here)
   const appItems = useMemo(
@@ -297,7 +333,7 @@ export default function UserDashboard({ embedded = false }) {
               color: "#64748b",
             }}
           >
-            Search productsâ€¦
+            Search products”¦
           </Box>
 
           <IconButton>
@@ -321,6 +357,83 @@ export default function UserDashboard({ embedded = false }) {
         {/* CATEGORIES */}
         <CategoryStrip categories={categories} onClick={(route) => navigate(route)} />
 
+        {/* LOCAL SHOPS */}
+        <Box sx={{ mt: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+              Local Shops
+            </Typography>
+            <Button size="small" onClick={() => navigate("/user/tri/tri-local-store")}>
+              View all
+            </Button>
+          </Box>
+
+          <Grid container spacing={1.25}>
+            {(nearbyShops || []).slice(0, 5).map((s) => (
+              <Grid key={s.id} item xs={6} sm={4} md={3}>
+                <Box
+                  onClick={() => navigate(`/merchant-marketplace/shops/${encodeURIComponent(s.id)}`)}
+                  sx={{
+                    p: 1,
+                    borderRadius: 1,
+                    bgcolor: "#fff",
+                    border: "1px solid #e2e8f0",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                    "&:hover": { borderColor: "#cbd5e1", bgcolor: "#fafafa" },
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: "50%",
+                      bgcolor: "#f1f5f9",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      overflow: "hidden",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {s.logo ? (
+                      <img
+                        src={s.logo}
+                        alt={s.name}
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                    ) : (
+                      <StorefrontIcon fontSize="small" color="primary" />
+                    )}
+                  </Box>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="body2" noWrap title={s.name}>
+                      {s.name}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      noWrap
+                      title={s.category_slug || ""}
+                    >
+                      {(s.category_slug || "local").replaceAll("-", " ")}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Grid>
+            ))}
+            {(nearbyShops || []).length === 0 ? (
+              <Grid item xs={12}>
+                <Typography variant="body2" color="text.secondary">
+                  No nearby shops found.
+                </Typography>
+              </Grid>
+            ) : null}
+          </Grid>
+        </Box>
+
         {/* PRODUCTS */}
         <ProductStrip title="Electronics" products={electronicsProducts} />
 
@@ -334,4 +447,3 @@ export default function UserDashboard({ embedded = false }) {
     </Box>
   );
 }
-

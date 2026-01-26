@@ -4,7 +4,7 @@ import { Link as RouterLink } from "react-router-dom";
 import AppCard from "./ui/AppCard";
 
 /**
- * AppsRow â€” single-row horizontal scroller for compact cards
+ * AppsRow ”” single-row horizontal scroller for compact cards
  *
  * Props:
  * - items: Array<{

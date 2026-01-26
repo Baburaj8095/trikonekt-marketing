@@ -88,7 +88,7 @@ export default function FilterBar({
         >
           {denomOptions.map((d) => (
             <option key={d} value={d}>
-              {d === "all" ? "All" : `â‚¹${d}`}
+              {d === "all" ? "All" : `₹${d}`}
             </option>
           ))}
         </TextField>
@@ -112,7 +112,7 @@ export default function FilterBar({
             />
             <Chip
               size="small"
-              label={`â‚¹${Math.round(priceRange[0])} - â‚¹${Math.round(priceRange[1])}`}
+              label={`₹${Math.round(priceRange[0])} - ₹${Math.round(priceRange[1])}`}
               variant="outlined"
             />
           </Stack>

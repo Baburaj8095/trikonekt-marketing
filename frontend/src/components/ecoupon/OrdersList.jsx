@@ -130,7 +130,7 @@ export default function OrdersList({
                     </Stack>
 
                     <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                      {o.product_title || o.product || "Eâ€‘Coupon"}
+                      {o.product_title || o.product || "E”‘Coupon"}
                     </Typography>
 
                     <Stack
@@ -143,7 +143,7 @@ export default function OrdersList({
                         Denomination:
                       </Typography>
                       <Typography variant="caption" sx={{ fontWeight: 800 }}>
-                        â‚¹{o.denomination_snapshot}
+                        ₹{o.denomination_snapshot}
                       </Typography>
 
                       <Typography variant="caption" color="text.secondary">
@@ -157,7 +157,7 @@ export default function OrdersList({
                         Total:
                       </Typography>
                       <Typography variant="caption" sx={{ fontWeight: 800 }}>
-                        â‚¹{Number(o.amount_total || 0).toLocaleString("en-IN")}
+                        ₹{Number(o.amount_total || 0).toLocaleString("en-IN")}
                       </Typography>
                     </Stack>
 
@@ -168,7 +168,7 @@ export default function OrdersList({
                       <Typography variant="caption">
                         {o.reviewed_at
                           ? new Date(o.reviewed_at).toLocaleString()
-                          : "â€”"}
+                          : "””"}
                       </Typography>
                     </Stack>
 

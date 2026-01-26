@@ -57,10 +57,10 @@ export default function RolePermissionsPage() {
           ) : (
             rows.map((r) => (
               <div key={r.id} style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr", padding: "10px 12px", borderTop: "1px solid #e2e8f0", alignItems: "center" }}>
-                <div>{r.role_name || r.role || "â€”"}</div>
-                <div>{r.permission_code || r.permission || "â€”"}</div>
+                <div>{r.role_name || r.role || "””"}</div>
+                <div>{r.permission_code || r.permission || "””"}</div>
                 <div>
-                  {r.created_at ? (() => { try { return new Date(r.created_at).toLocaleString(); } catch { return r.created_at; } })() : "â€”"}
+                  {r.created_at ? (() => { try { return new Date(r.created_at).toLocaleString(); } catch { return r.created_at; } })() : "””"}
                 </div>
               </div>
             ))

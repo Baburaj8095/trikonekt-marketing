@@ -17,12 +17,12 @@ export default function AboutPage() {
           Trikonekt is a smart digital platform built to connect people, businesses, and
           opportunities into one powerful network. Through our Connect â†’ Earn â†’ Grow model,
           everyday spending and interactions are transformed into meaningful income and
-          longâ€‘term growth.
+          long”‘term growth.
         </Typography>
 
         <Typography mt={3} color="text.secondary" maxWidth={800}>
-          Explore shopping, services, rewards, and business tools â€” all in a single unified
-          ecosystem designed for transparency and longâ€‘term value creation.
+          Explore shopping, services, rewards, and business tools ”” all in a single unified
+          ecosystem designed for transparency and long”‘term value creation.
         </Typography>
       </Container>
 

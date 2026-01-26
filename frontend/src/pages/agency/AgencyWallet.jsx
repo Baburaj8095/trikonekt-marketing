@@ -191,7 +191,7 @@ export default function AgencyWallet() {
   const disableReason = useMemo(() => {
     if (!kyc?.verified) return "KYC verification required";
     if (Number(displayWithdrawWallet) < 500)
-      return "Minimum withdrawable balance â‚¹500 required";
+      return "Minimum withdrawable balance ₹500 required";
     if (!windowInfo?.isOpen)
       return "Withdrawals are allowed only on Sunday 6:00 PM to 11:59 PM (IST)";
     if (inWindowCooldown)
@@ -436,9 +436,9 @@ export default function AgencyWallet() {
     const maxAvail = Math.min(Number(displayWithdrawWallet), perTxnCap);
     if (amtNum > maxAvail) {
       setWdrErr(
-        `Max per request is â‚¹${fmtAmount(
+        `Max per request is ₹${fmtAmount(
           perTxnCap
-        )}. Available to withdraw now: â‚¹${fmtAmount(maxAvail)}.`
+        )}. Available to withdraw now: ₹${fmtAmount(maxAvail)}.`
       );
       return;
     }
@@ -582,24 +582,24 @@ export default function AgencyWallet() {
         />
         <StatCard
           title="Direct Referral Withdrawal Commission"
-          value={`â‚¹ ${fmtAmount(directRefWithdrawCommission)}`}
+          value={`₹ ${fmtAmount(directRefWithdrawCommission)}`}
         />
 
         {/* Row 3 */}
-        <StatCard title="Today Earning" value={`â‚¹ ${fmtAmount(todayEarning)}`} />
+        <StatCard title="Today Earning" value={`₹ ${fmtAmount(todayEarning)}`} />
         <StatCard
           title="Direct Agency Referral Commission"
-          value={`â‚¹ ${fmtAmount(directRefIncome)}`}
+          value={`₹ ${fmtAmount(directRefIncome)}`}
         />
 
         {/* Row 4 */}
         <StatCard
           title="Agency Level Income"
-          value={`â‚¹ ${fmtAmount(matrixIncome)}`}
+          value={`₹ ${fmtAmount(matrixIncome)}`}
         />
         <StatCard
           title="Direct Referral Consumer Coupon Commission"
-          value={`â‚¹ ${fmtAmount(directRefCouponCommission)}`}
+          value={`₹ ${fmtAmount(directRefCouponCommission)}`}
         />
 
         {/* Row 5 */}
@@ -616,7 +616,7 @@ export default function AgencyWallet() {
         {/* Row 6 */}
         <StatCard
           title="Global Turnover Income"
-          value={`â‚¹ ${fmtAmount(globalTurnoverIncome)}`}
+          value={`₹ ${fmtAmount(globalTurnoverIncome)}`}
         />
         <Paper
           variant="outlined"
@@ -646,7 +646,7 @@ export default function AgencyWallet() {
                 Earn
               </Typography>
               <Typography variant="h6" sx={{ fontWeight: 800, mt: 0.5 }}>
-                â‚¹ {fmtAmount(nextBlock?.completed_in_current_block || "0")}
+                ₹ {fmtAmount(nextBlock?.completed_in_current_block || "0")}
               </Typography>
             </Box>
             <Box
@@ -662,7 +662,7 @@ export default function AgencyWallet() {
                 Limit
               </Typography>
               <Typography variant="h6" sx={{ fontWeight: 800, mt: 0.5 }}>
-                â‚¹ 1000
+                ₹ 1000
               </Typography>
             </Box>
           </Stack>
@@ -671,33 +671,33 @@ export default function AgencyWallet() {
         {/* Row 7 */}
         <StatCard
           title="Withdrawal Wallet"
-          value={`â‚¹ ${fmtAmount(displayWithdrawWallet)}`}
+          value={`₹ ${fmtAmount(displayWithdrawWallet)}`}
           hint="Net available to withdraw now"
         />
         <StatCard
           title="Income Wallet"
-          value={`â‚¹ ${fmtAmount(mainBalance)}`}
-          hint={`Completed â‚¹ ${fmtAmount(nextBlock?.completed_in_current_block || "0")} â€¢ Remaining â‚¹ ${fmtAmount(nextBlock?.remaining_to_next_block || "1000")}`}
+          value={`₹ ${fmtAmount(mainBalance)}`}
+          hint={`Completed ₹ ${fmtAmount(nextBlock?.completed_in_current_block || "0")} ”¢ Remaining ₹ ${fmtAmount(nextBlock?.remaining_to_next_block || "1000")}`}
         />
 
         {/* Row 8 */}
         <StatCard
           title="Product Sell Income"
-          value={`â‚¹ ${fmtAmount(productSellIncome)}`}
+          value={`₹ ${fmtAmount(productSellIncome)}`}
         />
         <StatCard
           title="App Download"
-          value={`â‚¹ ${fmtAmount(appDownloadIncome)}`}
+          value={`₹ ${fmtAmount(appDownloadIncome)}`}
         />
 
         {/* Row 9 */}
         <StatCard
           title="Shop Tieup"
-          value={`â‚¹ ${fmtAmount(shopTieupIncome)}`}
+          value={`₹ ${fmtAmount(shopTieupIncome)}`}
         />
         <StatCard
           title="Employee Sponsor Benefit"
-          value={`â‚¹ ${fmtAmount(employeeSponsorBenefit)}`}
+          value={`₹ ${fmtAmount(employeeSponsorBenefit)}`}
         />
       </Box>
 
@@ -724,8 +724,8 @@ export default function AgencyWallet() {
             ) : null}
             {Number(displayWithdrawWallet) < 500 ? (
               <Alert severity="warning" sx={{ mb: 1 }}>
-                Minimum withdrawable balance â‚¹500 required to enable
-                withdrawals. Short by â‚¹
+                Minimum withdrawable balance ₹500 required to enable
+                withdrawals. Short by ₹
                 {Math.max(0, 500 - Number(displayWithdrawWallet)).toFixed(2)}
               </Alert>
             ) : null}
@@ -748,7 +748,7 @@ export default function AgencyWallet() {
                 <TextField
                   fullWidth
                   size="small"
-                  label="Amount (â‚¹)"
+                  label="Amount (₹)"
                   name="amount"
                   value={wdrForm.amount}
                   onChange={onWdrChange}
@@ -758,9 +758,9 @@ export default function AgencyWallet() {
                     max: Math.min(Number(displayWithdrawWallet || 0), 750),
                     step: "0.01",
                   }}
-                  helperText={`Available this request: â‚¹ ${fmtAmount(
+                  helperText={`Available this request: ₹ ${fmtAmount(
                     Math.min(Number(displayWithdrawWallet || 0), 750)
-                  )} (cap â‚¹750)`}
+                  )} (cap ₹750)`}
                   required
                 />
                 <TextField

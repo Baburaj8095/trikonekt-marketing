@@ -111,6 +111,7 @@ class MerchantCategory(models.Model):
     name = models.CharField(max_length=150, unique=True, db_index=True)
     is_active = models.BooleanField(default=True, db_index=True)
     sort_order = models.IntegerField(default=0, db_index=True)
+    audience = models.CharField(max_length=16, choices=(("CONSUMER", "CONSUMER"), ("MERCHANT", "MERCHANT")), default="CONSUMER", db_index=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
@@ -127,6 +128,7 @@ class MerchantSubCategory(models.Model):
     name = models.CharField(max_length=150)
     is_active = models.BooleanField(default=True, db_index=True)
     sort_order = models.IntegerField(default=0, db_index=True)
+    audience = models.CharField(max_length=16, choices=(("CONSUMER", "CONSUMER"), ("MERCHANT", "MERCHANT")), default="CONSUMER", db_index=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:

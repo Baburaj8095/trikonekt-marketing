@@ -424,7 +424,7 @@ export default function EmployeeLuckyCoupons() {
                       .filter((c) => c.status === "ASSIGNED_EMPLOYEE" || c.status === "AVAILABLE")
                       .map((c) => (
                         <MenuItem key={c.id} value={c.id}>
-                          {c.code} {c.value ? `(â‚¹${c.value})` : ""}
+                          {c.code} {c.value ? `(₹${c.value})` : ""}
                         </MenuItem>
                       ))}
                   </TextField>
@@ -470,11 +470,11 @@ export default function EmployeeLuckyCoupons() {
                     sx={{ minWidth: 200 }}
                   />
                   {bulkResolveLoading ? (
-                    <Typography variant="caption" color="text.secondary">Resolving usernameâ€¦</Typography>
+                    <Typography variant="caption" color="text.secondary">Resolving username”¦</Typography>
                   ) : bulkResolvedUser ? (
                     <Typography variant="caption" color="text.secondary">
-                      This TR username belongs to {bulkResolvedUser.full_name || bulkResolvedUser.username} Â· PIN {bulkResolvedUser.pincode || "-"}
-                      {bulkResolvedUser.city ? ` Â· ${bulkResolvedUser.city}` : ""}{bulkResolvedUser.state ? `, ${bulkResolvedUser.state}` : ""}
+                      This TR username belongs to {bulkResolvedUser.full_name || bulkResolvedUser.username} · PIN {bulkResolvedUser.pincode || "-"}
+                      {bulkResolvedUser.city ? ` · ${bulkResolvedUser.city}` : ""}{bulkResolvedUser.state ? `, ${bulkResolvedUser.state}` : ""}
                     </Typography>
                   ) : bulkResolveError ? (
                     <Alert severity="warning">{bulkResolveError}</Alert>
@@ -534,7 +534,7 @@ export default function EmployeeLuckyCoupons() {
                         <TableCell>{c.status}</TableCell>
                         <TableCell>{c.batch || ""}</TableCell>
                         <TableCell>{c.serial || ""}</TableCell>
-                        <TableCell>{typeof c.value !== "undefined" ? `â‚¹${c.value}` : ""}</TableCell>
+                        <TableCell>{typeof c.value !== "undefined" ? `₹${c.value}` : ""}</TableCell>
                         <TableCell>{c.assigned_agency_username || ""}</TableCell>
                         <TableCell>{c.created_at ? new Date(c.created_at).toLocaleString() : ""}</TableCell>
                       </TableRow>
@@ -581,7 +581,7 @@ export default function EmployeeLuckyCoupons() {
                       <TableRow key={c.id}>
                         <TableCell>{c.earned_at ? new Date(c.earned_at).toLocaleString() : ""}</TableCell>
                         <TableCell>{c.role}</TableCell>
-                        <TableCell>â‚¹{c.amount}</TableCell>
+                        <TableCell>₹{c.amount}</TableCell>
                         <TableCell>{c.status}</TableCell>
                         <TableCell>{c.coupon_code || ""}</TableCell>
                       </TableRow>

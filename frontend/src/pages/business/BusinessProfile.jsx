@@ -91,7 +91,7 @@ export default function BusinessProfile() {
       <Paper elevation={2} sx={{ p: 2.5 }}>
         {loading ? (
           <Typography variant="body2" color="text.secondary">
-            Loadingâ€¦
+            Loading”¦
           </Typography>
         ) : (
           <Grid container spacing={2}>
@@ -144,7 +144,7 @@ export default function BusinessProfile() {
             <Grid item xs={12}>
               <Box sx={{ display: "flex", gap: 1 }}>
                 <Button variant="contained" onClick={handleSave} disabled={saving}>
-                  {saving ? "Savingâ€¦" : "Save Changes"}
+                  {saving ? "Saving”¦" : "Save Changes"}
                 </Button>
               </Box>
             </Grid>

@@ -61,7 +61,7 @@ export default function AgencyShell({ children }) {
       }}
       title={agencyCategory}
     >
-      {categoryLabel}{pincode ? ` â€¢ ${pincode}` : ""}
+      {categoryLabel}{pincode ? ` ”¢ ${pincode}` : ""}
     </span>
   ), [categoryLabel, pincode, agencyCategory]);
 
@@ -97,7 +97,7 @@ export default function AgencyShell({ children }) {
     // Genealogy
     { to: "/agency/my-team", label: "Genealogy", icon: "tree" },
 
-    // Coupons (3 tabs inside: Eâ€‘coupon, Store, Cart)
+    // Coupons (3 tabs inside: E”‘coupon, Store, Cart)
     { to: "/agency/coupons", label: "Coupons", icon: "ticket" },
 
     // Reports

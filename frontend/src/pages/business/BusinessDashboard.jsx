@@ -50,11 +50,11 @@ export default function BusinessDashboard() {
                 Merchant Profile
               </Typography>
               {loading ? (
-                <Typography variant="body2" color="text.secondary">Loadingâ€¦</Typography>
+                <Typography variant="body2" color="text.secondary">Loading”¦</Typography>
               ) : (
                 <>
-                  <Typography variant="body2"><b>Business Name:</b> {profile?.business_name || "â€”"}</Typography>
-                  <Typography variant="body2"><b>Mobile:</b> {profile?.mobile_number || "â€”"}</Typography>
+                  <Typography variant="body2"><b>Business Name:</b> {profile?.business_name || "””"}</Typography>
+                  <Typography variant="body2"><b>Mobile:</b> {profile?.mobile_number || "””"}</Typography>
                   <Typography variant="body2"><b>Verified:</b> {verified ? "Yes" : "No"}</Typography>
                   <Box sx={{ mt: 1.5 }}>
                     <Button variant="contained" size="small" onClick={() => navigate("/business/profile")}>
@@ -74,14 +74,14 @@ export default function BusinessDashboard() {
                 My Shops
               </Typography>
               {loading ? (
-                <Typography variant="body2" color="text.secondary">Loadingâ€¦</Typography>
+                <Typography variant="body2" color="text.secondary">Loading”¦</Typography>
               ) : (
                 <>
                   <Typography variant="body2"><b>Total:</b> {shops?.length || 0}</Typography>
                   {shops?.slice(0, 3).map((s) => (
                     <Box key={s.id} sx={{ mt: 0.75 }}>
                       <Typography variant="body2">
-                        {s.shop_name} â€” <i>{s.city || "â€”"}</i> [{s.status}]
+                        {s.shop_name} ”” <i>{s.city || "””"}</i> [{s.status}]
                       </Typography>
                     </Box>
                   ))}
