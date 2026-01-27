@@ -25,7 +25,7 @@ function StatusChip({ status }) {
   if (s === "ACTIVE") color = "success";
   if (s === "PENDING") color = "warning";
   if (s === "REJECTED") color = "error";
-  return <Chip size="small" label={s || "””"} color={color} variant={s === "ACTIVE" ? "filled" : "outlined"} />;
+  return <Chip size="small" label={s || ""} color={color} variant={s === "ACTIVE" ? "filled" : "outlined"} />;
 }
 
 export default function BusinessShops() {
@@ -326,10 +326,10 @@ export default function BusinessShops() {
                     </Box>
                   ) : null}
                   <Typography variant="body2" color="text.secondary">
-                    {s.address || "””"}
+                    {s.address || ""}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {s.city || "””"}
+                    {s.city || ""}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
                     {s.latitude != null && s.longitude != null
@@ -337,7 +337,7 @@ export default function BusinessShops() {
                       : null}
                   </Typography>
                   <Box sx={{ mt: 0.75 }}>
-                    <Typography variant="body2"><b>Contact:</b> {s.contact_number || "””"}</Typography>
+                    <Typography variant="body2"><b>Contact:</b> {s.contact_number || ""}</Typography>
                   </Box>
                 </CardContent>
                 <CardActions sx={{ justifyContent: "space-between" }}>

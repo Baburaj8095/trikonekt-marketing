@@ -14,7 +14,7 @@ export default function BusinessPage() {
         </Typography>
 
         <Typography color="text.secondary" maxWidth={800} mb={3}>
-          Grow your business with Trikonekt ”” acquire customers, accept e”‘payments, list your shop,
+          Grow your business with Trikonekt  acquire customers, accept e‑payments, list your shop,
           and run targeted promotions across our network.
         </Typography>
 

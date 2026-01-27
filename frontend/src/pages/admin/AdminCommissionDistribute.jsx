@@ -127,7 +127,7 @@ export default function AdminCommissionDistribute() {
     geo_royalty: "",
     // Prime 150 reward points amount (drives 150 points and 750 = 5x)
     prime150_reward_points_amount: "",
-    // Prime 750 multiplier (Ã—) relative to Prime 150
+    // Prime 750 multiplier (×) relative to Prime 150
     prime750_multiplier: "",
   });
 
@@ -363,7 +363,7 @@ export default function AdminCommissionDistribute() {
     }
   }
 
-  // 2) Fixed Level Commission (rupees) ”” retained logic (not shown as separate UI tab; managed in separate page)
+  // 2) Fixed Level Commission (rupees)  retained logic (not shown as separate UI tab; managed in separate page)
   const [lLoading, setLLoading] = useState(true);
   const [lSaving, setLSaving] = useState(false);
   const [lSeeding, setLSeeding] = useState(false);
@@ -499,7 +499,7 @@ export default function AdminCommissionDistribute() {
     }
   }
 
-  // 3) Matrix Commission (GLOBAL) ”” used earlier for 750 read-only; kept for reference
+  // 3) Matrix Commission (GLOBAL)  used earlier for 750 read-only; kept for reference
   const [mxLoading, setMxLoading] = useState(true);
   const [mxSaving, setMxSaving] = useState(false);
   const [mxServer, setMxServer] = useState(null);
@@ -637,7 +637,7 @@ export default function AdminCommissionDistribute() {
     }
   }
 
-  // 3b) Product-specific Overrides ”” 150 Coupon (Direct + Geo + Matrix)
+  // 3b) Product-specific Overrides  150 Coupon (Direct + Geo + Matrix)
   const [m150Loading, setM150Loading] = useState(true);
   const [m150Saving, setM150Saving] = useState(false);
   const [m150Server, setM150Server] = useState(null);
@@ -941,7 +941,7 @@ export default function AdminCommissionDistribute() {
     }
   }
 
-  // Matrix overrides ”” 150 Coupon
+  // Matrix overrides  150 Coupon
   const [mx150Loading, setMx150Loading] = useState(true);
   const [mx150Saving, setMx150Saving] = useState(false);
   const [mx150Server, setMx150Server] = useState(null);
@@ -1065,7 +1065,7 @@ export default function AdminCommissionDistribute() {
     }
   }
 
-  // 3c) Product-specific Overrides ”” ₹750 (Direct + Geo + Matrix + Opening)
+  // 3c) Product-specific Overrides  ₹750 (Direct + Geo + Matrix + Opening)
   const [m750Loading, setM750Loading] = useState(true);
   const [m750Saving, setM750Saving] = useState(false);
   const [m750Server, setM750Server] = useState(null);
@@ -1368,7 +1368,7 @@ setM750Server({
     }
   }
 
-  // Matrix overrides ”” ₹750
+  // Matrix overrides  ₹750
   const [mx750Loading, setMx750Loading] = useState(true);
   const [mx750Saving, setMx750Saving] = useState(false);
   const [mx750Server, setMx750Server] = useState(null);
@@ -1491,7 +1491,7 @@ setM750Server({
     }
   }
 
-  // 3d) Product-specific Overrides ”” ₹759 (Direct + Geo + Matrix)
+  // 3d) Product-specific Overrides  ₹759 (Direct + Geo + Matrix)
   const [m759Loading, setM759Loading] = useState(true);
   const [m759Saving, setM759Saving] = useState(false);
   const [m759Server, setM759Server] = useState(null);
@@ -1523,7 +1523,7 @@ setM750Server({
     geo_fixed_royalty: "",
   });
 
-  // ₹759 ”” Monthly config (first vs subsequent, levels, agency, base)
+  // ₹759  Monthly config (first vs subsequent, levels, agency, base)
   const [m759MServer, setM759MServer] = useState(null);
   const [m759MForm, setM759MForm] = useState({
     monthly_direct_first: "",
@@ -1858,7 +1858,7 @@ setM750Server({
     }
   }
 
-  // Matrix overrides ”” ₹759
+  // Matrix overrides  ₹759
   const [mx759Loading, setMx759Loading] = useState(true);
   const [mx759Saving, setMx759Saving] = useState(false);
   const [mx759Server, setMx759Server] = useState(null);
@@ -2037,7 +2037,7 @@ setM750Server({
     return (
       <>
         <Section
-          title="₹150 Activation ”” Direct Referral Bonuses"
+          title="₹150 Activation  Direct Referral Bonuses"
           subtitle="Set sponsor/self direct bonuses specific to ₹150 activation."
           right={
             <SaveBtn
@@ -2059,7 +2059,7 @@ setM750Server({
         </Section>
 
         <Section
-          title="₹150 Activation ”” Base & Opening"
+          title="₹150 Activation  Base & Opening"
           subtitle="Base used for geo percent splits; activation count opens N 5/3 matrix accounts per activation."
           right={
             <SaveBtn
@@ -2083,7 +2083,7 @@ setM750Server({
                   onChange={(e) => onM150Change("matrix_open_mode", e.target.value)}
                   style={{ height: 36, borderRadius: 8, border: "1px solid #e2e8f0", padding: "0 10px", fontWeight: 700 }}
                 >
-                  <option value="">””</option>
+                  <option value=""></option>
                   <option value="FIRST_TIME_ONLY">FIRST_TIME_ONLY</option>
                   <option value="EVERY_PURCHASE">EVERY_PURCHASE</option>
                   <option value="NEVER">NEVER</option>
@@ -2095,8 +2095,8 @@ setM750Server({
         </Section>
 
         <Section
-          title="Prime 750 ”” Settings"
-          subtitle="Set 750Ã— multiplier that scales off Prime 150. Base package is fixed to Prime 150."
+          title="Prime 750  Settings"
+          subtitle="Set 750× multiplier that scales off Prime 150. Base package is fixed to Prime 150."
           right={
             <SaveBtn
               onClick={() =>
@@ -2120,7 +2120,7 @@ setM750Server({
           ) : (
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
               <Input
-                label="Multiplier (Ã—)"
+                label="Multiplier (×)"
                 type="text"
                 step="1"
                 min="1"
@@ -2133,8 +2133,8 @@ setM750Server({
         </Section>
 
         <Section
-          title="₹150 Activation ”” Reward Points"
-          subtitle="Set points credited on ₹150 activation. Prime 750 uses the configured multiplier Ã— this value."
+          title="₹150 Activation  Reward Points"
+          subtitle="Set points credited on ₹150 activation. Prime 750 uses the configured multiplier × this value."
           right={
             <SaveBtn
               onClick={() =>
@@ -2177,7 +2177,7 @@ setM750Server({
         </Section>
 
         <Section
-          title="₹150 Activation ”” Geo (Agency)"
+          title="₹150 Activation  Geo (Agency)"
           subtitle="Percent vs fixed mode per role. Empty values imply fallback to global defaults."
           right={
             <SaveBtn
@@ -2210,7 +2210,7 @@ setM750Server({
                   onChange={(e) => onM150Change("geo_mode", e.target.value)}
                   style={{ height: 36, borderRadius: 8, border: "1px solid #e2e8f0", padding: "0 10px", fontWeight: 700 }}
                 >
-                  <option value="">””</option>
+                  <option value=""></option>
                   <option value="percent">Percent</option>
                   <option value="fixed">Fixed (₹)</option>
                 </select>
@@ -2231,7 +2231,7 @@ setM750Server({
         </Section>
 
         <Section
-          title="₹150 Activation ”” Matrix Commission (5 & 3)"
+          title="₹150 Activation  Matrix Commission (5 & 3)"
           subtitle="Per-package overrides for levels and arrays. Amounts in ₹, Percents in %."
           right={
             <SaveBtn
@@ -2332,7 +2332,7 @@ setM750Server({
     return (
       <>
         <Section
-          title="₹750 Activation ”” Direct Referral Bonuses"
+          title="₹750 Activation  Direct Referral Bonuses"
           subtitle="Set sponsor/self direct bonuses specific to ₹750 activation."
           right={
             <SaveBtn
@@ -2354,8 +2354,8 @@ setM750Server({
         </Section>
 
         <Section
-          title="₹750 Activation ”” Base & Opening"
-          subtitle="Set Base Amount used for geo percent splits and matrix payouts; optionally set how many 5/3 matrix accounts to open per 750 activation. If left empty, opening fallback = (150 Coupons Activation Count Ã— Prime 750 Multiplier)."
+          title="₹750 Activation  Base & Opening"
+          subtitle="Set Base Amount used for geo percent splits and matrix payouts; optionally set how many 5/3 matrix accounts to open per 750 activation. If left empty, opening fallback = (150 Coupons Activation Count × Prime 750 Multiplier)."
           right={
             <SaveBtn
               onClick={onM750Save}
@@ -2390,7 +2390,7 @@ setM750Server({
                   onChange={(e) => onM750Change("matrix_open_mode", e.target.value)}
                   style={{ height: 36, borderRadius: 8, border: "1px solid #e2e8f0", padding: "0 10px", fontWeight: 700 }}
                 >
-                  <option value="">””</option>
+                  <option value=""></option>
                   <option value="FIRST_TIME_ONLY">FIRST_TIME_ONLY</option>
                   <option value="EVERY_PURCHASE">EVERY_PURCHASE</option>
                   <option value="NEVER">NEVER</option>
@@ -2410,7 +2410,7 @@ setM750Server({
         </Section>
 
         <Section
-          title="₹750 Activation ”” Geo (Agency)"
+          title="₹750 Activation  Geo (Agency)"
           subtitle="Percent vs fixed mode per role. Empty values imply fallback to global defaults."
           right={
             <SaveBtn
@@ -2443,7 +2443,7 @@ setM750Server({
                   onChange={(e) => onM750Change("geo_mode", e.target.value)}
                   style={{ height: 36, borderRadius: 8, border: "1px solid #e2e8f0", padding: "0 10px", fontWeight: 700 }}
                 >
-                  <option value="">””</option>
+                  <option value=""></option>
                   <option value="percent">Percent</option>
                   <option value="fixed">Fixed (₹)</option>
                 </select>
@@ -2464,7 +2464,7 @@ setM750Server({
         </Section>
 
         <Section
-          title="₹750 Activation ”” Matrix Commission (5 & 3)"
+          title="₹750 Activation  Matrix Commission (5 & 3)"
           subtitle="Per-package overrides for levels and arrays. Amounts in ₹, Percents in %."
           right={
             <SaveBtn
@@ -2565,7 +2565,7 @@ setM750Server({
     return (
       <>
         <Section
-          title="₹759 Activation ”” Direct Referral Bonuses"
+          title="₹759 Activation  Direct Referral Bonuses"
           subtitle="Set sponsor/self direct bonuses specific to ₹759 activation."
           right={
             <SaveBtn
@@ -2588,7 +2588,7 @@ setM750Server({
 
         {/* Reward Points Base Section */}
         <Section
-          title="₹759 Monthly ”” Reward Points (Base Amount)"
+          title="₹759 Monthly  Reward Points (Base Amount)"
           subtitle="Reward points credited each month equal this Base Amount."
           right={
             <SaveBtn
@@ -2618,7 +2618,7 @@ setM750Server({
         </Section>
 
         <Section
-          title="₹759 Monthly ”” Direct Bonuses and Settings"
+          title="₹759 Monthly  Direct Bonuses and Settings"
           subtitle="Configure first-month vs subsequent-month sponsor bonus, base amount, and agency toggle for ₹759 flows. Level payouts are disabled."
           right={
             <SaveBtn
@@ -2659,7 +2659,7 @@ setM750Server({
                   onChange={(e) => onM759MonthlyChange("monthly_matrix_open_mode", e.target.value)}
                   style={{ height: 36, borderRadius: 8, border: "1px solid #e2e8f0", padding: "0 10px", fontWeight: 700 }}
                 >
-                  <option value="">””</option>
+                  <option value=""></option>
                   <option value="FIRST_MONTH_ONLY">FIRST_MONTH_ONLY</option>
                   <option value="EVERY_PURCHASE">EVERY_PURCHASE</option>
                   <option value="NEVER">NEVER</option>
@@ -2673,7 +2673,7 @@ setM750Server({
         </Section>
 
         <Section
-          title="₹759 Activation ”” Geo (Agency)"
+          title="₹759 Activation  Geo (Agency)"
           subtitle="Percent vs fixed mode per role. Empty values imply fallback to global defaults."
           right={
             <SaveBtn
@@ -2706,7 +2706,7 @@ setM750Server({
                   onChange={(e) => onM759Change("geo_mode", e.target.value)}
                   style={{ height: 36, borderRadius: 8, border: "1px solid #e2e8f0", padding: "0 10px", fontWeight: 700 }}
                 >
-                  <option value="">””</option>
+                  <option value=""></option>
                   <option value="percent">Percent</option>
                   <option value="fixed">Fixed (₹)</option>
                 </select>
@@ -2727,7 +2727,7 @@ setM750Server({
         </Section>
 
         <Section
-          title="₹759 Activation ”” Matrix Commission (5 & 3)"
+          title="₹759 Activation  Matrix Commission (5 & 3)"
           subtitle="Per-package overrides for levels and arrays. Amounts in ₹, Percents in %."
           right={
             <SaveBtn
@@ -2874,7 +2874,7 @@ setM750Server({
         </Section>
 
         <Section
-          title="Direct Refer Withdraw ”” Distribution Preview"
+          title="Direct Refer Withdraw  Distribution Preview"
           subtitle="Enter a user (ID or username) and amount to see the sponsor bonus, TDS/company pool, and net to user."
           right={
             <button
@@ -2961,7 +2961,7 @@ setM750Server({
                         <td style={{ borderBottom: "1px solid #f1f5f9", padding: 8 }}>
                           {ln?.recipient?.username
                             ? `${ln.recipient.username} (${ln.recipient.id || "?"})`
-                            : "””"}
+                            : ""}
                         </td>
                         <td style={{ borderBottom: "1px solid #f1f5f9", padding: 8 }}>{ln?.tx_type}</td>
                       </tr>

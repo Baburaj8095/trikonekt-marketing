@@ -97,7 +97,7 @@ export default function Home3() {
       { key: "wealth-galaxy", label: "Wealth Galaxy", route: "/user/wealth-galaxy", image: banner_wg },
       { key: "prime", label: "Prime", route: "/user/promo-packages", image: LOGO },
       { key: "bill-recharge", label: "Bill & Recharge", comingSoon: true, image: imgBillRecharge },
-      { key: "ecommerce", label: "E”‘commerce", route: "/trikonekt-products", image: imgEcommerce },
+      { key: "ecommerce", label: "E‑commerce", route: "/trikonekt-products", image: imgEcommerce },
       { key: "tri-holidays", label: "TRI Holidays", route: "/user/tri/tri-holidays", image: imgHolidays },
       { key: "tri-furniture", label: "TRI Furniture", route: "/user/tri/tri-furniture", image: imgFurniture },
       { key: "tri-electronics", label: "TRI Electronics", route: "/user/tri/tri-electronics", image: imgPlaystoreScreen },
@@ -115,7 +115,7 @@ export default function Home3() {
         it.key === "prime"
           ? {
               ...it,
-              badgeText: isPrime ? "Prime" : "Non”‘Prime",
+              badgeText: isPrime ? "Prime" : "Non‑Prime",
               badgeBg: isPrime ? "#16a34a" : "#6b7280",
               badgeFg: "#fff",
             }

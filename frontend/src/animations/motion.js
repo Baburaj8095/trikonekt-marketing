@@ -144,7 +144,7 @@ export const viewportOnce = {
 /**
  * RULES (DO NOT IGNORE)
  * --------------------
- * âœ” Animate sections, cards, CTAs
+ * ✔ Animate sections, cards, CTAs
  * âœ– Do NOT animate header, footer, background
  * âœ– Do NOT use bounce / spring
  * âœ– Do NOT animate everything

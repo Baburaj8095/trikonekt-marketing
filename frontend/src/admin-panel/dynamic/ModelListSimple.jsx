@@ -6,7 +6,7 @@ import ModelFormDialog from "./ModelFormDialog";
 import { getAdminMeta } from "../api/adminMeta";
 
 /**
- * ModelListSimple ”” Upgraded to use MUI DataGrid (via DataTable wrapper)
+ * ModelListSimple  Upgraded to use MUI DataGrid (via DataTable wrapper)
  * - Server-side pagination, sorting, and debounced search
  * - Clean UI with toolbar (Create) + density toggle
  * - Mobile friendly (flex columns with sensible minWidth, horizontal scroll when needed)
@@ -183,7 +183,7 @@ export default function ModelListSimple(props) {
           base.renderCell = (params) => {
             const row = params?.row || {};
             const username = row.user_username || (row.user && row.user.username);
-            return username || row.user || "””";
+            return username || row.user || "";
           };
         }
 

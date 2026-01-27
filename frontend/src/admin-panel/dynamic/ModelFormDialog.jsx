@@ -424,7 +424,7 @@ export default function ModelFormDialog({
                     size="small"
                   >
                     <MenuItem value="">
-                      <em>””</em>
+                      <em></em>
                     </MenuItem>
                     {f.choices.map(([v, text]) => (
                       <MenuItem key={String(v)} value={v}>
@@ -452,7 +452,7 @@ export default function ModelFormDialog({
                     SelectProps={{ onOpen: () => fetchRemoteOptions(f.name) }}
                   >
                     <MenuItem value="">
-                      <em>””</em>
+                      <em></em>
                     </MenuItem>
                     {(remoteOptions[f.name] || []).map((opt) => (
                       <MenuItem key={String(opt.value)} value={opt.value}>

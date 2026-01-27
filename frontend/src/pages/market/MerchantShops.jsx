@@ -239,10 +239,10 @@ export default function MerchantShops() {
                       />
                     </Box>
                     <Typography variant="body2" color="text.secondary">
-                      {s.address || "””"}
+                      {s.address || ""}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {s.city || "””"}
+                      {s.city || ""}
                     </Typography>
 {(s.distance_km !== null && s.distance_km !== undefined && !Number.isNaN(Number(s.distance_km))) ? (
   <Typography variant="caption" color="text.secondary">
@@ -252,7 +252,7 @@ export default function MerchantShops() {
                     <Box sx={{ mt: 0.75, display: "flex", alignItems: "center", gap: 1 }}>
                       <PhoneIphoneIcon fontSize="small" sx={{ color: "text.secondary" }} />
                       <Typography variant="body2" color="text.secondary">
-                        {s.contact_number || "””"}
+                        {s.contact_number || ""}
                       </Typography>
                     </Box>
                   </CardContent>

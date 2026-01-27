@@ -22,7 +22,7 @@ export default function AgencyReferAndEarn() {
     <Box sx={{ p: { xs: 2, md: 3 } }}>
       <ReferAndEarn title="Refer & Earn" sponsorUsername={sponsorUsername} />
       <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-        Share your referral links to invite Consumers, Employees, or Sub”‘Franchise agencies. Sponsor ID will be auto-filled.
+        Share your referral links to invite Consumers, Employees, or Sub‑Franchise agencies. Sponsor ID will be auto-filled.
       </Typography>
     </Box>
   );

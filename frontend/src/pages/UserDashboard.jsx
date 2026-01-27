@@ -26,9 +26,10 @@ import API, {
   listPromotions,
   listCategoryBanners,
   getNearbyShops,
+  getPublicShops,
 } from "../api/api";
 
-// IMAGE IMPORTS ”” fallbacks
+// IMAGE IMPORTS  fallbacks
 import heroImg from "../assets/Wealth_Galaxy.jpg";
 import promoImg1 from "../assets/spin1.png";
 import promoImg2 from "../assets/asst_2.png";
@@ -168,9 +169,40 @@ export default function UserDashboard({ embedded = false }) {
     let alive = true;
     async function load(params = {}) {
       try {
+        // Attempt nearby within given radius (default 5km)
         const res = await getNearbyShops({ limit: 5, ...params });
-        const arr = Array.isArray(res) ? res : res?.results || [];
-        if (alive) setNearbyShops(arr);
+        let arr = Array.isArray(res) ? res : res?.results || [];
+
+        // If empty and we had coordinates, widen radius to 50km
+        if ((!arr || arr.length === 0) && params.lat != null && params.lng != null) {
+          try {
+            const resWide = await getNearbyShops({
+              limit: 5,
+              lat: params.lat,
+              lng: params.lng,
+              radius_km: 50,
+            });
+            arr = Array.isArray(resWide) ? resWide : resWide?.results || [];
+          } catch (_) {}
+        }
+
+        // Final fallback: show latest ACTIVE shops from public list
+        if (!arr || arr.length === 0) {
+          try {
+            const res2 = await getPublicShops({ page: 1 });
+            const raw = Array.isArray(res2) ? res2 : res2?.results || [];
+            arr = (raw || []).slice(0, 5).map((s) => ({
+              id: s.id,
+              name: s.shop_name,
+              logo: s.image_url || null,
+              category_slug: null,
+              distance_km: null,
+              address: s.address || "",
+            }));
+          } catch (_) {}
+        }
+
+        if (alive) setNearbyShops(arr || []);
       } catch (_) {
         if (alive) setNearbyShops([]);
       }

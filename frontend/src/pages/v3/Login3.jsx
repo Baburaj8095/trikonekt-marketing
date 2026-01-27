@@ -1,4 +1,4 @@
-﻿// Login3.jsx ”” v3 Dark + Teal UX (logic preserved from Auth/Login.jsx)
+﻿// Login3.jsx  v3 Dark + Teal UX (logic preserved from Auth/Login.jsx)
 // Notes:
 // - All logic, state, API calls, and flows are kept the same as src/pages/Auth/Login.jsx
 // - Only the UI/UX styling is changed to match the attached dark sketch

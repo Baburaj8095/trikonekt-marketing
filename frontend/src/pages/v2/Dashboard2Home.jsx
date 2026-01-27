@@ -97,7 +97,7 @@ export default function Dashboard2Home({ isPrime = false }) {
     { key: "prime", label: "Prime", route: "/user/promo-packages", icon: <PrimeIcon /> },
     { key: "gift-cards", label: "Gift Cards", route: "/user/e-coupon-store", icon: <GiftCardIcon /> },
     { key: "bill-recharge", label: "Bill & Recharge", icon: <BillRechargeIcon /> },
-    { key: "ecommerce", label: "E”‘commerce", route: "/trikonekt-products", icon: <ECommerceIcon /> },
+    { key: "ecommerce", label: "E‑commerce", route: "/trikonekt-products", icon: <ECommerceIcon /> },
     { key: "tri-holidays", label: "TRI Holidays", route: "/user/tri/tri-holidays", icon: <ECommerceIcon /> },
     { key: "tri-furniture", label: "TRI Furniture", route: "/user/tri/tri-furniture", icon: <LocalStoreIcon /> },
     { key: "tri-electronics", label: "TRI Electronics & Home Appliances", route: "/user/tri/tri-electronics", icon: <ECommerceIcon /> },
@@ -107,14 +107,14 @@ export default function Dashboard2Home({ isPrime = false }) {
     { key: "tri-ev", label: "TRI EV Vehicles", route: "/user/tri/tri-ev", icon: <EVIcon /> },
   ], []);
 
-  // Top horizontal action rail ”” exact order requested
+  // Top horizontal action rail  exact order requested
   const topRailItems = useMemo(() => ([
     {
       key: "prime",
       label: "Prime",
       icon: WorkspacePremiumRoundedIcon,
       route: "/user/promo-packages",
-      badgeText: isPrime ? "Prime" : "Non”‘Prime",
+      badgeText: isPrime ? "Prime" : "Non‑Prime",
       tone: "brand",
     },
     {
@@ -155,7 +155,7 @@ export default function Dashboard2Home({ isPrime = false }) {
     },
   ]), [isPrime]);
 
-  // TRI Product card ”” square, premium, uncluttered (icon + label only)
+  // TRI Product card  square, premium, uncluttered (icon + label only)
   const TriItemCard = ({ icon, title, onClick, disabled }) => (
     <Box
       onClick={onClick}
@@ -245,7 +245,7 @@ export default function Dashboard2Home({ isPrime = false }) {
         <BannerCarousel rounded={false} height={{ xs: 200, sm: 240, md: 300 }} autoPlayMs={4500} showTitle={false} />
       </Box>
 
-      {/* 3) TRI PRODUCTS ”” 2-column premium grid, no horizontal scroll */}
+      {/* 3) TRI PRODUCTS  2-column premium grid, no horizontal scroll */}
       <Box sx={{ pt: 3 }}>
         <Typography sx={{ fontSize: 16, fontWeight: 700, color: "var(--bms-text-1)", mb: 1, px: 2 }}>
           TRI Products
@@ -275,7 +275,7 @@ export default function Dashboard2Home({ isPrime = false }) {
         </Box>
       </Box>
 
-      {/* 4) AGENCY PRODUCTS ”” horizontal carousel style retained */}
+      {/* 4) AGENCY PRODUCTS  horizontal carousel style retained */}
       <Box sx={{ pt: 2 }}>
         <Typography sx={{ fontSize: 16, fontWeight: 600, color: "var(--bms-text-1)", mb: 1, px: 2 }}>
           Agency Products

@@ -144,7 +144,7 @@ export default function Dashboard2() {
       { key: "wealth-galaxy", label: "Wealth Galaxy", route: "/user/wealth-galaxy", image: banner_wg },
       { key: "prime", label: "Prime", route: "/user/promo-packages", image: LOGO },
       { key: "bill-recharge", label: "Bill & Recharge", comingSoon: true, image: imgBillRecharge },
-      { key: "ecommerce", label: "E”‘commerce", route: "/trikonekt-products", image: imgEcommerce },
+      { key: "ecommerce", label: "E‑commerce", route: "/trikonekt-products", image: imgEcommerce },
       { key: "tri-holidays", label: "TRI Holidays", route: "/user/tri/tri-holidays", image: imgHolidays },
       { key: "tri-furniture", label: "TRI Furniture", route: "/user/tri/tri-furniture", image: imgFurniture },
       { key: "tri-electronics", label: "TRI Electronics", route: "/user/tri/tri-electronics", image: imgPlaystoreScreen },
@@ -162,7 +162,7 @@ export default function Dashboard2() {
         it.key === "prime"
           ? {
               ...it,
-              badgeText: isPrime ? "Prime" : "Non”‘Prime",
+              badgeText: isPrime ? "Prime" : "Non‑Prime",
               badgeBg: isPrime ? colors.success : colors.mutedBg,
               badgeFg: colors.textOnDark,
             }
@@ -279,7 +279,7 @@ export default function Dashboard2() {
           <Grid item xs={12} sm={4}>
             <V2SectionCard>
               <Typography sx={{ fontSize: 12, color: colors.textMuted }}>Main Wallet</Typography>
-              <Typography sx={{ fontSize: 18, fontWeight: 800, color: colors.textOnDark, mt: 0.5 }}>ADA ””</Typography>
+              <Typography sx={{ fontSize: 18, fontWeight: 800, color: colors.textOnDark, mt: 0.5 }}>ADA </Typography>
             </V2SectionCard>
           </Grid>
           <Grid item xs={12} sm={4}>
@@ -293,7 +293,7 @@ export default function Dashboard2() {
           <Grid item xs={12} sm={4}>
             <V2SectionCard>
               <Typography sx={{ fontSize: 12, color: colors.textMuted }}>Grade</Typography>
-              <Typography sx={{ fontSize: 18, fontWeight: 800, color: colors.textOnDark, mt: 0.5 }}>0 ”” Stars</Typography>
+              <Typography sx={{ fontSize: 18, fontWeight: 800, color: colors.textOnDark, mt: 0.5 }}>0  Stars</Typography>
             </V2SectionCard>
           </Grid>
         </Grid>
@@ -391,7 +391,7 @@ export default function Dashboard2() {
         </V2SectionCard>
       </Box>
 
-      {/* App Hub and E”‘Books */}
+      {/* App Hub and E‑Books */}
       <Box sx={{ pt: 2 }}>
         <Typography sx={{ fontSize: 14, fontWeight: 800, color: colors.textOnDark, mb: 1 }}>App Hub</Typography>
         <V2SectionCard>
@@ -400,7 +400,7 @@ export default function Dashboard2() {
       </Box>
 
       <Box sx={{ pt: 2 }}>
-        <Typography sx={{ fontSize: 14, fontWeight: 800, color: colors.textOnDark, mb: 1 }}>E”‘Books</Typography>
+        <Typography sx={{ fontSize: 14, fontWeight: 800, color: colors.textOnDark, mb: 1 }}>E‑Books</Typography>
         <V2SectionCard>
           <EBooks />
         </V2SectionCard>

@@ -262,7 +262,7 @@ export default function AdminWithdrawals() {
           Reset
         </button>
         <div style={{ marginLeft: "auto", color: "#334155", fontSize: 14 }}>
-          Pending: <b>{summary.pendingCount}</b> ”¢ Amount:{" "}
+          Pending: <b>{summary.pendingCount}</b> • Amount:{" "}
           <b>₹{summary.pendingAmount.toFixed(2)}</b>
         </div>
         {err ? <div style={{ color: "#dc2626" }}>{err}</div> : null}
@@ -327,10 +327,10 @@ export default function AdminWithdrawals() {
                   {r.username}
                 </div>
                 <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {r.full_name || "””"}
+                  {r.full_name || ""}
                 </div>
                 <div>₹{Number(r.amount || 0).toFixed(2)}</div>
-                <div>{r.method?.toUpperCase?.() || "””"}</div>
+                <div>{r.method?.toUpperCase?.() || ""}</div>
                 <div>{statusBadge}</div>
                 <div>{new Date(r.requested_at).toLocaleString()}</div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

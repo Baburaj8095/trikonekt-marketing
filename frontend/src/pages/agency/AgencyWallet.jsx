@@ -677,7 +677,7 @@ export default function AgencyWallet() {
         <StatCard
           title="Income Wallet"
           value={`₹ ${fmtAmount(mainBalance)}`}
-          hint={`Completed ₹ ${fmtAmount(nextBlock?.completed_in_current_block || "0")} ”¢ Remaining ₹ ${fmtAmount(nextBlock?.remaining_to_next_block || "1000")}`}
+          hint={`Completed ₹ ${fmtAmount(nextBlock?.completed_in_current_block || "0")} • Remaining ₹ ${fmtAmount(nextBlock?.remaining_to_next_block || "1000")}`}
         />
 
         {/* Row 8 */}

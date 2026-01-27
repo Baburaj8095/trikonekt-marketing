@@ -1,4 +1,4 @@
-﻿// Login.jsx ”” Final polished wireframe UI (single-file).
+﻿// Login.jsx  Final polished wireframe UI (single-file).
 // NOTE: This file PRESERVES your original logic (API calls, geolocation, registration, dialogs).
 // Styling is done via MUI sx props. Requires @mui/material and @mui/icons-material v7.
 
@@ -214,8 +214,15 @@ const Login = () => {
     business_category: "",
     address: "",
   });
-  const handleChange = (e) =>
-    setFormData((fd) => ({ ...fd, [e.target.name]: e.target.value }));
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    if (name === "username" && role === "user") {
+      const digits = (value || "").replace(/\D/g, "").slice(0, 10);
+      setFormData((fd) => ({ ...fd, [name]: digits }));
+    } else {
+      setFormData((fd) => ({ ...fd, [name]: value }));
+    }
+  };
 
   // Location/cascading state (kept)
   const [countries, setCountries] = useState([]);
@@ -1189,12 +1196,22 @@ const pincodeOptionsConsumer = useMemo(() => {
     return true;
   };
 
-  const loginField = {
-    label: "Username",
-    type: "text",
-    inputMode: "text",
-    placeholder: "Enter username",
-  };
+  const loginField = useMemo(() => {
+    if (role === "user") {
+      return {
+        label: "Phone Number",
+        type: "tel",
+        inputMode: "numeric",
+        placeholder: "Enter 10-digit phone number",
+      };
+    }
+    return {
+      label: "Username",
+      type: "text",
+      inputMode: "text",
+      placeholder: "Enter username",
+    };
+  }, [role]);
 
   // Pretty-print role for contextual login error message
   const prettyRole = (r) =>
@@ -1229,7 +1246,16 @@ const pincodeOptionsConsumer = useMemo(() => {
         let username = (formData.username || "").trim();
         let submitRole = role;
 
-        // Role mismatch guard ”” auto-correct role based on registered category
+        if (submitRole === "user") {
+          const phone = (username || "").replace(/\D/g, "").slice(0, 10);
+          if (phone.length !== 10) {
+            setErrorMsg("Enter a valid 10-digit phone number.");
+            return;
+          }
+          username = phone; // enforce phone-only, no TR prefix
+        }
+
+        // Role mismatch guard  auto-correct role based on registered category
         const resolved = await resolveRegisteredRole(username);
         if (resolved && resolved !== submitRole) {
           submitRole = resolved;
@@ -2253,7 +2279,7 @@ const pincodeOptionsConsumer = useMemo(() => {
                 label={loginField.label}
                 placeholder={loginField.placeholder}
                 type={loginField.type}
-                inputProps={{ inputMode: loginField.inputMode }}
+                inputProps={{ inputMode: loginField.inputMode, ...(role === "user" ? { maxLength: 10, pattern: "[0-9]*" } : {}) }}
                 onChange={handleChange}
                 sx={{ mb: 2 }}
                 required
@@ -2450,5 +2476,3 @@ const pincodeOptionsConsumer = useMemo(() => {
 };
 
 export default Login;
-
-

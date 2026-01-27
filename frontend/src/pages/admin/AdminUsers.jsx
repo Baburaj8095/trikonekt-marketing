@@ -338,7 +338,7 @@ export default function AdminUsers() {
         flex: 1,
         renderCell: (params) => {
           const row = params?.row || {};
-          const uname = row.username || "””";
+          const uname = row.username || "";
           return (
             <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
               <button
@@ -409,7 +409,7 @@ export default function AdminUsers() {
           const role = String(row.role || "").toLowerCase();
           const cat = String(row.category || "").toLowerCase();
           const isAgency = role === "agency" || cat.startsWith("agency");
-          if (!isAgency) return "””";
+          if (!isAgency) return "";
           const onOpen = (e) => {
             e?.stopPropagation?.();
             setPkgUser({ id: row.id, username: row.username, full_name: row.full_name });
@@ -448,7 +448,7 @@ export default function AdminUsers() {
           const c = String(row.category || "").toLowerCase();
           const isAgency = r === "agency" || c.startsWith("agency");
           const isEmployee = r === "employee" || c === "employee";
-          if (!isAgency && !isEmployee) return "””";
+          if (!isAgency && !isEmployee) return "";
           const onOpen = (e) => {
             e?.stopPropagation?.();
             const roleParam = isAgency ? "agency" : "employee";
@@ -591,7 +591,7 @@ export default function AdminUsers() {
                 }}
                 title="No level"
               >
-                ””
+                
               </div>
             );
           }
@@ -920,7 +920,7 @@ export default function AdminUsers() {
           ["Category", (r) => r.category ?? ""],
           ["KYC Status", (r) => (r.kyc_verified ? "Verified" : (r.kyc_status || "Pending"))],
           ["KYC Verified At", (r) => r.kyc_verified_at ?? ""],
-          ["E”‘Coupons Activated", (r) => r.activated_ecoupon_count ?? ""],
+          ["E‑Coupons Activated", (r) => r.activated_ecoupon_count ?? ""],
           ["Promo Package", (r) => r.last_promo_package ?? ""],
           ["Sponsor ID", (r) => r.sponsor_id ?? ""],
           ["Pincode", (r) => r.pincode ?? ""],
@@ -1096,7 +1096,7 @@ export default function AdminUsers() {
             cursor: "pointer",
             fontWeight: 700,
           }}
-          title="Create a new Agency (defaults to Sub”‘Franchise; you can change the category in the form)"
+          title="Create a new Agency (defaults to Sub‑Franchise; you can change the category in the form)"
         >
           New Agency
         </button>

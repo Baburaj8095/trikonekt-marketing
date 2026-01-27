@@ -239,7 +239,7 @@ export default function AdminMerchantCategories() {
                           {String(row[iconFieldKey]).slice(0, 48)}
                         </a>
                       ) : (
-                        "””"
+                        ""
                       )}
                     </TableCell>
                   ) : null}
@@ -261,7 +261,7 @@ export default function AdminMerchantCategories() {
                     />
                   </TableCell>
                   <TableCell>
-                    {row?.created_at ? new Date(row.created_at).toLocaleString() : "””"}
+                    {row?.created_at ? new Date(row.created_at).toLocaleString() : ""}
                   </TableCell>
                   <TableCell align="right">
                     <Tooltip title="Edit">

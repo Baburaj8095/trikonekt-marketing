@@ -248,7 +248,7 @@ export default function CustomUserListSimple() {
         header: name === "__str__" ? (meta.verbose_name_singular || "Repr") : name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
         renderCell: (row) => {
           const v = getFieldValue(row, name);
-          return v == null || v === "" ? "””" : String(v);
+          return v == null || v === "" ? "" : String(v);
         },
       };
     });

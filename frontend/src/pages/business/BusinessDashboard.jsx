@@ -53,8 +53,8 @@ export default function BusinessDashboard() {
                 <Typography variant="body2" color="text.secondary">Loading”¦</Typography>
               ) : (
                 <>
-                  <Typography variant="body2"><b>Business Name:</b> {profile?.business_name || "””"}</Typography>
-                  <Typography variant="body2"><b>Mobile:</b> {profile?.mobile_number || "””"}</Typography>
+                  <Typography variant="body2"><b>Business Name:</b> {profile?.business_name || ""}</Typography>
+                  <Typography variant="body2"><b>Mobile:</b> {profile?.mobile_number || ""}</Typography>
                   <Typography variant="body2"><b>Verified:</b> {verified ? "Yes" : "No"}</Typography>
                   <Box sx={{ mt: 1.5 }}>
                     <Button variant="contained" size="small" onClick={() => navigate("/business/profile")}>
@@ -81,7 +81,7 @@ export default function BusinessDashboard() {
                   {shops?.slice(0, 3).map((s) => (
                     <Box key={s.id} sx={{ mt: 0.75 }}>
                       <Typography variant="body2">
-                        {s.shop_name} ”” <i>{s.city || "””"}</i> [{s.status}]
+                        {s.shop_name}  <i>{s.city || ""}</i> [{s.status}]
                       </Typography>
                     </Box>
                   ))}

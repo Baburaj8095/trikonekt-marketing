@@ -1121,7 +1121,7 @@ class WalletTransactionAdmin(admin.ModelAdmin):
     def export_as_csv(self, request, queryset):
         import csv
         from django.http import HttpResponse
-        resp = HttpResponse(content_type='text/csv')
+        resp = HttpResponse(content_type='text/csv; charset=utf-8')
         resp['Content-Disposition'] = 'attachment; filename=wallet_transactions.csv'
         writer = csv.writer(resp)
         writer.writerow(['user', 'type', 'amount', 'balance_after', 'source_type', 'source_id', 'meta', 'created_at'])

@@ -24,7 +24,7 @@ const Svg = ({ children, size = 48, stroke = 1.8, viewBox = "0 0 24 24", ...rest
   </svg>
 );
 
-// E-commerce ”” laptop/cart
+// E-commerce  laptop/cart
 export const ECommerceIcon = (props) => (
   <Svg {...props}>
     <rect x="3" y="4" width="18" height="12" rx="2" />
@@ -36,7 +36,7 @@ export const ECommerceIcon = (props) => (
   </Svg>
 );
 
-// Genealogy ”” hierarchy/tree
+// Genealogy  hierarchy/tree
 export const GenealogyIcon = (props) => (
   <Svg {...props}>
     <rect x="3" y="3" width="6" height="4" rx="1.2" />
@@ -47,7 +47,7 @@ export const GenealogyIcon = (props) => (
   </Svg>
 );
 
-// EV ”” electric vehicle
+// EV  electric vehicle
 export const EVIcon = (props) => (
   <Svg {...props}>
     <rect x="3" y="10" width="18" height="7" rx="2" />
@@ -58,7 +58,7 @@ export const EVIcon = (props) => (
   </Svg>
 );
 
-// Gift Card ”” card with bow
+// Gift Card  card with bow
 export const GiftCardIcon = (props) => (
   <Svg {...props}>
     <rect x="3" y="6" width="18" height="12" rx="2" />
@@ -68,7 +68,7 @@ export const GiftCardIcon = (props) => (
   </Svg>
 );
 
-// Bill & Recharge ”” phone/payment
+// Bill & Recharge  phone/payment
 export const BillRechargeIcon = (props) => (
   <Svg {...props}>
     <rect x="7" y="2.5" width="10" height="19" rx="2" />
@@ -78,7 +78,7 @@ export const BillRechargeIcon = (props) => (
   </Svg>
 );
 
-// Wealth Galaxy ”” abstract orbit/galaxy
+// Wealth Galaxy  abstract orbit/galaxy
 export const WealthGalaxyIcon = (props) => (
   <Svg {...props}>
     <circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none" />
@@ -88,7 +88,7 @@ export const WealthGalaxyIcon = (props) => (
   </Svg>
 );
 
-// Prime ”” crown
+// Prime  crown
 export const PrimeIcon = (props) => (
   <Svg {...props}>
     <path d="M4 16l2-7 4 4 4-4 2 7H4Z" />
@@ -96,7 +96,7 @@ export const PrimeIcon = (props) => (
   </Svg>
 );
 
-// Spin & Win ”” wheel
+// Spin & Win  wheel
 export const SpinWinIcon = (props) => (
   <Svg {...props}>
     <circle cx="12" cy="12" r="8" />
@@ -105,7 +105,7 @@ export const SpinWinIcon = (props) => (
   </Svg>
 );
 
-// Local Store ”” storefront
+// Local Store  storefront
 export const LocalStoreIcon = (props) => (
   <Svg {...props}>
     <path d="M4 9h16l-2-4H6l-2 4Z" />

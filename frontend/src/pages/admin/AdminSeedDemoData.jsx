@@ -59,13 +59,13 @@ function useDemoData() {
       { name: "2BHK City Apartment", cat: "properties", price: 1500000, qty: 1 },
       { name: "Monthly Savings Plan", cat: "saving", price: 750, qty: 100 },
       { name: "Organic Veg Box", cat: "groceries", price: 699, qty: 50 },
-      { name: "Casual Cotton T”‘Shirt", cat: "fashion", price: 499, qty: 80 },
+      { name: "Casual Cotton T‑Shirt", cat: "fashion", price: 499, qty: 80 },
       { name: "Herbal Facewash", cat: "health-beauty", price: 199, qty: 60 },
       { name: "Grocery Delivery Combo", cat: "local-store", price: 999, qty: 30 },
     ];
     return base.map((p, i) => ({
       ...p,
-      description: `${p.name} ”” Demo product seeded at ${new Date(now).toLocaleString()}.`,
+      description: `${p.name}  Demo product seeded at ${new Date(now).toLocaleString()}.`,
       discount: i % 3 === 0 ? 10 : 0,
       max_reward_redeem_percent: i % 2 === 0 ? 5 : 0,
       country: "IN",
@@ -295,7 +295,7 @@ export default function AdminSeedDemoData() {
             <ul style={{ margin: 0, paddingLeft: 16 }}>
               {products.map((p) => (
                 <li key={p.name} style={{ fontSize: 13, color: "#334155" }}>
-                  {p.name} <span style={{ color: "#64748b" }}>[{p.cat}]</span> ”” ₹{p.price} ({p.qty} qty)
+                  {p.name} <span style={{ color: "#64748b" }}>[{p.cat}]</span>  ₹{p.price} ({p.qty} qty)
                 </li>
               ))}
             </ul>
@@ -322,7 +322,7 @@ export default function AdminSeedDemoData() {
         </div>
         {done ? (
           <div style={{ marginTop: 8, color: "#16a34a", fontWeight: 700 }}>
-            Completed. Check Admin â†’ E”‘commerce Categories and Admin â†’ Products, and the user page /trikonekt-products.
+            Completed. Check Admin â†’ E‑commerce Categories and Admin â†’ Products, and the user page /trikonekt-products.
           </div>
         ) : null}
       </Section>

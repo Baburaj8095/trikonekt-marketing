@@ -426,7 +426,7 @@ export default function AdminTriAppManage() {
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 2, md: 3 } }}>
       <Typography variant="h5" sx={{ fontWeight: 800, mb: 1, color: "#0C2D48" }}>
-        {appTitle} ”” Admin
+        {appTitle}  Admin
       </Typography>
       <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>
         Manage the catalog for this TRI app. Admin can control price visibility, add-to-cart and payment.

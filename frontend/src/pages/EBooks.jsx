@@ -4,7 +4,7 @@ import API, { getMyEBooks } from "../api/api";
 
 /**
  * EBooks
- * Standalone page section that lists user's purchased e”‘books.
+ * Standalone page section that lists user's purchased e‑books.
  * Safe to render inside a tab body.
  */
 export default function EBooks() {
@@ -38,7 +38,7 @@ export default function EBooks() {
         }
         return {
           id: eb.id ?? it?.id,
-          title: eb.title || "E”‘Book",
+          title: eb.title || "E‑Book",
           cover_url: cu,
           file_url: fu,
         };
@@ -46,7 +46,7 @@ export default function EBooks() {
       setEbooks(flat || []);
     } catch (e) {
       setEbooks([]);
-      setErr("Failed to load e”‘books.");
+      setErr("Failed to load e‑books.");
     } finally {
       setLoading(false);
     }
@@ -59,7 +59,7 @@ export default function EBooks() {
   return (
     <Box sx={{ p: 2 }}>
       <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>
-        My E”‘Books
+        My E‑Books
       </Typography>
       {loading ? (
         <Typography variant="body2">Loading...</Typography>
@@ -86,7 +86,7 @@ export default function EBooks() {
                   <Box
                     component="img"
                     src={eb.cover_url}
-                    alt={eb.title || "E”‘Book"}
+                    alt={eb.title || "E‑Book"}
                     sx={{ width: 44, height: 60, objectFit: "cover", borderRadius: 1 }}
                   />
                 ) : null}
@@ -95,7 +95,7 @@ export default function EBooks() {
                     variant="subtitle2"
                     sx={{ fontWeight: 700, lineHeight: 1.2, pr: 1 }}
                   >
-                    {eb.title || "E”‘Book"}
+                    {eb.title || "E‑Book"}
                   </Typography>
                   {eb.file_url ? (
                     <Button
@@ -118,7 +118,7 @@ export default function EBooks() {
         </Grid>
       ) : (
         <Typography variant="body2" color="text.secondary">
-          No e”‘books yet.
+          No e‑books yet.
         </Typography>
       )}
     </Box>

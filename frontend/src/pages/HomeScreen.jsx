@@ -185,7 +185,7 @@ export default function LandingPage() {
               "Designed for long-term value creation",
             ].map((point) => (
               <Grid item xs={12} sm={6} key={point}>
-                <Typography fontSize={15}>âœ” {point}</Typography>
+                <Typography fontSize={15}>✔ {point}</Typography>
               </Grid>
             ))}
           </Grid>

@@ -1,12 +1,12 @@
 /**
  * Utilities to detect and fix mojibake (UTF-8 decoded as ISO-8859-1/Windows-1252)
- * Common sequences: â€™, â€œ, â€, â€“, â€”, â€¢, â€¦, Ã, Â, â‚¹ (₹)
+ * Common sequences: ’, “, ”, ”“, , •, ”¦, Ã, , ₹ (₹)
  */
 
 export function looksLikeMojibake(s) {
   if (typeof s !== "string" || s.length === 0) return false;
   // Heuristic: look for frequent mojibake markers or Unicode replacement char
-  return /(?:\uFFFD|Â|Ã|â€™|â€œ|â€|â€“|â€”|â€‘|â€¢|â€¦|â€º|â€¹|â‚¹|Â©|Â·|ðŸ“ž|âœ‰ï¸)/.test(s) || /[\u0080-\u009F]/.test(s);
+  return /(?:\uFFFD|Ã|Â|â€|â‚¹|â€¢|â€”|â€“|â€˜|â€™|â€œ|â€)/.test(s);
 }
 
 /**
@@ -15,26 +15,26 @@ export function looksLikeMojibake(s) {
  */
 export function fixMojibakeString(s) {
   if (typeof s !== "string") return s;
+  if (!looksLikeMojibake(s)) return s;
 
   // Pre-map some very common sequences to improve output even if re-decode fails
   const mappings = [
-    [/â€™/g, "’"],
-    [/â€œ|â€/g, '"'],
-    [/â€“/g, "–"],
-    [/â€”/g, "—"],
-    [/â€¢/g, "•"],
-    [/â€¦/g, "…"],
-    [/Â©/g, "©"],
-    [/Â·/g, "·"],
-    [/Â±/g, "±"],
-    [/Â®/g, "®"],
-    [/â€º/g, "›"],
-    [/â€¹/g, "‹"],
-    [/â€‘/g, "\u2011"],
-    [/â‚¹/g, "₹"],
-    [/ðŸ“ž/g, "📞"],
-    [/âœ‰ï¸/g, "✉️"],
-    [/Â/g, ""], // stray CP1252 NBSP marker often preceding punctuation
+    [/’/g, "’"],
+    [/“|”/g, '"'],
+    [/”“/g, "–"],
+    [/•/g, "•"],
+    [/”¦/g, "…"],
+    [/©/g, "©"],
+    [/·/g, "·"],
+    [/±/g, "±"],
+    [/®/g, "®"],
+    [/”º/g, "›"],
+    [/”¹/g, "‹"],
+    [/‑/g, "-"],
+    [/₹/g, "₹"],
+    [/📞/g, "📞"],
+    [/✉️/g, "✉️"],
+    [/\u00A0/g, ""], // stray CP1252 NBSP marker often preceding punctuation
   ];
 
   // Accurate CP1252 Unicode->byte mapping for 0x80..0x9F range
@@ -137,7 +137,7 @@ export function installDomTextFixer() {
 
     if (node.nodeType === Node.TEXT_NODE) {
       const original = node.nodeValue || "";
-      const fixed = fixMojibakeString(original);
+      const fixed = looksLikeMojibake(original) ? fixMojibakeString(original) : original;
       if (fixed !== original) {
         node.nodeValue = fixed;
       }

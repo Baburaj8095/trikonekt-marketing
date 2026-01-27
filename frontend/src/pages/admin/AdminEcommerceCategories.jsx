@@ -314,7 +314,7 @@ export default function AdminEcommerceCategories() {
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: 0, color: "#0f172a" }}>E”‘commerce Categories</h2>
+        <h2 style={{ margin: 0, color: "#0f172a" }}>E‑commerce Categories</h2>
         <div style={{ color: "#64748b", fontSize: 13 }}>
           Create and manage categories that drive the new consumer home. These map to <code>/uploads/category-banners/</code>.
         </div>
@@ -426,8 +426,8 @@ export default function AdminEcommerceCategories() {
               }}
             >
               <div>#{r.id}</div>
-              <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.key || r.slug || "””"}</div>
-              <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.label || r.name || "””"}</div>
+              <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.key || r.slug || ""}</div>
+              <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.label || r.name || ""}</div>
               <div>{r.order ?? 0}</div>
               <div>{r.home_limit ?? 0}</div>
               <div>

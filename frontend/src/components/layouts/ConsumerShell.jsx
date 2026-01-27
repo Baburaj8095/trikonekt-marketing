@@ -42,7 +42,7 @@ export default function ConsumerShell({ children }) {
     { to: "/user/redeem-coupon", label: "My E coupons", icon: "ticket" },
     { to: "/user/my-orders", label: "My Orders", icon: "orders" },
     { to: "/trikonekt-products", label: "Trikonekt Products", icon: "box" },
-    { to: "/merchant-marketplace", label: "Merchant Marketplace", icon: "box" },
+    // { to: "/merchant-marketplace", label: "Merchant Marketplace", icon: "box" },
     // { to: "/agency-marketplace", label: "Agency Marketplace", icon: "box" },
     { to: "/user/support", label: "Support", icon: "ticket" },
     { to: "/user/cart", label: "Cart", icon: "orders" },

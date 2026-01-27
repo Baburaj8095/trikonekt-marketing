@@ -55,9 +55,9 @@ const isTourPackage = (pkg) => {
 };
 
 const getPlanOptions = (price) => {
-  // Prime 150: remove e”‘book flow (UI hint only shows redeem points)
+  // Prime 150: remove e‑book flow (UI hint only shows redeem points)
   if (approx(price, 150)) return ["Redeem points"];
-  // Prime 750: only two options ”” Redeem or Product (no separate E”‘Coupons option)
+  // Prime 750: only two options  Redeem or Product (no separate E‑Coupons option)
   if (approx(price, 750)) return ["Redeem", "Exclusive products"];
   if (approx(price, 759))
     return ["Electronics", "Home Appliances", "Furniture", "Travel & Tourism"];
@@ -67,7 +67,7 @@ const getPlanOptions = (price) => {
 const monthShort = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13"];
 
 /* ======================================================================== */
-/* Payment Sheet (shared) ”” unchanged logic; UI summary added */
+/* Payment Sheet (shared)  unchanged logic; UI summary added */
 /* ======================================================================== */
 function PaymentSheet({ open, onClose, data, onSuccess }) {
   const [txnId, setTxnId] = useState("");
@@ -146,7 +146,7 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
             <Box sx={{ mt: 0.5 }}>
               {summaryLines.map((s, i) => (
                 <Typography key={i} fontSize={12} color="text.secondary">
-                  ”¢ {s}
+                  • {s}
                 </Typography>
               ))}
             </Box>
@@ -205,7 +205,7 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
         </Box>
 
         <Alert severity="info" sx={{ mt: 2 }}>
-          Amount is auto”‘calculated and locked. Pay the exact amount.
+          Amount is auto‑calculated and locked. Pay the exact amount.
         </Alert>
 
         <TextField
@@ -299,7 +299,7 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
 /* ======================================================================== */
 
 /**
- * PrimeSection ”” membership-style UI
+ * PrimeSection  membership-style UI
  * - Requires choice: Redeem | Product
  * - Bonus ₹150 info is UI-only (no backend flag; reflected in uiMeta for summary)
  */
@@ -446,7 +446,7 @@ function Prime150Section({ reg150Pkg, prime150Active, onBuy }) {
 }
 
 /**
- * SeasonSection ”” Season-first flow
+ * SeasonSection  Season-first flow
  * - Season selector (Season 1 active; others locked unless admin exposes)
  * - Plan selector under Season 1: Registration ₹150 | Season Prime ₹759
  * - Box grid (4x3) visible only for Season Prime
@@ -567,9 +567,9 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
         Choose a season and plan to get started.
       </Typography>
 
-      {/* â‘  Season selector */}
+      {/* ① Season selector */}
       <Typography variant="subtitle2" sx={{ mt: 1 }}>
-        â‘  Choose Season 
+        ① Choose Season 
       </Typography>
       <Box sx={{ display: "grid", gap: 1 }}>
         {seasonsToShow.map((n) => {
@@ -612,9 +612,9 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
 
       <Divider sx={{ my: 1.5 }} />
 
-      {/* â‘¡ Plan selector (Season 1 only) */}
+      {/* ② Plan selector (Season 1 only) */}
       <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-        â‘¡ Choose Plan
+        ② Choose Plan
       </Typography>
       {selectedSeason === 1 ? (
         <Box sx={{ mt: 1 }}>
@@ -643,9 +643,9 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
 
       <Divider sx={{ my: 1.5 }} />
 
-      {/* â‘¢ Month grid (only for Season Prime) */}
+      {/* ③ Month grid (only for Season Prime) */}
       <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-        â‘¢ Select Months
+        ③ Select Months
       </Typography>
       {plan === "SEASON759" ? (
         <>
@@ -721,7 +721,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
 }
 
 /**
- * PromoSection ”” Monthly promotions & offers (grid 3 x 4 on mobile)
+ * PromoSection  Monthly promotions & offers (grid 3 x 4 on mobile)
  * - No season chooser, no membership info
  * - Uses current package_number from monthly_meta
  */
@@ -855,7 +855,7 @@ function PromoSection({ seasonPkg, history, onBuy, seasonActive }) {
 }
 
 /**
- * TourSection ”” sketch-compliant
+ * TourSection  sketch-compliant
  * - Static destinations with placeholders
  * - EXPLORE & BOOK -> Tri module (no duplication of booking logic)
  */
@@ -1152,7 +1152,7 @@ export default function PromoPackages({ title = "Consumer Packages" } = {}) {
             )
           ) : null}
 
-          {/* SEASON: Guided steps â‘  â‘¡ â‘¢ */}
+          {/* SEASON: Guided steps ① ② ③ */}
           {mappedTab === 2 ? (
             seasonPkg ? (
               <SeasonSection

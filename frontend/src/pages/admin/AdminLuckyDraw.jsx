@@ -422,7 +422,7 @@ export default function AdminLuckyDraw() {
                 <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
                   <div style={{ fontWeight: 700, color: "#0f172a" }}>{d.title || `#${d.id}`}</div>
                   <div style={{ fontSize: 12, color: "#475569" }}>
-                    Window: {humanDate(d.start_at)} ”” {humanDate(d.end_at)}
+                    Window: {humanDate(d.start_at)}  {humanDate(d.end_at)}
                   </div>
                   <div>
                     <span
@@ -435,7 +435,7 @@ export default function AdminLuckyDraw() {
                         border: d.status === "LIVE" ? "1px solid #10b98130" : "1px solid #e2e8f0",
                       }}
                     >
-                      {d.status || "DRAFT"} {d.locked ? " ”¢ LOCKED" : ""}
+                      {d.status || "DRAFT"} {d.locked ? " • LOCKED" : ""}
                     </span>
                   </div>
                   <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
@@ -471,8 +471,8 @@ export default function AdminLuckyDraw() {
                       {d.winners.map((w) => (
                         <div key={w.id} style={{ border: "1px solid #e2e8f0", borderRadius: 6, padding: 8 }}>
                           <div style={{ fontWeight: 600 }}>{w.username || `User #${w.user}`}</div>
-                          <div style={{ fontSize: 12, color: "#475569" }}>{w.prize_title || "””"}</div>
-                          <div style={{ fontSize: 12, color: "#64748b" }}>{w.prize_type}{w.prize_value ? ` ”¢ ₹${w.prize_value}` : ""}</div>
+                          <div style={{ fontSize: 12, color: "#475569" }}>{w.prize_title || ""}</div>
+                          <div style={{ fontSize: 12, color: "#64748b" }}>{w.prize_type}{w.prize_value ? ` • ₹${w.prize_value}` : ""}</div>
                           <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
                             <button
                               onClick={() => removeWinner(w.id)}
@@ -662,8 +662,8 @@ export default function AdminLuckyDraw() {
                   <div title={u.username || ""} style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
                     {u.username || `User #${u.user_id}`}
                   </div>
-                  <div>{u.phone || "””"}</div>
-                  <div>{u.pincode || "””"}</div>
+                  <div>{u.phone || ""}</div>
+                  <div>{u.pincode || ""}</div>
                   <div>{u.has_150 ? "Yes" : "No"}</div>
                   <div>{u.has_759 ? "Yes" : "No"}</div>
                   <div>
@@ -808,10 +808,10 @@ export default function AdminLuckyDraw() {
               >
                 <div>#{r.id}</div>
                 <div title={r.username || ""} style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {r.username || "””"}
+                  {r.username || ""}
                 </div>
-                <div>{r.phone || "””"}</div>
-                <div>{r.pincode || "””"}</div>
+                <div>{r.phone || ""}</div>
+                <div>{r.pincode || ""}</div>
                 <div>
                   <span
                     style={{
@@ -838,13 +838,13 @@ export default function AdminLuckyDraw() {
                           : "1px solid #e2e8f0",
                     }}
                   >
-                    {r.status || "””"}
+                    {r.status || ""}
                   </span>
                 </div>
-                <div>{r.sl_number || "””"}</div>
-                <div>{r.ledger_number || "””"}</div>
+                <div>{r.sl_number || ""}</div>
+                <div>{r.ledger_number || ""}</div>
                 <div title={r.agency_name || ""} style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {r.agency_name || "””"}
+                  {r.agency_name || ""}
                 </div>
                 <div>{humanDate(r.created_at)}</div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

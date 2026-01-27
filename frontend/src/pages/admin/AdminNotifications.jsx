@@ -23,7 +23,7 @@ function TabButton({ active, children, onClick }) {
 }
 
 /**
- * AdminNotifications ”” Unified Notifications console
+ * AdminNotifications  Unified Notifications console
  * - Templates: create/edit Notification Event Templates
  * - Dispatch: guidance + quick links to dispatch via Templates ("Dispatch now" action)
  * - Activity: monitor Batches and the Notifications Log
@@ -148,7 +148,7 @@ export default function AdminNotifications() {
             }}
           >
             Tip: Audience roles support "consumer", "agency", "employee", "merchant" (business), "company", or "all".
-            Set pinned_until to surface important announcements. Enable channels.in_app=true for in”‘app delivery.
+            Set pinned_until to surface important announcements. Enable channels.in_app=true for in‑app delivery.
           </div>
         </div>
       ) : null}

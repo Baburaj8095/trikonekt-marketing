@@ -267,7 +267,7 @@ export default function AdminECoupons() {
     enable_employee: false,
     is_active: true,
     max_per_order: "10",
-    display_title: "E”‘Coupon",
+    display_title: "E‑Coupon",
     display_desc: "",
   });
 
@@ -426,7 +426,7 @@ export default function AdminECoupons() {
     () =>
       agencies.map((u) => {
         const isSub = String(u?.category || "").toLowerCase().startsWith("agency") && String(u?.category || "").toLowerCase().includes("sub");
-        return { value: String(u.id), label: `${u.username} #${u.id}${isSub ? " [sub”‘franchise]" : ""}` };
+        return { value: String(u.id), label: `${u.username} #${u.id}${isSub ? " [sub‑franchise]" : ""}` };
       }),
     [agencies]
   );
@@ -443,10 +443,10 @@ export default function AdminECoupons() {
           String(u?.category || "").toLowerCase().includes("sub");
         const name = String(u?.full_name || "").trim() || u.username;
         const pin = String(u?.pincode || "").trim();
-        const pinPart = pin ? ` ”¢ PIN ${pin}` : "";
+        const pinPart = pin ? ` • PIN ${pin}` : "";
         return {
           value: String(u.id),
-          label: `${name} (${u.username})${pinPart}${isSub ? " [sub”‘franchise]" : ""}`,
+          label: `${name} (${u.username})${pinPart}${isSub ? " [sub‑franchise]" : ""}`,
         };
       }),
     [agencies]
@@ -498,7 +498,7 @@ export default function AdminECoupons() {
           const d = batchDenomCache[String(b.id)];
           return {
             value: String(b.id),
-            label: `#${b.id} ${b.prefix}${d ? ` ”¢ ₹${d}` : ""}${count ? ` (${count} codes)` : ""}`,
+            label: `#${b.id} ${b.prefix}${d ? ` • ₹${d}` : ""}${count ? ` (${count} codes)` : ""}`,
           };
         });
   }, [seasonBatches, batchDenomCache]);
@@ -1028,7 +1028,7 @@ export default function AdminECoupons() {
         ...f,
         price_per_unit: "",
         max_per_order: "10",
-        display_title: "E”‘Coupon",
+        display_title: "E‑Coupon",
         display_desc: "",
       }));
     } catch (e) {
@@ -1064,7 +1064,7 @@ export default function AdminECoupons() {
           enable_employee: false,
           is_active: true,
           max_per_order: 10,
-          display_title: `E”‘Coupon ₹${denom}`,
+          display_title: `E‑Coupon ₹${denom}`,
           display_desc: "",
         };
         try {
@@ -1163,7 +1163,7 @@ export default function AdminECoupons() {
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: 0, color: "#0f172a" }}>E”‘Coupons</h2>
+        <h2 style={{ margin: 0, color: "#0f172a" }}>E‑Coupons</h2>
         <div style={{ color: "#64748b", fontSize: 13 }}>
           Season-first creation. Create Season batches (₹150/₹759), assign by count to agencies/employees, manage store and view metrics.
         </div>
@@ -1508,7 +1508,7 @@ export default function AdminECoupons() {
               }))
             }
             options={[
-              { value: "agency", label: "Agency / Sub”‘franchise" },
+              { value: "agency", label: "Agency / Sub‑franchise" },
               { value: "employee", label: "Employee (Admin direct)" },
             ]}
           />
@@ -1717,12 +1717,12 @@ export default function AdminECoupons() {
                     borderBottom: "1px solid #e2e8f0",
                   }}
                 >
-                  <div>₹{r.denom || "””"}</div>
-                  <div>{r.batch_display || "””"}</div>
-                  <div>{r.count ?? "””"}</div>
-                  <div style={{ textTransform: "capitalize" }}>{r.role || "””"}</div>
-                  <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.assigned_by || "””"}</div>
-                  <div>{r.assigned_at ? new Date(r.assigned_at).toLocaleString() : "””"}</div>
+                  <div>₹{r.denom || ""}</div>
+                  <div>{r.batch_display || ""}</div>
+                  <div>{r.count ?? ""}</div>
+                  <div style={{ textTransform: "capitalize" }}>{r.role || ""}</div>
+                  <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.assigned_by || ""}</div>
+                  <div>{r.assigned_at ? new Date(r.assigned_at).toLocaleString() : ""}</div>
                 </div>
               ))}
               {!agencyHist.loading && (!agencyHist.rows || agencyHist.rows.length === 0) ? (
@@ -1895,7 +1895,7 @@ export default function AdminECoupons() {
             label="Display Title"
             value={spForm.display_title}
             onChange={(v) => setSpForm((f) => ({ ...f, display_title: v }))}
-            placeholder="e.g., E”‘Coupon ₹150"
+            placeholder="e.g., E‑Coupon ₹150"
           />
           <TextInput
             label="Display Description"
@@ -2010,12 +2010,12 @@ export default function AdminECoupons() {
                     >
                       <div>#{o.id}</div>
                       <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {o.buyer_username || o.buyer || "””"}
+                        {o.buyer_username || o.buyer || ""}
                       </div>
-                      <div>{o.role_at_purchase || "””"}</div>
+                      <div>{o.role_at_purchase || ""}</div>
                       <div>{o.quantity || 0}</div>
                       <div>₹{o.amount_total || 0}</div>
-                      <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{o.product_title || "””"}</div>
+                      <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{o.product_title || ""}</div>
                       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                         <input
                           style={{ padding: 8, border: "1px solid #e2e8f0", borderRadius: 8, minWidth: 160 }}
@@ -2189,12 +2189,12 @@ export default function AdminECoupons() {
                       borderBottom: "1px solid #e2e8f0",
                     }}
                   >
-                    <div style={{ textTransform: "capitalize" }}>{role || "””"}</div>
-                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{assignee || "””"}</div>
+                    <div style={{ textTransform: "capitalize" }}>{role || ""}</div>
+                    <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{assignee || ""}</div>
                     <div>{info}</div>
-                    <div>{count ?? "””"}</div>
-                    <div>{batch || "””"}</div>
-                    <div>{at ? new Date(at).toLocaleString() : "””"}</div>
+                    <div>{count ?? ""}</div>
+                    <div>{batch || ""}</div>
+                    <div>{at ? new Date(at).toLocaleString() : ""}</div>
                   </div>
                 );
               })}

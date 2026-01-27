@@ -289,7 +289,7 @@ export function setItemUnitPrice(key, unitPrice) {
 
 /** Convenience helpers to add mapped item types */
 
-export function addEcoupon({ productId, title = "E”‘Coupon", unitPrice = 0, qty = 1, denomination = null }) {
+export function addEcoupon({ productId, title = "E‑Coupon", unitPrice = 0, qty = 1, denomination = null }) {
   return addItem({
     type: "ECOUPON",
     id: productId,

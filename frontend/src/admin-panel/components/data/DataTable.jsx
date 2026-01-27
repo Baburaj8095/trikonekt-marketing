@@ -165,7 +165,7 @@ export default function DataTable({
           base.renderCell = (params) => {
             const row = params?.row || {};
             const v = getFieldValue(row, base.field);
-            if (v == null || v === "") return "””";
+            if (v == null || v === "") return "";
             return String(v);
           };
         }

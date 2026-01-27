@@ -465,11 +465,11 @@ export default function AdminShell({ children }) {
       label: "Promotions",
       items: [
         { to: "/admin/lucky-draw", label: "Lucky Draw", icon: "ticket" },
-        { to: "/admin/e-coupons", label: "E”‘Coupons", icon: "ticket" },
+        { to: "/admin/e-coupons", label: "E‑Coupons", icon: "ticket" },
         // Promo packages and related admin models inside AdminShell
         { to: "/admin/dashboard/models/business/promopackage", label: "Promo Packages", icon: "box" },
-        // { to: "/admin/dashboard/models/business/promoebook", label: "Promo E”‘Books (Library)", icon: "box" },
-        // { to: "/admin/dashboard/models/business/promopackageebook", label: "Package â†’ E”‘Books Mapping", icon: "box" },
+        // { to: "/admin/dashboard/models/business/promoebook", label: "Promo E‑Books (Library)", icon: "box" },
+        // { to: "/admin/dashboard/models/business/promopackageebook", label: "Package â†’ E‑Books Mapping", icon: "box" },
         { to: "/admin/promo-package-products", label: "Upload Promo Products (₹750)", icon: "upload" },
         { to: "/admin/dashboard/models/business/promopackageproduct", label: "Promo Products (₹750)", icon: "box" },
         { to: "/admin/dashboard/models/business/promomonthlypackage", label: "Season Numbers", icon: "box" },
@@ -504,8 +504,8 @@ export default function AdminShell({ children }) {
       key: "commissions",
       label: "Commissions & Matrix",
       items: [
-        // { to: "/admin/matrix/five", label: "5”‘Matrix", icon: "matrix5" },
-        // { to: "/admin/matrix/three", label: "3”‘Matrix", icon: "matrix3" },
+        // { to: "/admin/matrix/five", label: "5‑Matrix", icon: "matrix5" },
+        // { to: "/admin/matrix/three", label: "3‑Matrix", icon: "matrix3" },
         // { to: "/admin/commissions/matrix", label: "Matrix Commission", icon: "wallet" },
         // { to: "/admin/commissions/levels", label: "Level Commission", icon: "wallet" },
         { to: "/admin/commissions/distribute", label: "Commission Distribute", icon: "wallet" },

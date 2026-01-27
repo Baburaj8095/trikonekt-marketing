@@ -352,13 +352,13 @@ export default function Payment() {
       }
     }
 
-    // For e”‘coupon orders paid via Manual UPI, enforce UTR + screenshot
+    // For e‑coupon orders paid via Manual UPI, enforce UTR + screenshot
     if ((grouped.ECOUPON || []).length > 0 && paymentMethod === "MANUAL") {
       const hasUtr = String(ecouponPayment.utr || "").trim().length > 0;
       const hasFile = !!ecouponPayment.file;
       if (!hasUtr || !hasFile) {
         try {
-          alert("Enter UTR and attach payment screenshot for e”‘coupon orders.");
+          alert("Enter UTR and attach payment screenshot for e‑coupon orders.");
         } catch {}
         return;
       }
@@ -387,7 +387,7 @@ export default function Payment() {
             msg:
               e?.response?.data?.detail ||
               e?.message ||
-              "Failed to submit e”‘coupon order.",
+              "Failed to submit e‑coupon order.",
           });
         }
       }
@@ -686,11 +686,11 @@ export default function Payment() {
                     <Grid container spacing={1}>
                       <Grid item xs={12} sm={6} md={4}>
                         <Typography variant="caption" color="text.secondary">Payee</Typography>
-                        <div style={{ fontWeight: 800 }}>{payment.payee_name || "””"}</div>
+                        <div style={{ fontWeight: 800 }}>{payment.payee_name || ""}</div>
                       </Grid>
                       <Grid item xs={12} sm={6} md={4}>
                         <Typography variant="caption" color="text.secondary">UPI ID</Typography>
-                        <div style={{ fontWeight: 800 }}>{payment.upi_id || "””"}</div>
+                        <div style={{ fontWeight: 800 }}>{payment.upi_id || ""}</div>
                       </Grid>
                       <Grid item xs={12}>
                         <Typography variant="caption" color="text.secondary">Instructions</Typography>

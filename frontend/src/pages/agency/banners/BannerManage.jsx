@@ -176,7 +176,7 @@ function BannerItemsDialog({ open, onClose, banner }) {
 
   return (
     <Dialog open={open} onClose={() => !saving && onClose()} maxWidth="md" fullWidth>
-      <DialogTitle>Manage Items ”” {banner?.title || ""}</DialogTitle>
+      <DialogTitle>Manage Items  {banner?.title || ""}</DialogTitle>
       <DialogContent dividers>
         {loading ? (
           <LinearProgress />
@@ -504,7 +504,7 @@ export default function BannerManage() {
                   <CardContent sx={{ flexGrow: 1 }}>
                     <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{b.title}</Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                      {b.description || "””"}
+                      {b.description || ""}
                     </Typography>
                     <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
                       <Chip size="small" label={b.is_active ? "ACTIVE" : "INACTIVE"} color={b.is_active ? "success" : "default"} />

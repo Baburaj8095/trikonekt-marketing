@@ -130,7 +130,7 @@ export default function OrdersList({
                     </Stack>
 
                     <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                      {o.product_title || o.product || "E”‘Coupon"}
+                      {o.product_title || o.product || "E‑Coupon"}
                     </Typography>
 
                     <Stack
@@ -168,7 +168,7 @@ export default function OrdersList({
                       <Typography variant="caption">
                         {o.reviewed_at
                           ? new Date(o.reviewed_at).toLocaleString()
-                          : "””"}
+                          : ""}
                       </Typography>
                     </Stack>
 

@@ -253,7 +253,7 @@ export default function RoleSelect() {
             <RoleCard
               icon={<PersonIcon />}
               title="Consumer"
-              desc="Earn rewards and redeem e”‘coupons."
+              desc="Earn rewards and redeem e‑coupons."
               onLogin={() => navigate(buildUrl("user", "login"))}
               onRegister={() => navigate(buildUrl("user", "register"))}
               colors={palette.consumer}
@@ -266,7 +266,7 @@ export default function RoleSelect() {
             <RoleCard
               icon={<WorkIcon />}
               title="Employee"
-              desc="Review submissions and manage e”‘coupons."
+              desc="Review submissions and manage e‑coupons."
               onLogin={() => navigate(buildUrl("employee", "login"))}
               onRegister={() => navigate(buildUrl("employee", "register"))}
               colors={palette.employee}

@@ -24,7 +24,7 @@ import API, {
   listCategoryBanners,
 } from "../api/api";
 
-// IMAGE IMPORTS ”” fallbacks
+// IMAGE IMPORTS  fallbacks
 import heroImg from "../assets/Wealth_Galaxy.jpg";
 import promoImg1 from "../assets/spin1.png";
 import promoImg2 from "../assets/asst_2.png";

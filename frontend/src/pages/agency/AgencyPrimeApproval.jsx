@@ -271,7 +271,7 @@ export default function AgencyPrimeApproval() {
                 >
                   <CardContent sx={{ display: "flex", flexDirection: "column", gap: 1, flex: 1 }}>
                     <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 1.5 }}>
-                      SUB”‘FRANCHISE
+                      SUB‑FRANCHISE
                     </Typography>
                     <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
                       <Typography variant="h6" sx={{ fontWeight: 900 }}>{pkgName}</Typography>
@@ -441,7 +441,7 @@ export default function AgencyPrimeApproval() {
               </Typography>
               <Stack direction="row" spacing={1} alignItems="center">
                 <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
-                  {selected?.package?.upi_id || "””"}
+                  {selected?.package?.upi_id || ""}
                 </Typography>
                 {selected?.package?.upi_id ? (
                   <Tooltip title="Copy UPI ID">

@@ -65,7 +65,7 @@ export default function RequirePermission({ anyOf = [], children, Fallback403 })
     if (Fallback403) return <Fallback403 />;
     return (
       <div style={{ padding: 16, border: "1px solid #fecaca", background: "#fef2f2", color: "#991b1b", borderRadius: 10 }}>
-        403 ”” You do not have permission to access this page.
+        403  You do not have permission to access this page.
       </div>
     );
   }

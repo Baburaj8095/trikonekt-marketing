@@ -4,7 +4,7 @@ import API from "../../api/api";
 import normalizeMediaUrl from "../../utils/media";
 
 /**
- * BannerCarousel ”” BookMyShow-like hero slider
+ * BannerCarousel  BookMyShow-like hero slider
  *
  * Visual-only changes. Data/API unchanged.
  * - Auto-scroll 4”“5s

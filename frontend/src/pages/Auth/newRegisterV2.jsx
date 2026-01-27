@@ -1589,10 +1589,10 @@ const RegisterV2 = () => {
             <b>Sponsor ID:</b> {sponsorDisplay.username || sponsorId}
           </Typography>
           <Typography variant="body2" sx={{ color: "#0f172a" }}>
-            <b>Name:</b> {sponsorDisplay.name || "””"}
+            <b>Name:</b> {sponsorDisplay.name || ""}
           </Typography>
           <Typography variant="body2" sx={{ color: "#0f172a" }}>
-            <b>Pincode:</b> {sponsorDisplay.pincode || "””"}
+            <b>Pincode:</b> {sponsorDisplay.pincode || ""}
           </Typography>
         </Paper>
       )}

@@ -294,8 +294,8 @@ export default function AdminSupport() {
                 <StatusChip status={t.status} />
               </Stack>
               <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
-                {t.username ? `${t.username}${t.phone ? ` ”¢ ${t.phone}` : ""}` : ""}
-                {t.pincode ? ` ”¢ ${t.pincode}` : ""} {t.state_name ? ` ”¢ ${t.state_name}` : ""}
+                {t.username ? `${t.username}${t.phone ? ` • ${t.phone}` : ""}` : ""}
+                {t.pincode ? ` • ${t.pincode}` : ""} {t.state_name ? ` • ${t.state_name}` : ""}
               </Typography>
               <Typography variant="caption" sx={{ color: "text.disabled", display: "block" }}>
                 Updated: {t.updated_at ? new Date(t.updated_at).toLocaleString() : "-"}
@@ -350,12 +350,12 @@ export default function AdminSupport() {
 
         {/* Meta */}
         <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-          User: {detail.username} {detail.full_name ? `(${detail.full_name})` : ""} {detail.phone ? `”¢ ${detail.phone}` : ""}
-          {detail.pincode ? ` ”¢ ${detail.pincode}` : ""} {detail.state_name ? ` ”¢ ${detail.state_name}` : ""}
+          User: {detail.username} {detail.full_name ? `(${detail.full_name})` : ""} {detail.phone ? `• ${detail.phone}` : ""}
+          {detail.pincode ? ` • ${detail.pincode}` : ""} {detail.state_name ? ` • ${detail.state_name}` : ""}
         </Typography>
         <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-          Assignee: {detail.admin_assignee_username ? detail.admin_assignee_username : "Unassigned"} ”¢ Created:{" "}
-          {detail.created_at ? new Date(detail.created_at).toLocaleString() : "-"} ”¢ Updated:{" "}
+          Assignee: {detail.admin_assignee_username ? detail.admin_assignee_username : "Unassigned"} • Created:{" "}
+          {detail.created_at ? new Date(detail.created_at).toLocaleString() : "-"} • Updated:{" "}
           {detail.updated_at ? new Date(detail.updated_at).toLocaleString() : "-"}
         </Typography>
 
@@ -446,7 +446,7 @@ export default function AdminSupport() {
                 >
                   <Stack direction="row" alignItems="baseline" spacing={1}>
                     <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                      {m.author_username || "””"}
+                      {m.author_username || ""}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                       {m.created_at ? new Date(m.created_at).toLocaleString() : ""}

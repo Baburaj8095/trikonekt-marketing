@@ -123,7 +123,7 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
             <Box sx={{ mt: 0.5 }}>
               {summaryLines.map((s, i) => (
                 <Typography key={i} fontSize={12} color="text.secondary">
-                  ”¢ {s}
+                  • {s}
                 </Typography>
               ))}
             </Box>
@@ -189,7 +189,7 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
         </Box>
 
         <Alert severity="info" sx={{ mt: 2 }}>
-          Amount is auto”‘calculated and locked. Pay the exact amount.
+          Amount is auto‑calculated and locked. Pay the exact amount.
         </Alert>
 
         <TextField

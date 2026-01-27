@@ -195,7 +195,7 @@ export default function AdminMatrixCommission() {
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ margin: 0, color: "#0f172a" }}>Matrix Commission</h2>
         <div style={{ color: "#64748b", fontSize: 13 }}>
-          Configure 5”‘Matrix (FIVE_150) and 3”‘Matrix (THREE_50/THREE_150) level-wise payouts. Amount arrays override percents when present.
+          Configure 5‑Matrix (FIVE_150) and 3‑Matrix (THREE_50/THREE_150) level-wise payouts. Amount arrays override percents when present.
         </div>
       </div>
 
@@ -233,7 +233,7 @@ export default function AdminMatrixCommission() {
       </div>
 
       <Section
-        title="5”‘Matrix (FIVE_150)"
+        title="5‑Matrix (FIVE_150)"
         extraRight={
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <Pill>Levels: {fiveLevels || "-"}</Pill>
@@ -267,7 +267,7 @@ export default function AdminMatrixCommission() {
       </Section>
 
       <Section
-        title="3”‘Matrix (THREE_50 / THREE_150)"
+        title="3‑Matrix (THREE_50 / THREE_150)"
         extraRight={
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <Pill>Levels: {threeLevels || "-"}</Pill>

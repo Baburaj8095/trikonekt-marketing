@@ -614,10 +614,10 @@ export async function assignEmployeeByCount(payload) {
 }
 
 /**
- * E”‘Coupon Store APIs
+ * E‑Coupon Store APIs
  */
 
-// Bootstrap: role”‘filtered products + active payment config (for create order screen)
+// Bootstrap: role‑filtered products + active payment config (for create order screen)
 export async function getEcouponStoreBootstrap() {
   const res = await API.get("/coupons/store/orders/bootstrap/", {
     // cache for short time to reduce flicker
@@ -627,7 +627,7 @@ export async function getEcouponStoreBootstrap() {
   return res?.data || res;
 }
 
-// Create an e”‘coupon order (multipart). Fields: product, quantity, utr?, notes?, payment_proof_file?
+// Create an e‑coupon order (multipart). Fields: product, quantity, utr?, notes?, payment_proof_file?
 export async function createEcouponOrder({ product, quantity, utr = "", notes = "", file = null }) {
   const fd = new FormData();
   fd.append("product", String(product));
@@ -692,7 +692,7 @@ export async function listCouponSeasons(params = {}) {
 }
 
 /**
- * Consumer e”‘coupon wallet helpers
+ * Consumer e‑coupon wallet helpers
  */
 export async function getMyECoupons(params = {}) {
   const res = await API.get("/coupons/codes/mine-consumer/", { params, dedupe: "cancelPrevious" });
@@ -707,7 +707,7 @@ export async function transferECoupon(codeId, { to_username, pincode = "", notes
   return res?.data || res;
 }
 
-// Activation/Redeem using v1 endpoints with e”‘coupon source context
+// Activation/Redeem using v1 endpoints with e‑coupon source context
 export async function activateECoupon150({ code }) {
   const res = await API.post("/v1/coupon/activate/?async=1", {
     type: "150",

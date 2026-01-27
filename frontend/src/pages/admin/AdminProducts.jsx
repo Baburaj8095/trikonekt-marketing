@@ -236,7 +236,7 @@ function CreateProductDialog({ open, onClose, onCreated }) {
                 size="small"
                 required
                 error={!!errors.category}
-                helperText={errors.category || "No categories found. Create in Admin â†’ E”‘commerce Categories or use Seed Demo Data."}
+                helperText={errors.category || "No categories found. Create in Admin â†’ E‑commerce Categories or use Seed Demo Data."}
               />
             )}
             <TextField

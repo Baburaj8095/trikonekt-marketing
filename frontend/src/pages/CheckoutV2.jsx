@@ -47,7 +47,7 @@ export default function CheckoutV2() {
   const [ecouponPayment, setEcouponPayment] = useState({
     utr: "",
     notes: "",
-    file: null, // optional global file to apply to each e”‘coupon order if line.file not set
+    file: null, // optional global file to apply to each e‑coupon order if line.file not set
   });
 
   // Sync cart snapshot
@@ -267,7 +267,7 @@ export default function CheckoutV2() {
             msg:
               e?.response?.data?.detail ||
               e?.message ||
-              "Failed to submit e”‘coupon order.",
+              "Failed to submit e‑coupon order.",
           });
         }
       }
@@ -712,11 +712,11 @@ export default function CheckoutV2() {
             <Typography variant="caption" color="text.secondary">
               Payee
             </Typography>
-            <div style={{ fontWeight: 800 }}>{payment.payee_name || "””"}</div>
+            <div style={{ fontWeight: 800 }}>{payment.payee_name || ""}</div>
             <Typography variant="caption" color="text.secondary">
               UPI ID
             </Typography>
-            <div style={{ fontWeight: 800 }}>{payment.upi_id || "””"}</div>
+            <div style={{ fontWeight: 800 }}>{payment.upi_id || ""}</div>
             <Typography variant="caption" color="text.secondary">
               Instructions
             </Typography>
@@ -727,7 +727,7 @@ export default function CheckoutV2() {
           </Box>
         ) : (
           <Alert severity="warning" sx={{ mb: 1 }}>
-            Payments are temporarily unavailable or not configured for e”‘coupons.
+            Payments are temporarily unavailable or not configured for e‑coupons.
           </Alert>
         )}
 

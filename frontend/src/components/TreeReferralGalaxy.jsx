@@ -4,7 +4,7 @@ import API from "../api/api";
 /**
  * TreeReferralGalaxy
  *
- * A reusable 5Ã—Matrix tree viewer with:
+ * A reusable 5×Matrix tree viewer with:
  * - Header "Geneology"
  * - Breadcrumbs MANJUNATH â†’ SHARANAPPA â†’ ...
  * - Parent card (top)
@@ -544,8 +544,8 @@ export default function TreeReferralGalaxy({
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 6 }}>
             <div style={styles.card}>
               <AvatarIcon size={rootAvatar} />
-              <div style={styles.cardName}>{displayName(root) || "””"}</div>
-              <div style={styles.cardTR}>TR Username: {displayTR(root) || "””"}</div>
+              <div style={styles.cardName}>{displayName(root) || ""}</div>
+              <div style={styles.cardTR}>TR Username: {displayTR(root) || ""}</div>
               {typeof dFor(root.id).account_active === "boolean" ? (
                 <div style={{ marginTop: 6 }}>
                   <span style={{ fontSize: 12, fontWeight: 700, color: dFor(root.id).account_active ? "#16a34a" : "#64748b" }}>
@@ -559,8 +559,8 @@ export default function TreeReferralGalaxy({
               {dFor(root.id).pincode ? (
                 <div style={styles.cardTR}>Pincode: {dFor(root.id).pincode}</div>
               ) : null}
-              <div style={styles.cardTeam}>Direct: {directOf(root.id) ?? "””"}</div>
-              <div style={styles.cardTeam}>Team: {getCountValue(root.id) ?? "””"}</div>
+              <div style={styles.cardTeam}>Direct: {directOf(root.id) ?? ""}</div>
+              <div style={styles.cardTeam}>Team: {getCountValue(root.id) ?? ""}</div>
             </div>
           </div>
 
@@ -571,8 +571,8 @@ export default function TreeReferralGalaxy({
             {children.map((c) => (
               <div key={c.id} style={styles.childCard} onClick={() => drillDown(c)}>
                 <AvatarIcon size={childAvatar} />
-                <div style={{ ...styles.cardName, fontSize: 14, marginTop: 6 }}>{displayName(c) || "””"}</div>
-                <div style={{ ...styles.cardTR, fontSize: 12 }}>TR Username: {displayTR(c) || "””"}</div>
+                <div style={{ ...styles.cardName, fontSize: 14, marginTop: 6 }}>{displayName(c) || ""}</div>
+                <div style={{ ...styles.cardTR, fontSize: 12 }}>TR Username: {displayTR(c) || ""}</div>
                 {typeof dFor(c.id).account_active === "boolean" ? (
                   <div style={{ ...styles.subtle, marginTop: 4, color: dFor(c.id).account_active ? "#16a34a" : "#64748b", fontWeight: 700 }}>
                     {dFor(c.id).account_active ? "Active" : "Inactive"}
@@ -584,8 +584,8 @@ export default function TreeReferralGalaxy({
                 {dFor(c.id).pincode ? (
                   <div style={{ ...styles.cardTR, fontSize: 12 }}>Pincode: {dFor(c.id).pincode}</div>
                 ) : null}
-                <div style={{ ...styles.cardTeam, fontSize: 13 }}>Direct: {directOf(c.id) ?? "””"}</div>
-                <div style={{ ...styles.cardTeam, fontSize: 13 }}>Team: {getCountValue(c.id) ?? "””"}</div>
+                <div style={{ ...styles.cardTeam, fontSize: 13 }}>Direct: {directOf(c.id) ?? ""}</div>
+                <div style={{ ...styles.cardTeam, fontSize: 13 }}>Team: {getCountValue(c.id) ?? ""}</div>
               </div>
             ))}
             {Array.from({ length: placeholders }).map((_, idx) => (

@@ -1320,6 +1320,109 @@ def handle_bulk_assign_agencies(task: BackgroundTask) -> None:
         except Exception:
             pass
 
+def handle_promo_approve_payouts(task: BackgroundTask) -> None:
+    """
+    Background: process PRIME promo approval side-effects (payouts/matrix) for a PromoPurchase.
+
+    Payload:
+      {
+        "purchase_id": int,
+        "reviewer_id": int | null
+      }
+    Idempotent via:
+      - BackgroundTask.idempotency_key (e.g., "promo_approve:{purchase_id}")
+      - Audit "promo_purchase_distributed" with metadata.purchase_id
+    """
+    payload = task.payload or {}
+    pid = payload.get("purchase_id")
+    if not pid:
+        return
+
+    from decimal import Decimal as D
+    from business.models import PromoPurchase
+    from coupons.models import AuditTrail
+
+    obj = PromoPurchase.objects.select_related("user", "package").filter(pk=int(pid)).first()
+    if not obj or str(getattr(obj, "status", "")) != "APPROVED":
+        return
+
+    # If already distributed, exit
+    try:
+        already = AuditTrail.objects.filter(
+            action="promo_purchase_distributed",
+            metadata__purchase_id=obj.id
+        ).exists()
+    except Exception:
+        already = False
+    if already:
+        return
+
+    # Determine type
+    try:
+        price = D(str(getattr(obj.package, "price", "0") or "0"))
+    except Exception:
+        price = D("0")
+    ptype = str(getattr(obj.package, "type", "") or "")
+    is_prime = ptype == "PRIME"
+    is_prime_150 = is_prime and abs(price - D("150")) <= D("0.5")
+    is_prime_750 = is_prime and abs(price - D("750")) <= D("0.5")
+    is_prime_759 = is_prime and abs(price - D("759")) <= D("0.75")
+
+    # Execute engines (best-effort), track success to avoid stamping audit on failure
+    success = False
+    try:
+        if is_prime_150:
+            from business.services.prime import distribute_prime_150_payouts
+            distribute_prime_150_payouts(
+                obj.user,
+                source={"type": "PROMO_PURCHASE_APPROVAL", "id": obj.id},
+            )
+            success = True
+        elif is_prime_750:
+            from business.services.prime import distribute_prime_750_payouts
+            distribute_prime_750_payouts(
+                obj.user,
+                source={"type": "PROMO_PURCHASE_APPROVAL", "id": obj.id},
+            )
+            success = True
+        elif is_prime_759:
+            # Mirror approval-time 759 behavior (first-month detection)
+            is_first_flag = False
+            try:
+                from business.models import Promo759Subscription
+                prev_exists = Promo759Subscription.objects.filter(user=obj.user).exists()
+                sub, _ = Promo759Subscription.objects.get_or_create(
+                    promo_purchase=obj,
+                    defaults={"user": obj.user, "metadata": {"source": "PROMO_PURCHASE_APPROVAL"}}
+                )
+                is_first_flag = not prev_exists
+            except Exception:
+                is_first_flag = False
+            try:
+                from business.services.monthly import distribute_monthly_759_payouts
+                distribute_monthly_759_payouts(
+                    obj.user,
+                    is_first_month=bool(is_first_flag),
+                    source={"type": "PROMO_PURCHASE_APPROVAL", "id": obj.id},
+                )
+                success = True
+            except Exception:
+                pass
+    except Exception:
+        success = False
+
+    # Stamp audit to guard idempotency (only on success and if not already)
+    if success:
+        try:
+            AuditTrail.objects.create(
+                action="promo_purchase_distributed",
+                actor=getattr(obj, "approved_by", None),
+                notes=f"Promo purchase #{obj.id} payouts done",
+                metadata={"purchase_id": obj.id, "package": getattr(obj.package, "code", None)},
+            )
+        except Exception:
+            pass
+
 # Register built-in handlers
 register_handler("coupon_dist", handle_coupon_dist)
 register_handler("monthly_759", handle_monthly_759)
@@ -1331,6 +1434,7 @@ register_handler("assign_employee_count", handle_assign_employee_count)
 register_handler("assign_agency_count", handle_assign_agency_count)
 register_handler("admin_assign_employee_count", handle_admin_assign_employee_count)
 register_handler("bulk_assign_agencies", handle_bulk_assign_agencies)
+register_handler("promo_approve_payouts", handle_promo_approve_payouts)
 
 
 # -----------------------

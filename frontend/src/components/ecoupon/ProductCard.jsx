@@ -36,7 +36,7 @@ export default function ECouponProductCard({ product, available = null, onAddToC
   const total = unit * q;
   const outOfStock = Number.isFinite(available) ? Number(available) <= 0 : false;
 
-  const title = product?.display_title || "E”‘Coupon";
+  const title = product?.display_title || "E‑Coupon";
   const desc = product?.display_desc || "";
 
   const handleDec = () => setQty((x) => Math.max(1, parseInt(x || 1, 10) - 1));
@@ -83,7 +83,7 @@ export default function ECouponProductCard({ product, available = null, onAddToC
                 <text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='Montserrat,Arial' font-size='72' fill='#94a3b8'>₹</text>
               </svg>
             `)}
-            alt="E”‘Coupon"
+            alt="E‑Coupon"
             loading="lazy"
             style={{ width: "100%", aspectRatio: dense ? "1 / 1" : "4 / 3", objectFit: "cover" }}
           />
@@ -146,7 +146,7 @@ export default function ECouponProductCard({ product, available = null, onAddToC
               Available
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 900 }}>
-              {Number.isFinite(available) ? available : "””"}
+              {Number.isFinite(available) ? available : ""}
             </Typography>
           </Stack>
         </Stack>

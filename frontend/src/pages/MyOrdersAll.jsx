@@ -73,7 +73,7 @@ function StatusChip({ status }) {
 export default function MyOrdersAll() {
   const [tab, setTab] = useState("ecoupons");
 
-  // E”‘Coupon orders
+  // E‑Coupon orders
   const [ecOrders, setEcOrders] = useState([]);
   const [ecLoading, setEcLoading] = useState(false);
 
@@ -144,7 +144,7 @@ export default function MyOrdersAll() {
           allowScrollButtonsMobile
           variant="scrollable"
         >
-          <Tab label="E”‘Coupons" value="ecoupons" />
+          <Tab label="E‑Coupons" value="ecoupons" />
           <Tab label="Promo Purchases" value="promo" />
           <Tab label="Products" value="products" />
           <Tab label="Marketplace" value="market" />
@@ -153,7 +153,7 @@ export default function MyOrdersAll() {
 
       {tab === "ecoupons" ? (
         <Section
-          title="E”‘Coupon Orders"
+          title="E‑Coupon Orders"
           actions={
             <Button size="small" variant="outlined" onClick={loadEcOrders} disabled={ecLoading}>
               {ecLoading ? "Refreshing..." : "Refresh"}
@@ -176,7 +176,7 @@ export default function MyOrdersAll() {
                   <TableRow>
                     <TableCell colSpan={5}>
                       <Typography variant="body2" color="text.secondary">
-                        No E”‘Coupon orders yet.
+                        No E‑Coupon orders yet.
                       </Typography>
                     </TableCell>
                   </TableRow>

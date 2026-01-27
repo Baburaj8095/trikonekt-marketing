@@ -2,7 +2,7 @@
 import { Box, Chip, Typography } from "@mui/material";
 
 /**
- * HeroBanner ”” compact top banner with background image and badge
+ * HeroBanner  compact top banner with background image and badge
  *
  * Props:
  * - title: string

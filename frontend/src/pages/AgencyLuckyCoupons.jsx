@@ -629,12 +629,12 @@ export default function AgencyLuckyCoupons() {
               )}
             </Paper>
           </Grid>
-          {/* All My E”‘Coupon Codes (full list with status) */}
+          {/* All My E‑Coupon Codes (full list with status) */}
           <Grid item xs={12}>
             <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mb: 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2, gap: 1, flexWrap: "wrap" }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>
-                  All My E”‘Coupon Codes
+                  All My E‑Coupon Codes
                 </Typography>
                 <Stack
                   direction={{ xs: "column", sm: "row" }}
@@ -722,7 +722,7 @@ export default function AgencyLuckyCoupons() {
                       <TableRow>
                         <TableCell colSpan={9}>
                           <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                            No e”‘coupon codes found.
+                            No e‑coupon codes found.
                           </Typography>
                         </TableCell>
                       </TableRow>

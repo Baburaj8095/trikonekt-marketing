@@ -1,5 +1,5 @@
 ﻿/**
- * LoginV2.jsx ”” UI-only refactor (NO logic changes)
+ * LoginV2.jsx  UI-only refactor (NO logic changes)
  * - Fintech-grade, native app-style layout
  * - All auth logic, API calls, redirects, handlers, field names and labels preserved
  * - Primary CTA text unchanged: "Sign In"
@@ -115,7 +115,7 @@ export default function LoginV2() {
       let username = (formData.username || "").trim();
       let submitRole = role;
 
-      // Role mismatch guard ”” auto-correct role based on registered category
+      // Role mismatch guard  auto-correct role based on registered category
       const resolved = await resolveRegisteredRole(username);
       if (resolved && resolved !== submitRole) {
         submitRole = resolved;

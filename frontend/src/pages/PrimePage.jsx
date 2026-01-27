@@ -14,7 +14,7 @@ export default function PrimePage() {
         </Typography>
 
         <Typography color="text.secondary" maxWidth={800} mb={3}>
-          Unlock premium benefits with Trikonekt Prime ”” enhanced rewards, exclusive offers, and tools
+          Unlock premium benefits with Trikonekt Prime  enhanced rewards, exclusive offers, and tools
           designed to help you earn and grow faster.
         </Typography>
 

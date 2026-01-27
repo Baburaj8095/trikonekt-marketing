@@ -196,7 +196,7 @@ function Card({ title, value, subtitle, onClick, palette = "blue" }) {
  * AdminDashboard
  * - Merged overview counters and Admin Models into a single responsive card grid.
  * - Keeps only the requested account counters: Users, Withdrawal Requests, User KYC, Wallets, Transactions.
- * - Removed Quick Actions and Recent E”‘Coupon Assignments sections as requested.
+ * - Removed Quick Actions and Recent E‑Coupon Assignments sections as requested.
  */
 export default function AdminDashboard() {
   const [data, setData] = useState(null);
@@ -465,7 +465,7 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                     <div style={{ marginTop: 6, fontSize: 12, fontWeight: 700, whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere" }}>
-                      Renewal: {typeof p.months_remaining === "number" ? `${p.months_remaining} month${p.months_remaining === 1 ? "" : "s"} remaining` : "””"}
+                      Renewal: {typeof p.months_remaining === "number" ? `${p.months_remaining} month${p.months_remaining === 1 ? "" : "s"} remaining` : ""}
                     </div>
                   </div>
                 );
@@ -515,7 +515,7 @@ export default function AdminDashboard() {
                 palette="indigo"
               />
               <Card
-                title="Sub”‘Franchises"
+                title="Sub‑Franchises"
                 value={(catCounts.agency_sub_franchise ?? 0)}
                 subtitle=""
                 onClick={() => nav("/admin/users?category=agency_sub_franchise")}
@@ -560,7 +560,7 @@ export default function AdminDashboard() {
               palette="cyan"
             />
             <Card
-              title="E”‘Coupons"
+              title="E‑Coupons"
               value={(data?.coupons?.total ?? 0)}
               subtitle=""
               onClick={() => nav("/admin/e-coupons")}

@@ -239,10 +239,10 @@ export default function AdminBanners() {
             >
               <div>{b.id}</div>
               <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                {b.title || "””"}
+                {b.title || ""}
               </div>
-              <div>{b.state || "””"}</div>
-              <div>{b.pincode || "””"}</div>
+              <div>{b.state || ""}</div>
+              <div>{b.pincode || ""}</div>
               <div>{Array.isArray(b.items) ? b.items.length : 0}</div>
               <div>
                 <span

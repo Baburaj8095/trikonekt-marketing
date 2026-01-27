@@ -11,6 +11,7 @@ from django.conf import settings
 import time
 import logging
 import os
+from jobs.models import BackgroundTask
 from .models import (
     BusinessRegistration,
     MerchantCategory,
@@ -706,12 +707,27 @@ class AdminPromoPurchaseApproveView(APIView):
             credited_750 = False
             credited_150_redeem = False
             try:
-                # For PRIME 750, rely on policy-driven points in distribute_prime_750_payouts; no extra credit here.
+                # For PRIME 750, rely on policy-driven points in distribute_prime_750_payouts; no extra credit here for PRODUCT.
                 # 150 REDEEM: use existing redeem flow (credits configured 150 by default into points)
                 if is_prime_150 and redeem150_choice:
                     from business.services.activation import redeem_150 as _redeem_150
                     _redeem_150(obj.user, {"type": "PROMO_150_REDEEM", "id": obj.id})
                     credited_150_redeem = True
+                # PRIME 750 REDEEM: credit 750 reward points
+                if is_prime_750 and redeem750_choice and not credited_750:
+                    from accounts.models import RewardPointsAccount
+                    from decimal import Decimal as Dp7
+                    RewardPointsAccount.credit_points(
+                        obj.user,
+                        Dp7("750.00"),
+                        reason="PRIME_750",
+                        meta={
+                            "purchase_id": obj.id,
+                            "package": getattr(obj.package, "code", None),
+                            "choice": prime750_choice,
+                        },
+                    )
+                    credited_750 = True
             except Exception:
                 pass
             # Ensure PRIME 150 adds reward points on approval (e‑book removed)
@@ -886,7 +902,8 @@ class AdminPromoPurchaseApproveView(APIView):
 
             obj.save(update_fields=fields_to_update)
 
-            # PRIME promo payouts at approval time (config-driven, idempotent)
+
+            # PRIME promo payouts at approval time (moved to background)
             try:
                 from coupons.models import AuditTrail
                 distributed = AuditTrail.objects.filter(
@@ -895,77 +912,30 @@ class AdminPromoPurchaseApproveView(APIView):
                 ).exists()
             except Exception:
                 distributed = False
-            if not distributed:
+
+            # Ensure PromoProductOrder exists for PRIME 750 PRODUCT choice (synchronous, as before)
+            if is_prime_750 and prime750_choice == "PRODUCT":
                 try:
-                    if is_prime_150:
-                        from .services.prime import distribute_prime_150_payouts
-                        distribute_prime_150_payouts(
-                            obj.user,
-                            source={"type": "PROMO_PURCHASE_APPROVAL", "id": obj.id},
-                        )
-                    elif is_prime_750:
-                        from .services.prime import distribute_prime_750_payouts
-                        distribute_prime_750_payouts(
-                            obj.user,
-                            source={"type": "PROMO_PURCHASE_APPROVAL", "id": obj.id},
-                        )
-                        # Create ProductOrder for PRODUCT choice
-                        if prime750_choice == "PRODUCT":
-                            try:
-                                from .models import PromoProductOrder
-                                PromoProductOrder.objects.get_or_create(
-                                    promo_purchase=obj,
-                                    defaults={
-                                        "user": obj.user,
-                                        "product": getattr(obj, "selected_promo_product", None),
-                                        "shipping_address": getattr(obj, "shipping_address", ""),
-                                    },
-                                )
-                            except Exception:
-                                pass
-                    elif is_prime_759:
-                        # Create subscription marker and trigger month-1 payout (matrix repetition per config)
-                        is_first_flag = False
-                        try:
-                            from .models import Promo759Subscription
-                            # Determine if this is the user's first-ever 759 subscription BEFORE creating purchase-linked marker
-                            prev_exists = Promo759Subscription.objects.filter(user=obj.user).exists()
-                            sub, _ = Promo759Subscription.objects.get_or_create(
-                                promo_purchase=obj,
-                                defaults={"user": obj.user, "metadata": {"source": "PROMO_PURCHASE_APPROVAL"}}
-                            )
-                            is_first_flag = not prev_exists
-                        except Exception:
-                            try:
-                                logger.exception("prime_759 subscription ensure failed", extra={"purchase_id": obj.id, "user_id": getattr(obj.user, "id", None)})
-                            except Exception:
-                                pass
-                            is_first_flag = False
-                        # Trigger monthly payouts with matrix opening decided inside service based on UI mode:
-                        # - FIRST_MONTH_ONLY: open matrix only when is_first_flag is True
-                        # - EVERY_PURCHASE: service treats every purchase as first-month for matrix part only
-                        try:
-                            from .services.monthly import distribute_monthly_759_payouts
-                            distribute_monthly_759_payouts(
-                                obj.user,
-                                is_first_month=bool(is_first_flag),
-                                source={"type": "PROMO_PURCHASE_APPROVAL", "id": obj.id},
-                            )
-                        except Exception:
-                            try:
-                                logger.exception("prime_759 monthly payout failed", extra={"purchase_id": obj.id, "user_id": getattr(obj.user, "id", None), "is_first_month": bool(is_first_flag)})
-                            except Exception:
-                                pass
-                    # Stamp audit to guard idempotency
-                    try:
-                        AuditTrail.objects.create(
-                            action="promo_purchase_distributed",
-                            actor=request.user,
-                            notes=f"Promo purchase #{obj.id} payouts done",
-                            metadata={"purchase_id": obj.id, "package": getattr(obj.package, "code", None)},
-                        )
-                    except Exception:
-                        pass
+                    from .models import PromoProductOrder
+                    PromoProductOrder.objects.get_or_create(
+                        promo_purchase=obj,
+                        defaults={
+                            "user": obj.user,
+                            "product": getattr(obj, "selected_promo_product", None),
+                            "shipping_address": getattr(obj, "shipping_address", ""),
+                        },
+                    )
+                except Exception:
+                    pass
+
+            # Offload PRIME 150/750/759 payouts/matrix to background worker
+            if not distributed and (is_prime_150 or is_prime_750 or is_prime_759):
+                try:
+                    transaction.on_commit(lambda: BackgroundTask.enqueue(
+                        "promo_approve_payouts",
+                        payload={"purchase_id": obj.id, "reviewer_id": getattr(request.user, "id", None)},
+                        idempotency_key=f"promo_approve:{obj.id}",
+                    ))
                 except Exception:
                     pass
 

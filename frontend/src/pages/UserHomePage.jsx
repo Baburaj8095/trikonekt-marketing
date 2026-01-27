@@ -27,7 +27,7 @@ export default function UserHomePage() {
         }}
       >
         <img
-          src="/assets/hero-banner.jpg" // ðŸ”´ replace with real image
+          src="/assets/hero-banner.jpg" // 🔴 replace with real image
           alt="banner"
           style={{
             width: "100%",
@@ -113,7 +113,7 @@ export default function UserHomePage() {
             }}
           >
             <img
-              src="/assets/spin-win.jpg" // ðŸ”´ replace
+              src="/assets/spin-win.jpg" // 🔴 replace
               alt="spin"
               style={{ width: "100%", height: "100%", objectFit: "cover" }}
             />
@@ -169,7 +169,7 @@ export default function UserHomePage() {
               }}
             >
               <img
-                src="/assets/product.jpg" // ðŸ”´ replace
+                src="/assets/product.jpg" // 🔴 replace
                 alt="product"
                 style={{ width: "100%", height: "100%", objectFit: "cover" }}
               />

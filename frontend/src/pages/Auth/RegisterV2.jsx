@@ -877,7 +877,15 @@ const RegisterV2 = () => {
     if (lockedRole) return;
     if (v) setRole(v);
   };
-  const handleChange = (e) => setFormData((fd) => ({ ...fd, [e.target.name]: e.target.value }));
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    if (name === "phone" && role === "user") {
+      const digits = String(value || "").replace(/\D/g, "").slice(0, 10);
+      setFormData((fd) => ({ ...fd, [name]: digits }));
+    } else {
+      setFormData((fd) => ({ ...fd, [name]: value }));
+    }
+  };
   const handleSetRole = (r) => {
     setRole(r);
     try {
@@ -1017,6 +1025,13 @@ const RegisterV2 = () => {
         setErrorMsg("Phone number is required for Consumer/Employee registration");
         return;
       }
+      if (category === "consumer") {
+        const phoneDigits = String(formData.phone || "").replace(/\D/g, "").slice(0, 10);
+        if (phoneDigits.length !== 10) {
+          setErrorMsg("Enter a valid 10-digit phone number for Consumer registration.");
+          return;
+        }
+      }
     }
     if (category === "business") {
       if (!formData.email) {
@@ -1135,7 +1150,10 @@ const RegisterV2 = () => {
         // 1) Create login-enabled Business user via Accounts API (same flow as agency/consumer)
         const resp = await API.post("/accounts/register/", payload);
         const data = resp?.data || {};
-        const uname = data.username || "(generated)";
+        const unameRaw = data.username || "(generated)";
+        const uname = (category === "consumer")
+          ? String(formData.phone || "").replace(/\D/g, "").slice(0, 10)
+          : unameRaw;
 
         // 2) Fire-and-forget: also persist business profile for admin workflow
         (async () => {
@@ -1167,7 +1185,10 @@ const RegisterV2 = () => {
       } else {
         const resp = await API.post("/accounts/register/", payload);
         const data = resp?.data || {};
-        const uname = data.username || "(generated)";
+        const unameRaw = data.username || "(generated)";
+        const uname = (category === "consumer")
+          ? String(formData.phone || "").replace(/\D/g, "").slice(0, 10)
+          : unameRaw;
         setSuccessMsg(`Welcome to Trikonekt!\nUsername: ${uname}\nPassword: ${submittedPassword}`);
         setRegSuccessText({ username: uname, password: submittedPassword });
         setRegSuccessOpen(true);
@@ -2045,10 +2066,10 @@ const RegisterV2 = () => {
                       <b>Sponsor ID:</b> {sponsorDisplay.username || sponsorId}
                     </Typography>
                     <Typography variant="body2">
-                      <b>Name:</b> {sponsorDisplay.name || "””"}
+                      <b>Name:</b> {sponsorDisplay.name || ""}
                     </Typography>
                     <Typography variant="body2">
-                      <b>Pincode:</b> {sponsorDisplay.pincode || "””"}
+                      <b>Pincode:</b> {sponsorDisplay.pincode || ""}
                     </Typography>
                   </Box>
                 </Box>
@@ -2201,5 +2222,3 @@ const RegisterV2 = () => {
 };
 
 export default RegisterV2;
-
-

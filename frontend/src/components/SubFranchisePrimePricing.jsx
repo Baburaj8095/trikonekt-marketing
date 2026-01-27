@@ -25,10 +25,10 @@ import { useNavigate } from "react-router-dom";
 import { addAgencyPackage } from "../store/cart";
 
 /**
- * Sub”‘franchise Packages + Rewards UI
+ * Sub‑franchise Packages + Rewards UI
  *
  * Enhancements:
- * - Dynamically lists all active Sub”‘franchise (AG_SF*) packages returned by:
+ * - Dynamically lists all active Sub‑franchise (AG_SF*) packages returned by:
  *     GET /business/agency-packages/catalog/
  *   Each card shows name, amount, description and a Buy/Requested button.
  * - Buy posts to:
@@ -50,10 +50,10 @@ export default function SubFranchisePrimePricing({
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
   const [buyingId, setBuyingId] = React.useState(null);
-  // Per”‘package custom amount input (₹)
+  // Per‑package custom amount input (₹)
   const [customAmounts, setCustomAmounts] = React.useState({});
 
-  // Payment drawer (UI only) ”” mirror consumer UX without changing backend flow
+  // Payment drawer (UI only)  mirror consumer UX without changing backend flow
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [selectedPkg, setSelectedPkg] = React.useState(null);
   const [txnId, setTxnId] = React.useState("");
@@ -218,7 +218,7 @@ export default function SubFranchisePrimePricing({
             </Typography>
           </Box>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Choose your Sub”‘franchise Prime package. Click BUY to send a request; admin will verify and complete payment.
+            Choose your Sub‑franchise Prime package. Click BUY to send a request; admin will verify and complete payment.
           </Typography>
         </>
       )}
@@ -254,7 +254,7 @@ export default function SubFranchisePrimePricing({
                   >
                     <CardContent sx={{ display: "flex", flexDirection: "column", gap: 0.5, flex: 1 }}>
                       <Typography variant="overline" sx={{ letterSpacing: 1.5 }} color="text.secondary">
-                        SUB”‘FRANCHISE PACKAGE
+                        SUB‑FRANCHISE PACKAGE
                       </Typography>
                       <Typography variant="h6" sx={{ fontWeight: 900 }}>{pkg.name}</Typography>
                       <Typography variant="h4" sx={{ fontWeight: 900, lineHeight: 1.1 }}>
@@ -338,7 +338,7 @@ export default function SubFranchisePrimePricing({
                   }}
                 />
                 <Typography variant="overline" sx={{ letterSpacing: 2 }} color="text.secondary">
-                  SUB”‘FRANCHISE
+                  SUB‑FRANCHISE
                 </Typography>
                 <Typography variant="h6" sx={{ fontWeight: 900, mt: 0.5 }}>
                   {r.title}
@@ -453,7 +453,7 @@ export default function SubFranchisePrimePricing({
         </Box>
 
         <Alert severity="info" sx={{ mt: 2 }}>
-          Amount is auto”‘calculated/entered above. Pay the exact amount and enter the UTR below.
+          Amount is auto‑calculated/entered above. Pay the exact amount and enter the UTR below.
         </Alert>
 
         <TextField

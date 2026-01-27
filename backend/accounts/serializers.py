@@ -519,7 +519,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         # USERNAME_FIELD is globally unique; enforce against username only.
         if CustomUser.objects.filter(username__iexact=username_base).exists():
             if category == 'consumer':
-                # Deterministic username TR+phone => same phone implies same username for consumer
+                # Deterministic phone-only username => same phone implies same username for consumer
                 raise serializers.ValidationError({'phone': 'Consumer already exists for this phone number.'})
             raise serializers.ValidationError({'detail': 'Username already exists.'})
 
@@ -576,7 +576,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     def _build_username(self, category: str, phone: str, unique_id: str) -> str:
         """
         Generate admin-friendly usernames using prefixes by category.
-        - Consumer: TR+phone
+        - Consumer: phone (digits-only)
         - Employee: TREP+phone
         - Sub-Franchise: TRSF+phone
         - Pincode Agency: TRPN+phone
@@ -605,7 +605,9 @@ class RegisterSerializer(serializers.ModelSerializer):
             'merchant': 'TRBS',
         }
 
-        if category in coordinator_cats:
+        if category == 'consumer':
+            base = phone_digits
+        elif category in coordinator_cats:
             base = phone_digits  # do not change coordinator usernames
         else:
             pref = prefix_map.get(category)

@@ -343,7 +343,7 @@ export default function AdminPackages() {
                   </div>
                   <div style={{ marginTop: 6, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                     <div style={{ fontSize: 12, fontWeight: 700 }}>
-                      Renewal: {typeof p.months_remaining === "number" ? `${p.months_remaining} month${p.months_remaining === 1 ? "" : "s"} remaining` : "””"}
+                      Renewal: {typeof p.months_remaining === "number" ? `${p.months_remaining} month${p.months_remaining === 1 ? "" : "s"} remaining` : ""}
                     </div>
                     <div style={{ display: "flex", gap: 6 }}>
                       <button
@@ -417,7 +417,7 @@ export default function AdminPackages() {
                       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                         <div style={{ fontWeight: 900, color: "#0f172a" }}>{pkgName}</div>
                         <div style={{ fontSize: 12, color: "#64748b" }}>
-                          Amount: <b>₹{r.amount}</b> ”¢ Method: <b>{r.method || "UPI"}</b> ”¢ UTR: <b>{r.utr || "””"}</b>
+                          Amount: <b>₹{r.amount}</b> • Method: <b>{r.method || "UPI"}</b> • UTR: <b>{r.utr || ""}</b>
                         </div>
                         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
                           <a
@@ -521,7 +521,7 @@ export default function AdminPackages() {
         right={
           <div style={{ color: "#64748b", fontSize: 12 }}>
             {activeTab.key === "packages"
-              ? "Define package name, code, and amount here. Toggle default to auto”‘assign to agencies."
+              ? "Define package name, code, and amount here. Toggle default to auto‑assign to agencies."
               : activeTab.key === "assignments"
               ? "Assign packages to agencies. One (agency, package) per row."
               : "Record payments for a specific assignment (amount, reference, notes)."}
@@ -572,7 +572,7 @@ export default function AdminPackages() {
             }}
           >
             <div style={{ fontWeight: 900, color: "#0f172a", marginBottom: 8 }}>
-              Add Payment ”” {payForm.title || ""}
+              Add Payment  {payForm.title || ""}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>

@@ -437,7 +437,7 @@ export default function EmployeeDashboard({ embedded = false }) {
     }
   };
 
-  // My E”‘Coupon codes (assigned to me)
+  // My E‑Coupon codes (assigned to me)
   const [codes, setCodes] = useState([]);
   const [codesLoading, setCodesLoading] = useState(false);
   const [codesError, setCodesError] = useState("");
@@ -450,14 +450,14 @@ export default function EmployeeDashboard({ embedded = false }) {
       const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
       setCodes(arr || []);
     } catch (e) {
-      setCodesError("Failed to load my e”‘coupon codes.");
+      setCodesError("Failed to load my e‑coupon codes.");
       setCodes([]);
     } finally {
       setCodesLoading(false);
     }
   };
 
-  // Assign e”‘coupon to consumer (employee flow)
+  // Assign e‑coupon to consumer (employee flow)
   const [assign, setAssign] = useState({ codeId: "", consumerUsername: "" });
   const [assignBusy, setAssignBusy] = useState(false);
   const doAssign = async () => {
@@ -470,7 +470,7 @@ export default function EmployeeDashboard({ embedded = false }) {
       await API.post(`/coupons/codes/${assign.codeId}/assign-consumer/`, {
         consumer_username: String(assign.consumerUsername).trim(),
       });
-      alert("E”‘Coupon assigned to consumer.");
+      alert("E‑Coupon assigned to consumer.");
       setAssign({ codeId: "", consumerUsername: "" });
       await loadCodes();
       await loadMyCommissions();
@@ -484,7 +484,7 @@ export default function EmployeeDashboard({ embedded = false }) {
     }
   };
 
-  // Pending E”‘Coupon submissions awaiting my (employee) approval
+  // Pending E‑Coupon submissions awaiting my (employee) approval
   const [pendingSubs, setPendingSubs] = useState([]);
   const [pendingLoading, setPendingLoading] = useState(false);
   const [pendingError, setPendingError] = useState("");
@@ -498,7 +498,7 @@ export default function EmployeeDashboard({ embedded = false }) {
       const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
       setPendingSubs(arr || []);
     } catch (e) {
-      setPendingError("Failed to load pending e”‘coupon submissions.");
+      setPendingError("Failed to load pending e‑coupon submissions.");
       setPendingSubs([]);
     } finally {
       setPendingLoading(false);
@@ -993,7 +993,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                   Manual Coupon Submissions Awaiting My Approval
                 </Typography>
                 <Box sx={{ mb: 2 }}>
-                  <Alert severity="info">My reviews ”” Approved: {luckyStats.approved} | Rejected: {luckyStats.rejected}</Alert>
+                  <Alert severity="info">My reviews  Approved: {luckyStats.approved} | Rejected: {luckyStats.rejected}</Alert>
                 </Box>
                 <Box sx={{ mb: 2 }}>
                   <Alert severity="success">My commission earned: ₹{commissionTotal.toFixed(2)}</Alert>
@@ -1116,11 +1116,11 @@ export default function EmployeeDashboard({ embedded = false }) {
             <Grid container spacing={2} sx={{ width: "100%", minWidth: 0, boxSizing: "border-box" }}>
             <Grid item xs={12} sx={{ width: "100%"}}>
               <Paper elevation={3} sx={{width:"100%", p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff", width: "100%" }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My E”‘Coupon Codes</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My E‑Coupon Codes</Typography>
 
-                {/* Pending E”‘Coupon submissions awaiting my approval */}
+                {/* Pending E‑Coupon submissions awaiting my approval */}
                 {/* <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2, bgcolor: "#fff" }}>
-                  <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Pending E”‘Coupon Submissions Awaiting My Approval</Typography>
+                  <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Pending E‑Coupon Submissions Awaiting My Approval</Typography>
                   {pendingLoading ? (
                     <Box sx={{ py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
                       <CircularProgress size={18} /> <Typography variant="body2">Loading”¦</Typography>
@@ -1163,7 +1163,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                           <TableRow>
                             <TableCell colSpan={6}>
                               <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                                No pending e”‘coupon submissions.
+                                No pending e‑coupon submissions.
                               </Typography>
                             </TableCell>
                           </TableRow>
@@ -1175,7 +1175,7 @@ export default function EmployeeDashboard({ embedded = false }) {
 
                 {/* Assign to Consumer */}
                 <Paper variant="outlined" xs={12} sm={12} md={6} sx={{ width:"100%", p: 2, borderRadius: 2, mb: 2, bgcolor: "#fbfdff" }}>
-                  <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Assign E”‘Coupon to Consumer</Typography>
+                  <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Assign E‑Coupon to Consumer</Typography>
                   <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                     <TextField
                       select
@@ -1223,7 +1223,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                             </Stack>
                             <Stack direction="row" spacing={1} sx={{ mt: 0.5, color: "text.secondary" }}>
                               <Typography variant="caption">{c.value !== undefined ? `₹${c.value}` : ""}</Typography>
-                              <Typography variant="caption">”¢ {c.created_at ? new Date(c.created_at).toLocaleString() : ""}</Typography>
+                              <Typography variant="caption">• {c.created_at ? new Date(c.created_at).toLocaleString() : ""}</Typography>
                             </Stack>
                             {(c.batch || c.serial || c.assigned_agency_username) ? (
                               <Typography variant="caption" sx={{ display: "block", mt: 0.5, color: "text.secondary" }}>
@@ -1322,7 +1322,7 @@ export default function EmployeeDashboard({ embedded = false }) {
               <Grid container spacing={2} sx={{ width: "100%", minWidth: 0, boxSizing: "border-box" }}>
             <Grid item xs={12}>
               <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>My Team (5”‘Matrix)</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>My Team (5‑Matrix)</Typography>
                 <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden", background: "#fff", padding: 12 }}>
                   <TreeReferralGalaxy mode="self" />
                 </div>
@@ -1348,7 +1348,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                   <Alert severity="error">{walletError}</Alert>
                 ) : (
                   <Alert severity="info" sx={{ mb: 2 }}>
-                    Balance: ₹{wallet.balance} {wallet.updated_at ? `”” updated ${new Date(wallet.updated_at).toLocaleString()}` : ""}
+                    Balance: ₹{wallet.balance} {wallet.updated_at ? ` updated ${new Date(wallet.updated_at).toLocaleString()}` : ""}
                   </Alert>
                 )}
 
@@ -1568,7 +1568,7 @@ export default function EmployeeDashboard({ embedded = false }) {
               </Paper>
 
               <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mt: 2, bgcolor: "#fbfdff" }}>
-                <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Assign E”‘Coupon to Consumer</Typography>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Assign E‑Coupon to Consumer</Typography>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                   <TextField
                     select
@@ -1624,7 +1624,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                     Manual Coupon Submissions Awaiting My Approval
                   </Typography>
                   <Box sx={{ mb: 2 }}>
-                    <Alert severity="info">My reviews ”” Approved: {luckyStats.approved} | Rejected: {luckyStats.rejected}</Alert>
+                    <Alert severity="info">My reviews  Approved: {luckyStats.approved} | Rejected: {luckyStats.rejected}</Alert>
                   </Box>
                   <Box sx={{ mb: 2 }}>
                     <Alert severity="success">My commission earned: ₹{commissionTotal.toFixed(2)}</Alert>
@@ -1811,11 +1811,11 @@ export default function EmployeeDashboard({ embedded = false }) {
             <Grid container spacing={2}>
               <Grid item xs={12}>
                 <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My E”‘Coupon Codes</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 2 }}>My E‑Coupon Codes</Typography>
 
-                  {/* Pending E”‘Coupon submissions awaiting my approval */}
+                  {/* Pending E‑Coupon submissions awaiting my approval */}
                   <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2, bgcolor: "#fff" }}>
-                    <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Pending E”‘Coupon Submissions Awaiting My Approval</Typography>
+                    <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Pending E‑Coupon Submissions Awaiting My Approval</Typography>
                     {pendingLoading ? (
                       <Box sx={{ py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
                         <CircularProgress size={18} /> <Typography variant="body2">Loading”¦</Typography>
@@ -1857,7 +1857,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                           {(!pendingSubs || pendingSubs.length === 0) && (
                             <TableRow>
                               <TableCell colSpan={6}>
-                                <Typography variant="body2" sx={{ color: "text.secondary" }}>No pending e”‘coupon submissions.</Typography>
+                                <Typography variant="body2" sx={{ color: "text.secondary" }}>No pending e‑coupon submissions.</Typography>
                               </TableCell>
                             </TableRow>
                           )}
@@ -1868,7 +1868,7 @@ export default function EmployeeDashboard({ embedded = false }) {
 
                   {/* Assign to Consumer */}
                   <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2, bgcolor: "#fbfdff" }}>
-                    <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Assign E”‘Coupon to Consumer</Typography>
+                    <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>Assign E‑Coupon to Consumer</Typography>
                     <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                       <TextField
                         select
@@ -1927,7 +1927,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                             </Stack>
                             <Stack direction="row" spacing={1} sx={{ mt: 0.5, color: "text.secondary" }}>
                               <Typography variant="caption">{c.value !== undefined ? `₹${c.value}` : ""}</Typography>
-                              <Typography variant="caption">”¢ {c.created_at ? new Date(c.created_at).toLocaleString() : ""}</Typography>
+                              <Typography variant="caption">• {c.created_at ? new Date(c.created_at).toLocaleString() : ""}</Typography>
                             </Stack>
                             {(c.batch || c.serial || c.assigned_agency_username) ? (
                               <Typography variant="caption" sx={{ display: "block", mt: 0.5, color: "text.secondary" }}>
@@ -2021,7 +2021,7 @@ export default function EmployeeDashboard({ embedded = false }) {
             <Grid container spacing={2}>
               <Grid item xs={12}>
                 <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>My Team (5”‘Matrix)</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>My Team (5‑Matrix)</Typography>
                   <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden", background: "#fff", padding: 12 }}>
                     <TreeReferralGalaxy mode="self" />
                   </div>
@@ -2046,7 +2046,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                     <Alert severity="error">{walletError}</Alert>
                   ) : (
                     <Alert severity="info" sx={{ mb: 2 }}>
-                      Balance: ₹{wallet.balance} {wallet.updated_at ? `”” updated ${new Date(wallet.updated_at).toLocaleString()}` : ""}
+                      Balance: ₹{wallet.balance} {wallet.updated_at ? ` updated ${new Date(wallet.updated_at).toLocaleString()}` : ""}
                     </Alert>
                   )}
 

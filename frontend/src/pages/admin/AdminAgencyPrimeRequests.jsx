@@ -58,12 +58,12 @@ export default function AdminAgencyPrimeRequests() {
 
   function fmtDate(ts) {
     try {
-      if (!ts) return "””";
+      if (!ts) return "";
       const d = new Date(ts);
       if (Number.isNaN(d.getTime())) return String(ts);
       return d.toLocaleString();
     } catch {
-      return String(ts ?? "””");
+      return String(ts ?? "");
     }
   }
 
@@ -140,7 +140,7 @@ export default function AdminAgencyPrimeRequests() {
           color: fg,
         }}
       >
-        {s || "””"}
+        {s || ""}
       </span>
     );
   }
@@ -246,7 +246,7 @@ export default function AdminAgencyPrimeRequests() {
                 >
                   <div style={{ fontWeight: 900, color: "#0f172a" }}>{pkgName}</div>
                   <div style={{ color: "#64748b", fontSize: 12 }}>
-                    Agency: <b>{r.agency_username || "””"}</b>
+                    Agency: <b>{r.agency_username || ""}</b>
                   </div>
                   <div style={{ marginLeft: "auto" }}>
                     <StatusBadge status={r.status} />
@@ -263,7 +263,7 @@ export default function AdminAgencyPrimeRequests() {
                 >
                   <Info title="Amount" value={fmtAmount(r.amount)} />
                   <Info title="Method" value={r.method || "UPI"} />
-                  <Info title="UTR / Ref" value={r.utr || "””"} />
+                  <Info title="UTR / Ref" value={r.utr || ""} />
                   <Info title="Requested At" value={fmtDate(r.created_at)} />
                   {r.approved_at ? (
                     <Info title="Actioned At" value={fmtDate(r.approved_at)} />
@@ -350,7 +350,7 @@ function Info({ title, value }) {
           wordBreak: "break-word",
         }}
       >
-        {value ?? "””"}
+        {value ?? ""}
       </div>
     </div>
   );

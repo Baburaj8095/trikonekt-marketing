@@ -67,12 +67,12 @@ export default function AdminMerchantSubcategories() {
     return "";
   }
   function getRowCategoryName(row) {
-    if (!row) return "””";
+    if (!row) return "";
     if (row.category && typeof row.category === "object") {
-      return row.category.name || "””";
+      return row.category.name || "";
     }
     const cid = getRowCategoryId(row);
-    if (!cid) return "””";
+    if (!cid) return "";
     const m = (cats || []).find((c) => String(c.id) === String(cid));
     return m ? (m.name || `#${cid}`) : `#${cid}`;
   }

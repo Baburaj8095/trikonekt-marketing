@@ -419,7 +419,7 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
               {getDisplayName(pkg)}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              Code: {pkg.code} ”¢ Type: {getDisplayType(pkg)}
+              Code: {pkg.code} • Type: {getDisplayType(pkg)}
             </Typography>
           </Box>
 
@@ -624,8 +624,8 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
                     />
                   </RadioGroup>
                   <Typography variant="caption" color="text.secondary">
-                    Choose E”‘Book to access it in your dashboard or Redeem to
-                    follow e”‘coupon allocation flow with reward credit.
+                    Choose E‑Book to access it in your dashboard or Redeem to
+                    follow e‑coupon allocation flow with reward credit.
                   </Typography>
                 </Box>
               ) : null}
@@ -657,7 +657,7 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
                     <FormControlLabel
                       value="COUPON"
                       control={<Radio size="small" />}
-                      label="E”‘Coupon"
+                      label="E‑Coupon"
                     />
                   </RadioGroup>
 
@@ -780,7 +780,7 @@ function PackageCard({ pkg, onAddToCart, onOpenDetail }) {
                   ) : (
                     <Typography variant="caption" color="text.secondary">
                       {prime750Choice === "REDEEM"
-                        ? "You will receive e”‘coupon allocation on approval."
+                        ? "You will receive e‑coupon allocation on approval."
                         : "You will be eligible for Lucky Draw on approval."}
                     </Typography>
                   )}

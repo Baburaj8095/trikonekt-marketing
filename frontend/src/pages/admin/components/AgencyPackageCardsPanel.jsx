@@ -206,7 +206,7 @@ export default function AgencyPackageCardsPanel({ open, onClose, agencyId, usern
           }}
         >
           <div style={{ fontWeight: 900, color: "#0f172a" }}>
-            Packages ”” {username ? `${username}` : ""}{agencyId ? ` (#${agencyId})` : ""}
+            Packages  {username ? `${username}` : ""}{agencyId ? ` (#${agencyId})` : ""}
           </div>
           <button
             onClick={onClose}
@@ -289,7 +289,7 @@ export default function AgencyPackageCardsPanel({ open, onClose, agencyId, usern
                     </div>
                     <div style={{ marginTop: 6, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                       <div style={{ fontSize: 12, fontWeight: 700 }}>
-                        Renewal: {typeof p.months_remaining === "number" ? `${p.months_remaining} month${p.months_remaining === 1 ? "" : "s"} remaining` : "””"}
+                        Renewal: {typeof p.months_remaining === "number" ? `${p.months_remaining} month${p.months_remaining === 1 ? "" : "s"} remaining` : ""}
                       </div>
                       <button
                         onClick={() => openPay(p.id, title)}
@@ -312,7 +312,7 @@ export default function AgencyPackageCardsPanel({ open, onClose, agencyId, usern
               })}
             </div>
           ) : (
-            // No assignments ”” show catalog so admin can assign directly
+            // No assignments  show catalog so admin can assign directly
             <div>
               <div style={{ marginBottom: 8, color: "#64748b" }}>No package assigned for this agency.</div>
               {catLoading ? (
@@ -331,7 +331,7 @@ export default function AgencyPackageCardsPanel({ open, onClose, agencyId, usern
                 >
                   {(catalog || []).map((c) => {
                     const assigned = !!c.assigned;
-                    const amt = c.amount ? `₹${c.amount}` : "””";
+                    const amt = c.amount ? `₹${c.amount}` : "";
                     return (
                       <div
                         key={c.id}
@@ -448,7 +448,7 @@ export default function AgencyPackageCardsPanel({ open, onClose, agencyId, usern
             }}
           >
             <div style={{ fontWeight: 900, color: "#0f172a", marginBottom: 8 }}>
-              Add Payment ”” {payForm.title || ""}
+              Add Payment  {payForm.title || ""}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>

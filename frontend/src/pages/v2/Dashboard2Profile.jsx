@@ -50,7 +50,7 @@ export default function Dashboard2Profile({ setTab, openScreen }) {
     {
       title: "Orders & Coupons",
       items: [
-        { label: "My E”‘Coupons", screen: "my-e-coupons2" },
+        { label: "My E‑Coupons", screen: "my-e-coupons2" },
         { label: "My Orders", screen: "my-orders2" },
         { label: "Cart", screen: "cart2" },
       ],

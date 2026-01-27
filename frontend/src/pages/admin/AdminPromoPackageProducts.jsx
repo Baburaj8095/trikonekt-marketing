@@ -253,7 +253,7 @@ export default function AdminPromoPackageProducts() {
               ) : (
                 packages.map((pkg) => (
                   <MenuItem key={pkg.id} value={String(pkg.id)}>
-                    {pkg.code} ”” {pkg.name} (₹{pkg.price})
+                    {pkg.code}  {pkg.name} (₹{pkg.price})
                   </MenuItem>
                 ))
               )}

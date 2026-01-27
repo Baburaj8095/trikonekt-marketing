@@ -380,9 +380,9 @@ export default function LuckyDraw({ embedded = false }) {
         ) : (
           <Box>
             <Typography variant="body2" sx={{ mb: 1, color: "text.secondary" }}>
-              {spinInfo.draw.title ? <strong>{spinInfo.draw.title}</strong> : null} ”¢ Window:&nbsp;
-              {spinInfo.draw.start_at ? new Date(spinInfo.draw.start_at).toLocaleString() : "-"} ””{" "}
-              {spinInfo.draw.end_at ? new Date(spinInfo.draw.end_at).toLocaleString() : "-"} ”¢ Status: {spinInfo.draw.status}
+              {spinInfo.draw.title ? <strong>{spinInfo.draw.title}</strong> : null} • Window:&nbsp;
+              {spinInfo.draw.start_at ? new Date(spinInfo.draw.start_at).toLocaleString() : "-"} {" "}
+              {spinInfo.draw.end_at ? new Date(spinInfo.draw.end_at).toLocaleString() : "-"} • Status: {spinInfo.draw.status}
             </Typography>
 
             {spinInfo.draw.status === "LIVE" ? (
@@ -536,7 +536,7 @@ export default function LuckyDraw({ embedded = false }) {
                 onBlur={resolveTR}
                 required
                 error={Boolean(trError)}
-                helperText={trError ? trError : "Required ”” routes this submission to the specified TR."}
+                helperText={trError ? trError : "Required  routes this submission to the specified TR."}
                 disabled={!luckyEnabled}
               />
               <Button variant="outlined" size="small" onClick={resolveTR} disabled={!luckyEnabled || trResolving}>
@@ -614,9 +614,9 @@ export default function LuckyDraw({ embedded = false }) {
               return (
                 <li key={s.id} style={{ marginBottom: 8 }}>
                   <Typography variant="body2" sx={{ mb: 0.5 }}>
-                    <strong>SL:</strong> {s.sl_number} ”” <strong>Ledger:</strong> {s.ledger_number} ”” {s.pincode} ”” {meta.label}
-                    {s.assigned_tre_username ? ` ”” TRE: ${s.assigned_tre_username}` : ""}
-                    {s.created_at ? ` ”” ${new Date(s.created_at).toLocaleString()}` : ""}
+                    <strong>SL:</strong> {s.sl_number}  <strong>Ledger:</strong> {s.ledger_number}  {s.pincode}  {meta.label}
+                    {s.assigned_tre_username ? `  TRE: ${s.assigned_tre_username}` : ""}
+                    {s.created_at ? `  ${new Date(s.created_at).toLocaleString()}` : ""}
                   </Typography>
                   {s.image ? (
                     <a href={s.image} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>

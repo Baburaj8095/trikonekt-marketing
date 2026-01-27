@@ -10,7 +10,7 @@ html, body {
 }
 
 body {
-  font-family: 'Montserrat', sans-serif;
+  font-family: 'Montserrat', 'Segoe UI', Roboto, Helvetica, Arial, 'Noto Sans', 'Noto Sans Symbols 2', 'Segoe UI Symbol', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;
   color: #0f172a; /* Ensure readable default text color on light backgrounds */
 }
 

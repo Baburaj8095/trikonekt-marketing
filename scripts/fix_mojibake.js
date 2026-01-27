@@ -47,6 +47,28 @@ const replacements = [
 
   // Stray 'Â' often preceding punctuation
   { re: /Â/g, to: "" },
+
+  // Additional observed sequences in repo
+  { re: /”¢/g, to: "•" },
+  { re: /âœ”/g, to: "✔" },
+  { re: /âœ”ï¸/g, to: "✔️" },
+  { re: /ðŸ”´/g, to: "🔴" },
+  { re: /ðŸ“œ/g, to: "📜" },
+  { re: /ðŸ”‘/g, to: "🔑" },
+  { re: /â‘ /g, to: "①" },
+  { re: /â‘¡/g, to: "②" },
+  { re: /â‘¢/g, to: "③" },
+
+  // Generic bad curly pair -> empty (used as placeholder like "””")
+  { re: /””/g, to: "" },
+
+  // Curly quote + prime/apostrophe used as hyphen; normalize to non-breaking hyphen
+  { re: /”‘/g, to: "‑" }, // U+2011
+
+  // Emoji sequences occasionally present as mojibake
+  { re: /ðŸ“ž/g, to: "📞" }, // telephone receiver
+  { re: /âœ‰ï¸/g, to: "✉️" }, // envelope with VS16
+
 ];
 
 function isTextFile(p) {

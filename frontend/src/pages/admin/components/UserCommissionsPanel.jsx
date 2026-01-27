@@ -123,7 +123,7 @@ export default function UserCommissionsPanel({ open, onClose, userId, role, user
         headerName: "Code Value",
         minWidth: 120,
         width: 140,
-        renderCell: (p) => (p?.row?.coupon_code_value != null ? `₹${Number(p.row.coupon_code_value).toFixed(2)}` : "””"),
+        renderCell: (p) => (p?.row?.coupon_code_value != null ? `₹${Number(p.row.coupon_code_value).toFixed(2)}` : ""),
       },
     ];
   }, []);
@@ -179,7 +179,7 @@ export default function UserCommissionsPanel({ open, onClose, userId, role, user
           }}
         >
           <div style={{ fontWeight: 900, color: "#0f172a" }}>
-            Commissions ”” {username ? `${username}` : ""}{userId ? ` (#${userId})` : ""}{role ? ` [${role}]` : ""}
+            Commissions  {username ? `${username}` : ""}{userId ? ` (#${userId})` : ""}{role ? ` [${role}]` : ""}
           </div>
           <button
             onClick={onClose}
@@ -202,19 +202,19 @@ export default function UserCommissionsPanel({ open, onClose, userId, role, user
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <div style={{ padding: 10, borderRadius: 8, background: "#f8fafc", border: "1px solid #e2e8f0", minWidth: 160 }}>
               <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>Earned</div>
-              <div style={{ fontWeight: 900, color: "#0f172a" }}>{summary.counts.earned} ”¢ ₹{summary.totals.earned}</div>
+              <div style={{ fontWeight: 900, color: "#0f172a" }}>{summary.counts.earned} • ₹{summary.totals.earned}</div>
             </div>
             <div style={{ padding: 10, borderRadius: 8, background: "#f8fafc", border: "1px solid #e2e8f0", minWidth: 160 }}>
               <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>Paid</div>
-              <div style={{ fontWeight: 900, color: "#0f172a" }}>{summary.counts.paid} ”¢ ₹{summary.totals.paid}</div>
+              <div style={{ fontWeight: 900, color: "#0f172a" }}>{summary.counts.paid} • ₹{summary.totals.paid}</div>
             </div>
             <div style={{ padding: 10, borderRadius: 8, background: "#f8fafc", border: "1px solid #e2e8f0", minWidth: 160 }}>
               <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>Reversed</div>
-              <div style={{ fontWeight: 900, color: "#0f172a" }}>{summary.counts.reversed} ”¢ ₹{summary.totals.reversed}</div>
+              <div style={{ fontWeight: 900, color: "#0f172a" }}>{summary.counts.reversed} • ₹{summary.totals.reversed}</div>
             </div>
             <div style={{ padding: 10, borderRadius: 8, background: "#f8fafc", border: "1px solid #e2e8f0", minWidth: 160 }}>
               <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>Total</div>
-              <div style={{ fontWeight: 900, color: "#0f172a" }}>{summary.counts.total} ”¢ ₹{summary.totals.total}</div>
+              <div style={{ fontWeight: 900, color: "#0f172a" }}>{summary.counts.total} • ₹{summary.totals.total}</div>
             </div>
             {summaryLoading ? <div style={{ color: "#64748b", fontSize: 12, alignSelf: "center" }}>Refreshing...</div> : null}
           </div>

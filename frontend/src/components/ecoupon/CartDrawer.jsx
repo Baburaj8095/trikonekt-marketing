@@ -127,9 +127,9 @@ export default function CartDrawer({ open, onClose, onCheckout }) {
                 t === "ECOUPON"
                   ? it?.meta?.denomination != null
                     ? `Denomination: ₹${it.meta.denomination}`
-                    : "E”‘Coupon"
+                    : "E‑Coupon"
                   : t === "PROMO_PACKAGE"
-                  ? `Promo Package ”¢ ${String(it?.meta?.kind || "")}`
+                  ? `Promo Package • ${String(it?.meta?.kind || "")}`
                   : t;
 
               return (
@@ -220,7 +220,7 @@ export default function CartDrawer({ open, onClose, onCheckout }) {
                               ₹{unit.toLocaleString("en-IN")}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
-                              ”¢ Subtotal:
+                              • Subtotal:
                             </Typography>
                             <Typography variant="body2" sx={{ fontWeight: 800 }}>
                               ₹{Number(subtotal).toLocaleString("en-IN")}
@@ -250,7 +250,7 @@ export default function CartDrawer({ open, onClose, onCheckout }) {
             {/* Hint - payment is manual for ecoupons today */}
             {ecouponItems.length > 0 ? (
               <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
-                E”‘Coupons checkout is manual. You can review the QR and submit at Checkout.
+                E‑Coupons checkout is manual. You can review the QR and submit at Checkout.
               </Typography>
             ) : null}
 

@@ -53,6 +53,78 @@ function humanizeType(t) {
   }
 }
 
+// Derive prime tier and friendly source message for transactions
+function extractPrimeTier(meta = {}, tx = {}) {
+  const src = String(meta.source || "").toUpperCase();
+  const trig = String(meta.trigger || "").toUpperCase();
+  const pool = String(meta.pool_type || "").toUpperCase();
+  const st = String(tx?.source_type || "").toUpperCase();
+
+  if (src.includes("_150") || trig.includes("150") || pool.includes("150")) return 150;
+  if (src.includes("_750") || trig.includes("750")) return 750;
+  if (src.includes("_759") || st === "MONTHLY_759" || src === "MONTHLY_759") return 759;
+
+  const gross = Number(meta.gross);
+  if (gross === 150) return 150;
+  if (gross === 750) return 750;
+
+  return undefined;
+}
+
+function describeSource(tx = {}) {
+  const type = String(tx?.type || "").toUpperCase();
+  const meta = tx?.meta || {};
+  const src = String(meta.source || "").toUpperCase();
+  const st = String(tx?.source_type || "").toUpperCase();
+  const ot = String(meta.orig_type || "").toUpperCase();
+  const tier = extractPrimeTier(meta, tx);
+
+  // Keep existing label for debits
+  if (type === "SELF_ACCOUNT_DEBIT") return humanizeType(type);
+
+  // Reward points
+  if (type === "RP_EARN") {
+    if (st === "MONTHLY_759" || src === "MONTHLY_759" || tier === 759) {
+      return "Monthly 759 Prime - Reward Points";
+    }
+    return "Reward Points Earned";
+  }
+
+  // Referral bonuses
+  if (type === "DIRECT_REF_BONUS" || src === "JOIN_REFERRAL" || st === "JOIN_REFERRAL") {
+    if (tier) return `Referral Bonus ${tier} Prime`;
+    return "Referral Bonus";
+  }
+
+  // Prime self activations
+  if (ot === "PRIME_150_SELF" || src === "PRIME_150_SELF" || type === "PRIME_150_SELF") return "Prime 150 Self Activation";
+  if (ot === "PRIME_750_SELF" || src === "PRIME_750_SELF" || type === "PRIME_750_SELF") return "Prime 750 Self Activation";
+  if (ot === "PRIME_759_SELF" || src === "PRIME_759_SELF" || type === "PRIME_759_SELF") return "Prime 759 Self Activation";
+
+  // Monthly 759 flows
+  if (st === "MONTHLY_759" || src === "MONTHLY_759" || src.includes("759")) {
+    if (src.startsWith("FIVE_MATRIX")) return "5 Matrix 759 Prime";
+    return "Monthly 759 Prime";
+  }
+
+  // Matrix autopool bonuses
+  if (src.startsWith("THREE_MATRIX")) {
+    const t = tier || (src.includes("150") ? 150 : src.includes("750") ? 750 : undefined);
+    return `3 Matrix ${t || ""} Prime`.trim();
+  }
+  if (src.startsWith("FIVE_MATRIX")) {
+    const t = tier || (src.includes("150") ? 150 : src.includes("750") ? 750 : src.includes("759") ? 759 : undefined);
+    return `5 Matrix ${t || ""} Prime`.trim();
+  }
+
+  // Prime direct/self
+  if (src === "PRIME_150" || st === "PRIME_150" || tier === 150) return "Prime 150";
+  if (src === "PRIME_750" || st === "PRIME_750" || tier === 750) return "Prime 750";
+
+  // Fallback
+  return humanizeType(type);
+}
+
 function ymd(d) {
   const dt = new Date(d);
   const y = dt.getFullYear();
@@ -257,7 +329,7 @@ function HistoryRow({ tx, onClick }) {
       }).format(new Date(tx.created_at))
     : "";
 
-  const typeName = humanizeType(tx?.type);
+  const typeName = describeSource(tx);
 
   return (
     <Paper
@@ -292,16 +364,16 @@ function HistoryRow({ tx, onClick }) {
           </Typography>
 
           <Typography sx={{ fontSize: 12, color: "text.secondary", mt: 0.25 }}>
-            {dateStr} {timeStr ? `”¢ ${timeStr}` : ""}
+            {dateStr} {timeStr ? `• ${timeStr}` : ""}
           </Typography>
         </Box>
 
         <Stack direction="row" spacing={1} alignItems="center">
           <Box sx={{ textAlign: "right" }}>
             <AmountBadge value={amount} />
-            <Box sx={{ mt: 0.35, display: "flex", justifyContent: "flex-end" }}>
+            {/* <Box sx={{ mt: 0.35, display: "flex", justifyContent: "flex-end" }}>
               <StatusChip tx={tx} />
-            </Box>
+            </Box> */}
           </Box>
 
           <ChevronRightIcon sx={{ color: "#A0AEC0", fontSize: 20 }} />
@@ -592,4 +664,3 @@ export default function History() {
     </Box>
   );
 }
-

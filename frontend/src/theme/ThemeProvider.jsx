@@ -36,7 +36,7 @@ const theme = createTheme({
   typography: {
     // Professional, readable stack; use Montserrat globally
     fontFamily:
-      'Montserrat, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"',
+      'Montserrat, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Noto Sans", "Noto Sans Symbols 2", "Segoe UI Symbol", "Apple Color Emoji", "Segoe UI Emoji"',
     fontSize: 14,
     button: {
       textTransform: "none",
@@ -217,4 +217,3 @@ export default function ThemeProvider({ children }) {
     </MuiThemeProvider>
   );
 }
-

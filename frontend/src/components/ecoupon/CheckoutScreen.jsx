@@ -74,14 +74,14 @@ export default function CheckoutScreen({ paymentConfig, onUploadProof, onProceed
               Payee
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 800 }}>
-              {payment.payee_name || "””"}
+              {payment.payee_name || ""}
             </Typography>
 
             <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
               UPI ID
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 800 }}>
-              {payment.upi_id || "””"}
+              {payment.upi_id || ""}
             </Typography>
 
             <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>

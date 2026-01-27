@@ -1,4 +1,4 @@
-﻿// Login.jsx ”” Final polished wireframe UI (single-file).
+﻿// Login.jsx  Final polished wireframe UI (single-file).
 // NOTE: This file PRESERVES your original logic (API calls, geolocation, registration, dialogs).
 // Styling is done via MUI sx props. Requires @mui/material and @mui/icons-material v7.
 
@@ -932,7 +932,7 @@ const Login = () => {
   }, [isAgency, selectedCity, selectedState]);
 
   const pincodeOptions = useMemo(() => {
-    // Sub”‘Franchise should list all pincodes for the selected district irrespective of sponsor coverage
+    // Sub‑Franchise should list all pincodes for the selected district irrespective of sponsor coverage
     if (isSubFranchiseCat) {
       return Array.isArray(districtPincodes) ? districtPincodes : [];
     }
@@ -1312,7 +1312,7 @@ const Login = () => {
         });
         const uname = userResp?.data?.username || "(generated)";
 
-        // Step 2: Submit business details for admin review (best”‘effort; non”‘blocking)
+        // Step 2: Submit business details for admin review (best‑effort; non‑blocking)
         const brPayload = {
           full_name: formData.full_name || "",
           email: formData.email || "",
@@ -1570,9 +1570,9 @@ const Login = () => {
                   Sponsor verified
                 </Alert>
                 <Box sx={{ p: 1.5, borderRadius: 1, bgcolor: "#f5f9ff", border: "1px solid #e3f2fd" }}>
-                  <Typography variant="body2"><b>Sponsor ID:</b> {sponsorDisplay.username || normalizeSponsor(sponsorId) || "””"}</Typography>
-                  <Typography variant="body2"><b>Name:</b> {sponsorDisplay.name || "””"}</Typography>
-                  <Typography variant="body2"><b>Pincode:</b> {sponsorDisplay.pincode || "””"}</Typography>
+                  <Typography variant="body2"><b>Sponsor ID:</b> {sponsorDisplay.username || normalizeSponsor(sponsorId) || ""}</Typography>
+                  <Typography variant="body2"><b>Name:</b> {sponsorDisplay.name || ""}</Typography>
+                  <Typography variant="body2"><b>Pincode:</b> {sponsorDisplay.pincode || ""}</Typography>
                 </Box>
               </Box>
             )}
@@ -2105,9 +2105,9 @@ const Login = () => {
                           Sponsor verified
                         </Alert>
                 <Box sx={{ p: 1.5, borderRadius: 1, bgcolor: "#f5f9ff", border: "1px solid #e3f2fd" }}>
-                  <Typography variant="body2"><b>Sponsor ID:</b> {sponsorDisplay.username || normalizeSponsor(sponsorId) || "””"}</Typography>
-                  <Typography variant="body2"><b>Name:</b> {sponsorDisplay.name || "””"}</Typography>
-                  <Typography variant="body2"><b>Pincode:</b> {sponsorDisplay.pincode || "””"}</Typography>
+                  <Typography variant="body2"><b>Sponsor ID:</b> {sponsorDisplay.username || normalizeSponsor(sponsorId) || ""}</Typography>
+                  <Typography variant="body2"><b>Name:</b> {sponsorDisplay.name || ""}</Typography>
+                  <Typography variant="body2"><b>Pincode:</b> {sponsorDisplay.pincode || ""}</Typography>
                 </Box>
                       </Box>
                     )}

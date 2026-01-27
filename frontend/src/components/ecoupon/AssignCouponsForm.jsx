@@ -17,7 +17,7 @@ import CurrencyRupeeIcon from "@mui/icons-material/CurrencyRupee";
  * AssignCouponsForm
  * - Modernized input fields with icons
  * - Used for:
- *    * variant="consumer"  -> Send E”‘Coupons to Consumer (by Count)
+ *    * variant="consumer"  -> Send E‑Coupons to Consumer (by Count)
  *    * variant="employee"  -> Distribute to Employee (by Count)
  *
  * Props:
@@ -256,7 +256,7 @@ export default function AssignCouponsForm({
           <Typography variant="caption" color="text.secondary">
             Selected: ₹{selectedDenom}
             {selectedAvail !== null && selectedAvail >= 0
-              ? ` ”” ${selectedAvail} available`
+              ? `  ${selectedAvail} available`
               : ""}
           </Typography>
         ) : null}

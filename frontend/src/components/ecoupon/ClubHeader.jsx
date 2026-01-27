@@ -4,10 +4,10 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 /**
  * ClubHeader
- * Consistent header + tabbed navigation for "My E”‘Coupon Club"
+ * Consistent header + tabbed navigation for "My E‑Coupon Club"
  * Tabs:
- *  - E”‘Coupon (redeem / activate)
- *  - E”‘Coupon Store
+ *  - E‑Coupon (redeem / activate)
+ *  - E‑Coupon Store
  *  - Manual Lucky Coupon
  *
  * Intended for consumer routes only (/user/...).
@@ -34,7 +34,7 @@ export default function ClubHeader() {
     </>
     // <Box sx={{ mb: 1.5 }}>
     //   <Typography variant="h6" sx={{ fontWeight: 900, color: "#0f172a", mb: 0.5 }}>
-    //     My E”‘Coupon Club
+    //     My E‑Coupon Club
     //   </Typography>
     //   <Paper
     //     elevation={0}
@@ -53,8 +53,8 @@ export default function ClubHeader() {
     //       textColor="primary"
     //       indicatorColor="primary"
     //     >
-    //       {/* <Tab label="E”‘Coupon" value="coupon" /> */}
-    //       {/* <Tab label="E”‘Coupon Store" value="store" />
+    //       {/* <Tab label="E‑Coupon" value="coupon" /> */}
+    //       {/* <Tab label="E‑Coupon Store" value="store" />
     //       <Tab label="Manual Lucky Coupon" value="lucky" /> */}
     //     </Tabs>
     //   </Paper>

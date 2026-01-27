@@ -82,7 +82,7 @@ export default function ConsumerCoupon() {
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [errorSummary, setErrorSummary] = useState("");
 
-  // My owned E”‘Coupons (direct assignments)
+  // My owned E‑Coupons (direct assignments)
   const [myCodes, setMyCodes] = useState([]);
   const [codesLoading, setCodesLoading] = useState(false);
   const [codesError, setCodesError] = useState("");
@@ -346,7 +346,7 @@ export default function ConsumerCoupon() {
       setMyCodes(arr || []);
     } catch (e) {
       setMyCodes([]);
-      setCodesError("Failed to load my e”‘coupons.");
+      setCodesError("Failed to load my e‑coupons.");
     } finally {
       setCodesLoading(false);
     }
@@ -424,7 +424,7 @@ export default function ConsumerCoupon() {
       }
     } catch (e) {
       setErrorSummary("Failed to load summary.");
-      setCodesError("Failed to load my e”‘coupons.");
+      setCodesError("Failed to load my e‑coupons.");
       setMySummary(null);
       setMyCodes([]);
     } finally {
@@ -484,7 +484,7 @@ export default function ConsumerCoupon() {
     return { id: taskId, status: "TIMEOUT" };
   };
 
-  // Quick Activate button per owned e”‘coupon
+  // Quick Activate button per owned e‑coupon
   const handleActivateCode = async (code) => {
     if (!code?.id) return;
     const codeId = code.id;
@@ -681,7 +681,7 @@ export default function ConsumerCoupon() {
       setSubmitting(true);
       setWalletMsg("");
 
-      // Physical/Lucky Draw coupons are not available on the consumer e”‘coupon screen
+      // Physical/Lucky Draw coupons are not available on the consumer e‑coupon screen
       if (form.action === "ACTIVATE") {
         const t = form.coupon_type === "50" ? "50" : "150";
         await API.post("/v1/coupon/activate/?async=1", {
@@ -723,7 +723,7 @@ export default function ConsumerCoupon() {
       <ClubHeader />
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2, flexWrap: "wrap", gap: 1 }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>
-          My E”‘Coupons
+          My E‑Coupons
         </Typography>
         <Typography variant="caption" color="text.secondary">
           {displayName}
@@ -739,7 +739,7 @@ export default function ConsumerCoupon() {
           textColor="primary"
           indicatorColor="primary"
         >
-          <Tab label="E”‘Coupon Store" value="store" />
+          <Tab label="E‑Coupon Store" value="store" />
           <Tab label="Manual Lucky Coupon" value="manual" />
           <Tab label="Coupon Summary" value="summary" />
         </Tabs>
@@ -1170,7 +1170,7 @@ export default function ConsumerCoupon() {
       <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mb: 2 }}>
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
           <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48" }}>
-            All My E”‘Coupon Codes
+            All My E‑Coupon Codes
           </Typography>
           <Button size="small" variant="outlined" onClick={loadCombined}>Refresh</Button>
         </Box>
@@ -1201,7 +1201,7 @@ export default function ConsumerCoupon() {
           <Alert severity="error">{codesError}</Alert>
         ) : filteredCodes.length === 0 ? (
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            No e”‘coupon entries.
+            No e‑coupon entries.
           </Typography>
         ) : (
           <>
@@ -1228,7 +1228,7 @@ export default function ConsumerCoupon() {
                       <Chip size="small" label={c.display_status || c.status} color={chipColor} />
                     </Box>
                     <Typography variant="caption" color="text.secondary">
-                      {typeof c.value !== "undefined" ? `₹${c.value}` : ""}{c.created_at ? ` ”¢ ${new Date(c.created_at).toLocaleString()}` : ""}
+                      {typeof c.value !== "undefined" ? `₹${c.value}` : ""}{c.created_at ? ` • ${new Date(c.created_at).toLocaleString()}` : ""}
                     </Typography>
                     {!isRedeemed ? (
                       <Stack direction="row" spacing={1}>
@@ -1405,8 +1405,8 @@ export default function ConsumerCoupon() {
                 <li key={s.id} style={{ marginBottom: 12, listStyle: "none" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <Typography variant="body2" sx={{ mr: 1 }}>
-                      <strong>Code:</strong> {s.coupon_code} ”” <strong>Status:</strong> {statusLabel(s.status)}{" "}
-                      {s.created_at ? `”” ${new Date(s.created_at).toLocaleString()}` : ""}
+                      <strong>Code:</strong> {s.coupon_code}  <strong>Status:</strong> {statusLabel(s.status)}{" "}
+                      {s.created_at ? ` ${new Date(s.created_at).toLocaleString()}` : ""}
                     </Typography>
                     <Button size="small" variant="outlined" onClick={() => useSubmissionCode(s)}>
                       Use

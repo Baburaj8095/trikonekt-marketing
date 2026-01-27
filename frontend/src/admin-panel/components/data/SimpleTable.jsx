@@ -1,7 +1,7 @@
 ﻿import React from "react";
 
 /**
- * SimpleTable ”” minimal, dependency-free table for admin listings with enhanced admin UX.
+ * SimpleTable  minimal, dependency-free table for admin listings with enhanced admin UX.
  *
  * Props:
  * - columns: Array<{
@@ -336,7 +336,7 @@ export default function SimpleTable({
           Next
         </button>
         <div style={{ color: "#64748b", marginLeft: 8 }}>
-          Page {page} of {totalPages} ”¢ Total {total}
+          Page {page} of {totalPages} • Total {total}
         </div>
       </div>
     </div>

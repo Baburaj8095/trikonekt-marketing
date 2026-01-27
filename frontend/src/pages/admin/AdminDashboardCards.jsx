@@ -142,7 +142,7 @@ export default function AdminDashboardCards() {
             }}
           >
             Matrix Commission Master
-            <div style={{ fontSize: 12, color: "#1d4ed8", fontWeight: 600 }}>5”‘Matrix & 3”‘Matrix settings</div>
+            <div style={{ fontSize: 12, color: "#1d4ed8", fontWeight: 600 }}>5‑Matrix & 3‑Matrix settings</div>
           </div>
         </div>
       </Section>

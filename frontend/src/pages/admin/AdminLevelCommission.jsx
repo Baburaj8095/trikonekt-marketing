@@ -314,7 +314,7 @@ export default function AdminLevelCommission() {
               Last updated:{" "}
               {server?.updated_at
                 ? new Date(server.updated_at).toLocaleString()
-                : "””"}
+                : ""}
             </div>
           </>
         )}

@@ -219,311 +219,230 @@ export default function TrikonektProducts() {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: { xs: 2, md: 3 } }}>
-      <Box sx={{ mb: 1.5 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-          <Typography variant="h5" sx={{ fontWeight: 700, color: colors.textPrimary }}>
-            Trikonekt Products
-          </Typography>
-          <IconButton size="small" onClick={() => setDrawerOpen(true)} title="Open cart">
-            <Badge badgeContent={cartCount} sx={{ "& .MuiBadge-badge": { bgcolor: colors.primary, color: colors.textOnPrimary } }}>
+  <Box sx={{ bgcolor: "#f7f7f7", minHeight: "100vh" }}>
+    {/* Top Sticky Header like Blinkit */}
+    <Box
+      sx={{
+        position: "sticky",
+        top: 0,
+        zIndex: 1200,
+        bgcolor: "#fff",
+        borderBottom: "1px solid #eee",
+      }}
+    >
+      <Container maxWidth="xl" sx={{ py: 1.5 }}>
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <Box sx={{ flex: 1 }}>
+            <Typography sx={{ fontWeight: 800, fontSize: 18, mb: 0.5 }}>
+              Trikonekt
+            </Typography>
+
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Search for products..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              sx={{
+                bgcolor: "#f3f3f3",
+                borderRadius: 2,
+                "& fieldset": { border: "none" },
+              }}
+            />
+          </Box>
+
+          <IconButton
+            onClick={() => setDrawerOpen(true)}
+            sx={{
+              ml: 1,
+              bgcolor: "#ff6d00",
+              color: "#fff",
+              "&:hover": { bgcolor: "#ff6d00" },
+              borderRadius: 2,
+              width: 44,
+              height: 44,
+            }}
+          >
+            <Badge
+              badgeContent={cartCount}
+              sx={{
+                "& .MuiBadge-badge": {
+                  bgcolor: "#000",
+                  color: "#fff",
+                  fontWeight: 700,
+                },
+              }}
+            >
               <ShoppingCartIcon />
             </Badge>
           </IconButton>
         </Stack>
-      </Box>
+      </Container>
 
+      {/* Sort + Chips row (Blinkit-like) */}
+      <Box sx={{ px: 1.5, pb: 1 }}>
+        <Container maxWidth="xl">
+          <Stack direction="row" spacing={1} alignItems="center">
+            <TextField
+              select
+              size="small"
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+              sx={{
+                width: 160,
+                bgcolor: "#fff",
+                "& fieldset": { borderRadius: 2 },
+              }}
+            >
+              <MenuItem value="">Relevance</MenuItem>
+              <MenuItem value="newest">Newest</MenuItem>
+              <MenuItem value="price_asc">Price Low</MenuItem>
+              <MenuItem value="price_desc">Price High</MenuItem>
+              <MenuItem value="rating_desc">Top Rated</MenuItem>
+            </TextField>
 
-      {/* Filters & Sorting Bar */}
-      <Box
-        sx={{
-          mb: 2,
-          p: 2,
-          borderRadius: `${cardTokens.radius}px`,
-          border: cardTokens.border,
-          bgcolor: cardTokens.bg,
-          boxShadow: "none",
-        }}
-      >
-        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems={{ xs: "stretch", md: "center" }}>
-          <TextField
-            size="small"
-            placeholder="Search products..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            sx={{ minWidth: { xs: "100%", md: 280 } }}
-          />
-          <Stack direction="row" spacing={1} flexWrap="wrap">
-            <Chip
-              size="small"
-              label="Popular"
-              onClick={() => setSort((s) => (s === "rating_desc" ? "" : "rating_desc"))}
-              sx={{
-                fontWeight: 700,
-                bgcolor: sort === "rating_desc" ? colors.primary : colors.white,
-                color: sort === "rating_desc" ? colors.textOnPrimary : colors.textPrimary,
-                border: `1px solid ${colors.primary}`,
-              }}
-            />
-            <Chip
-              size="small"
-              label="Newest"
-              onClick={() => setSort((s) => (s === "newest" ? "" : "newest"))}
-              sx={{
-                fontWeight: 700,
-                bgcolor: sort === "newest" ? colors.primary : colors.white,
-                color: sort === "newest" ? colors.textOnPrimary : colors.textPrimary,
-                border: `1px solid ${colors.primary}`,
-              }}
-            />
-            <Chip
-              size="small"
-              label="Price Low"
-              onClick={() => setSort((s) => (s === "price_asc" ? "" : "price_asc"))}
-              sx={{
-                fontWeight: 700,
-                bgcolor: sort === "price_asc" ? colors.primary : colors.white,
-                color: sort === "price_asc" ? colors.textOnPrimary : colors.textPrimary,
-                border: `1px solid ${colors.primary}`,
-              }}
-            />
-            <Chip
-              size="small"
-              label="Price High"
-              onClick={() => setSort((s) => (s === "price_desc" ? "" : "price_desc"))}
-              sx={{
-                fontWeight: 700,
-                bgcolor: sort === "price_desc" ? colors.primary : colors.white,
-                color: sort === "price_desc" ? colors.textOnPrimary : colors.textPrimary,
-                border: `1px solid ${colors.primary}`,
-              }}
-            />
-            {category ? (
-              <Chip
-                size="small"
-                label={`Category: ${category}`}
-                onDelete={clearCategory}
-                sx={{
-                  fontWeight: 700,
-                  bgcolor: colors.white,
-                  color: colors.textPrimary,
-                  border: `1px solid ${colors.primary}`,
-                }}
-              />
-            ) : null}
-          </Stack>
-          <Box flex={{ md: 1 }} />
-          <Stack direction="row" spacing={1}>
-            <V2Button variant="secondary" onClick={() => setDense((d) => !d)}>
-              {dense ? "Cozy View" : "Compact View"}
+            <Box sx={{ flex: 1, overflowX: "auto" }}>
+              <Stack direction="row" spacing={1} sx={{ minWidth: "max-content", pb: 0.5 }}>
+                <Chip
+                  size="small"
+                  label="Popular"
+                  onClick={() => setSort((s) => (s === "rating_desc" ? "" : "rating_desc"))}
+                  sx={{
+                    fontWeight: 700,
+                    bgcolor: sort === "rating_desc" ? "#ff6d00" : "#fff",
+                    color: sort === "rating_desc" ? "#fff" : "#111",
+                    border: "1px solid #eee",
+                  }}
+                />
+                <Chip
+                  size="small"
+                  label="Newest"
+                  onClick={() => setSort((s) => (s === "newest" ? "" : "newest"))}
+                  sx={{
+                    fontWeight: 700,
+                    bgcolor: sort === "newest" ? "#ff6d00" : "#fff",
+                    color: sort === "newest" ? "#fff" : "#111",
+                    border: "1px solid #eee",
+                  }}
+                />
+                <Chip
+                  size="small"
+                  label="Price Low"
+                  onClick={() => setSort((s) => (s === "price_asc" ? "" : "price_asc"))}
+                  sx={{
+                    fontWeight: 700,
+                    bgcolor: sort === "price_asc" ? "#ff6d00" : "#fff",
+                    color: sort === "price_asc" ? "#fff" : "#111",
+                    border: "1px solid #eee",
+                  }}
+                />
+                <Chip
+                  size="small"
+                  label="Price High"
+                  onClick={() => setSort((s) => (s === "price_desc" ? "" : "price_desc"))}
+                  sx={{
+                    fontWeight: 700,
+                    bgcolor: sort === "price_desc" ? "#ff6d00" : "#fff",
+                    color: sort === "price_desc" ? "#fff" : "#111",
+                    border: "1px solid #eee",
+                  }}
+                />
+
+                {category ? (
+                  <Chip
+                    size="small"
+                    label={`Category: ${category}`}
+                    onDelete={clearCategory}
+                    sx={{
+                      fontWeight: 700,
+                      bgcolor: "#fff",
+                      color: "#111",
+                      border: "1px solid #eee",
+                    }}
+                  />
+                ) : null}
+              </Stack>
+            </Box>
+
+            <V2Button
+              variant="secondary"
+              onClick={() => setDense((d) => !d)}
+              sx={{ borderRadius: 2, height: 36 }}
+            >
+              {dense ? "Cozy" : "Compact"}
             </V2Button>
-            <V2Button onClick={fetchProducts}>Refresh</V2Button>
           </Stack>
-        </Stack>
+        </Container>
       </Box>
+    </Box>
 
-      {/* Promo Package Section */}
-      {/* <Box sx={{ mb: 2 }}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
-          Promo Package
-        </Typography>
-        {loadingPromo ? (
-          <Box sx={{ py: 2, display: "flex", alignItems: "center", gap: 1 }}>
-            <CircularProgress size={20} /> <Typography variant="body2">Loading promo items...</Typography>
-          </Box>
-        ) : (
-          <ProductGrid
-            items={promoItems || []}
-            dense={dense}
-            emptyMessage="No promo package products available."
-            onSelect={(p) => {
-              if (p && p._promo) {
-                setAddressDlg({ open: true, pkgId: p.package_id || null, product: p, address: "" });
-              } else if (p?.id) {
-                navigate(`${basePath}/products/${p.id}`);
-              }
-            }}
-            onQuickView={(p) => {
-              if (p && p._promo) {
-                setAddressDlg({ open: true, pkgId: p.package_id || null, product: p, address: "" });
-              } else {
-                setQuickView({ open: true, product: p });
-              }
-            }}
-          />
-        )}
-      </Box> */}
-
-      {/* Products Section */}
+    {/* Product Section */}
+    <Container maxWidth="xl" sx={{ py: 2 }}>
       {loading ? (
-        <Box sx={{ py: 4, display: "flex", alignItems: "center", gap: 1 }}>
-          <CircularProgress size={22} /> <Typography variant="body2">Loading products...</Typography>
+        <Box sx={{ py: 6, display: "flex", justifyContent: "center" }}>
+          <CircularProgress />
         </Box>
       ) : (
         <>
-          <Box
-            sx={{
-              mb: 1.5,
-              display: "flex",
-              alignItems: { xs: "flex-start", sm: "center" },
-              gap: 1,
-              justifyContent: "space-between",
-              flexDirection: { xs: "column", sm: "row" }
-            }}
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            sx={{ mb: 1 }}
           >
-            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-              Products {rows?.length ? `(${rows.length})` : ""}
+            <Typography sx={{ fontWeight: 800, fontSize: 16 }}>
+              Products {filteredRows?.length ? `(${filteredRows.length})` : ""}
             </Typography>
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                flexWrap: "wrap",
-                width: { xs: "100%", sm: "auto" },
-                justifyContent: { xs: "flex-start", sm: "flex-end" }
-              }}
-            >
-              <TextField
-                select
-                size="small"
-                label="Sort by"
-                value={sort}
-                onChange={(e) => setSort(e.target.value)}
-                sx={{ width: { xs: "100%", sm: 180 } }}
-              >
-                <MenuItem value="">Relevance</MenuItem>
-                <MenuItem value="price_asc">Price: Low to High</MenuItem>
-                <MenuItem value="price_desc">Price: High to Low</MenuItem>
-                <MenuItem value="newest">Newest</MenuItem>
-                <MenuItem value="rating_desc">Rating</MenuItem>
-              </TextField>
-              <V2Button variant="secondary" onClick={() => setDense((d) => !d)}>
-                {dense ? "Cozy view" : "Compact view"}
-              </V2Button>
-              <V2Button onClick={fetchProducts}>Refresh</V2Button>
-            </Box>
-          </Box>
+
+            <V2Button onClick={fetchProducts} sx={{ borderRadius: 2 }}>
+              Refresh
+            </V2Button>
+          </Stack>
+
+          {/* IMPORTANT: This grid must be Blinkit-like */}
           <ProductGrid
             items={filteredRows || []}
             dense={dense}
-            onSelect={(p) => {
-              navigate(`${basePath}/products/${p.id}`);
-            }}
+            onSelect={(p) => navigate(`${basePath}/products/${p.id}`)}
             onQuickView={(p) => setQuickView({ open: true, product: p })}
             onAddToCart={handleAddToCart}
             showAddToCart
           />
         </>
       )}
-
-      <QuickViewModal
-        open={quickView.open}
-        product={quickView.product}
-        onClose={() => setQuickView({ open: false, product: null })}
-        onGoToDetails={() => {
-          if (quickView.product?.id) {
-            navigate(`${basePath}/products/${quickView.product.id}`);
-            setQuickView({ open: false, product: null });
-          }
-        }}
-      />
-
-      {/* Cart Drawer */}
-      <CartDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        onCheckout={handleGoCheckout}
-      />
-
-      {/* Floating cart button on mobile */}
-      <Box
-        sx={{
-          position: "fixed",
-          right: 16,
-          bottom: 16,
-          display: { xs: "block", md: "none" },
-          zIndex: 1300,
-        }}
-      >
-        <V2Button
-          onClick={() => setDrawerOpen(true)}
-          startIcon={
-            <Badge badgeContent={cartCount} sx={{ "& .MuiBadge-badge": { bgcolor: colors.primary, color: colors.textOnPrimary } }}>
-              <ShoppingCartIcon />
-            </Badge>
-          }
-          sx={{ borderRadius: `${cardTokens.radius}px` }}
-        >
-          Cart
-        </V2Button>
-      </Box>
-
-      <Dialog
-        open={addressDlg.open}
-        onClose={() => setAddressDlg({ open: false, pkgId: null, product: null, address: "" })}
-        fullWidth
-        maxWidth="sm"
-      >
-        <DialogTitle>Select shipping address</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" sx={{ mb: 1 }}>
-            {addressDlg.product ? `Product: ${addressDlg.product.name}` : ""}
-          </Typography>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Shipping Address"
-            fullWidth
-            multiline
-            minRows={3}
-            value={addressDlg.address}
-            onChange={(e) => setAddressDlg((s) => ({ ...s, address: e.target.value }))}
-          />
-        </DialogContent>
-        <DialogActions>
-          <V2Button variant="secondary" onClick={() => setAddressDlg({ open: false, pkgId: null, product: null, address: "" })}>
-            Cancel
-          </V2Button>
-          <V2Button
-            onClick={() => {
-              const addr = String(addressDlg.address || "").trim();
-              if (!addr) {
-                setSnack({ open: true, type: "error", msg: "Enter shipping address" });
-                return;
-              }
-              try {
-                addPromoPackagePrime({
-                  pkgId: addressDlg.pkgId,
-                  name: addressDlg.product?.package_name || "Prime 750 Product",
-                  unitPrice: Number(addressDlg.product?.package_price || 0),
-                  qty: 1,
-                  selected_promo_product_id: addressDlg.product?.id ?? null,
-                  shipping_address: addr,
-                  prime750_choice: "PRODUCT",
-                });
-                setSnack({ open: true, type: "success", msg: "Added to cart." });
-                setAddressDlg({ open: false, pkgId: null, product: null, address: "" });
-              } catch (e) {
-                setSnack({ open: true, type: "error", msg: "Failed to add to cart." });
-              }
-            }}
-          >
-            Add to Cart
-          </V2Button>
-        </DialogActions>
-      </Dialog>
-      <Snackbar
-        open={snack.open}
-        autoHideDuration={3000}
-        onClose={() => setSnack((s) => ({ ...s, open: false }))}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <Alert severity={snack.type} onClose={() => setSnack((s) => ({ ...s, open: false }))}>
-          {snack.msg}
-        </Alert>
-      </Snackbar>
     </Container>
-  );
+
+    {/* Modals */}
+    <QuickViewModal
+      open={quickView.open}
+      product={quickView.product}
+      onClose={() => setQuickView({ open: false, product: null })}
+      onGoToDetails={() => {
+        if (quickView.product?.id) {
+          navigate(`${basePath}/products/${quickView.product.id}`);
+          setQuickView({ open: false, product: null });
+        }
+      }}
+    />
+
+    <CartDrawer
+      open={drawerOpen}
+      onClose={() => setDrawerOpen(false)}
+      onCheckout={handleGoCheckout}
+    />
+
+    {/* Snackbar */}
+    <Snackbar
+      open={snack.open}
+      autoHideDuration={3000}
+      onClose={() => setSnack((s) => ({ ...s, open: false }))}
+      anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+    >
+      <Alert severity={snack.type} onClose={() => setSnack((s) => ({ ...s, open: false }))}>
+        {snack.msg}
+      </Alert>
+    </Snackbar>
+  </Box>
+);
 }
 

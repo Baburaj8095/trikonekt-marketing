@@ -22,7 +22,7 @@ export default function DashboardCardGridDemo() {
       <Grid container spacing={2}>
         <Grid item xs={6} sm={4} md={3}>
           <DashboardCard
-            title="E”‘commerce"
+            title="E‑commerce"
             subtitle="Exclusive partner deals"
             image={imgEcommerce}
             to="/trikonekt-products"

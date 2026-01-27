@@ -8,9 +8,10 @@ from locations.models import Country, State, City
 
 def read_fixture_any_encoding(fpath: Path):
     """
-    Try multiple common encodings and return parsed JSON (list of objects).
+    Strictly read JSON fixtures as UTF-8 (with optional BOM).
+    Avoid cp1252/latin-1 fallback which can silently corrupt Unicode (mojibake).
     """
-    encodings = ["utf-8", "utf-8-sig", "cp1252", "latin-1"]
+    encodings = ["utf-8", "utf-8-sig"]
     last_err = None
     for enc in encodings:
         try:
@@ -20,7 +21,7 @@ def read_fixture_any_encoding(fpath: Path):
         except Exception as e:
             last_err = e
             continue
-    raise last_err or Exception("Unable to read fixture with common encodings")
+    raise last_err or Exception("Unable to read fixture with UTF-8/UTF-8-SIG")
 
 
 class Command(BaseCommand):
@@ -56,8 +57,8 @@ class Command(BaseCommand):
 
             self.stdout.write(f"Using fixture: {fixture_path}")
 
-            # Read and parse fixture with robust encoding fallbacks
-            self.stdout.write("Reading fixture (trying utf-8/utf-8-sig/cp1252/latin-1)...")
+            # Read and parse fixture in UTF-8 (cp1252/latin-1 fallbacks removed to prevent mojibake)
+            self.stdout.write("Reading fixture (trying utf-8/utf-8-sig)...")
             objects = read_fixture_any_encoding(fixture_path)
             if not isinstance(objects, list):
                 self.stdout.write(self.style.ERROR("Fixture root is not a list"))
