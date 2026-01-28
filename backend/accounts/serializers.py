@@ -326,9 +326,21 @@ class RegisterSerializer(serializers.ModelSerializer):
 
         # Enforce agency hierarchy transitions only for agency categories
         if category in AGENCY_CATEGORIES:
-            # Admin/staff can only sponsor State Coordinators
-            if getattr(sponsor_user, 'is_superuser', False) or getattr(sponsor_user, 'is_staff', False):
-                # Admin/company sponsor can onboard any agency category (including sub-franchise)
+            # Admin/company/root-consumer can sponsor any agency category (including sub-franchise)
+            is_root_consumer = False
+            try:
+                from business.models import RootConsumerConfig
+                rc_user = RootConsumerConfig.get_solo().get_root_user()
+                is_root_consumer = bool(rc_user and rc_user.id == getattr(sponsor_user, 'id', None))
+            except Exception:
+                is_root_consumer = False
+            admin_relaxed = (
+                getattr(sponsor_user, 'is_superuser', False)
+                or getattr(sponsor_user, 'is_staff', False)
+                or getattr(sponsor_user, 'category', '') == 'company'
+                or is_root_consumer
+            )
+            if admin_relaxed:
                 allowed_next = AGENCY_CATEGORIES
                 sponsor_cat = 'admin'
             else:
@@ -351,7 +363,20 @@ class RegisterSerializer(serializers.ModelSerializer):
                     'category': f'Invalid category for sponsor. Sponsor category "{sponsor_cat}" can sponsor only {sorted(list(allowed_next))}.'
                 })
 
-            admin_relaxed = (getattr(sponsor_user, 'is_superuser', False) or getattr(sponsor_user, 'is_staff', False))
+            # Recompute here for clarity in region checks (same logic as above)
+            is_root_consumer = False
+            try:
+                from business.models import RootConsumerConfig
+                rc_user = RootConsumerConfig.get_solo().get_root_user()
+                is_root_consumer = bool(rc_user and rc_user.id == getattr(sponsor_user, 'id', None))
+            except Exception:
+                is_root_consumer = False
+            admin_relaxed = (
+                getattr(sponsor_user, 'is_superuser', False)
+                or getattr(sponsor_user, 'is_staff', False)
+                or getattr(sponsor_user, 'category', '') == 'company'
+                or is_root_consumer
+            )
             # Region-level validations by category
             # Store resolved values for use in create()
             self._assign_states = []
@@ -521,7 +546,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             if category == 'consumer':
                 # Deterministic phone-only username => same phone implies same username for consumer
                 raise serializers.ValidationError({'phone': 'Consumer already exists for this phone number.'})
-            raise serializers.ValidationError({'detail': 'Username already exists.'})
+            # For non-consumer categories, we'll auto-generate a unique username with suffix during create().
 
         # Basic email validation presence is optional; rely on DRF internal if provided
         return attrs
@@ -578,47 +603,53 @@ class RegisterSerializer(serializers.ModelSerializer):
         Generate admin-friendly usernames using prefixes by category.
         - Consumer: phone (digits-only)
         - Employee: TREP+phone
-        - Sub-Franchise: TRSF+phone
-        - Pincode Agency: TRPN+phone
-        - State Agency: TRST+phone
-        - District Agency: TRDT+phone
         - Merchant: TRBS+phone
         - Business: TRBS+phone
-        - Coordinators (state/district/pincode): unchanged scheme -> use phone only (no prefix)
+        - Agency:
+            - State Coordinator: TRSC+phone
+            - District Coordinator: TRDC+phone
+            - Pincode Coordinator: TRPC+phone
+            - State: TRST+phone
+            - District: TRDT+phone
+            - Pincode: TRPN+phone
+            - Sub-Franchise: TRSF+phone
         """
         phone_digits = ''.join(c for c in (phone or '') if c.isdigit())
 
-        coordinator_cats = {
-            'agency_state_coordinator',
-            'agency_district_coordinator',
-            'agency_pincode_coordinator',
-        }
-
         prefix_map = {
-            'consumer': 'TR',
             'employee': 'TREP',
-            'agency_sub_franchise': 'TRSF',
-            'agency_pincode': 'TRPN',
+            'merchant': 'TRBS',
+            'business': 'TRBS',
+            'agency_state_coordinator': 'TRSC',
+            'agency_district_coordinator': 'TRDC',
+            'agency_pincode_coordinator': 'TRPC',
             'agency_state': 'TRST',
             'agency_district': 'TRDT',
-            'business': 'TRBS',
-            'merchant': 'TRBS',
+            'agency_pincode': 'TRPN',
+            'agency_sub_franchise': 'TRSF',
         }
 
         if category == 'consumer':
             base = phone_digits
-        elif category in coordinator_cats:
-            base = phone_digits  # do not change coordinator usernames
         else:
-            pref = prefix_map.get(category)
-            if pref:
-                base = f"{pref}{phone_digits}"
-            else:
-                # default to consumer-like prefix
-                base = f"TR{phone_digits}"
+            pref = prefix_map.get(category, 'TR')
+            base = f"{pref}{phone_digits}"
 
         username = base
         return username
+
+    def _build_unique_username(self, category: str, phone: str, unique_id: str) -> str:
+        """
+        Ensure a globally-unique username. Uses category-specific base from _build_username,
+        if taken appends -2, -3, ... until free.
+        """
+        base = self._build_username(category, phone, unique_id)
+        uname = base
+        i = 2
+        while CustomUser.objects.filter(username__iexact=uname).exists():
+            uname = f"{base}-{i}"
+            i += 1
+        return uname
 
     @transaction.atomic
     def create(self, validated_data):
@@ -673,8 +704,8 @@ class RegisterSerializer(serializers.ModelSerializer):
         # Pre-generate 6-digit id for this registration
         unique_id = CustomUser.generate_unique_id()
 
-        # Build username based on category rules
-        username = self._build_username(category, phone_digits, unique_id)
+        # Build username based on category rules (ensure global uniqueness for non-consumer duplicates)
+        username = self._build_unique_username(category, phone_digits, unique_id)
 
         # Determine who registered this account:
         # Prefer the sponsor user (by username) as the parent link; fall back to the authenticated actor.

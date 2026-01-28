@@ -409,7 +409,7 @@ export default function AdminShell({ children }) {
       label: "User Management",
       items: [
         { to: "/admin/users", label: "Users", icon: "users" },
-        { to: "/admin/user-tree", label: "Genealogy", icon: "tree" },
+        // { to: "/admin/user-tree", label: "Genealogy", icon: "tree" },
       ],
     },
      {

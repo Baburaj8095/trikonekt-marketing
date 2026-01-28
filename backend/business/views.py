@@ -417,17 +417,57 @@ class PromoPurchaseMeListCreateView(APIView):
 
 class AdminPromoPurchaseListView(APIView):
     """
-    GET /api/business/admin/promo/purchases/?status=PENDING|APPROVED|REJECTED|CANCELLED
-    Admin-only list of promo purchases (defaults to PENDING).
+    GET /api/business/admin/promo/purchases/
+    Filters:
+      - status=PENDING|APPROVED|REJECTED|CANCELLED (defaults to PENDING)
+      - user_id=<int>
+      - kind=150|750|759|monthly
+        * 150/750: PRIME with price≈150/750
+        * 759/monthly: MONTHLY packages
+      - date_from=YYYY-MM-DD (requested_at)
+      - date_to=YYYY-MM-DD (requested_at)
     """
     permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("promo")]
 
     def get(self, request):
+        from decimal import Decimal as D
+
         status_in = (request.query_params.get("status") or "PENDING").strip().upper()
         valid = {"PENDING", "APPROVED", "REJECTED", "CANCELLED"}
         qs = PromoPurchase.objects.select_related("user", "package").order_by("-requested_at", "-id")
         if status_in in valid:
             qs = qs.filter(status=status_in)
+
+        # user filter
+        uid = (request.query_params.get("user_id") or "").strip()
+        if uid.isdigit():
+            qs = qs.filter(user_id=int(uid))
+
+        # kind filter
+        kind_raw = (request.query_params.get("kind") or "").strip().lower()
+        if kind_raw:
+            if kind_raw in ("150",):
+                qs = qs.filter(package__type="PRIME", package__price__gte=D("149.5"), package__price__lte=D("150.5"))
+            elif kind_raw in ("750",):
+                qs = qs.filter(package__type="PRIME", package__price__gte=D("749.5"), package__price__lte=D("750.5"))
+            elif kind_raw in ("759", "monthly"):
+                qs = qs.filter(package__type="MONTHLY")
+            # else: ignore unknown kind
+
+        # date range on requested_at
+        d_from = (request.query_params.get("date_from") or "").strip()
+        d_to = (request.query_params.get("date_to") or "").strip()
+        if d_from:
+            try:
+                qs = qs.filter(requested_at__date__gte=d_from)
+            except Exception:
+                pass
+        if d_to:
+            try:
+                qs = qs.filter(requested_at__date__lte=d_to)
+            except Exception:
+                pass
+
         ser = PromoPurchaseSerializer(qs, many=True, context={"request": request})
         return Response(ser.data, status=status.HTTP_200_OK)
 

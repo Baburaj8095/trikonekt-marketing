@@ -1236,13 +1236,29 @@ def handle_new_user_post_save(sender, instance: CustomUser, created: bool, **kwa
                 pos = getattr(acc, "position", None)
                 lvl = int(getattr(acc, "level", 0) or 0)
                 if parent_owner and pos:
+                    # Best-effort: sync matrix placement to CustomUser without breaking outer transaction.
+                    parent_id = parent_owner.id
+                    position = int(pos)
+                    level = int(lvl)
+                    # If the (parent, position) slot is already occupied, skip syncing to avoid IntegrityError.
                     try:
-                        instance.parent_id = parent_owner.id
-                        instance.matrix_position = int(pos)
-                        instance.depth = int(lvl)
-                        instance.save(update_fields=["parent", "matrix_position", "depth"])
+                        slot_taken = CustomUser.objects.filter(parent_id=parent_id, matrix_position=position).exclude(pk=instance.pk).exists()
                     except Exception:
-                        pass
+                        slot_taken = True
+                    if not slot_taken:
+                        try:
+                            from django.db import IntegrityError
+                            # Use a nested savepoint so any integrity error rolls back only this part.
+                            with transaction.atomic():
+                                instance.parent_id = parent_id
+                                instance.matrix_position = position
+                                instance.depth = level
+                                instance.save(update_fields=["parent", "matrix_position", "depth"])
+                        except IntegrityError:
+                            # Slot taken concurrently or conflicting historical data; ignore.
+                            pass
+                        except Exception:
+                            pass
     except Exception:
         # best-effort; do not block user creation
         pass
