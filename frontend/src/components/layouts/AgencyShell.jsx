@@ -95,7 +95,7 @@ export default function AgencyShell({ children }) {
     { to: "/agency/prime-package", label: "Agency Prime Package", icon: "box" },
 
     // Genealogy
-    { to: "/agency/my-team", label: "Genealogy", icon: "tree" },
+    // { to: "/agency/my-team", label: "Genealogy", icon: "tree" },
 
     // Coupons (3 tabs inside: E‑coupon, Store, Cart)
     { to: "/agency/coupons", label: "Coupons", icon: "ticket" },
