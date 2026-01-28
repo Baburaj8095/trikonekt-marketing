@@ -271,6 +271,19 @@ const RegisterV2 = () => {
     } catch {}
   }, []); // eslint-disable-line
 
+  // Default sponsor for Consumer when none provided via URL
+  useEffect(() => {
+    try {
+      if (role === "user") {
+        const s = normalizeSponsor(sponsorId);
+        if (!s) {
+          setSponsorId("TRIKONEKT");
+          setSponsorLocked(false); // keep editable for user to change
+        }
+      }
+    } catch {}
+  }, [role, sponsorId]); // eslint-disable-line
+
   // Keep URL in sync with sponsor and agency_level for deep-linking and menu navigation
   useEffect(() => {
     try {

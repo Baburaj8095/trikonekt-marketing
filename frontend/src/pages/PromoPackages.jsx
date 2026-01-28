@@ -331,7 +331,7 @@ function Prime750Section({ pkg, prime150Active, prime750Active, onBuy }) {
       </Box>
       <Divider sx={{ my: 1.5 }} />
 
-      <FormControlLabel
+      {/* <FormControlLabel
         sx={{ mt: 0.5 }}
         control={<Checkbox size="small" checked disabled />}
         label={
@@ -339,7 +339,7 @@ function Prime750Section({ pkg, prime150Active, prime750Active, onBuy }) {
             {prime150Active ? "Prime 150 active" : "Prime 150 will be included"}
           </Typography>
         }
-      />
+      /> */}
 
       <Divider sx={{ my: 1.5 }} />
 
@@ -569,7 +569,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
 
       {/* ① Season selector */}
       <Typography variant="subtitle2" sx={{ mt: 1 }}>
-        ① Choose Season 
+        Choose Season 
       </Typography>
       <Box sx={{ display: "grid", gap: 1 }}>
         {seasonsToShow.map((n) => {
@@ -618,15 +618,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
       </Typography>
       {selectedSeason === 1 ? (
         <Box sx={{ mt: 1 }}>
-          <FormControlLabel
-            sx={{ mt: 0.5 }}
-            control={<Checkbox size="small" checked disabled />}
-            label={
-              <Typography fontSize={14}>
-                {prime150Active ? "Registration ₹150 active" : "Registration ₹150 will be included"}
-              </Typography>
-            }
-          />
+          
           <RadioGroup value={plan} onChange={(e) => setPlan(e.target.value)}>
             <FormControlLabel
               value="SEASON759"
@@ -942,7 +934,6 @@ export default function PromoPackages({ title = "Consumer Packages" } = {}) {
   const [paymentData, setPaymentData] = useState(null);
   const [seasonsHints, setSeasonsHints] = useState([]);
   const [tab, setTab] = useState(0);
-  const mappedTab = tab >= 1 ? tab + 1 : tab;
   const [paymentSuccessOpen, setPaymentSuccessOpen] = useState(false);
 
   useEffect(() => {
@@ -1124,36 +1115,34 @@ export default function PromoPackages({ title = "Consumer Packages" } = {}) {
           indicatorColor="primary"
           sx={{ borderBottom: "1px solid", borderColor: "divider" }}
         >
-          <Tab label="Prime" />
+          <Tab label="Prime 150" />
+          <Tab label="Prime 750" />
           <Tab label="Season" />
           <Tab label="Tour" />
         </Tabs>
 
         <Box sx={{ p: 2 }}>
-          {/* PRIME: Prime 150 + Prime 750 as two clean sections */}
-          {mappedTab === 0 ? (
-            <>
-              <Prime150Section reg150Pkg={reg150Pkg} prime150Active={prime150Active} onBuy={onBuy} />
-              <Divider sx={{ my: 1.5 }} />
-              {primePkg ? (
-                <Prime750Section pkg={primePkg} prime150Active={prime150Active} prime750Active={prime750Active} onBuy={onBuy} />
-              ) : (
-                <Alert severity="warning">Prime 750 package not available.</Alert>
-              )}
-            </>
+          {/* PRIME 150 */}
+          {tab === 0 ? (
+            <Prime150Section reg150Pkg={reg150Pkg} prime150Active={prime150Active} onBuy={onBuy} />
           ) : null}
 
-          {/* PROMO: Monthly Promo 759, 3x4 grid, selected count, Proceed to Pay */}
-          {mappedTab === 1 ? (
-            seasonPkg ? (
-              <PromoSection seasonPkg={seasonPkg} history={history} onBuy={onBuy} seasonActive={seasonActive} />
+          {/* PRIME 750 */}
+          {tab === 1 ? (
+            primePkg ? (
+              <Prime750Section
+                pkg={primePkg}
+                prime150Active={prime150Active}
+                prime750Active={prime750Active}
+                onBuy={onBuy}
+              />
             ) : (
-              <Alert severity="warning">Monthly promo package not available.</Alert>
+              <Alert severity="warning">Prime 750 package not available.</Alert>
             )
           ) : null}
 
-          {/* SEASON: Guided steps ① ② ③ */}
-          {mappedTab === 2 ? (
+          {/* SEASON */}
+          {tab === 2 ? (
             seasonPkg ? (
               <SeasonSection
                 seasonPkg={seasonPkg}
@@ -1169,8 +1158,8 @@ export default function PromoPackages({ title = "Consumer Packages" } = {}) {
             )
           ) : null}
 
-          {/* TOUR: Destinations only, Explore & Book CTA */}
-          {mappedTab === 3 ? <TourSection triHolidays={triHolidays} /> : null}
+          {/* TOUR */}
+          {tab === 3 ? <TourSection triHolidays={triHolidays} /> : null}
         </Box>
       </Paper>
 
@@ -1205,4 +1194,3 @@ export default function PromoPackages({ title = "Consumer Packages" } = {}) {
     </Box>
   );
 }
-
