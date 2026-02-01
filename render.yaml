@@ -15,7 +15,7 @@ services:
       elif [ "$SEED_LOCATIONS_ON_DEPLOY" = "True" ]; then
         python manage.py load_location_data
       fi
-    startCommand: gunicorn core.wsgi:application --bind 0.0.0.0:$PORT --worker-class gthread --workers 2 --threads 2 --timeout 300 --graceful-timeout 30 --max-requests 200 --max-requests-jitter 50
+    startCommand: gunicorn core.wsgi:application --bind 0.0.0.0:$PORT --workers=1 --threads=1 --timeout=30 --max-requests=200 --max-requests-jitter=50
     healthCheckPath: /healthz
     envVars:
       - key: SECRET_KEY
@@ -79,7 +79,7 @@ services:
       - key: PYTHONUNBUFFERED
         value: "1"
       - key: DB_CONN_MAX_AGE
-        value: "120"
+        value: "0"
       - key: DRF_PAGE_SIZE
         value: "25"
       - key: DRF_THROTTLE_ANON
@@ -104,7 +104,7 @@ services:
       pip install -r requirements.txt
     preDeployCommand: |
       python manage.py migrate --noinput
-    startCommand: python manage.py process_tasks
+    startCommand: python manage.py process_tasks --max-runtime-seconds=50 --max-iterations=100 --sleep=0.5 --reap-on-start --reap-stuck-seconds=120
     envVars:
       # IMPORTANT: Use the same SECRET_KEY value as the web service for consistent signing.
       # Render YAML cannot auto-sync between services; after first deploy, copy the generated SECRET_KEY from web to worker.
@@ -123,7 +123,7 @@ services:
       - key: PYTHONUNBUFFERED
         value: "1"
       - key: DB_CONN_MAX_AGE
-        value: "120"
+        value: "0"
 
 databases:
   - name: trikonekt-db

@@ -1,0 +1,2796 @@
+{
+  "generated_at": "2026-01-30T13:31:24.939405",
+  "pools": {
+    "FIVE_150": {
+      "total_accounts": 77,
+      "total_active": 77,
+      "sentinel": {
+        "id": 1217,
+        "owner_id": 32,
+        "owner_username": "TRIKONEKT",
+        "level": 0
+      },
+      "level1_under_sentinel": [
+        {
+          "id": 1219,
+          "owner_id": 32,
+          "owner_username": "TRIKONEKT",
+          "pool_type": "FIVE_150",
+          "status": "ACTIVE",
+          "level": 1,
+          "position": 1,
+          "parent_account_id": 1217,
+          "source_type": "PROMO_PURCHASE_APPROVAL",
+          "source_id": "392",
+          "created_at": "2026-01-28 03:35:25.787626+00:00"
+        },
+        {
+          "id": 1221,
+          "owner_id": 32,
+          "owner_username": "TRIKONEKT",
+          "pool_type": "FIVE_150",
+          "status": "ACTIVE",
+          "level": 1,
+          "position": 2,
+          "parent_account_id": 1217,
+          "source_type": "PROMO_PURCHASE_APPROVAL",
+          "source_id": "393",
+          "created_at": "2026-01-28 03:35:31.617575+00:00"
+        },
+        {
+          "id": 1224,
+          "owner_id": 101,
+          "owner_username": "1010000001",
+          "pool_type": "FIVE_150",
+          "status": "ACTIVE",
+          "level": 1,
+          "position": 3,
+          "parent_account_id": 1217,
+          "source_type": "REGISTRATION",
+          "source_id": "101",
+          "created_at": "2026-01-28 06:21:38.932009+00:00"
+        },
+        {
+          "id": 1225,
+          "owner_id": 102,
+          "owner_username": "1010000002",
+          "pool_type": "FIVE_150",
+          "status": "ACTIVE",
+          "level": 1,
+          "position": 4,
+          "parent_account_id": 1217,
+          "source_type": "REGISTRATION",
+          "source_id": "102",
+          "created_at": "2026-01-28 07:31:42.776835+00:00"
+        },
+        {
+          "id": 1226,
+          "owner_id": 103,
+          "owner_username": "1010000003",
+          "pool_type": "FIVE_150",
+          "status": "ACTIVE",
+          "level": 1,
+          "position": 5,
+          "parent_account_id": 1217,
+          "source_type": "REGISTRATION",
+          "source_id": "103",
+          "created_at": "2026-01-28 07:32:51.884225+00:00"
+        }
+      ],
+      "sample_accounts": [
+        {
+          "account": {
+            "id": 1217,
+            "owner_id": 32,
+            "owner_username": "TRIKONEKT",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 0,
+            "position": null,
+            "parent_account_id": null,
+            "source_type": "SENTINEL",
+            "source_id": "FIVE_150",
+            "created_at": "2026-01-28 00:53:55.367421+00:00"
+          },
+          "owner": {
+            "id": 32,
+            "username": "TRIKONEKT",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 03:35:25.226825+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1219,
+            "owner_id": 32,
+            "owner_username": "TRIKONEKT",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 1,
+            "position": 1,
+            "parent_account_id": 1217,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "392",
+            "created_at": "2026-01-28 03:35:25.787626+00:00"
+          },
+          "owner": {
+            "id": 32,
+            "username": "TRIKONEKT",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 03:35:25.226825+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1221,
+            "owner_id": 32,
+            "owner_username": "TRIKONEKT",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 1,
+            "position": 2,
+            "parent_account_id": 1217,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "393",
+            "created_at": "2026-01-28 03:35:31.617575+00:00"
+          },
+          "owner": {
+            "id": 32,
+            "username": "TRIKONEKT",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 03:35:25.226825+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1224,
+            "owner_id": 101,
+            "owner_username": "1010000001",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 1,
+            "position": 3,
+            "parent_account_id": 1217,
+            "source_type": "REGISTRATION",
+            "source_id": "101",
+            "created_at": "2026-01-28 06:21:38.932009+00:00"
+          },
+          "owner": {
+            "id": 101,
+            "username": "1010000001",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 11:35:32.790495+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1225,
+            "owner_id": 102,
+            "owner_username": "1010000002",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 1,
+            "position": 4,
+            "parent_account_id": 1217,
+            "source_type": "REGISTRATION",
+            "source_id": "102",
+            "created_at": "2026-01-28 07:31:42.776835+00:00"
+          },
+          "owner": {
+            "id": 102,
+            "username": "1010000002",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 13:08:50.249577+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1226,
+            "owner_id": 103,
+            "owner_username": "1010000003",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 1,
+            "position": 5,
+            "parent_account_id": 1217,
+            "source_type": "REGISTRATION",
+            "source_id": "103",
+            "created_at": "2026-01-28 07:32:51.884225+00:00"
+          },
+          "owner": {
+            "id": 103,
+            "username": "1010000003",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 13:43:28.963795+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1227,
+            "owner_id": 104,
+            "owner_username": "1010000004",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 1,
+            "parent_account_id": 1219,
+            "source_type": "REGISTRATION",
+            "source_id": "104",
+            "created_at": "2026-01-28 07:33:36.895720+00:00"
+          },
+          "owner": {
+            "id": 104,
+            "username": "1010000004",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 15:27:55.240030+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1228,
+            "owner_id": 105,
+            "owner_username": "1010000005",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 2,
+            "parent_account_id": 1219,
+            "source_type": "REGISTRATION",
+            "source_id": "105",
+            "created_at": "2026-01-28 07:34:37.841065+00:00"
+          },
+          "owner": {
+            "id": 105,
+            "username": "1010000005",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 03:02:56.865514+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1235,
+            "owner_id": 101,
+            "owner_username": "1010000001",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 3,
+            "parent_account_id": 1219,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "394",
+            "created_at": "2026-01-28 11:35:34.339796+00:00"
+          },
+          "owner": {
+            "id": 101,
+            "username": "1010000001",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 11:35:32.790495+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1237,
+            "owner_id": 102,
+            "owner_username": "1010000002",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 4,
+            "parent_account_id": 1219,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "397",
+            "created_at": "2026-01-28 13:08:51.924972+00:00"
+          },
+          "owner": {
+            "id": 102,
+            "username": "1010000002",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 13:08:50.249577+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1239,
+            "owner_id": 102,
+            "owner_username": "1010000002",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 5,
+            "parent_account_id": 1219,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "398",
+            "created_at": "2026-01-28 13:16:10.904387+00:00"
+          },
+          "owner": {
+            "id": 102,
+            "username": "1010000002",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 13:08:50.249577+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1241,
+            "owner_id": 103,
+            "owner_username": "1010000003",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 1,
+            "parent_account_id": 1221,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "400",
+            "created_at": "2026-01-28 13:43:30.044961+00:00"
+          },
+          "owner": {
+            "id": 103,
+            "username": "1010000003",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 13:43:28.963795+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1243,
+            "owner_id": 103,
+            "owner_username": "1010000003",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 2,
+            "parent_account_id": 1221,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "401",
+            "created_at": "2026-01-28 13:53:05.729771+00:00"
+          },
+          "owner": {
+            "id": 103,
+            "username": "1010000003",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 13:43:28.963795+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1245,
+            "owner_id": 104,
+            "owner_username": "1010000004",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 3,
+            "parent_account_id": 1221,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "403",
+            "created_at": "2026-01-28 15:27:56.472102+00:00"
+          },
+          "owner": {
+            "id": 104,
+            "username": "1010000004",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 15:27:55.240030+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1247,
+            "owner_id": 104,
+            "owner_username": "1010000004",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 4,
+            "parent_account_id": 1221,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "404",
+            "created_at": "2026-01-28 15:45:57.085289+00:00"
+          },
+          "owner": {
+            "id": 104,
+            "username": "1010000004",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 15:27:55.240030+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1249,
+            "owner_id": 105,
+            "owner_username": "1010000005",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 5,
+            "parent_account_id": 1221,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "406",
+            "created_at": "2026-01-29 03:02:57.917825+00:00"
+          },
+          "owner": {
+            "id": 105,
+            "username": "1010000005",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 03:02:56.865514+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1251,
+            "owner_id": 105,
+            "owner_username": "1010000005",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 1,
+            "parent_account_id": 1224,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "407",
+            "created_at": "2026-01-29 03:03:01.636837+00:00"
+          },
+          "owner": {
+            "id": 105,
+            "username": "1010000005",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 03:02:56.865514+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1253,
+            "owner_id": 120,
+            "owner_username": "1010000006",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 2,
+            "parent_account_id": 1224,
+            "source_type": "REGISTRATION",
+            "source_id": "120",
+            "created_at": "2026-01-29 03:46:23.636253+00:00"
+          },
+          "owner": {
+            "id": 120,
+            "username": "1010000006",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 04:12:19.015223+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1254,
+            "owner_id": 121,
+            "owner_username": "1010000007",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 3,
+            "parent_account_id": 1224,
+            "source_type": "REGISTRATION",
+            "source_id": "121",
+            "created_at": "2026-01-29 03:47:33.448908+00:00"
+          },
+          "owner": {
+            "id": 121,
+            "username": "1010000007",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 04:12:24.900452+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1255,
+            "owner_id": 122,
+            "owner_username": "1010000008",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 4,
+            "parent_account_id": 1224,
+            "source_type": "REGISTRATION",
+            "source_id": "122",
+            "created_at": "2026-01-29 03:53:05.086843+00:00"
+          },
+          "owner": {
+            "id": 122,
+            "username": "1010000008",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 04:12:30.034808+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1257,
+            "owner_id": 124,
+            "owner_username": "1010000009",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 1,
+            "parent_account_id": 1225,
+            "source_type": "REGISTRATION",
+            "source_id": "124",
+            "created_at": "2026-01-29 03:55:47.923607+00:00"
+          },
+          "owner": {
+            "id": 124,
+            "username": "1010000009",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 04:12:35.433252+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1258,
+            "owner_id": 125,
+            "owner_username": "1010000010",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 2,
+            "parent_account_id": 1225,
+            "source_type": "REGISTRATION",
+            "source_id": "125",
+            "created_at": "2026-01-29 03:56:53.697609+00:00"
+          },
+          "owner": {
+            "id": 125,
+            "username": "1010000010",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 04:12:41.596284+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1259,
+            "owner_id": 120,
+            "owner_username": "1010000006",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 5,
+            "parent_account_id": 1224,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "409",
+            "created_at": "2026-01-29 04:12:20.061633+00:00"
+          },
+          "owner": {
+            "id": 120,
+            "username": "1010000006",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 04:12:19.015223+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1261,
+            "owner_id": 120,
+            "owner_username": "1010000006",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 3,
+            "parent_account_id": 1225,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "410",
+            "created_at": "2026-01-29 04:12:23.395089+00:00"
+          },
+          "owner": {
+            "id": 120,
+            "username": "1010000006",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 04:12:19.015223+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1263,
+            "owner_id": 121,
+            "owner_username": "1010000007",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 4,
+            "parent_account_id": 1225,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "411",
+            "created_at": "2026-01-29 04:12:26.116783+00:00"
+          },
+          "owner": {
+            "id": 121,
+            "username": "1010000007",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 04:12:24.900452+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1265,
+            "owner_id": 121,
+            "owner_username": "1010000007",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 5,
+            "parent_account_id": 1225,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "412",
+            "created_at": "2026-01-29 04:12:28.252204+00:00"
+          },
+          "owner": {
+            "id": 121,
+            "username": "1010000007",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 04:12:24.900452+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1267,
+            "owner_id": 122,
+            "owner_username": "1010000008",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 1,
+            "parent_account_id": 1226,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "413",
+            "created_at": "2026-01-29 04:12:31.003963+00:00"
+          },
+          "owner": {
+            "id": 122,
+            "username": "1010000008",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 04:12:30.034808+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1269,
+            "owner_id": 122,
+            "owner_username": "1010000008",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 2,
+            "parent_account_id": 1226,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "414",
+            "created_at": "2026-01-29 04:12:33.742248+00:00"
+          },
+          "owner": {
+            "id": 122,
+            "username": "1010000008",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 04:12:30.034808+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1271,
+            "owner_id": 124,
+            "owner_username": "1010000009",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 3,
+            "parent_account_id": 1226,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "415",
+            "created_at": "2026-01-29 04:12:36.532158+00:00"
+          },
+          "owner": {
+            "id": 124,
+            "username": "1010000009",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 04:12:35.433252+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1273,
+            "owner_id": 124,
+            "owner_username": "1010000009",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 4,
+            "parent_account_id": 1226,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "416",
+            "created_at": "2026-01-29 04:12:39.886950+00:00"
+          },
+          "owner": {
+            "id": 124,
+            "username": "1010000009",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 04:12:35.433252+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1275,
+            "owner_id": 125,
+            "owner_username": "1010000010",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 5,
+            "parent_account_id": 1226,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "417",
+            "created_at": "2026-01-29 04:12:42.618495+00:00"
+          },
+          "owner": {
+            "id": 125,
+            "username": "1010000010",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 04:12:41.596284+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1277,
+            "owner_id": 125,
+            "owner_username": "1010000010",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 1,
+            "parent_account_id": 1227,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "418",
+            "created_at": "2026-01-29 04:12:45.418966+00:00"
+          },
+          "owner": {
+            "id": 125,
+            "username": "1010000010",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 04:12:41.596284+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1279,
+            "owner_id": 126,
+            "owner_username": "8310547774",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 2,
+            "parent_account_id": 1227,
+            "source_type": "REGISTRATION",
+            "source_id": "126",
+            "created_at": "2026-01-29 04:36:42.951925+00:00"
+          },
+          "owner": {
+            "id": 126,
+            "username": "8310547774",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 07:00:22.051366+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1280,
+            "owner_id": 127,
+            "owner_username": "0831054777",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 3,
+            "parent_account_id": 1227,
+            "source_type": "REGISTRATION",
+            "source_id": "127",
+            "created_at": "2026-01-29 04:43:04.832627+00:00"
+          },
+          "owner": {
+            "id": 127,
+            "username": "0831054777",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": false,
+            "first_purchase_activated_at": null
+          }
+        },
+        {
+          "account": {
+            "id": 1281,
+            "owner_id": 128,
+            "owner_username": "7026122552",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 4,
+            "parent_account_id": 1227,
+            "source_type": "REGISTRATION",
+            "source_id": "128",
+            "created_at": "2026-01-29 05:11:48.452533+00:00"
+          },
+          "owner": {
+            "id": 128,
+            "username": "7026122552",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 05:48:26.768025+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1282,
+            "owner_id": 129,
+            "owner_username": "9008140507",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 5,
+            "parent_account_id": 1227,
+            "source_type": "REGISTRATION",
+            "source_id": "129",
+            "created_at": "2026-01-29 05:16:12.730220+00:00"
+          },
+          "owner": {
+            "id": 129,
+            "username": "9008140507",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 09:43:08.631337+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1283,
+            "owner_id": 128,
+            "owner_username": "7026122552",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 1,
+            "parent_account_id": 1228,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "421",
+            "created_at": "2026-01-29 05:48:27.946420+00:00"
+          },
+          "owner": {
+            "id": 128,
+            "username": "7026122552",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 05:48:26.768025+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1285,
+            "owner_id": 130,
+            "owner_username": "8971951221",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 2,
+            "parent_account_id": 1228,
+            "source_type": "REGISTRATION",
+            "source_id": "130",
+            "created_at": "2026-01-29 06:28:09.429710+00:00"
+          },
+          "owner": {
+            "id": 130,
+            "username": "8971951221",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": false,
+            "first_purchase_activated_at": null
+          }
+        },
+        {
+          "account": {
+            "id": 1286,
+            "owner_id": 131,
+            "owner_username": "0897195122",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 3,
+            "parent_account_id": 1228,
+            "source_type": "REGISTRATION",
+            "source_id": "131",
+            "created_at": "2026-01-29 06:31:40.056612+00:00"
+          },
+          "owner": {
+            "id": 131,
+            "username": "0897195122",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": false,
+            "first_purchase_activated_at": null
+          }
+        },
+        {
+          "account": {
+            "id": 1287,
+            "owner_id": 132,
+            "owner_username": "8792202719",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 4,
+            "parent_account_id": 1228,
+            "source_type": "REGISTRATION",
+            "source_id": "132",
+            "created_at": "2026-01-29 06:35:43.999594+00:00"
+          },
+          "owner": {
+            "id": 132,
+            "username": "8792202719",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": false,
+            "first_purchase_activated_at": null
+          }
+        },
+        {
+          "account": {
+            "id": 1288,
+            "owner_id": 133,
+            "owner_username": "9704221726",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 5,
+            "parent_account_id": 1228,
+            "source_type": "REGISTRATION",
+            "source_id": "133",
+            "created_at": "2026-01-29 06:41:18.592542+00:00"
+          },
+          "owner": {
+            "id": 133,
+            "username": "9704221726",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 09:45:37.523427+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1289,
+            "owner_id": 126,
+            "owner_username": "8310547774",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 1,
+            "parent_account_id": 1235,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "422",
+            "created_at": "2026-01-29 07:00:23.334215+00:00"
+          },
+          "owner": {
+            "id": 126,
+            "username": "8310547774",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 07:00:22.051366+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1291,
+            "owner_id": 134,
+            "owner_username": "8088822445",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 2,
+            "parent_account_id": 1235,
+            "source_type": "REGISTRATION",
+            "source_id": "134",
+            "created_at": "2026-01-29 07:17:28.544464+00:00"
+          },
+          "owner": {
+            "id": 134,
+            "username": "8088822445",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": false,
+            "first_purchase_activated_at": null
+          }
+        },
+        {
+          "account": {
+            "id": 1292,
+            "owner_id": 135,
+            "owner_username": "9611443183",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 3,
+            "parent_account_id": 1235,
+            "source_type": "REGISTRATION",
+            "source_id": "135",
+            "created_at": "2026-01-29 07:38:36.636336+00:00"
+          },
+          "owner": {
+            "id": 135,
+            "username": "9611443183",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": false,
+            "first_purchase_activated_at": null
+          }
+        },
+        {
+          "account": {
+            "id": 1293,
+            "owner_id": 136,
+            "owner_username": "8095918105",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 4,
+            "parent_account_id": 1235,
+            "source_type": "REGISTRATION",
+            "source_id": "136",
+            "created_at": "2026-01-29 07:40:33.449951+00:00"
+          },
+          "owner": {
+            "id": 136,
+            "username": "8095918105",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 07:41:53.376203+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1294,
+            "owner_id": 136,
+            "owner_username": "8095918105",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 5,
+            "parent_account_id": 1235,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "423",
+            "created_at": "2026-01-29 07:41:54.921603+00:00"
+          },
+          "owner": {
+            "id": 136,
+            "username": "8095918105",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 07:41:53.376203+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1296,
+            "owner_id": 137,
+            "owner_username": "7022026569",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 1,
+            "parent_account_id": 1237,
+            "source_type": "REGISTRATION",
+            "source_id": "137",
+            "created_at": "2026-01-29 07:41:58.020185+00:00"
+          },
+          "owner": {
+            "id": 137,
+            "username": "7022026569",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": false,
+            "first_purchase_activated_at": null
+          }
+        },
+        {
+          "account": {
+            "id": 1297,
+            "owner_id": 139,
+            "owner_username": "0809591810",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 2,
+            "parent_account_id": 1237,
+            "source_type": "REGISTRATION",
+            "source_id": "139",
+            "created_at": "2026-01-29 08:04:49.262502+00:00"
+          },
+          "owner": {
+            "id": 139,
+            "username": "0809591810",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 08:09:17.688863+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1298,
+            "owner_id": 140,
+            "owner_username": "9606535824",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 3,
+            "parent_account_id": 1237,
+            "source_type": "REGISTRATION",
+            "source_id": "140",
+            "created_at": "2026-01-29 08:06:58.605132+00:00"
+          },
+          "owner": {
+            "id": 140,
+            "username": "9606535824",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": false,
+            "first_purchase_activated_at": null
+          }
+        },
+        {
+          "account": {
+            "id": 1299,
+            "owner_id": 139,
+            "owner_username": "0809591810",
+            "pool_type": "FIVE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 4,
+            "parent_account_id": 1237,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "425",
+            "created_at": "2026-01-29 08:09:19.156877+00:00"
+          },
+          "owner": {
+            "id": 139,
+            "username": "0809591810",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 08:09:17.688863+00:00"
+          }
+        }
+      ]
+    },
+    "THREE_150": {
+      "total_accounts": 42,
+      "total_active": 42,
+      "sentinel": {
+        "id": 1218,
+        "owner_id": 32,
+        "owner_username": "TRIKONEKT",
+        "level": 0
+      },
+      "level1_under_sentinel": [
+        {
+          "id": 1220,
+          "owner_id": 32,
+          "owner_username": "TRIKONEKT",
+          "pool_type": "THREE_150",
+          "status": "ACTIVE",
+          "level": 1,
+          "position": 1,
+          "parent_account_id": 1218,
+          "source_type": "PROMO_PURCHASE_APPROVAL",
+          "source_id": "392",
+          "created_at": "2026-01-28 03:35:25.815016+00:00"
+        },
+        {
+          "id": 1222,
+          "owner_id": 32,
+          "owner_username": "TRIKONEKT",
+          "pool_type": "THREE_150",
+          "status": "ACTIVE",
+          "level": 1,
+          "position": 2,
+          "parent_account_id": 1218,
+          "source_type": "PROMO_PURCHASE_APPROVAL",
+          "source_id": "393",
+          "created_at": "2026-01-28 03:35:31.640326+00:00"
+        },
+        {
+          "id": 1236,
+          "owner_id": 101,
+          "owner_username": "1010000001",
+          "pool_type": "THREE_150",
+          "status": "ACTIVE",
+          "level": 1,
+          "position": 3,
+          "parent_account_id": 1218,
+          "source_type": "PROMO_PURCHASE_APPROVAL",
+          "source_id": "394",
+          "created_at": "2026-01-28 11:35:34.387269+00:00"
+        }
+      ],
+      "sample_accounts": [
+        {
+          "account": {
+            "id": 1218,
+            "owner_id": 32,
+            "owner_username": "TRIKONEKT",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 0,
+            "position": null,
+            "parent_account_id": null,
+            "source_type": "SENTINEL",
+            "source_id": "THREE_150",
+            "created_at": "2026-01-28 00:54:05.446477+00:00"
+          },
+          "owner": {
+            "id": 32,
+            "username": "TRIKONEKT",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 03:35:25.226825+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1220,
+            "owner_id": 32,
+            "owner_username": "TRIKONEKT",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 1,
+            "position": 1,
+            "parent_account_id": 1218,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "392",
+            "created_at": "2026-01-28 03:35:25.815016+00:00"
+          },
+          "owner": {
+            "id": 32,
+            "username": "TRIKONEKT",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 03:35:25.226825+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1222,
+            "owner_id": 32,
+            "owner_username": "TRIKONEKT",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 1,
+            "position": 2,
+            "parent_account_id": 1218,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "393",
+            "created_at": "2026-01-28 03:35:31.640326+00:00"
+          },
+          "owner": {
+            "id": 32,
+            "username": "TRIKONEKT",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 03:35:25.226825+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1236,
+            "owner_id": 101,
+            "owner_username": "1010000001",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 1,
+            "position": 3,
+            "parent_account_id": 1218,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "394",
+            "created_at": "2026-01-28 11:35:34.387269+00:00"
+          },
+          "owner": {
+            "id": 101,
+            "username": "1010000001",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 11:35:32.790495+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1238,
+            "owner_id": 102,
+            "owner_username": "1010000002",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 1,
+            "parent_account_id": 1220,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "397",
+            "created_at": "2026-01-28 13:08:51.986663+00:00"
+          },
+          "owner": {
+            "id": 102,
+            "username": "1010000002",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 13:08:50.249577+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1240,
+            "owner_id": 102,
+            "owner_username": "1010000002",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 2,
+            "parent_account_id": 1220,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "398",
+            "created_at": "2026-01-28 13:16:10.940630+00:00"
+          },
+          "owner": {
+            "id": 102,
+            "username": "1010000002",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 13:08:50.249577+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1242,
+            "owner_id": 103,
+            "owner_username": "1010000003",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 3,
+            "parent_account_id": 1220,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "400",
+            "created_at": "2026-01-28 13:43:30.107558+00:00"
+          },
+          "owner": {
+            "id": 103,
+            "username": "1010000003",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 13:43:28.963795+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1244,
+            "owner_id": 103,
+            "owner_username": "1010000003",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 1,
+            "parent_account_id": 1222,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "401",
+            "created_at": "2026-01-28 13:53:05.790838+00:00"
+          },
+          "owner": {
+            "id": 103,
+            "username": "1010000003",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 13:43:28.963795+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1246,
+            "owner_id": 104,
+            "owner_username": "1010000004",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 2,
+            "parent_account_id": 1222,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "403",
+            "created_at": "2026-01-28 15:27:56.520875+00:00"
+          },
+          "owner": {
+            "id": 104,
+            "username": "1010000004",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 15:27:55.240030+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1248,
+            "owner_id": 104,
+            "owner_username": "1010000004",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 3,
+            "parent_account_id": 1222,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "404",
+            "created_at": "2026-01-28 15:45:57.126015+00:00"
+          },
+          "owner": {
+            "id": 104,
+            "username": "1010000004",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 15:27:55.240030+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1250,
+            "owner_id": 105,
+            "owner_username": "1010000005",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 1,
+            "parent_account_id": 1236,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "406",
+            "created_at": "2026-01-29 03:02:57.992841+00:00"
+          },
+          "owner": {
+            "id": 105,
+            "username": "1010000005",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 03:02:56.865514+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1252,
+            "owner_id": 105,
+            "owner_username": "1010000005",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 2,
+            "parent_account_id": 1236,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "407",
+            "created_at": "2026-01-29 03:03:01.702729+00:00"
+          },
+          "owner": {
+            "id": 105,
+            "username": "1010000005",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 03:02:56.865514+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1260,
+            "owner_id": 120,
+            "owner_username": "1010000006",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 2,
+            "position": 3,
+            "parent_account_id": 1236,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "409",
+            "created_at": "2026-01-29 04:12:20.136489+00:00"
+          },
+          "owner": {
+            "id": 120,
+            "username": "1010000006",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 04:12:19.015223+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1262,
+            "owner_id": 120,
+            "owner_username": "1010000006",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 1,
+            "parent_account_id": 1238,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "410",
+            "created_at": "2026-01-29 04:12:23.450473+00:00"
+          },
+          "owner": {
+            "id": 120,
+            "username": "1010000006",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 04:12:19.015223+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1264,
+            "owner_id": 121,
+            "owner_username": "1010000007",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 2,
+            "parent_account_id": 1238,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "411",
+            "created_at": "2026-01-29 04:12:26.186552+00:00"
+          },
+          "owner": {
+            "id": 121,
+            "username": "1010000007",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 04:12:24.900452+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1266,
+            "owner_id": 121,
+            "owner_username": "1010000007",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 3,
+            "parent_account_id": 1238,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "412",
+            "created_at": "2026-01-29 04:12:28.338680+00:00"
+          },
+          "owner": {
+            "id": 121,
+            "username": "1010000007",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 04:12:24.900452+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1268,
+            "owner_id": 122,
+            "owner_username": "1010000008",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 1,
+            "parent_account_id": 1240,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "413",
+            "created_at": "2026-01-29 04:12:31.064656+00:00"
+          },
+          "owner": {
+            "id": 122,
+            "username": "1010000008",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 04:12:30.034808+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1270,
+            "owner_id": 122,
+            "owner_username": "1010000008",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 2,
+            "parent_account_id": 1240,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "414",
+            "created_at": "2026-01-29 04:12:33.833367+00:00"
+          },
+          "owner": {
+            "id": 122,
+            "username": "1010000008",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 04:12:30.034808+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1272,
+            "owner_id": 124,
+            "owner_username": "1010000009",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 3,
+            "parent_account_id": 1240,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "415",
+            "created_at": "2026-01-29 04:12:36.646868+00:00"
+          },
+          "owner": {
+            "id": 124,
+            "username": "1010000009",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 04:12:35.433252+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1274,
+            "owner_id": 124,
+            "owner_username": "1010000009",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 1,
+            "parent_account_id": 1242,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "416",
+            "created_at": "2026-01-29 04:12:39.955071+00:00"
+          },
+          "owner": {
+            "id": 124,
+            "username": "1010000009",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 04:12:35.433252+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1276,
+            "owner_id": 125,
+            "owner_username": "1010000010",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 2,
+            "parent_account_id": 1242,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "417",
+            "created_at": "2026-01-29 04:12:42.703476+00:00"
+          },
+          "owner": {
+            "id": 125,
+            "username": "1010000010",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 04:12:41.596284+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1278,
+            "owner_id": 125,
+            "owner_username": "1010000010",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 3,
+            "parent_account_id": 1242,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "418",
+            "created_at": "2026-01-29 04:12:45.493672+00:00"
+          },
+          "owner": {
+            "id": 125,
+            "username": "1010000010",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 04:12:41.596284+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1284,
+            "owner_id": 128,
+            "owner_username": "7026122552",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 1,
+            "parent_account_id": 1244,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "421",
+            "created_at": "2026-01-29 05:48:28.053183+00:00"
+          },
+          "owner": {
+            "id": 128,
+            "username": "7026122552",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 05:48:26.768025+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1290,
+            "owner_id": 126,
+            "owner_username": "8310547774",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 2,
+            "parent_account_id": 1244,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "422",
+            "created_at": "2026-01-29 07:00:23.439419+00:00"
+          },
+          "owner": {
+            "id": 126,
+            "username": "8310547774",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 07:00:22.051366+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1295,
+            "owner_id": 136,
+            "owner_username": "8095918105",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 3,
+            "parent_account_id": 1244,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "423",
+            "created_at": "2026-01-29 07:41:55.046498+00:00"
+          },
+          "owner": {
+            "id": 136,
+            "username": "8095918105",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 07:41:53.376203+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1300,
+            "owner_id": 139,
+            "owner_username": "0809591810",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 1,
+            "parent_account_id": 1246,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "425",
+            "created_at": "2026-01-29 08:09:19.319499+00:00"
+          },
+          "owner": {
+            "id": 139,
+            "username": "0809591810",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 08:09:17.688863+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1304,
+            "owner_id": 129,
+            "owner_username": "9008140507",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 2,
+            "parent_account_id": 1246,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "424",
+            "created_at": "2026-01-29 09:43:10.008416+00:00"
+          },
+          "owner": {
+            "id": 129,
+            "username": "9008140507",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 09:43:08.631337+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1306,
+            "owner_id": 133,
+            "owner_username": "9704221726",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 3,
+            "parent_account_id": 1246,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "426",
+            "created_at": "2026-01-29 09:45:38.617229+00:00"
+          },
+          "owner": {
+            "id": 133,
+            "username": "9704221726",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 09:45:37.523427+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1342,
+            "owner_id": 150,
+            "owner_username": "8095918106",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 1,
+            "parent_account_id": 1248,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "427",
+            "created_at": "2026-01-29 10:31:01.574558+00:00"
+          },
+          "owner": {
+            "id": 150,
+            "username": "8095918106",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 10:30:36.796841+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1344,
+            "owner_id": 150,
+            "owner_username": "8095918106",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 2,
+            "parent_account_id": 1248,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "428",
+            "created_at": "2026-01-29 10:51:19.933244+00:00"
+          },
+          "owner": {
+            "id": 150,
+            "username": "8095918106",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 10:30:36.796841+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1351,
+            "owner_id": 187,
+            "owner_username": "7760377601",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 3,
+            "parent_account_id": 1248,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "493",
+            "created_at": "2026-01-29 15:01:26.026779+00:00"
+          },
+          "owner": {
+            "id": 187,
+            "username": "7760377601",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 15:01:24.819242+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1354,
+            "owner_id": 188,
+            "owner_username": "9739214809",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 1,
+            "parent_account_id": 1250,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "494",
+            "created_at": "2026-01-29 15:10:52.384350+00:00"
+          },
+          "owner": {
+            "id": 188,
+            "username": "9739214809",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 15:10:50.182855+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1357,
+            "owner_id": 189,
+            "owner_username": "9886933927",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 2,
+            "parent_account_id": 1250,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "496",
+            "created_at": "2026-01-29 15:19:38.484345+00:00"
+          },
+          "owner": {
+            "id": 189,
+            "username": "9886933927",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 15:19:37.160955+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1360,
+            "owner_id": 190,
+            "owner_username": "8310806917",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 3,
+            "parent_account_id": 1250,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "497",
+            "created_at": "2026-01-29 15:33:07.772101+00:00"
+          },
+          "owner": {
+            "id": 190,
+            "username": "8310806917",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 15:33:06.423467+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1362,
+            "owner_id": 32,
+            "owner_username": "TRIKONEKT",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 1,
+            "parent_account_id": 1252,
+            "source_type": "ECOUPON_150",
+            "source_id": "29",
+            "created_at": "2026-01-29 16:36:48.244504+00:00"
+          },
+          "owner": {
+            "id": 32,
+            "username": "TRIKONEKT",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 03:35:25.226825+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1364,
+            "owner_id": 32,
+            "owner_username": "TRIKONEKT",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 2,
+            "parent_account_id": 1252,
+            "source_type": "ECOUPON",
+            "source_id": "29",
+            "created_at": "2026-01-29 16:36:48.836408+00:00"
+          },
+          "owner": {
+            "id": 32,
+            "username": "TRIKONEKT",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 03:35:25.226825+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1366,
+            "owner_id": 32,
+            "owner_username": "TRIKONEKT",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 3,
+            "parent_account_id": 1252,
+            "source_type": "ECOUPON_150",
+            "source_id": "30",
+            "created_at": "2026-01-29 16:40:28.096756+00:00"
+          },
+          "owner": {
+            "id": 32,
+            "username": "TRIKONEKT",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 03:35:25.226825+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1368,
+            "owner_id": 32,
+            "owner_username": "TRIKONEKT",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 1,
+            "parent_account_id": 1260,
+            "source_type": "ECOUPON",
+            "source_id": "30",
+            "created_at": "2026-01-29 16:40:28.689635+00:00"
+          },
+          "owner": {
+            "id": 32,
+            "username": "TRIKONEKT",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-28 03:35:25.226825+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1370,
+            "owner_id": 136,
+            "owner_username": "8095918105",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 2,
+            "parent_account_id": 1260,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "498",
+            "created_at": "2026-01-29 16:40:35.149372+00:00"
+          },
+          "owner": {
+            "id": 136,
+            "username": "8095918105",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 07:41:53.376203+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1372,
+            "owner_id": 125,
+            "owner_username": "1010000010",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 3,
+            "position": 3,
+            "parent_account_id": 1260,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "499",
+            "created_at": "2026-01-29 16:44:19.656921+00:00"
+          },
+          "owner": {
+            "id": 125,
+            "username": "1010000010",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 04:12:41.596284+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1374,
+            "owner_id": 136,
+            "owner_username": "8095918105",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 4,
+            "position": 1,
+            "parent_account_id": 1262,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "502",
+            "created_at": "2026-01-29 17:01:56.833802+00:00"
+          },
+          "owner": {
+            "id": 136,
+            "username": "8095918105",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-29 07:41:53.376203+00:00"
+          }
+        },
+        {
+          "account": {
+            "id": 1377,
+            "owner_id": 185,
+            "owner_username": "0991662908",
+            "pool_type": "THREE_150",
+            "status": "ACTIVE",
+            "level": 4,
+            "position": 2,
+            "parent_account_id": 1262,
+            "source_type": "PROMO_PURCHASE_APPROVAL",
+            "source_id": "505",
+            "created_at": "2026-01-30 05:47:23.787716+00:00"
+          },
+          "owner": {
+            "id": 185,
+            "username": "0991662908",
+            "category": "consumer",
+            "is_staff": false,
+            "is_superuser": false,
+            "account_active": true,
+            "first_purchase_activated_at": "2026-01-30 05:47:22.358704+00:00"
+          }
+        }
+      ]
+    }
+  },
+  "root_user": {
+    "id": 32,
+    "username": "TRIKONEKT",
+    "category": "consumer",
+    "is_staff": false,
+    "is_superuser": false,
+    "account_active": true,
+    "first_purchase_activated_at": "2026-01-28 03:35:25.226825+00:00"
+  },
+  "users_matrix_presence": [
+    {
+      "id": 32,
+      "username": "TRIKONEKT",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": true,
+      "first_purchase_activated_at": "2026-01-28 03:35:25.226825+00:00",
+      "has_FIVE_150": true,
+      "has_THREE_150": true
+    },
+    {
+      "id": 1,
+      "username": "admin",
+      "category": "consumer",
+      "is_staff": true,
+      "is_superuser": true,
+      "account_active": true,
+      "first_purchase_activated_at": "2026-01-26 09:31:35.442970+00:00",
+      "has_FIVE_150": false,
+      "has_THREE_150": false
+    },
+    {
+      "id": 27,
+      "username": "CONS_USER1",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": false,
+      "first_purchase_activated_at": null,
+      "has_FIVE_150": false,
+      "has_THREE_150": false
+    },
+    {
+      "id": 32,
+      "username": "TRIKONEKT",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": true,
+      "first_purchase_activated_at": "2026-01-28 03:35:25.226825+00:00",
+      "has_FIVE_150": true,
+      "has_THREE_150": true
+    },
+    {
+      "id": 36,
+      "username": "TR9000000002",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": false,
+      "first_purchase_activated_at": null,
+      "has_FIVE_150": false,
+      "has_THREE_150": false
+    },
+    {
+      "id": 101,
+      "username": "1010000001",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": true,
+      "first_purchase_activated_at": "2026-01-28 11:35:32.790495+00:00",
+      "has_FIVE_150": true,
+      "has_THREE_150": true
+    },
+    {
+      "id": 102,
+      "username": "1010000002",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": true,
+      "first_purchase_activated_at": "2026-01-28 13:08:50.249577+00:00",
+      "has_FIVE_150": true,
+      "has_THREE_150": true
+    },
+    {
+      "id": 103,
+      "username": "1010000003",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": true,
+      "first_purchase_activated_at": "2026-01-28 13:43:28.963795+00:00",
+      "has_FIVE_150": true,
+      "has_THREE_150": true
+    },
+    {
+      "id": 104,
+      "username": "1010000004",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": true,
+      "first_purchase_activated_at": "2026-01-28 15:27:55.240030+00:00",
+      "has_FIVE_150": true,
+      "has_THREE_150": true
+    },
+    {
+      "id": 105,
+      "username": "1010000005",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": true,
+      "first_purchase_activated_at": "2026-01-29 03:02:56.865514+00:00",
+      "has_FIVE_150": true,
+      "has_THREE_150": true
+    },
+    {
+      "id": 120,
+      "username": "1010000006",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": true,
+      "first_purchase_activated_at": "2026-01-29 04:12:19.015223+00:00",
+      "has_FIVE_150": true,
+      "has_THREE_150": true
+    },
+    {
+      "id": 121,
+      "username": "1010000007",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": true,
+      "first_purchase_activated_at": "2026-01-29 04:12:24.900452+00:00",
+      "has_FIVE_150": true,
+      "has_THREE_150": true
+    },
+    {
+      "id": 122,
+      "username": "1010000008",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": true,
+      "first_purchase_activated_at": "2026-01-29 04:12:30.034808+00:00",
+      "has_FIVE_150": true,
+      "has_THREE_150": true
+    },
+    {
+      "id": 124,
+      "username": "1010000009",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": true,
+      "first_purchase_activated_at": "2026-01-29 04:12:35.433252+00:00",
+      "has_FIVE_150": true,
+      "has_THREE_150": true
+    },
+    {
+      "id": 125,
+      "username": "1010000010",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": true,
+      "first_purchase_activated_at": "2026-01-29 04:12:41.596284+00:00",
+      "has_FIVE_150": true,
+      "has_THREE_150": true
+    },
+    {
+      "id": 126,
+      "username": "8310547774",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": true,
+      "first_purchase_activated_at": "2026-01-29 07:00:22.051366+00:00",
+      "has_FIVE_150": true,
+      "has_THREE_150": true
+    },
+    {
+      "id": 127,
+      "username": "0831054777",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": false,
+      "first_purchase_activated_at": null,
+      "has_FIVE_150": true,
+      "has_THREE_150": false
+    },
+    {
+      "id": 128,
+      "username": "7026122552",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": true,
+      "first_purchase_activated_at": "2026-01-29 05:48:26.768025+00:00",
+      "has_FIVE_150": true,
+      "has_THREE_150": true
+    },
+    {
+      "id": 129,
+      "username": "9008140507",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": true,
+      "first_purchase_activated_at": "2026-01-29 09:43:08.631337+00:00",
+      "has_FIVE_150": true,
+      "has_THREE_150": true
+    },
+    {
+      "id": 130,
+      "username": "8971951221",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": false,
+      "first_purchase_activated_at": null,
+      "has_FIVE_150": true,
+      "has_THREE_150": false
+    },
+    {
+      "id": 131,
+      "username": "0897195122",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": false,
+      "first_purchase_activated_at": null,
+      "has_FIVE_150": true,
+      "has_THREE_150": false
+    },
+    {
+      "id": 132,
+      "username": "8792202719",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": false,
+      "first_purchase_activated_at": null,
+      "has_FIVE_150": true,
+      "has_THREE_150": false
+    },
+    {
+      "id": 133,
+      "username": "9704221726",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": true,
+      "first_purchase_activated_at": "2026-01-29 09:45:37.523427+00:00",
+      "has_FIVE_150": true,
+      "has_THREE_150": true
+    },
+    {
+      "id": 134,
+      "username": "8088822445",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": false,
+      "first_purchase_activated_at": null,
+      "has_FIVE_150": true,
+      "has_THREE_150": false
+    },
+    {
+      "id": 135,
+      "username": "9611443183",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": false,
+      "first_purchase_activated_at": null,
+      "has_FIVE_150": true,
+      "has_THREE_150": false
+    },
+    {
+      "id": 136,
+      "username": "8095918105",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": true,
+      "first_purchase_activated_at": "2026-01-29 07:41:53.376203+00:00",
+      "has_FIVE_150": true,
+      "has_THREE_150": true
+    },
+    {
+      "id": 137,
+      "username": "7022026569",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": false,
+      "first_purchase_activated_at": null,
+      "has_FIVE_150": true,
+      "has_THREE_150": false
+    },
+    {
+      "id": 139,
+      "username": "0809591810",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": true,
+      "first_purchase_activated_at": "2026-01-29 08:09:17.688863+00:00",
+      "has_FIVE_150": true,
+      "has_THREE_150": true
+    },
+    {
+      "id": 140,
+      "username": "9606535824",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": false,
+      "first_purchase_activated_at": null,
+      "has_FIVE_150": true,
+      "has_THREE_150": false
+    },
+    {
+      "id": 143,
+      "username": "9739523166",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": false,
+      "first_purchase_activated_at": null,
+      "has_FIVE_150": true,
+      "has_THREE_150": false
+    },
+    {
+      "id": 148,
+      "username": "0997261906",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": false,
+      "first_purchase_activated_at": null,
+      "has_FIVE_150": true,
+      "has_THREE_150": false
+    },
+    {
+      "id": 149,
+      "username": "9197042217",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": false,
+      "first_purchase_activated_at": null,
+      "has_FIVE_150": true,
+      "has_THREE_150": false
+    },
+    {
+      "id": 150,
+      "username": "8095918106",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": true,
+      "first_purchase_activated_at": "2026-01-29 10:30:36.796841+00:00",
+      "has_FIVE_150": true,
+      "has_THREE_150": true
+    },
+    {
+      "id": 183,
+      "username": "7892413601",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": false,
+      "first_purchase_activated_at": null,
+      "has_FIVE_150": true,
+      "has_THREE_150": false
+    },
+    {
+      "id": 184,
+      "username": "8147108566",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": false,
+      "first_purchase_activated_at": null,
+      "has_FIVE_150": true,
+      "has_THREE_150": false
+    },
+    {
+      "id": 185,
+      "username": "0991662908",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": true,
+      "first_purchase_activated_at": "2026-01-30 05:47:22.358704+00:00",
+      "has_FIVE_150": true,
+      "has_THREE_150": true
+    },
+    {
+      "id": 187,
+      "username": "7760377601",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": true,
+      "first_purchase_activated_at": "2026-01-29 15:01:24.819242+00:00",
+      "has_FIVE_150": true,
+      "has_THREE_150": true
+    },
+    {
+      "id": 188,
+      "username": "9739214809",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": true,
+      "first_purchase_activated_at": "2026-01-29 15:10:50.182855+00:00",
+      "has_FIVE_150": true,
+      "has_THREE_150": true
+    },
+    {
+      "id": 189,
+      "username": "9886933927",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": true,
+      "first_purchase_activated_at": "2026-01-29 15:19:37.160955+00:00",
+      "has_FIVE_150": true,
+      "has_THREE_150": true
+    },
+    {
+      "id": 190,
+      "username": "8310806917",
+      "category": "consumer",
+      "is_staff": false,
+      "is_superuser": false,
+      "account_active": true,
+      "first_purchase_activated_at": "2026-01-29 15:33:06.423467+00:00",
+      "has_FIVE_150": true,
+      "has_THREE_150": true
+    }
+  ]
+}

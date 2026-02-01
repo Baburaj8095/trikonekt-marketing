@@ -1324,29 +1324,33 @@ def handle_promo_approve_payouts(task: BackgroundTask) -> None:
     """
     Background: process PRIME promo approval side-effects (payouts/matrix) for a PromoPurchase.
 
-    Payload:
-      {
-        "purchase_id": int,
-        "reviewer_id": int | null
-      }
-    Idempotent via:
-      - BackgroundTask.idempotency_key (e.g., "promo_approve:{purchase_id}")
-      - Audit "promo_purchase_distributed" with metadata.purchase_id
+    Enforced flow for PRIME 150:
+      - Idempotency check (AuditTrail)
+      - Within a DB transaction:
+          * create structural matrix entry (AutoPoolAccount, FIVE_150) if missing
+          * call existing payout engine (no formula changes)
+          * write audit with entry_id
+        (atomic: entry rolled back if payout fails)
+
+    Other packages (PRIME 750 / PRIME 759) reuse existing payout engines unchanged.
     """
+    from decimal import Decimal as D
+    from django.db import transaction
+
     payload = task.payload or {}
     pid = payload.get("purchase_id")
     if not pid:
         return
 
-    from decimal import Decimal as D
+    # Late imports to avoid circulars
     from business.models import PromoPurchase
     from coupons.models import AuditTrail
 
     obj = PromoPurchase.objects.select_related("user", "package").filter(pk=int(pid)).first()
-    if not obj or str(getattr(obj, "status", "")) != "APPROVED":
+    if not obj or str(getattr(obj, "status", "")).upper() != "APPROVED":
         return
 
-    # If already distributed, exit
+    # If already distributed, exit (strict idempotency)
     try:
         already = AuditTrail.objects.filter(
             action="promo_purchase_distributed",
@@ -1362,66 +1366,135 @@ def handle_promo_approve_payouts(task: BackgroundTask) -> None:
         price = D(str(getattr(obj.package, "price", "0") or "0"))
     except Exception:
         price = D("0")
-    ptype = str(getattr(obj.package, "type", "") or "")
+    ptype = str(getattr(obj.package, "type", "") or "").upper()
     is_prime = ptype == "PRIME"
     is_prime_150 = is_prime and abs(price - D("150")) <= D("0.5")
     is_prime_750 = is_prime and abs(price - D("750")) <= D("0.5")
     is_prime_759 = is_prime and abs(price - D("759")) <= D("0.75")
 
-    # Execute engines (best-effort), track success to avoid stamping audit on failure
     success = False
-    try:
-        if is_prime_150:
+
+    # PRIME 150: create entry (structural) then call payout (financial) atomically
+    if is_prime_150:
+        try:
+            from business.models import AutoPoolAccount, CommissionConfig
             from business.services.prime import distribute_prime_150_payouts
-            distribute_prime_150_payouts(
-                obj.user,
-                source={"type": "PROMO_PURCHASE_APPROVAL", "id": obj.id},
-            )
+
+            # Reuse existing entry if created earlier for this purchase (idempotent by source tuple)
+            existing = AutoPoolAccount.objects.filter(
+                pool_type="FIVE_150",
+                status="ACTIVE",
+                source_type="PROMO_PURCHASE_APPROVAL",
+                source_id=str(obj.id),
+            ).order_by("id").first()
+
+            with transaction.atomic():
+                entry = existing
+                if not entry:
+                    # Amount for entry metadata (does not affect payouts)
+                    try:
+                        amt = D(str(CommissionConfig.get_solo().prime_activation_amount or "150"))
+                    except Exception:
+                        amt = D("150.00")
+                    entry = AutoPoolAccount.create_five_150_for_user(
+                        obj.user,
+                        amount=amt,
+                        source_type="PROMO_PURCHASE_APPROVAL",
+                        source_id=str(obj.id),
+                    )
+                    if not entry:
+                        # User not eligible or placement deferred; do not stamp audit
+                        raise RuntimeError("Matrix entry creation returned None")
+
+                # Financial event: call existing payout engine (unchanged)
+                distribute_prime_150_payouts(
+                    obj.user,
+                    source={"type": "PROMO_PURCHASE_APPROVAL", "id": obj.id, "entry_id": getattr(entry, "id", None)},
+                )
+
+                # Idempotent success marker + audit
+                try:
+                    AuditTrail.objects.create(
+                        action="promo_purchase_distributed",
+                        actor=getattr(obj, "approved_by", None),
+                        notes=f"Promo purchase #{obj.id} payouts done",
+                        metadata={
+                            "purchase_id": obj.id,
+                            "package": getattr(obj.package, "code", None),
+                            "entry_id": getattr(entry, "id", None),
+                            "pool": "FIVE_150",
+                        },
+                    )
+                except Exception:
+                    # Non-blocking of the transaction – entry+payout already done
+                    pass
+
             success = True
-        elif is_prime_750:
+        except Exception:
+            # Ensure no partial commit (entry is rolled back by atomic if payout failed)
+            success = False
+
+    # PRIME 750: reuse existing engine (no structural entry mandated here)
+    elif is_prime_750:
+        try:
             from business.services.prime import distribute_prime_750_payouts
             distribute_prime_750_payouts(
                 obj.user,
                 source={"type": "PROMO_PURCHASE_APPROVAL", "id": obj.id},
             )
+            # Audit success
+            try:
+                AuditTrail.objects.create(
+                    action="promo_purchase_distributed",
+                    actor=getattr(obj, "approved_by", None),
+                    notes=f"Promo purchase #{obj.id} payouts done",
+                    metadata={"purchase_id": obj.id, "package": getattr(obj.package, "code", None)},
+                )
+            except Exception:
+                pass
             success = True
-        elif is_prime_759:
-            # Mirror approval-time 759 behavior (first-month detection)
+        except Exception:
+            success = False
+
+    # PRIME 759 monthly: reuse existing engine (first-month flag preserved)
+    elif is_prime_759:
+        try:
+            from business.models import Promo759Subscription
+            from business.services.monthly import distribute_monthly_759_payouts
+
             is_first_flag = False
             try:
-                from business.models import Promo759Subscription
                 prev_exists = Promo759Subscription.objects.filter(user=obj.user).exists()
-                sub, _ = Promo759Subscription.objects.get_or_create(
+                Promo759Subscription.objects.get_or_create(
                     promo_purchase=obj,
-                    defaults={"user": obj.user, "metadata": {"source": "PROMO_PURCHASE_APPROVAL"}}
+                    defaults={"user": obj.user, "metadata": {"source": "PROMO_PURCHASE_APPROVAL"}},
                 )
                 is_first_flag = not prev_exists
             except Exception:
                 is_first_flag = False
+
+            distribute_monthly_759_payouts(
+                obj.user,
+                is_first_month=bool(is_first_flag),
+                source={"type": "PROMO_PURCHASE_APPROVAL", "id": obj.id},
+            )
+
             try:
-                from business.services.monthly import distribute_monthly_759_payouts
-                distribute_monthly_759_payouts(
-                    obj.user,
-                    is_first_month=bool(is_first_flag),
-                    source={"type": "PROMO_PURCHASE_APPROVAL", "id": obj.id},
+                AuditTrail.objects.create(
+                    action="promo_purchase_distributed",
+                    actor=getattr(obj, "approved_by", None),
+                    notes=f"Promo purchase #{obj.id} payouts done",
+                    metadata={"purchase_id": obj.id, "package": getattr(obj.package, "code", None)},
                 )
-                success = True
             except Exception:
                 pass
-    except Exception:
-        success = False
-
-    # Stamp audit to guard idempotency (only on success and if not already)
-    if success:
-        try:
-            AuditTrail.objects.create(
-                action="promo_purchase_distributed",
-                actor=getattr(obj, "approved_by", None),
-                notes=f"Promo purchase #{obj.id} payouts done",
-                metadata={"purchase_id": obj.id, "package": getattr(obj.package, "code", None)},
-            )
+            success = True
         except Exception:
-            pass
+            success = False
+
+    # Others: no-op
+    else:
+        success = False
 
 # Register built-in handlers
 register_handler("coupon_dist", handle_coupon_dist)

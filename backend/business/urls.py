@@ -39,6 +39,9 @@ from .views import (
     AdminApplyWithdrawCommissionView,
     # Root Consumer admin
     AdminRootConsumerView,
+    # Matrix tree + sentinel admin
+    MatrixTreeView,
+    AdminMatrixEnforceSentinelView,
 )
 
 urlpatterns = [
@@ -88,4 +91,8 @@ urlpatterns = [
     path('admin/withdrawals/apply/', AdminApplyWithdrawCommissionView.as_view(), name='admin_apply_withdraw_commission'),
     # Root Consumer admin endpoints
     path('admin/root-consumer/', AdminRootConsumerView.as_view(), name='admin_root_consumer'),
+
+    # Matrix Tree (entry-based) and Sentinel enforcement
+    path('matrix/tree/', MatrixTreeView.as_view(), name='matrix_tree'),
+    path('admin/matrix/enforce-sentinel/', AdminMatrixEnforceSentinelView.as_view(), name='admin_matrix_enforce_sentinel'),
 ]

@@ -81,10 +81,34 @@ WSGI_APPLICATION = 'core.wsgi.application'
 DATABASES = {
     'default': dj_database_url.config(
         default="postgresql://trikonekt:Lmt91m5Lnp1dwEoKBPzOuFFjXF0fk4Xi@dpg-d4734kn5r7bs73ajic80-a.singapore-postgres.render.com/trikonekt_rn21",
-        conn_max_age=int(os.environ.get('DB_CONN_MAX_AGE', '120')),
+        conn_max_age=int(os.environ.get('DB_CONN_MAX_AGE', '0')),
         ssl_require=True
     )
 }
+# Force Starter-plan safety: always disable persistent DB connections
+try:
+    DATABASES['default']['CONN_MAX_AGE'] = 0
+except Exception:
+    pass
+
+# Enable persistent connection health checks (Django 4.2+; harmless if ignored on older versions)
+try:
+    DATABASES['default']['CONN_HEALTH_CHECKS'] = True
+except Exception:
+    pass
+
+# Add Postgres keepalive and SSL options to reduce "SSL connection has been closed unexpectedly" on Render
+try:
+    DATABASES['default'].setdefault('OPTIONS', {})
+    DATABASES['default']['OPTIONS'].setdefault('sslmode', 'require')
+    DATABASES['default']['OPTIONS'].setdefault('connect_timeout', int(os.environ.get('DB_CONNECT_TIMEOUT', '10')))
+    DATABASES['default']['OPTIONS'].setdefault('keepalives', 1)
+    DATABASES['default']['OPTIONS'].setdefault('keepalives_idle', int(os.environ.get('DB_KEEPALIVES_IDLE', '30')))
+    DATABASES['default']['OPTIONS'].setdefault('keepalives_interval', int(os.environ.get('DB_KEEPALIVES_INTERVAL', '10')))
+    DATABASES['default']['OPTIONS'].setdefault('keepalives_count', int(os.environ.get('DB_KEEPALIVES_COUNT', '5')))
+except Exception:
+    # Fallback silently if OPTIONS cannot be set
+    pass
 
 AUTH_PASSWORD_VALIDATORS = []
 
@@ -163,6 +187,12 @@ CORS_ALLOW_METHODS = [
     'PUT',
 ]
 
+# Allow local React dev server origins in DEBUG (for direct http://localhost:8000 API calls)
+if DEBUG:
+    for _o in ('http://localhost:3000', 'http://127.0.0.1:3000'):
+        if _o not in CORS_ALLOWED_ORIGINS:
+            CORS_ALLOWED_ORIGINS.append(_o)
+
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
@@ -170,11 +200,17 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get('DATA_UPLOAD_MAX_MEMORY_SIZE', str(5 * 1024 * 1024)))
 FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get('FILE_UPLOAD_MAX_MEMORY_SIZE', str(5 * 1024 * 1024)))
 
-# Cloudinary media storage (enabled when CLOUDINARY_URL is set)
+# Cloudinary media storage (enabled when CLOUDINARY_URL is set AND packages are available)
 if os.environ.get('CLOUDINARY_URL'):
-    INSTALLED_APPS += ['cloudinary_storage', 'cloudinary']
-    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
-    CLOUDINARY_STORAGE = {'SECURE': True}
+    try:
+        import importlib.util
+        if importlib.util.find_spec("cloudinary_storage") and importlib.util.find_spec("cloudinary"):
+            INSTALLED_APPS += ['cloudinary_storage', 'cloudinary']
+            DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+            CLOUDINARY_STORAGE = {'SECURE': True}
+    except Exception:
+        # If packages are not installed, silently skip Cloudinary to avoid startup crashes
+        pass
 
 # CSRF trusted origins for local frontend dev
 # This allows POST/PUT/PATCH/DELETE from the React dev server at port 3000

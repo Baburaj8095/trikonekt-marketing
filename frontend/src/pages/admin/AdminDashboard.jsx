@@ -274,14 +274,14 @@ export default function AdminDashboard() {
 
     const fetchMetrics = async () => {
       try {
-        const res = await API.get("admin/metrics/", { timeout: 12000, retryAttempts: 1 });
+        const res = await API.get("admin/metrics/", { timeout: 12000, retryAttempts: 1, cacheTTL: 15000, dedupe: "cancelPrevious" });
         if (!mounted) return;
         setData(res?.data || {});
         setErr("");
       } catch (e1) {
         try {
           // Fallback alias path registered in backend/core/urls.py
-          const res2 = await API.get("adminapi/metrics/", { timeout: 12000, retryAttempts: 1 });
+          const res2 = await API.get("adminapi/metrics/", { timeout: 12000, retryAttempts: 1, cacheTTL: 15000, dedupe: "cancelPrevious" });
           if (!mounted) return;
           setData(res2?.data || {});
           setErr("");
@@ -342,7 +342,7 @@ export default function AdminDashboard() {
       try {
         setCatLoading(true);
         setCatErr("");
-        const res = await API.get("admin/users/category-counts/", { timeout: 8000, retryAttempts: 0 });
+        const res = await API.get("admin/users/category-counts/", { timeout: 8000, retryAttempts: 0, cacheTTL: 30000, dedupe: "cancelPrevious" });
         if (!mounted) return;
         const obj = res?.data || {};
         setCatCounts(obj);
@@ -545,13 +545,13 @@ export default function AdminDashboard() {
               onClick={() => nav("/admin/users")}
               palette="green"
             />
-            <Card
-              title="KYC Pending"
-              value={(users.kycPending ?? 0)}
-              subtitle=""
-              onClick={() => nav("/admin/kyc?status=pending")}
-              palette="red"
-            />
+              <Card
+                title="KYC"
+                value={(data?.kyc?.submitted ?? data?.kyc?.unverified ?? data?.kyc?.pending ?? 0)}
+                subtitle={`Submitted: ${(data?.kyc?.submitted ?? data?.kyc?.unverified ?? data?.kyc?.pending ?? 0)} | Approved: ${(data?.kyc?.approved ?? 0)}`}
+                onClick={() => nav("/admin/kyc?status=submitted")}
+                palette="indigo"
+              />
             <Card
               title="Genealogy"
               value={"Tree"}
@@ -573,6 +573,13 @@ export default function AdminDashboard() {
               subtitle=""
               onClick={() => nav("/admin/dashboard/models/business/promopackage")}
               palette="purple"
+            />
+            <Card
+              title="Prime History"
+              value="Approved"
+              subtitle=""
+              onClick={() => nav("/admin/promo-purchases?status=APPROVED")}
+              palette="rose"
             />
 
             {/* Admin models as cards (flattened) */}
@@ -636,4 +643,3 @@ export default function AdminDashboard() {
     </RequirePermission>
   );
 }
-

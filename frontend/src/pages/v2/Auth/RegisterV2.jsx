@@ -88,7 +88,7 @@ const RegisterV2 = () => {
   const [sponsorLocked, setSponsorLocked] = useState(false);
   const [sponsorChecking, setSponsorChecking] = useState(false);
   const [sponsorValid, setSponsorValid] = useState(null);
-  const [sponsorDisplay, setSponsorDisplay] = useState({ name: "", pincode: "", username: "" });
+  const [sponsorDisplay, setSponsorDisplay] = useState({ name: "", pincode: "", username: "", role: "", category: "", state: "", district: "" });
   // Default company sponsor when not provided via URL
   const DEFAULT_COMPANY_SPONSOR = "TR8095918105";
 
@@ -182,6 +182,7 @@ const RegisterV2 = () => {
   const [successMsg, setSuccessMsg] = useState("");
   const [regSuccessOpen, setRegSuccessOpen] = useState(false);
   const [regSuccessText, setRegSuccessText] = useState({ username: "", password: "" });
+  const [submitting, setSubmitting] = useState(false);
 
   const isAgency = role === "agency";
   const currentCategory = mapUIRoleToCategory();
@@ -623,6 +624,10 @@ const RegisterV2 = () => {
       let name = "";
       let pcode = "";
       let uname = s;
+      let role = "";
+      let category = "";
+      let stateName = "";
+      let districtName = "";
       try {
         try {
           const r = await API.get("/accounts/regions/by-sponsor/", { params: { sponsor: s, level: "state" } });
@@ -630,7 +635,11 @@ const RegisterV2 = () => {
           name = sp.full_name || sp.username || "";
           pcode = sp.pincode || "";
           uname = sp.username || s;
-          exists = Boolean(name || pcode || uname);
+          role = sp.role || "";
+          category = sp.category || "";
+          stateName = sp.state || "";
+          districtName = sp.district || "";
+          exists = Boolean(sp && (sp.username || name || pcode));
         } catch {
           try {
             const r2 = await API.get("/accounts/hierarchy/", { params: { username: s } });
@@ -640,12 +649,14 @@ const RegisterV2 = () => {
               uname = u.username;
               name = u.full_name || "";
               pcode = u.pincode || "";
+              role = u.role || role || "";
+              category = u.category || category || "";
             }
           } catch {}
         }
       } finally {
         setSponsorValid(exists);
-        setSponsorDisplay({ name, pincode: pcode, username: uname });
+        setSponsorDisplay({ name, pincode: pcode, username: uname, role, category, state: stateName, district: districtName });
         setSponsorChecking(false);
       }
     }, 450);
@@ -1078,10 +1089,11 @@ const RegisterV2 = () => {
       if (selectedPincodeAgency) payload.selected_pincode = selectedPincodeAgency.trim();
     }
 
+    setSubmitting(true);
     try {
       const submittedPassword = formData.password;
       if (category === "business") {
-        const resp = await API.post("/accounts/register/", payload);
+        const resp = await API.post("/accounts/register/", payload, { timeout: 45000 });
         const data = resp?.data || {};
         const uname = data.username || "(generated)";
 
@@ -1111,7 +1123,7 @@ const RegisterV2 = () => {
         setRegSuccessText({ username: uname, password: submittedPassword });
         setRegSuccessOpen(true);
       } else {
-        const resp = await API.post("/accounts/register/", payload);
+        const resp = await API.post("/accounts/register/", payload, { timeout: 45000 });
         const data = resp?.data || {};
         const uname = data.username || "(generated)";
         setSuccessMsg(`Welcome to Trikonekt!\nUsername: ${uname}\nPassword: ${submittedPassword}`);
@@ -1145,6 +1157,8 @@ const RegisterV2 = () => {
       const msg =
         err?.response?.data ? JSON.stringify(err.response.data) : "Registration failed!";
       setErrorMsg(typeof msg === "string" ? msg : String(msg));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -1393,8 +1407,11 @@ const RegisterV2 = () => {
             <CheckCircleRoundedIcon sx={{ fontSize: 18 }} />
             <Typography variant="body2">Sponsor verified</Typography>
           </Box>
+          <Typography variant="caption" sx={{ color: "#6B7280", display: "block" }}>
+            Username: {sponsorDisplay.username || "-"} | Role: {sponsorDisplay.role || sponsorDisplay.category || "-"}
+          </Typography>
           <Typography variant="caption" sx={{ color: "#6B7280", mb: 1, display: "block" }}>
-            Your sponsor connects you to the TRIKONEKT network
+            State: {sponsorDisplay.state || "-"} | District: {sponsorDisplay.district || "-"} | Pincode: {sponsorDisplay.pincode || "-"}
           </Typography>
         </>
       )}
@@ -1968,7 +1985,7 @@ const RegisterV2 = () => {
             },
           }}
         >
-          <V2Button fullWidth type="submit">
+          <V2Button fullWidth type="submit" disabled={submitting}>
             Sign Up
           </V2Button>
         </Box>
@@ -2088,4 +2105,3 @@ const RegisterV2 = () => {
 };
 
 export default RegisterV2;
-

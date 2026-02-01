@@ -1,0 +1,1436 @@
+from django.contrib.auth.models import AbstractUser
+from django.db import models, transaction
+from locations.models import State
+
+
+class CustomUser(AbstractUser):
+    # USERNAME_FIELD must be globally unique in Django; keep global uniqueness.
+    username = models.CharField(max_length=150, unique=True, db_index=True)
+
+    ROLE_CHOICES = [
+        ('user', 'User'),
+        ('agency', 'Agency'),
+        ('employee', 'Employee'),
+    ]
+
+    CATEGORY_CHOICES = [
+        ('consumer', 'Consumer (General User)'),
+        ('employee', 'Employee'),
+        ('business', 'Business'),
+        ('merchant', 'Merchant'),
+        ('company', 'Company'),
+        ('agency_state_coordinator', 'Agency State Coordinator'),
+        ('agency_state', 'Agency State'),
+        ('agency_district_coordinator', 'Agency District Coordinator'),
+        ('agency_district', 'Agency District'),
+        ('agency_pincode_coordinator', 'Agency Pincode Coordinator'),
+        ('agency_pincode', 'Agency Pincode'),
+        ('agency_sub_franchise', 'Agency Sub-Franchise'),
+        ('company_manager', 'Company Manager'),
+    ]
+
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='user', db_index=True)
+    # Specific registration category for username/ownership logic
+    category = models.CharField(max_length=40, choices=CATEGORY_CHOICES, default='consumer', db_index=True)
+    # Admin RBAC Role (single role per admin user; null for non-admins)
+    admin_role = models.ForeignKey('adminapi.Role', null=True, blank=True, on_delete=models.SET_NULL, related_name='users')
+
+    # 6-digit unique registration id
+    unique_id = models.CharField(max_length=6, unique=True, blank=True, null=True, editable=False)
+
+    # The user who registered this account (used for employees/businesses created by a user)
+    registered_by = models.ForeignKey(
+        'self', null=True, blank=True, on_delete=models.SET_NULL, related_name='registrations'
+    )
+
+    # Registration profile fields
+    full_name = models.CharField(max_length=150, blank=True)
+    phone = models.CharField(max_length=20, blank=True)
+    age = models.PositiveSmallIntegerField(null=True, blank=True)
+    country = models.ForeignKey('locations.Country', null=True, blank=True, on_delete=models.SET_NULL, related_name='users')
+    state = models.ForeignKey('locations.State', null=True, blank=True, on_delete=models.SET_NULL, related_name='users')
+    city = models.ForeignKey('locations.City', null=True, blank=True, on_delete=models.SET_NULL, related_name='users')
+    pincode = models.CharField(max_length=10, blank=True, db_index=True)
+    address = models.TextField(blank=True)
+    avatar = models.ImageField(upload_to='uploads/profile/', blank=True, null=True)
+    sponsor_id = models.CharField(max_length=64, blank=True)
+    prefix_code = models.CharField(max_length=6, blank=True, db_index=True)
+    prefixed_id = models.CharField(max_length=32, unique=True, null=True, blank=True)
+    # 5-Matrix genealogy fields
+    parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='children')
+    matrix_position = models.PositiveSmallIntegerField(null=True, blank=True, db_index=True)
+    depth = models.PositiveIntegerField(default=0, db_index=True)
+
+    # Activation/eligibility flags
+    first_purchase_activated_at = models.DateTimeField(null=True, blank=True)
+    # Admin-controlled account status for earnings/eligibility
+    account_active = models.BooleanField(default=False, db_index=True)
+    autopool_enabled = models.BooleanField(default=False)
+    rewards_enabled = models.BooleanField(default=False)
+    is_agency_unlocked = models.BooleanField(default=False)
+    can_create_self_accounts = models.BooleanField(default=False)
+    # Encrypted copy of the last set password (Fernet). Visible only to superusers in admin.
+    last_password_encrypted = models.TextField(null=True, blank=True)
+
+    class Meta(AbstractUser.Meta):
+        constraints = [
+            models.UniqueConstraint(
+                fields=['parent', 'matrix_position'],
+                name='uniq_parent_matrix_position',
+                condition=models.Q(parent__isnull=False)
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['parent']),
+            models.Index(fields=['depth']),
+            # Speed up AdminUsers list filters and ordering
+            models.Index(fields=['date_joined']),
+            models.Index(fields=['account_active', 'date_joined']),
+            models.Index(fields=['first_purchase_activated_at']),
+            models.Index(fields=['role', 'category']),
+        ]
+
+    def __str__(self):
+        return f"{self.username} ({self.role} / {self.category})"
+
+    # Prefix mapping and allocation for hierarchical sponsor codes
+    PREFIX_MAP = {
+        'consumer': 'TR',
+        'employee': 'TREP',
+        'business': 'TRBS',
+        'merchant': 'TRBS',
+        'company': 'TR',
+        'agency_state_coordinator': 'TRSC',
+        'agency_state': 'TRST',
+        'agency_district_coordinator': 'TRDC',
+        'agency_district': 'TRDT',
+        'agency_pincode_coordinator': 'TRPC',
+        'agency_pincode': 'TRPN',
+        'agency_sub_franchise': 'TRSF',
+        'company_manager': 'TRCM',
+    }
+
+    @classmethod
+    def category_to_prefix(cls, category: str) -> str:
+        cat = (category or '').strip() or 'consumer'
+        return cls.PREFIX_MAP.get(cat, 'TR')
+
+    @classmethod
+    @transaction.atomic
+    def allocate_prefixed_id(cls, category: str) -> str:
+        """
+        Allocate and return a new prefixed sponsor/code like PREFIX-0000000001.
+        """
+        prefix = cls.category_to_prefix(category)
+        next_num = PrefixSequence.allocate_next(prefix)
+        return f"{prefix}-{next_num:010d}"
+
+    @classmethod
+    def generate_unique_id(cls) -> str:
+        """
+        Generate a 6-digit unique numeric id not used by any CustomUser.unique_id.
+        """
+        import random
+        while True:
+            candidate = f"{random.randint(0, 999999):06d}"
+            if not cls.objects.filter(unique_id=candidate).exists():
+                return candidate
+
+    def save(self, *args, **kwargs):
+        # Ensure 6-digit registration id
+        if not self.unique_id:
+            self.unique_id = self.generate_unique_id()
+
+        # Allocate hierarchical prefix code and ID once category is known
+        if not getattr(self, "prefixed_id", None) and (self.category or ""):
+            try:
+                code = CustomUser.allocate_prefixed_id(self.category)
+                self.prefixed_id = code
+                try:
+                    self.prefix_code = code.split("-", 1)[0]
+                except Exception:
+                    self.prefix_code = CustomUser.category_to_prefix(self.category)
+            except Exception:
+                # best-effort; fall back to lazy allocation on next save
+                pass
+
+        # Sponsor ID defaults to hierarchical prefixed_id if available, else username
+        if not self.sponsor_id:
+            self.sponsor_id = self.prefixed_id or self.username or ""
+
+        # Initialize account_active default on creation:
+        # - Agencies start INACTIVE by default (activate after first AgencyPackagePayment)
+        # - Business/Merchant remain Active by default
+        if getattr(self._state, "adding", False):
+            try:
+                if self.category in ("business", "merchant"):
+                    self.account_active = True
+            except Exception:
+                # best-effort
+                pass
+
+        super().save(*args, **kwargs)
+
+
+# Existing proxy example retained
+class PincodeUser(CustomUser):
+    class Meta:
+        proxy = True
+        verbose_name = "Pincode User"
+        verbose_name_plural = "Pincode Users"
+
+
+# Proxy models to expose separate sections in Django admin for each registration type
+class ConsumerAccount(CustomUser):
+    class Meta:
+        proxy = True
+        verbose_name = "Consumer"
+        verbose_name_plural = "Consumers"
+
+
+class EmployeeAccount(CustomUser):
+    class Meta:
+        proxy = True
+        verbose_name = "Employee"
+        verbose_name_plural = "Employees"
+
+
+class CompanyAccount(CustomUser):
+    class Meta:
+        proxy = True
+        verbose_name = "Company"
+        verbose_name_plural = "Companies"
+
+
+class AgencyStateCoordinator(CustomUser):
+    class Meta:
+        proxy = True
+        verbose_name = "Agency State Coordinator"
+        verbose_name_plural = "Agency State Coordinators"
+
+
+class AgencyState(CustomUser):
+    class Meta:
+        proxy = True
+        verbose_name = "Agency State"
+        verbose_name_plural = "Agency States"
+
+
+class AgencyDistrictCoordinator(CustomUser):
+    class Meta:
+        proxy = True
+        verbose_name = "Agency District Coordinator"
+        verbose_name_plural = "Agency District Coordinators"
+
+
+class AgencyDistrict(CustomUser):
+    class Meta:
+        proxy = True
+        verbose_name = "Agency District"
+        verbose_name_plural = "Agency Districts"
+
+
+class AgencyPincodeCoordinator(CustomUser):
+    class Meta:
+        proxy = True
+        verbose_name = "Agency Pincode Coordinator"
+        verbose_name_plural = "Agency Pincode Coordinators"
+
+
+class AgencyPincode(CustomUser):
+    class Meta:
+        proxy = True
+        verbose_name = "Agency Pincode"
+        verbose_name_plural = "Agency Pincodes"
+
+
+class AgencySubFranchise(CustomUser):
+    class Meta:
+        proxy = True
+        verbose_name = "Agency Sub-Franchise"
+        verbose_name_plural = "Agency Sub-Franchises"
+
+
+class AgencyRegionAssignment(models.Model):
+    """
+    Region assignment capability for agency users.
+
+    level:
+      - state: user can operate in given State (FK)
+      - district: user can operate in given district (free-text) under a specific State
+      - pincode: user can operate in given 6-digit pincode
+    """
+    LEVEL_CHOICES = [
+        ('state', 'State'),
+        ('district', 'District'),
+        ('pincode', 'Pincode'),
+    ]
+
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='region_assignments')
+    level = models.CharField(max_length=16, choices=LEVEL_CHOICES, db_index=True)
+
+    # Context fields
+    state = models.ForeignKey('locations.State', null=True, blank=True, on_delete=models.CASCADE, related_name='region_assignments')
+    district = models.CharField(max_length=100, blank=True)  # district name (best-effort text)
+    pincode = models.CharField(max_length=10, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['user', 'level']),
+            models.Index(fields=['level', 'state']),
+            models.Index(fields=['level', 'pincode']),
+        ]
+        constraints = [
+            # For level=state, ensure uniqueness per user+state
+            models.UniqueConstraint(
+                fields=['user', 'level', 'state'],
+                name='uniq_assignment_user_state',
+                condition=models.Q(level='state')
+            ),
+            # For level=district, ensure uniqueness per user+state+district (case-insensitive)
+            models.UniqueConstraint(
+                name='uniq_assignment_user_state_district_ci',
+                fields=['user', 'state', 'district', 'level'],
+                condition=models.Q(level='district')
+            ),
+            # For level=pincode, ensure uniqueness per user+pincode
+            models.UniqueConstraint(
+                fields=['user', 'level', 'pincode'],
+                name='uniq_assignment_user_pincode',
+                condition=models.Q(level='pincode')
+            ),
+        ]
+
+    def __str__(self):
+        desc = None
+        if self.level == 'state' and self.state:
+            desc = f"State={self.state.name}"
+        elif self.level == 'district':
+            desc = f"State={getattr(self.state, 'name', '')}, District={self.district}"
+        elif self.level == 'pincode':
+            desc = f"Pincode={self.pincode}"
+        return f"{self.user.username} [{self.level}] {desc or ''}".strip()
+
+
+# Prefix-based sequential code allocator for hierarchical IDs (e.g., TR-0000000001)
+class PrefixSequence(models.Model):
+    prefix = models.CharField(max_length=10, unique=True)
+    last_number = models.BigIntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Prefix Sequence"
+        verbose_name_plural = "Prefix Sequences"
+
+    @classmethod
+    @transaction.atomic
+    def allocate_next(cls, prefix: str) -> int:
+        p, _ = cls.objects.select_for_update().get_or_create(prefix=prefix, defaults={"last_number": 0})
+        p.last_number = int(p.last_number or 0) + 1
+        p.save(update_fields=["last_number", "updated_at"])
+        return int(p.last_number)
+
+# ======================
+# Wallet & Ledger Models
+# ======================
+from decimal import Decimal
+from django.db import transaction
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+
+class Wallet(models.Model):
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='wallet')
+    balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    # New dual-balance model
+    main_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)         # Gross earnings (e.g., commissions)
+    withdrawable_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0) # Net withdrawable after tax withholding
+    self_account_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)  # Streamed 25% reserve for auto-activation packs
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return f"Wallet<{self.user.username}> ₹{self.balance}"
+
+    @transaction.atomic
+    def credit(self, amount: Decimal, tx_type: str, meta: dict | None = None, source_type: str | None = None, source_id: str | None = None):
+        """
+        Credit logic with dual-wallet support:
+        - COMMISSION_CREDIT: withhold cfg.tax_percent to company wallet, add gross to main, net to withdrawable.
+        - Other credits: add to main (no withholding), do not change withdrawable unless explicitly done elsewhere.
+        """
+        # Determine activation status; accrue to main ledger for inactive users, but do not add to withdrawable or run auto-block
+        try:
+            inactive = not bool(getattr(self.user, "account_active", False))
+        except Exception:
+            inactive = False
+        from decimal import Decimal as D
+        # Lock this wallet row
+        w = Wallet.objects.select_for_update().get(pk=self.pk)
+        amt = D(amount or 0)
+
+        meta = meta or {}
+        tx_name = str(tx_type or "")
+        tx_upper = tx_name.upper()
+        COMMISSION_WITHHOLD_TYPES = {
+            "COMMISSION_CREDIT",
+            "DIRECT_REF_BONUS",
+            "LEVEL_BONUS",
+            "AUTOPOOL_BONUS_FIVE",
+            "AUTOPOOL_BONUS_THREE",
+            "FRANCHISE_INCOME",
+            "GLOBAL_ROYALTY",
+            # Prime payouts (direct/self) should follow 75/25 streaming
+            "PRIME_150_DIRECT",
+            "PRIME_750_DIRECT",
+            "PRIME_150_SELF",
+            "PRIME_750_SELF",
+            # Monthly 759 payouts follow 75/25 streaming
+            "MONTHLY_759_DIRECT",
+            "MONTHLY_759_SELF",
+        }
+        # Normalize tx type for classification to make PRIME streaming robust
+        is_commission = (tx_upper in COMMISSION_WITHHOLD_TYPES)
+        is_prime_tx = tx_upper.startswith("PRIME_") and (tx_upper.endswith("_DIRECT") or tx_upper.endswith("_SELF"))
+        no_withhold = bool(meta.get("no_withhold"))
+
+        if (is_commission or is_prime_tx) and not no_withhold and amt > 0:
+            # 75/25 streaming model:
+            # - 75% -> income (main + withdrawable when active)
+            # - 25% -> self reserve (self_account_balance)
+            income = (amt * D("0.75")).quantize(D("0.01"))
+            self_part = (amt - income).quantize(D("0.01"))
+            if self_part < D("0.00"):
+                self_part = D("0.00")
+
+            # Update balances (streaming does NOT touch withdrawable_balance)
+            w.main_balance = (w.main_balance or D("0")) + income
+            w.self_account_balance = (w.self_account_balance or D("0")) + self_part
+            w.balance = (w.balance or D("0")) + amt
+            w.save(update_fields=["balance", "main_balance", "self_account_balance", "updated_at"])
+
+            # Record 75% income credit (for visibility)
+            meta_main = {**(meta or {}), "ledger": "MAIN", "split": "STREAM_75_25", "gross": str(amt), "income_75": str(income), "self_25": str(self_part), "orig_type": str(tx_type)}
+            if inactive:
+                meta_main["pending_due_to_inactive"] = True
+            WalletTransaction.objects.create(
+                user=self.user,
+                amount=income,
+                balance_after=w.balance,
+                type="INCOME_CREDIT_75",
+                source_type=source_type or '',
+                source_id=str(source_id) if source_id is not None else '',
+                meta=meta_main
+            )
+
+
+            # 25% self reserve credit marker
+            if self_part > 0:
+                WalletTransaction.objects.create(
+                    user=self.user,
+                    amount=self_part,
+                    balance_after=w.balance,
+                    type="SELF_ACCOUNT_CREDIT",
+                    source_type=source_type or '',
+                    source_id=str(source_id) if source_id is not None else '',
+                    meta={**(meta or {}), "ledger": "SELF_ACCOUNT", "split": "STREAM_75_25", "orig_type": str(tx_type)}
+                )
+
+            # Apply micro-packs (₹250) from self reserve for active users
+            if not inactive:
+                try:
+                    self._apply_self_account_rule(w)
+                except Exception:
+                    pass
+
+            return w.balance
+
+        # Default: non-commission or withholding disabled
+        w.main_balance = (w.main_balance or D("0")) + amt
+        w.balance = (w.balance or D("0")) + amt
+        w.save(update_fields=['balance', 'main_balance', 'updated_at'])
+        meta2 = dict(meta or {})
+        if inactive:
+            meta2["pending_due_to_inactive"] = True
+        WalletTransaction.objects.create(
+            user=self.user,
+            amount=amt,
+            balance_after=w.balance,
+            type=tx_type,
+            source_type=source_type or '',
+            source_id=str(source_id) if source_id is not None else '',
+            meta=meta2
+        )
+        return w.balance
+
+    @transaction.atomic
+    def debit(self, amount: Decimal, tx_type: str, meta: dict | None = None, source_type: str | None = None, source_id: str | None = None):
+        from decimal import Decimal as D
+        amt = D(amount or 0)
+        if amt <= 0:
+            raise ValueError("Debit amount must be positive.")
+        # Lock this wallet row
+        w = Wallet.objects.select_for_update().get(pk=self.pk)
+
+        if tx_type == "WITHDRAWAL_DEBIT":
+            # Debit specifically from Main Wallet as per new policy
+            new_main = (w.main_balance or D("0")) - amt
+            if new_main < 0:
+                raise ValueError("Insufficient main wallet balance.")
+            w.main_balance = new_main
+            w.balance = (w.balance or D("0")) - amt
+            if w.balance < 0:
+                w.balance = D("0")
+            w.save(update_fields=['balance', 'main_balance', 'updated_at'])
+        else:
+            # Generic debit from total; reduce main first
+            new_main = (w.main_balance or D("0"))
+            take_main = min(new_main, amt)
+            new_main = new_main - take_main
+            rem = amt - take_main
+            new_wd = (w.withdrawable_balance or D("0"))
+            if rem > 0:
+                if new_wd < rem:
+                    raise ValueError("Insufficient wallet balance.")
+                new_wd = new_wd - rem
+            w.main_balance = new_main
+            w.withdrawable_balance = new_wd
+            w.balance = (w.balance or D("0")) - amt
+            if w.balance < 0:
+                raise ValueError("Insufficient wallet balance.")
+            w.save(update_fields=['balance', 'main_balance', 'withdrawable_balance', 'updated_at'])
+
+        WalletTransaction.objects.create(
+            user=self.user,
+            amount=amt * D('-1'),
+            balance_after=w.balance,
+            type=tx_type,
+            source_type=source_type or '',
+            source_id=str(source_id) if source_id is not None else '',
+            meta=meta or {}
+        )
+        return w.balance
+
+    @classmethod
+    @transaction.atomic
+    def release_pending_for_user(cls, user: "CustomUser"):
+        """
+        Convert all pending_due_to_inactive credits into withdrawable credits for the given user.
+        - For commission transactions: use recorded 'net' in meta.
+        - For non-commission transactions: release full amount.
+        - Does not change total balance; only increases withdrawable balance and appends WITHDRAWABLE_CREDIT markers.
+        - Clears the pending flag on original transactions to ensure idempotency.
+        """
+        from decimal import Decimal as D
+        if not user:
+            return
+        # Ensure wallet and lock for update
+        w = cls.get_or_create_for_user(user)
+        w = cls.objects.select_for_update().get(pk=w.pk)
+
+        # Find all transactions marked pending due to inactive
+        qs = WalletTransaction.objects.filter(user=user, meta__pending_due_to_inactive=True).order_by("id")
+        for tx in qs:
+            try:
+                meta = dict(tx.meta or {})
+            except Exception:
+                meta = {}
+            # Determine net to release
+            net_val = meta.get("net", None)
+            try:
+                net = D(str(net_val)) if net_val is not None else D(str(tx.amount or "0"))
+            except Exception:
+                net = D("0")
+            if net <= 0:
+                # Clear the pending flag even if nothing to release
+                if meta.get("pending_due_to_inactive"):
+                    meta["pending_due_to_inactive"] = False
+                    tx.meta = meta
+                    tx.save(update_fields=["meta"])
+                continue
+
+            # Increase withdrawable only (do not change total balance/main)
+            w.withdrawable_balance = (w.withdrawable_balance or D("0")) + net
+            w.save(update_fields=["withdrawable_balance", "updated_at"])
+
+            # Append a withdrawable credit marker linked to original tx
+            WalletTransaction.objects.create(
+                user=user,
+                amount=net,
+                balance_after=w.balance,
+                type="WITHDRAWABLE_CREDIT",
+                source_type=tx.source_type or "",
+                source_id=tx.source_id or "",
+                meta={"ledger": "WITHDRAWAL", "released_from": "pending_inactive", "original_tx_id": tx.id},
+            )
+
+            # Clear pending flag on original transaction
+            meta["pending_due_to_inactive"] = False
+            meta["released_from_pending"] = True
+            try:
+                meta["released_net"] = str(net)
+            except Exception:
+                pass
+            tx.meta = meta
+            tx.save(update_fields=["meta"])
+
+    @classmethod
+    def get_or_create_for_user(cls, user: CustomUser) -> "Wallet":
+        w, _ = cls.objects.get_or_create(user=user, defaults={'balance': Decimal('0.00')})
+        return w
+
+
+    def _apply_self_account_rule(self, w: "Wallet"):
+        """
+        Consume self_account_balance in ₹250 micro-packs:
+          - ₹150 auto e‑coupon purchase for self (requires available coupon; if not available, stop)
+          - ₹50 direct sponsor bonus (to registered_by, or routed to company if no sponsor)
+          - ₹50 company/royalty credit
+        Effects per pack:
+          - self_account_balance -= 250
+          - balance -= 250
+          - Transactions:
+              SELF_ACCOUNT_DEBIT -250 (pack marker)
+              AUTO_PURCHASE_DEBIT -150 (if coupon allocated)
+              ADJUSTMENT_DEBIT -50 (user-side marker for company portion)
+              ADJUSTMENT_DEBIT -50 (user-side marker for sponsor portion)
+              Sponsor DIRECT_REF_BONUS +50 (no_withhold)
+              Company TAX_POOL_CREDIT +50 (no_withhold)
+          - AuditTrail: action="auto_250_self_pack_applied"
+        """
+        from decimal import Decimal as D
+        try:
+            from coupons.models import AuditTrail, CouponCode
+        except Exception:
+            return  # coupons app not available
+
+        # Helper: resolve company recipient
+        def _get_company_user():
+            try:
+                from business.models import CommissionConfig, RootConsumerConfig
+                cfg = CommissionConfig.get_solo()
+                # Prefer Root Consumer if configured, else tax_company_user
+                rc = RootConsumerConfig.get_solo().get_root_user()
+                cu = rc or getattr(cfg, "tax_company_user", None)
+            except Exception:
+                cu = None
+            if cu:
+                return cu
+            try:
+                return CustomUser.objects.filter(category="company").first() or CustomUser.objects.filter(is_superuser=True).first()
+            except Exception:
+                return None
+
+        # Strong lock on wallet row to serialize pack application
+        try:
+            w = Wallet.objects.select_for_update().get(pk=w.pk)
+        except Exception:
+            pass
+
+        sponsor = getattr(self.user, "registered_by", None)
+        company_user = _get_company_user()
+
+        # While we have at least one ₹250 pack, attempt to apply; bail if no coupon available
+        # Lock already held by caller (credit); proceed with safe loop bound
+        loops = 0
+        while True:
+            loops += 1
+            if loops > 50:
+                break  # hard safety
+            try:
+                cur_self = D(str(getattr(w, "self_account_balance", "0") or "0"))
+            except Exception:
+                cur_self = D("0")
+            if cur_self < D("250.00"):
+                break
+
+            # Try to allocate one ₹150 e‑coupon for this user; if none available, stop (retain reserve for later)
+            coupon_applied = False
+            coupon_code_val = None
+            try:
+                base_qs = CouponCode.objects.filter(
+                    issued_channel="e_coupon",
+                    value=D("150.00"),
+                    status="AVAILABLE",
+                    assigned_agency__isnull=True,
+                    assigned_employee__isnull=True,
+                    assigned_consumer__isnull=True,
+                )
+                try:
+                    locking_qs = base_qs.select_for_update(skip_locked=True)
+                except Exception:
+                    locking_qs = base_qs
+                pick_ids = list(locking_qs.order_by("serial", "id").values_list("id", flat=True)[:1])
+                if not pick_ids:
+                    break  # no coupon stock; stop applying further packs for now
+                affected = (
+                    CouponCode.objects.filter(id__in=pick_ids)
+                    .filter(
+                        issued_channel="e_coupon",
+                        status="AVAILABLE",
+                        assigned_agency__isnull=True,
+                        assigned_employee__isnull=True,
+                        assigned_consumer__isnull=True,
+                    )
+                    .update(assigned_consumer_id=self.user_id, status="SOLD")
+                )
+                if affected:
+                    coupon_applied = True
+                    try:
+                        cobj = CouponCode.objects.filter(id=pick_ids[0]).only("code").first()
+                        coupon_code_val = getattr(cobj, "code", None)
+                    except Exception:
+                        coupon_code_val = None
+            except Exception:
+                # On any error resolving coupon, stop to avoid partial consumption
+                break
+
+            # Deduct the pack from self-reserve and overall balance
+            w.self_account_balance = (w.self_account_balance or D("0")) - D("250.00")
+            if w.self_account_balance < D("0"):
+                w.self_account_balance = D("0")
+            w.balance = (w.balance or D("0")) - D("250.00")
+            if w.balance < D("0"):
+                w.balance = D("0")
+            w.save(update_fields=["balance", "self_account_balance", "updated_at"])
+
+            # Record SELF_ACCOUNT_DEBIT marker with breakdown and pack index
+            try:
+                existing = WalletTransaction.objects.filter(user=self.user, type="SELF_ACCOUNT_DEBIT", source_type="SELF_250_PACK").count()
+                pack_index = int(existing) + 1
+            except Exception:
+                pack_index = None
+
+            WalletTransaction.objects.create(
+                user=self.user,
+                amount=D("-250.00"),
+                balance_after=w.balance,
+                type="SELF_ACCOUNT_DEBIT",
+                source_type="SELF_250_PACK",
+                source_id="",
+                meta={
+                    "source_type": "SELF_250_PACK",
+                    "breakdown": {"coupon": 150, "sponsor": 50, "company": 50},
+                    "coupon_code": coupon_code_val,
+                    "sponsor_user_id": getattr(sponsor, "id", None) if sponsor else getattr(company_user, "id", None),
+                    "company_user_id": getattr(company_user, "id", None),
+                    "pack_index": pack_index,
+                }
+            )
+
+            # Record coupon issued marker if applied
+            if coupon_applied:
+                WalletTransaction.objects.create(
+                    user=self.user,
+                    amount=D("-150.00"),
+                    balance_after=w.balance,
+                    type="AUTO_ECOUPON_ISSUED",
+                    source_type="SELF_250_PACK",
+                    source_id="",
+                    meta={"source_type": "SELF_250_PACK", "coupon_code": coupon_code_val},
+                )
+
+            # Sponsor and company portions (₹50 each). If no sponsor, route sponsor portion to company.
+            sponsor_bonus = D("50.00")
+            company_share = D("50.00")
+            sponsor_recipient = sponsor if sponsor else company_user
+
+
+            # Credit sponsor/company wallets (no withholding)
+            if sponsor_recipient and sponsor_bonus > 0:
+                try:
+                    sw = Wallet.get_or_create_for_user(sponsor_recipient)
+                    sw.credit(
+                        sponsor_bonus,
+                        tx_type="DIRECT_REF_BONUS",
+                        meta={"from_user_id": self.user.id, "from_user": getattr(self.user, "username", None), "no_withhold": True, "auto_rule": "SELF_250_PACK"},
+                        source_type="SELF_250_PACK",
+                        source_id="",
+                    )
+                except Exception:
+                    pass
+
+            if company_user and company_share > 0:
+                try:
+                    cw = Wallet.get_or_create_for_user(company_user)
+                    cw.credit(
+                        company_share,
+                        tx_type="TAX_POOL_CREDIT",
+                        meta={"from_user_id": self.user.id, "from_user": getattr(self.user, "username", None), "no_withhold": True, "auto_rule": "SELF_250_PACK"},
+                        source_type="SELF_250_PACK",
+                        source_id="",
+                    )
+                except Exception:
+                    pass
+
+            # Audit pack application
+            try:
+                AuditTrail.objects.create(
+                    action="auto_250_self_pack_applied",
+                    actor=self.user,
+                    notes="Applied SELF_250_PACK",
+                    metadata={
+                        "coupon_applied": bool(coupon_applied),
+                        "coupon_code": coupon_code_val,
+                        "sponsor_id": getattr(sponsor_recipient, "id", None),
+                        "company_id": getattr(company_user, "id", None),
+                    },
+                )
+            except Exception:
+                pass
+
+
+class WalletTransaction(models.Model):
+    TYPE_CHOICES = [
+        ('COUPON_PURCHASE_CREDIT', 'Coupon Purchase Credit'),
+        ('REDEEM_ECOUPON_CREDIT', 'E-Coupon Redeem Credit'),
+        ('PRODUCT_PURCHASE_DEBIT', 'Product Purchase Debit'),
+        ('BANNER_PURCHASE_DEBIT', 'Banner Purchase Debit'),
+        ('COMMISSION_CREDIT', 'Commission Credit'),
+        ('AUTO_POOL_DEBIT', 'Auto Pool Debit'),
+        ('ADJUSTMENT_CREDIT', 'Adjustment Credit'),
+        ('ADJUSTMENT_DEBIT', 'Adjustment Debit'),
+        ('REFUND_CREDIT', 'Refund Credit'),
+        # Added for MLM/Packages
+        ('PRIME_ACTIVATION_CREDIT', 'Prime Activation Credit'),
+        ('GLOBAL_ACTIVATION_CREDIT', 'Global Activation Credit'),
+        ('DIRECT_REF_BONUS', 'Direct Referral Bonus'),
+        ('WELCOME_BONUS', 'Welcome Bonus'),
+        ('SELF_BONUS_ACTIVE', 'Self Bonus (Active)'),
+        ('LEVEL_BONUS', 'Level Bonus'),
+        ('AUTOPOOL_BONUS_FIVE', 'Auto-Pool Bonus (5-Matrix)'),
+        ('AUTOPOOL_BONUS_THREE', 'Auto-Pool Bonus (3-Matrix)'),
+        ('WITHDRAWAL_DEBIT', 'Withdrawal Debit'),
+        ('LIFETIME_WITHDRAWAL_BONUS', 'Lifetime Withdrawal Bonus'),
+        ('GLOBAL_ROYALTY', 'Global Royalty'),
+        ('REWARD_CREDIT', 'Reward Credit'),
+        ('REWARD_DEBIT', 'Reward Debit'),
+        ('FRANCHISE_INCOME', 'Franchise Income'),
+        # Dual-wallet support
+        ('WITHDRAWABLE_CREDIT', 'Withdrawable Credit'),
+        ('TAX_POOL_CREDIT', 'Tax Pool Credit'),
+        ('ECOUPON_WALLET_DEBIT', 'E-Coupon Wallet Debit'),
+        ('AUTO_PURCHASE_DEBIT', 'Auto Purchase Debit'),
+        ('PRODUCT_WALLET_CREDIT', 'Product Wallet Credit'),
+        # Streaming 75/25 support
+        ('INCOME_CREDIT_75', 'Income Credit'),
+        ('SELF_ACCOUNT_CREDIT', 'Self Account Credit'),
+        ('SELF_ACCOUNT_DEBIT', 'Self Account Debit (250 Pack)'),
+        ('AUTO_ECOUPON_ISSUED', 'Auto E-Coupon Issued'),
+    ]
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='wallet_transactions', db_index=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    balance_after = models.DecimalField(max_digits=12, decimal_places=2)
+    type = models.CharField(max_length=32, choices=TYPE_CHOICES, db_index=True)
+    source_type = models.CharField(max_length=64, blank=True, default='')
+    source_id = models.CharField(max_length=64, blank=True, default='')
+    meta = models.JSONField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'type']),
+            models.Index(fields=['created_at']),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user.username} {self.type} {self.amount} -> {self.balance_after}"
+
+
+# ======================
+# Reward Points Ledger
+# ======================
+
+class RewardPointsAccount(models.Model):
+    """
+    Independent reward points balance (not the money wallet).
+    Points can be earned and redeemed; redemption can be reserved via RewardPointsHold
+    and is finally deducted on order approval.
+    """
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name="reward_points_account")
+    balance_points = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["user"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"RPA<{getattr(self.user, 'username', 'user')}> {self.balance_points} pts"
+
+    @classmethod
+    def get_or_create_for_user(cls, user: CustomUser) -> "RewardPointsAccount":
+        acc, _ = cls.objects.get_or_create(user=user, defaults={"balance_points": Decimal("0.00")})
+        return acc
+
+    @classmethod
+    def point_value_in_inr(cls) -> Decimal:
+        """
+        Conversion rate: 1 point => ₹1.00 (configurable later via CommissionConfig).
+        """
+        return Decimal("1.00")
+
+    @classmethod
+    def get_available_points(cls, user: CustomUser) -> Decimal:
+        from decimal import Decimal as D
+        acc = cls.get_or_create_for_user(user)
+        # Sum of pending holds
+        pending = RewardPointsHold.objects.filter(user=user, status=RewardPointsHold.STATUS_PENDING).aggregate(
+            s=models.Sum("points")
+        )["s"] or D("0.00")
+        avail = (acc.balance_points or D("0.00")) - pending
+        if avail < D("0.00"):
+            avail = D("0.00")
+        return avail.quantize(D("0.01"))
+
+    @classmethod
+    def get_available_value_in_inr(cls, user: CustomUser) -> Decimal:
+        from decimal import Decimal as D
+        pts = cls.get_available_points(user)
+        rate = cls.point_value_in_inr()
+        return (pts * rate).quantize(D("0.01"))
+
+    @classmethod
+    @transaction.atomic
+    def reserve_value(cls, user: CustomUser, value_in_inr: Decimal, *, source_type: str, source_id: str, meta: dict | None = None) -> "RewardPointsHold":
+        """
+        Reserve (hold) reward points for a purchase equal to the given ₹ value.
+        Raises ValidationError if insufficient available points.
+        """
+        from decimal import Decimal as D
+        rate = cls.point_value_in_inr()
+        val = D(str(value_in_inr or "0"))
+        if val <= D("0"):
+            raise ValidationError("Reserve value must be positive.")
+        need_points = (val / rate).quantize(D("0.01"))
+        acc = cls.get_or_create_for_user(user)
+        # Lock account row
+        acc = RewardPointsAccount.objects.select_for_update().get(pk=acc.pk)
+        available = cls.get_available_points(user)
+        if available < need_points:
+            raise ValidationError("Insufficient reward points to reserve.")
+        hold = RewardPointsHold.objects.create(
+            user=user,
+            points=need_points,
+            status=RewardPointsHold.STATUS_PENDING,
+            source_type=source_type or "",
+            source_id=str(source_id or ""),
+            metadata={**(meta or {}), "reserved_value": str(val), "rate": str(rate)},
+        )
+        return hold
+
+    @classmethod
+    @transaction.atomic
+    def commit_hold(cls, hold: "RewardPointsHold", *, commit_points: Decimal | None = None, meta: dict | None = None):
+        """
+        Convert a pending hold into a final redemption by deducting points from the account.
+        If commit_points is provided and smaller than hold.points, only that many points are redeemed;
+        the remainder becomes available automatically because the hold will no longer be pending.
+        """
+        from decimal import Decimal as D
+        if not hold or hold.status != RewardPointsHold.STATUS_PENDING:
+            raise ValidationError("Hold is not pending.")
+        pts = D(str(commit_points if commit_points is not None else hold.points))
+        if pts <= D("0"):
+            # Nothing to commit; just release the hold
+            hold.status = RewardPointsHold.STATUS_RELEASED
+            hold.save(update_fields=["status", "updated_at"])
+            return
+        if pts > hold.points:
+            pts = hold.points
+
+        acc = RewardPointsAccount.get_or_create_for_user(hold.user)
+        # Lock account row
+        acc = RewardPointsAccount.objects.select_for_update().get(pk=acc.pk)
+        if (acc.balance_points or D("0.00")) < pts:
+            raise ValidationError("Insufficient reward points to commit.")
+        acc.balance_points = (acc.balance_points or D("0.00")) - pts
+        acc.save(update_fields=["balance_points", "updated_at"])
+
+        RewardPointsTransaction.objects.create(
+            user=hold.user,
+            points=pts * D("-1"),
+            type=RewardPointsTransaction.TYPE_REDEEM,
+            meta=meta or {},
+        )
+        # Mark hold completed (store committed info)
+        md = hold.metadata or {}
+        md["committed_points"] = str(pts)
+        hold.metadata = md
+        hold.status = RewardPointsHold.STATUS_COMPLETED
+        hold.save(update_fields=["metadata", "status", "updated_at"])
+
+    @classmethod
+    @transaction.atomic
+    def release_hold(cls, hold: "RewardPointsHold"):
+        if not hold or hold.status != RewardPointsHold.STATUS_PENDING:
+            return
+        hold.status = RewardPointsHold.STATUS_RELEASED
+        hold.save(update_fields=["status", "updated_at"])
+
+    @classmethod
+    @transaction.atomic
+    def credit_points(cls, user: CustomUser, points: Decimal, *, reason: str = "EARN", meta: dict | None = None):
+        """
+        Credit (earn) reward points to the user's account.
+        """
+        from decimal import Decimal as D
+        pts = D(str(points or "0"))
+        if pts <= D("0"):
+            raise ValidationError("Credit points must be positive.")
+        acc = cls.get_or_create_for_user(user)
+        acc = RewardPointsAccount.objects.select_for_update().get(pk=acc.pk)
+        acc.balance_points = (acc.balance_points or D("0.00")) + pts
+        acc.save(update_fields=["balance_points", "updated_at"])
+        RewardPointsTransaction.objects.create(
+            user=user,
+            points=pts,
+            type=RewardPointsTransaction.TYPE_EARN,
+            meta=meta or {"reason": reason},
+        )
+
+
+class RewardPointsTransaction(models.Model):
+    TYPE_EARN = "EARN"
+    TYPE_REDEEM = "REDEEM"
+    TYPE_ADJUST = "ADJUST"
+    TYPE_CHOICES = [
+        (TYPE_EARN, "Earn"),
+        (TYPE_REDEEM, "Redeem"),
+        (TYPE_ADJUST, "Adjust"),
+    ]
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="reward_points_transactions", db_index=True)
+    points = models.DecimalField(max_digits=12, decimal_places=2)
+    type = models.CharField(max_length=16, choices=TYPE_CHOICES, db_index=True)
+    meta = models.JSONField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "type"]),
+            models.Index(fields=["created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"RPT<{getattr(self.user, 'username', 'user')}> {self.type} {self.points} pts"
+
+
+class RewardPointsHold(models.Model):
+    STATUS_PENDING = "PENDING"
+    STATUS_COMPLETED = "COMPLETED"
+    STATUS_RELEASED = "RELEASED"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_COMPLETED, "Completed"),
+        (STATUS_RELEASED, "Released"),
+    ]
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="reward_points_holds", db_index=True)
+    points = models.DecimalField(max_digits=12, decimal_places=2)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+    source_type = models.CharField(max_length=64, blank=True, default="")
+    source_id = models.CharField(max_length=64, blank=True, default="")
+    metadata = models.JSONField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "status"]),
+            models.Index(fields=["source_type", "source_id"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"Hold<{getattr(self.user, 'username', 'user')}> {self.points} pts [{self.status}]"
+
+
+@receiver(post_save, sender=CustomUser)
+def create_reward_account_for_new_user(sender, instance: CustomUser, created: bool, **kwargs):
+    if created:
+        def _create_rpa():
+            try:
+                RewardPointsAccount.objects.get_or_create(user=instance, defaults={"balance_points": Decimal("0.00")})
+            except Exception:
+                # Do not block user creation
+                pass
+        try:
+            transaction.on_commit(_create_rpa)
+        except Exception:
+            # Fallback when on_commit is unavailable (e.g., autocommit)
+            _create_rpa()
+
+
+class UserKYC(models.Model):
+    """
+    Consumer KYC details for withdrawals and payouts.
+    """
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name="kyc")
+    bank_name = models.CharField(max_length=150, blank=True)
+    bank_account_number = models.CharField(max_length=50, blank=True)
+    ifsc_code = models.CharField(max_length=20, blank=True)
+    # Optional: link to user's DigiLocker document or Aadhaar proof
+    aadhaar_digilocker_url = models.CharField(max_length=255, blank=True)
+    verified = models.BooleanField(default=False, db_index=True)
+    verified_by = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.SET_NULL, related_name="kyc_verified_set")
+    verified_at = models.DateTimeField(null=True, blank=True)
+    kyc_reopen_allowed = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+        verbose_name = "User KYC"
+        verbose_name_plural = "User KYC"
+
+    def __str__(self) -> str:
+        return f"KYC<{getattr(self.user, 'username', 'user')}>"
+
+
+class WithdrawalRequest(models.Model):
+    METHOD_CHOICES = (
+        ("bank", "Bank Transfer"),
+    )
+    STATUS_CHOICES = (
+        ("pending", "Pending"),
+        ("approved", "Approved"),
+        ("rejected", "Rejected"),
+    )
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="withdrawal_requests", db_index=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    method = models.CharField(max_length=16, choices=METHOD_CHOICES, default="bank", db_index=True)
+    upi_id = models.CharField(max_length=100, blank=True)
+    # bank fallback (can be copied from UserKYC on create)
+    bank_name = models.CharField(max_length=150, blank=True)
+    bank_account_number = models.CharField(max_length=50, blank=True)
+    ifsc_code = models.CharField(max_length=20, blank=True)
+
+    note = models.TextField(blank=True)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="pending", db_index=True)
+    requested_at = models.DateTimeField(auto_now_add=True)
+    decided_at = models.DateTimeField(null=True, blank=True)
+    decided_by = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.SET_NULL, related_name="withdrawals_decided")
+    payout_ref = models.CharField(max_length=100, blank=True)  # external txn id if any
+
+    class Meta:
+        ordering = ["-requested_at"]
+        indexes = [
+            models.Index(fields=["user", "status"]),
+            models.Index(fields=["status", "requested_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"WDR<{self.user.username}> ₹{self.amount} [{self.status}]"
+
+    @transaction.atomic
+    def approve(self, actor: CustomUser, payout_ref: str | None = None):
+        if self.status != "pending":
+            raise ValueError("Only pending withdrawals can be approved.")
+        # Debit user wallet
+        w = Wallet.get_or_create_for_user(self.user)
+        w.debit(
+            self.amount,
+            tx_type="WITHDRAWAL_DEBIT",
+            meta={"withdrawal_id": self.id, "method": self.method, "payout_ref": payout_ref or ""},
+            source_type="WITHDRAWAL",
+            source_id=str(self.id),
+        )
+        # Lifetime 3% referral withdrawal bonus to direct sponsor (if exists)
+        sponsor = getattr(self.user, "registered_by", None)
+        try:
+            if sponsor:
+                bonus = (self.amount or Decimal("0")) * Decimal("0.03")
+                if bonus > 0:
+                    sw = Wallet.get_or_create_for_user(sponsor)
+                    sw.credit(
+                        bonus.quantize(Decimal("0.01")),
+                        tx_type="LIFETIME_WITHDRAWAL_BONUS",
+                        meta={"from_user": self.user.username, "withdrawal_id": self.id},
+                        source_type="WITHDRAWAL_BONUS",
+                        source_id=str(self.id),
+                    )
+        except Exception:
+            # best-effort
+            pass
+        # Persist status
+        from django.utils import timezone as _tz
+        self.status = "approved"
+        self.decided_by = actor
+        self.decided_at = _tz.now()
+        if payout_ref:
+            self.payout_ref = payout_ref
+        self.save(update_fields=["status", "decided_by", "decided_at", "payout_ref"])
+
+    @transaction.atomic
+    def reject(self, actor: CustomUser, reason: str | None = None):
+        if self.status != "pending":
+            raise ValueError("Only pending withdrawals can be rejected.")
+        from django.utils import timezone as _tz
+        self.status = "rejected"
+        self.decided_by = actor
+        self.decided_at = _tz.now()
+        if reason:
+            self.note = (self.note or "") + f"\nRejected: {reason}"
+        self.save(update_fields=["status", "decided_by", "decided_at", "note"])
+
+
+@receiver(post_save, sender=CustomUser)
+def create_wallet_for_new_user(sender, instance: CustomUser, created: bool, **kwargs):
+    if created:
+        def _create_wallet():
+            try:
+                Wallet.objects.get_or_create(user=instance, defaults={'balance': Decimal('0.00')})
+            except Exception:
+                # Avoid blocking user creation if wallet init fails
+                pass
+        try:
+            transaction.on_commit(_create_wallet)
+        except Exception:
+            # Fallback when on_commit is unavailable (e.g., autocommit)
+            _create_wallet()
+
+
+@receiver(post_save, sender=CustomUser)
+def handle_new_user_post_save(sender, instance: CustomUser, created: bool, **kwargs):
+    """
+    On new user creation:
+      - Trigger referral join payouts and optional autopool placement.
+      - Optionally distribute franchise benefit on registration (config-driven).
+    """
+    if not created:
+        return
+    # Best-effort guard against import issues
+    cfg = None
+    try:
+        from business.models import CommissionConfig, AutoPoolAccount
+        cfg = CommissionConfig.get_solo()
+    except Exception:
+        cfg = None
+
+    # Auto 5-matrix placement on consumer registration (config-driven)
+    # If CommissionConfig.autopool_trigger_on_direct_referral is True, place a FIVE_150 account for the new consumer
+    # and sync matrix fields (parent/matrix_position/depth) on the user for AdminMatrix5Tree.
+    try:
+        if (
+            created
+            and cfg
+            and getattr(cfg, "autopool_trigger_on_direct_referral", False)
+            and str(getattr(instance, "category", "")).lower() == "consumer"
+            and not getattr(instance, "is_staff", False)
+            and not getattr(instance, "is_superuser", False)
+        ):
+            acc = AutoPoolAccount.create_five_150_for_user(
+                instance,
+                amount=None,
+                source_type="REGISTRATION",
+                source_id=str(getattr(instance, "id", "")),
+            )
+            if acc and getattr(acc, "parent_account", None):
+                parent_owner = getattr(acc.parent_account, "owner", None)
+                pos = getattr(acc, "position", None)
+                lvl = int(getattr(acc, "level", 0) or 0)
+                if parent_owner and pos:
+                    # Best-effort: sync matrix placement to CustomUser without breaking outer transaction.
+                    parent_id = parent_owner.id
+                    position = int(pos)
+                    level = int(lvl)
+                    # If the (parent, position) slot is already occupied, skip syncing to avoid IntegrityError.
+                    try:
+                        slot_taken = CustomUser.objects.filter(parent_id=parent_id, matrix_position=position).exclude(pk=instance.pk).exists()
+                    except Exception:
+                        slot_taken = True
+                    if not slot_taken:
+                        try:
+                            from django.db import IntegrityError
+                            # Use a nested savepoint so any integrity error rolls back only this part.
+                            with transaction.atomic():
+                                instance.parent_id = parent_id
+                                instance.matrix_position = position
+                                instance.depth = level
+                                instance.save(update_fields=["parent", "matrix_position", "depth"])
+                        except IntegrityError:
+                            # Slot taken concurrently or conflicting historical data; ignore.
+                            pass
+                        except Exception:
+                            pass
+    except Exception:
+        # best-effort; do not block user creation
+        pass
+
+    # DEFERRED: No referral/matrix payouts on registration.
+    # Intentionally not calling referral.on_user_join here. Payouts will be triggered on first activation.
+
+    # DEFERRED: No franchise payouts on registration.
+    # Franchise payouts will be triggered on first activation inside ensure_first_purchase_activation.
+
+
+@receiver(post_save, sender=CustomUser)
+def release_pending_on_activation(sender, instance: CustomUser, created: bool, **kwargs):
+    """
+    When a user's account_active becomes True (via admin or any other path),
+    release all pending_due_to_inactive wallet credits into withdrawable balance.
+    Idempotent: original txs have their pending flag cleared on release.
+    """
+    if created:
+        return
+    try:
+        if getattr(instance, "account_active", False):
+            from accounts.models import Wallet
+            Wallet.release_pending_for_user(instance)
+    except Exception:
+        # best-effort; do not block saves
+        pass
+
+class UserNominee(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="nominees", db_index=True)
+    name = models.CharField(max_length=150)
+    relationship = models.CharField(max_length=50, blank=True)
+    phone = models.CharField(max_length=20, blank=True)
+    share_percent = models.PositiveSmallIntegerField(default=0)  # 0..100
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at", "-id"]
+        indexes = [
+            models.Index(fields=["user"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"Nominee<{self.user.username}: {self.name} ({self.share_percent}%)>"
+
+class SupportTicket(models.Model):
+    TYPE_CHOICES = [
+        ('KYC_REVERIFY', 'KYC Re-verification'),
+        ('GENERAL', 'General'),
+    ]
+    STATUS_CHOICES = [
+        ('open', 'Open'),
+        ('in_progress', 'In Progress'),
+        ('resolved', 'Resolved'),
+        ('rejected', 'Rejected'),
+        ('closed', 'Closed'),
+    ]
+
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='support_tickets', db_index=True)
+    type = models.CharField(max_length=32, choices=TYPE_CHOICES, db_index=True)
+    subject = models.CharField(max_length=200)
+    message = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open', db_index=True)
+    admin_assignee = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_tickets')
+    resolution_note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at', '-id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'type'],
+                name='uniq_open_kyc_reverify_ticket',
+                condition=models.Q(type='KYC_REVERIFY') & models.Q(status__in=['open', 'in_progress'])
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"Ticket<{self.id}> {self.type} {self.status}"
+
+
+class SupportTicketMessage(models.Model):
+    ticket = models.ForeignKey(SupportTicket, on_delete=models.CASCADE, related_name='messages')
+    author = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='support_messages')
+    message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at', 'id']
+
+    def __str__(self) -> str:
+        return f"Msg<{self.ticket_id} by {getattr(self.author, 'username', '')}>"
+
+
+# ==============================
+# Superuser → Consumer clone + Root Consumer auto-setup
+# ==============================
+def _generate_unique_consumer_username(base: str) -> str:
+    """
+    Generate a unique username based on base with '-consumer' suffix.
+    Falls back to '-consumer-2', '-consumer-3', ...
+    """
+    from django.utils.text import slugify
+    base = (base or "admin").strip()
+    base_cons = f"{base}-consumer"
+    uname = base_cons
+    i = 2
+    while CustomUser.objects.filter(username=uname).exists():
+        uname = f"{base_cons}-{i}"
+        i += 1
+    return uname
+
+
+def _clone_superuser_as_consumer(superuser: CustomUser) -> CustomUser | None:
+    """
+    Create a non-staff, non-superuser consumer clone of the given superuser.
+    Copies hashed password so creds are initially the same. Idempotent by username uniqueness.
+    Sets RootConsumerConfig.root_user if not configured yet.
+    """
+    try:
+        # Guard: do not clone if already a consumer clone exists with likely suffix
+        base = f"{getattr(superuser, 'username', 'admin')}-consumer"
+        exists = CustomUser.objects.filter(username__startswith=base).exists()
+        if exists:
+            consumer = CustomUser.objects.filter(username__startswith=base).order_by("id").first()
+        else:
+            uname = _generate_unique_consumer_username(getattr(superuser, "username", "admin"))
+            consumer = CustomUser.objects.create(
+                username=uname,
+                password=superuser.password,  # hashed password copied as-is
+                email=getattr(superuser, "email", "") or "",
+                full_name=getattr(superuser, "full_name", "") or "",
+                phone=getattr(superuser, "phone", "") or "",
+                country=getattr(superuser, "country", None),
+                state=getattr(superuser, "state", None),
+                city=getattr(superuser, "city", None),
+                pincode=getattr(superuser, "pincode", "") or "",
+                address=getattr(superuser, "address", "") or "",
+                role="user",
+                category="consumer",
+                is_staff=False,
+                is_superuser=False,
+                account_active=True,
+                registered_by=None,
+            )
+        # Attempt to set as Root Consumer if not set
+        try:
+            from business.models import RootConsumerConfig
+            cfg = RootConsumerConfig.get_solo()
+            if not cfg.get_root_user():
+                cfg.root_user = consumer
+                cfg.save(update_fields=["root_user", "updated_at"])
+        except Exception:
+            pass
+        return consumer
+    except Exception:
+        return None
+
+
+@receiver(post_save, sender=CustomUser)
+def ensure_consumer_clone_for_new_superuser(sender, instance: CustomUser, created: bool, **kwargs):
+    """
+    Whenever a new superuser is created, also create a consumer clone for domain usage,
+    and set it as Root Consumer if not already configured.
+    """
+    if not created:
+        return
+    try:
+        if getattr(instance, "is_superuser", False):
+            _clone_superuser_as_consumer(instance)
+    except Exception:
+        # best-effort; never block user creation
+        pass

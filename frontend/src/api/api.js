@@ -5,7 +5,21 @@ import { deepFixMojibake, fixMojibakeString } from "../utils/encodingFix";
 const rawBaseURL =
   process.env.REACT_APP_API_URL ||
   "/api";
-const baseURL = rawBaseURL.endsWith("/") ? rawBaseURL : rawBaseURL + "/";
+let baseURL = rawBaseURL.endsWith("/") ? rawBaseURL : rawBaseURL + "/";
+
+/* In development, FORCE baseURL to relative "/api/" so requests originate from :3000 and are proxied by CRA.
+   This preserves http://localhost:3000/api/... in the Network tab regardless of REACT_APP_API_URL. */
+if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") {
+  baseURL = "/api/";
+}
+
+// Expose/debug baseURL used by the app at runtime (development only)
+if (typeof window !== "undefined") {
+  try { window.__API_BASE_URL__ = baseURL; } catch (_) {}
+  if (process.env.NODE_ENV !== "production") {
+    try { console.info("[API] baseURL:", baseURL); } catch (_) {}
+  }
+}
 
 const API = axios.create({ baseURL });
 
@@ -309,12 +323,60 @@ API.interceptors.request.use((config) => {
           //  - baseURL="http://localhost:8000/api", url="/uploads/cards/" -> "uploads/cards/" => "http://.../api/uploads/cards/"
           //  - If url already begins with "/api/", strip that prefix to avoid "/api/api/*" when using axios baseURL="/api"
           let path = u.startsWith("/api/") ? u.slice(5) : u.slice(1);
-          config.url = path;
+          config.url = path || u; // if empty, keep original so guard rejects
         }
       }
     } catch (_) {}
 
+
+    // Debug guard: detect empty/baseURL requests that would hit "/api/" with no path
+    {
+      const rawUrl = config.url;
+      const urlStr = typeof rawUrl === "string" ? rawUrl.trim() : "";
+      const isUndefinedStr = typeof rawUrl === "string" && (rawUrl === "undefined" || rawUrl === "null");
+      const isEmptyOrRoot =
+        !urlStr ||
+        urlStr === "/" ||
+        urlStr === "api" ||
+        urlStr === "api/" ||
+        urlStr === "/api" ||
+        urlStr === "/api/" ||
+        isUndefinedStr;
+
+      if (!urlStr || isEmptyOrRoot || typeof rawUrl !== "string") {
+        const err = new Error("[API] Aborting request: empty or root API path. Check caller stack.");
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.error("[API] Aborting request with empty path.", {
+            url: rawUrl,
+            baseURL: config.baseURL || API.defaults.baseURL || baseURL,
+            stack: err.stack,
+          });
+        }
+        return Promise.reject(err); // abort request here
+      }
+    }
+
     const method = (config.method || "get").toLowerCase();
+
+    // Heuristics: apply safe defaults for common admin endpoints to reduce duplicate requests
+    try {
+      const rawUrl = String(config.url || "");
+      const path = rawUrl.startsWith("/") ? rawUrl.slice(1) : rawUrl;
+      const p = path.toLowerCase();
+      if (method === "get") {
+        // admin/me: cache for 60s and cancel previous in-flight by default
+        if (p.startsWith("admin/me/")) {
+          if (config.cacheTTL == null) config.cacheTTL = 60_000;
+          if (config.dedupe == null) config.dedupe = "cancelPrevious";
+        }
+        // admin/metrics: cache for 15s to smooth out re-renders/StrictMode
+        if (p.startsWith("admin/metrics/") || p.startsWith("adminapi/metrics/")) {
+          if (config.cacheTTL == null) config.cacheTTL = 15_000;
+          if (config.dedupe == null) config.dedupe = "cancelPrevious";
+        }
+      }
+    } catch (_) {}
 
     if (method === "get") {
       const key = makeRequestKey(config);
@@ -340,7 +402,7 @@ API.interceptors.request.use((config) => {
       }
 
       // Request de-duplication: cancel previous in-flight identical GET, keep latest
-      const strategy = config.dedupe || "cancelPrevious"; // "cancelPrevious" | "none"
+      const strategy = config.dedupe ?? "none"; // default: no dedupe unless explicitly requested
       if (strategy !== "none") {
         const existing = inflight.get(key);
         if (existing) {
@@ -417,6 +479,19 @@ API.interceptors.request.use(async (config) => {
       config.headers.Authorization = `Bearer ${token}`;
     }
   }
+
+  // Dev-only: emit whether Authorization is attached for hierarchy endpoint to debug 401s
+  if (process.env.NODE_ENV !== "production") {
+    try {
+      const path = String(config.url || "").replace(/^\//, "");
+      if (path.startsWith("accounts/hierarchy/")) {
+        const hasAuth = !!(config.headers && config.headers.Authorization);
+        // eslint-disable-next-line no-console
+        console.debug("[API] hierarchy Authorization attached:", hasAuth);
+      }
+    } catch (_) {}
+  }
+
   return config;
 });
 
@@ -507,6 +582,20 @@ API.interceptors.response.use(
         inflight.delete(originalRequest._reqKey);
       }
     } catch (_) {}
+
+    // Treat request cancellations/aborts distinctly: do not retry or surface as timeout
+    const isCanceled =
+      (typeof axios !== "undefined" && typeof axios.isCancel === "function" && axios.isCancel(error)) ||
+      error?.code === "ERR_CANCELED" ||
+      error?.name === "CanceledError" ||
+      (typeof error?.message === "string" && /aborted|abort|canceled|cancelled/i.test(error.message));
+    if (isCanceled) {
+      try {
+        if (originalRequest?._trackLoading) decrementLoading();
+      } catch (_) {}
+      try { error.__canceled = true; } catch (_) {}
+      return Promise.reject(error);
+    }
 
     // Lightweight retries for idempotent requests on transient errors
     try {
@@ -895,7 +984,7 @@ export async function createPromoPurchase({
 
 // Admin promo purchases
 export async function adminListPromoPurchases(params = {}) {
-  const res = await API.get("/business/admin/promo/purchases/", { params, dedupe: "cancelPrevious" });
+  const res = await API.get("/business/admin/promo/purchases/", { params });
   return res?.data || res;
 }
 export async function adminApprovePromoPurchase(id) {

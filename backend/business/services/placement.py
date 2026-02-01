@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Optional, Tuple, List
 
 from django.db import transaction, IntegrityError
-from django.db.models import Count
+from django.db.models import Count, Max
 
 from business.models import AutoPoolAccount, CommissionConfig
 
@@ -82,7 +82,13 @@ def _ensure_sentinel_root(pool_type: str) -> AutoPoolAccount:
         )
         if root:
             return root
-        return AutoPoolAccount.objects.create(
+        # Compute a user_entry_index for the sentinel owner/pool under lock to satisfy uniqueness
+        try:
+            sel2 = AutoPoolAccount.objects.select_for_update()
+        except TypeError:
+            sel2 = AutoPoolAccount.objects.select_for_update()
+        cur_max = (sel2.filter(owner=owner, pool_type=pool_type).aggregate(m=Max("user_entry_index")) or {}).get("m") or 0
+        root = AutoPoolAccount.objects.create(
             owner=owner,
             username_key=getattr(owner, "username", "") or f"ROOT-{pool_type}",
             entry_amount=_q2(0),
@@ -91,9 +97,11 @@ def _ensure_sentinel_root(pool_type: str) -> AutoPoolAccount:
             parent_account=None,
             level=0,
             position=None,
+            user_entry_index=int(cur_max) + 1,
             source_type="SENTINEL",
             source_id=pool_type,
         )
+        return root
 
 
 def is_level_full(level: int, width: int, pool_type: str) -> bool:
@@ -108,14 +116,27 @@ def is_level_full(level: int, width: int, pool_type: str) -> bool:
     return actual >= expected
 
 
-def find_next_placement_slot(width: int, max_depth: int, pool_type: str) -> Tuple[AutoPoolAccount, int, int]:
+def find_next_placement_slot(width: int, max_depth: int, pool_type: str, start_account_id: Optional[int] = None) -> Tuple[AutoPoolAccount, int, int]:
     """
     BFS TOP -> DOWN -> LEFT -> RIGHT strictly under the sentinel root tree (single genealogy).
     Returns (parent_row, position, child_level).
     Strict width-before-depth: never place in level N+1 unless level N (for the current sentinel subtree) is fully filled.
     Raises NoCapacityError if no slot exists within configured max_depth.
     """
-    root = _ensure_sentinel_root(pool_type)
+    # Enforce single sentinel root per pool (reattach stray roots) before searching
+    try:
+        from business.services.structure import enforce_single_sentinel
+        enforce_single_sentinel(pool_type)
+    except Exception:
+        pass
+
+    # Allow starting BFS from a sponsor's subtree root if provided; else use sentinel
+    if start_account_id:
+        root = AutoPoolAccount.objects.filter(id=int(start_account_id), pool_type=pool_type, status="ACTIVE").first()
+        if not root:
+            root = _ensure_sentinel_root(pool_type)
+    else:
+        root = _ensure_sentinel_root(pool_type)
 
     # Build BFS frontier restricted to the sentinel tree:
     # level 0 parents = [root], next level parents = children of previous level parents, and so on.
@@ -129,31 +150,34 @@ def find_next_placement_slot(width: int, max_depth: int, pool_type: str) -> Tupl
 
         found_slot: Optional[Tuple[AutoPoolAccount, int, int]] = None
 
-        # Iterate parents, locking one at a time to avoid heavy locking
-        for pid in current_parents:
-            with transaction.atomic():
-                try:
-                    qs = AutoPoolAccount.objects.select_for_update(skip_locked=True)
-                except TypeError:
-                    qs = AutoPoolAccount.objects.select_for_update()
-                parent = qs.filter(id=int(pid)).first()
-                if not parent:
-                    # locked by another tx; move on
-                    continue
+        # Same-level round-robin: pos-major, then parent-id order
+        for pos_try in range(1, int(width) + 1):
+            for pid in current_parents:
+                with transaction.atomic():
+                    try:
+                        qs = AutoPoolAccount.objects.select_for_update(skip_locked=True)
+                    except TypeError:
+                        qs = AutoPoolAccount.objects.select_for_update()
+                    parent = qs.filter(id=int(pid)).first()
+                    if not parent:
+                        # locked by another tx; move on
+                        continue
 
-                child_level = int(getattr(parent, "level", 0) or 0) + 1
-                if child_level > int(max_depth):
-                    raise MaxDepthError(f"Max depth reached for pool={pool_type}: next={child_level}, configured={max_depth}")
+                    child_level = int(getattr(parent, "level", 0) or 0) + 1
+                    if child_level > int(max_depth):
+                        raise MaxDepthError(f"Max depth reached for pool={pool_type}: next={child_level}, configured={max_depth}")
 
-                taken = list(
-                    AutoPoolAccount.objects.filter(parent_account=parent, pool_type=pool_type, status="ACTIVE")
-                    .order_by("position", "id")
-                    .values_list("position", flat=True)
-                )
-                pos = _first_missing_position(taken, int(width))
-                if pos is not None:
-                    found_slot = (parent, int(pos), child_level)
-                    break
+                    exists = AutoPoolAccount.objects.filter(
+                        parent_account=parent,
+                        pool_type=pool_type,
+                        status="ACTIVE",
+                        position=int(pos_try),
+                    ).exists()
+                    if not exists:
+                        found_slot = (parent, int(pos_try), child_level)
+                        break
+            if found_slot:
+                break
 
         if found_slot:
             return found_slot
@@ -213,9 +237,13 @@ class GenericPlacement:
         source_id: str = "",
         width: Optional[int] = None,
         max_depth: Optional[int] = None,
+        start_entry_id: Optional[int] = None,
     ) -> AutoPoolAccount:
         """
-        Place a new AutoPoolAccount deterministically under the global sentinel tree.
+        Place a new AutoPoolAccount deterministically under a subtree:
+        - If start_entry_id is provided, BFS within that subtree
+        - Otherwise, under the global sentinel tree
+        Strict width-before-depth and round-robin at the same level.
         Fails with MaxDepthError/NoCapacityError instead of falling back to sponsor/self.
         """
         if width is None or max_depth is None:
@@ -224,32 +252,47 @@ class GenericPlacement:
             max_depth = d if max_depth is None else max_depth
 
         # Find the slot (locks parent row)
-        parent, position, child_level = find_next_placement_slot(int(width), int(max_depth), pool_type)
+        parent, position, child_level = find_next_placement_slot(
+            int(width), int(max_depth), pool_type, start_account_id=int(start_entry_id) if start_entry_id else None
+        )
 
         # Compute deterministic display key (compatible with existing suffix behavior)
         uname = AutoPoolAccount._next_username_key(owner, pool_type)
 
-        # Retry-loop in case of rare race on sibling unique constraint
+        # Retry-loop to handle sibling position race and per-user index race
         attempts = 0
         while True:
             attempts += 1
             try:
-                acc = AutoPoolAccount.objects.create(
-                    owner=owner,
-                    username_key=uname,
-                    entry_amount=_q2(amount or 0),
-                    pool_type=pool_type,
-                    status="ACTIVE",
-                    parent_account=parent,
-                    level=int(child_level),
-                    position=int(position),
-                    source_type=source_type or "",
-                    source_id=str(source_id or ""),
-                )
-                return acc
+                # Use an inner savepoint so an IntegrityError doesn't break the outer atomic block
+                with transaction.atomic():
+                    # Compute next monotonic user_entry_index per (owner, pool_type) under lock
+                    try:
+                        sel = AutoPoolAccount.objects.select_for_update()
+                    except TypeError:
+                        sel = AutoPoolAccount.objects.select_for_update()
+                    cur_max = (sel.filter(owner=owner, pool_type=pool_type).aggregate(m=Max("user_entry_index")) or {}).get("m") or 0
+                    next_idx = int(cur_max) + 1
+
+                    acc = AutoPoolAccount.objects.create(
+                        owner=owner,
+                        username_key=uname,
+                        entry_amount=_q2(amount or 0),
+                        pool_type=pool_type,
+                        status="ACTIVE",
+                        parent_account=parent,
+                        level=int(child_level),
+                        position=int(position),
+                        user_entry_index=int(next_idx),
+                        source_type=source_type or "",
+                        source_id=str(source_id or ""),
+                    )
+                    return acc
             except IntegrityError:
-                if attempts >= 3:
+                if attempts >= 5:
                     # Re-throw a clear error; caller can decide to retry externally
-                    raise NoCapacityError(f"Lost race for parent={parent.id} pos={position} in {pool_type}; retry later")
+                    raise NoCapacityError(f"Lost race creating account for {pool_type} (parent={getattr(parent, 'id', None)} pos={position}); retry later")
                 # Recompute a slot and try again
-                parent, position, child_level = find_next_placement_slot(int(width), int(max_depth), pool_type)
+                parent, position, child_level = find_next_placement_slot(
+                    int(width), int(max_depth), pool_type, start_account_id=int(start_entry_id) if start_entry_id else None
+                )

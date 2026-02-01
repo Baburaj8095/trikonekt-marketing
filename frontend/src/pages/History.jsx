@@ -329,7 +329,8 @@ function HistoryRow({ tx, onClick }) {
       }).format(new Date(tx.created_at))
     : "";
 
-  const typeName = describeSource(tx);
+  const levelIdx = Number(tx?.meta?.level_index);
+  const typeName = `${describeSource(tx)}${Number.isFinite(levelIdx) ? ` - Level ${levelIdx}` : ""}`;
 
   return (
     <Paper
@@ -483,13 +484,29 @@ export default function History() {
     };
   }, []);
 
-  const sectionsIncoming = useMemo(() => groupByDay(incoming), [incoming]);
+  const incomingGross = useMemo(
+    () =>
+      (incoming || []).map((tx) => {
+        const g = Number(tx?.meta?.gross);
+        return isNaN(g) ? tx : { ...tx, amount: g };
+      }),
+    [incoming]
+  );
+  const sectionsIncoming = useMemo(() => groupByDay(incomingGross), [incomingGross]);
   const sectionsSelf = useMemo(() => groupByDay(selfAccount), [selfAccount]);
   const sectionsRewards = useMemo(() => groupByDay(cashback), [cashback]);
   const sectionsRedeem = useMemo(() => groupByDay(redeem), [redeem]);
+  const totalGross = useMemo(
+    () =>
+      (incoming || []).reduce((sum, tx) => {
+        const g = Number(tx?.meta?.gross ?? 0);
+        return sum + (isNaN(g) ? 0 : g);
+      }, 0),
+    [incoming]
+  );
 
   const tabs = [
-    { label: `Incoming (${incoming.length})`, key: "incoming" },
+    { label: `Bonus History (${incoming.length})`, key: "incoming" },
     { label: `Self Account (${selfAccount.length})`, key: "self" },
     { label: `Rewards (${cashback.length})`, key: "rewards" },
     { label: `Redeem (${redeem.length})`, key: "redeem" },
@@ -556,6 +573,7 @@ export default function History() {
             >
               ₹ {fmtAmount(top.main_income_balance)}
             </Typography>
+           
           </Box>
         </Stack>
       </Paper>
@@ -573,9 +591,9 @@ export default function History() {
           "&::-webkit-scrollbar": { display: "none" },
         }}
       >
-        <MiniCard
-          title="Income Wallet"
-          value={`₹ ${fmtAmount(top.main_income_balance)}`}
+          <MiniCard
+          title="Bonus Wallet"
+          value={`₹ ${fmtAmount(totalGross)}`}
           icon={<SavingsIcon fontSize="small" />}
           color="success"
         />
@@ -651,7 +669,7 @@ export default function History() {
             </Typography>
           ) : (
             <>
-              {tab === 0 && <SectionList sections={sectionsIncoming} fallbackRows={incoming} />}
+              {tab === 0 && <SectionList sections={sectionsIncoming} fallbackRows={incomingGross} />}
               {tab === 1 && <SectionList sections={sectionsSelf} fallbackRows={selfAccount} />}
               {tab === 2 && <SectionList sections={sectionsRewards} fallbackRows={cashback} />}
               {tab === 3 && <SectionList sections={sectionsRedeem} fallbackRows={redeem} />}

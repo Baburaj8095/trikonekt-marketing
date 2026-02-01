@@ -174,7 +174,7 @@ const Login = () => {
   const [sponsorLocked, setSponsorLocked] = useState(false);
   const [sponsorChecking, setSponsorChecking] = useState(false);
   const [sponsorValid, setSponsorValid] = useState(null); // null unknown, true valid, false invalid
-  const [sponsorDisplay, setSponsorDisplay] = useState({ name: "", pincode: "", username: "" });
+  const [sponsorDisplay, setSponsorDisplay] = useState({ name: "", pincode: "", username: "", role: "", category: "", state: "", district: "" });
 
   // Normalize sponsor input to avoid passing URLs or malformed strings to the API
   const normalizeSponsor = (val) => {
@@ -378,20 +378,28 @@ const Login = () => {
       let exists = false;
       let name = "";
       let pcode = "";
-      let uname = "";
+      let uname = s;
+      let role = "";
+      let category = "";
+      let stateName = "";
+      let districtName = "";
       try {
         // Prefer public endpoint that now returns sponsor identity
         const r = await API.get("/accounts/regions/by-sponsor/", { params: { sponsor: s, level: "state" } });
         const sp = r?.data?.sponsor || {};
         name = sp.full_name || sp.username || "";
         pcode = sp.pincode || "";
-        uname = sp.username || "";
-        exists = Boolean(name || pcode || uname);
+        uname = sp.username || s;
+        role = sp.role || "";
+        category = sp.category || "";
+        stateName = sp.state || "";
+        districtName = sp.district || "";
+        exists = Boolean(sp && (sp.username || name || pcode));
       } catch (_) {
-        exists = false;
+        // ignore, keep exists as false
       } finally {
         setSponsorValid(exists);
-        setSponsorDisplay({ name, pincode: pcode, username: uname || s });
+        setSponsorDisplay({ name, pincode: pcode, username: uname, role, category, state: stateName, district: districtName });
         setSponsorChecking(false);
       }
     }, 450);
@@ -1570,9 +1578,11 @@ const Login = () => {
                   Sponsor verified
                 </Alert>
                 <Box sx={{ p: 1.5, borderRadius: 1, bgcolor: "#f5f9ff", border: "1px solid #e3f2fd" }}>
-                  <Typography variant="body2"><b>Sponsor ID:</b> {sponsorDisplay.username || normalizeSponsor(sponsorId) || ""}</Typography>
-                  <Typography variant="body2"><b>Name:</b> {sponsorDisplay.name || ""}</Typography>
-                  <Typography variant="body2"><b>Pincode:</b> {sponsorDisplay.pincode || ""}</Typography>
+                  <Typography variant="body2"><b>Sponsor:</b> {sponsorDisplay.username || normalizeSponsor(sponsorId) || "-"}</Typography>
+                  <Typography variant="body2"><b>Name:</b> {sponsorDisplay.name || "-"}</Typography>
+                  <Typography variant="body2"><b>Role:</b> {sponsorDisplay.role || sponsorDisplay.category || "-"}</Typography>
+                  <Typography variant="body2"><b>Location:</b> {`${sponsorDisplay.district || "-"}, ${sponsorDisplay.state || "-"}`}</Typography>
+                  <Typography variant="body2"><b>Pincode:</b> {sponsorDisplay.pincode || "-"}</Typography>
                 </Box>
               </Box>
             )}
@@ -2105,9 +2115,11 @@ const Login = () => {
                           Sponsor verified
                         </Alert>
                 <Box sx={{ p: 1.5, borderRadius: 1, bgcolor: "#f5f9ff", border: "1px solid #e3f2fd" }}>
-                  <Typography variant="body2"><b>Sponsor ID:</b> {sponsorDisplay.username || normalizeSponsor(sponsorId) || ""}</Typography>
-                  <Typography variant="body2"><b>Name:</b> {sponsorDisplay.name || ""}</Typography>
-                  <Typography variant="body2"><b>Pincode:</b> {sponsorDisplay.pincode || ""}</Typography>
+                  <Typography variant="body2"><b>Sponsor:</b> {sponsorDisplay.username || normalizeSponsor(sponsorId) || "-"}</Typography>
+                  <Typography variant="body2"><b>Name:</b> {sponsorDisplay.name || "-"}</Typography>
+                  <Typography variant="body2"><b>Role:</b> {sponsorDisplay.role || sponsorDisplay.category || "-"}</Typography>
+                  <Typography variant="body2"><b>Location:</b> {`${sponsorDisplay.district || "-"}, ${sponsorDisplay.state || "-"}`}</Typography>
+                  <Typography variant="body2"><b>Pincode:</b> {sponsorDisplay.pincode || "-"}</Typography>
                 </Box>
                       </Box>
                     )}
@@ -2405,5 +2417,3 @@ const Login = () => {
 };
 
 export default Login;
-
-

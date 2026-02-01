@@ -73,26 +73,67 @@ function Badge({ children, color = "#0369a1", bg = "#e0f2fe" }) {
 }
 
 export default function AdminKYC() {
-  const [filters, setFilters] = useState({
-    status: "pending", // default tab
+  // View mode bifurcation: 'kyc' vs 'nominee'
+  const [viewMode, setViewMode] = useState("kyc"); // 'kyc' | 'nominee'
+
+  // KYC filters
+  const [kycFilters, setKycFilters] = useState({
+    status: "submitted", // default tab
     user: "",
     state: "",
     pincode: "",
     date_from: "",
     date_to: "",
   });
-  const [density, setDensity] = useState("standard");
-  const [reloadKey, setReloadKey] = useState(0);
 
-  function setF(key, val) {
-    setFilters((f) => ({ ...f, [key]: val }));
+  // Nominee filters (aligned to UserNominee fields where possible)
+  const [nomineeFilters, setNomineeFilters] = useState({
+    user: "",
+    name: "",
+    relationship: "",
+    date_from: "",
+    date_to: "",
+    status: "", // e.g. "completed" | "incomplete" (backend optional)
+  });
+
+  const [density, setDensity] = useState("standard");
+  const [reloadKeyKyc, setReloadKeyKyc] = useState(0);
+  const [reloadKeyNominee, setReloadKeyNominee] = useState(0);
+
+  function setKycF(key, val) {
+    setKycFilters((f) => ({ ...f, [key]: val }));
+  }
+  function setNomineeF(key, val) {
+    setNomineeFilters((f) => ({ ...f, [key]: val }));
   }
 
   const statusOptions = useMemo(
     () => [
       { value: "", label: "Any" },
       { value: "pending", label: "Pending" },
+      { value: "submitted", label: "Submitted" },
       { value: "verified", label: "Verified" },
+    ],
+    []
+  );
+
+  const nomineeRelationshipOptions = useMemo(
+    () => [
+      { value: "", label: "Any" },
+      { value: "Spouse", label: "Spouse" },
+      { value: "Parent", label: "Parent" },
+      { value: "Child", label: "Child" },
+      { value: "Sibling", label: "Sibling" },
+      { value: "Other", label: "Other" },
+    ],
+    []
+  );
+
+  const nomineeStatusOptions = useMemo(
+    () => [
+      { value: "", label: "Any" },
+      { value: "completed", label: "Completed" },
+      { value: "incomplete", label: "Incomplete" },
     ],
     []
   );
@@ -101,7 +142,7 @@ export default function AdminKYC() {
     if (!window.confirm(`Verify KYC for ${row.username}?`)) return;
     try {
       await API.patch(`/admin/kyc/${row.user_id}/verify/`);
-      setReloadKey((k) => k + 1);
+      setReloadKeyKyc((k) => k + 1);
     } catch (e) {
       alert(e?.response?.data?.detail || "Failed to verify KYC");
     }
@@ -111,14 +152,14 @@ export default function AdminKYC() {
     if (!window.confirm(`Reject KYC for ${row.username}?`)) return;
     try {
       await API.patch(`/admin/kyc/${row.user_id}/reject/`);
-      setReloadKey((k) => k + 1);
+      setReloadKeyKyc((k) => k + 1);
     } catch (e) {
       alert(e?.response?.data?.detail || "Failed to reject KYC");
     }
   }
 
-  // DataGrid columns (responsive with flex + minWidth)
-  const columns = useMemo(
+  // KYC DataGrid columns (responsive with flex + minWidth)
+  const columnsKyc = useMemo(
     () => [
       { field: "user_id", headerName: "UserID", minWidth: 110 },
       { field: "username", headerName: "Username", minWidth: 160, flex: 1 },
@@ -147,7 +188,7 @@ export default function AdminKYC() {
           const s = String(v || "");
           if (!s) return "";
           if (s.length <= 4) return s;
-          return "•••• " + s.slice(-4);
+          return s;
         },
         valueGetter: (_, row) => (row && row.bank_account_number) || "",
       },
@@ -159,11 +200,7 @@ export default function AdminKYC() {
         headerAlign: "center",
         renderCell: (params) => {
           const verified = !!params?.row?.verified;
-          return verified ? (
-            <Badge color="#065f46" bg="#d1fae5">Verified</Badge>
-          ) : (
-            <Badge>Pending</Badge>
-          );
+          return verified ? <Badge color="#065f46" bg="#d1fae5">Verified</Badge> : <Badge>Pending</Badge>;
         },
         valueFormatter: (v) => (!!v ? "Verified" : "Pending"),
       },
@@ -215,12 +252,43 @@ export default function AdminKYC() {
     []
   );
 
-  // Server-side fetcher mapped to admin KYC endpoint
-  const fetcher = useCallback(
+  // Nominee DataGrid columns (aligned with accounts.UserNomineeSerializer; admin endpoint may include user fields optionally)
+  const columnsNominee = useMemo(
+    () => [
+      // Show user info if admin endpoint provides it; falls back to empty if not present
+      { field: "user_id", headerName: "UserID", minWidth: 100 },
+      { field: "username", headerName: "Username", minWidth: 160, flex: 1 },
+
+      // Core nominee fields from accounts.UserNomineeSerializer
+      { field: "name", headerName: "Nominee Name", minWidth: 200, flex: 1 },
+      { field: "relationship", headerName: "Relationship", minWidth: 140 },
+      { field: "phone", headerName: "Phone", minWidth: 140 },
+      { field: "share_percent", headerName: "Share %", minWidth: 100, align: "right", headerAlign: "right",
+        valueFormatter: (v) => (v == null || v === "" ? "" : `${v}%`) },
+
+      // Timestamps
+      { field: "updated_at", headerName: "Updated At", minWidth: 180 },
+      { field: "created_at", headerName: "Created At", minWidth: 180 },
+
+      // Optional status column if backend provides
+      { field: "status", headerName: "Status", minWidth: 120, align: "center", headerAlign: "center",
+        renderCell: (params) => {
+          const status = String(params?.row?.status || "").toLowerCase();
+          if (status === "completed") return <Badge color="#065f46" bg="#d1fae5">Completed</Badge>;
+          if (status === "incomplete") return <Badge color="#92400e" bg="#fef3c7">Incomplete</Badge>;
+          return String(params?.row?.status || "");
+        },
+      },
+    ],
+    []
+  );
+
+  // Server-side fetchers
+  const fetcherKyc = useCallback(
     async ({ page, pageSize, search, ordering }) => {
       const params = { page, page_size: pageSize };
       // Merge active filters (omit empty)
-      Object.entries(filters).forEach(([k, v]) => {
+      Object.entries(kycFilters).forEach(([k, v]) => {
         if (v !== null && v !== undefined && String(v).trim() !== "") {
           params[k] = v;
         }
@@ -229,7 +297,6 @@ export default function AdminKYC() {
       if (search && String(search).trim()) {
         params.user = String(search).trim();
       }
-      // Pass ordering if backend supports it
       if (ordering) params.ordering = ordering;
 
       const res = await API.get("/admin/kyc/", { params });
@@ -238,7 +305,33 @@ export default function AdminKYC() {
       const count = typeof data?.count === "number" ? data.count : results.length;
       return { results, count };
     },
-    [filters, reloadKey]
+    [kycFilters, reloadKeyKyc]
+  );
+
+  // Note: This expects an admin endpoint to list nominee records. If not present yet,
+  // backend should implement GET /admin/nominees/ returning {count, results}.
+  // We map search to both user and name so backend can choose which to honor.
+  const fetcherNominee = useCallback(
+    async ({ page, pageSize, search, ordering }) => {
+      const params = { page, page_size: pageSize };
+      Object.entries(nomineeFilters).forEach(([k, v]) => {
+        if (v !== null && v !== undefined && String(v).trim() !== "") {
+          params[k] = v;
+        }
+      });
+      if (search && String(search).trim()) {
+        params.user = String(search).trim();
+        params.name = String(search).trim();
+      }
+      if (ordering) params.ordering = ordering;
+
+      const res = await API.get("/admin/nominees/", { params });
+      const data = res?.data;
+      const results = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
+      const count = typeof data?.count === "number" ? data.count : results.length;
+      return { results, count };
+    },
+    [nomineeFilters, reloadKeyNominee]
   );
 
   const toolbar = (
@@ -293,7 +386,7 @@ export default function AdminKYC() {
         </div>
       </div>
       <button
-        onClick={() => setReloadKey((k) => k + 1)}
+        onClick={() => (viewMode === "kyc" ? setReloadKeyKyc((k) => k + 1) : setReloadKeyNominee((k) => k + 1))}
         style={{
           padding: "8px 12px",
           borderRadius: 8,
@@ -311,71 +404,180 @@ export default function AdminKYC() {
 
   return (
     <div>
-      <div style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: 0, color: "#0f172a" }}>KYC Verification</h2>
-        <div style={{ color: "#64748b", fontSize: 13 }}>
-          Review and decide user KYC. Use filters to find records quickly, and quick filter in the table toolbar.
+      {/* Page header + view toggle */}
+      <div style={{ marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <div>
+          <h2 style={{ margin: 0, color: "#0f172a" }}>{viewMode === "kyc" ? "KYC Verification" : "Nominee Details"}</h2>
+          <div style={{ color: "#64748b", fontSize: 13 }}>
+            {viewMode === "kyc"
+              ? "Review and decide user KYC. Use filters to find records quickly, and quick filter in the table toolbar."
+              : "Review consumer nominee details. Use filters to find records quickly, and quick filter in the table toolbar."}
+          </div>
+        </div>
+        <div
+          role="tablist"
+          aria-label="View mode"
+          style={{ display: "inline-flex", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}
+        >
+          <button
+            role="tab"
+            aria-selected={viewMode === "kyc"}
+            onClick={() => setViewMode("kyc")}
+            style={{
+              padding: "8px 14px",
+              fontSize: 13,
+              background: viewMode === "kyc" ? "#0f172a" : "#fff",
+              color: viewMode === "kyc" ? "#fff" : "#0f172a",
+              border: 0,
+              cursor: "pointer",
+              fontWeight: 600,
+            }}
+          >
+            KYC
+          </button>
+          <button
+            role="tab"
+            aria-selected={viewMode === "nominee"}
+            onClick={() => setViewMode("nominee")}
+            style={{
+              padding: "8px 14px",
+              fontSize: 13,
+              background: viewMode === "nominee" ? "#0f172a" : "#fff",
+              color: viewMode === "nominee" ? "#fff" : "#0f172a",
+              border: 0,
+              borderLeft: "1px solid #e5e7eb",
+              cursor: "pointer",
+              fontWeight: 600,
+            }}
+          >
+            Nominee
+          </button>
         </div>
       </div>
 
       {/* Filters */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-          gap: 12,
-          marginBottom: 12,
-        }}
-      >
-        <Select
-          label="Status"
-          value={filters.status}
-          onChange={(v) => setF("status", v)}
-          options={statusOptions}
-        />
-        <TextInput
-          label="User"
-          value={filters.user}
-          onChange={(v) => setF("user", v)}
-          placeholder="user id / username / name / phone"
-        />
-        <TextInput
-          label="State ID"
-          value={filters.state}
-          onChange={(v) => setF("state", v)}
-          placeholder="numeric state id"
-        />
-        <TextInput
-          label="Pincode"
-          value={filters.pincode}
-          onChange={(v) => setF("pincode", v)}
-          placeholder="contains"
-        />
-        <TextInput
-          label="Updated From"
-          type="date"
-          value={filters.date_from}
-          onChange={(v) => setF("date_from", v)}
-          placeholder=""
-        />
-        <TextInput
-          label="Updated To"
-          type="date"
-          value={filters.date_to}
-          onChange={(v) => setF("date_to", v)}
-          placeholder=""
-        />
-      </div>
+      {viewMode === "kyc" ? (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+            gap: 12,
+            marginBottom: 12,
+          }}
+        >
+          <Select
+            label="Status"
+            value={kycFilters.status}
+            onChange={(v) => setKycF("status", v)}
+            options={statusOptions}
+          />
+          <TextInput
+            label="User"
+            value={kycFilters.user}
+            onChange={(v) => setKycF("user", v)}
+            placeholder="user id / username / name / phone"
+          />
+          <TextInput
+            label="State ID"
+            value={kycFilters.state}
+            onChange={(v) => setKycF("state", v)}
+            placeholder="numeric state id"
+          />
+          <TextInput
+            label="Pincode"
+            value={kycFilters.pincode}
+            onChange={(v) => setKycF("pincode", v)}
+            placeholder="contains"
+          />
+          <TextInput
+            label="Updated From"
+            type="date"
+            value={kycFilters.date_from}
+            onChange={(v) => setKycF("date_from", v)}
+            placeholder=""
+          />
+          <TextInput
+            label="Updated To"
+            type="date"
+            value={kycFilters.date_to}
+            onChange={(v) => setKycF("date_to", v)}
+            placeholder=""
+          />
+        </div>
+      ) : (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+            gap: 12,
+            marginBottom: 12,
+          }}
+        >
+          <TextInput
+            label="User"
+            value={nomineeFilters.user}
+            onChange={(v) => setNomineeF("user", v)}
+            placeholder="user id / username (if supported by backend)"
+          />
+          <TextInput
+            label="Nominee Name"
+            value={nomineeFilters.name}
+            onChange={(v) => setNomineeF("name", v)}
+            placeholder="full or partial name"
+          />
+          <Select
+            label="Relationship"
+            value={nomineeFilters.relationship}
+            onChange={(v) => setNomineeF("relationship", v)}
+            options={nomineeRelationshipOptions}
+          />
+          <Select
+            label="Status"
+            value={nomineeFilters.status}
+            onChange={(v) => setNomineeF("status", v)}
+            options={nomineeStatusOptions}
+          />
+          <TextInput
+            label="Updated From"
+            type="date"
+            value={nomineeFilters.date_from}
+            onChange={(v) => setNomineeF("date_from", v)}
+            placeholder=""
+          />
+          <TextInput
+            label="Updated To"
+            type="date"
+            value={nomineeFilters.date_to}
+            onChange={(v) => setNomineeF("date_to", v)}
+            placeholder=""
+          />
+        </div>
+      )}
 
-      <DataTable
-        columns={columns}
-        fetcher={fetcher}
-        density={density}
-        toolbar={toolbar}
-        checkboxSelection={true}
-        onSelectionChange={() => {}}
-      />
+      {/* Table */}
+      {viewMode === "kyc" ? (
+        <DataTable
+          columns={columnsKyc}
+          fetcher={fetcherKyc}
+          density={density}
+          toolbar={toolbar}
+          checkboxSelection={true}
+          onSelectionChange={() => {}}
+          instanceKey="kyc"
+          extraKey={String(reloadKeyKyc)}
+        />
+      ) : (
+        <DataTable
+          columns={columnsNominee}
+          fetcher={fetcherNominee}
+          density={density}
+          toolbar={toolbar}
+          checkboxSelection={true}
+          onSelectionChange={() => {}}
+          instanceKey="nominee"
+          extraKey={String(reloadKeyNominee)}
+        />
+      )}
     </div>
   );
 }
-

@@ -1,0 +1,120 @@
+{
+  "32:FIVE_150_matrix": {
+    "root": {
+      "id": 32,
+      "username": "TRIKONEKT",
+      "level": 1,
+      "matrix_position": null,
+      "depth": 0
+    },
+    "children_count": 5,
+    "first_children": [
+      {
+        "id": 32,
+        "username": "TRIKONEKT",
+        "pos": 1
+      },
+      {
+        "id": 32,
+        "username": "TRIKONEKT",
+        "pos": 2
+      },
+      {
+        "id": 101,
+        "username": "1010000001",
+        "pos": 3
+      },
+      {
+        "id": 102,
+        "username": "1010000002",
+        "pos": 4
+      },
+      {
+        "id": 103,
+        "username": "1010000003",
+        "pos": 5
+      }
+    ]
+  },
+  "32:THREE_150_matrix": {
+    "root": {
+      "id": 32,
+      "username": "TRIKONEKT",
+      "level": 1,
+      "matrix_position": null,
+      "depth": 0
+    },
+    "children_count": 3,
+    "first_children": [
+      {
+        "id": 32,
+        "username": "TRIKONEKT",
+        "pos": 1
+      },
+      {
+        "id": 32,
+        "username": "TRIKONEKT",
+        "pos": 2
+      },
+      {
+        "id": 101,
+        "username": "1010000001",
+        "pos": 3
+      }
+    ]
+  },
+  "101:FIVE_150_matrix": {
+    "root": {
+      "id": 101,
+      "username": "1010000001",
+      "level": 1,
+      "matrix_position": null,
+      "depth": 1
+    },
+    "children_count": 4,
+    "first_children": [
+      {
+        "id": 105,
+        "username": "1010000005",
+        "pos": 1
+      },
+      {
+        "id": 120,
+        "username": "1010000006",
+        "pos": 2
+      },
+      {
+        "id": 121,
+        "username": "1010000007",
+        "pos": 3
+      },
+      {
+        "id": 122,
+        "username": "1010000008",
+        "pos": 4
+      }
+    ]
+  },
+  "101:THREE_150_matrix": {
+    "root": {
+      "id": 101,
+      "username": "1010000001",
+      "level": 1,
+      "matrix_position": null,
+      "depth": 1
+    },
+    "children_count": 2,
+    "first_children": [
+      {
+        "id": 105,
+        "username": "1010000005",
+        "pos": 1
+      },
+      {
+        "id": 120,
+        "username": "1010000006",
+        "pos": 3
+      }
+    ]
+  }
+}

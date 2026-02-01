@@ -20,6 +20,19 @@ export default function KYCScreen() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
+  // Nominees state
+  const [nominees, setNominees] = useState([]);
+  const [loadingNominees, setLoadingNominees] = useState(true);
+  const [savingNominee, setSavingNominee] = useState(false);
+  const [nomineeError, setNomineeError] = useState('');
+  const [nomineeMsg, setNomineeMsg] = useState('');
+  const [nomineeForm, setNomineeForm] = useState({
+    name: '',
+    relationship: '',
+    phone: '',
+    share_percent: '',
+  });
+
   const locked = meta.verified && !meta.can_submit_kyc;
 
   const validate = useCallback(() => {
@@ -69,9 +82,25 @@ export default function KYCScreen() {
     }
   }, []);
 
+  const loadNominees = useCallback(async () => {
+    try {
+      setLoadingNominees(true);
+      setNomineeError('');
+      setNomineeMsg('');
+      const res = await API.get('accounts/nominees/');
+      const arr = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+      setNominees(arr);
+    } catch (e) {
+      setNomineeError('Failed to load nominees.');
+    } finally {
+      setLoadingNominees(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadKYC();
-  }, [loadKYC]);
+    loadNominees();
+  }, [loadKYC, loadNominees]);
 
   const onSubmit = useCallback(async () => {
     if (!validate()) return;
@@ -108,6 +137,69 @@ export default function KYCScreen() {
       setSaving(false);
     }
   }, [form, meta, validate]);
+
+  // Nominee helpers
+  const validateNominee = useCallback(() => {
+    const n = (nomineeForm.name || '').trim();
+    const r = (nomineeForm.relationship || '').trim();
+    const p = String(nomineeForm.phone || '').replace(/[^0-9]/g, '');
+    const s = String(nomineeForm.share_percent || '').trim();
+    if (!n) {
+      setNomineeError('Nominee name is required.');
+      return false;
+    }
+    if (!r) {
+      setNomineeError('Relationship is required.');
+      return false;
+    }
+    if (!p || p.length < 10) {
+      setNomineeError('Enter a valid 10-digit phone for nominee.');
+      return false;
+    }
+    const sp = Number(s);
+    if (!Number.isFinite(sp) || sp < 0 || sp > 100) {
+      setNomineeError('Share percent must be between 0 and 100.');
+      return false;
+    }
+    setNomineeError('');
+    return true;
+  }, [nomineeForm]);
+
+  const onSaveNominee = useCallback(async () => {
+    if (!validateNominee()) return;
+    try {
+      setSavingNominee(true);
+      setNomineeMsg('');
+      const payload = {
+        name: String(nomineeForm.name || '').trim(),
+        relationship: String(nomineeForm.relationship || '').trim(),
+        phone: String(nomineeForm.phone || '').replace(/[^0-9]/g, ''),
+        share_percent: Number(nomineeForm.share_percent || 0),
+      };
+      await API.post('accounts/nominees/', payload);
+      setNomineeForm({ name: '', relationship: '', phone: '', share_percent: '' });
+      setNomineeMsg('Nominee saved.');
+      await loadNominees();
+      Alert.alert('Success', 'Nominee saved.');
+    } catch (err) {
+      const msg =
+        err?.response?.data?.detail ||
+        (err?.response?.data ? JSON.stringify(err.response.data) : 'Failed to save nominee.');
+      setNomineeError(String(msg));
+      Alert.alert('Error', String(msg));
+    } finally {
+      setSavingNominee(false);
+    }
+  }, [nomineeForm, validateNominee, loadNominees]);
+
+  const onDeleteNominee = useCallback(async (id) => {
+    try {
+      await API.delete(`accounts/nominees/${id}/`);
+      await loadNominees();
+    } catch (e) {
+      Alert.alert('Error', 'Failed to delete nominee.');
+    }
+  }, [loadNominees]);
 
   if (loading) {
     return (
@@ -223,6 +315,157 @@ export default function KYCScreen() {
           Last updated: {new Date(meta.updated_at).toLocaleString()}
         </Text>
       ) : null}
+
+      {/* Nominees Section */}
+      <View style={{ height: 1, backgroundColor: '#e5e7eb', marginVertical: 16 }} />
+      <Text style={{ fontSize: 18, fontWeight: '800', color: '#0C2D48', marginBottom: 8 }}>Nominee Details</Text>
+      <Text style={{ color: '#64748b', marginBottom: 10 }}>
+        Add nominee details. These are saved to your profile.
+      </Text>
+
+      {nomineeMsg ? (
+        <Text style={{ backgroundColor: '#ecfdf5', color: '#065f46', padding: 10, borderRadius: 8, marginBottom: 8 }}>
+          {nomineeMsg}
+        </Text>
+      ) : null}
+      {nomineeError ? (
+        <Text style={{ backgroundColor: '#fee2e2', color: '#991b1b', padding: 10, borderRadius: 8, marginBottom: 8 }}>
+          {nomineeError}
+        </Text>
+      ) : null}
+
+      <View style={{ marginBottom: 10 }}>
+        <Text style={{ color: '#334155', marginBottom: 6 }}>Name</Text>
+        <TextInput
+          value={nomineeForm.name}
+          onChangeText={(t) => setNomineeForm((f) => ({ ...f, name: t }))}
+          placeholder="Nominee full name"
+          style={{
+            backgroundColor: '#fff',
+            borderColor: '#e2e8f0',
+            borderWidth: 1,
+            borderRadius: 10,
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+          }}
+        />
+      </View>
+
+      <View style={{ marginBottom: 10 }}>
+        <Text style={{ color: '#334155', marginBottom: 6 }}>Relationship</Text>
+        <TextInput
+          value={nomineeForm.relationship}
+          onChangeText={(t) => setNomineeForm((f) => ({ ...f, relationship: t }))}
+          placeholder="e.g., Father, Mother, Spouse"
+          style={{
+            backgroundColor: '#fff',
+            borderColor: '#e2e8f0',
+            borderWidth: 1,
+            borderRadius: 10,
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+          }}
+        />
+      </View>
+
+      <View style={{ marginBottom: 10 }}>
+        <Text style={{ color: '#334155', marginBottom: 6 }}>Nominee Phone</Text>
+        <TextInput
+          value={nomineeForm.phone}
+          onChangeText={(t) => setNomineeForm((f) => ({ ...f, phone: t.replace(/[^0-9]/g, '') }))}
+          placeholder="10-digit phone"
+          keyboardType="number-pad"
+          maxLength={10}
+          style={{
+            backgroundColor: '#fff',
+            borderColor: '#e2e8f0',
+            borderWidth: 1,
+            borderRadius: 10,
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+          }}
+        />
+      </View>
+
+      <View style={{ marginBottom: 10 }}>
+        <Text style={{ color: '#334155', marginBottom: 6 }}>Share Percent (%)</Text>
+        <TextInput
+          value={String(nomineeForm.share_percent)}
+          onChangeText={(t) => {
+            // allow only digits, clamp 0-100
+            const n = t.replace(/[^0-9]/g, '');
+            setNomineeForm((f) => ({ ...f, share_percent: n }));
+          }}
+          placeholder="e.g., 100"
+          keyboardType="number-pad"
+          maxLength={3}
+          style={{
+            backgroundColor: '#fff',
+            borderColor: '#e2e8f0',
+            borderWidth: 1,
+            borderRadius: 10,
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+          }}
+        />
+      </View>
+
+      <Pressable
+        onPress={onSaveNominee}
+        disabled={savingNominee}
+        style={({ pressed }) => ({
+          backgroundColor: savingNominee ? '#9ca3af' : '#16a34a',
+          paddingVertical: 12,
+          borderRadius: 10,
+          alignItems: 'center',
+          opacity: pressed ? 0.9 : 1,
+          marginTop: 6,
+          marginBottom: 12,
+        })}
+      >
+        <Text style={{ color: '#fff', fontWeight: '800' }}>{savingNominee ? 'Saving...' : 'Save Nominee'}</Text>
+      </Pressable>
+
+      <Text style={{ fontSize: 16, fontWeight: '700', color: '#0C2D48', marginBottom: 8 }}>My Nominees</Text>
+      {loadingNominees ? (
+        <View style={{ paddingVertical: 8 }}>
+          <ActivityIndicator size="small" color="#2563eb" />
+        </View>
+      ) : nominees && nominees.length ? (
+        nominees.map((n) => (
+          <View
+            key={n.id}
+            style={{
+              backgroundColor: '#fff',
+              borderColor: '#e2e8f0',
+              borderWidth: 1,
+              borderRadius: 10,
+              padding: 12,
+              marginBottom: 10,
+            }}
+          >
+            <Text style={{ color: '#0f172a', fontWeight: '700' }}>{n.name} • {n.relationship}</Text>
+            <Text style={{ color: '#334155', marginTop: 2 }}>Phone: {n.phone || '-'}</Text>
+            <Text style={{ color: '#334155' }}>Share: {n.share_percent != null ? `${n.share_percent}%` : '-'}</Text>
+            <View style={{ flexDirection: 'row', marginTop: 8, gap: 8 }}>
+              <Pressable
+                onPress={() => onDeleteNominee(n.id)}
+                style={({ pressed }) => ({
+                  backgroundColor: '#ef4444',
+                  paddingVertical: 8,
+                  paddingHorizontal: 12,
+                  borderRadius: 8,
+                  opacity: pressed ? 0.9 : 1,
+                })}
+              >
+                <Text style={{ color: '#fff', fontWeight: '700' }}>Delete</Text>
+              </Pressable>
+            </View>
+          </View>
+        ))
+      ) : (
+        <Text style={{ color: '#64748b' }}>No nominees added yet.</Text>
+      )}
     </ScrollView>
   );
 }

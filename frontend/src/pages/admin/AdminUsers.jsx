@@ -113,6 +113,7 @@ export default function AdminUsers() {
     setColVis(mobileHiddenCols);
   }, [mobileHiddenCols]);
 
+
   function setF(key, val) {
     setFilters((f) => ({ ...f, [key]: val }));
   }
@@ -319,13 +320,24 @@ export default function AdminUsers() {
   const columns = useMemo(
     () => [
       {
+        field: "__slno",
+        headerName: "Sl No",
+        minWidth: 80,
+        width: 80,
+        sortable: false,
+        filterable: false,
+        align: "center",
+        headerAlign: "center",
+      },
+      {
         field: "avatar",
         headerName: "Profile",
         minWidth: 80,
         renderCell: (params) => {
-          const url = params?.row?.avatar_url;
-          return url ? (
-            <img src={normalizeMediaUrl(url)} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", border: "1px solid #e2e8f0" }} />
+          const urlRaw = params?.row?.avatar_url || params?.row?.avatar?.url || params?.row?.avatar || "";
+          const src = urlRaw ? normalizeMediaUrl(urlRaw) : "";
+          return src ? (
+            <img src={src} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", border: "1px solid #e2e8f0" }} />
           ) : (
             <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#e2e8f0", display: "inline-block" }} />
           );
@@ -353,6 +365,10 @@ export default function AdminUsers() {
           );
         },
       },
+      { field: "full_name", headerName: "Full Name", minWidth: 180, flex: 1 },
+      { field: "sponsor_id", headerName: "Sponsor ID", minWidth: 160 },
+      { field: "phone", headerName: "Mobile", minWidth: 140 },
+      { field: "email", headerName: "Email", minWidth: 200, flex: 1 },
       {
         field: "__login",
         headerName: "Login",
@@ -476,10 +492,7 @@ export default function AdminUsers() {
           );
         },
       },
-      { field: "full_name", headerName: "Full Name", minWidth: 180, flex: 1 },
-      { field: "sponsor_id", headerName: "Sponsor ID", minWidth: 160 },
-      { field: "phone", headerName: "Mobile", minWidth: 140 },
-      { field: "email", headerName: "Email", minWidth: 200, flex: 1 },
+      
       {
         field: "activated_ecoupon_count",
         headerName: "E Coupons (Activated)",
@@ -515,6 +528,145 @@ export default function AdminUsers() {
         field: "last_promo_package",
         headerName: "Promo Package",
         minWidth: 180,
+      },
+      {
+        field: "__prime150",
+        headerName: "Prime 150",
+        minWidth: 120,
+        sortable: false,
+        filterable: false,
+        renderCell: (params) => {
+          const row = params?.row || {};
+          const n = Number(row.prime150_count ?? 0);
+          const label = Number.isFinite(n) ? String(n) : "";
+          const active = n > 0;
+          const onOpen = (e) => {
+            e?.stopPropagation?.();
+            if (!row?.id) return;
+            const url = `/admin/promo-purchases?user_id=${encodeURIComponent(row.id)}&kind=150&status=APPROVED`;
+            try { window.location.assign(url); } catch (_) {}
+          };
+          return (
+            <div
+              onClick={onOpen}
+              role="button"
+              title={active ? `${n} approved purchases` : "0"}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: isMobile ? "2px 8px" : "3px 8px",
+                borderRadius: 8,
+                fontSize: isMobile ? 11 : 12,
+                fontWeight: 700,
+                lineHeight: 1,
+                backgroundColor: active ? "#0ea5e9" : "#f1f5f9",
+                border: active ? "1px solid #0284c7" : "1px solid #cbd5e1",
+                color: active ? "#ffffff" : "#0f172a",
+                minWidth: 40,
+                cursor: "pointer",
+                userSelect: "none",
+              }}
+            >
+              {label}
+            </div>
+          );
+        },
+      },
+      {
+        field: "__prime750",
+        headerName: "Prime 750",
+        minWidth: 120,
+        sortable: false,
+        filterable: false,
+        renderCell: (params) => {
+          const row = params?.row || {};
+          const n = Number(row.prime750_count ?? 0);
+          const label = Number.isFinite(n) ? String(n) : "";
+          const active = n > 0;
+          const onOpen = (e) => {
+            e?.stopPropagation?.();
+            if (!row?.id) return;
+            const url = `/admin/promo-purchases?user_id=${encodeURIComponent(row.id)}&kind=750&status=APPROVED`;
+            try { window.location.assign(url); } catch (_) {}
+          };
+          return (
+            <div
+              onClick={onOpen}
+              role="button"
+              title={active ? `${n} approved purchases` : "0"}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: isMobile ? "2px 8px" : "3px 8px",
+                borderRadius: 8,
+                fontSize: isMobile ? 11 : 12,
+                fontWeight: 700,
+                lineHeight: 1,
+                backgroundColor: active ? "#0ea5e9" : "#f1f5f9",
+                border: active ? "1px solid #0284c7" : "1px solid #cbd5e1",
+                color: active ? "#ffffff" : "#0f172a",
+                minWidth: 40,
+                cursor: "pointer",
+                userSelect: "none",
+              }}
+            >
+              {label}
+            </div>
+          );
+        },
+      },
+      {
+        field: "__monthly759",
+        headerName: "Monthly 759",
+        minWidth: 190,
+        sortable: false,
+        filterable: false,
+        renderCell: (params) => {
+          const row = params?.row || {};
+          const n = Number(row.monthly_759_count ?? 0); // boxes purchased
+          const label = Number.isFinite(n) ? String(n) : "";
+          const active = n > 0;
+          const pkgNo = row.monthly_current_number ?? null;
+          const paid = Number(row.monthly_boxes_paid_current ?? 0);
+          const total = Number(row.monthly_total_boxes_current ?? 12);
+          const rem = Number.isFinite(Number(row.monthly_boxes_remaining_current))
+            ? Number(row.monthly_boxes_remaining_current)
+            : Math.max(0, total - paid);
+          const subtext = `Months - ${paid}/${total} (remaining ${rem})`;
+          const onOpen = (e) => {
+            e?.stopPropagation?.();
+            if (!row?.id) return;
+            const url = `/admin/promo-purchases?user_id=${encodeURIComponent(row.id)}&kind=759&status=APPROVED`;
+            try { window.location.assign(url); } catch (_) {}
+          };
+          return (
+              <div
+                onClick={onOpen}
+                role="button"
+                title={`${n} boxes purchased — ${subtext}`}
+                style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: isMobile ? "2px 8px" : "3px 8px",
+                borderRadius: 8,
+                fontSize: isMobile ? 11 : 12,
+                fontWeight: 700,
+                lineHeight: 1,
+                backgroundColor: active ? "#0ea5e9" : "#f1f5f9",
+                border: active ? "1px solid #0284c7" : "1px solid #cbd5e1",
+                color: active ? "#ffffff" : "#0f172a",
+                minWidth: 40,
+                cursor: "pointer",
+                userSelect: "none",
+              }}
+              >
+                {subtext}
+              </div>
+          );
+        },
       },
       {
         field: "kyc_status",
@@ -761,43 +913,34 @@ export default function AdminUsers() {
         },
       },
       {
-        field: "__delete",
-        headerName: "Delete",
+        field: "__edit",
+        headerName: "Edit",
         minWidth: 120,
         sortable: false,
         filterable: false,
         renderCell: (params) => {
           const row = params?.row || {};
-          const onDelete = async (e) => {
+          const onEdit = (e) => {
             e?.stopPropagation?.();
-            try {
-              if (!row?.id) return;
-              const ok = window.confirm("Delete this user permanently?");
-              if (!ok) return;
-              await API.delete(`/admin/users/${row.id}/`);
-              setReloadKey((k) => k + 1);
-            } catch (e) {
-              const msg = e?.response?.data?.detail || e?.message || "Delete failed";
-              window.alert(String(msg));
-            }
+            openEdit(row);
           };
           return (
             <button
               type="button"
-              onClick={onDelete}
-              title="Delete user"
+              onClick={onEdit}
+              title="Edit user"
               style={{
                 borderRadius: 8,
                 padding: "6px 10px",
-                background: "#ef4444",
+                background: "#0ea5e9",
                 color: "#fff",
-                border: "1px solid #b91c1c",
+                border: "1px solid #0284c7",
                 cursor: "pointer",
                 fontSize: 12,
                 fontWeight: 700,
               }}
             >
-              Delete
+              Edit
             </button>
           );
         },
@@ -809,7 +952,7 @@ export default function AdminUsers() {
   // Server-side fetcher for DataTable
   const fetcher = useCallback(
     async ({ page, pageSize, search, ordering }) => {
-      const params = { page, page_size: pageSize };
+      const params = { page, page_size: pageSize, fast: 1 };
       // merge active filters
       Object.entries(filters).forEach(([k, v]) => {
         if (v !== null && v !== undefined && String(v).trim() !== "") {
@@ -820,10 +963,12 @@ export default function AdminUsers() {
       if (ordering) params.ordering = ordering;
 
       try {
-        const res = await API.get("/admin/users/", {
+
+        // Use explicit /api path so the call appears as http://localhost:3000/api/admin/users/?page=... in DevTools
+        const res = await API.get("/api/admin/users/", {
           params,
-          dedupe: "none",
-          timeout: 30000,
+          dedupe: "cancelPrevious",
+          timeout: 60000,
           retryAttempts: 1,
           cacheTTL: 8000, // short-lived cache to avoid repeat hits during quick UI changes
         });
@@ -833,6 +978,15 @@ export default function AdminUsers() {
         setApiErr("");
         return { results, count };
       } catch (e) {
+        const isCanceled =
+          e?.__canceled === true ||
+          e?.code === "ERR_CANCELED" ||
+          e?.name === "CanceledError" ||
+          (typeof e?.message === "string" && /aborted|abort|canceled|cancelled/i.test(e.message));
+        if (isCanceled) {
+          // Propagate canceled so DataTable ignores and preserves previous rows
+          throw e;
+        }
         const status = e?.response?.status;
         const msg = e?.response?.data?.detail || e?.message || "Request failed";
         setApiErr(`${status || ""} ${msg}`.trim());
@@ -854,11 +1008,11 @@ export default function AdminUsers() {
 
     // Try backend export endpoint first (if available), otherwise fall back to client-side CSV export
     try {
-      const res = await API.get("/admin/users/export/", {
-        params: { ...params, format: "xlsx" },
+      const res = await API.get("/api/admin/users/export-xlsx", {
+        params,
         responseType: "blob",
-        timeout: 60000,
-        dedupe: "none",
+        timeout: 120000,
+        dedupe: "cancelPrevious",
         retryAttempts: 0,
       });
       const blob = new Blob([res?.data || res], {
@@ -884,7 +1038,7 @@ export default function AdminUsers() {
         // Fetch all pages with current filters (no table search term available here)
         while (true) {
           const pageParams = { ...params, page, page_size: pageSize };
-          const resp = await API.get("/admin/users/", {
+          const resp = await API.get("/api/admin/users/", {
             params: pageParams,
             dedupe: "none",
             retryAttempts: 1,
@@ -1157,6 +1311,12 @@ export default function AdminUsers() {
     });
   }, [editFields, selected]);
 
+  // Hide password from edit dialog
+  const editFieldsNoPassword = useMemo(
+    () => (editFieldsWithNames || []).filter((f) => f && String(f.name || "").toLowerCase() !== "password"),
+    [editFieldsWithNames]
+  );
+
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
@@ -1242,6 +1402,7 @@ export default function AdminUsers() {
         fetcher={fetcher}
         density={density}
         toolbar={toolbar}
+        extraKey={JSON.stringify(filters) + ":" + reloadKey}
         checkboxSelection={true}
         onSelectionChange={() => {}}
         columnVisibilityModel={colVis}
@@ -1253,7 +1414,7 @@ export default function AdminUsers() {
         onClose={() => setEditOpen(false)}
         route="/admin/users/"
         record={selected}
-        fields={editFieldsWithNames}
+        fields={editFieldsNoPassword}
         onSaved={() => setReloadKey((k) => k + 1)}
         title={selected?.id ? `Edit ${selected.username || selected.full_name || selected.id}` : "Create User"}
       />

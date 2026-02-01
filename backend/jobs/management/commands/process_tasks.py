@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.db.models import F
+from django.db import connections, close_old_connections
+from django.db.utils import OperationalError, InterfaceError
 
 from jobs.models import BackgroundTask
 
@@ -32,6 +34,7 @@ class Command(BaseCommand):
         start = timezone.now()
         iterations = 0
         idle_streak = 0
+        db_error_streak = 0
 
         reap_stuck_secs = int(opts["reap_stuck_seconds"] or 0)
         reap_on_start = bool(opts["reap_on_start"])
@@ -56,6 +59,21 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.ERROR(f"Reaper exception: {e!r}"))
                 return 0, 0
 
+        def _db_healthcheck():
+            """
+            Ensure DB connection is alive; if not, close stale connections so Django can reconnect.
+            Compatible with Django versions with/without .health_check().
+            """
+            try:
+                conn = connections["default"]
+                if hasattr(conn, "health_check"):
+                    conn.health_check()
+            except Exception:
+                try:
+                    close_old_connections()
+                except Exception:
+                    pass
+
         self.stdout.write(self.style.SUCCESS("Worker started"))
 
         if reap_stuck_secs > 0 and reap_on_start:
@@ -71,12 +89,36 @@ class Command(BaseCommand):
 
             iterations += 1
 
+            # Ensure DB connection is alive before any ORM work
+            try:
+                _db_healthcheck()
+            except Exception:
+                pass
+
             if reap_stuck_secs > 0:
                 reap_stuck()
 
-            task = BackgroundTask.fetch_next()
+            try:
+                task = BackgroundTask.fetch_next()
+                db_error_streak = 0
+            except (OperationalError, InterfaceError) as e:
+                self.stdout.write(self.style.ERROR(f"DB error during fetch_next: {e!r}"))
+                try:
+                    close_old_connections()
+                except Exception:
+                    pass
+                db_error_streak += 1
+                delay = min(backoff_max, (backoff_base ** min(db_error_streak, 10)))
+                self.stdout.write(self.style.WARNING(f"DB reconnect backoff sleeping {delay:.2f}s (streak={db_error_streak})"))
+                time.sleep(delay)
+                continue
+
             if not task:
                 idle_streak += 1
+                try:
+                    _db_healthcheck()
+                except Exception:
+                    pass
                 time.sleep(sleep_s)
                 continue
 
@@ -104,4 +146,8 @@ class Command(BaseCommand):
             if once:
                 break
 
+            try:
+                _db_healthcheck()
+            except Exception:
+                pass
             time.sleep(sleep_s)

@@ -15,4 +15,3 @@ django-cloudinary-storage
 django-admin-thumbnails
 openpyxl
 xhtml2pdf
-cryptography

@@ -5,7 +5,7 @@ from django.db.models import Q, Case, When, Value, IntegerField
 
 from core.crypto import encrypt_string
 
-from .models import CustomUser, AgencyRegionAssignment, WalletTransaction, Wallet, UserKYC, WithdrawalRequest, SupportTicket, SupportTicketMessage
+from .models import CustomUser, AgencyRegionAssignment, WalletTransaction, Wallet, UserKYC, WithdrawalRequest, SupportTicket, SupportTicketMessage, UserNominee
 from locations.models import Country, State, City
 
 
@@ -997,12 +997,19 @@ class PublicUserSerializer(serializers.ModelSerializer):
 
     def get_avatar_url(self, obj):
         try:
-            f = getattr(obj, 'avatar', None)
-            if f and getattr(f, 'url', None):
-                return f.url
+            f = getattr(obj, "avatar", None)
+            url = getattr(f, "url", "") if f else ""
+            if not url:
+                return None
+            req = getattr(self, "context", {}).get("request", None)
+            if req:
+                try:
+                    return req.build_absolute_uri(url)
+                except Exception:
+                    pass
+            return url
         except Exception:
-            pass
-        return None
+            return None
 
 
 class ProfileMeSerializer(serializers.ModelSerializer):
@@ -1024,12 +1031,25 @@ class ProfileMeSerializer(serializers.ModelSerializer):
 
     def get_avatar_url(self, obj):
         try:
-            f = getattr(obj, 'avatar', None)
-            if f and getattr(f, 'url', None):
-                return f.url
+            f = getattr(obj, "avatar", None)
+            url = getattr(f, "url", "") if f else ""
+            if not url:
+                return None
+            req = getattr(self, "context", {}).get("request", None)
+            if req:
+                try:
+                    return req.build_absolute_uri(url)
+                except Exception:
+                    pass
+            return url
         except Exception:
-            pass
-        return None
+            return None
+
+class UserNomineeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserNominee
+        fields = ["id", "name", "relationship", "phone", "share_percent", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at"]
 
 class UserKYCSerializer(serializers.ModelSerializer):
     can_submit_kyc = serializers.SerializerMethodField(read_only=True)

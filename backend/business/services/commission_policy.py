@@ -232,27 +232,6 @@ class CommissionPolicy:
                                 return True
                         except Exception:
                             pass
-        # Fallback: if no per-product or explicit map found, consider global typed config on CommissionConfig
-        # For monthly 759, require explicit per-product override; do not enable from global typed fields
-        if product_key == "759":
-            return False
-        try:
-            from business.models import CommissionConfig as _Cfg
-            _cfg = _Cfg.get_solo()
-            if key == "consumer_matrix_5":
-                lv = int(getattr(_cfg, "five_matrix_levels", 0) or 0)
-                am = list(getattr(_cfg, "five_matrix_amounts_json", []) or [])
-                pc = list(getattr(_cfg, "five_matrix_percents_json", []) or [])
-                if (lv > 0) or (len(am) > 0) or (len(pc) > 0):
-                    return True
-            elif key == "consumer_matrix_3":
-                lv = int(getattr(_cfg, "three_matrix_levels", 0) or 0)
-                am = list(getattr(_cfg, "three_matrix_amounts_json", []) or [])
-                pc = list(getattr(_cfg, "three_matrix_percents_json", []) or [])
-                if (lv > 0) or (len(am) > 0) or (len(pc) > 0):
-                    return True
-        except Exception:
-            pass
         return False
 
     @classmethod

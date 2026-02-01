@@ -650,6 +650,11 @@ class PromoPurchaseSerializer(serializers.ModelSerializer):
     # Admin list convenience fields
     user_id = serializers.IntegerField(source="user.id", read_only=True)
     user_username = serializers.SerializerMethodField()
+    user_full_name = serializers.SerializerMethodField()
+    user_pincode = serializers.SerializerMethodField()
+    user_city_name = serializers.SerializerMethodField()
+    user_state_name = serializers.SerializerMethodField()
+    user_role_label = serializers.SerializerMethodField()
 
     def get_user_username(self, obj):
         try:
@@ -657,6 +662,58 @@ class PromoPurchaseSerializer(serializers.ModelSerializer):
             return getattr(u, "username", None)
         except Exception:
             return None
+
+    def get_user_full_name(self, obj):
+        try:
+            u = getattr(obj, "user", None)
+            return getattr(u, "full_name", "") or ""
+        except Exception:
+            return ""
+
+    def get_user_pincode(self, obj):
+        try:
+            u = getattr(obj, "user", None)
+            return getattr(u, "pincode", "") or ""
+        except Exception:
+            return ""
+
+    def get_user_city_name(self, obj):
+        try:
+            u = getattr(obj, "user", None)
+            city = getattr(u, "city", None)
+            return getattr(city, "name", "") or ""
+        except Exception:
+            return ""
+
+    def get_user_state_name(self, obj):
+        try:
+            u = getattr(obj, "user", None)
+            state = getattr(u, "state", None)
+            return getattr(state, "name", "") or ""
+        except Exception:
+            return ""
+
+    def get_user_role_label(self, obj):
+        try:
+            u = getattr(obj, "user", None)
+            if not u:
+                return "consumer"
+            cat = str(getattr(u, "category", "") or "").lower()
+            role = str(getattr(u, "role", "") or "").lower()
+            # Normalize to one of: consumer, agency, employee, merchant
+            if cat.startswith("agency"):
+                return "agency"
+            if cat in {"merchant", "business"}:
+                return "merchant"
+            if cat in {"employee"}:
+                return "employee"
+            if cat in {"consumer"}:
+                return "consumer"
+            if role in {"agency", "employee"}:
+                return role
+            return "consumer"
+        except Exception:
+            return "consumer"
 
     def get_selected_product_name(self, obj):
         # Prefer decoupled promo product name; fallback to legacy market product name
@@ -678,6 +735,11 @@ class PromoPurchaseSerializer(serializers.ModelSerializer):
             "id",
             "user_id",
             "user_username",
+            "user_full_name",
+            "user_pincode",
+            "user_city_name",
+            "user_state_name",
+            "user_role_label",
             "package",
             "package_id",
             "quantity",

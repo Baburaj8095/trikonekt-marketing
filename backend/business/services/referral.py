@@ -4,8 +4,9 @@ from decimal import Decimal
 from typing import Dict, Any, List
 
 from django.db import transaction, IntegrityError
+from django.db.models import Q
 
-from accounts.models import Wallet, CustomUser
+from accounts.models import Wallet, CustomUser, WalletTransaction
 from business.models import (
     CommissionConfig,
     AutoPoolAccount,
@@ -239,9 +240,14 @@ def _distribute_five_matrix(new_user: CustomUser, source: Dict[str, Any]):
         levels = int(cfg.get_matrix_five_levels())
     except Exception:
         levels = 6
-    fixed: list = getattr(cfg, "five_matrix_amounts_json", []) or []
+    # Resolve fixed amounts from admin master config first, then typed field, else fallback
+    master = dict(getattr(cfg, "master_commission_json", {}) or {})
+    cm5 = dict(master.get("consumer_matrix_5", {}) or {})
+    row5_150 = dict(cm5.get("150", {}) or {})
+    fixed: list = list(row5_150.get("fixed_amounts") or getattr(cfg, "five_matrix_amounts_json", []) or [])
     if not fixed:
-        fixed = [15, 2, 2.5, 0.5, 0.05, 0.1]
+        # Fallback aligned to UI: L1=2, L2=1, L3=1, L4=0.5, L5=0.5, L6=0
+        fixed = [2, 1, 1, 0.5, 0.5, 0]
 
     src_type = str(source.get("type") or "")
     src_id = str(source.get("id") or "")
@@ -317,11 +323,15 @@ def on_user_join(new_user: CustomUser, source: Dict[str, Any] | None = None) -> 
         _q2(fixed.get("l5", 0.5)),
     ]
 
-    # Direct sponsor bonus (suppress for PRIME 750 first activation via promo purchase)
+    # Direct sponsor bonus (suppress for PRIME first activation via promo purchase per Option A)
     suppress_direct = False
     try:
         st = str(src_type or "").strip().lower()
-        if st in ("promo_purchase", "promo_purchase_approval"):
+        # Suppress when join is triggered by prime/coupon purchase flows
+        if st in ("promo_purchase", "promo_purchase_approval", "ecoupon", "e_coupon", "coupon_first_purchase", "prime_150", "prime_750"):
+            suppress_direct = True
+        elif st in ("promo_purchase", "promo_purchase_approval"):
+            # Additional safety: introspect promo package to detect PRIME
             try:
                 pid = int(src_id)
             except Exception:
@@ -334,7 +344,7 @@ def on_user_join(new_user: CustomUser, source: Dict[str, Any] | None = None) -> 
                     if pp:
                         price = D(str(getattr(pp.package, "price", "0") or "0"))
                         is_prime = str(getattr(pp.package, "type", "") or "").upper() == "PRIME"
-                        if is_prime and abs(price - D("750")) <= D("0.5"):
+                        if is_prime and (abs(price - D("750")) <= D("0.5") or abs(price - D("150")) <= D("0.5")):
                             suppress_direct = True
                 except Exception:
                     pass
@@ -342,7 +352,19 @@ def on_user_join(new_user: CustomUser, source: Dict[str, Any] | None = None) -> 
         pass
 
     sponsor = getattr(new_user, "registered_by", None)
-    if (not suppress_direct) and sponsor and direct_amt > 0:
+    # Idempotency guard: if any matching direct was already credited (PRIME_*_DIRECT or DIRECT_REF_BONUS) for this sponsor/referral/purchase, suppress generic direct
+    try:
+        exists_direct_any = False
+        if sponsor:
+            exists_direct_any = WalletTransaction.objects.filter(user=sponsor).filter(
+                Q(type__in=("PRIME_150_DIRECT", "PRIME_750_DIRECT", "DIRECT_REF_BONUS")) & (
+                    Q(meta__from_user_id=getattr(new_user, "id", None)) |
+                    Q(source_type__in=("ECOUPON", "PROMO_PURCHASE", "PROMO_PURCHASE_APPROVAL"), source_id=str(src_id or ""))
+                )
+            ).exists()
+    except Exception:
+        exists_direct_any = False
+    if (not suppress_direct) and sponsor and direct_amt > 0 and not exists_direct_any:
         _credit_wallet(
             sponsor,
             direct_amt,
@@ -377,9 +399,12 @@ def on_user_join(new_user: CustomUser, source: Dict[str, Any] | None = None) -> 
             source_id=str(getattr(new_user, "id", "")),
         )
 
-    # 5-matrix genealogy benefit distribution (up to configured 6 levels)
+    # 5-matrix genealogy benefit distribution on JOIN is disabled by default.
+    # Enable via admin: master_commission_json.referral_join.enable_matrix_distribution = true
     try:
-        if is_matrix_eligible(new_user):
+        master = dict(getattr(CommissionConfig.get_solo(), "master_commission_json", {}) or {})
+        enable_join_matrix = bool((master.get("referral_join", {}) or {}).get("enable_matrix_distribution", False))
+        if enable_join_matrix and is_matrix_eligible(new_user):
             _distribute_five_matrix(new_user, {"type": "JOIN_REFERRAL", "id": getattr(new_user, "id", "")})
     except Exception:
         pass

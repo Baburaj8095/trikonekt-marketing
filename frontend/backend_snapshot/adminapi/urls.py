@@ -1,0 +1,140 @@
+from django.urls import path, include
+from .views import (
+    AdminMetricsView,
+    AdminUserTreeRoot,
+    AdminUserTreeDefaultRoot,
+    AdminUserTreeChildren,
+    AdminUsersList,
+    AdminUserCategoryCountsView,
+    AdminUserDetail,
+    AdminUsersExportXLSX,
+    AdminUserImpersonateView,
+    AdminUserSetTempPasswordView,
+    AdminUserWalletAdjustView,
+    AdminECouponBulkCreateView,
+    AdminECouponAssignView,
+    AdminKYCList,
+    AdminKYCVerifyView,
+    AdminKYCRejectView,
+    AdminWithdrawalList,
+    AdminWithdrawalApproveView,
+    AdminWithdrawalRejectView,
+    AdminMatrixProgressList,
+    AdminMatrixTree,
+    AdminMatrix5Tree,
+    AdminAutopoolSummary,
+    AdminAutopoolTransactionList,
+    # Support
+    AdminSupportTicketList,
+    AdminSupportTicketUpdate,
+    AdminSupportTicketMessageCreate,
+    AdminSupportTicketApproveKYC,
+    AdminPingView,
+    AdminUserEditMetaView,
+    AdminLevelCommissionView,
+    AdminLevelCommissionSeedView,
+    AdminMatrixCommissionConfig,
+    AdminRewardPointsConfig,
+    # New matrix admin endpoints
+    AdminMatrixAccountsList,
+    AdminMatrixAccountStats,
+    AdminMasterCommissionConfig,
+    AdminWithdrawalDistributionPreviewView,
+)
+from .dynamic import router as dynamic_router, admin_meta as dynamic_admin_meta, admin_meta_summary, admin_meta_fields
+# RBAC endpoints
+from .views_rbac import (
+    AdminMeView,
+    AdminUsersListCreate,
+    AdminUserActivateView,
+    AdminUserDeactivateView,
+    AdminUserAssignRoleView,
+    RoleListCreateView,
+    RoleDetailView,
+    PermissionListCreateView,
+    PermissionDetailView,
+    RolePermissionsListView,
+    RolePermissionsBulkAssignView,
+    RolePermissionsForRoleView,
+    AdminPermissionSeedDefaultsView,
+)
+
+urlpatterns = [
+    path("metrics/", AdminMetricsView.as_view()),
+    path("ping/", AdminPingView.as_view()),
+    path("users/tree/root/", AdminUserTreeRoot.as_view()),
+    path("users/tree/default-root/", AdminUserTreeDefaultRoot.as_view()),
+    path("users/tree/children/", AdminUserTreeChildren.as_view()),
+    path("users/category-counts/", AdminUserCategoryCountsView.as_view()),
+    # Admin Users (list/search via existing view, plus POST create via RBAC wrapper)
+    path("users/", AdminUsersListCreate.as_view()),
+    path("users/export-xlsx", AdminUsersExportXLSX.as_view()),
+    path("users/edit-meta/", AdminUserEditMetaView.as_view()),
+    path("users/<int:pk>/", AdminUserDetail.as_view()),
+    path("users/<int:pk>/impersonate/", AdminUserImpersonateView.as_view()),
+    path("users/<int:pk>/set-temp-password/", AdminUserSetTempPasswordView.as_view()),
+    path("users/<int:pk>/wallet-adjust/", AdminUserWalletAdjustView.as_view()),
+
+    # E-Coupons (ELC)
+    path("coupons/bulk-ecoupons/", AdminECouponBulkCreateView.as_view()),
+    path("coupons/assign-ecoupons/", AdminECouponAssignView.as_view()),
+
+    # KYC
+    path("kyc/", AdminKYCList.as_view()),
+    path("kyc/<int:user_id>/verify/", AdminKYCVerifyView.as_view()),
+    path("kyc/<int:user_id>/reject/", AdminKYCRejectView.as_view()),
+
+    # Withdrawals
+    path("withdrawals/", AdminWithdrawalList.as_view()),
+    path("withdrawals/<int:pk>/approve/", AdminWithdrawalApproveView.as_view()),
+    path("withdrawals/<int:pk>/reject/", AdminWithdrawalRejectView.as_view()),
+    path("withdrawals/distribution-preview/", AdminWithdrawalDistributionPreviewView.as_view()),
+
+    # Matrix & Autopool
+    path("matrix/progress/", AdminMatrixProgressList.as_view()),
+    path("matrix/tree/", AdminMatrixTree.as_view()),
+    path("matrix/tree5/", AdminMatrix5Tree.as_view()),
+    path("matrix/accounts/", AdminMatrixAccountsList.as_view()),
+    path("matrix/account-stats/", AdminMatrixAccountStats.as_view()),
+    path("autopool/summary/", AdminAutopoolSummary.as_view()),
+    path("autopool/transactions/", AdminAutopoolTransactionList.as_view()),
+    # Master Level Commission (Direct + L1..L5)
+    path("commission/levels/", AdminLevelCommissionView.as_view()),
+    path("commission/levels/seed/", AdminLevelCommissionSeedView.as_view()),
+    # Matrix commission configuration (5-matrix and 3-matrix)
+    path("commission/matrix/", AdminMatrixCommissionConfig.as_view()),
+    path("commission/master/", AdminMasterCommissionConfig.as_view()),
+    # Rewards Points (admin configurable schedule)
+    path("rewards/points-config/", AdminRewardPointsConfig.as_view()),
+
+    # Support tickets
+    path("support/tickets/", AdminSupportTicketList.as_view()),
+    path("support/tickets/<int:pk>/", AdminSupportTicketUpdate.as_view()),
+    path("support/tickets/<int:pk>/messages/", AdminSupportTicketMessageCreate.as_view()),
+    path("support/tickets/<int:pk>/approve-kyc/", AdminSupportTicketApproveKYC.as_view()),
+
+    # ===== RBAC core =====
+    # Current admin info
+    path("me/", AdminMeView.as_view()),
+    # Admin user actions
+    path("users/<int:pk>/activate/", AdminUserActivateView.as_view()),
+    path("users/<int:pk>/deactivate/", AdminUserDeactivateView.as_view()),
+    path("users/<int:pk>/assign-role/", AdminUserAssignRoleView.as_view()),
+    # Roles
+    path("roles/", RoleListCreateView.as_view()),
+    path("roles/<int:pk>/", RoleDetailView.as_view()),
+    # Permissions
+    path("permissions/", PermissionListCreateView.as_view()),
+    path("permissions/seed-defaults/", AdminPermissionSeedDefaultsView.as_view()),
+    path("permissions/<int:pk>/", PermissionDetailView.as_view()),
+    # Role-Permission mapping
+    path("role-permissions/", RolePermissionsListView.as_view()),
+    path("role-permissions/bulk-assign/", RolePermissionsBulkAssignView.as_view()),
+    path("roles/<int:pk>/permissions/", RolePermissionsForRoleView.as_view()),
+
+    # Dynamic admin models (auto-discovered)
+    path("", include(dynamic_router.urls)),
+    path("admin-meta/", dynamic_admin_meta),
+    path("admin-meta/summary/", admin_meta_summary),
+    path("admin-meta/fields/<str:app_label>/<str:model_name>/", admin_meta_fields),
+]

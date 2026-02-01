@@ -5,7 +5,10 @@ from django.db.models import Q, F, Case, When, IntegerField
 from rest_framework.views import APIView
 from django.http import HttpResponse
 from django.conf import settings
-from xhtml2pdf import pisa
+try:
+    from xhtml2pdf import pisa
+except Exception:
+    pisa = None  # type: ignore
 import os
 from .models import Product, PurchaseRequest, Banner, BannerItem, BannerPurchaseRequest, MerchantShop, MerchantProfile, Shop
 from .serializers import (
@@ -827,6 +830,8 @@ class PurchaseRequestInvoiceView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, pk, *args, **kwargs):
+        if pisa is None:
+            return Response({"detail": "PDF generation is not available on this server."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         try:
             pr = PurchaseRequest.objects.select_related("product", "product__created_by", "created_by").get(pk=pk)
         except PurchaseRequest.DoesNotExist:
@@ -851,7 +856,7 @@ class PurchaseRequestInvoiceView(APIView):
                 fpath = os.path.join(branding_dir, fname)
                 if os.path.exists(fpath):
                     # xhtml2pdf supports local file paths via link_callback; pass as file:// URI
-                    logo_uri = f"file://{fpath.replace('\\', '/')}"
+                    logo_uri = "file://" + fpath.replace("\\", "/")
                     break
         except Exception:
             logo_uri = None

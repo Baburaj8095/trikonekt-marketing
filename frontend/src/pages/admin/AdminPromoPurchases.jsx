@@ -1,4 +1,5 @@
 ﻿import React, { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   adminListPromoPurchases,
   adminApprovePromoPurchase,
@@ -78,7 +79,50 @@ function extractUTR(remarks = "") {
 }
 
 export default function AdminPromoPurchases() {
-  const [status, setStatus] = useState("PENDING");
+  const location = useLocation();
+  const [status, setStatus] = useState(() => {
+    try {
+      const params = new URLSearchParams(location.search || "");
+      const s = String(params.get("status") || "PENDING").toUpperCase();
+      return ["PENDING", "APPROVED", "REJECTED", "CANCELLED"].includes(s) ? s : "PENDING";
+    } catch {
+      return "PENDING";
+    }
+  });
+  const [kind, setKind] = useState(() => {
+    try {
+      const params = new URLSearchParams(location.search || "");
+      const k = String(params.get("kind") || "").toLowerCase();
+      return ["150", "750", "759", "monthly"].includes(k) ? k : "";
+    } catch {
+      return "";
+    }
+  });
+  const [userId, setUserId] = useState(() => {
+    try {
+      const params = new URLSearchParams(location.search || "");
+      const v = params.get("user_id");
+      return v && /^\d+$/.test(v) ? v : "";
+    } catch {
+      return "";
+    }
+  });
+  const [dateFrom, setDateFrom] = useState(() => {
+    try {
+      const params = new URLSearchParams(location.search || "");
+      return params.get("date_from") || "";
+    } catch {
+      return "";
+    }
+  });
+  const [dateTo, setDateTo] = useState(() => {
+    try {
+      const params = new URLSearchParams(location.search || "");
+      return params.get("date_to") || "";
+    } catch {
+      return "";
+    }
+  });
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [rows, setRows] = useState([]);
@@ -90,6 +134,17 @@ export default function AdminPromoPurchases() {
       { value: "APPROVED", label: "Approved" },
       { value: "REJECTED", label: "Rejected" },
       { value: "CANCELLED", label: "Cancelled" },
+    ],
+    []
+  );
+
+  const kindOptions = useMemo(
+    () => [
+      { value: "", label: "Any kind" },
+      { value: "150", label: "Prime 150" },
+      { value: "750", label: "Prime 750" },
+      { value: "759", label: "Monthly (₹759)" },
+      { value: "monthly", label: "Monthly (all)" },
     ],
     []
   );
@@ -111,7 +166,13 @@ export default function AdminPromoPurchases() {
     setLoading(true);
     setErr("");
     try {
-      const items = await adminListPromoPurchases({ status });
+      const params = {};
+      if (status) params.status = status;
+      if (kind) params.kind = kind;
+      if (userId) params.user_id = userId;
+      if (dateFrom) params.date_from = dateFrom;
+      if (dateTo) params.date_to = dateTo;
+      const items = await adminListPromoPurchases(params);
       setRows(Array.isArray(items) ? items : []);
     } catch (e) {
       const d = e?.response?.data;
@@ -124,7 +185,7 @@ export default function AdminPromoPurchases() {
 
   useEffect(() => {
     fetchRows();
-  }, [status]);
+  }, [status, kind, userId, dateFrom, dateTo]);
 
   async function handleApprove(r) {
     if (!window.confirm(`Approve purchase #${r.id}?`)) return;
@@ -221,19 +282,23 @@ export default function AdminPromoPurchases() {
           style={{
             display: "grid",
             gridTemplateColumns:
-              // Added dedicated Payment column
-              "70px 160px 1.1fr 0.8fr 60px 120px 120px 140px 240px 140px",
+              // Added Role, Pincode, City, State and dedicated Payment column
+              "70px 160px 120px 100px 140px 140px 1.1fr 0.8fr 60px 120px 120px 140px 240px 140px",
             gap: 8,
             padding: "10px",
             background: "#f8fafc",
             borderBottom: "1px solid #e2e8f0",
             fontWeight: 700,
             color: "#0f172a",
-            minWidth: 1080,
+            minWidth: 1400,
           }}
         >
           <div>ID</div>
           <div>User</div>
+          <div>Role</div>
+          <div>Pincode</div>
+          <div>City</div>
+          <div>State</div>
           <div>Package</div>
           <div>Type</div>
           <div>Qty</div>
@@ -263,22 +328,37 @@ export default function AdminPromoPurchases() {
                 style={{
                   display: "grid",
                   gridTemplateColumns:
-                    "70px 160px 1.1fr 0.8fr 60px 120px 120px 140px 240px 140px",
+                    "70px 160px 120px 100px 140px 140px 1.1fr 0.8fr 60px 120px 120px 140px 240px 140px",
                   gap: 8,
                   padding: "10px",
                   borderBottom: "1px solid #e2e8f0",
                   alignItems: "center",
-                  minWidth: 1080,
+                  minWidth: 1400,
                 }}
               >
                 <div>#{r.id}</div>
-                <div style={{ wordBreak: "break-all" }}>{userLabel}</div>
+                <div style={{ wordBreak: "break-all" }}>
+                  <div>{userLabel}</div>
+                  {r.user_full_name ? (
+                    <div style={{ fontSize: 12, color: "#64748b" }}>{r.user_full_name}</div>
+                  ) : null}
+                </div>
+
+                <div>{r.user_role_label || ""}</div>
+                <div>{r.user_pincode || ""}</div>
+                <div>{r.user_city_name || ""}</div>
+                <div>{r.user_state_name || ""}</div>
 
                 <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
                   <div style={{ fontWeight: 700, color: "#0f172a" }}>{pkgName}</div>
                   <div style={{ fontSize: 12, color: "#64748b" }}>
                     ₹{pkgPrice.toFixed(2)}{monText}
                   </div>
+                  {isMonthly ? (
+                    <div style={{ fontSize: 12, color: "#475569" }}>
+                      Pkg #: {String(r.package_number ?? "")} • Boxes: {Array.isArray(r.boxes_json) ? `${r.boxes_json.length} [${r.boxes_json.join(",")}]` : "0 []"}
+                    </div>
+                  ) : null}
                 </div>
 
                 <div>{pkg.type || ""}</div>
@@ -370,6 +450,20 @@ export default function AdminPromoPurchases() {
 
               <div style={{ fontSize: 12, color: "#64748b" }}>User</div>
               <div style={{ fontWeight: 600, wordBreak: "break-all" }}>{userLabel}</div>
+              {r.user_full_name ? (
+                <div style={{ fontSize: 12, color: "#475569" }}>{r.user_full_name}</div>
+              ) : null}
+
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 4 }}>
+                <div style={{ fontSize: 12, color: "#64748b" }}>Role</div>
+                <div style={{ fontWeight: 600 }}>{r.user_role_label || "—"}</div>
+                <div style={{ fontSize: 12, color: "#64748b" }}>Pincode</div>
+                <div style={{ fontWeight: 600 }}>{r.user_pincode || "—"}</div>
+                <div style={{ fontSize: 12, color: "#64748b" }}>City</div>
+                <div style={{ fontWeight: 600 }}>{r.user_city_name || "—"}</div>
+                <div style={{ fontSize: 12, color: "#64748b" }}>State</div>
+                <div style={{ fontWeight: 600 }}>{r.user_state_name || "—"}</div>
+              </div>
 
               <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>Package</div>
               <div style={{ fontWeight: 700, color: "#0f172a" }}>{pkgName}</div>
@@ -461,6 +555,57 @@ export default function AdminPromoPurchases() {
           onChange={setStatus}
           options={statusOptions}
         />
+        <Select
+          label="Kind"
+          value={kind}
+          onChange={setKind}
+          options={kindOptions}
+        />
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <label style={{ fontSize: 12, color: "#64748b" }}>User ID</label>
+          <input
+            value={userId}
+            onChange={(e) => setUserId(e.target.value)}
+            placeholder="numeric id"
+            style={{
+              padding: "10px 12px",
+              borderRadius: 8,
+              border: "1px solid #e2e8f0",
+              outline: "none",
+              background: "#fff",
+            }}
+          />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <label style={{ fontSize: 12, color: "#64748b" }}>From date</label>
+          <input
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            placeholder="YYYY-MM-DD"
+            style={{
+              padding: "10px 12px",
+              borderRadius: 8,
+              border: "1px solid #e2e8f0",
+              outline: "none",
+              background: "#fff",
+            }}
+          />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <label style={{ fontSize: 12, color: "#64748b" }}>To date</label>
+          <input
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            placeholder="YYYY-MM-DD"
+            style={{
+              padding: "10px 12px",
+              borderRadius: 8,
+              border: "1px solid #e2e8f0",
+              outline: "none",
+              background: "#fff",
+            }}
+          />
+        </div>
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center", flexWrap: "wrap" }}>
@@ -486,4 +631,3 @@ export default function AdminPromoPurchases() {
     </div>
   );
 }
-

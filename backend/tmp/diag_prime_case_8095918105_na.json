@@ -1,0 +1,102 @@
+{
+  "ok": true,
+  "now": "2026-01-31T04:24:29.816468+00:00",
+  "input": {
+    "username": "8095918105",
+    "purchase_id": ""
+  },
+  "user": {
+    "id": 136,
+    "username": "8095918105",
+    "role": "user",
+    "category": "consumer",
+    "sponsor_id": 125,
+    "sponsor_username": "1010000010"
+  },
+  "policy_prime150": {
+    "direct_sponsor": "15.0",
+    "direct_self": "1.0",
+    "enable_3_matrix": true,
+    "enable_5_matrix": true,
+    "reward_points_amount": "1.0"
+  },
+  "config": {
+    "products.150.matrix_open_mode": "EVERY_PURCHASE",
+    "products.150.matrix_open_count": 1,
+    "consumer_matrix_3.150.fixed_amounts_len": 15,
+    "consumer_matrix_3.150.percents_len": 0,
+    "general.allow_agency_in_matrix": false
+  },
+  "matrix_accounts_for_purchase": {
+    "five_150_count": null,
+    "three_150_count": null
+  },
+  "payouts_for_purchase": {
+    "three_count": null,
+    "five_count": null,
+    "three_rows": [],
+    "five_rows": []
+  },
+  "sponsor_join_bonus": [
+    {
+      "id": 74008,
+      "user_id": 125,
+      "amount": "3.75",
+      "type": "SELF_ACCOUNT_CREDIT",
+      "source_type": "JOIN_REFERRAL",
+      "source_id": "136",
+      "meta_source": "FIVE_MATRIX_FIXED",
+      "meta_level": 1,
+      "meta_fixed": true,
+      "meta_percent": null,
+      "orig_type": "AUTOPOOL_BONUS_FIVE",
+      "created_at": "2026-01-29T07:41:53.521557+00:00"
+    },
+    {
+      "id": 74007,
+      "user_id": 125,
+      "amount": "11.25",
+      "type": "INCOME_CREDIT_75",
+      "source_type": "JOIN_REFERRAL",
+      "source_id": "136",
+      "meta_source": "FIVE_MATRIX_FIXED",
+      "meta_level": 1,
+      "meta_fixed": true,
+      "meta_percent": null,
+      "orig_type": "AUTOPOOL_BONUS_FIVE",
+      "created_at": "2026-01-29T07:41:53.519951+00:00"
+    },
+    {
+      "id": 74006,
+      "user_id": 125,
+      "amount": "3.75",
+      "type": "SELF_ACCOUNT_CREDIT",
+      "source_type": "JOIN_REFERRAL",
+      "source_id": "136",
+      "meta_source": "JOIN_REFERRAL",
+      "meta_level": null,
+      "meta_fixed": null,
+      "meta_percent": null,
+      "orig_type": "DIRECT_REF_BONUS",
+      "created_at": "2026-01-29T07:41:53.483871+00:00"
+    },
+    {
+      "id": 74005,
+      "user_id": 125,
+      "amount": "11.25",
+      "type": "INCOME_CREDIT_75",
+      "source_type": "JOIN_REFERRAL",
+      "source_id": "136",
+      "meta_source": "JOIN_REFERRAL",
+      "meta_level": null,
+      "meta_fixed": null,
+      "meta_percent": null,
+      "orig_type": "DIRECT_REF_BONUS",
+      "created_at": "2026-01-29T07:41:53.459347+00:00"
+    }
+  ],
+  "audits": {
+    "matrix_distributed_for_purchase": null,
+    "promo_purchase_distributed": null
+  }
+}

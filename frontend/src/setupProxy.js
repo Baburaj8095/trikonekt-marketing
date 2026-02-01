@@ -1,43 +1,58 @@
-﻿/* CRA dev proxy to backend Django server.
-   - Proxies all /api/* requests to http://localhost:8000/api/*
-   - Also proxies /media and /static for local asset access
-   Notes:
-   - Restart `npm start` after creating or changing this file.
-   - You can override target via REACT_APP_DEV_PROXY_TARGET.
-*/
+﻿/* eslint-disable import/no-extraneous-dependencies */
 const { createProxyMiddleware } = require("http-proxy-middleware");
 
-module.exports = function (app) {
-  const target = process.env.REACT_APP_DEV_PROXY_TARGET || "http://localhost:8000";
+/**
+ * CRA dev proxy to backend.
+ *
+ * Why this is needed:
+ * - When running the React dev server on http://localhost:3000, any request to "/api/*"
+ *   would otherwise try to hit http://localhost:3000/api/* (which doesn't exist) and can
+ *   appear as "canceled" in the Network tab or fail due to CORS.
+ * - This proxy forwards "/api/*" (and a few media paths) to the Django backend
+ *   running on http://localhost:8000 by default.
+ *
+ * Usage:
+ * - Restart the React dev server after adding this file.
+ * - Optionally set BACKEND_URL env var to point to a different backend, e.g.:
+ *   BACKEND_URL=http://127.0.0.1:8000
+ */
+module.exports = function setup(app) {
+  const target = process.env.BACKEND_URL || "http://localhost:8000";
 
-  // API proxy
+  const commonOptions = {
+    target,
+    changeOrigin: true,
+    ws: false,
+    secure: false,
+    xfwd: true,
+    // Be generous with timeouts so the dev server doesn't abort long backend calls
+    proxyTimeout: 300000,
+    timeout: 300000,
+    onError(err, req, res) {
+      try {
+        res.writeHead(502, { "Content-Type": "text/plain" });
+        res.end("Dev proxy to backend failed.");
+      } catch (_) {}
+      // eslint-disable-next-line no-console
+      console.error("[setupProxy] Proxy error:", err && err.message ? err.message : err);
+    },
+  };
+
+  // Proxy API requests
   app.use(
-    "/api",
+    ["/api", "/api/"],
     createProxyMiddleware({
-      target,
-      changeOrigin: true,
-      xfwd: true,
-      secure: false,
-      ws: false,
-      // Keep /api prefix as-is
-      pathRewrite: {
-        "^/api": "/api",
-      },
-      logLevel: "warn",
+      ...commonOptions,
+      // Keep the "/api" prefix as-is so backend sees "/api/..." paths unchanged
+      // pathRewrite: { "^/api": "/api" },
     })
   );
 
-  // Media (optional convenience) - DO NOT proxy /static in CRA dev; it breaks bundle.js
-  app.use(
-    ["/media"],
-    createProxyMiddleware({
-      target,
-      changeOrigin: true,
-      xfwd: true,
-      secure: false,
-      ws: false,
-      logLevel: "warn",
-    })
-  );
+  // Optional: Proxy media/uploads through the same backend if you serve files there in dev
+  app.use(["/media", "/media/"], createProxyMiddleware(commonOptions));
+  app.use(["/uploads", "/uploads/"], createProxyMiddleware(commonOptions));
+
+
+  // eslint-disable-next-line no-console
+  console.log(`[setupProxy] Proxying /api, /media, /uploads to ${target}`);
 };
-

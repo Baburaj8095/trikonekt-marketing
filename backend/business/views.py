@@ -38,6 +38,23 @@ from .serializers import (
 
 logger = logging.getLogger(__name__)
 
+def _bounded_limit_offset(request, default=25, max_limit=25):
+    try:
+        limit = int(request.query_params.get("limit", default))
+    except Exception:
+        limit = default
+    try:
+        offset = int(request.query_params.get("offset", 0))
+    except Exception:
+        offset = 0
+    if limit <= 0:
+        limit = default
+    if limit > max_limit:
+        limit = max_limit
+    if offset < 0:
+        offset = 0
+    return limit, offset
+
 
 class BusinessRegistrationCreateView(generics.CreateAPIView):
     """
@@ -404,7 +421,9 @@ class PromoPurchaseMeListCreateView(APIView):
 
     def get(self, request):
         qs = PromoPurchase.objects.filter(user=request.user).select_related("package").order_by("-requested_at", "-id")
-        ser = PromoPurchaseSerializer(qs, many=True, context={"request": request})
+        limit, offset = _bounded_limit_offset(request, default=25, max_limit=25)
+        qs_page = qs[offset:offset + limit]
+        ser = PromoPurchaseSerializer(qs_page, many=True, context={"request": request})
         return Response(ser.data, status=status.HTTP_200_OK)
 
     def post(self, request):
@@ -434,7 +453,7 @@ class AdminPromoPurchaseListView(APIView):
 
         status_in = (request.query_params.get("status") or "PENDING").strip().upper()
         valid = {"PENDING", "APPROVED", "REJECTED", "CANCELLED"}
-        qs = PromoPurchase.objects.select_related("user", "package").order_by("-requested_at", "-id")
+        qs = PromoPurchase.objects.select_related("user", "user__state", "user__city", "package").order_by("-requested_at", "-id")
         if status_in in valid:
             qs = qs.filter(status=status_in)
 
@@ -468,7 +487,9 @@ class AdminPromoPurchaseListView(APIView):
             except Exception:
                 pass
 
-        ser = PromoPurchaseSerializer(qs, many=True, context={"request": request})
+        limit, offset = _bounded_limit_offset(request, default=25, max_limit=25)
+        qs_page = qs[offset:offset + limit]
+        ser = PromoPurchaseSerializer(qs_page, many=True, context={"request": request})
         return Response(ser.data, status=status.HTTP_200_OK)
 
 
@@ -1153,7 +1174,9 @@ class AdminProductOrdersListView(APIView):
                 qs = qs.filter(created_at__date__lte=d_to)
             except Exception:
                 pass
-        ser = PromoProductOrderSerializer(qs, many=True, context={"request": request})
+        limit, offset = _bounded_limit_offset(request, default=25, max_limit=25)
+        qs_page = qs[offset:offset + limit]
+        ser = PromoProductOrderSerializer(qs_page, many=True, context={"request": request})
         return Response(ser.data, status=status.HTTP_200_OK)
 
 
@@ -2104,7 +2127,9 @@ class AdminAgencyPaymentRequestListView(APIView):
                 qs = qs.filter(agency_id=int(agency_id))
             except Exception:
                 pass
-        ser = AgencyPackagePaymentRequestSerializer(qs, many=True, context={"request": request})
+        limit, offset = _bounded_limit_offset(request, default=25, max_limit=25)
+        qs_page = qs[offset:offset + limit]
+        ser = AgencyPackagePaymentRequestSerializer(qs_page, many=True, context={"request": request})
         return Response(ser.data, status=status.HTTP_200_OK)
 
 
@@ -2258,6 +2283,8 @@ class DailyReportAllView(APIView):
                 pass
 
         qs = qs.order_by("-date", "-id")
+        limit, offset = _bounded_limit_offset(request, default=25, max_limit=25)
+        qs_page = qs[offset:offset + limit]
 
         # CSV export
         if (request.query_params.get("format") or "").lower() == "csv":
@@ -2271,7 +2298,7 @@ class DailyReportAllView(APIView):
                 "tr_registered", "wg_registered", "asia_pay_registered", "dm_account_registered",
                 "e_coupon_issued", "physical_coupon_issued", "product_sold", "total_amount",
             ])
-            for r in qs:
+            for r in qs_page:
                 writer.writerow([
                     r.date, getattr(r.reporter, "username", ""), r.role,
                     r.tr_registered, r.wg_registered, r.asia_pay_registered, r.dm_account_registered,
@@ -2279,7 +2306,7 @@ class DailyReportAllView(APIView):
                 ])
             return resp
 
-        ser = DailyReportSerializer(qs, many=True)
+        ser = DailyReportSerializer(qs_page, many=True)
         return Response(ser.data, status=status.HTTP_200_OK)
 
 
@@ -2554,3 +2581,76 @@ class AdminApplyWithdrawCommissionView(APIView):
             return Response({"detail": "Failed to apply distribution."}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(breakdown, status=status.HTTP_200_OK)
+
+
+# ==============================
+# Matrix Tree API (Entry-based, read-only)
+# ==============================
+class MatrixTreeView(APIView):
+    """
+    GET /api/business/matrix/tree/?pool_type=FIVE_150[&start_entry_id=ID][&display_user_id=ID][&max_nodes=1000][&max_depth=N]
+    Rules:
+      - Build tree strictly from AutoPoolAccount structure (id, parent_account, level, position, status, pool_type)
+      - No writes/side-effects
+      - If start_entry_id missing, resolve UI head:
+          * display_user_id (if provided) -> earliest ACTIVE entry for that user
+          * else default display_user_id=32 -> earliest ACTIVE entry for user 32
+          * fallback to sentinel root if none
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from business.services.structure import build_tree, get_display_start_entry
+        pool_type = (request.query_params.get("pool_type") or "FIVE_150").strip().upper()
+        start_entry_id = request.query_params.get("start_entry_id")
+        display_user_id = request.query_params.get("display_user_id")
+
+        # Parse bounds
+        try:
+            max_nodes = int(request.query_params.get("max_nodes", 1000) or 1000)
+            if max_nodes <= 0:
+                max_nodes = 1000
+            max_nodes = min(max_nodes, 5000)
+        except Exception:
+            max_nodes = 1000
+        try:
+            max_depth_param = request.query_params.get("max_depth")
+            max_depth = int(max_depth_param) if max_depth_param is not None else None
+        except Exception:
+            max_depth = None
+
+        # Start id resolution
+        start_id = None
+        if start_entry_id is not None:
+            try:
+                start_id = int(start_entry_id)
+            except Exception:
+                start_id = None
+        if start_id is None:
+            # Default UI head resolution: user 32 by default (override via display_user_id)
+            try:
+                disp_id = int(display_user_id) if display_user_id is not None else 32
+            except Exception:
+                disp_id = None
+            start_id = get_display_start_entry(pool_type, disp_id)
+
+        data = build_tree(pool_type, start_entry_id=start_id, max_nodes=max_nodes, max_depth=max_depth)
+        return Response(data, status=status.HTTP_200_OK)
+
+
+# ==============================
+# Admin: Enforce Single Sentinel Root (per pool)
+# ==============================
+class AdminMatrixEnforceSentinelView(APIView):
+    """
+    POST /api/business/admin/matrix/enforce-sentinel/
+    Body or query: { "pool_type": "FIVE_150" }
+    Ensures exactly one sentinel structural root (reattaches extras). Read-only otherwise.
+    """
+    permission_classes = [IsAdminOrStaff]
+
+    def post(self, request):
+        from business.services.structure import enforce_single_sentinel
+        pool_type = (request.data.get("pool_type") or request.query_params.get("pool_type") or "FIVE_150").strip().upper()
+        sentinel = enforce_single_sentinel(pool_type)
+        return Response({"sentinel_id": int(getattr(sentinel, "id", 0) or 0), "pool_type": pool_type}, status=status.HTTP_200_OK)

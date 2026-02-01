@@ -9,7 +9,7 @@ import time
 import logging
 logger = logging.getLogger(__name__)
 
-from accounts.models import Wallet, CustomUser
+from accounts.models import Wallet, CustomUser, WalletTransaction
 from business.models import (
     CommissionConfig,
     AutoPoolAccount,
@@ -359,7 +359,22 @@ def activate_150_active(user: CustomUser, source: Dict[str, Any]) -> bool:
 
     # Direct sponsor bonus (configurable)
     sponsor = getattr(user, "registered_by", None)
-    if sponsor and direct_amt > 0:
+    # Suppress generic DIRECT_REF_BONUS for promo purchase flows; PRIME engine handles direct bonus
+    try:
+        st_lower = str(src_type or "").strip().lower()
+    except Exception:
+        st_lower = ""
+    suppress_generic = st_lower in ("promo_purchase", "promo_purchase_approval")
+    # Guard: if PRIME direct was already paid for this sponsor-referral, suppress generic DIRECT_REF_BONUS
+    try:
+        exists_prime_direct = WalletTransaction.objects.filter(
+            user=sponsor,
+            type__in=("PRIME_150_DIRECT", "PRIME_750_DIRECT"),
+            meta__from_user_id=getattr(user, "id", None),
+        ).exists()
+    except Exception:
+        exists_prime_direct = False
+    if sponsor and direct_amt > 0 and not exists_prime_direct and not suppress_generic:
         _credit_wallet(
             sponsor,
             direct_amt,

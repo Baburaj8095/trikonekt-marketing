@@ -623,6 +623,8 @@ class AutoPoolAccount(models.Model):
     entry_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("150.00"))
     pool_type = models.CharField(max_length=16, choices=POOL_TYPE_CHOICES, default="THREE_150", db_index=True)
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="ACTIVE", db_index=True)
+    # Monotonic per (owner, pool_type). Distinguishes multiple entries of the same user in the same matrix.
+    user_entry_index = models.PositiveIntegerField(default=0, db_index=True)
     # Sibling position under parent (1-based). Null for root accounts.
     position = models.PositiveSmallIntegerField(null=True, blank=True, db_index=True)
     # Provenance for idempotent creation and reporting (e.g., ECOUPON_ORDER, PROMO_PURCHASE)
@@ -644,7 +646,16 @@ class AutoPoolAccount(models.Model):
                 fields=["parent_account", "pool_type", "position"],
                 name="uniq_autopool_sibling_position",
                 condition=models.Q(parent_account__isnull=False),
-            )
+            ),
+            models.UniqueConstraint(
+                fields=["owner", "pool_type", "user_entry_index"],
+                name="uniq_user_entry_index_per_user_pool",
+            ),
+            models.UniqueConstraint(
+                fields=["pool_type"],
+                name="uniq_single_sentinel_per_pool",
+                condition=models.Q(parent_account__isnull=True),
+            ),
         ]
 
     def __str__(self):
@@ -782,6 +793,34 @@ class AutoPoolAccount(models.Model):
             count = 0
         idx = int(count) + 1
         return base if idx == 1 else f"{base}{sep}{idx}"
+
+
+    @classmethod
+    def _is_virtual_root_user(cls, user):
+        try:
+            if getattr(user, "id", None) == 32:
+                return True
+            rc = RootConsumerConfig.get_solo()
+            ru = rc.get_root_user()
+            return bool(ru and getattr(ru, "id", None) == getattr(user, "id", None))
+        except Exception:
+            return getattr(user, "id", None) == 32
+
+    @classmethod
+    def _sponsor_start_entry_id_for(cls, user, pool_type: str):
+        """
+        Resolve sponsor-scoped BFS start entry for placement:
+        - Return earliest ACTIVE AutoPoolAccount.id for the sponsor in this pool_type
+        - If sponsor has no entry, return None (caller should fallback to sentinel)
+        """
+        try:
+            sponsor = getattr(user, "registered_by", None)
+            if not sponsor or not getattr(sponsor, "id", None):
+                return None
+            acc = cls.objects.filter(owner=sponsor, pool_type=pool_type, status="ACTIVE").order_by("id").first()
+            return int(acc.id) if acc else None
+        except Exception:
+            return None
 
     @classmethod
     def place_in_three_pool(cls, user, pool_type: str, amount: Decimal, source_type: str = "", source_id: str = ""):

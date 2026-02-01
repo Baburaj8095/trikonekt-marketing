@@ -22,10 +22,11 @@ export default function DataTable({
   columnVisibilityModel,
   onColumnVisibilityModelChange,
   instanceKey,
+  extraKey,
 }) {
   const [rows, setRows] = useState([]);
   const [rowCount, setRowCount] = useState(0);
-  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 100 });
+  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 50 });
   const [sortModel, setSortModel] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [search, setSearch] = useState("");
@@ -34,6 +35,7 @@ export default function DataTable({
   const searchRef = useRef("");
   const reqSeq = useRef(0);
   const inflightKeyRef = useRef(null);
+  const firstPaginationEventRef = useRef(true);
   useEffect(() => { searchRef.current = search; }, [search]);
 
   // Debounce user typing before applying the search that triggers fetch
@@ -43,6 +45,8 @@ export default function DataTable({
   }, [searchText]);
 
   const load = useCallback(async () => {
+    // Avoid overlapping requests entirely; wait for current one to finish before starting another.
+    if (loading) return;
     const mySeq = (reqSeq.current += 1);
     const ordering = sortModel[0]
       ? `${sortModel[0].sort === "desc" ? "-" : ""}${sortModel[0].field}`
@@ -52,6 +56,7 @@ export default function DataTable({
       ps: paginationModel.pageSize,
       s: searchRef.current || "",
       o: ordering || "",
+      x: extraKey || "",
     });
     // Prevent starting a duplicate identical in-flight request (avoid axios cancel noise)
     if (inflightKeyRef.current === key) return;
@@ -74,7 +79,13 @@ export default function DataTable({
         return { ...fieldsObj, ...dataObj, ...r, id: fallbackId };
       });
       if (mySeq === reqSeq.current) {
-        setRows(normalized);
+        const baseIndex = (paginationModel.page || 0) * (paginationModel.pageSize || 0);
+        const withIndex = normalized.map((row, i) => ({
+          ...row,
+          __slno: baseIndex + i + 1,
+          __slnoPage: i + 1,
+        }));
+        setRows(withIndex);
         setRowCount(count || 0);
       }
     } catch (e) {
@@ -87,7 +98,7 @@ export default function DataTable({
         }
       }
     }
-  }, [fetcher, paginationModel, sortModel, search]);
+  }, [fetcher, paginationModel, sortModel, search, extraKey]);
 
   useEffect(() => {
     // On search/filter change: reset to first page; the load effect will run when 'load' changes
@@ -95,10 +106,10 @@ export default function DataTable({
   }, [search, fetcher]);
 
   useEffect(() => {
-    // Always load data when 'load' changes (pagination/sort/search/filters).
-    // In React StrictMode, this may run twice in development which is acceptable.
+    // Always perform the initial load. Our inflight de-duplication and cancel handling
+    // already suppress duplicate/canceled noise in dev StrictMode.
     load();
-  }, [load]);
+  }, [load, instanceKey]);
 
   // Safe deep getter to support nested column fields: "user.username", "item[0].name", etc.
   const deepGet = (obj, path) => {
@@ -192,9 +203,16 @@ export default function DataTable({
   }, [columns]);
 
   const handlePaginationChange = useCallback((model) => {
-    setPaginationModel((prev) => (
-      prev.page === model.page && prev.pageSize === model.pageSize ? prev : model
-    ));
+    setPaginationModel((prev) => {
+      // Ignore MUI's first emit that may carry its internal default (often 50),
+      // so our desired default 100 is preserved for the initial request.
+      if (firstPaginationEventRef.current) {
+        firstPaginationEventRef.current = false;
+        return prev;
+      }
+      if (prev.page === model.page && prev.pageSize === model.pageSize) return prev;
+      return model;
+    });
   }, []);
 
   const handleSortChange = useCallback((m) => {
@@ -227,8 +245,9 @@ export default function DataTable({
         loading={loading}
         paginationMode="server"
         sortingMode="server"
+        initialState={{ pagination: { paginationModel: { page: 0, pageSize: 50 } } }}
         pagination
-        pageSizeOptions={[10, 25, 50, 100]}
+        pageSizeOptions={[100, 50, 25, 10]}
         paginationModel={paginationModel}
         onPaginationModelChange={handlePaginationChange}
         onSortModelChange={handleSortChange}
@@ -284,4 +303,3 @@ export default function DataTable({
     </div>
   );
 }
-

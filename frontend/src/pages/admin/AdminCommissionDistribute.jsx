@@ -129,6 +129,9 @@ export default function AdminCommissionDistribute() {
     prime150_reward_points_amount: "",
     // Prime 750 multiplier (×) relative to Prime 150
     prime750_multiplier: "",
+    // Prime 150 matrix toggles (policy-level)
+    prime150_enable_3: "0",
+    prime150_enable_5: "0",
   });
 
   useEffect(() => {
@@ -146,6 +149,8 @@ export default function AdminCommissionDistribute() {
         const geo = data?.geo || {};
         const mulRaw = Number(data?.commissions?.prime_750?.multiplier);
         const mulNorm = Number.isFinite(mulRaw) && mulRaw > 0 ? Math.floor(mulRaw) : 1;
+        const en3 = !!(data?.commissions?.prime_150?.matrix?.enable_3);
+        const en5 = !!(data?.commissions?.prime_150?.matrix?.enable_5);
         const vals = {
           tax_percent: tax,
           withdrawal_sponsor_percent: wd,
@@ -166,12 +171,16 @@ export default function AdminCommissionDistribute() {
           geo_royalty: toFixedStr(geo.royalty ?? 0, 2),
           prime150_reward_points_amount: toFixedStr((data?.commissions?.prime_150?.rewards?.points_amount) ?? 0, 2),
           prime750_multiplier: String(mulNorm),
+          prime150_enable_3: en3 ? "1" : "0",
+          prime150_enable_5: en5 ? "1" : "0",
         };
         setMServer({
           tax_percent: toNum(vals.tax_percent),
           withdrawal_sponsor_percent: toNum(vals.withdrawal_sponsor_percent),
           tax_company_user_id: cuId ? Number(cuId) : null,
           prime750_multiplier: mulNorm,
+          prime150_enable_3: en3,
+          prime150_enable_5: en5,
           prime150_reward_points_amount: toNum(vals.prime150_reward_points_amount),
           upline: {
             l1: toNum(vals.upline_l1),
@@ -215,6 +224,11 @@ export default function AdminCommissionDistribute() {
       if (/^\d*$/.test(s)) setMForm((f) => ({ ...f, [name]: s }));
       return;
     }
+    if (name === "prime150_enable_3" || name === "prime150_enable_5") {
+      const v = String(value) === "1" ? "1" : "0";
+      setMForm((f) => ({ ...f, [name]: v }));
+      return;
+    }
     // numeric with 2 decimals
     const cleaned = value.replace(/[^\d.]/g, "");
     const parts = cleaned.split(".");
@@ -251,6 +265,11 @@ export default function AdminCommissionDistribute() {
     const multBase = Number(mServer.prime750_multiplier || 1);
     if (multCur !== null && isFinite(multCur) && Math.floor(multCur) !== Math.floor(multBase))
       add(out, "commissions.prime_750.multiplier", Math.floor(multCur));
+    // prime_150 matrix enable toggles
+    const en3Cur = (mForm.prime150_enable_3 === "1");
+    const en5Cur = (mForm.prime150_enable_5 === "1");
+    if (Boolean(mServer.prime150_enable_3) !== en3Cur) add(out, "commissions.prime_150.matrix.enable_3", en3Cur);
+    if (Boolean(mServer.prime150_enable_5) !== en5Cur) add(out, "commissions.prime_150.matrix.enable_5", en5Cur);
 
     const curCompanyId = mServer.tax_company_user_id || null;
     const formCompanyId = mForm.tax_company_user_id === "" ? null : Number(mForm.tax_company_user_id);
@@ -900,6 +919,9 @@ export default function AdminCommissionDistribute() {
         geo_fixed_royalty: toFixedStr(gf.royalty ?? 0, 2),
         product_base_amount: toFixedStr(data?.product_base_amount ?? 0, 2),
         coupon_activation_count: String(data?.coupon_activation_count ?? ""),
+        // reflect matrix open config from server
+        matrix_open_mode: String((data?.matrix_open_mode || "")).toUpperCase(),
+        matrix_open_count: String(data?.matrix_open_count ?? ""),
       };
       setM150Server({
         direct_bonus: {
@@ -931,6 +953,9 @@ export default function AdminCommissionDistribute() {
         },
         product_base_amount: toNum(vals.product_base_amount),
         coupon_activation_count: (vals.coupon_activation_count === "" ? null : Number(vals.coupon_activation_count)),
+        // reflect matrix open config into server snapshot
+        matrix_open_mode: String((data?.matrix_open_mode || "")).toUpperCase() || "",
+        matrix_open_count: (String(data?.matrix_open_count ?? "") === "" ? null : Number(String(data?.matrix_open_count))),
       });
       setM150Form(vals);
       setOk("150 Coupon Commission saved");
@@ -976,10 +1001,10 @@ export default function AdminCommissionDistribute() {
           three_matrix_percents_json: threePercs.map((x) => toNum(x)),
         });
         setMx150Form({
-          five_levels: String(FIXED_FIVE_MATRIX_LEVELS),
+          five_levels: String(fiveLevels || ""),
           five_amounts: fiveAmounts.map((x) => toFixedStr(x, 2)).join(", "),
           five_percents: fivePercs.map((x) => toFixedStr(x, 2)).join(", "),
-          three_levels: String(FIXED_THREE_MATRIX_LEVELS),
+          three_levels: String(threeLevels || ""),
           three_amounts: threeAmounts.map((x) => toFixedStr(x, 2)).join(", "),
           three_percents: threePercs.map((x) => toFixedStr(x, 2)).join(", "),
         });
@@ -1402,10 +1427,10 @@ setM750Server({
           three_matrix_percents_json: threePercs.map((x) => toNum(x)),
         });
         setMx750Form({
-          five_levels: String(FIXED_FIVE_MATRIX_LEVELS),
+          five_levels: String(fiveLevels || ""),
           five_amounts: fiveAmounts.map((x) => toFixedStr(x, 2)).join(", "),
           five_percents: fivePercs.map((x) => toFixedStr(x, 2)).join(", "),
-          three_levels: String(FIXED_THREE_MATRIX_LEVELS),
+          three_levels: String(threeLevels || ""),
           three_amounts: threeAmounts.map((x) => toFixedStr(x, 2)).join(", "),
           three_percents: threePercs.map((x) => toFixedStr(x, 2)).join(", "),
         });
@@ -1892,10 +1917,10 @@ setM750Server({
           three_matrix_percents_json: threePercs.map((x) => toNum(x)),
         });
         setMx759Form({
-          five_levels: String(FIXED_FIVE_MATRIX_LEVELS),
+          five_levels: String(fiveLevels || ""),
           five_amounts: fiveAmounts.map((x) => toFixedStr(x, 2)).join(", "),
           five_percents: fivePercs.map((x) => toFixedStr(x, 2)).join(", "),
-          three_levels: String(FIXED_THREE_MATRIX_LEVELS),
+          three_levels: String(threeLevels || ""),
           three_amounts: threeAmounts.map((x) => toFixedStr(x, 2)).join(", "),
           three_percents: threePercs.map((x) => toFixedStr(x, 2)).join(", "),
         });
@@ -2015,7 +2040,11 @@ setM750Server({
 
   const SaveBtn = ({ onClick, disabled, saving, dirty, labelSaved = "Saved" }) => (
     <button
-      onClick={onClick}
+      type="button"
+      onClick={(e) => {
+        try { e?.preventDefault?.(); e?.stopPropagation?.(); } catch (_) {}
+        if (typeof onClick === "function") onClick(e);
+      }}
       disabled={disabled || saving || !dirty}
       style={{
         height: 30,
@@ -2095,23 +2124,14 @@ setM750Server({
         </Section>
 
         <Section
-          title="Prime 750  Settings"
-          subtitle="Set 750× multiplier that scales off Prime 150. Base package is fixed to Prime 150."
-          right={
+          title="₹150 Activation  Matrix Toggles"
+          subtitle="Enable or disable consumer matrix payouts for ₹150 via policy flags. Per-package arrays under Matrix Commission also imply enablement."
+right={
             <SaveBtn
-              onClick={() =>
-                onMasterSave({
-                  commissions: {
-                    prime_750: {
-                      multiplier: Math.max(1, Math.floor(Number(mForm.prime750_multiplier || 1))),
-                      base_package: "prime_150",
-                    },
-                  },
-                })
-              }
+              onClick={() => onMasterSave()}
               disabled={mLoading}
               saving={mSaving}
-              dirty={Number(mForm.prime750_multiplier || 1) !== Number(mServer?.prime750_multiplier || 1)}
+              dirty={mDirty}
             />
           }
         >
@@ -2119,18 +2139,32 @@ setM750Server({
             <div style={{ color: "#64748b" }}>Loading...</div>
           ) : (
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
-              <Input
-                label="Multiplier (×)"
-                type="text"
-                step="1"
-                min="1"
-                placeholder="e.g. 5"
-                value={mForm.prime750_multiplier}
-                onChange={(v) => onMChange("prime750_multiplier", v)}
-              />
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 220px" }}>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>Enable 5‑Matrix (₹150)</label>
+                <select
+                  value={mForm.prime150_enable_5 || "0"}
+                  onChange={(e) => onMChange("prime150_enable_5", e.target.value)}
+                  style={{ height: 36, borderRadius: 8, border: "1px solid #e2e8f0", padding: "0 10px", fontWeight: 700 }}
+                >
+                  <option value="1">Enabled</option>
+                  <option value="0">Disabled</option>
+                </select>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 220px" }}>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>Enable 3‑Matrix (₹150)</label>
+                <select
+                  value={mForm.prime150_enable_3 || "0"}
+                  onChange={(e) => onMChange("prime150_enable_3", e.target.value)}
+                  style={{ height: 36, borderRadius: 8, border: "1px solid #e2e8f0", padding: "0 10px", fontWeight: 700 }}
+                >
+                  <option value="1">Enabled</option>
+                  <option value="0">Disabled</option>
+                </select>
+              </div>
             </div>
           )}
         </Section>
+
 
         <Section
           title="₹150 Activation  Reward Points"
@@ -2247,7 +2281,7 @@ setM750Server({
           ) : (
             <>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
-                <Input label="5-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 10" value={mx150Form.five_levels} onChange={(v) => onMx150Change("five_levels", v)} disabled />
+                <Input label="5-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 10" value={mx150Form.five_levels} onChange={(v) => onMx150Change("five_levels", v)} />
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 380px" }}>
                   <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>5-Matrix Amounts (₹, CSV)</label>
                   <textarea
@@ -2285,7 +2319,7 @@ setM750Server({
               </div>
 
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <Input label="3-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 15" value={mx150Form.three_levels} onChange={(v) => onMx150Change("three_levels", v)} disabled />
+                <Input label="3-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 15" value={mx150Form.three_levels} onChange={(v) => onMx150Change("three_levels", v)} />
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 380px" }}>
                   <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>3-Matrix Amounts (₹, CSV)</label>
                   <textarea
@@ -2410,6 +2444,44 @@ setM750Server({
         </Section>
 
         <Section
+          title="Prime 750  Settings"
+          subtitle="Set 750× multiplier that scales off Prime 150. Base package is fixed to Prime 150."
+          right={
+            <SaveBtn
+              onClick={() =>
+                onMasterSave({
+                  commissions: {
+                    prime_750: {
+                      multiplier: Math.max(1, Math.floor(Number(mForm.prime750_multiplier || 1))),
+                      base_package: "prime_150",
+                    },
+                  },
+                })
+              }
+              disabled={mLoading}
+              saving={mSaving}
+              dirty={Number(mForm.prime750_multiplier || 1) !== Number(mServer?.prime750_multiplier || 1)}
+            />
+          }
+        >
+          {mLoading ? (
+            <div style={{ color: "#64748b" }}>Loading...</div>
+          ) : (
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
+              <Input
+                label="Multiplier (×)"
+                type="text"
+                step="1"
+                min="1"
+                placeholder="e.g. 5"
+                value={mForm.prime750_multiplier}
+                onChange={(v) => onMChange("prime750_multiplier", v)}
+              />
+            </div>
+          )}
+        </Section>
+
+        <Section
           title="₹750 Activation  Geo (Agency)"
           subtitle="Percent vs fixed mode per role. Empty values imply fallback to global defaults."
           right={
@@ -2480,7 +2552,7 @@ setM750Server({
           ) : (
             <>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
-                <Input label="5-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 6" value={mx750Form.five_levels} onChange={(v) => onMx750Change("five_levels", v)} disabled/>
+                <Input label="5-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 6" value={mx750Form.five_levels} onChange={(v) => onMx750Change("five_levels", v)} />
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 380px" }}>
                   <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>5-Matrix Amounts (₹, CSV)</label>
                   <textarea
@@ -2518,7 +2590,7 @@ setM750Server({
               </div>
 
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <Input label="3-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 15" value={mx750Form.three_levels} onChange={(v) => onMx750Change("three_levels", v)} disabled/>
+                <Input label="3-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 15" value={mx750Form.three_levels} onChange={(v) => onMx750Change("three_levels", v)} />
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 380px" }}>
                   <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>3-Matrix Amounts (₹, CSV)</label>
                   <textarea
@@ -2743,7 +2815,7 @@ setM750Server({
           ) : (
             <>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
-                <Input label="5-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 6" value={mx759Form.five_levels} onChange={(v) => onMx759Change("five_levels", v)} disabled />
+                <Input label="5-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 6" value={mx759Form.five_levels} onChange={(v) => onMx759Change("five_levels", v)} />
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 380px" }}>
                   <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>5-Matrix Amounts (₹, CSV)</label>
                   <textarea
@@ -2781,7 +2853,7 @@ setM750Server({
               </div>
 
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <Input label="3-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 15" value={mx759Form.three_levels} onChange={(v) => onMx759Change("three_levels", v)} disabled />
+                <Input label="3-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 15" value={mx759Form.three_levels} onChange={(v) => onMx759Change("three_levels", v)} />
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 380px" }}>
                   <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>3-Matrix Amounts (₹, CSV)</label>
                   <textarea
@@ -2843,6 +2915,7 @@ setM750Server({
           subtitle="Sponsor commission percent applied on withdrawals (global)."
           right={
             <button
+              type="button"
               onClick={onWithdrawSave}
               disabled={mLoading || mSaving || !sponsorDirty}
               style={{
@@ -2878,6 +2951,7 @@ setM750Server({
           subtitle="Enter a user (ID or username) and amount to see the sponsor bonus, TDS/company pool, and net to user."
           right={
             <button
+              type="button"
               onClick={onPreview}
               disabled={pLoading || !pUser || !pAmount}
               style={{
@@ -2983,6 +3057,47 @@ setM750Server({
     );
   }
 
+  // Save All (per tab)
+  const anySaving = mSaving || m150Saving || mx150Saving || m750Saving || mx750Saving || m759Saving || mx759Saving || lSaving || lSeeding || pLoading || mxSaving;
+  const tabDirty = (
+    (activeTab === TABS.ACT150 && (mDirty || m150Dirty || mx150Dirty)) ||
+    (activeTab === TABS.ACT750 && (mDirty || m750Dirty || mx750Dirty)) ||
+    (activeTab === TABS.ACT759 && (m759Dirty || m759MonthlyDirty || mx759Dirty)) ||
+    (activeTab === TABS.WITHDRAW && (mServer && Number(Number(mForm.withdrawal_sponsor_percent||0).toFixed(2)) !== Number(Number(mServer?.withdrawal_sponsor_percent||0).toFixed(2))))
+  );
+  const tabLoading = (
+    (activeTab === TABS.ACT150 && (mLoading || m150Loading || mx150Loading)) ||
+    (activeTab === TABS.ACT750 && (mLoading || m750Loading || mx750Loading)) ||
+    (activeTab === TABS.ACT759 && (m759Loading || mx759Loading)) ||
+    (activeTab === TABS.WITHDRAW && mLoading)
+  );
+
+  async function onSaveAll() {
+    try {
+      if (activeTab === TABS.ACT150) {
+        if (mDirty) await onMasterSave();
+        if (m150Dirty) await onM150Save();
+        if (mx150Dirty) await onMx150Save();
+      } else if (activeTab === TABS.ACT750) {
+        if (mDirty) await onMasterSave();
+        if (m750Dirty) await onM750Save();
+        if (mx750Dirty) await onMx750Save();
+      } else if (activeTab === TABS.ACT759) {
+        if (m759Dirty || m759MonthlyDirty) await onM759Save();
+        if (mx759Dirty) await onMx759Save();
+      } else if (activeTab === TABS.WITHDRAW) {
+        const sponsorDirty =
+          mServer &&
+          Number(Number(mForm.withdrawal_sponsor_percent).toFixed(2)) !==
+            Number(Number(mServer.withdrawal_sponsor_percent).toFixed(2));
+        if (sponsorDirty) {
+          const sp = Number(Number(mForm.withdrawal_sponsor_percent || 0).toFixed(2));
+          await onMasterSave({ withdrawal: { sponsor_percent: sp } });
+        }
+      }
+    } catch (_) {}
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
@@ -2992,6 +3107,13 @@ setM750Server({
             Tab-based configuration without changing payout formulas. Package-specific overrides where supported.
           </div>
         </div>
+        <SaveBtn
+          onClick={onSaveAll}
+          disabled={tabLoading}
+          saving={anySaving}
+          dirty={tabDirty}
+          labelSaved="All Saved"
+        />
       </div>
 
       {/* Tabs */}
@@ -3004,6 +3126,7 @@ setM750Server({
         ].map((t) => (
           <button
             key={t.key}
+            type="button"
             onClick={() => setActiveTab(t.key)}
             style={{
               padding: "8px 12px",
@@ -3065,4 +3188,3 @@ setM750Server({
     </div>
   );
 }
-

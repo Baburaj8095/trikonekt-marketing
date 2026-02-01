@@ -1,7 +1,7 @@
 from rest_framework import generics
-from rest_framework.pagination import PageNumberPagination
-from .models import CustomUser, AgencyRegionAssignment, Wallet, WalletTransaction, SupportTicket, SupportTicketMessage
-from .serializers import RegisterSerializer, PublicUserSerializer, UserKYCSerializer, WithdrawalRequestSerializer, ProfileMeSerializer, SupportTicketSerializer, SupportTicketMessageSerializer
+from rest_framework.pagination import PageNumberPagination, CursorPagination
+from .models import CustomUser, AgencyRegionAssignment, Wallet, WalletTransaction, SupportTicket, SupportTicketMessage, UserNominee
+from .serializers import RegisterSerializer, PublicUserSerializer, UserKYCSerializer, WithdrawalRequestSerializer, ProfileMeSerializer, SupportTicketSerializer, SupportTicketMessageSerializer, UserNomineeSerializer
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .token_serializers import CustomTokenObtainPairSerializer
@@ -22,7 +22,10 @@ from django.utils import timezone
 from django.contrib.staticfiles import finders
 from io import BytesIO
 import os
-from xhtml2pdf import pisa
+try:
+    from xhtml2pdf import pisa
+except Exception:
+    pisa = None  # type: ignore
 
 
 class RegisterView(generics.CreateAPIView):
@@ -158,78 +161,169 @@ class ProfileMeView(generics.RetrieveUpdateAPIView):
         return self.request.user
 
 
+class UsersCursorPagination(CursorPagination):
+    page_size = 25
+    page_size_query_param = "page_size"
+    max_page_size = 100
+    ordering = ("-date_joined", "-id")
+
+
 class UsersListView(generics.ListAPIView):
     """
     List users with filters by pincode/state/country/category/role.
-    - pincode: exact match
+    - pincode: exact match (digits normalized); supports pincode=me
     - state_id: numeric State PK
     - country_id: numeric Country PK
     - category: one of CustomUser.CATEGORY_CHOICES codes
-    - role: user/agency/employee
+    - role: user/agency/employee (employee/agency support legacy data variants)
     - registered_by: 'me' or user id
+
+    Performance:
+    - Uses CursorPagination to avoid COUNT(*) and OFFSET
+    - Eliminates expensive OR with UNION-style id subqueries where needed
+    - Applies .only() to avoid fetching unused columns
+    - Keeps select_related only for relations used by the serializer
+    - Orders by ('-date_joined', '-id') for stability
     """
     serializer_class = PublicUserSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = UsersCursorPagination
+
+    def _normalize_pin(self, val: str | None) -> str | None:
+        s = (val or "").strip()
+        if not s:
+            return None
+        digits = "".join(c for c in s if c.isdigit())
+        return digits or s
 
     def get_queryset(self):
-        qs = CustomUser.objects.all().select_related('country', 'state', 'city', 'registered_by')
+        req = self.request
+        qp = req.query_params
 
-        pincode = self.request.query_params.get('pincode')
-        state_id = self.request.query_params.get('state_id')
-        country_id = self.request.query_params.get('country_id')
-        category = self.request.query_params.get('category')
-        role = self.request.query_params.get('role')
-        registered_by = self.request.query_params.get('registered_by')
+        pincode = qp.get('pincode')
+        state_id = qp.get('state_id')
+        country_id = qp.get('country_id')
+        category = qp.get('category')
+        role = qp.get('role')
+        registered_by = qp.get('registered_by')
 
-        # Default scoping and "assignable" filter for agencies
-        # - If assignable=1 and actor is an agency, restrict to employees either registered_by=me OR in my pincode.
-        # - Else, if actor is an agency querying role=employee without pincode/registered_by, default scope to my pincode.
+        # Base queryset: narrow columns and join only relations used in serializer
+        base_fields = [
+            'id', 'username', 'unique_id', 'prefixed_id', 'prefix_code', 'email', 'full_name', 'phone',
+            'pincode', 'address', 'sponsor_id', 'category', 'role', 'registered_by_id',
+            'date_joined', 'account_active', 'is_active', 'avatar',
+            'country__name', 'state__name', 'city__name', 'registered_by__username',
+        ]
+        qs = (
+            CustomUser.objects
+            .select_related('country', 'state', 'city', 'registered_by')
+            .only(*base_fields)
+        )
+
+        # Agency "assignable" optimization: replace OR with union of id subqueries
         try:
-            user = self.request.user
+            user = req.user
             role_param = (role or "").strip().lower()
-            is_agency_actor = (getattr(user, "role", None) == "agency") or str(getattr(user, "category", "")).startswith("agency_")
-            me_pin = (getattr(user, "pincode", "") or "").strip()
-            assignable = self.request.query_params.get('assignable')
+            is_agency_actor = (str(getattr(user, "role", "")).lower() == "agency") or str(getattr(user, "category", "")).startswith("agency_")
+            me_pin_norm = self._normalize_pin(getattr(user, "pincode", "") or "")
+            assignable = qp.get('assignable')
             if is_agency_actor and role_param == "employee":
                 if assignable:
-                    if me_pin:
-                        qs = qs.filter(Q(registered_by=user) | Q(pincode__iexact=me_pin))
+                    if me_pin_norm:
+                        ids_a = CustomUser.objects.filter(registered_by=user).values_list('id', flat=True)
+                        # Prefer exact match on digits for index usage; fall back to iexact if non-digit input
+                        if me_pin_norm.isdigit():
+                            ids_b = CustomUser.objects.filter(pincode=me_pin_norm).values_list('id', flat=True)
+                        else:
+                            ids_b = CustomUser.objects.filter(pincode__iexact=me_pin_norm).values_list('id', flat=True)
+                        ids_union = ids_a.union(ids_b)
+                        qs = qs.filter(id__in=ids_union)
                     else:
                         qs = qs.filter(registered_by=user)
-                elif not pincode and not registered_by:
-                    if me_pin:
-                        qs = qs.filter(pincode__iexact=me_pin)
+                elif not pincode and not registered_by and me_pin_norm:
+                    if me_pin_norm.isdigit():
+                        qs = qs.filter(pincode=me_pin_norm)
+                    else:
+                        qs = qs.filter(pincode__iexact=me_pin_norm)
         except Exception:
             pass
 
-        # Support pincode=me to use the current authenticated user's pincode (useful for agency logins)
+        # Support pincode=me
         if pincode == 'me':
-            me_pin = getattr(self.request.user, 'pincode', '') or ''
+            me_pin = self._normalize_pin(getattr(req.user, 'pincode', '') or '')
             pincode = me_pin if me_pin else None
 
+        # Apply simple filters (prefer sargable forms)
         if pincode:
-            qs = qs.filter(pincode__iexact=pincode)
+            pin_norm = self._normalize_pin(pincode)
+            if pin_norm and pin_norm.isdigit():
+                qs = qs.filter(pincode=pin_norm)
+            elif pin_norm:
+                qs = qs.filter(pincode__iexact=pin_norm)
+
         if state_id:
             qs = qs.filter(state_id=state_id)
         if country_id:
             qs = qs.filter(country_id=country_id)
         if category:
             qs = qs.filter(category=category)
+
+        # Role filters: eliminate OR via id-union where legacy data requires it
         if role:
-            # Be tolerant for legacy data: treat "employee" role also as category=employee,
-            # and "agency" role also as any agency_* category.
-            if role == 'employee':
-                qs = qs.filter(Q(role='employee') | Q(category='employee'))
-            elif role == 'agency':
-                qs = qs.filter(Q(role='agency') | Q(category__startswith='agency_'))
+            r = role.strip().lower()
+            if r == 'employee':
+                ids_r = CustomUser.objects.filter(role='employee').values_list('id', flat=True)
+                ids_c = CustomUser.objects.filter(category='employee').values_list('id', flat=True)
+                ids_union = ids_r.union(ids_c)
+                qs = qs.filter(id__in=ids_union)
+            elif r == 'agency':
+                ids_r = CustomUser.objects.filter(role='agency').values_list('id', flat=True)
+                ids_c = CustomUser.objects.filter(category__startswith='agency_').values_list('id', flat=True)
+                ids_union = ids_r.union(ids_c)
+                qs = qs.filter(id__in=ids_union)
             else:
                 qs = qs.filter(role=role)
+
         if registered_by == 'me':
-            qs = qs.filter(registered_by=self.request.user)
+            qs = qs.filter(registered_by=req.user)
         elif registered_by:
             qs = qs.filter(registered_by_id=registered_by)
 
-        return qs.order_by('-date_joined')
+        # Stable compound ordering compatible with cursor pagination
+        return qs.order_by('-date_joined', '-id')
+
+    def list(self, request, *args, **kwargs):
+        # Lightweight instrumentation similar to debug toolbar (timing only)
+        import time, logging
+        t0 = time.perf_counter()
+        queryset = self.get_queryset()
+        t1 = time.perf_counter()
+        page = self.paginate_queryset(queryset)
+        t2 = time.perf_counter()
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            data = serializer.data
+            t3 = time.perf_counter()
+            sql_count = None
+            sql_time = None
+            try:
+                from django.db import connection
+                sql_count = len(connection.queries)
+                sql_time = sum(float(q.get("time", 0) or 0) for q in connection.queries)
+            except Exception:
+                pass
+            try:
+                logger = logging.getLogger("perf.accounts.users_list")
+                logger.info(
+                    "users_list timings db_prep_ms=%.1f paginate_ms=%.1f serialize_ms=%.1f total_ms=%.1f sql_count=%s sql_ms=%s",
+                    (t1 - t0) * 1000.0, (t2 - t1) * 1000.0, (t3 - t2) * 1000.0, (t3 - t0) * 1000.0,
+                    sql_count, sql_time
+                )
+            except Exception:
+                pass
+            return self.get_paginated_response(data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 class MyEmployeesListView(generics.ListAPIView):
@@ -419,11 +513,49 @@ def regions_by_sponsor(request):
     if not sponsor or level not in ('state', 'district', 'pincode'):
         return Response({'detail': 'sponsor and valid level (state|district|pincode) are required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    sponsor_digits = ''.join(c for c in sponsor if c.isdigit())
-    q = Q(username__iexact=sponsor) | Q(sponsor_id__iexact=sponsor)
-    if sponsor_digits:
-        q = q | Q(phone__iexact=sponsor_digits)
-    sponsor_user = CustomUser.objects.filter(q).first()
+    def _resolve_sponsor_user(sval: str):
+        s = (sval or "").strip()
+        if not s:
+            return None
+        digits = "".join(ch for ch in s if ch.isdigit())
+        # 1) Exact code/username match (do NOT match sponsor_id to avoid picking the sponsor's sponsor)
+        u = CustomUser.objects.filter(Q(prefixed_id__iexact=s) | Q(username__iexact=s)).first()
+        if u:
+            return u
+        # 2) Try adding/removing dash after prefix for TR-like codes
+        try:
+            if len(s) > 2 and s[:2].isalpha() and "-" not in s:
+                u = CustomUser.objects.filter(
+                    Q(prefixed_id__iexact=f"{s[:2]}-{s[2:]}") | Q(username__iexact=f"{s[:2]}-{s[2:]}")
+                ).first()
+                if u:
+                    return u
+        except Exception:
+            pass
+        # 3) Digits-only: prefer TR+digits (code) before falling back to phone
+        if digits and digits == s:
+            pref = "TR"
+            u = CustomUser.objects.filter(
+                Q(prefixed_id__iexact=f"{pref}{digits}")
+                | Q(prefixed_id__iexact=f"{pref}-{digits}")
+                | Q(username__iexact=f"{pref}{digits}")
+                | Q(username__iexact=f"{pref}-{digits}")
+            ).first()
+            if u:
+                return u
+            u = CustomUser.objects.filter(unique_id__iexact=digits).first()
+            if u:
+                return u
+            u = CustomUser.objects.filter(phone__iexact=digits).first()
+            if u:
+                return u
+        # 4) Fallback (legacy): avoid sponsor_id to prevent mis-resolution to an account that used this as their sponsor reference
+        q = Q(username__iexact=s)
+        if digits:
+            q = q | Q(phone__iexact=digits)
+        return CustomUser.objects.filter(q).first()
+
+    sponsor_user = _resolve_sponsor_user(sponsor)
     if not sponsor_user:
         return Response({'detail': 'Sponsor not found.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -573,7 +705,16 @@ def regions_by_sponsor(request):
         except Exception:
             derived_pin = None
         pincode = (getattr(sponsor_user, 'pincode', '') or '') or (derived_pin or '')
-        return Response({'states': out_states, 'pincodes': out_pincodes, 'pins_by_state': pins_by_state, 'sponsor': {'username': sponsor_user.username, 'full_name': full_name, 'pincode': pincode}}, status=status.HTTP_200_OK)
+        sponsor_payload = {
+            'username': sponsor_user.username,
+            'full_name': full_name,
+            'pincode': pincode,
+            'role': getattr(sponsor_user, 'role', None),
+            'category': getattr(sponsor_user, 'category', None),
+            'state': getattr(getattr(sponsor_user, 'state', None), 'name', None),
+            'district': getattr(getattr(sponsor_user, 'city', None), 'name', None),
+        }
+        return Response({'states': out_states, 'pincodes': out_pincodes, 'pins_by_state': pins_by_state, 'sponsor': sponsor_payload}, status=status.HTTP_200_OK)
 
     if level == 'district':
         # Return distinct districts (optionally filtered by state)
@@ -632,7 +773,16 @@ def regions_by_sponsor(request):
             except Exception:
                 pins = []
         pincode = (getattr(sponsor_user, 'pincode', '') or '') or (pins[0] if pins else '')
-        resp['sponsor'] = {'username': sponsor_user.username, 'full_name': full_name, 'pincode': pincode}
+        sponsor_payload = {
+            'username': sponsor_user.username,
+            'full_name': full_name,
+            'pincode': pincode,
+            'role': getattr(sponsor_user, 'role', None),
+            'category': getattr(sponsor_user, 'category', None),
+            'state': getattr(getattr(sponsor_user, 'state', None), 'name', None),
+            'district': getattr(getattr(sponsor_user, 'city', None), 'name', None),
+        }
+        resp['sponsor'] = sponsor_payload
         return Response(resp, status=status.HTTP_200_OK)
 
     # level == 'pincode'
@@ -678,7 +828,16 @@ def regions_by_sponsor(request):
             pins_sorted = sorted(pins)
             full_name = getattr(sponsor_user, 'full_name', '') or sponsor_user.username
             pincode = (getattr(sponsor_user, 'pincode', '') or '') or (pins_sorted[0] if pins_sorted else '')
-            return Response({'pincodes': pins_sorted, 'sponsor': {'username': sponsor_user.username, 'full_name': full_name, 'pincode': pincode}}, status=status.HTTP_200_OK)
+            sponsor_payload = {
+                'username': sponsor_user.username,
+                'full_name': full_name,
+                'pincode': pincode,
+                'role': getattr(sponsor_user, 'role', None),
+                'category': getattr(sponsor_user, 'category', None),
+                'state': getattr(getattr(sponsor_user, 'state', None), 'name', None),
+                'district': getattr(getattr(sponsor_user, 'city', None), 'name', None),
+            }
+            return Response({'pincodes': pins_sorted, 'sponsor': sponsor_payload}, status=status.HTTP_200_OK)
         except Exception:
             # fall back to sponsor-derived behavior below if any error
             pass
@@ -699,7 +858,16 @@ def regions_by_sponsor(request):
 
     full_name = getattr(sponsor_user, 'full_name', '') or sponsor_user.username
     pincode = (getattr(sponsor_user, 'pincode', '') or '') or (out_pins[0] if out_pins else '')
-    return Response({'pincodes': out_pins, 'sponsor': {'username': sponsor_user.username, 'full_name': full_name, 'pincode': pincode}}, status=status.HTTP_200_OK)
+    sponsor_payload = {
+        'username': sponsor_user.username,
+        'full_name': full_name,
+        'pincode': pincode,
+        'role': getattr(sponsor_user, 'role', None),
+        'category': getattr(sponsor_user, 'category', None),
+        'state': getattr(getattr(sponsor_user, 'state', None), 'name', None),
+        'district': getattr(getattr(sponsor_user, 'city', None), 'name', None),
+    }
+    return Response({'pincodes': out_pins, 'sponsor': sponsor_payload}, status=status.HTTP_200_OK)
 
 
 # Simple hierarchy endpoint for audits and dashboards
@@ -1792,6 +1960,11 @@ def wallet_me_banks(request):
             "id": "kyc",
             "label": f"KYC • {kyc.bank_name or 'Bank'}",
             "bank_name": kyc.bank_name or "",
+            # Full account number (unmasked) for UIs that want to display the complete value
+            "account_number": (kyc.bank_account_number or "").strip(),
+            "account_number_full": (kyc.bank_account_number or "").strip(),
+            # Convenience fields for masked/last4 display (if a UI prefers masking)
+            "account_number_last4": ((kyc.bank_account_number or "").strip()[-4:] if (kyc.bank_account_number or "").strip() else ""),
             "account_number_masked": mask_ac(kyc.bank_account_number or ""),
             "ifsc": kyc.ifsc_code or "",
             "is_default": True,
@@ -1965,6 +2138,33 @@ class SupportTicketMessageCreate(generics.CreateAPIView):
         serializer.save(ticket=ticket, author=self.request.user)
 
 # ====================
+# Nominees (User)
+# ====================
+
+class NomineeListCreateView(generics.ListCreateAPIView):
+    """
+    List my nominees and create a new nominee.
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserNomineeSerializer
+
+    def get_queryset(self):
+        return UserNominee.objects.filter(user=self.request.user).order_by("-updated_at", "-id")
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+class NomineeDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Retrieve/Update/Delete a nominee that belongs to me.
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserNomineeSerializer
+
+    def get_queryset(self):
+        return UserNominee.objects.filter(user=self.request.user)
+
+# ====================
 # Employee Offer Letter (PDF)
 # ====================
 def _xhtml2pdf_link_callback(uri, rel):
@@ -2009,6 +2209,8 @@ class OfferLetterPDFView(APIView):
         if str(getattr(user, "role", "")).lower() != "employee" and str(getattr(user, "category", "")).lower() != "employee":
             return Response({"detail": "Offer letter is available for employees only."}, status=status.HTTP_403_FORBIDDEN)
 
+        if pisa is None:
+            return Response({"detail": "PDF generation is not available on this server."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         today = timezone.now().strftime("%d %B %Y")
         company = "Trikonekt"
 

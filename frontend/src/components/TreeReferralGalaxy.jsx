@@ -32,6 +32,7 @@ export default function TreeReferralGalaxy({
   maxDepth = 10,
   maxChildren = 5,
   pool = "",
+  showPlaceholders = false,
 }) {
   const isAdmin = mode === "admin";
 
@@ -98,6 +99,27 @@ export default function TreeReferralGalaxy({
     return c;
   }, []);
 
+  // Normalize matrix-tree node shape to user-centric shape:
+  // - id = owner_id (user id)
+  // - matrix_account_id = account_id
+  // - matrix_position = position
+  const normalizeMatrixNode = useCallback(function map(node) {
+    if (!node || typeof node !== "object") return node;
+    const children = Array.isArray(node.children) ? node.children.map(map) : [];
+    const ownerId = Number.isFinite(node.owner_id) ? node.owner_id : node.id;
+    const out = {
+      id: ownerId,
+      username: node.username || "",
+      full_name: node.full_name || "",
+      matrix_account_id: Number.isFinite(node.account_id) ? node.account_id : (Number.isFinite(node.matrix_account_id) ? node.matrix_account_id : null),
+      matrix_position: Number.isFinite(node.position) ? node.position : (Number.isFinite(node.matrix_position) ? node.matrix_position : undefined),
+      status: node.status,
+      team_count: (typeof node.team_count === "number" ? node.team_count : undefined),
+      children,
+    };
+    return out;
+  }, []);
+
   const putCount = useCallback((src, id, value) => {
     setCountsMap((prev) => {
       const next = new Map(prev);
@@ -135,15 +157,13 @@ export default function TreeReferralGalaxy({
           });
         } else {
           // Matrix-based (parent/children)
-          {
-            const mxParams = { root_user_id: userId, max_depth: maxDepth };
-            if (pool) mxParams.pool = pool;
-            res = await API.get("/admin/matrix/tree5/", {
-              params: mxParams,
-              cacheTTL: 5000,
-              retryAttempts: 2,
-            });
-          }
+          const mxParams = { root_user_id: userId, max_depth: maxDepth, source: "matrix" };
+          if (pool) mxParams.pool = pool;
+          res = await API.get("/admin/matrix/tree5/", {
+            params: mxParams,
+            cacheTTL: 5000,
+            retryAttempts: 2,
+          });
         }
       } else {
         // Authenticated sponsor subtree; server validates root is within my sponsor downline (or self)
@@ -231,9 +251,9 @@ export default function TreeReferralGalaxy({
     } catch {
       // ignore
     }
-  }, [isAdmin, putDetails, putDirect]);
+  }, [isAdmin, putDetails, putDirect, maxChildren]);
 
-  const fetchRoot = useCallback(async ({ identifier, userId, depth = 6 }) => {
+  const fetchRoot = useCallback(async ({ identifier, userId, startEntryId, depth = 6 }) => {
     setLoading(true);
     setErr("");
     try {
@@ -249,16 +269,21 @@ export default function TreeReferralGalaxy({
 
         if (ident) ident = sanitizeIdentifier(ident);
 
-        if (usedId) {
+        if (Number.isFinite(startEntryId) && startEntryId > 0) {
+          paramsMx.start_entry_id = startEntryId;
+        } else if (usedId) {
           paramsMx.root_user_id = usedId;
         } else if (ident) {
           paramsMx.identifier = ident;
         } else {
-          throw new Error("identifier or userId required for admin mode");
+          throw new Error("identifier or userId or startEntryId required for admin mode");
         }
 
         const r1 = await API.get("/admin/matrix/tree5/", { params: paramsMx, cacheTTL: 5000, retryAttempts: 2 });
-        const node1 = r1?.data || null;
+        let node1 = r1?.data || null;
+        if (node1) {
+          node1 = normalizeMatrixNode(node1);
+        }
 
         // Respect preferredSource: if 'matrix', do not fallback to sponsor even if empty
         const requestedSrc = (preferredSource || "auto").toLowerCase();
@@ -348,32 +373,31 @@ export default function TreeReferralGalaxy({
     } finally {
       setLoading(false);
     }
-  }, [isAdmin, onUserChange, sanitizeIdentifier]);
+  }, [isAdmin, onUserChange, sanitizeIdentifier, preferredSource, pool, maxDepth, maxChildren, putCount, countNodes, loadSelfAndChildrenDetails]);
 
   // Initial load
   useEffect(() => {
-      if (isAdmin) {
-        if (initialUserId || initialIdentifier) {
-          fetchRoot({ userId: initialUserId, identifier: initialIdentifier, depth: maxDepth });
-        } else {
-          (async () => {
-            try {
-              const r = await API.get("/admin/users/tree/default-root/", { cacheTTL: 60000, retryAttempts: 2 });
-              const rid = r?.data?.id;
-              if (rid) {
-                await fetchRoot({ userId: rid, depth: maxDepth });
-              }
-            } catch (e) {
-              // best-effort: leave root null and show search bar
-            }
-          })();
-        }
+    if (isAdmin) {
+      if (initialUserId || initialIdentifier) {
+        fetchRoot({ userId: initialUserId, identifier: initialIdentifier, depth: maxDepth });
       } else {
-        fetchRoot({ depth: maxDepth });
+        (async () => {
+          try {
+            const r = await API.get("/admin/users/tree/default-root/", { cacheTTL: 60000, retryAttempts: 2 });
+            const rid = r?.data?.id;
+            if (rid) {
+              await fetchRoot({ userId: rid, depth: maxDepth });
+            }
+          } catch (e) {
+            // best-effort: leave root null and show search bar
+          }
+        })();
       }
+    } else {
+      fetchRoot({ depth: maxDepth });
+    }
     // eslint-disable-next-line
   }, []);
-
 
   const onSearch = async () => {
     if (!isAdmin) return;
@@ -385,6 +409,7 @@ export default function TreeReferralGalaxy({
     try {
       setSearchBusy(true);
       setCrumbs([]);
+      setRoot((prev) => (prev ? { ...prev, children: [] } : prev));
       const clean = sanitizeIdentifier(raw);
       await fetchRoot({ identifier: clean, depth: maxDepth });
     } finally {
@@ -393,11 +418,17 @@ export default function TreeReferralGalaxy({
   };
 
   const drillDown = async (child) => {
-    if (!child || !child.id) return;
+    if (!child) return;
+    // reset current team/grid to avoid mixing nodes from previous view
+    setRoot((prev) => (prev ? { ...prev, children: [] } : prev));
     if (root) {
-      setCrumbs((prev) => [...prev, { id: root.id, username: root.username, full_name: root.full_name }]);
+      setCrumbs((prev) => [...prev, { id: root.id, username: root.username, full_name: root.full_name, matrix_account_id: root.matrix_account_id }]);
     }
-    await fetchRoot({ userId: child.id, depth: maxDepth });
+    if (sourceType === "matrix" && Number.isFinite(child.matrix_account_id) && child.matrix_account_id > 0) {
+      await fetchRoot({ startEntryId: child.matrix_account_id, depth: maxDepth });
+    } else if (Number.isFinite(child.id)) {
+      await fetchRoot({ userId: child.id, depth: maxDepth });
+    }
   };
 
   const crumbClick = async (idx) => {
@@ -406,7 +437,12 @@ export default function TreeReferralGalaxy({
     const target = crumbs[idx];
     const newTrail = crumbs.slice(0, idx); // ancestors up to before the target
     setCrumbs(newTrail);
-    await fetchRoot({ userId: target.id, depth: maxDepth });
+    setRoot((prev) => (prev ? { ...prev, children: [] } : prev));
+    if (sourceType === "matrix" && Number.isFinite(target.matrix_account_id) && target.matrix_account_id > 0) {
+      await fetchRoot({ startEntryId: target.matrix_account_id, depth: maxDepth });
+    } else {
+      await fetchRoot({ userId: target.id, depth: maxDepth });
+    }
   };
 
   const goBackOne = async () => {
@@ -429,6 +465,13 @@ export default function TreeReferralGalaxy({
   };
   const displayName = (u) => (u?.full_name || u?.username || "").toString();
   const displayTR = (u) => maskTRUsername((u?.username || "").toString());
+  const displayNameEntry = (u) => {
+    const base = displayName(u) || "";
+    if (sourceType === "matrix" && Number.isFinite(u?.matrix_account_id) && u.matrix_account_id > 0) {
+      return `${base} (Entry #${u.matrix_account_id})`;
+    }
+    return base;
+  };
 
   const AvatarIcon = ({ size = 56 }) => (
     <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -475,9 +518,34 @@ export default function TreeReferralGalaxy({
     topBar: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 8 },
   }), [isMobile, cardW, gap, maxChildren]);
 
-  // Compute up to maxChildren children and placeholders
-  const children = useMemo(() => Array.isArray(root?.children) ? root.children.slice(0, maxChildren) : [], [root, maxChildren]);
-  const placeholders = Math.max(0, maxChildren - children.length);
+  // Compute up to maxChildren children and placeholders (stable order by matrix_position, then id)
+  const children = useMemo(() => {
+    const arr = Array.isArray(root?.children) ? [...root.children] : [];
+    arr.sort((a, b) => {
+      const pa = (a && typeof a.matrix_position === "number") ? a.matrix_position : 999999;
+      const pb = (b && typeof b.matrix_position === "number") ? b.matrix_position : 999999;
+      if (pa !== pb) return pa - pb;
+      const ia = (a && typeof a.id === "number") ? a.id : 0;
+      const ib = (b && typeof b.id === "number") ? b.id : 0;
+      return ia - ib;
+    });
+    return arr.slice(0, maxChildren);
+  }, [root, maxChildren]);
+
+  // Control placeholders and filter out malformed children (prevents a blank card)
+  const effectiveShowPlaceholders = useMemo(() => (showPlaceholders && !isAdmin), [showPlaceholders, isAdmin]);
+  const placeholders = useMemo(() => (effectiveShowPlaceholders ? Math.max(0, maxChildren - children.length) : 0), [effectiveShowPlaceholders, maxChildren, children.length]);
+  const renderedChildren = useMemo(
+    () =>
+      children.filter(
+        (c) =>
+          c &&
+          (Number.isFinite(c.id) ||
+            (typeof c.username === "string" && c.username.trim().length > 0) ||
+            (typeof c.full_name === "string" && c.full_name.trim().length > 0))
+      ),
+    [children]
+  );
 
   // Helpers to read details/direct counts
   const dFor = useCallback((id) => detailsMap.get(id) || {}, [detailsMap]);
@@ -491,16 +559,16 @@ export default function TreeReferralGalaxy({
       <div style={styles.bar}>
         <div style={styles.breadcrumb}>
           {crumbs.map((c, idx) => (
-            <React.Fragment key={c.id}>
+            <React.Fragment key={(sourceType === "matrix" && Number.isFinite(c.matrix_account_id) && c.matrix_account_id > 0) ? `acc:${c.matrix_account_id}` : (Number.isFinite(c.id) ? `u:${c.id}` : c.id)}>
               <span style={styles.crumbLink} onClick={() => crumbClick(idx)}>
-                {(displayName(c) || "").toUpperCase() || (displayTR(c) || "").toUpperCase()}
+                {(displayNameEntry(c) || "").toUpperCase() || (displayTR(c) || "").toUpperCase()}
               </span>
               <span style={styles.crumbSep}>â†’</span>
             </React.Fragment>
           ))}
           {root ? (
             <span style={{ fontWeight: 800, color: "#0f172a", textTransform: "uppercase" }}>
-              {(displayName(root) || "").toUpperCase() || (displayTR(root) || "").toUpperCase()}
+              {(displayNameEntry(root) || "").toUpperCase() || (displayTR(root) || "").toUpperCase()}
             </span>
           ) : null}
         </div>
@@ -544,7 +612,7 @@ export default function TreeReferralGalaxy({
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 6 }}>
             <div style={styles.card}>
               <AvatarIcon size={rootAvatar} />
-              <div style={styles.cardName}>{displayName(root) || ""}</div>
+              <div style={styles.cardName}>{displayNameEntry(root) || ""}</div>
               <div style={styles.cardTR}>TR Username: {displayTR(root) || ""}</div>
               {typeof dFor(root.id).account_active === "boolean" ? (
                 <div style={{ marginTop: 6 }}>
@@ -560,46 +628,51 @@ export default function TreeReferralGalaxy({
                 <div style={styles.cardTR}>Pincode: {dFor(root.id).pincode}</div>
               ) : null}
               <div style={styles.cardTeam}>Direct: {directOf(root.id) ?? ""}</div>
-              <div style={styles.cardTeam}>Team: {getCountValue(root.id) ?? ""}</div>
+              <div style={styles.cardTeam}>Team: {sourceType === "matrix" && typeof root.team_count === "number" ? root.team_count : (getCountValue(root.id) ?? "")}</div>
             </div>
           </div>
 
           {/* Team row */}
-          <div style={styles.teamLabel}>Team</div>
-          <div style={styles.scrollX}>
-            <div style={styles.row}>
-            {children.map((c) => (
-              <div key={c.id} style={styles.childCard} onClick={() => drillDown(c)}>
-                <AvatarIcon size={childAvatar} />
-                <div style={{ ...styles.cardName, fontSize: 14, marginTop: 6 }}>{displayName(c) || ""}</div>
-                <div style={{ ...styles.cardTR, fontSize: 12 }}>TR Username: {displayTR(c) || ""}</div>
-                {typeof dFor(c.id).account_active === "boolean" ? (
-                  <div style={{ ...styles.subtle, marginTop: 4, color: dFor(c.id).account_active ? "#16a34a" : "#64748b", fontWeight: 700 }}>
-                    {dFor(c.id).account_active ? "Active" : "Inactive"}
-                  </div>
-                ) : null}
-                {dFor(c.id).phone ? (
-                  <div style={{ ...styles.cardTR, fontSize: 12 }}>Phone: {dFor(c.id).phone}</div>
-                ) : null}
-                {dFor(c.id).pincode ? (
-                  <div style={{ ...styles.cardTR, fontSize: 12 }}>Pincode: {dFor(c.id).pincode}</div>
-                ) : null}
-                <div style={{ ...styles.cardTeam, fontSize: 13 }}>Direct: {directOf(c.id) ?? ""}</div>
-                <div style={{ ...styles.cardTeam, fontSize: 13 }}>Team: {getCountValue(c.id) ?? ""}</div>
+          {(renderedChildren.length > 0 || effectiveShowPlaceholders) ? (
+            <>
+              <div style={styles.teamLabel}>Team</div>
+              <div style={styles.scrollX}>
+                <div style={{ ...styles.row, gridTemplateColumns: `repeat(${effectiveShowPlaceholders ? maxChildren : renderedChildren.length}, ${cardW}px)` }}>
+                  {renderedChildren.map((c, idx) => (
+                    <div key={(sourceType === "matrix" && Number.isFinite(c.matrix_account_id) && c.matrix_account_id > 0) ? `acc:${c.matrix_account_id}` : (Number.isFinite(c.id) ? `u:${c.id}` : `u-${idx}`)} style={styles.childCard} onClick={() => drillDown(c)}>
+                      <AvatarIcon size={childAvatar} />
+                      <div style={{ ...styles.cardName, fontSize: 14, marginTop: 6 }}>{displayNameEntry(c) || ""}</div>
+                      <div style={{ ...styles.cardTR, fontSize: 12 }}>TR Username: {displayTR(c) || ""}</div>
+                      {typeof dFor(c.id).account_active === "boolean" ? (
+                        <div style={{ ...styles.subtle, marginTop: 4, color: dFor(c.id).account_active ? "#16a34a" : "#64748b", fontWeight: 700 }}>
+                          {dFor(c.id).account_active ? "Active" : "Inactive"}
+                        </div>
+                      ) : null}
+                      {dFor(c.id).phone ? (
+                        <div style={{ ...styles.cardTR, fontSize: 12 }}>Phone: {dFor(c.id).phone}</div>
+                      ) : null}
+                      {dFor(c.id).pincode ? (
+                        <div style={{ ...styles.cardTR, fontSize: 12 }}>Pincode: {dFor(c.id).pincode}</div>
+                      ) : null}
+                      {/* <div style={{ ...styles.cardTeam, fontSize: 13 }}>Direct: {directOf(c.id) ?? ""}</div>
+                      <div style={{ ...styles.cardTeam, fontSize: 13 }}>Team: {sourceType === "matrix" && typeof c.team_count === "number" ? c.team_count : (getCountValue(c.id) ?? "")}</div> */}
+                    </div>
+                  ))}
+                  {effectiveShowPlaceholders
+                    ? Array.from({ length: placeholders }).map((_, idx) => (
+                        <div key={`ph-${idx}`} style={styles.placeholder}>
+                          <AvatarIcon size={Math.max(32, childAvatar - 8)} />
+                          <div style={{ marginTop: 6, fontWeight: 700 }}>Empty</div>
+                          <div style={{ ...styles.subtle, marginTop: 2 }}>No member</div>
+                        </div>
+                      ))
+                    : null}
+                </div>
               </div>
-            ))}
-            {Array.from({ length: placeholders }).map((_, idx) => (
-              <div key={`ph-${idx}`} style={styles.placeholder}>
-                <AvatarIcon size={Math.max(32, childAvatar - 8)} />
-                <div style={{ marginTop: 6, fontWeight: 700 }}>Empty</div>
-                <div style={{ ...styles.subtle, marginTop: 2 }}>No member</div>
-              </div>
-            ))}
-            </div>
-          </div>
+            </>
+          ) : null}
         </div>
       )}
     </div>
   );
 }
-

@@ -25,6 +25,9 @@ from .views import (
     SupportTicketListCreate,
     SupportTicketDetail,
     SupportTicketMessageCreate,
+    # Nominees
+    NomineeListCreateView,
+    NomineeDetailView,
     # Offer letter
     OfferLetterPDFView,
     # Wallet history/banks/spend
@@ -68,6 +71,9 @@ urlpatterns = [
     path('support/tickets/', SupportTicketListCreate.as_view(), name='support_tickets'),
     path('support/tickets/<int:pk>/', SupportTicketDetail.as_view(), name='support_ticket_detail'),
     path('support/tickets/<int:pk>/messages/', SupportTicketMessageCreate.as_view(), name='support_ticket_message_create'),
+    # Nominees
+    path('nominees/', NomineeListCreateView.as_view(), name='nominees_list_create'),
+    path('nominees/<int:pk>/', NomineeDetailView.as_view(), name='nominee_detail'),
     path('token/refresh/', CustomTokenRefreshView.as_view(), name='token_refresh'),
     # Employee Offer Letter (PDF download)
     path('employee/offer-letter/', OfferLetterPDFView.as_view(), name='employee_offer_letter'),

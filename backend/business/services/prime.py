@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from typing import Any, Dict, Optional
+from django.db.models import Q
 
 from accounts.models import Wallet, CustomUser
 from business.models import CommissionConfig, AutoPoolAccount
@@ -47,14 +48,22 @@ def _matrix_open_cfg(product_key: str) -> tuple[str, int]:
     return mode, count
 
 def _matrix_audit_exists_for_purchase(src_type: str, src_id: str, product_key: str) -> bool:
+    """
+    Consider matrix 'already distributed' ONLY when wallet transactions for matrix payouts exist
+    for this purchase/source. An orphan audit without wallet evidence should not block payouts.
+    """
     try:
-        from coupons.models import AuditTrail
-        return AuditTrail.objects.filter(
-            action="matrix_distributed",
-            metadata__source_type=str(src_type or ""),
-            metadata__source_id=str(src_id or ""),
-            metadata__product_key=str(product_key),
+        from coupons.models import AuditTrail  # noqa: F401 (kept for context)
+        from accounts.models import WalletTransaction as WT
+        src_t = str(src_type or "")
+        src_i = str(src_id or "")
+        # Wallet evidence of matrix payouts for this purchase
+        tx_exists = WT.objects.filter(
+            source_type=src_t,
+            source_id=src_i,
+            meta__orig_type__in=("AUTOPOOL_BONUS_FIVE", "AUTOPOOL_BONUS_THREE"),
         ).exists()
+        return tx_exists
     except Exception:
         return False
 
@@ -311,18 +320,93 @@ def distribute_prime_150_payouts(
 
     # 1) Direct + Self (strict decimals)
     direct_amt = _q2(p150.direct_sponsor)
-    if sponsor and direct_amt > 0:
+    # Fallback: if policy yields 0, try master.direct_bonus['150'] and aliases
+    try:
+        if direct_amt <= 0:
+            cfgx = CommissionConfig.get_solo()
+            masterx = dict(getattr(cfgx, "master_commission_json", {}) or {})
+            db = dict(masterx.get("direct_bonus", {}) or {})
+            row150_db = dict(db.get("150", {}) or {})
+            if not row150_db:
+                for alias in ("coupon150", "coupon_150", "prime150", "prime_150"):
+                    node = db.get(alias)
+                    if isinstance(node, dict) and node:
+                        row150_db = dict(node)
+                        break
+            d2 = _q2(row150_db.get("sponsor", 0))
+            if d2 > 0:
+                direct_amt = d2
+    except Exception:
+        pass
+
+    # Idempotency: avoid duplicate PRIME_150_DIRECT for the same purchase/source
+    paid_direct = False
+    try:
+        if sponsor:
+            from accounts.models import WalletTransaction as WT
+            # Primary idempotency: prior PRIME_150_DIRECT for same purchase
+            paid_direct = WT.objects.filter(
+                user=sponsor,
+                source_type=src_type,
+                source_id=src_id,
+                meta__orig_type="PRIME_150_DIRECT",
+            ).exists()
+            # Cross-flow guard: if ANY direct already credited for this referral/purchase, skip paying again
+            if not paid_direct:
+                try:
+                    exists_any_direct = WT.objects.filter(user=sponsor).filter(
+                        Q(type__in=("PRIME_150_DIRECT", "PRIME_750_DIRECT", "DIRECT_REF_BONUS")) &
+                        Q(source_type=src_type, source_id=src_id)
+                    ).exists()
+                except Exception:
+                    exists_any_direct = False
+                if exists_any_direct:
+                    paid_direct = True
+    except Exception:
+        paid_direct = False
+    if sponsor and direct_amt > 0 and not paid_direct:
         _credit_wallet(
             sponsor,
             direct_amt,
             tx_type="PRIME_150_DIRECT",
-            meta={"source": "PRIME_150"},
+            meta={"source": "PRIME_150", "from_user_id": getattr(consumer, "id", None), "from_user": getattr(consumer, "username", None)},
             source_type=src_type,
             source_id=src_id,
         )
 
     self_amt = _q2(p150.direct_self)
-    if self_amt > 0:
+    # Fallback: if policy yields 0, try master.direct_bonus['150'] and aliases
+    try:
+        if self_amt <= 0:
+            cfgx = CommissionConfig.get_solo()
+            masterx = dict(getattr(cfgx, "master_commission_json", {}) or {})
+            db = dict(masterx.get("direct_bonus", {}) or {})
+            row150_db = dict(db.get("150", {}) or {})
+            if not row150_db:
+                for alias in ("coupon150", "coupon_150", "prime150", "prime_150"):
+                    node = db.get(alias)
+                    if isinstance(node, dict) and node:
+                        row150_db = dict(node)
+                        break
+            s2 = _q2(row150_db.get("self", 0))
+            if s2 > 0:
+                self_amt = s2
+    except Exception:
+        pass
+
+    # Idempotency: avoid duplicate PRIME_150_SELF for the same purchase/source
+    paid_self = False
+    try:
+        from accounts.models import WalletTransaction as WT
+        paid_self = WT.objects.filter(
+            user=consumer,
+            source_type=src_type,
+            source_id=src_id,
+            meta__orig_type="PRIME_150_SELF",
+        ).exists()
+    except Exception:
+        paid_self = False
+    if self_amt > 0 and not paid_self:
         _credit_wallet(
             consumer,
             self_amt,
@@ -340,7 +424,11 @@ def distribute_prime_150_payouts(
         if v > 0:
             base150 = v
     except Exception:
-        base150 = None
+        # Fallback to typed config to keep matrix opening/distribution functional
+        try:
+            base150 = _q2(getattr(cfg, "prime_activation_amount", 150) or 150)
+        except Exception:
+            base150 = None
 
     if base150 is not None:
         from business.models import distribute_auto_pool_commissions  # local import to avoid circular
@@ -352,6 +440,15 @@ def distribute_prime_150_payouts(
             source_id=src_id,
             extra_meta={"trigger": "PRIME_150"},
         )
+
+    # Resolve effective matrix enable flags combining policy and master config
+    try:
+        master_for_enable = dict(getattr(CommissionConfig.get_solo(), "master_commission_json", {}) or {})
+        eff_enable_5 = bool(p150.enable_5_matrix) or CommissionPolicy._enabled_from_cm(master_for_enable, "consumer_matrix_5", "150")
+        eff_enable_3 = bool(p150.enable_3_matrix) or CommissionPolicy._enabled_from_cm(master_for_enable, "consumer_matrix_3", "150")
+    except Exception:
+        eff_enable_5 = bool(p150.enable_5_matrix)
+        eff_enable_3 = bool(p150.enable_3_matrix)
 
     # 3) Matrix opening with UI-configurable repetition and per-purchase idempotency
     mode150, cfg_count150 = _matrix_open_cfg("150")
@@ -376,7 +473,7 @@ def distribute_prime_150_payouts(
     if perform_matrix:
         count_eff = max(0, int(cfg_count150))
         if count_eff > 0:
-            if bool(p150.enable_5_matrix):
+            if eff_enable_5:
                 for _ in range(count_eff):
                     try:
                         acc5 = AutoPoolAccount.create_five_150_for_user(
@@ -393,7 +490,7 @@ def distribute_prime_150_payouts(
                             logger.exception("matrix create_five_150_for_user failed", extra={"product": "150", "user_id": getattr(consumer, "id", None), "source_id": src_id})
                         except Exception:
                             pass
-            if bool(p150.enable_3_matrix):
+            if eff_enable_3:
                 for _ in range(count_eff):
                     try:
                         acc3 = AutoPoolAccount.create_three_150_for_user(
@@ -424,6 +521,8 @@ def distribute_prime_150_payouts(
                     five_levels = int(cfg2.get_matrix_five_levels())
                     row5_150 = dict(cm5.get("150", {}) or {})
                     fixed5 = list(row5_150.get("fixed_amounts") or getattr(cfg2, "five_matrix_amounts_json", []) or [])
+                    if not fixed5:
+                        fixed5 = [2, 1, 1, 0.5, 0.5, 0]
                     if fixed5:
                         for acc in created_five:
                             upline6 = _matrix_ancestors(acc, depth=five_levels) or _resolve_upline(consumer, depth=five_levels)
@@ -472,6 +571,8 @@ def distribute_prime_150_payouts(
                     three_levels = int(cfg2.get_matrix_three_levels())
                     row3_150 = dict(cm3.get("150", {}) or {})
                     fixed3 = list(row3_150.get("fixed_amounts") or getattr(cfg2, "three_matrix_amounts_json", []) or [])
+                    if not fixed3:
+                        fixed3 = [5] + [0] * 14
                     if fixed3:
                         for acc in created_three:
                             upline15 = _matrix_ancestors(acc, depth=three_levels) or _resolve_upline(consumer, depth=three_levels)
@@ -581,17 +682,131 @@ def distribute_prime_750_payouts(
     pay_direct = _q2(row750.get("sponsor", 0))
     pay_self = _q2(row750.get("self", 0))
 
-    if sponsor and pay_direct > 0:
+    # Fallback for 750: derive from PRIME 150 direct/self using multiplier when 750 amounts are missing/zero
+    try:
+        if pay_direct <= 0 or pay_self <= 0:
+            try:
+                pol750 = CommissionPolicy.load().prime750()
+                mult = int(getattr(pol750, "multiplier", 0) or 0)
+            except Exception:
+                mult = 0
+            if mult > 0:
+                # Try policy prime150 first
+                try:
+                    p150_cfg = CommissionPolicy.load().prime150()
+                    d150 = _q2(p150_cfg.direct_sponsor)
+                    s150 = _q2(p150_cfg.direct_self)
+                except Exception:
+                    d150 = Decimal("0.00")
+                    s150 = Decimal("0.00")
+                # If still zero, try master.direct_bonus['150'] (with aliases)
+                if d150 <= 0 or s150 <= 0:
+                    try:
+                        direct_all2 = dict(master.get("direct_bonus", {}) or {})
+                        row150_2 = dict(direct_all2.get("150", {}) or {})
+                        if not row150_2:
+                            for alias in ("coupon150", "coupon_150", "prime150", "prime_150"):
+                                cand2 = direct_all2.get(alias)
+                                if isinstance(cand2, dict) and cand2:
+                                    row150_2 = dict(cand2)
+                                    break
+                        d150 = _q2(row150_2.get("sponsor", 0))
+                        s150 = _q2(row150_2.get("self", 0))
+                    except Exception:
+                        pass
+                changed = False
+                if pay_direct <= 0 and d150 > 0:
+                    pay_direct = _q2(Decimal(d150) * Decimal(mult))
+                    changed = True
+                if pay_self <= 0 and s150 > 0:
+                    pay_self = _q2(Decimal(s150) * Decimal(mult))
+                    changed = True
+                if changed:
+                    try:
+                        from coupons.models import AuditTrail
+                        AuditTrail.objects.create(
+                            action="prime_750_direct_fallback_from_150",
+                            actor=consumer,
+                            notes="Derived PRIME 750 direct/self from PRIME 150 amounts using multiplier",
+                            metadata={
+                                "multiplier": int(mult),
+                                "derived_direct": str(pay_direct),
+                                "derived_self": str(pay_self),
+                                "source_type": src_type,
+                                "source_id": src_id,
+                            },
+                        )
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+
+    # Observability: if direct sponsor amount is 0 at runtime, stamp an audit so we can diagnose transient config
+    try:
+        if sponsor and pay_direct <= 0:
+            from coupons.models import AuditTrail
+            AuditTrail.objects.create(
+                action="prime_750_direct_skipped_zero",
+                actor=consumer,
+                notes="PRIME 750 direct sponsor is 0 as per current master_commission_json",
+                metadata={
+                    "source_type": src_type,
+                    "source_id": src_id,
+                    "configured_direct_sponsor": str(pay_direct),
+                    "configured_direct_self": str(pay_self),
+                },
+            )
+    except Exception:
+        pass
+
+    # Idempotency: avoid duplicate PRIME_750_DIRECT for the same purchase/source
+    paid_direct_750 = False
+    try:
+        if sponsor:
+            from accounts.models import WalletTransaction as WT
+            # Primary idempotency: prior PRIME_750_DIRECT for same purchase
+            paid_direct_750 = WT.objects.filter(
+                user=sponsor,
+                source_type=src_type,
+                source_id=src_id,
+                meta__orig_type="PRIME_750_DIRECT",
+            ).exists()
+            # Cross-flow guard: if ANY direct already credited for this referral/purchase, skip paying again
+            if not paid_direct_750:
+                try:
+                    exists_any_direct = WT.objects.filter(user=sponsor).filter(
+                        Q(type__in=("PRIME_150_DIRECT", "PRIME_750_DIRECT", "DIRECT_REF_BONUS")) &
+                        Q(source_type=src_type, source_id=src_id)
+                    ).exists()
+                except Exception:
+                    exists_any_direct = False
+                if exists_any_direct:
+                    paid_direct_750 = True
+    except Exception:
+        paid_direct_750 = False
+    if sponsor and pay_direct > 0 and not paid_direct_750:
         _credit_wallet(
             sponsor,
             pay_direct,
             tx_type="PRIME_750_DIRECT",
-            meta={"source": "PRIME_750"},
+            meta={"source": "PRIME_750", "from_user_id": getattr(consumer, "id", None), "from_user": getattr(consumer, "username", None)},
             source_type=src_type,
             source_id=src_id,
         )
 
-    if pay_self > 0:
+    # Idempotency: avoid duplicate PRIME_750_SELF for the same purchase/source
+    paid_self_750 = False
+    try:
+        from accounts.models import WalletTransaction as WT
+        paid_self_750 = WT.objects.filter(
+            user=consumer,
+            source_type=src_type,
+            source_id=src_id,
+            meta__orig_type="PRIME_750_SELF",
+        ).exists()
+    except Exception:
+        paid_self_750 = False
+    if pay_self > 0 and not paid_self_750:
         _credit_wallet(
             consumer,
             pay_self,

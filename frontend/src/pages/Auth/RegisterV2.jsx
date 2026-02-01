@@ -49,7 +49,7 @@ import {
 } from "@mui/icons-material";
 
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-import API from "../../api/api";
+import API, { getAccessToken } from "../../api/api";
 import LOGO from "../../assets/TRIKONEKT.jpg";
 
 // New, standalone registration page that preserves existing registration logic and APIs
@@ -92,7 +92,8 @@ const RegisterV2 = () => {
   const [sponsorLocked, setSponsorLocked] = useState(false);
   const [sponsorChecking, setSponsorChecking] = useState(false);
   const [sponsorValid, setSponsorValid] = useState(null);
-  const [sponsorDisplay, setSponsorDisplay] = useState({ name: "", pincode: "", username: "" });
+  const [sponsorDisplay, setSponsorDisplay] = useState({ name: "", pincode: "", username: "", usernameCanonical: "" });
+  const sponsorInitRef = useRef(false);
 
   // Agency
   const [agencyLevel, setAgencyLevel] = useState("");
@@ -196,6 +197,7 @@ const RegisterV2 = () => {
   const [successMsg, setSuccessMsg] = useState("");
   const [regSuccessOpen, setRegSuccessOpen] = useState(false);
   const [regSuccessText, setRegSuccessText] = useState({ username: "", password: "" });
+  const [submitting, setSubmitting] = useState(false);
 
   const isAgency = role === "agency";
   const currentCategory = mapUIRoleToCategory();
@@ -269,27 +271,56 @@ const RegisterV2 = () => {
         setSponsorLocked(true);
       }
     } catch {}
+    // mark sponsor init complete
+    sponsorInitRef.current = true;
   }, []); // eslint-disable-line
 
   // Default sponsor for Consumer when none provided via URL
   useEffect(() => {
     try {
+      // Wait until sponsor init from URL is processed
+      if (!sponsorInitRef.current) return;
+
       if (role === "user") {
+        // Do not override if sponsor present in URL
+        const params = new URLSearchParams(location.search || "");
+        const raw =
+          params.get("agencyid") ||
+          params.get("sponsor") ||
+          params.get("sponsor_id") ||
+          params.get("ref");
+        const fromUrl = normalizeSponsor(raw || "");
         const s = normalizeSponsor(sponsorId);
-        if (!s) {
+        if (!s && !fromUrl) {
           setSponsorId("TRIKONEKT");
           setSponsorLocked(false); // keep editable for user to change
         }
       }
     } catch {}
-  }, [role, sponsorId]); // eslint-disable-line
+  }, [role, sponsorId, location.search]); // eslint-disable-line
 
   // Keep URL in sync with sponsor and agency_level for deep-linking and menu navigation
   useEffect(() => {
     try {
+      // Avoid rewriting URL until sponsor initialization is complete
+      if (!sponsorInitRef.current) return;
+
       const params = new URLSearchParams(location.search || "");
+      const existingRaw =
+        params.get("agencyid") ||
+        params.get("sponsor") ||
+        params.get("sponsor_id") ||
+        params.get("ref");
+      const existingSponsor = normalizeSponsor(existingRaw || "");
+
       const nextParams = new URLSearchParams();
       const s = normalizeSponsor(sponsorId);
+
+      // If URL already has a sponsor and our state isn't yet in sync, don't rewrite.
+      if (existingSponsor && s !== existingSponsor) {
+        return;
+      }
+
       if (s) nextParams.set("sponsor", s);
       if (role === "agency") {
         if (agencyLevel) nextParams.set("agency_level", agencyLevel);
@@ -667,7 +698,7 @@ const RegisterV2 = () => {
     const s = normalizeSponsor(sponsorId);
     if (!s) {
       setSponsorValid(null);
-      setSponsorDisplay({ name: "", pincode: "", username: "" });
+      setSponsorDisplay({ name: "", pincode: "", username: "", usernameCanonical: "" });
       return;
     }
     setSponsorChecking(true);
@@ -675,32 +706,46 @@ const RegisterV2 = () => {
       let exists = false;
       let name = "";
       let pcode = "";
-      let uname = s;
+      let canonicalUsername = "";
+      const input = s;
       try {
-        // Preferred public endpoint (also returns sponsor identity in many deployments)
+        let matched = false;
+        // Prefer regions endpoint but only trust it if it echoes back the same username
         try {
-          const r = await API.get("/accounts/regions/by-sponsor/", { params: { sponsor: s, level: "state" } });
+          const r = await API.get("/accounts/regions/by-sponsor/", { params: { sponsor: input, level: "state" } });
           const sp = r?.data?.sponsor || {};
-          name = sp.full_name || sp.username || "";
-          pcode = sp.pincode || "";
-          uname = sp.username || s;
-          exists = Boolean(name || pcode || uname);
-        } catch {
-          // fallback: probe hierarchy
+          const spUser = String(sp.username || "").trim();
+          if (spUser) {
+            matched = true;
+            exists = true;
+            canonicalUsername = spUser;
+            name = sp.full_name || sp.username || "";
+            pcode = sp.pincode || "";
+          }
+        } catch {}
+        // Fallback: explicit user lookup (only if we have an access token to avoid 401 on public page)
+        const hasToken = (() => {
+          try { return !!getAccessToken(); } catch { return false; }
+        })();
+        if (!matched && hasToken) {
           try {
-            const r2 = await API.get("/accounts/hierarchy/", { params: { username: s } });
+            const r2 = await API.get("/accounts/hierarchy/", { params: { username: input } });
             const u = r2?.data?.user || r2?.data || {};
-            if (u?.username) {
+            const uUser = String(u?.username || "").trim();
+            if (uUser && uUser.toLowerCase() === input.toLowerCase()) {
               exists = true;
-              uname = u.username;
               name = u.full_name || "";
               pcode = u.pincode || "";
             }
           } catch {}
         }
       } finally {
-        setSponsorValid(exists);
-        setSponsorDisplay({ name, pincode: pcode, username: uname });
+        // If backend returns mismatched sponsor (e.g., TRIKONEKT), treat as "unknown" (null) instead of invalid (false)
+        // so registration isn't blocked and we keep the URL-provided sponsor visible.
+        setSponsorValid(exists ? true : null);
+        // Display the entered sponsor value (e.g., 8095918105) as the visible Sponsor ID,
+        // while still using backend data for name/pincode and canonical username (if any).
+        setSponsorDisplay({ name: exists ? name : "", pincode: exists ? pcode : "", username: input, usernameCanonical: canonicalUsername });
         setSponsorChecking(false);
       }
     }, 450);
@@ -892,7 +937,7 @@ const RegisterV2 = () => {
   };
   const handleChange = (e) => {
     const { name, value } = e.target;
-    if (name === "phone" && role === "user") {
+    if (name === "phone") {
       const digits = String(value || "").replace(/\D/g, "").slice(0, 10);
       setFormData((fd) => ({ ...fd, [name]: digits }));
     } else {
@@ -1033,18 +1078,10 @@ const RegisterV2 = () => {
       return;
     }
     const category = mapUIRoleToCategory();
-    if (category === "employee" || category === "consumer") {
-      if (!formData.phone) {
-        setErrorMsg("Phone number is required for Consumer/Employee registration");
-        return;
-      }
-      if (category === "consumer") {
-        const phoneDigits = String(formData.phone || "").replace(/\D/g, "").slice(0, 10);
-        if (phoneDigits.length !== 10) {
-          setErrorMsg("Enter a valid 10-digit phone number for Consumer registration.");
-          return;
-        }
-      }
+    const phoneDigits = String(formData.phone || "").replace(/\D/g, "").slice(0, 10);
+    if (!phoneDigits || phoneDigits.length !== 10) {
+      setErrorMsg("Enter a valid 10-digit phone number.");
+      return;
     }
     if (category === "business") {
       if (!formData.email) {
@@ -1072,8 +1109,8 @@ const RegisterV2 = () => {
       setErrorMsg("Sponsor Username is required");
       return;
     }
-    if (sponsorValid === false) {
-      setErrorMsg("Invalid Sponsor Username. Please correct the Sponsor ID.");
+    if (sponsorValid !== true) {
+      setErrorMsg("Sponsor not found. Please enter a valid Sponsor Username/code/phone that exists.");
       return;
     }
     if (AGENCY_CATEGORIES.has(category) && !validateAgencyInputs()) {
@@ -1115,13 +1152,19 @@ const RegisterV2 = () => {
       }
     } catch {}
 
+    // Resolve effective sponsor for submission
+    let effectiveSponsor = normalizeSponsor(sponsorId) || "";
+    if (sponsorValid === true) {
+      effectiveSponsor = sponsorDisplay.usernameCanonical || effectiveSponsor;
+    }
+
     // Build payload
     const payload = {
       password: formData.password,
       email: formData.email || "",
       full_name: formData.full_name || "",
-      phone: formData.phone || "",
-      sponsor_id: normalizeSponsor(sponsorId) || "",
+      phone: phoneDigits,
+      sponsor_id: effectiveSponsor,
       category,
     };
 
@@ -1157,11 +1200,12 @@ const RegisterV2 = () => {
       if (selectedPincodeAgency) payload.selected_pincode = selectedPincodeAgency.trim();
     }
 
+    setSubmitting(true);
     try {
       const submittedPassword = formData.password;
       if (category === "business") {
         // 1) Create login-enabled Business user via Accounts API (same flow as agency/consumer)
-        const resp = await API.post("/accounts/register/", payload);
+        const resp = await API.post("/accounts/register/", payload, { timeout: 45000 });
         const data = resp?.data || {};
         const unameRaw = data.username || "(generated)";
         const uname = (category === "consumer")
@@ -1178,7 +1222,7 @@ const RegisterV2 = () => {
               business_name: formData.business_name || "",
               business_category: formData.business_category || "",
               address: formData.address || "",
-              sponsor_id: sponsorId || "",
+              sponsor_id: normalizeSponsor(sponsorId) || "",
               country: selectedCountry || null,
               state: selectedState || null,
               city: cityId ?? (selectedCityId && /^\d+$/.test(String(selectedCityId)) ? Number(selectedCityId) : null),
@@ -1196,7 +1240,7 @@ const RegisterV2 = () => {
         setRegSuccessText({ username: uname, password: submittedPassword });
         setRegSuccessOpen(true);
       } else {
-        const resp = await API.post("/accounts/register/", payload);
+        const resp = await API.post("/accounts/register/", payload, { timeout: 45000 });
         const data = resp?.data || {};
         const unameRaw = data.username || "(generated)";
         const uname = (category === "consumer")
@@ -1232,9 +1276,43 @@ const RegisterV2 = () => {
 
       
     } catch (err) {
-      const msg =
-        err?.response?.data ? JSON.stringify(err.response.data) : "Registration failed!";
-      setErrorMsg(typeof msg === "string" ? msg : String(msg));
+      try {
+        const data = err?.response?.data;
+        if (data && typeof data === "object") {
+          const first = (k) => {
+            const v = data[k];
+            if (Array.isArray(v)) return v[0];
+            if (typeof v === "string") return v;
+            return null;
+          };
+          const parts = [];
+          const sponsorErr = first("sponsor_id");
+          const phoneErr = first("phone");
+          const countryErr = first("country");
+          const stateErr = first("state");
+          const cityErr = first("city");
+          const pincodeErr = first("pincode");
+          const categoryErr = first("category");
+          const detailErr = first("detail");
+          if (sponsorErr) parts.push(`Sponsor: ${sponsorErr}`);
+          if (phoneErr) parts.push(`Phone: ${phoneErr}`);
+          if (countryErr) parts.push(`Country: ${countryErr}`);
+          if (stateErr) parts.push(`State: ${stateErr}`);
+          if (cityErr) parts.push(`District: ${cityErr}`);
+          if (pincodeErr) parts.push(`Pincode: ${pincodeErr}`);
+          if (categoryErr) parts.push(`Category: ${categoryErr}`);
+          if (detailErr) parts.push(detailErr);
+          setErrorMsg(parts.length ? parts.join(" | ") : JSON.stringify(data));
+        } else {
+          setErrorMsg("Registration failed!");
+        }
+      } catch {
+        const msg =
+          err?.response?.data ? JSON.stringify(err.response.data) : "Registration failed!";
+        setErrorMsg(typeof msg === "string" ? msg : String(msg));
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -1287,7 +1365,7 @@ const RegisterV2 = () => {
               onChange={handleChange}
               sx={{ mb: 2 }}
               type="tel"
-              inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
+              inputProps={{ inputMode: "numeric", pattern: "[0-9]*", maxLength: 10 }}
               required
               InputProps={{
                 startAdornment: (
@@ -1492,7 +1570,7 @@ const RegisterV2 = () => {
               onChange={handleChange}
               sx={{ mb: 2 }}
               type="tel"
-              inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
+              inputProps={{ inputMode: "numeric", pattern: "[0-9]*", maxLength: 10 }}
               required
               InputProps={{
                 startAdornment: (
@@ -1658,7 +1736,7 @@ const RegisterV2 = () => {
               onChange={handleChange}
               sx={{ mb: 2 }}
               type="tel"
-              inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
+              inputProps={{ inputMode: "numeric", pattern: "[0-9]*", maxLength: 10 }}
               required
               InputProps={{
                 startAdornment: (
@@ -2065,7 +2143,7 @@ const RegisterV2 = () => {
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
                   <CircularProgress size={16} />
                   <Typography variant="body2" color="text.secondary">
-                    Validating sponsor”¦
+                    Validating sponsor...
                   </Typography>
                 </Box>
               )}
@@ -2078,6 +2156,11 @@ const RegisterV2 = () => {
                     <Typography variant="body2">
                       <b>Sponsor ID:</b> {sponsorDisplay.username || sponsorId}
                     </Typography>
+                    {Boolean(sponsorDisplay.usernameCanonical) && (
+                      <Typography variant="body2">
+                        <b>Username:</b> {sponsorDisplay.usernameCanonical}
+                      </Typography>
+                    )}
                     <Typography variant="body2">
                       <b>Name:</b> {sponsorDisplay.name || ""}
                     </Typography>
@@ -2145,6 +2228,7 @@ const RegisterV2 = () => {
               fullWidth
               type="submit"
               variant="contained"
+              disabled={submitting}
               sx={{
                 py: 1.05,
                 fontWeight: 700,
@@ -2155,7 +2239,7 @@ const RegisterV2 = () => {
                 mb: 1.25,
               }}
             >
-              REGISTER
+              {submitting ? "REGISTERING..." : "REGISTER"}
             </Button>
 
             <Typography variant="body2" align="center" sx={{ color: "text.secondary" }}>

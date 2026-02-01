@@ -63,6 +63,28 @@ class AdminMetricsView(APIView):
             "kycPending": int(kyc_pending),
         }
 
+        # KYC aggregate block for dashboard (submitted, pending, approved)
+        # "submitted" counts only KYC where user has actually provided details (bank_name / account / IFSC not empty)
+        qs_submitted = UserKYC.objects.filter(
+            (Q(bank_name__isnull=False) & ~Q(bank_name=""))
+            | (Q(bank_account_number__isnull=False) & ~Q(bank_account_number=""))
+            | (Q(ifsc_code__isnull=False) & ~Q(ifsc_code=""))
+        )
+        submitted_count = qs_submitted.count()
+        approved_count = qs_submitted.filter(verified=True).count()
+        kyc_block = {
+            "submitted": int(submitted_count),
+            "approved": int(approved_count),
+            # Pending among those who actually submitted (submitted - approved)
+            "pending": int(max(submitted_count - approved_count, 0)),
+            # Unverified KYC rows (matches AdminKYC list with status=pending)
+            "unverified": int(kyc_unverified or 0),
+            # Consumers without any KYC row
+            "missing": int(users_agg.get("consumers_without_kyc") or 0),
+            # Combined pending signal for high-level use
+            "pending_all": int((kyc_unverified or 0) + (users_agg.get("consumers_without_kyc") or 0)),
+        }
+
         # Wallets (aggregate total balance and count together)
         wagg = Wallet.objects.aggregate(s=Sum("balance"), c=Count("id"))
         total_balance = wagg.get("s") or Decimal("0.00")
@@ -142,6 +164,7 @@ class AdminMetricsView(APIView):
             "users": users_block,
             "wallets": wallets_block,
             "withdrawals": withdrawals_block,
+            "kyc": kyc_block,
             "coupons": coupons_block,
             "uploads": uploads_block,
             "uploadsModels": uploads_models_block,
@@ -354,29 +377,6 @@ class AdminUsersList(ListAPIView):
         qs = (
             CustomUser.objects
             .select_related("country", "state", "city", "wallet", "kyc", "registered_by")
-            .prefetch_related(
-                "matrix_progress",
-                Prefetch(
-                    "promo_purchases",
-                    queryset=PromoPurchase.objects.select_related("package")
-                    .filter(status="APPROVED")
-                    .order_by("-approved_at", "-id"),
-                    to_attr="approved_promo_purchases",
-                ),
-                Prefetch(
-                    "region_assignments",
-                    queryset=AgencyRegionAssignment.objects.select_related("state", "state__country").order_by("id"),
-                    to_attr="prefetched_agency_assignments",
-                ),
-            )
-            .annotate(
-                direct_count=Count("registrations", distinct=True),
-                activated_ecoupon_count=Count(
-                    "coupon_submissions",
-                    filter=Q(coupon_submissions__status="AGENCY_APPROVED"),
-                    distinct=True,
-                ),
-            )
             .only(
                 # Base fields used by AdminUserNodeSerializer and filters
                 "id", "username", "full_name", "email", "role", "category",
@@ -469,7 +469,9 @@ class AdminUsersList(ListAPIView):
             )
 
         ordering = (self.request.query_params.get("ordering") or "-date_joined").strip()
-        if ordering:
+        if ordering in ("-date_joined", "date_joined"):
+            qs = qs.order_by("-date_joined", "-id")
+        else:
             qs = qs.order_by(ordering)
         return qs
 
@@ -491,6 +493,28 @@ class AdminUsersList(ListAPIView):
             page_size = 25
         page = max(1, page)
         page_size = max(1, min(page_size, 200))
+
+        # Fast mode: skip COUNT(*) and compute has_next via one extra row
+        fast_param = str(request.query_params.get("fast") or "").strip().lower()
+        if fast_param in ("1", "true", "yes"):
+            start = (page - 1) * page_size
+            limit = page_size + 1
+            items = list(qs[start:start + limit])
+            has_next = len(items) > page_size
+            if has_next:
+                items = items[:page_size]
+            serializer = self.get_serializer(items, many=True)
+            return Response(
+                {
+                    "count": None,
+                    "page": page,
+                    "page_size": page_size,
+                    "has_next": bool(has_next),
+                    "has_prev": start > 0,
+                    "results": serializer.data,
+                },
+                status=200,
+            )
 
         # Compute total with a lightweight queryset (no prefetch/annotate) to avoid slow COUNT(*)
         base = CustomUser.objects.all()
@@ -1195,6 +1219,12 @@ class AdminKYCList(ListAPIView):
             qs = qs.filter(verified=False)
         elif status_in == "verified":
             qs = qs.filter(verified=True)
+        elif status_in == "submitted":
+            qs = qs.filter(
+                (Q(bank_name__isnull=False) & ~Q(bank_name=""))
+                | (Q(bank_account_number__isnull=False) & ~Q(bank_account_number=""))
+                | (Q(ifsc_code__isnull=False) & ~Q(ifsc_code=""))
+            )
 
         if user_q:
             if user_q.isdigit():
@@ -1679,320 +1709,223 @@ class AdminMatrixTree(APIView):
 
 class AdminMatrix5Tree(APIView):
     """
-    Returns 5-matrix genealogy tree (spillover parent/children) for a root user.
-    Query:
-      - identifier: sponsor_id | username | phone (digits) | email | unique_id | id
-      - root_user_id: integer (alternative to identifier)
-      - max_depth: default 6 (hard cap 20)
-      - source: matrix | sponsor | auto (default: auto). When auto and matrix has no children, falls back to sponsor-based tree.
-    Response:
-      { id, username, full_name, level, matrix_position?, depth?, children:[...] }
+    Entry-based matrix tree for AutoPoolAccount.
+
+    Query params:
+      - pool: FIVE_150 | THREE_150 | THREE_50 (default FIVE_150)
+      - start_entry_id: int (optional) -> start BFS from this AutoPoolAccount.id
+      - display_user_id: int (optional) -> if provided, start at this user's earliest entry in the pool.
+          Special rule: if display_user_id == 32 and the user has no entry, fall back to sentinel root.
+      - root_user_id: int (optional) -> alias for display_user_id (backward compatibility with older clients)
+      - identifier: str (optional) -> resolve to a user (id/username/email/unique_id/phone/sponsor_id) and start at their earliest entry
+      - max_depth: int (optional) -> defaults to configured levels for the pool; capped to configured levels and 20.
+
+    Response (entry-based):
+      {
+        "account_id": <int>,           # AutoPoolAccount.id
+        "owner_id": <int>,
+        "username": <str>,
+        "level": <int>,                # entry.level
+        "position": <int|null>,        # sibling position under parent
+        "status": "ACTIVE",
+        "children": [ ...same shape... ]
+      }
     """
     permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("autopool")]
 
     def get(self, request):
-        # sanitize identifier (strip any bracketed suffixes like " [sub franchise]" and trailing tokens)
-        identifier = (request.query_params.get("identifier") or "").strip()
-        if "[" in identifier:
-            identifier = identifier.split("[", 1)[0].strip()
-        if " " in identifier:
-            identifier = identifier.split()[0].strip()
-
-        try:
-            root_id = int(request.query_params.get("root_user_id") or "0")
-        except Exception:
-            root_id = 0
-
-        source = (request.query_params.get("source") or "auto").strip().lower()
-        try:
-            max_depth = int(request.query_params.get("max_depth") or 6)
-        except Exception:
-            max_depth = 6
-        max_depth = max(1, min(max_depth, 20))
-
-        sponsor_wide = str(request.query_params.get("sponsor_wide") or "").strip().lower() in ("1", "true", "yes")
-
-        pool = (request.query_params.get("pool") or "").strip().upper()
+        # Params
+        pool = (request.query_params.get("pool") or "FIVE_150").strip().upper()
         if pool not in ("FIVE_150", "THREE_150", "THREE_50"):
             pool = "FIVE_150"
 
-        # Resolve root user
-        user = None
-        if root_id > 0:
-            user = CustomUser.objects.filter(id=root_id).first()
+        try:
+            start_entry_id = int(request.query_params.get("start_entry_id") or "0")
+        except Exception:
+            start_entry_id = 0
+        try:
+            display_user_id = int(request.query_params.get("display_user_id") or "0")
+        except Exception:
+            display_user_id = 0
+        # Backward-compat: accept root_user_id as an alias for display_user_id (older clients)
+        if display_user_id <= 0:
+            try:
+                display_user_id = int(request.query_params.get("root_user_id") or "0")
+            except Exception:
+                display_user_id = display_user_id
 
-        if not user and identifier:
-            digits = "".join([c for c in identifier if c.isdigit()])
-            # Prefer exact prefixed_id (sponsor code like TR9000000016)
-            user = CustomUser.objects.filter(prefixed_id__iexact=identifier).first() or user
-            # Try exact id if numeric-only
-            if not user and digits and digits == identifier and digits.isdigit():
-                user = CustomUser.objects.filter(id=int(digits)).first()
-            # Generic username/email/unique_id/phone (do not pick a child by sponsor_id here)
+        # Optional identifier support (admin search bar): resolve to user then use earliest entry
+        ident = (request.query_params.get("identifier") or "").strip()
+        if display_user_id <= 0 and ident:
+            user = None
+            # Prefer exact prefixed_id (sponsor code)
+            try:
+                user = CustomUser.objects.filter(prefixed_id__iexact=ident).first() or None
+            except Exception:
+                user = None
+            # Numeric id path
             if not user:
-                q = (
-                    Q(username__iexact=identifier)
-                    | Q(email__iexact=identifier)
-                    | Q(unique_id__iexact=identifier)
-                )
-                if digits:
-                    q = q | Q(phone__iexact=digits) | Q(username__iexact=digits)
-                user = CustomUser.objects.filter(q).first()
-
-        if not user:
-            return Response({"detail": "Root user not found"}, status=404)
-
-        # Builders with cycle guards and node budget to prevent runaway
-        node_budget = {"count": 0}
-        NODE_CAP = max(50, min(5000, 5 ** min(max_depth, 6)))  # safe cap
-
-        def build_matrix(u, level: int, visited=None):
-            # Batch BFS (one query per level), max 5 children per parent, with hard node cap.
-            root = {
-                "id": u.id,
-                "username": u.username,
-                "full_name": u.full_name,
-                "level": level,
-                "matrix_position": getattr(u, "matrix_position", None),
-                "depth": getattr(u, "depth", 0),
-                "children": [],
-            }
-            if max_depth <= 1:
-                return root
-
-            nodes_by_user = {u.id: root}
-            current_ids = [u.id]
-            current_level = level
-            total_nodes = 1  # counts nodes materialized in the tree (including root)
-
-            while current_ids and current_level < max_depth and total_nodes < NODE_CAP:
-                rows = list(
-                    CustomUser.objects.filter(parent_id__in=current_ids, category="consumer")
-                    .values("id", "username", "full_name", "matrix_position", "depth", "parent_id")
-                    .order_by("parent_id", "matrix_position", "id")
-                )
-                if not rows:
-                    break
-
-                per_parent_counts = {}
-                next_ids = []
-
-                for r in rows:
-                    pid = r.get("parent_id")
-                    # skip if parent pruned (e.g., due to cap)
-                    parent_node = nodes_by_user.get(pid)
-                    if not parent_node:
-                        continue
-                    if per_parent_counts.get(pid, 0) >= 5:
-                        continue
-                    if total_nodes >= NODE_CAP:
-                        break
-
-                    child_node = {
-                        "id": r["id"],
-                        "username": r["username"],
-                        "full_name": r["full_name"],
-                        "level": current_level + 1,
-                        "matrix_position": r.get("matrix_position"),
-                        "depth": r.get("depth", 0),
-                        "children": [],
-                    }
-                    parent_node["children"].append(child_node)
-                    nodes_by_user[r["id"]] = child_node
-                    per_parent_counts[pid] = per_parent_counts.get(pid, 0) + 1
-                    next_ids.append(r["id"])
-                    total_nodes += 1
-
-                current_ids = next_ids
-                current_level += 1
-
-            return root
-
-        def build_sponsor(u, level: int, visited=None):
-            if visited is None:
-                visited = set()
-            uid = getattr(u, "id", None)
-            if uid in visited:
-                return None
-            visited.add(uid)
-            node = {
-                "id": u.id,
-                "username": u.username,
-                "full_name": u.full_name,
-                "level": level,
-                "children": [],
-            }
-            if level >= max_depth:
-                return node
-
-            # Build children query
-            children_q = Q(registered_by_id=u.id)
-            tokens = set()
-            if sponsor_wide:
-                # Build robust sponsor tokens including dashless variant of prefixed_id
+                digits = "".join(ch for ch in ident if ch.isdigit())
                 try:
-                    pid = (getattr(u, "prefixed_id", "") or "").strip()
-                    if pid:
-                        tokens.add(pid)
-                        tokens.add(pid.replace("-", ""))
-                    uname = (getattr(u, "username", "") or "").strip()
-                    if uname:
-                        tokens.add(uname)
-                    uid2 = (getattr(u, "unique_id", "") or "").strip()
-                    if uid2:
-                        tokens.add(uid2)
-                    phone_digits = "".join(ch for ch in str(getattr(u, "phone", "") or "") if ch.isdigit())
-                    if phone_digits:
-                        tokens.add(phone_digits)
+                    if digits and digits == ident and digits.isdigit():
+                        user = CustomUser.objects.filter(id=int(digits)).first()
                 except Exception:
-                    pass
-                for t in tokens:
-                    children_q = children_q | Q(sponsor_id__iexact=t)
-
-            candidates = list(
-                CustomUser.objects.filter(children_q, category="consumer")
-                .exclude(id=u.id)
-                .only("id", "username", "full_name", "registered_by_id", "sponsor_id")
-                .order_by("id")
-                .distinct()
-            )
-
-            children = []
-            if sponsor_wide:
-                owner_cache = {}
-                def _owner_id_by_token(token: str):
-                    if not token:
-                        return None
-                    tok = str(token).strip()
-                    if tok in owner_cache:
-                        return owner_cache[tok]
-                    q = Q(prefixed_id__iexact=tok) | Q(username__iexact=tok) | Q(unique_id__iexact=tok)
-                    t_no_dash = "".join(ch for ch in tok if ch.isalnum())
-                    if t_no_dash and t_no_dash != tok:
-                        q = q | Q(prefixed_id__iexact=t_no_dash)
-                    digits = "".join(ch for ch in tok if ch.isdigit())
+                    user = user
+            # Username/email/unique_id and phone digits fallback
+            if not user:
+                try:
+                    q = (Q(username__iexact=ident) | Q(email__iexact=ident) | Q(unique_id__iexact=ident))
+                    digits = "".join(ch for ch in ident if ch.isdigit())
                     if digits:
                         q = q | Q(phone__iexact=digits) | Q(username__iexact=digits)
-                    u2 = CustomUser.objects.filter(q).only("id").first()
-                    oid = getattr(u2, "id", None)
-                    owner_cache[tok] = oid
-                    return oid
+                    user = CustomUser.objects.filter(q).first()
+                except Exception:
+                    user = user
+            if user:
+                try:
+                    display_user_id = int(getattr(user, "id", 0) or 0)
+                except Exception:
+                    display_user_id = 0
 
-                for c in candidates:
-                    if getattr(c, "registered_by_id", None) == u.id:
-                        children.append(c)
-                    else:
-                        sid = (getattr(c, "sponsor_id", "") or "").strip()
-                        if _owner_id_by_token(sid) == u.id:
-                            children.append(c)
+        # Configured depth
+        cfg = CommissionConfig.get_solo()
+        default_levels = cfg.get_matrix_five_levels() if pool == "FIVE_150" else cfg.get_matrix_three_levels()
+        try:
+            max_depth = int(request.query_params.get("max_depth") or default_levels)
+        except Exception:
+            max_depth = default_levels
+        max_depth = max(1, min(int(max_depth), int(default_levels), 20))
+
+        fanout = 5 if pool == "FIVE_150" else 3
+
+        # Resolve sentinel to guarantee a structural root exists
+        try:
+            from business.services.placement import _ensure_sentinel_root
+            sentinel = _ensure_sentinel_root(pool)
+        except Exception:
+            sentinel = AutoPoolAccount.objects.filter(pool_type=pool, parent_account__isnull=True).order_by("id").first()
+
+        # Determine start account id:
+        root_acc = None
+        if start_entry_id > 0:
+            root_acc = (
+                AutoPoolAccount.objects.select_related("owner", "parent_account")
+                .filter(id=start_entry_id, pool_type=pool, status="ACTIVE")
+                .first()
+            )
+        if not root_acc and display_user_id > 0:
+            # Special UI head rule: user 32
+            if display_user_id == 32:
+                root_acc = (
+                    AutoPoolAccount.objects.select_related("owner")
+                    .filter(owner_id=32, pool_type=pool, status="ACTIVE")
+                    .order_by("id")
+                    .first()
+                )
+                if not root_acc and sentinel and getattr(sentinel, "pool_type", None) == pool:
+                    root_acc = AutoPoolAccount.objects.select_related("owner").filter(id=sentinel.id).first()
             else:
-                # Fast path: strictly direct registrations only
-                for c in candidates:
-                    if getattr(c, "registered_by_id", None) == u.id:
-                        children.append(c)
+                root_acc = (
+                    AutoPoolAccount.objects.select_related("owner")
+                    .filter(owner_id=display_user_id, pool_type=pool, status="ACTIVE")
+                    .order_by("id")
+                    .first()
+                )
+        if not root_acc:
+            # Fallback to sentinel for this pool
+            if sentinel and getattr(sentinel, "pool_type", None) == pool:
+                root_acc = AutoPoolAccount.objects.select_related("owner").filter(id=sentinel.id).first()
 
-            for c in children:
-                cn = build_sponsor(c, level + 1, visited)
-                if cn:
-                    node["children"].append(cn)
-            return node
+        if not root_acc:
+            return Response({"detail": "No matrix root available for the requested pool."}, status=404)
 
-        # Autopool fallback builder (uses AutoPoolAccount graph if CustomUser.parent tree is empty)
-        def build_autopool(u, level: int, pool_type="FIVE_150", visited=None):
-            if visited is None:
-                visited = set()
-            # Determine branching factor based on pool type
-            fanout = 5 if pool_type == "FIVE_150" else 3
-            uid = getattr(u, "id", None)
-            if uid in visited:
-                return None
-            visited.add(uid)
-
-            node_budget["count"] += 1
-            node = {
-                "id": u.id,
-                "username": u.username,
-                "full_name": u.full_name,
-                "level": level,
-                "matrix_position": getattr(u, "matrix_position", None),
-                "depth": getattr(u, "depth", 0),
+        # BFS over AutoPoolAccount graph, width-before-depth, per-parent fanout cap
+        def serialize_node(acc, rel_level):
+            return {
+                "account_id": acc.id,
+                "owner_id": getattr(acc.owner, "id", None),
+                "username": getattr(acc.owner, "username", None),
+                "level": int(rel_level),  # relative to requested root (root=1)
+                "abs_level": int(getattr(acc, "level", 0) or 0),  # absolute persisted level
+                "position": getattr(acc, "position", None),
+                "status": getattr(acc, "status", "ACTIVE"),
+                "team_count": 0,  # to be annotated after BFS as number of descendant entries
                 "children": [],
             }
-            if level >= max_depth or node_budget["count"] >= NODE_CAP:
-                return node
-            try:
-                from business.models import AutoPoolAccount
-                from business.services.placement import _ensure_sentinel_root
-                sentinel = _ensure_sentinel_root(pool_type)
-            except Exception:
-                sentinel = None
-                AutoPoolAccount = None  # type: ignore
 
-            # Determine parent accounts for this user at this level
-            parent_acc_ids = []
-            try:
-                if sentinel and getattr(sentinel, "owner_id", None) == getattr(u, "id", None):
-                    parent_acc_ids = [int(sentinel.id)]
-                else:
-                    parent_acc_ids = list(
-                        AutoPoolAccount.objects.filter(owner_id=u.id, pool_type=pool_type, status="ACTIVE")
-                        .values_list("id", flat=True)
-                    ) if AutoPoolAccount else []
-            except Exception:
-                parent_acc_ids = []
+        root = serialize_node(root_acc, 1)
+        # Expose pool fanout for client consumers (fixed width: 5 for FIVE_150, 3 for THREE_x)
+        try:
+            root["fanout"] = int(fanout)
+        except Exception:
+            pass
 
-            if not parent_acc_ids or not AutoPoolAccount:
-                return node
+        nodes_by_account = {int(root_acc.id): root}
+        current_parent_ids = [int(root_acc.id)]
+        rel_levels = {int(root_acc.id): 1}
+        levels_used = 1  # count root as level 1 for response budget
 
-            # Find child accounts under these parent accounts and map to unique consumer owners in position order
-            try:
-                qs = (AutoPoolAccount.objects
-                      .select_related("owner")
-                      .filter(pool_type=pool_type, status="ACTIVE", parent_account_id__in=parent_acc_ids)
-                      .order_by("position", "id"))
-            except Exception:
-                qs = []
+        while current_parent_ids and levels_used < max_depth:
+            # Fetch children for all current parents in a single query
+            rows = list(
+                AutoPoolAccount.objects.select_related("owner")
+                .filter(
+                    pool_type=pool,
+                    status="ACTIVE",
+                    parent_account_id__in=current_parent_ids,
+                )
+                .order_by("parent_account_id", "position", "id")
+            )
+            if not rows:
+                break
 
-            seen_level = set()
-            child_users = []
-            for a in qs:
-                ou = getattr(a, "owner", None)
-                oid = getattr(ou, "id", None)
-                cat = str(getattr(ou, "category", "") or "").lower()
-                if not oid or cat != "consumer":
+            # Per-parent child cap (fanout)
+            counts = {}
+            next_parent_ids = []
+            for acc in rows:
+                pid = getattr(acc, "parent_account_id", None)
+                if pid is None or int(pid) not in nodes_by_account:
+                    # parent may have been pruned; skip
                     continue
-                if oid in seen_level:
+                used = counts.get(int(pid), 0)
+                if used >= fanout:
                     continue
-                seen_level.add(oid)
-                child_users.append(ou)
-                if len(child_users) >= fanout:
-                    break
+                parent_node = nodes_by_account[int(pid)]
+                parent_rel = int(rel_levels.get(int(pid), levels_used))
+                child_rel = parent_rel + 1
+                child_node = serialize_node(acc, child_rel)
+                parent_node["children"].append(child_node)
+                nodes_by_account[int(acc.id)] = child_node
+                rel_levels[int(acc.id)] = child_rel
+                counts[int(pid)] = used + 1
+                next_parent_ids.append(int(acc.id))
 
-            for cu in child_users:
-                cn = build_autopool(cu, level + 1, visited)
-                if cn:
-                    node["children"].append(cn)
-            return node
+            if not next_parent_ids:
+                break
+            current_parent_ids = next_parent_ids
+            levels_used += 1
 
-        # Decide source
-        if source == "matrix":
-            tree = build_autopool(user, 1, pool_type=pool)
-            if not tree or not isinstance(tree.get("children", []), list) or len(tree["children"]) == 0:
-                tree = build_matrix(user, 1)
-            return Response(tree, status=200)
-        if source == "sponsor":
-            tree = build_sponsor(user, 1)
-            return Response(tree, status=200)
+        # Post-process: annotate team_count per entry as total number of descendant entries
+        def _annotate_team_count(node: dict) -> int:
+            try:
+                kids = node.get("children") or []
+            except Exception:
+                kids = []
+            total = 0
+            for ch in kids:
+                total += 1 + _annotate_team_count(ch)
+            try:
+                node["team_count"] = int(total)
+            except Exception:
+                node["team_count"] = 0
+            return total
 
-        # auto: try matrix; if empty children at root, fall back to autopool; then sponsor
-        mx_tree = build_matrix(user, 1)
-        if not mx_tree or not isinstance(mx_tree.get("children", []), list) or len(mx_tree["children"]) == 0:
-            ap_tree = build_autopool(user, 1, pool_type=pool)
-            if ap_tree and isinstance(ap_tree.get("children", []), list) and len(ap_tree["children"]) > 0:
-                return Response(ap_tree, status=200)
-            sp_tree = build_sponsor(user, 1)
-            return Response(sp_tree, status=200)
-        return Response(mx_tree, status=200)
+        try:
+            _annotate_team_count(root)
+        except Exception:
+            pass
+
+        return Response(root, status=200)
 
 
 class AdminAutopoolSummary(APIView):

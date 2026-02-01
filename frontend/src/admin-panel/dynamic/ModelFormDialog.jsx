@@ -228,61 +228,94 @@ export default function ModelFormDialog({
     setSaving(true);
     setErrors({});
     try {
-      const wantsForm =
-        formFields.some((f) => isFileField(f)) ||
-        Object.values(values).some((v) => v instanceof File);
+      const isEdit = record && (record.id || record.pk);
+      const original = record || {};
+
+      // Compute changed keys only (send diff on PATCH)
+      const changed = [];
+      for (const f of formFields) {
+        if (f.read_only) continue;
+        const name = f.name;
+        let v = values[name];
+
+        // Preserve existing behavior: on edit, omit empty -> do not change
+        if (isEdit && (v === "" || v === null || v === undefined)) {
+          continue;
+        }
+
+        let left = v;
+        let right = original[name];
+
+        // For files: treat as changed only if a new File is selected
+        if (isFileField(f)) {
+          if (left instanceof File) {
+            changed.push(name);
+          }
+          continue;
+        }
+
+        // Normalize numeric for comparison
+        if (isNumeric(f) && left !== "" && left !== null && left !== undefined) {
+          if (f.type === "FloatField" || f.type === "DecimalField") {
+            const n = Number(left);
+            if (!Number.isNaN(n)) left = n;
+          } else {
+            const n = parseInt(left, 10);
+            if (!Number.isNaN(n)) left = n;
+          }
+        }
+
+        // Normalize relations for comparison
+        if (isRelationField(f)) {
+          left = coerceRelationValue(f, left);
+          right = coerceRelationValue(f, right);
+        }
+
+        const same = (a, b) => {
+          if (typeof a === "boolean" || typeof b === "boolean") return Boolean(a) === Boolean(b);
+          if (a === undefined && b === undefined) return true;
+          return String(a ?? "") === String(b ?? "");
+        };
+
+        if (!same(left, right)) {
+          changed.push(name);
+        }
+      }
+
+      // Nothing changed — close without request
+      if (!changed.length) {
+        onClose && onClose();
+        return;
+      }
+
+      // Sync username with phone when phone changed (edit mode)
+      let newUsernameForSync = null;
+      if (isEdit && changed.includes("phone")) {
+        const t = String(values.phone ?? "").trim();
+        if (t) {
+          newUsernameForSync = t;
+          if (!changed.includes("username")) changed.push("username");
+        }
+      }
+
+      // If any changed field is a file, use FormData; else JSON
+      const wantsForm = changed.some((name) => {
+        const f = formFields.find((x) => x.name === name);
+        return isFileField(f) || (values[name] instanceof File);
+      });
 
       let dataToSend = null;
 
       if (wantsForm) {
         const form = new FormData();
-        for (const f of formFields) {
-          if (f.read_only) continue;
-          let v = values[f.name];
+        for (const name of changed) {
+          const f = formFields.find((x) => x.name === name) || {};
+          let v = (name === "username" && newUsernameForSync) ? newUsernameForSync : values[name];
 
-          // On edit, omit empty to keep existing
-          if (v === null || v === undefined || v === "") {
-            if (!record) form.append(f.name, "");
-            continue;
-          }
+          if (v === "" || v === null || v === undefined) continue;
 
           if (v instanceof File) {
-            form.append(f.name, v);
-            continue;
-          }
-
-          // Normalize numeric types
-          if (isNumeric(f)) {
-            if (f.type === "FloatField" || f.type === "DecimalField") {
-              const n = Number(v);
-              if (!Number.isNaN(n)) v = n;
-            } else {
-              const n = parseInt(v, 10);
-              if (!Number.isNaN(n)) v = n;
-            }
-          }
-
-          // Coerce relation PKs
-          if (isRelationField(f)) {
-            v = coerceRelationValue(f, v);
-          }
-
-          if (typeof v === "boolean") {
-            form.append(f.name, v ? "true" : "false");
-          } else {
-            form.append(f.name, String(v));
-          }
-        }
-        dataToSend = form;
-      } else {
-        const payload = {};
-        const isEdit = record && (record.id || record.pk);
-        for (const f of formFields) {
-          if (f.read_only) continue;
-          let v = values[f.name];
-
-          // On edit, omit empty values to avoid overwriting with blanks (lets backend keep existing)
-          if (isEdit && (v === "" || v === null || v === undefined)) {
+            form.append(name, v);
             continue;
           }
 
@@ -300,12 +333,38 @@ export default function ModelFormDialog({
             v = coerceRelationValue(f, v);
           }
 
-          payload[f.name] = v;
+          if (typeof v === "boolean") {
+            form.append(name, v ? "true" : "false");
+          } else {
+            form.append(name, String(v));
+          }
+        }
+        dataToSend = form;
+      } else {
+        const payload = {};
+        for (const name of changed) {
+          const f = formFields.find((x) => x.name === name) || {};
+          let v = (name === "username" && newUsernameForSync) ? newUsernameForSync : values[name];
+
+          if (isNumeric(f) && v !== "" && v !== null && v !== undefined) {
+            if (f.type === "FloatField" || f.type === "DecimalField") {
+              const n = Number(v);
+              if (!Number.isNaN(n)) v = n;
+            } else {
+              const n = parseInt(v, 10);
+              if (!Number.isNaN(n)) v = n;
+            }
+          }
+
+          if (isRelationField(f)) {
+            v = coerceRelationValue(f, v);
+          }
+
+          payload[name] = v;
         }
         dataToSend = payload;
       }
 
-      const isEdit = record && (record.id || record.pk);
       const url = isEdit ? `${route}${record.id || record.pk}/` : route;
       const method = isEdit ? "patch" : "post";
 
@@ -345,7 +404,7 @@ export default function ModelFormDialog({
           }}
         >
           {(formFields || [])
-            .filter((f) => f.name !== "id" && f.name !== "pk")
+            .filter((f) => f.name !== "id" && f.name !== "pk" && !(record && String(f.name || "").toLowerCase() === "password"))
             .map((f) => {
               const val = values[f.name];
               const label = f.label || f.name;
@@ -494,4 +553,3 @@ export default function ModelFormDialog({
     </Dialog>
   );
 }
-

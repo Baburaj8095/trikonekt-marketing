@@ -34,15 +34,7 @@ export function normalizeMediaUrl(input) {
     // Absolute URL cases
     try {
       const u = new URL(input);
-      // If pointing to localhost/127.0.0.1, rewrite to backend origin (mobile devices can't resolve localhost)
-      if (u.hostname === "localhost" || u.hostname === "127.0.0.1") {
-        const base = backendOrigin || (typeof window !== "undefined" ? window.location.origin : "");
-        if (base) {
-          const b = new URL(base);
-          // Keep path and query, swap origin
-          return `${b.origin}${u.pathname}${u.search}${u.hash}`;
-        }
-      }
+      
       // If page is https and image is http, upgrade to https to avoid mixed content block on mobile/strict browsers
       try {
         if (typeof window !== "undefined" && window.location?.protocol === "https:" && u.protocol === "http:") {
@@ -50,6 +42,22 @@ export function normalizeMediaUrl(input) {
           return u.toString();
         }
       } catch (_) {}
+
+      // Rewrite local/loopback hosts to backend ABSOLUTE origin only (avoid rewriting to frontend origin)
+      try {
+        let backendAbsOrigin = "";
+        const base = API?.defaults?.baseURL || "";
+        if (/^https?:\/\//i.test(base)) {
+          backendAbsOrigin = new URL(base).origin;
+        }
+        const host = (u.hostname || "").toLowerCase();
+        const isLocalHost = host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0" || host === "::1";
+        if (backendAbsOrigin && isLocalHost) {
+          const rewritten = new URL(u.pathname + u.search + u.hash, backendAbsOrigin);
+          return rewritten.toString();
+        }
+      } catch (_) {}
+
       // Already an absolute, return as-is
       return input;
     } catch (_) {
@@ -69,4 +77,3 @@ export function normalizeMediaUrl(input) {
 }
 
 export default normalizeMediaUrl;
-

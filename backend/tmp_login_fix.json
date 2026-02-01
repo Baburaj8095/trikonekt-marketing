@@ -1,8 +1,0 @@
-{
-  "exists": true,
-  "before_pwd_ok": false,
-  "after_pwd_ok": true,
-  "auth_ok": true,
-  "jwt_custom_ok": true,
-  "jwt_custom_err": null
-}
