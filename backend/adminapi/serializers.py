@@ -167,24 +167,27 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
 
     def get_sponsor_id(self, obj):
         try:
-            # Prefer the actual upline (registered_by) used during registration
-            rb = getattr(obj, "registered_by", None)
+            # Prefer the stored sponsor_id when set; fall back to registered_by when empty
             sid = (getattr(obj, "sponsor_id", "") or "").strip()
 
+            # If stored sponsor_id equals self identifiers, hide it
+            uname = (getattr(obj, "username", "") or "").strip()
+            pid = (getattr(obj, "prefixed_id", "") or "").strip()
+            pid2 = pid.replace("-", "") if pid else ""
+            if sid:
+                if sid.lower() in {uname.lower(), pid.lower(), pid2.lower()}:
+                    return ""
+                return sid
+
+            # Fallback to the actual upline (registered_by) used during registration
+            rb = getattr(obj, "registered_by", None)
             if rb:
                 # Username is commonly used as sponsor code; fallback to prefixed_id
                 val = (getattr(rb, "username", "") or "").strip() or (getattr(rb, "prefixed_id", "") or "").strip()
                 if val:
                     return val
 
-            # If stored sponsor_id equals self identifiers, hide it
-            uname = (getattr(obj, "username", "") or "").strip()
-            pid = (getattr(obj, "prefixed_id", "") or "").strip()
-            pid2 = pid.replace("-", "") if pid else ""
-            if sid and sid.lower() in {uname.lower(), pid.lower(), pid2.lower()}:
-                return ""
-
-            return sid
+            return ""
         except Exception:
             return (getattr(obj, "sponsor_id", "") or "")
 
