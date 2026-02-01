@@ -744,13 +744,24 @@ class AdminUserEditMetaView(APIView):
                     f["type"] = "PasswordField"
                     f["required"] = False
                     f["label"] = f.get("label") or "Set New Password"
-                if name == "sponsor_id" and not getattr(request.user, "is_superuser", False):
-                    f["read_only"] = True
-                    hint = "Only superuser can modify Sponsor ID"
-                    if f.get("help_text"):
-                        f["help_text"] = f"{f['help_text']} | {hint}"
-                    else:
-                        f["help_text"] = hint
+                if name == "sponsor_id":
+                    # Allow superuser or admins with manage_users/edit_users permissions to modify Sponsor ID
+                    is_super = bool(getattr(request.user, "is_superuser", False))
+                    can_edit = is_super
+                    if not can_edit:
+                        try:
+                            from .permissions import get_effective_permissions
+                            perms = get_effective_permissions(request.user)
+                            can_edit = ("*" in perms) or ("manage_users" in perms) or ("edit_users" in perms)
+                        except Exception:
+                            can_edit = False
+                    f["read_only"] = not can_edit
+                    if not can_edit:
+                        hint = "Only superuser or admins with Manage/Edit Users permission can modify Sponsor ID"
+                        if f.get("help_text"):
+                            f["help_text"] = f"{f['help_text']} | {hint}"
+                        else:
+                            f["help_text"] = hint
 
             # Restrict to allowed fields only
             allowed = {"phone", "pincode", "sponsor_id", "password"}
@@ -775,10 +786,18 @@ class AdminUserEditMetaView(APIView):
         except Exception:
             # Fallback minimal meta (restricted to allowed fields)
             is_super = bool(getattr(request.user, "is_superuser", False))
+            can_edit = is_super
+            if not can_edit:
+                try:
+                    from .permissions import get_effective_permissions
+                    perms = get_effective_permissions(request.user)
+                    can_edit = ("*" in perms) or ("manage_users" in perms) or ("edit_users" in perms)
+                except Exception:
+                    can_edit = False
             meta = [
                 {"name": "phone", "type": "CharField", "required": False, "label": "Mobile", "help_text": "Changing mobile will also change Username to the new mobile."},
                 {"name": "pincode", "type": "CharField", "required": False, "label": "Pincode", "help_text": "Country/State/City will auto-update from this pincode on Save."},
-                {"name": "sponsor_id", "type": "CharField", "required": False, "label": "Sponsor ID", "read_only": not is_super},
+                {"name": "sponsor_id", "type": "CharField", "required": False, "label": "Sponsor ID", "read_only": not can_edit},
                 {"name": "password", "type": "PasswordField", "required": False, "label": "Set New Password"},
             ]
         return Response({"fields": meta}, status=200)
@@ -811,7 +830,7 @@ class AdminUserDetail(APIView):
                     return Response({"detail": "Forbidden"}, status=403)
         except Exception:
             return Response({"detail": "Forbidden"}, status=403)
-        serializer = AdminUserEditSerializer(user, data=request.data, partial=True)
+        serializer = AdminUserEditSerializer(user, data=request.data, partial=True, context={"request": request})
         if serializer.is_valid():
             obj = serializer.save()
             return Response(AdminUserEditSerializer(obj).data, status=200)

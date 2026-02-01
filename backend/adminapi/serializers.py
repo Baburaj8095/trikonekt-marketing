@@ -887,11 +887,20 @@ class AdminUserEditSerializer(serializers.ModelSerializer):
             if k not in allowed:
                 validated_data.pop(k, None)
 
-        # Permission: Only superuser can modify sponsor_id; strip whitespace
+        # Permission: Allow superuser or admins with edit_users/manage_users to modify sponsor_id; strip whitespace
         request = getattr(self, "context", {}).get("request", None)
         if "sponsor_id" in validated_data:
-            is_super = bool(getattr(getattr(request, "user", None), "is_superuser", False))
-            if not is_super:
+            u = getattr(request, "user", None)
+            is_super = bool(getattr(u, "is_superuser", False))
+            can_edit = is_super
+            if not can_edit:
+                try:
+                    from .permissions import get_effective_permissions
+                    perms = get_effective_permissions(u)
+                    can_edit = ("*" in perms) or ("manage_users" in perms) or ("edit_users" in perms)
+                except Exception:
+                    can_edit = False
+            if not can_edit:
                 validated_data.pop("sponsor_id", None)
             else:
                 sid = validated_data.get("sponsor_id")
