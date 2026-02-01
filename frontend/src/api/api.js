@@ -7,9 +7,8 @@ const rawBaseURL =
   "/api";
 let baseURL = rawBaseURL.endsWith("/") ? rawBaseURL : rawBaseURL + "/";
 
-/* In development, FORCE baseURL to relative "/api/" so requests originate from :3000 and are proxied by CRA.
-   This preserves http://localhost:3000/api/... in the Network tab regardless of REACT_APP_API_URL. */
-if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") {
+/* In browser, FORCE baseURL to relative "/api/" so requests are same-origin and proxied by hosting (e.g., Vercel) to backend, avoiding CORS. */
+if (typeof window !== "undefined") {
   baseURL = "/api/";
 }
 

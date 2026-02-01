@@ -1,4 +1,4 @@
-﻿import API, { ensureFreshAccess, getAccessToken } from "../../api/api";
+﻿import API from "../../api/api";
 
 /**
  * Admin meta API helpers with caching and in-flight dedupe.
@@ -53,23 +53,9 @@ export async function getAdminMeta() {
   // Reuse in-flight
   if (g.__ADMIN_META_INFLIGHT__) return g.__ADMIN_META_INFLIGHT__;
 
-  const base = getBase();
-  const fullUrl = joinUrl(base, "/admin/admin-meta/summary/");
-
   g.__ADMIN_META_INFLIGHT__ = (async () => {
-    let token = await ensureFreshAccess();
-    if (!token) token = getAccessToken();
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
-    const resp = await fetch(fullUrl, { method: "GET", headers });
-    if (!resp.ok) {
-      let detail = "Failed to load admin metadata";
-      try {
-        const d = await resp.json();
-        detail = d?.detail || detail;
-      } catch (_) {}
-      throw new Error(detail);
-    }
-    const data = await resp.json().catch(() => ({}));
+    const res = await API.get("/admin/admin-meta/summary/", { dedupe: "cancelPrevious", cacheTTL: 300000 });
+    const data = res?.data || {};
     g.__ADMIN_META_CACHE__ = data || {};
     g.__ADMIN_META_CACHE_TS__ = Date.now();
     g.__ADMIN_META_CACHE_VER__ = CLIENT_META_VERSION;
@@ -91,23 +77,9 @@ export async function getModelFields(app, model) {
     return g.__ADMIN_FIELDS_INFLIGHT__[key];
   }
 
-  const base = getBase();
-  const fullUrl = joinUrl(base, `/admin/admin-meta/fields/${encodeURIComponent(app)}/${encodeURIComponent(model)}/`);
-
   g.__ADMIN_FIELDS_INFLIGHT__[key] = (async () => {
-    let token = await ensureFreshAccess();
-    if (!token) token = getAccessToken();
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
-    const resp = await fetch(fullUrl, { method: "GET", headers });
-    if (!resp.ok) {
-      let detail = "Failed to load model fields";
-      try {
-        const d = await resp.json();
-        detail = d?.detail || detail;
-      } catch (_) {}
-      throw new Error(detail);
-    }
-    const data = await resp.json().catch(() => ({}));
+    const res = await API.get(`/admin/admin-meta/fields/${encodeURIComponent(app)}/${encodeURIComponent(model)}/`, { dedupe: "cancelPrevious", cacheTTL: 600000 });
+    const data = res?.data || {};
     const fields = Array.isArray(data?.fields) ? data.fields : [];
     g.__ADMIN_FIELDS_CACHE__[key] = { data: fields, ts: Date.now() };
     return fields;
@@ -131,4 +103,3 @@ export function primeAdminMeta(data) {
   g.__ADMIN_META_CACHE__ = data || {};
   g.__ADMIN_META_CACHE_TS__ = Date.now();
 }
-
