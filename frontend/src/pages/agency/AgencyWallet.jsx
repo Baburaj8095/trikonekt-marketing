@@ -28,18 +28,18 @@ function fmtAmount(value) {
 }
 
 function computeWeeklyWindowLocal() {
-  // Compute current week's Sunday 6:00 PM to 11:59 PM window using local time
+  // Compute current week's Wednesday 6:00 PM to 11:59 PM window using local time
   const now = new Date();
   const day = now.getDay(); // 0=Sun ... 6=Sat
-  const daysSinceSun = ((day - 0) + 7) % 7;
+  const daysSinceWed = ((day - 3) + 7) % 7;
 
-  const currentSun = new Date(now);
-  currentSun.setHours(0, 0, 0, 0);
-  currentSun.setDate(currentSun.getDate() - daysSinceSun);
+  const currentWed = new Date(now);
+  currentWed.setHours(0, 0, 0, 0);
+  currentWed.setDate(currentWed.getDate() - daysSinceWed);
 
-  const currentStart = new Date(currentSun);
+  const currentStart = new Date(currentWed);
   currentStart.setHours(18, 0, 0, 0); // 6:00 PM
-  const currentEnd = new Date(currentSun);
+  const currentEnd = new Date(currentWed);
   currentEnd.setHours(23, 59, 59, 999); // 11:59 PM
 
   const isOpen = now >= currentStart && now < currentEnd;
@@ -193,7 +193,7 @@ export default function AgencyWallet() {
     if (Number(displayWithdrawWallet) < 500)
       return "Minimum withdrawable balance ₹500 required";
     if (!windowInfo?.isOpen)
-      return "Withdrawals are allowed only on Sunday 6:00 PM to 11:59 PM (IST)";
+      return "Withdrawals are allowed only on Wednesday 6:00 PM to 11:59 PM (IST)";
     if (inWindowCooldown)
       return "You have already requested a withdrawal in this week's window";
     return "";
@@ -731,7 +731,7 @@ export default function AgencyWallet() {
             ) : null}
             {!windowInfo?.isOpen ? (
               <Alert severity="info" sx={{ mb: 1 }}>
-                Withdrawals open on Sunday between 6:00 PM and 11:59 PM (IST).{" "}
+                Withdrawals open on Wednesday between 6:00 PM and 11:59 PM (IST).{" "}
                 Next window:{" "}
                 {windowInfo?.nextWindowAt
                   ? windowInfo.nextWindowAt.toLocaleString()
@@ -791,4 +791,3 @@ export default function AgencyWallet() {
     </Box>
   );
 }
-

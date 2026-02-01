@@ -164,7 +164,7 @@ SIMPLE_JWT = {
 
 # CORS configuration
 CORS_ALLOWED_ORIGINS = _csv_env('CORS_ALLOWED_ORIGINS', 'https://trikonekt.com,https://www.trikonekt.com')
-CORS_ALLOWED_ORIGIN_REGEXES = _csv_env('CORS_ALLOWED_ORIGIN_REGEXES', '^https://.*\\.vercel\\.app$')
+CORS_ALLOWED_ORIGIN_REGEXES = _csv_env('CORS_ALLOWED_ORIGIN_REGEXES', '^https://.*\\.vercel\\.app$,^https://.*\\.trikonekt\\.com$')
 CORS_ALLOW_ALL_ORIGINS = False if (CORS_ALLOWED_ORIGINS or CORS_ALLOWED_ORIGIN_REGEXES) else True
 CORS_ALLOW_CREDENTIALS = False
 CORS_ALLOW_HEADERS = [

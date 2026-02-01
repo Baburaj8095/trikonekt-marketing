@@ -22,24 +22,24 @@ function fmtAmount(value) {
 }
 
 function computeWeeklyWindowLocal() {
-  // Compute current week's Sunday 6:00 PM to 11:59 PM window using local time
+  // Compute current week's Wednesday 6:00 PM to 11:59 PM window using local time
   const now = new Date();
 
   // JS weekday: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
   const day = now.getDay();
 
-  // Days since this week's Sunday
-  const daysSinceSun = ((day - 0) + 7) % 7;
+  // Days since this week's Wednesday
+  const daysSinceWed = ((day - 3) + 7) % 7;
 
-  // Get this week's Sunday date
-  const currentSun = new Date(now);
-  currentSun.setHours(0, 0, 0, 0);
-  currentSun.setDate(currentSun.getDate() - daysSinceSun);
+  // Get this week's Wednesday date
+  const currentWed = new Date(now);
+  currentWed.setHours(0, 0, 0, 0);
+  currentWed.setDate(currentWed.getDate() - daysSinceWed);
 
   // Window start/end (local time)
-  const currentStart = new Date(currentSun);
+  const currentStart = new Date(currentWed);
   currentStart.setHours(18, 0, 0, 0); // 6:00 PM
-  const currentEnd = new Date(currentSun);
+  const currentEnd = new Date(currentWed);
   currentEnd.setHours(23, 59, 59, 999); // 11:59 PM
 
   // Open state
@@ -48,7 +48,7 @@ function computeWeeklyWindowLocal() {
   // Next window start
   let nextStart = new Date(currentStart);
   if (now >= currentEnd) {
-    // next week's Sunday
+    // next week's Wednesday
     nextStart = new Date(currentStart);
     nextStart.setDate(nextStart.getDate() + 7);
   } else if (now < currentStart) {
@@ -161,7 +161,7 @@ export default function Wallet() {
   const disableReason = useMemo(() => {
     if (!kyc?.verified) return "KYC verification required";
     if (Number(withdrawableBalance) < 500) return "Minimum withdrawable balance ₹500 required";
-    if (!windowInfo?.isOpen) return "Withdrawals are allowed only on Sunday 6:00 PM to 11:59 PM (IST)";
+    if (!windowInfo?.isOpen) return "Withdrawals are allowed only on Wednesday 6:00 PM to 11:59 PM (IST)";
     if (inWindowCooldown) return "You have already requested a withdrawal in this week's window";
     return "";
   }, [kyc, withdrawableBalance, windowInfo, inWindowCooldown]);
@@ -438,7 +438,7 @@ export default function Wallet() {
               ) : null}
               {!windowInfo?.isOpen ? (
                 <Alert severity="info" sx={{ mb: 1 }}>
-                  Withdrawals open on Sunday between 6:00 PM and 11:59 PM (IST).{" "}
+                  Withdrawals open on Wednesday between 6:00 PM and 11:59 PM (IST).{" "}
                 </Alert>
               ) : null}
               {inWindowCooldown ? (
@@ -564,4 +564,3 @@ export default function Wallet() {
     </Box>
   );
 }
-
