@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
 from django.db.models import Q, Case, When, Value, IntegerField
+import os
 
 from core.crypto import encrypt_string
 
@@ -998,9 +999,74 @@ class PublicUserSerializer(serializers.ModelSerializer):
     def get_avatar_url(self, obj):
         try:
             f = getattr(obj, "avatar", None)
-            url = getattr(f, "url", "") if f else ""
+            if not f:
+                return None
+            # If the stored name is already an absolute URL (Cloudinary), return it verbatim
+            try:
+                name = getattr(f, "name", "") or ""
+                if isinstance(name, str) and (name.startswith("http://") or name.startswith("https://")):
+                    return name
+            except Exception:
+                pass
+
+            # Best-effort migrate local avatar to Cloudinary on read if configured
+            try:
+                if os.environ.get("CLOUDINARY_URL"):
+                    file_obj = None
+                    try:
+                        f.open("rb")
+                        file_obj = getattr(f, "file", None) or f
+                    except Exception:
+                        file_obj = None
+                    if file_obj is not None:
+                        try:
+                            from cloudinary import uploader as _clduploader  # type: ignore
+                            try:
+                                file_obj.seek(0)
+                            except Exception:
+                                pass
+                            res = _clduploader.upload(
+                                file_obj,
+                                folder="uploads/profile",
+                                resource_type="image",
+                                invalidate=True,
+                            )
+                            url2 = (res or {}).get("secure_url") or (res or {}).get("url")
+                            if url2:
+                                obj.avatar.name = url2
+                                obj.save(update_fields=["avatar"])
+                                return url2
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+
+            # Else, fall back to storage-provided URL (relative under MEDIA_URL)
+            url = getattr(f, "url", "") or ""
             if not url:
                 return None
+
+            # Fix corrupted MEDIA URL that percent-encodes a remote absolute URL (e.g., /media/https%3A/...)
+            # Also handle single-slash forms like "https:/res.cloudinary.com" and normalize to "https://..."
+            try:
+                from urllib.parse import unquote
+                import re
+                decoded = unquote(url)
+                m = re.search(r"(https?:/{1,2}\S+)", decoded)
+                if m:
+                    remote = m.group(1)
+                    # Normalize single slash to double slash
+                    remote = remote.replace("https:/", "https://").replace("http:/", "http://")
+                    # Persist cleaned remote URL for future requests
+                    try:
+                        obj.avatar.name = remote
+                        obj.save(update_fields=["avatar"])
+                    except Exception:
+                        pass
+                    return remote
+            except Exception:
+                pass
+
             req = getattr(self, "context", {}).get("request", None)
             if req:
                 try:
@@ -1011,12 +1077,115 @@ class PublicUserSerializer(serializers.ModelSerializer):
         except Exception:
             return None
 
+    def update(self, instance, validated_data):
+        """
+        Robust Cloudinary handling for avatar uploads:
+        - Accept file from request.FILES['avatar'] or from validated_data['avatar'].
+        - Prefer direct Cloudinary upload; on success, set absolute secure URL on instance.avatar.
+        - If direct upload didn't occur (or failed), fall back to default update; then
+          best-effort migrate the just-saved local file to Cloudinary and replace with secure URL.
+        """
+        request = getattr(self, "context", {}).get("request", None)
+
+        # 1) Pick up an uploaded file from request.FILES or validated_data
+        upload_file = None
+        try:
+            if request is not None and hasattr(request, "FILES"):
+                upload_file = request.FILES.get("avatar") or None
+        except Exception:
+            upload_file = None
+        # If not found in request.FILES, check validated_data (may contain InMemoryUploadedFile)
+        vd_file = validated_data.get("avatar") if "avatar" in validated_data else None
+        if upload_file is None and getattr(vd_file, "read", None):
+            upload_file = vd_file
+
+        did_cloud = False
+        # 2) Direct Cloudinary upload path (when we have a file handle)
+        if upload_file is not None:
+            try:
+                from cloudinary import uploader as _clduploader  # type: ignore
+                # Ensure pointer at start
+                try:
+                    upload_file.seek(0)
+                except Exception:
+                    pass
+                res = _clduploader.upload(
+                    upload_file,
+                    folder="uploads/profile",
+                    resource_type="image",
+                    invalidate=True,
+                )
+                url = (res or {}).get("secure_url") or (res or {}).get("url")
+                if url:
+                    try:
+                        instance.avatar.name = url
+                        instance.save(update_fields=["avatar"])
+                        did_cloud = True
+                        # Prevent default local save of the same file
+                        validated_data.pop("avatar", None)
+                    except Exception:
+                        did_cloud = False
+            except Exception:
+                # Swallow and continue to default update; we'll try migrate-after-update
+                did_cloud = False
+
+        # 3) Proceed with normal updates for non-avatar fields
+        inst = super().update(instance, validated_data)
+
+        # 4) If Cloudinary is configured but upload didn't happen and avatar looks local, migrate it now
+        try:
+            import os
+            cloud_enabled = bool(os.environ.get("CLOUDINARY_URL"))
+        except Exception:
+            cloud_enabled = False
+
+        try:
+            if cloud_enabled and not did_cloud:
+                f = getattr(inst, "avatar", None)
+                if f:
+                    # If stored name is not already an absolute URL, try migrating
+                    name = str(getattr(f, "name", "") or "")
+                    is_abs = name.startswith("http://") or name.startswith("https://")
+                    if not is_abs:
+                        # Obtain a readable stream for the current file
+                        file_obj = None
+                        try:
+                            # AvatarFile has .open() and .file
+                            f.open("rb")
+                            file_obj = getattr(f, "file", None) or f
+                        except Exception:
+                            file_obj = None
+                        if file_obj is not None:
+                            try:
+                                from cloudinary import uploader as _clduploader2  # type: ignore
+                                try:
+                                    file_obj.seek(0)
+                                except Exception:
+                                    pass
+                                res2 = _clduploader2.upload(
+                                    file_obj,
+                                    folder="uploads/profile",
+                                    resource_type="image",
+                                    invalidate=True,
+                                )
+                                url2 = (res2 or {}).get("secure_url") or (res2 or {}).get("url")
+                                if url2:
+                                    inst.avatar.name = url2
+                                    inst.save(update_fields=["avatar"])
+                            except Exception:
+                                # best-effort only
+                                pass
+        except Exception:
+            pass
+
+        return inst
+
 
 class ProfileMeSerializer(serializers.ModelSerializer):
     country = serializers.PrimaryKeyRelatedField(queryset=Country.objects.all(), required=False, allow_null=True)
     state = serializers.PrimaryKeyRelatedField(queryset=State.objects.all(), required=False, allow_null=True)
     city = serializers.PrimaryKeyRelatedField(queryset=City.objects.all(), required=False, allow_null=True)
-    avatar = serializers.ImageField(required=False, allow_null=True)
+    avatar = serializers.ImageField(required=False, allow_null=True, write_only=True)
     avatar_url = serializers.SerializerMethodField(read_only=True)
     age = serializers.IntegerField(required=False, allow_null=True, min_value=0, max_value=120)
 
@@ -1032,9 +1201,74 @@ class ProfileMeSerializer(serializers.ModelSerializer):
     def get_avatar_url(self, obj):
         try:
             f = getattr(obj, "avatar", None)
-            url = getattr(f, "url", "") if f else ""
+            if not f:
+                return None
+            # If the stored name is already an absolute URL (Cloudinary), return it verbatim
+            try:
+                name = getattr(f, "name", "") or ""
+                if isinstance(name, str) and (name.startswith("http://") or name.startswith("https://")):
+                    return name
+            except Exception:
+                pass
+
+            # Best-effort migrate local avatar to Cloudinary on read if configured
+            try:
+                if os.environ.get("CLOUDINARY_URL"):
+                    file_obj = None
+                    try:
+                        f.open("rb")
+                        file_obj = getattr(f, "file", None) or f
+                    except Exception:
+                        file_obj = None
+                    if file_obj is not None:
+                        try:
+                            from cloudinary import uploader as _clduploader  # type: ignore
+                            try:
+                                file_obj.seek(0)
+                            except Exception:
+                                pass
+                            res = _clduploader.upload(
+                                file_obj,
+                                folder="uploads/profile",
+                                resource_type="image",
+                                invalidate=True,
+                            )
+                            url2 = (res or {}).get("secure_url") or (res or {}).get("url")
+                            if url2:
+                                obj.avatar.name = url2
+                                obj.save(update_fields=["avatar"])
+                                return url2
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+
+            # Else, fall back to storage-provided URL (relative under MEDIA_URL)
+            url = getattr(f, "url", "") or ""
             if not url:
                 return None
+
+            # Fix corrupted MEDIA URL that percent-encodes a remote absolute URL (e.g., /media/https%3A/...)
+            # Also handle single-slash forms like "https:/res.cloudinary.com" and normalize to "https://..."
+            try:
+                from urllib.parse import unquote
+                import re
+                decoded = unquote(url)
+                m = re.search(r"(https?:/{1,2}\S+)", decoded)
+                if m:
+                    remote = m.group(1)
+                    # Normalize single slash to double slash
+                    remote = remote.replace("https:/", "https://").replace("http:/", "http://")
+                    # Persist cleaned remote URL for future requests
+                    try:
+                        obj.avatar.name = remote
+                        obj.save(update_fields=["avatar"])
+                    except Exception:
+                        pass
+                    return remote
+            except Exception:
+                pass
+
             req = getattr(self, "context", {}).get("request", None)
             if req:
                 try:
@@ -1044,6 +1278,109 @@ class ProfileMeSerializer(serializers.ModelSerializer):
             return url
         except Exception:
             return None
+
+    def update(self, instance, validated_data):
+        """
+        Robust Cloudinary handling for avatar uploads:
+        - Accept file from request.FILES['avatar'] or from validated_data['avatar'].
+        - Prefer direct Cloudinary upload; on success, set absolute secure URL on instance.avatar.
+        - If direct upload didn't occur (or failed), fall back to default update; then
+          best-effort migrate the just-saved local file to Cloudinary and replace with secure URL.
+        """
+        request = getattr(self, "context", {}).get("request", None)
+
+        # 1) Pick up an uploaded file from request.FILES or validated_data
+        upload_file = None
+        try:
+            if request is not None and hasattr(request, "FILES"):
+                upload_file = request.FILES.get("avatar") or None
+        except Exception:
+            upload_file = None
+        # If not found in request.FILES, check validated_data (may contain InMemoryUploadedFile)
+        vd_file = validated_data.get("avatar") if "avatar" in validated_data else None
+        if upload_file is None and getattr(vd_file, "read", None):
+            upload_file = vd_file
+
+        did_cloud = False
+        # 2) Direct Cloudinary upload path (when we have a file handle)
+        if upload_file is not None:
+            try:
+                from cloudinary import uploader as _clduploader  # type: ignore
+                # Ensure pointer at start
+                try:
+                    upload_file.seek(0)
+                except Exception:
+                    pass
+                res = _clduploader.upload(
+                    upload_file,
+                    folder="uploads/profile",
+                    resource_type="image",
+                    invalidate=True,
+                )
+                url = (res or {}).get("secure_url") or (res or {}).get("url")
+                if url:
+                    try:
+                        instance.avatar.name = url
+                        instance.save(update_fields=["avatar"])
+                        did_cloud = True
+                        # Prevent default local save of the same file
+                        validated_data.pop("avatar", None)
+                    except Exception:
+                        did_cloud = False
+            except Exception:
+                # Swallow and continue to default update; we'll try migrate-after-update
+                did_cloud = False
+
+        # 3) Proceed with normal updates for non-avatar fields
+        inst = super().update(instance, validated_data)
+
+        # 4) If Cloudinary is configured but upload didn't happen and avatar looks local, migrate it now
+        try:
+            import os
+            cloud_enabled = bool(os.environ.get("CLOUDINARY_URL"))
+        except Exception:
+            cloud_enabled = False
+
+        try:
+            if cloud_enabled and not did_cloud:
+                f = getattr(inst, "avatar", None)
+                if f:
+                    # If stored name is not already an absolute URL, try migrating
+                    name = str(getattr(f, "name", "") or "")
+                    is_abs = name.startswith("http://") or name.startswith("https://")
+                    if not is_abs:
+                        # Obtain a readable stream for the current file
+                        file_obj = None
+                        try:
+                            # AvatarFile has .open() and .file
+                            f.open("rb")
+                            file_obj = getattr(f, "file", None) or f
+                        except Exception:
+                            file_obj = None
+                        if file_obj is not None:
+                            try:
+                                from cloudinary import uploader as _clduploader2  # type: ignore
+                                try:
+                                    file_obj.seek(0)
+                                except Exception:
+                                    pass
+                                res2 = _clduploader2.upload(
+                                    file_obj,
+                                    folder="uploads/profile",
+                                    resource_type="image",
+                                    invalidate=True,
+                                )
+                                url2 = (res2 or {}).get("secure_url") or (res2 or {}).get("url")
+                                if url2:
+                                    inst.avatar.name = url2
+                                    inst.save(update_fields=["avatar"])
+                            except Exception:
+                                # best-effort only
+                                pass
+        except Exception:
+            pass
+
+        return inst
 
 class UserNomineeSerializer(serializers.ModelSerializer):
     class Meta:

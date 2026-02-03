@@ -52,7 +52,7 @@ class CustomUser(AbstractUser):
     city = models.ForeignKey('locations.City', null=True, blank=True, on_delete=models.SET_NULL, related_name='users')
     pincode = models.CharField(max_length=10, blank=True, db_index=True)
     address = models.TextField(blank=True)
-    avatar = models.ImageField(upload_to='uploads/profile/', blank=True, null=True)
+    avatar = models.ImageField(upload_to='uploads/profile/', blank=True, null=True, max_length=500)
     sponsor_id = models.CharField(max_length=64, blank=True)
     prefix_code = models.CharField(max_length=6, blank=True, db_index=True)
     prefixed_id = models.CharField(max_length=32, unique=True, null=True, blank=True)

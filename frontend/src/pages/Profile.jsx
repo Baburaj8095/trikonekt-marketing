@@ -198,9 +198,14 @@ export default function Profile() {
       if (address !== undefined) fd.append("address", address);
       if (avatarFile) fd.append("avatar", avatarFile);
 
-      await API.patch("/accounts/profile/", fd, {
+      const res = await API.patch("/accounts/profile/", fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
+      const newUrl = res?.data?.avatar_url || res?.data?.avatar || null;
+      if (newUrl) {
+        setAvatarUrl(newUrl);
+        setAvatarFile(null);
+      }
 
       setOk("Profile updated successfully.");
 
@@ -221,6 +226,10 @@ export default function Profile() {
           ? sessionStorage
           : localStorage;
         store.setItem(`user_${ns}`, JSON.stringify(data));
+        if (data && data.avatar_url) {
+          setAvatarUrl(data.avatar_url);
+          setAvatarFile(null);
+        }
         if (ns === "user") {
           try {
             localStorage.setItem("user", JSON.stringify(data));

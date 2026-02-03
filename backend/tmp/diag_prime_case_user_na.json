@@ -1,9 +1,0 @@
-{
-  "ok": false,
-  "now": "2026-01-31T04:21:40.432692+00:00",
-  "input": {
-    "username": "",
-    "purchase_id": ""
-  },
-  "error": "user_not_found"
-}

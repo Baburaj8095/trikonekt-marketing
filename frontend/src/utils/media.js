@@ -34,6 +34,22 @@ export function normalizeMediaUrl(input) {
     // Absolute URL cases
     try {
       const u = new URL(input);
+
+      // If absolute points to local backend but path embeds an encoded remote (e.g., /media/https%3A/...), extract and return the remote
+      try {
+        const decodedPath = decodeURIComponent(u.pathname || "");
+        const m = decodedPath.match(/(https?:\/{1,2}[^?#]+)/i);
+        if (m) {
+          let remote = m[1].replace("https:/", "https://").replace("http:/", "http://");
+          // If page is https and image is http, upgrade to https
+          try {
+            if (typeof window !== "undefined" && window.location?.protocol === "https:" && remote.startsWith("http://")) {
+              remote = remote.replace(/^http:\/\//i, "https://");
+            }
+          } catch (_) {}
+          return remote;
+        }
+      } catch (_) {}
       
       // If page is https and image is http, upgrade to https to avoid mixed content block on mobile/strict browsers
       try {
@@ -66,6 +82,18 @@ export function normalizeMediaUrl(input) {
 
     // Relative path cases: "/media/...", "media/...", etc.
     const path = input.startsWith("/") ? input : `/${input}`;
+    // If relative path embeds an encoded absolute URL, extract and return it
+    try {
+      const decodedPath = decodeURIComponent(path);
+      const m2 = decodedPath.match(/(https?:\/{1,2}[^?#]+)/i);
+      if (m2) {
+        let remote = m2[1].replace("https:/", "https://").replace("http:/", "http://");
+        if (typeof window !== "undefined" && window.location?.protocol === "https:" && remote.startsWith("http://")) {
+          remote = remote.replace(/^http:\/\//i, "https://");
+        }
+        return remote;
+      }
+    } catch (_) {}
     if (backendOrigin) return `${backendOrigin}${path}`;
     if (typeof window !== "undefined" && window.location) {
       return `${window.location.origin}${path}`;
