@@ -7,6 +7,7 @@ from core.crypto import encrypt_string, decrypt_string
 from django.core.mail import send_mail
 from django.conf import settings
 from locations.views import PINCODES_OFFLINE, india_place_variants
+from django.db import transaction
 
 
 class AdminUserNodeSerializer(serializers.ModelSerializer):
@@ -865,6 +866,7 @@ class AdminUserEditSerializer(serializers.ModelSerializer):
         fields = [
             "email",
             "full_name",
+            "username",
             "phone",
             "age",
             "address",
@@ -884,8 +886,18 @@ class AdminUserEditSerializer(serializers.ModelSerializer):
         # Accept only whitelisted fields from admin edit dialog and grid toggles
         password = validated_data.pop("password", None)
 
+        # Capture current username and handle explicit username update intent
+        old_username = (getattr(instance, "username", "") or "")
+        explicit_username = None
+        if "username" in validated_data:
+            explicit_username = str(validated_data.get("username") or "").strip()
+            if explicit_username:
+                # Enforce uniqueness (case-insensitive) excluding this user
+                if CustomUser.objects.filter(username__iexact=explicit_username).exclude(pk=instance.pk).exists():
+                    raise serializers.ValidationError({"username": "Username already in use."})
+
         # Drop any keys not in allowed set (server-side enforcement)
-        allowed = {"sponsor_id", "phone", "pincode", "account_active"}
+        allowed = {"email", "full_name", "username", "phone", "pincode", "state", "city", "account_active", "sponsor_id"}
         for k in list(validated_data.keys()):
             if k not in allowed:
                 validated_data.pop(k, None)
@@ -928,8 +940,11 @@ class AdminUserEditSerializer(serializers.ModelSerializer):
         # Persist basic field updates (account_active, phone, pincode, sponsor_id)
         instance = super().update(instance, validated_data)
 
-        # If phone changed, also update username
-        if new_username and new_username != instance.username:
+        # Apply explicit username if provided, else sync username from phone change
+        if explicit_username:
+            if explicit_username != instance.username:
+                instance.username = explicit_username
+        elif new_username and new_username != instance.username:
             instance.username = new_username
 
         # Handle pincode -> auto assign geo FKs
@@ -1020,10 +1035,19 @@ class AdminUserEditSerializer(serializers.ModelSerializer):
                 pass
 
         # Persist all accumulated changes
+        username_before_save = getattr(instance, "username", None)
         try:
             instance.save()
         except Exception:
             instance.save()
+
+        # Cascade sponsor_id when username changes: update all users whose sponsor_id equals old username
+        try:
+            if old_username and username_before_save and str(old_username).strip().lower() != str(username_before_save).strip().lower():
+                with transaction.atomic():
+                    CustomUser.objects.filter(sponsor_id__iexact=old_username).update(sponsor_id=username_before_save)
+        except Exception:
+            pass
 
         return instance
 

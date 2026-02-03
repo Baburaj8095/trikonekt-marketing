@@ -37,6 +37,7 @@ from .views import (
     wallet_purchase_product,
 )
 from .token_serializers import CustomTokenRefreshView
+from .views_tree import MyFiveMatrixTeamV1
 
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
@@ -77,4 +78,6 @@ urlpatterns = [
     path('token/refresh/', CustomTokenRefreshView.as_view(), name='token_refresh'),
     # Employee Offer Letter (PDF download)
     path('employee/offer-letter/', OfferLetterPDFView.as_view(), name='employee_offer_letter'),
+    # New: 5-matrix genealogy (self + subtree within my downline)
+    path('my/genealogy/tree5/', MyFiveMatrixTeamV1.as_view(), name='my_genealogy_tree5'),
 ]

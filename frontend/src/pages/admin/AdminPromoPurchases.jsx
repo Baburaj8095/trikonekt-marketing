@@ -282,19 +282,20 @@ export default function AdminPromoPurchases() {
           style={{
             display: "grid",
             gridTemplateColumns:
-              // Added Role, Pincode, City, State and dedicated Payment column
-              "70px 160px 120px 100px 140px 140px 1.1fr 0.8fr 60px 120px 120px 140px 240px 140px",
+              // Added Sponsor column after User + dedicated Payment column
+              "70px 160px 160px 120px 100px 140px 140px 1.1fr 0.8fr 60px 120px 120px 140px 240px 140px",
             gap: 8,
             padding: "10px",
             background: "#f8fafc",
             borderBottom: "1px solid #e2e8f0",
             fontWeight: 700,
             color: "#0f172a",
-            minWidth: 1400,
+            minWidth: 1560,
           }}
         >
           <div>ID</div>
           <div>User</div>
+          <div>Sponsor</div>
           <div>Role</div>
           <div>Pincode</div>
           <div>City</div>
@@ -317,7 +318,8 @@ export default function AdminPromoPurchases() {
             const proofUrl = r.payment_proof || "";
             const isMonthly = (pkg.type || "") === "MONTHLY";
             const monText = isMonthly ? ` • ${String(r.year || "")}-${String(r.month || "").toString().padStart(2, "0")}` : "";
-            const userLabel = r.user_username ? r.user_username : (r.user_id ? `#${r.user_id}` : "");
+            const userLabel = r.user_username ? `${r.user_username} ${r.user_id ? `(#${r.user_id})` : ""}` : (r.user_id ? `#${r.user_id}` : "");
+            const sponsorLabel = r.sponsor_username ? r.sponsor_username : (r.sponsor_user_id ? `#${r.sponsor_user_id}` : (r.sponsor_code || ""));
             const pkgName = pkg.name || pkg.code || "";
             const pkgPrice = Number(pkg.price || 0);
             const amountPaid = Number(r.amount_paid || 0);
@@ -328,12 +330,12 @@ export default function AdminPromoPurchases() {
                 style={{
                   display: "grid",
                   gridTemplateColumns:
-                    "70px 160px 120px 100px 140px 140px 1.1fr 0.8fr 60px 120px 120px 140px 240px 140px",
+                    "70px 160px 160px 120px 100px 140px 140px 1.1fr 0.8fr 60px 120px 120px 140px 240px 140px",
                   gap: 8,
                   padding: "10px",
                   borderBottom: "1px solid #e2e8f0",
                   alignItems: "center",
-                  minWidth: 1400,
+                  minWidth: 1560,
                 }}
               >
                 <div>#{r.id}</div>
@@ -341,6 +343,13 @@ export default function AdminPromoPurchases() {
                   <div>{userLabel}</div>
                   {r.user_full_name ? (
                     <div style={{ fontSize: 12, color: "#64748b" }}>{r.user_full_name}</div>
+                  ) : null}
+                </div>
+
+                <div style={{ wordBreak: "break-all" }}>
+                  <div>{sponsorLabel || ""}</div>
+                  {r.sponsor_full_name ? (
+                    <div style={{ fontSize: 12, color: "#64748b" }}>{r.sponsor_full_name}</div>
                   ) : null}
                 </div>
 
@@ -425,7 +434,8 @@ export default function AdminPromoPurchases() {
           const proofUrl = r.payment_proof || "";
           const isMonthly = (pkg.type || "") === "MONTHLY";
           const monText = isMonthly ? ` • ${String(r.year || "")}-${String(r.month || "").toString().padStart(2, "0")}` : "";
-          const userLabel = r.user_username ? r.user_username : (r.user_id ? `#${r.user_id}` : "");
+          const userLabel = r.user_username ? `${r.user_username} ${r.user_id ? `(#${r.user_id})` : ""}` : (r.user_id ? `#${r.user_id}` : "");
+          const sponsorLabel = r.sponsor_username ? r.sponsor_username : (r.sponsor_user_id ? `#${r.sponsor_user_id}` : (r.sponsor_code || ""));
           const pkgName = pkg.name || pkg.code || "";
           const pkgPrice = Number(pkg.price || 0);
           const amountPaid = Number(r.amount_paid || 0);
@@ -452,6 +462,12 @@ export default function AdminPromoPurchases() {
               <div style={{ fontWeight: 600, wordBreak: "break-all" }}>{userLabel}</div>
               {r.user_full_name ? (
                 <div style={{ fontSize: 12, color: "#475569" }}>{r.user_full_name}</div>
+              ) : null}
+
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>Sponsor</div>
+              <div style={{ fontWeight: 600, wordBreak: "break-all" }}>{sponsorLabel || ""}</div>
+              {r.sponsor_full_name ? (
+                <div style={{ fontSize: 12, color: "#475569" }}>{r.sponsor_full_name}</div>
               ) : null}
 
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 4 }}>

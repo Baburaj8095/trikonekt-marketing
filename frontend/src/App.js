@@ -25,6 +25,7 @@ import Wallet from "./pages/Wallet";
 import History from "./pages/History";
 import LoadingOverlay from "./components/LoadingOverlay";
 import MyTeam from "./pages/team/MyTeam";
+import Genealogy5 from "./pages/team/Genealogy5";
 import EmployeeDailyReport from "./pages/reports/EmployeeDailyReport";
 import AgencyDailyReport from "./pages/reports/AgencyDailyReport";
 import AdminProtectedRoute from "./components/AdminProtectedRoute";
@@ -281,6 +282,17 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/user/genealogy-5"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <Genealogy5 />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/user/genealogy" element={<Navigate to="/user/genealogy-5" replace />} />
         <Route
           path="/user/wealth-galaxy"
           element={
@@ -1413,4 +1425,3 @@ function App() {
 }
 
 export default App;
-

@@ -319,15 +319,12 @@ export default function AdminUsers() {
   // DataGrid columns (flex + minWidth for responsive)
   const columns = useMemo(
     () => [
+      
       {
-        field: "__slno",
-        headerName: "Sl No",
-        minWidth: 80,
-        width: 80,
-        sortable: false,
-        filterable: false,
-        align: "center",
-        headerAlign: "center",
+        field: "id",
+        headerName: "ID",
+        minWidth: 90,
+        width: 90,
       },
       {
         field: "avatar",
@@ -952,7 +949,7 @@ export default function AdminUsers() {
   // Server-side fetcher for DataTable
   const fetcher = useCallback(
     async ({ page, pageSize, search, ordering }) => {
-      const params = { page, page_size: pageSize, fast: 1 };
+      const params = { page, page_size: pageSize };
       // merge active filters
       Object.entries(filters).forEach(([k, v]) => {
         if (v !== null && v !== undefined && String(v).trim() !== "") {
@@ -974,7 +971,28 @@ export default function AdminUsers() {
         });
         const data = res?.data;
         const results = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
-        const count = typeof data?.count === "number" ? data.count : results.length;
+        const hasNext = !!data?.has_next;
+        const hasPrev = !!data?.has_prev;
+        // Robust rowCount computation:
+        // - If backend provides a numeric count, use it.
+        // - If it provides a string count (e.g., "68"), parse it.
+        // - If count is null/undefined (fast mode), synthesize using page/pageSize and has_next.
+        let count;
+        const rawCount = data?.count;
+        if (typeof rawCount === "number" && Number.isFinite(rawCount)) {
+          count = rawCount;
+        } else if (typeof rawCount === "string") {
+          const s = rawCount.trim().toLowerCase();
+          if (s !== "" && s !== "null" && s !== "none" && s !== "nan") {
+            const n = parseInt(rawCount, 10);
+            if (Number.isFinite(n)) count = n;
+          }
+        }
+        if (typeof count !== "number") {
+          const baseIndex = Math.max(0, (Number(page) - 1) * Number(pageSize));
+          // Add +1 when hasNext to ensure MUI enables the next-page control.
+          count = baseIndex + results.length + (hasNext ? 1 : 0);
+        }
         setApiErr("");
         return { results, count };
       } catch (e) {
@@ -1050,7 +1068,9 @@ export default function AdminUsers() {
             : Array.isArray(data)
             ? data
             : [];
-          const count = typeof data?.count === "number" ? data.count : results.length;
+let countRaw = data?.count;
+let countNum = Number(countRaw);
+const count = Number.isFinite(countNum) ? countNum : results.length;
           if (total == null) total = count;
           if (!results.length) break;
           all = all.concat(results);
@@ -1317,6 +1337,35 @@ export default function AdminUsers() {
     [editFieldsWithNames]
   );
 
+  // Limit Admin Users edit form to only allowed fields and adapt for State Coordinator
+  const editFieldsRestricted = useMemo(() => {
+    const allowed = new Set(["email", "full_name", "username", "phone", "sponsor_id", "pincode", "state", "city", "account_active"]);
+    const cat = String(selected?.category || "").toLowerCase();
+    if (cat === "agency_state_coordinator") {
+      allowed.delete("city");
+      allowed.delete("pincode");
+    }
+    let arr = (editFieldsWithNames || []).filter(
+      (f) => f && allowed.has(String(f.name || ""))
+    );
+    // Ensure Username is present for cascade behavior even if meta didn't include it
+    const hasUsername = arr.some((f) => String(f.name) === "username");
+    if (!hasUsername) {
+      arr = [{ name: "username", type: "CharField", required: false, label: "Username" }, ...arr];
+    }
+    // Ensure Sponsor ID is present even if meta didn't include it
+    const hasSponsor = arr.some((f) => String(f.name) === "sponsor_id");
+    if (!hasSponsor) {
+      arr = [...arr, { name: "sponsor_id", type: "CharField", required: false, label: "Sponsor ID" }];
+    }
+    return arr;
+  }, [editFieldsWithNames, selected?.category]);
+
+  const editFieldsRestrictedNoPassword = useMemo(
+    () => (editFieldsRestricted || []).filter((f) => f && String(f.name || "").toLowerCase() !== "password"),
+    [editFieldsRestricted]
+  );
+
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
@@ -1414,7 +1463,7 @@ export default function AdminUsers() {
         onClose={() => setEditOpen(false)}
         route="/admin/users/"
         record={selected}
-        fields={editFieldsNoPassword}
+        fields={editFieldsRestrictedNoPassword}
         onSaved={() => setReloadKey((k) => k + 1)}
         title={selected?.id ? `Edit ${selected.username || selected.full_name || selected.id}` : "Create User"}
       />

@@ -38,6 +38,7 @@ export default function ConsumerShell({ children }) {
     { to: "/user/wallet", label: "Wallet", icon: "wallet" },
     { to: "/user/history", label: "History", icon: "orders" },
     // { to: "/user/my-team", label: "Genealogy", icon: "tree" },
+    { to: "/user/genealogy-5", label: "Genealogy 5-Matrix", icon: "tree" },
     { to: "/user/promo-packages", label: "Join Prime", icon: "star" },
     { to: "/user/redeem-coupon", label: "My E coupons", icon: "ticket" },
     { to: "/user/my-orders", label: "My Orders", icon: "orders" },
@@ -78,4 +79,3 @@ export default function ConsumerShell({ children }) {
     </ShellBase>
   );
 }
-

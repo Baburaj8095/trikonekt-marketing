@@ -763,24 +763,30 @@ class AdminUserEditMetaView(APIView):
                         else:
                             f["help_text"] = hint
 
-            # Restrict to allowed fields only
-            allowed = {"phone", "pincode", "sponsor_id", "password"}
+            # Restrict to allowed fields only (Admin Users editor shows geo fields via custom UI)
+            allowed = {"full_name", "email", "phone", "sponsor_id", "account_active"}
             meta = [f for f in meta if f.get("name") in allowed]
 
             # Reorder and add helpful labels/hints
-            order = ["phone", "pincode", "sponsor_id", "password"]
+            order = ["full_name", "email", "phone", "sponsor_id", "account_active"]
             meta_map = {f["name"]: f for f in meta}
             out = []
             for key in order:
                 if key in meta_map:
                     f = meta_map[key]
+                    if key == "full_name":
+                        f["label"] = "Full Name"
+                    if key == "email":
+                        f["label"] = "Email"
                     if key == "phone":
-                        f["label"] = "Mobile"
-                        f["help_text"] = (f.get("help_text") or "").strip() or "Changing mobile will also change Username to the new mobile."
-                    if key == "pincode":
-                        f["label"] = "Pincode"
-                        help_msg = "Country/State/City will auto-update from this pincode on Save."
-                        f["help_text"] = (f.get("help_text") + " | " + help_msg).strip(" |") if f.get("help_text") else help_msg
+                        f["label"] = "Phone"
+                        hint = "On save, Username is auto-synced to this phone. Downline users whose Sponsor ID equals the old username will be updated to the new one."
+                        f["help_text"] = (f.get("help_text") + " | " + hint).strip(" |") if f.get("help_text") else hint
+                    if key == "sponsor_id":
+                        f["label"] = "Sponsor ID"
+                        # read_only already set above based on permissions; keep any help_text from earlier
+                    if key == "account_active":
+                        f["label"] = "Account Active"
                     out.append(f)
             meta = out
         except Exception:
@@ -795,10 +801,11 @@ class AdminUserEditMetaView(APIView):
                 except Exception:
                     can_edit = False
             meta = [
-                {"name": "phone", "type": "CharField", "required": False, "label": "Mobile", "help_text": "Changing mobile will also change Username to the new mobile."},
-                {"name": "pincode", "type": "CharField", "required": False, "label": "Pincode", "help_text": "Country/State/City will auto-update from this pincode on Save."},
-                {"name": "sponsor_id", "type": "CharField", "required": False, "label": "Sponsor ID", "read_only": not can_edit},
-                {"name": "password", "type": "PasswordField", "required": False, "label": "Set New Password"},
+                {"name": "full_name", "type": "CharField", "required": False, "label": "Full Name"},
+                {"name": "email", "type": "EmailField", "required": False, "label": "Email"},
+                {"name": "phone", "type": "CharField", "required": False, "label": "Phone", "help_text": "Username will be synced to this phone on save; sponsor cascades accordingly."},
+                {"name": "sponsor_id", "type": "CharField", "required": False, "label": "Sponsor ID", "read_only": (not can_edit)},
+                {"name": "account_active", "type": "BooleanField", "required": False, "label": "Account Active"},
             ]
         return Response({"fields": meta}, status=200)
 

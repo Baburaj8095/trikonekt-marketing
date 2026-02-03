@@ -35,7 +35,6 @@ export default function DataTable({
   const searchRef = useRef("");
   const reqSeq = useRef(0);
   const inflightKeyRef = useRef(null);
-  const firstPaginationEventRef = useRef(true);
   useEffect(() => { searchRef.current = search; }, [search]);
 
   // Debounce user typing before applying the search that triggers fetch
@@ -204,12 +203,6 @@ export default function DataTable({
 
   const handlePaginationChange = useCallback((model) => {
     setPaginationModel((prev) => {
-      // Ignore MUI's first emit that may carry its internal default (often 50),
-      // so our desired default 100 is preserved for the initial request.
-      if (firstPaginationEventRef.current) {
-        firstPaginationEventRef.current = false;
-        return prev;
-      }
       if (prev.page === model.page && prev.pageSize === model.pageSize) return prev;
       return model;
     });
@@ -245,7 +238,7 @@ export default function DataTable({
         loading={loading}
         paginationMode="server"
         sortingMode="server"
-        initialState={{ pagination: { paginationModel: { page: 0, pageSize: 50 } } }}
+        initialState={{ pagination: { paginationModel: { page: 0, pageSize: 10 } } }}
         pagination
         pageSizeOptions={[100, 50, 25, 10]}
         paginationModel={paginationModel}

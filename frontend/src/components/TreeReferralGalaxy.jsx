@@ -654,8 +654,8 @@ export default function TreeReferralGalaxy({
                       {dFor(c.id).pincode ? (
                         <div style={{ ...styles.cardTR, fontSize: 12 }}>Pincode: {dFor(c.id).pincode}</div>
                       ) : null}
-                      {/* <div style={{ ...styles.cardTeam, fontSize: 13 }}>Direct: {directOf(c.id) ?? ""}</div>
-                      <div style={{ ...styles.cardTeam, fontSize: 13 }}>Team: {sourceType === "matrix" && typeof c.team_count === "number" ? c.team_count : (getCountValue(c.id) ?? "")}</div> */}
+                      <div style={{ ...styles.cardTeam, fontSize: 13 }}>Direct: {directOf(c.id) ?? ""}</div>
+                      <div style={{ ...styles.cardTeam, fontSize: 13 }}>Team: {sourceType === "matrix" && typeof c.team_count === "number" ? c.team_count : (getCountValue(c.id) ?? "")}</div>
                     </div>
                   ))}
                   {effectiveShowPlaceholders

@@ -185,16 +185,20 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get('DATA_UPLOAD_MAX_MEMORY_SIZE', str(5 * 1024 * 1024)))
 FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get('FILE_UPLOAD_MAX_MEMORY_SIZE', str(5 * 1024 * 1024)))
 
-# Cloudinary media storage (enabled when CLOUDINARY_URL is set AND packages are available)
+# Cloudinary media storage (enabled when CLOUDINARY_URL is set; shim re-exports real classes if available)
 if os.environ.get('CLOUDINARY_URL'):
+    # Always point default storage to cloudinary_storage shim; it binds to real classes when available.
+    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+    CLOUDINARY_STORAGE = {'SECURE': True}
+    # Add apps if available; local shim makes 'cloudinary_storage' import-safe
+    if 'cloudinary_storage' not in INSTALLED_APPS:
+        INSTALLED_APPS += ['cloudinary_storage']
     try:
-        import importlib.util
-        if importlib.util.find_spec("cloudinary_storage") and importlib.util.find_spec("cloudinary"):
-            INSTALLED_APPS += ['cloudinary_storage', 'cloudinary']
-            DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
-            CLOUDINARY_STORAGE = {'SECURE': True}
+        import cloudinary  # type: ignore
+        if 'cloudinary' not in INSTALLED_APPS:
+            INSTALLED_APPS += ['cloudinary']
     except Exception:
-        # If packages are not installed, silently skip Cloudinary to avoid startup crashes
+        # cloudinary pkg missing; uploads will fall back to local via shim
         pass
 
 # CSRF trusted origins for local frontend dev

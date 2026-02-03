@@ -453,7 +453,7 @@ class AdminPromoPurchaseListView(APIView):
 
         status_in = (request.query_params.get("status") or "PENDING").strip().upper()
         valid = {"PENDING", "APPROVED", "REJECTED", "CANCELLED"}
-        qs = PromoPurchase.objects.select_related("user", "user__state", "user__city", "package").order_by("-requested_at", "-id")
+        qs = PromoPurchase.objects.select_related("user", "user__registered_by", "user__state", "user__city", "package").order_by("-requested_at", "-id")
         if status_in in valid:
             qs = qs.filter(status=status_in)
 

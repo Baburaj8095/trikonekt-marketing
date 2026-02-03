@@ -142,8 +142,15 @@ export default function Profile() {
             const j = JSON.parse(raw);
             if (j && typeof j === "object") setNominee({ ...nominee, ...j });
           }
-        } catch {}
-      } catch (e) {
+      } catch {}
+      // Refresh avatarUrl from server so UI reflects the final storage URL (e.g., Cloudinary)
+      try {
+        const profile = await API.get("/accounts/profile/");
+        const d2 = profile?.data || {};
+        setAvatarUrl(d2.avatar_url || null);
+        setAvatarFile(null);
+      } catch {}
+    } catch (e) {
         setErr("Failed to load profile.");
       }
     })();
@@ -201,6 +208,7 @@ export default function Profile() {
       try {
         const me = await API.get("/accounts/me/");
         const data = me?.data || {};
+        setAvatarUrl(data.avatar_url || null);
         const preferLocal =
           typeof localStorage !== "undefined" &&
           localStorage.getItem(`refresh_${ns}`) !== null;
@@ -662,4 +670,3 @@ export default function Profile() {
     </Box>
   );
 }
-

@@ -655,6 +655,10 @@ class PromoPurchaseSerializer(serializers.ModelSerializer):
     user_city_name = serializers.SerializerMethodField()
     user_state_name = serializers.SerializerMethodField()
     user_role_label = serializers.SerializerMethodField()
+    sponsor_code = serializers.SerializerMethodField()
+    sponsor_user_id = serializers.SerializerMethodField()
+    sponsor_username = serializers.SerializerMethodField()
+    sponsor_full_name = serializers.SerializerMethodField()
 
     def get_user_username(self, obj):
         try:
@@ -715,6 +719,39 @@ class PromoPurchaseSerializer(serializers.ModelSerializer):
         except Exception:
             return "consumer"
 
+    def get_sponsor_code(self, obj):
+        try:
+            u = getattr(obj, "user", None)
+            return (getattr(u, "sponsor_id", "") or "")
+        except Exception:
+            return ""
+
+    def get_sponsor_user_id(self, obj):
+        try:
+            u = getattr(obj, "user", None)
+            reg = getattr(u, "registered_by", None)
+            return getattr(reg, "id", None)
+        except Exception:
+            return None
+
+    def get_sponsor_username(self, obj):
+        try:
+            u = getattr(obj, "user", None)
+            reg = getattr(u, "registered_by", None)
+            return getattr(reg, "username", None)
+        except Exception:
+            return None
+
+    def get_sponsor_full_name(self, obj):
+        try:
+            u = getattr(obj, "user", None)
+            reg = getattr(u, "registered_by", None)
+            if not reg:
+                return ""
+            return (getattr(reg, "full_name", "") or getattr(reg, "username", "") or "")
+        except Exception:
+            return ""
+
     def get_selected_product_name(self, obj):
         # Prefer decoupled promo product name; fallback to legacy market product name
         try:
@@ -740,6 +777,10 @@ class PromoPurchaseSerializer(serializers.ModelSerializer):
             "user_city_name",
             "user_state_name",
             "user_role_label",
+            "sponsor_code",
+            "sponsor_user_id",
+            "sponsor_username",
+            "sponsor_full_name",
             "package",
             "package_id",
             "quantity",
