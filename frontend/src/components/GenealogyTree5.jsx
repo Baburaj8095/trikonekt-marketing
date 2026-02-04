@@ -20,7 +20,7 @@ export default function GenealogyTree5({
   title = "Genealogy",
 }) {
   const [pool, setPool] = useState(
-    ["FIVE_150"].includes(String(initialPool).toUpperCase())
+    ["FIVE_150","THREE_150"].includes(String(initialPool).toUpperCase())
       ? String(initialPool).toUpperCase()
       : "FIVE_150"
   );
@@ -66,11 +66,11 @@ export default function GenealogyTree5({
   const displayName = (u) => (u?.full_name || u?.username || "").toString();
   const displayTR = (u) => (u?.username || "").toString();
 
-  const fetchRoot = useCallback(async ({ root_user_id = null } = {}) => {
+  const fetchRoot = useCallback(async ({ root_user_id = null, spill_from_owner_id = null } = {}) => {
     setLoading(true);
     setErr("");
     try {
-      const res = await getMyGenealogyTree5({ root_user_id, max_depth: maxDepth, pool });
+      const res = await getMyGenealogyTree5({ root_user_id, max_depth: maxDepth, pool, spill_from_owner_id });
       setRoot(res || null);
     } catch (e) {
       setErr(e?.response?.data?.detail || e?.message || "Failed to load genealogy");
@@ -88,8 +88,9 @@ export default function GenealogyTree5({
   // Re-fetch when pool changes (stay at current root if any)
   useEffect(() => {
     if (!root) return;
-    fetchRoot({ root_user_id: root?.id || null });
-  }, [pool, root?.id, fetchRoot]);
+    // Re-fetch same root when pool changes; keep current root, no owner spill context needed
+    fetchRoot({ root_user_id: root?.id || null, spill_from_owner_id: null });
+  }, [pool, fetchRoot]);
 
   const children = useMemo(() => {
     const arr = Array.isArray(root?.children) ? [...root.children] : [];
@@ -128,7 +129,7 @@ export default function GenealogyTree5({
     if (root) {
       setCrumbs((prev) => [...prev, { id: root.id, username: root.username, full_name: root.full_name }]);
     }
-    await fetchRoot({ root_user_id: child.id });
+    await fetchRoot({ root_user_id: child.id, spill_from_owner_id: root?.id || null });
   };
 
   return (
@@ -160,6 +161,7 @@ export default function GenealogyTree5({
           ) : null}
           <select value={pool} onChange={(e) => setPool(e.target.value)} style={styles.sel}>
             <option value="FIVE_150">5-Matrix</option>
+            <option value="THREE_150">3-Matrix</option>
           </select>
         </div>
       </div>

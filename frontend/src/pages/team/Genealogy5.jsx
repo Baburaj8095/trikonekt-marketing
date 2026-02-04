@@ -18,7 +18,7 @@ export default function Genealogy5() {
           padding: 12,
         }}
       >
-        <GenealogyTree5 initialPool="FIVE_150" maxDepth={6} showPlaceholders />
+        <GenealogyTree5 initialPool="FIVE_150" maxDepth={10} showPlaceholders />
       </div>
     </div>
   );
