@@ -923,6 +923,16 @@ class AdminUserEditSerializer(serializers.ModelSerializer):
     # Write-only password field to allow admin reset; Django stores hashed passwords (non-reversible)
     password = serializers.CharField(write_only=True, required=False, allow_blank=False, min_length=8)
 
+    # Admin-only region assignment inputs (write-only)
+    assign_states = serializers.ListField(child=serializers.IntegerField(), required=False, write_only=True)
+    assign_districts = serializers.ListField(child=serializers.CharField(allow_blank=False), required=False, write_only=True)
+    assign_pincodes = serializers.ListField(child=serializers.RegexField(r'^\d{6}$'), required=False, write_only=True)
+
+    # Read-only current assignments for prefill
+    states_assigned = serializers.SerializerMethodField(read_only=True)
+    districts_assigned = serializers.SerializerMethodField(read_only=True)
+    pincodes_assigned = serializers.SerializerMethodField(read_only=True)
+
     class Meta:
         model = CustomUser
         fields = [
@@ -942,11 +952,24 @@ class AdminUserEditSerializer(serializers.ModelSerializer):
             "account_active",
             "is_active",
             "password",
+            # Admin-only region assignments (write-only)
+            "assign_states",
+            "assign_districts",
+            "assign_pincodes",
+            # Read-only current assignments for prefill
+            "states_assigned",
+            "districts_assigned",
+            "pincodes_assigned",
         ]
 
     def update(self, instance, validated_data):
         # Accept only whitelisted fields from admin edit dialog and grid toggles
         password = validated_data.pop("password", None)
+
+        # Extract assignment arrays (admin-only, write-only)
+        assign_states = validated_data.pop("assign_states", None)
+        assign_districts = validated_data.pop("assign_districts", None)
+        assign_pincodes = validated_data.pop("assign_pincodes", None)
 
         # Capture current username and handle explicit username update intent
         old_username = (getattr(instance, "username", "") or "")
@@ -1111,7 +1134,123 @@ class AdminUserEditSerializer(serializers.ModelSerializer):
         except Exception:
             pass
 
+        # Apply region assignments if provided (coordinator categories)
+        try:
+            cat = str(getattr(instance, "category", "")).lower()
+            # State Coordinator: assign up to 2 states
+            if isinstance(assign_states, list) and cat == "agency_state_coordinator":
+                allowed_ids = []
+                for x in assign_states:
+                    try:
+                        xi = int(x)
+                        allowed_ids.append(xi)
+                    except Exception:
+                        continue
+                from locations.models import State as _St
+                states = list(_St.objects.filter(id__in=allowed_ids))[:2]
+                # Remove unselected
+                instance.region_assignments.filter(level="state").exclude(state__in=states).delete()
+                # Ensure selected
+                for st in states:
+                    AgencyRegionAssignment.objects.get_or_create(
+                        user=instance, level="state", state=st, defaults={"district": "", "pincode": ""}
+                    )
+
+            # District Coordinator: assign up to 2 districts under current state
+            if isinstance(assign_districts, list) and cat == "agency_district_coordinator":
+                sel_state = getattr(instance, "state", None)
+                if sel_state:
+                    # Normalize districts (de-dup, preserve order)
+                    dnorm = []
+                    seen = set()
+                    for d in assign_districts:
+                        s = str(d or "").strip()
+                        if not s:
+                            continue
+                        lk = s.lower()
+                        if lk in seen:
+                            continue
+                        seen.add(lk)
+                        dnorm.append(s)
+                    dnorm = dnorm[:2]
+                    instance.region_assignments.filter(level="district", state=sel_state).exclude(district__in=dnorm).delete()
+                    for d in dnorm:
+                        AgencyRegionAssignment.objects.get_or_create(
+                            user=instance, level="district", state=sel_state, district=d, defaults={"pincode": ""}
+                        )
+
+            # Pincode Coordinator: assign up to 4 pincodes under current state/district
+            if isinstance(assign_pincodes, list) and cat == "agency_pincode_coordinator":
+                sel_state = getattr(instance, "state", None)
+                try:
+                    dname = (getattr(getattr(instance, "city", None), "name", "") or "").strip()
+                except Exception:
+                    dname = ""
+                pins = []
+                seenp = set()
+                for p in assign_pincodes:
+                    s = "".join(ch for ch in str(p or "") if ch.isdigit())
+                    if len(s) == 6 and s not in seenp:
+                        seenp.add(s)
+                        pins.append(s)
+                pins = pins[:4]
+                if pins:
+                    instance.region_assignments.filter(level="pincode").exclude(pincode__in=pins).delete()
+                else:
+                    # Explicitly clear when empty array provided
+                    instance.region_assignments.filter(level="pincode").delete()
+                for p in pins:
+                    AgencyRegionAssignment.objects.get_or_create(
+                        user=instance, level="pincode", state=sel_state, district=dname, pincode=p
+                    )
+        except Exception:
+            # Best-effort; do not block admin edit if assignments fail
+            pass
+
         return instance
+
+    def get_states_assigned(self, obj):
+        try:
+            rows = AgencyRegionAssignment.objects.select_related("state").filter(user_id=getattr(obj, "id", None), level="state")
+            out = []
+            for a in rows:
+                if getattr(a, "state_id", None) and getattr(a, "state", None):
+                    out.append({"id": a.state_id, "name": a.state.name or ""})
+            return out
+        except Exception:
+            return []
+
+    def get_districts_assigned(self, obj):
+        try:
+            qs = AgencyRegionAssignment.objects.filter(user_id=getattr(obj, "id", None), level="district")
+            # If user's primary state is set, filter to it
+            st_id = getattr(obj, "state_id", None)
+            if st_id:
+                qs = qs.filter(state_id=st_id)
+            names = []
+            seen = set()
+            for a in qs.only("district"):
+                d = (getattr(a, "district", "") or "").strip()
+                if d and d.lower() not in seen:
+                    seen.add(d.lower())
+                    names.append(d)
+            return names
+        except Exception:
+            return []
+
+    def get_pincodes_assigned(self, obj):
+        try:
+            qs = AgencyRegionAssignment.objects.filter(user_id=getattr(obj, "id", None), level="pincode")
+            pins = []
+            seen = set()
+            for a in qs.only("pincode"):
+                p = (getattr(a, "pincode", "") or "").strip()
+                if p and p not in seen:
+                    seen.add(p)
+                    pins.append(p)
+            return pins
+        except Exception:
+            return []
 
 
 class AdminPurchaseRequestSerializer(serializers.ModelSerializer):

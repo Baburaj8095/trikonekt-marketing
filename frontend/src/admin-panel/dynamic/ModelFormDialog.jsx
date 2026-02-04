@@ -70,6 +70,14 @@ export default function ModelFormDialog({
     const cat = String(record?.category || "").toLowerCase();
     return cat === "agency_state_coordinator";
   }, [record]);
+  // Additional agency category flags for specialized admin editing
+  const category = React.useMemo(() => String(record?.category || "").toLowerCase(), [record]);
+  const isDC = React.useMemo(() => category === "agency_district_coordinator", [category]);
+  const isPC = React.useMemo(() => category === "agency_pincode_coordinator", [category]);
+  const isStateCat = React.useMemo(() => category === "agency_state", [category]);
+  const isDistrictCat = React.useMemo(() => category === "agency_district", [category]);
+  const isPincodeCat = React.useMemo(() => category === "agency_pincode", [category]);
+  const isSubFranchiseCat = React.useMemo(() => category === "agency_sub_franchise", [category]);
 
   // Geo state for Admin Users editor
   const [geoStates, setGeoStates] = React.useState([]);
@@ -77,6 +85,14 @@ export default function ModelFormDialog({
   const [stateIdSel, setStateIdSel] = React.useState("");
   const [cityIdSel, setCityIdSel] = React.useState("");
   const [pin6, setPin6] = React.useState("");
+  // Coordinator multi-assignments and sponsor-scoped options
+  const [assignStates, setAssignStates] = React.useState([]);
+  const [assignDistricts, setAssignDistricts] = React.useState([]);
+  const [assignPincodes, setAssignPincodes] = React.useState([]);
+  const [sponsorStates, setSponsorStates] = React.useState([]);
+  const [sponsorDistricts, setSponsorDistricts] = React.useState([]);
+  const [sponsorPincodes, setSponsorPincodes] = React.useState([]);
+  const [districtPincodes, setDistrictPincodes] = React.useState([]);
 
   // Resolve fields dynamically:
   // 1) Prefer backend OPTIONS schema (POST for create, PATCH/POST for edit)
@@ -152,7 +168,101 @@ export default function ModelFormDialog({
     }
     setValues(init);
     setErrors({});
-  }, [record, formFields, open]);
+}, [record, formFields, open]);
+
+  // Initialize coordinator assignment arrays from record (prefer read-only *_assigned from API)
+  React.useEffect(() => {
+    if (!open || !isAdminUsersRoute) return;
+    try {
+      const as = Array.isArray(record?.states_assigned)
+        ? record.states_assigned.map((s) => String((s && (s.id ?? s)))).filter(Boolean)
+        : (Array.isArray(record?.assign_states) ? record.assign_states.map((x) => String(x)) : []);
+      const ad = Array.isArray(record?.districts_assigned)
+        ? record.districts_assigned.map((x) => String(x))
+        : (Array.isArray(record?.assign_districts) ? record.assign_districts.map((x) => String(x)) : []);
+      const ap = Array.isArray(record?.pincodes_assigned)
+        ? record.pincodes_assigned.map((x) => String(x))
+        : (Array.isArray(record?.assign_pincodes) ? record.assign_pincodes.map((x) => String(x)) : []);
+      setAssignStates(as);
+      setAssignDistricts(ad);
+      setAssignPincodes(ap);
+    } catch {
+      setAssignStates([]);
+      setAssignDistricts([]);
+      setAssignPincodes([]);
+    }
+  }, [open, isAdminUsersRoute, record]);
+
+  // Fallback prefill for multi-assign selections when backend doesn't return assign_* fields
+  React.useEffect(() => {
+    if (!open || !isAdminUsersRoute) return;
+    try {
+      const preferArray = (...cands) => {
+        for (const c of cands) if (Array.isArray(c) && c.length) return c;
+        return [];
+      };
+
+      // Robust candidates from common server payload shapes
+      const candStates = preferArray(
+        record?.assign_states,
+        record?.selected_states,
+        record?.states,
+        record?.assigned_states,
+        record?.regions?.states,
+        record?.data?.assign_states
+      );
+      const candDistricts = preferArray(
+        record?.assign_districts,
+        record?.selected_districts,
+        record?.districts,
+        record?.assigned_districts,
+        record?.regions?.districts,
+        record?.data?.assign_districts
+      );
+      const candPincodes = preferArray(
+        record?.assign_pincodes,
+        record?.selected_pincodes,
+        record?.pincodes,
+        record?.pincode_list,
+        record?.assigned_pincodes,
+        record?.regions?.pincodes,
+        record?.data?.assign_pincodes
+      );
+
+      // State Coordinator: prefer array candidates; fallback to single selected_state/state
+      if (isSC && (!Array.isArray(assignStates) || assignStates.length === 0)) {
+        if (candStates.length) {
+          setAssignStates(candStates.map((x) => String(x)));
+        } else {
+          const sid = record?.selected_state ?? record?.state ?? record?.state_id;
+          if (sid != null && sid !== "") setAssignStates([String(sid)]);
+        }
+      }
+
+      // District Coordinator: prefer array candidates; fallback to selected_district/district_name/city_name
+      if (isDC && (!Array.isArray(assignDistricts) || assignDistricts.length === 0)) {
+        if (candDistricts.length) {
+          setAssignDistricts(candDistricts.map((x) => String(x)));
+        } else {
+          const d = record?.selected_district || record?.district_name || record?.city_name;
+          if (d) setAssignDistricts([String(d)]);
+        }
+      }
+
+      // Pincode Coordinator: prefer array candidates; fallback to single selected_pincode/pincode
+      if (isPC && (!Array.isArray(assignPincodes) || assignPincodes.length === 0)) {
+        if (candPincodes.length) {
+          const pins = candPincodes
+            .map((p) => String(p || "").replace(/\D/g, "").slice(0, 6))
+            .filter((p) => /^\d{6}$/.test(p));
+          if (pins.length) setAssignPincodes(pins);
+        } else {
+          const p = String(record?.selected_pincode || record?.pincode || "").replace(/\D/g, "").slice(0, 6);
+          if (p && /^\d{6}$/.test(p)) setAssignPincodes([p]);
+        }
+      }
+    } catch (_) {}
+  }, [open, isAdminUsersRoute, isSC, isDC, isPC, record, assignStates, assignDistricts, assignPincodes]);
 
   const handleChange = (name, v) => {
     setValues((s) => ({ ...s, [name]: v }));
@@ -284,7 +394,7 @@ export default function ModelFormDialog({
         if (cancelled) return;
         setGeoStates(arr);
 
-        // Initial state selection (prefer id, fallback by name)
+        // Initial state selection (prefer id, fallback by name or selected_state)
         const rid = record?.state ?? record?.state_id;
         const rname = record?.state_name;
         let sid = rid ? String(rid) : "";
@@ -292,10 +402,13 @@ export default function ModelFormDialog({
           const m = arr.find((s) => String(s?.name || "").trim().toLowerCase() === String(rname).trim().toLowerCase());
           if (m) sid = String(m.id);
         }
+        if (!sid && record?.selected_state) {
+          sid = String(record.selected_state);
+        }
         setStateIdSel(sid);
 
-        // Initial pincode
-        const pin = String(record?.pincode || "");
+        // Initial pincode (fallback to selected_pincode for agency edits)
+        const pin = String(record?.pincode || record?.selected_pincode || "");
         setPin6(pin);
 
         // Load cities for selected state
@@ -310,6 +423,11 @@ export default function ModelFormDialog({
           if (!cid && rcn) {
             const m2 = arr2.find((c) => String(c?.name || c?.Name || c?.city || c?.City || "").trim().toLowerCase() === String(rcn).trim().toLowerCase());
             if (m2) cid = String(m2.id);
+          }
+          if (!cid && record?.selected_district) {
+            const sd = String(record.selected_district).trim().toLowerCase();
+            const m3 = arr2.find((c) => String(c?.name || c?.Name || c?.city || c?.City || "").trim().toLowerCase() === sd);
+            if (m3) cid = String(m3.id);
           }
           if (!cancelled) setCityIdSel(cid);
         } else {
@@ -338,7 +456,113 @@ export default function ModelFormDialog({
       }
     })();
     return () => { cancelled = true; };
-  }, [open, isAdminUsersRoute, stateIdSel]);
+}, [open, isAdminUsersRoute, stateIdSel]);
+
+  // If districts are prefilled from assignDistricts (or PC needs district), map first match to cityIdSel when cities load
+  React.useEffect(() => {
+    if (!open || !isAdminUsersRoute) return;
+    if (!(isDC || isPC)) return;
+    if (!stateIdSel || !Array.isArray(geoCities) || !geoCities.length) return;
+    if (cityIdSel) return;
+    const name = Array.isArray(assignDistricts) && assignDistricts.length ? String(assignDistricts[0]) : "";
+    if (!name) return;
+    const norm = (s) => String(s || "").trim().toLowerCase();
+    const m = (geoCities || []).find(
+      (c) => norm(c?.name || c?.Name || c?.city || c?.City) === norm(name)
+    );
+    if (m) setCityIdSel(String(m.id));
+  }, [open, isAdminUsersRoute, isDC, isPC, stateIdSel, geoCities, assignDistricts, cityIdSel]);
+
+  // Sponsor-scoped states
+  React.useEffect(() => {
+    if (!open || !isAdminUsersRoute) return;
+    const s = String(record?.sponsor_id || "").trim();
+    if (!s) { setSponsorStates([]); return; }
+    (async () => {
+      try {
+        const r = await API.get("/accounts/regions/by-sponsor/", { params: { sponsor: s, level: "state" } });
+        const rows = Array.isArray(r?.data?.states) ? r.data.states : (Array.isArray(r?.data?.results) ? r.data.results : []);
+        setSponsorStates(rows || []);
+      } catch {
+        setSponsorStates([]);
+      }
+    })();
+  }, [open, isAdminUsersRoute, record?.sponsor_id]);
+
+  // Sponsor-scoped districts for selected state
+  React.useEffect(() => {
+    if (!open || !isAdminUsersRoute || !stateIdSel) { setSponsorDistricts([]); return; }
+    const s = String(record?.sponsor_id || "").trim();
+    if (!s) { setSponsorDistricts([]); return; }
+    (async () => {
+      try {
+        const r = await API.get("/accounts/regions/by-sponsor/", { params: { sponsor: s, level: "district", state_id: stateIdSel } });
+        const rows = Array.isArray(r?.data?.districts) ? r.data.districts : (Array.isArray(r?.data?.results) ? r.data.results : []);
+        setSponsorDistricts(rows || []);
+      } catch {
+        setSponsorDistricts([]);
+      }
+    })();
+  }, [open, isAdminUsersRoute, record?.sponsor_id, stateIdSel]);
+
+  // Sponsor-scoped pincodes (global list under sponsor)
+  React.useEffect(() => {
+    if (!open || !isAdminUsersRoute) return;
+    const s = String(record?.sponsor_id || "").trim();
+    if (!s) { setSponsorPincodes([]); return; }
+    (async () => {
+      try {
+        const r = await API.get("/accounts/regions/by-sponsor/", { params: { sponsor: s, level: "pincode" } });
+        const rows = Array.isArray(r?.data?.pincodes) ? r.data.pincodes : (Array.isArray(r?.data?.results) ? r.data.results : []);
+        const pins = Array.from(new Set((rows || []).map((p) => String(p || "").replace(/\D/g, "").slice(0, 6)).filter((p) => /^\d{6}$/.test(p))));
+        setSponsorPincodes(pins);
+      } catch {
+        setSponsorPincodes([]);
+      }
+    })();
+  }, [open, isAdminUsersRoute, record?.sponsor_id]);
+
+  // District-based pincodes for currently selected city/state
+  React.useEffect(() => {
+    if (!open || !isAdminUsersRoute || !stateIdSel) { setDistrictPincodes([]); return; }
+    const item = (geoCities || []).find((c) => String(c?.id) === String(cityIdSel));
+    const dname = item?.name || item?.Name || item?.city || item?.City || "";
+    if (!dname) { setDistrictPincodes([]); return; }
+    (async () => {
+      try {
+        const resp = await API.get("/location/pincodes/by-district/", { params: { district_name: dname, state_id: stateIdSel } });
+        const rows = Array.isArray(resp?.data) ? resp.data : (resp?.data?.results || resp?.data?.pincodes || []);
+        const pins = Array.from(new Set((rows || []).map((p) => String(p || "").replace(/\D/g, "").slice(0, 6)).filter((p) => /^\d{6}$/.test(p))));
+        setDistrictPincodes(pins);
+        setAssignPincodes((prev) => (Array.isArray(prev) ? prev.filter((p) => pins.includes(p)) : []));
+      } catch {
+        setDistrictPincodes([]);
+      }
+    })();
+  }, [open, isAdminUsersRoute, stateIdSel, cityIdSel, geoCities]);
+
+  // Derived options for coordinator editors
+  const districtOptionsAdmin = React.useMemo(() => {
+    const fromSponsor = (sponsorDistricts || [])
+      .filter((d) => String(d?.state_id) === String(stateIdSel))
+      .map((d) => d?.district)
+      .filter(Boolean);
+    if (fromSponsor.length) return Array.from(new Set(fromSponsor));
+    const fromCities = (geoCities || [])
+      .map((c) => c?.name || c?.Name || c?.city || c?.City)
+      .filter(Boolean);
+    return Array.from(new Set(fromCities));
+  }, [sponsorDistricts, stateIdSel, geoCities]);
+
+  const pincodeOptionsAdmin = React.useMemo(() => {
+    const hasDistrict = Array.isArray(districtPincodes) && districtPincodes.length > 0;
+    const hasSponsor = Array.isArray(sponsorPincodes) && sponsorPincodes.length > 0;
+    if (hasDistrict && hasSponsor) {
+      const ss = new Set(sponsorPincodes);
+      return districtPincodes.filter((p) => ss.has(p));
+    }
+    return hasDistrict ? districtPincodes : sponsorPincodes;
+  }, [districtPincodes, sponsorPincodes]);
 
   // Pincode -> auto-map state/district when possible (Admin Users)
   React.useEffect(() => {
@@ -452,7 +676,7 @@ export default function ModelFormDialog({
         }
       }
 
-      // Admin Users whitelist and geo merge
+      // Admin Users whitelist and geo merge (+ multi-assign support for coordinators)
       if (isAdminUsersRoute) {
         const origState = original?.state ?? original?.state_id ?? "";
         const origCity = original?.city ?? original?.city_id ?? "";
@@ -460,9 +684,34 @@ export default function ModelFormDialog({
         if (stateIdSel && String(stateIdSel) !== String(origState) && !changed.includes("state")) changed.push("state");
         if (!isSC && cityIdSel && String(cityIdSel) !== String(origCity) && !changed.includes("city")) changed.push("city");
         if (!isSC && typeof pin6 === "string" && String(pin6) !== String(origPin) && !changed.includes("pincode")) changed.push("pincode");
-        const whitelist = isSC
-          ? ["full_name", "email", "phone", "sponsor_id", "username", "state", "account_active"]
-          : ["full_name", "email", "phone", "sponsor_id", "username", "state", "city", "pincode", "account_active"];
+
+        // Multi-assign diffs
+        const arrEq = (a, b) => {
+          const A = Array.isArray(a) ? a.map(String).sort() : [];
+          const B = Array.isArray(b) ? b.map(String).sort() : [];
+          return A.length === B.length && A.every((v, i) => v === B[i]);
+        };
+        const origAssignStates = Array.isArray(original?.states_assigned)
+          ? original.states_assigned.map((s) => String((s && (s.id ?? s)))).filter(Boolean)
+          : (Array.isArray(original?.assign_states) ? original.assign_states.map(String) : []);
+        const origAssignDistricts = Array.isArray(original?.districts_assigned)
+          ? original.districts_assigned.map(String)
+          : (Array.isArray(original?.assign_districts) ? original.assign_districts.map(String) : []);
+        const origAssignPincodes = Array.isArray(original?.pincodes_assigned)
+          ? original.pincodes_assigned.map(String)
+          : (Array.isArray(original?.assign_pincodes) ? original.assign_pincodes.map(String) : []);
+        if (isSC && !arrEq(origAssignStates, assignStates) && !changed.includes("assign_states")) changed.push("assign_states");
+        if (isDC && !arrEq(origAssignDistricts, assignDistricts) && !changed.includes("assign_districts")) changed.push("assign_districts");
+        if (isPC && !arrEq(origAssignPincodes, assignPincodes) && !changed.includes("assign_pincodes")) changed.push("assign_pincodes");
+
+        // Whitelist
+        const whitelist = [
+          "full_name", "email", "phone", "sponsor_id", "username",
+          "state", "city", "pincode", "account_active",
+          ...(isSC ? ["assign_states"] : []),
+          ...(isDC ? ["assign_districts"] : []),
+          ...(isPC ? ["assign_pincodes"] : []),
+        ];
         for (let i = changed.length - 1; i >= 0; i--) {
           if (!whitelist.includes(changed[i])) changed.splice(i, 1);
         }
@@ -512,6 +761,17 @@ export default function ModelFormDialog({
             if (name === "state") v = stateIdSel ? parseInt(stateIdSel, 10) : "";
             if (!isSC && name === "city") v = cityIdSel ? parseInt(cityIdSel, 10) : "";
             if (!isSC && name === "pincode") v = pin6 || "";
+            if (name === "assign_states") {
+              v = (assignStates || []).map((x) => parseInt(x, 10)).filter((n) => Number.isFinite(n));
+            }
+            if (name === "assign_districts") {
+              v = Array.isArray(assignDistricts) ? assignDistricts : [];
+            }
+            if (name === "assign_pincodes") {
+              v = (assignPincodes || [])
+                .map((p) => String(p || "").replace(/\D/g, "").slice(0, 6))
+                .filter((p) => /^\d{6}$/.test(p));
+            }
           }
 
           if (v === "" || v === null || v === undefined) continue;
@@ -552,6 +812,17 @@ export default function ModelFormDialog({
             if (name === "state") v = stateIdSel ? parseInt(stateIdSel, 10) : "";
             if (!isSC && name === "city") v = cityIdSel ? parseInt(cityIdSel, 10) : "";
             if (!isSC && name === "pincode") v = pin6 || "";
+            if (name === "assign_states") {
+              v = (assignStates || []).map((x) => parseInt(x, 10)).filter((n) => Number.isFinite(n));
+            }
+            if (name === "assign_districts") {
+              v = Array.isArray(assignDistricts) ? assignDistricts : [];
+            }
+            if (name === "assign_pincodes") {
+              v = (assignPincodes || [])
+                .map((p) => String(p || "").replace(/\D/g, "").slice(0, 6))
+                .filter((p) => /^\d{6}$/.test(p));
+            }
           }
 
           if (isNumeric(f) && v !== "" && v !== null && v !== undefined) {
@@ -674,6 +945,22 @@ export default function ModelFormDialog({
 
               if (isRelationField(f)) veff = coerceRelationValue(f, veff);
               payloadAll[f.name] = veff;
+            }
+            // Include coordinator multi-assign fields as well (JSON)
+            if (isAdminUsersRoute) {
+              if (isSC) {
+                payloadAll.assign_states = (assignStates || [])
+                  .map((x) => parseInt(x, 10))
+                  .filter((n) => Number.isFinite(n));
+              }
+              if (isDC) {
+                payloadAll.assign_districts = Array.isArray(assignDistricts) ? assignDistricts : [];
+              }
+              if (isPC) {
+                payloadAll.assign_pincodes = (assignPincodes || [])
+                  .map((p) => String(p || "").replace(/\D/g, "").slice(0, 6))
+                  .filter((p) => /^\d{6}$/.test(p));
+              }
             }
             fullData = payloadAll;
           }
@@ -872,30 +1159,58 @@ export default function ModelFormDialog({
             })}
           {isAdminUsersRoute && (
             <>
-              <TextField
-                select
-                label="State"
-                value={stateIdSel || ""}
-                onChange={(e) => {
-                  setStateIdSel(String(e.target.value));
-                  setCityIdSel("");
-                }}
-                required
-                error={!!errors.state}
-                helperText={errors.state || " "}
-                size="small"
-              >
-                <MenuItem value="">
-                  <em></em>
-                </MenuItem>
-                {(geoStates || []).map((s) => (
-                  <MenuItem key={String(s.id)} value={String(s.id)}>
-                    {s.name}
+              {!isSC ? (
+                <TextField
+                  select
+                  label="State"
+                  value={stateIdSel || ""}
+                  onChange={(e) => {
+                    setStateIdSel(String(e.target.value));
+                    setCityIdSel("");
+                  }}
+                  required
+                  error={!!errors.state}
+                  helperText={errors.state || " "}
+                  size="small"
+                >
+                  <MenuItem value="">
+                    <em></em>
                   </MenuItem>
-                ))}
-              </TextField>
+                  {(geoStates || []).map((s) => (
+                    <MenuItem key={String(s.id)} value={String(s.id)}>
+                      {s.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              ) : (
+                <TextField
+                  select
+                  label="States (Max 2)"
+                  value={assignStates}
+                  onChange={(e) => setAssignStates(Array.from(e.target.value || []).map((v) => String(v)))}
+                  SelectProps={{
+                    multiple: true,
+                    renderValue: (selected) => {
+                      const ids = Array.from(selected || []);
+                      const names = ids.map((id) => {
+                        const st = (geoStates || []).find((x) => String(x.id) === String(id));
+                        return st ? st.name : id;
+                      });
+                      return names.join(", ");
+                    },
+                  }}
+                  helperText="Select one or more states to assign"
+                  size="small"
+                >
+                  {(geoStates || []).map((s) => (
+                    <MenuItem key={String(s.id)} value={String(s.id)}>
+                      {s.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
 
-              {!isSC && (
+              {!isSC && !isDC && (
                 <TextField
                   select
                   label="District"
@@ -921,7 +1236,26 @@ export default function ModelFormDialog({
                 </TextField>
               )}
 
-              {!isSC && (
+              {isDC && (
+                <TextField
+                  select
+                  label="Districts (Max 2)"
+                  value={assignDistricts}
+                  onChange={(e) => setAssignDistricts(Array.from(e.target.value || []).map((v) => String(v)))}
+                  SelectProps={{ multiple: true, renderValue: (selected) => (Array.from(selected || [])).join(", ") }}
+                  size="small"
+                  disabled={!stateIdSel}
+                  helperText="Select one or more districts"
+                >
+                  {(districtOptionsAdmin || []).map((d) => (
+                    <MenuItem key={d} value={d}>
+                      {d}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
+
+              {!isSC && !isDC && !isPC && (
                 <TextField
                   label="Pincode"
                   value={pin6}
@@ -932,6 +1266,25 @@ export default function ModelFormDialog({
                   size="small"
                   inputProps={{ inputMode: "numeric", pattern: "[0-9]*", maxLength: 6 }}
                 />
+              )}
+
+              {isPC && (
+                <TextField
+                  select
+                  label="Pincodes (Max 4)"
+                  value={assignPincodes}
+                  onChange={(e) => setAssignPincodes(Array.from(e.target.value || []))}
+                  SelectProps={{ multiple: true, renderValue: (selected) => (Array.from(selected || [])).join(", ") }}
+                  size="small"
+                  disabled={!stateIdSel || !cityIdSel}
+                  helperText="Select one or more pincodes"
+                >
+                  {(pincodeOptionsAdmin || []).map((pin) => (
+                    <MenuItem key={pin} value={pin}>
+                      {pin}
+                    </MenuItem>
+                  ))}
+                </TextField>
               )}
             </>
           )}

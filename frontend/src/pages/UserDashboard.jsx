@@ -19,6 +19,7 @@ import CategoryStrip from "../components/CategoryStrip";
 import ProductStrip from "../components/ProductStrip";
 import BillsAndRecharge from "../components/BillsAndRecharge";
 import SmartImage from "../components/SmartImage2";
+import PrimeStrip from "../components/PrimeBadge";
 
 import API, {
   listMyPromoPurchases,
@@ -376,6 +377,10 @@ export default function UserDashboard({ embedded = false }) {
         </Toolbar>
       </AppBar> */}
 
+      <PrimeStrip
+        isPrime={purchasedPrime750}
+        onJoinClick={() => navigate("/user/promo-packages")}
+      />
       {/* CONTENT */}
       <Box px={2} pb={3}>
         {/* HERO */}

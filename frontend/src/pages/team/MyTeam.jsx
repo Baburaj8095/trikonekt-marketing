@@ -240,23 +240,6 @@ export default function MyTeam() {
           </Card>
         </Box>
       ) : null}
-
-      {/* 3 Matrix Tree (consumer placement sponsor-based, include self; direct count visible on top card) */}
-      {tab === 1 ? (
-        <Box sx={{ mt: 2 }}>
-          <div
-            style={{
-              border: "1px solid #e2e8f0",
-              borderRadius: 10,
-              background: "#f8fafc",
-              padding: 12,
-            }}
-          >
-            {/* Use sponsor-based tree and deeper depth to emulate 3-matrix consumer placement */}
-            <TreeReferralGalaxy mode="self" preferredSource="sponsor" maxDepth={levels.three} maxChildren={3} />
-          </div>
-        </Box>
-      ) : null}
     </Box>
   );
 }

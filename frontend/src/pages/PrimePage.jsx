@@ -1,12 +1,51 @@
-﻿import React from "react";
+﻿import React, { useEffect, useState } from "react";
 import { Box, Container, Typography, Card, CardContent, Grid } from "@mui/material";
 import PublicNavbar from "../components/PublicNavbar";
 import Footer from "../components/Footer";
+import { useNavigate } from "react-router-dom";
+import PrimeStrip from "../components/PrimeBadge";
+import { listMyPromoPurchases } from "../api/api";
 
 export default function PrimePage() {
+  const navigate = useNavigate();
+  const [purchasedPrime750, setPurchasedPrime750] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await listMyPromoPurchases();
+        const list = Array.isArray(res) ? res : res?.results || [];
+        const valid = (list || []).filter((pp) => String(pp?.status || "").toUpperCase() === "APPROVED");
+        let has750 = false;
+        for (const pp of valid) {
+          const pkg = pp?.package || {};
+          const type = String(pkg?.type || "");
+          const name = String(pkg?.name || "").toLowerCase();
+          const code = String(pkg?.code || "").toLowerCase();
+          const price = Number(pkg?.price || 0);
+          if (type === "PRIME" && (Math.abs(price - 750) < 0.5 || name.includes("750") || code.includes("750"))) {
+            has750 = true;
+          }
+        }
+        if (!alive) return;
+        setPurchasedPrime750(has750);
+      } catch (_) {
+        if (!alive) return;
+        setPurchasedPrime750(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
   return (
     <Box bgcolor="#ffffff" minHeight="100vh" display="flex" flexDirection="column">
       <PublicNavbar />
+      <PrimeStrip
+        isPrime={purchasedPrime750}
+        onJoinClick={() => navigate("/user/promo-packages")}
+      />
 
       <Container sx={{ py: { xs: 5, md: 8 }, flex: 1 }}>
         <Typography fontSize={{ xs: 28, md: 36 }} fontWeight={800} color="#0C2D48" mb={2}>
@@ -40,4 +79,3 @@ export default function PrimePage() {
     </Box>
   );
 }
-
