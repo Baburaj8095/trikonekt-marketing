@@ -1,0 +1,27 @@
+{
+  "generated_at": "2026-02-07T15:33:06.269820Z",
+  "query_identifier": "9886178729",
+  "resolved": {
+    "found": true,
+    "id": 36,
+    "username": "9886178729",
+    "phone": "9886178729",
+    "prefixed_id": "TR-0000000326"
+  },
+  "pools": {
+    "FIVE_150": {
+      "pool": "FIVE_150",
+      "fanout": 5,
+      "default_levels": 10,
+      "has_entry": false
+    },
+    "THREE_150": {
+      "pool": "THREE_150",
+      "fanout": 3,
+      "default_levels": 15,
+      "has_entry": false
+    }
+  },
+  "directs_count": 0,
+  "directs_sample": []
+}

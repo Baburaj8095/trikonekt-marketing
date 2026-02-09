@@ -1,0 +1,16 @@
+C:\Users\Baburaj\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\db\backends\utils.py:98: RuntimeWarning: Accessing the database during app initialization is discouraged. To fix this warning, avoid executing queries in AppConfig.ready() or when your app modules are imported.
+  warnings.warn(self.APPS_NOT_READY_WARNING_MSG, category=RuntimeWarning)
+Scanning users: 81, pools=['FIVE_150', 'THREE_150'], dry_run=True
+Summary (missing placements to create):
+  FIVE_150: 3 to create
+  THREE_150: 4 to create
+Preview first 10 planned placements for FIVE_150:
+    ts=2026-01-28 11:35:32.785035+00:00  user_id=101  product=150
+    ts=2026-01-29 19:56:30.447166+00:00  user_id=150  product=150
+    ts=2026-01-30 17:18:04.944534+00:00  user_id=139  product=150
+Preview first 10 planned placements for THREE_150:
+    ts=2026-01-28 11:35:32.785035+00:00  user_id=101  product=150
+    ts=2026-01-29 04:12:41.592808+00:00  user_id=125  product=150
+    ts=2026-01-29 19:56:30.447166+00:00  user_id=150  product=150
+    ts=2026-01-30 17:18:04.944534+00:00  user_id=139  product=150
+Dry-run complete. No changes applied.

@@ -1,119 +1,114 @@
 {
   "32:FIVE_150_matrix": {
     "root": {
-      "id": 32,
-      "username": "TRIKONEKT",
+      "id": null,
+      "username": "9999999999",
       "level": 1,
       "matrix_position": null,
-      "depth": 0
+      "depth": null
     },
-    "children_count": 5,
+    "children_count": 2,
     "first_children": [
       {
-        "id": 32,
-        "username": "TRIKONEKT",
-        "pos": 1
+        "id": null,
+        "username": "9999999999",
+        "pos": null
       },
       {
-        "id": 32,
-        "username": "TRIKONEKT",
-        "pos": 2
-      },
-      {
-        "id": 101,
-        "username": "1010000001",
-        "pos": 3
-      },
-      {
-        "id": 102,
-        "username": "1010000002",
-        "pos": 4
-      },
-      {
-        "id": 103,
-        "username": "1010000003",
-        "pos": 5
+        "id": null,
+        "username": "9999999999",
+        "pos": null
       }
     ]
   },
   "32:THREE_150_matrix": {
     "root": {
-      "id": 32,
-      "username": "TRIKONEKT",
+      "id": null,
+      "username": "9999999999",
       "level": 1,
       "matrix_position": null,
-      "depth": 0
+      "depth": null
     },
     "children_count": 3,
     "first_children": [
       {
-        "id": 32,
-        "username": "TRIKONEKT",
-        "pos": 1
+        "id": null,
+        "username": "9999999999",
+        "pos": null
       },
       {
-        "id": 32,
-        "username": "TRIKONEKT",
-        "pos": 2
+        "id": null,
+        "username": "9999999999",
+        "pos": null
       },
       {
-        "id": 101,
+        "id": null,
         "username": "1010000001",
-        "pos": 3
+        "pos": null
       }
     ]
   },
   "101:FIVE_150_matrix": {
     "root": {
-      "id": 101,
+      "id": null,
       "username": "1010000001",
       "level": 1,
       "matrix_position": null,
-      "depth": 1
+      "depth": null
     },
-    "children_count": 4,
+    "children_count": 5,
     "first_children": [
       {
-        "id": 105,
-        "username": "1010000005",
-        "pos": 1
+        "id": null,
+        "username": "8310547774",
+        "pos": null
       },
       {
-        "id": 120,
-        "username": "1010000006",
-        "pos": 2
+        "id": null,
+        "username": "0831054777",
+        "pos": null
       },
       {
-        "id": 121,
-        "username": "1010000007",
-        "pos": 3
+        "id": null,
+        "username": "9606535824",
+        "pos": null
       },
       {
-        "id": 122,
-        "username": "1010000008",
-        "pos": 4
+        "id": null,
+        "username": "7892413601",
+        "pos": null
+      },
+      {
+        "id": null,
+        "username": "8095918105",
+        "pos": null
       }
     ]
   },
   "101:THREE_150_matrix": {
     "root": {
-      "id": 101,
+      "id": null,
       "username": "1010000001",
       "level": 1,
       "matrix_position": null,
-      "depth": 1
+      "depth": null
     },
-    "children_count": 2,
+    "children_count": 3,
     "first_children": [
       {
-        "id": 105,
+        "id": null,
         "username": "1010000005",
-        "pos": 1
+        "pos": null
       },
       {
-        "id": 120,
+        "id": null,
+        "username": "1010000005",
+        "pos": null
+      },
+      {
+        "id": null,
         "username": "1010000006",
-        "pos": 3
+        "pos": null
       }
     ]
   }

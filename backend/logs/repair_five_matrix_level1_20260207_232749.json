@@ -1,0 +1,35 @@
+{
+  "pool": "FIVE_150",
+  "dry_run": true,
+  "executed_at": "20260207_232749",
+  "roots_processed": [
+    1217
+  ],
+  "results": [
+    {
+      "root_id": 1217,
+      "root_level": 0,
+      "pool": "FIVE_150",
+      "before_children": [
+        {
+          "id": 1219,
+          "owner_id": 32,
+          "username": "9999999999",
+          "position": 1,
+          "level": 1
+        },
+        {
+          "id": 1221,
+          "owner_id": 32,
+          "username": "9999999999",
+          "position": 2,
+          "level": 1
+        }
+      ],
+      "missing_positions": [],
+      "promotions": [],
+      "skipped": [],
+      "renumber": []
+    }
+  ]
+}

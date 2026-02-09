@@ -64,6 +64,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     state_name = serializers.CharField(required=False, allow_blank=True, write_only=True)
     state_code = serializers.CharField(required=False, allow_blank=True, write_only=True)    # e.g. KA (may be unused)
     city_name = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    area = serializers.CharField(required=False, allow_blank=True, write_only=True)
 
     # Outputs
     username = serializers.CharField(read_only=True)
@@ -79,7 +80,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             'assign_states', 'selected_state', 'assign_districts', 'selected_district',
             'assign_pincodes', 'selected_pincode',
             # helper write-only inputs
-            'country_name', 'country_code', 'state_name', 'state_code', 'city_name'
+            'country_name', 'country_code', 'state_name', 'state_code', 'city_name', 'area'
         )
         extra_kwargs = {
             'role': {'required': False},
@@ -664,6 +665,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         pincode = validated_data.pop('pincode', '')
         sponsor_id = validated_data.pop('sponsor_id', '')
         category = validated_data.pop('category', 'consumer') or 'consumer'
+        area = (validated_data.pop('area', '') or '').strip()
 
         # Best-effort fallback: derive country/state/district (city) from pincode for Consumer, Employee and Sub-Franchise
         try:
@@ -727,6 +729,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             country=country,
             state=state,
             city=city,
+            address=area,
             registered_by=registered_by,
         )
         # Store upline's code in sponsor_id; keep user's own referral code in prefixed_id (allocated on save)

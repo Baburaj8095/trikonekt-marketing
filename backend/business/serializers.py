@@ -37,7 +37,7 @@ class BusinessRegistrationSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'unique_id',
             'full_name', 'email', 'phone',
-            'business_name', 'business_category', 'business_address', 'address', 'category_id', 'subcategory_id',
+            'business_name', 'business_category', 'business_address', 'address', 'category_id', 'subcategory_id', 'commission_percent', 'service_mode',
             'sponsor_id',
             'country', 'state', 'city', 'pincode',
             'country_name', 'country_code', 'state_name', 'state_code', 'city_name',
@@ -47,6 +47,8 @@ class BusinessRegistrationSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'unique_id', 'review_status', 'forwarded_to', 'forwarded_at', 'registered_by', 'created_at', 'updated_at']
         extra_kwargs = {
             'business_address': {'required': False, 'allow_blank': True},
+            'commission_percent': {'required': False},
+            'service_mode': {'required': False},
         }
 
     def to_internal_value(self, data):
@@ -252,6 +254,18 @@ class BusinessRegistrationSerializer(serializers.ModelSerializer):
             except Exception:
                 business_category = ""
 
+        # Optional commercial terms from client (defaults: 0% and BOTH)
+        commission_percent_in = validated_data.pop('commission_percent', None)
+        try:
+            from decimal import Decimal as _D
+            commission_percent_val = _D(str(commission_percent_in)) if commission_percent_in is not None else _D("0.00")
+        except Exception:
+            commission_percent_val = None
+        service_mode_in = (validated_data.pop('service_mode', '') or '')
+        service_mode_norm = str(service_mode_in).strip().upper()
+        if service_mode_norm not in {BusinessRegistration.SERVICE_MODE_ONLINE, BusinessRegistration.SERVICE_MODE_OFFLINE, BusinessRegistration.SERVICE_MODE_BOTH}:
+            service_mode_norm = BusinessRegistration.SERVICE_MODE_BOTH
+
         reg = BusinessRegistration.objects.create(
             full_name=full_name,
             email=email,
@@ -261,6 +275,8 @@ class BusinessRegistrationSerializer(serializers.ModelSerializer):
             category=category_obj,
             subcategory=subcategory_obj,
             business_address=business_address,
+            commission_percent=(commission_percent_val if commission_percent_val is not None else 0),
+            service_mode=service_mode_norm,
             sponsor_id=sponsor_id,
             pincode=pincode,
             country=country,

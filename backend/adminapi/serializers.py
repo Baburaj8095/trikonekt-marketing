@@ -14,6 +14,7 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
     state_name = serializers.SerializerMethodField()
     country_name = serializers.SerializerMethodField()
     district_name = serializers.SerializerMethodField()
+    area = serializers.SerializerMethodField()
     sponsor_id = serializers.SerializerMethodField()
     wallet_balance = serializers.SerializerMethodField()
     wallet_status = serializers.SerializerMethodField()
@@ -51,6 +52,7 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
             "category",
             "phone",
             "pincode",
+            "area",
             "district_name",
             "state_name",
             "country_name",
@@ -163,6 +165,13 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
             if assn and getattr(assn, "district", ""):
                 return assn.district or ""
             return ""
+        except Exception:
+            return ""
+
+    def get_area(self, obj):
+        try:
+            cat = (getattr(obj, "category", "") or "").lower()
+            return (getattr(obj, "address", "") or "") if cat == "consumer" else ""
         except Exception:
             return ""
 

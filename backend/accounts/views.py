@@ -1291,6 +1291,30 @@ class TeamSummaryView(APIView):
         except Exception:
             matrix = []
 
+        # My matrix positions (ACTIVE only) for FIVE_150 and THREE_150
+        try:
+            from business.models import AutoPoolAccount
+            pos_qs = (
+                AutoPoolAccount.objects
+                .filter(owner=user, status="ACTIVE", pool_type__in=["FIVE_150", "THREE_150"])
+                .only("id", "username_key", "pool_type", "status", "level", "user_entry_index", "created_at")
+                .order_by("pool_type", "user_entry_index", "id")
+            )
+            my_positions = [
+                {
+                    "id": int(getattr(p, "id", 0) or 0),
+                    "username_key": getattr(p, "username_key", "") or "",
+                    "pool_type": getattr(p, "pool_type", "") or "",
+                    "status": getattr(p, "status", "") or "",
+                    "level": int(getattr(p, "level", 0) or 0),
+                    "user_entry_index": int(getattr(p, "user_entry_index", 0) or 0),
+                    "created_at": getattr(p, "created_at", None),
+                }
+                for p in pos_qs
+            ]
+        except Exception:
+            my_positions = []
+
         # Recent team members (latest 10)
         recent_team = list(
             CustomUser.objects.filter(registered_by=user)
@@ -1354,6 +1378,7 @@ class TeamSummaryView(APIView):
                 "generation_levels_breakdown": gen_breakdown,
                 "commissions_split": comm_split,
                 "matrix_progress": matrix,
+                "my_positions": my_positions,
                 "direct_team": direct_team,
                 "direct_team_counts": direct_counts,
                 "recent_team": recent_team,

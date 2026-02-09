@@ -533,7 +533,12 @@ export default function TreeReferralGalaxy({
   }, [root, maxChildren]);
 
   // Control placeholders and filter out malformed children (prevents a blank card)
-  const effectiveShowPlaceholders = useMemo(() => (showPlaceholders && !isAdmin), [showPlaceholders, isAdmin]);
+  const effectiveShowPlaceholders = useMemo(() => {
+    if (showPlaceholders) return true;
+    // Auto-enable placeholders for admin 5-matrix view to visualize empty slots at Level-1
+    if (isAdmin && sourceType === "matrix" && (pool === "FIVE_150" || maxChildren === 5)) return true;
+    return false;
+  }, [showPlaceholders, isAdmin, sourceType, pool, maxChildren]);
   const placeholders = useMemo(() => (effectiveShowPlaceholders ? Math.max(0, maxChildren - children.length) : 0), [effectiveShowPlaceholders, maxChildren, children.length]);
   const renderedChildren = useMemo(
     () =>
@@ -563,7 +568,7 @@ export default function TreeReferralGalaxy({
               <span style={styles.crumbLink} onClick={() => crumbClick(idx)}>
                 {(displayNameEntry(c) || "").toUpperCase() || (displayTR(c) || "").toUpperCase()}
               </span>
-              <span style={styles.crumbSep}>â†’</span>
+              <span style={styles.crumbSep}>→</span>
             </React.Fragment>
           ))}
           {root ? (

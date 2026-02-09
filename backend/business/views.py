@@ -860,8 +860,10 @@ class AdminPromoPurchaseApproveView(APIView):
 
             # Mark approved and set active window
             obj.status = "APPROVED"
+            # Preserve chronology: use original requested_at when available, else now
+            approved_ts = getattr(obj, "requested_at", None) or timezone.now()
             obj.approved_by = request.user
-            obj.approved_at = timezone.now()
+            obj.approved_at = approved_ts
 
             today = timezone.localdate()
             if obj.package.type == "MONTHLY":
@@ -945,7 +947,10 @@ class AdminPromoPurchaseApproveView(APIView):
                 obj.active_from = None
                 obj.active_to = None
             else:
-                obj.active_from = today
+                try:
+                    obj.active_from = approved_ts.date()
+                except Exception:
+                    obj.active_from = timezone.localdate()
                 obj.active_to = None
 
             fields_to_update = ["status", "approved_by", "approved_at", "active_from", "active_to"]

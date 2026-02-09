@@ -1,0 +1,129 @@
+{
+  "pool": "FIVE_150",
+  "dry_run": false,
+  "executed_at": "20260207_233939",
+  "roots_processed": [
+    1217
+  ],
+  "results": [
+    {
+      "root_id": 1217,
+      "root_level": 0,
+      "pool": "FIVE_150",
+      "before_children": [
+        {
+          "id": 1219,
+          "owner_id": 32,
+          "username": "9999999999",
+          "position": 1,
+          "level": 1
+        },
+        {
+          "id": 1221,
+          "owner_id": 32,
+          "username": "9999999999",
+          "position": 2,
+          "level": 1
+        }
+      ],
+      "missing_positions": [],
+      "promotions": [
+        {
+          "account_id": 1235,
+          "owner_id": 101,
+          "old_parent_id": 1219,
+          "new_parent_id": 1217,
+          "old_level": 2,
+          "new_level": 1,
+          "new_position": 3,
+          "subtree_size": 8,
+          "delta_applied": -1,
+          "descendants_touched": 7
+        },
+        {
+          "account_id": 1237,
+          "owner_id": 102,
+          "old_parent_id": 1219,
+          "new_parent_id": 1217,
+          "old_level": 2,
+          "new_level": 1,
+          "new_position": 4,
+          "subtree_size": 6,
+          "delta_applied": -1,
+          "descendants_touched": 5
+        },
+        {
+          "account_id": 1239,
+          "owner_id": 102,
+          "old_parent_id": 1219,
+          "new_parent_id": 1217,
+          "old_level": 2,
+          "new_level": 1,
+          "new_position": 5,
+          "subtree_size": 8,
+          "delta_applied": -1,
+          "descendants_touched": 7
+        }
+      ],
+      "skipped": [],
+      "unblock_moves": [
+        {
+          "child_id": 1224,
+          "old_position": 3,
+          "new_position": 6,
+          "status": "CLOSED"
+        },
+        {
+          "child_id": 1225,
+          "old_position": 4,
+          "new_position": 7,
+          "status": "CLOSED"
+        },
+        {
+          "child_id": 1226,
+          "old_position": 5,
+          "new_position": 8,
+          "status": "CLOSED"
+        }
+      ],
+      "renumber": [],
+      "after_children": [
+        {
+          "id": 1219,
+          "owner_id": 32,
+          "username": "9999999999",
+          "position": 1,
+          "level": 1
+        },
+        {
+          "id": 1221,
+          "owner_id": 32,
+          "username": "9999999999",
+          "position": 2,
+          "level": 1
+        },
+        {
+          "id": 1235,
+          "owner_id": 101,
+          "username": "1010000001",
+          "position": 3,
+          "level": 1
+        },
+        {
+          "id": 1237,
+          "owner_id": 102,
+          "username": "1010000002",
+          "position": 4,
+          "level": 1
+        },
+        {
+          "id": 1239,
+          "owner_id": 102,
+          "username": "1010000002",
+          "position": 5,
+          "level": 1
+        }
+      ]
+    }
+  ]
+}

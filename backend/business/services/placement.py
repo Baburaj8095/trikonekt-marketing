@@ -123,10 +123,9 @@ def find_next_placement_slot(width: int, max_depth: int, pool_type: str, start_a
     Strict width-before-depth: never place in level N+1 unless level N (for the current sentinel subtree) is fully filled.
     Raises NoCapacityError if no slot exists within configured max_depth.
     """
-    # Enforce single sentinel root per pool (reattach stray roots) before searching
+    # Ensure at least one sentinel exists for this pool. Do not reseat existing trees.
     try:
-        from business.services.structure import enforce_single_sentinel
-        enforce_single_sentinel(pool_type)
+        _ensure_sentinel_root(pool_type)
     except Exception:
         pass
 
@@ -167,10 +166,10 @@ def find_next_placement_slot(width: int, max_depth: int, pool_type: str, start_a
                     if child_level > int(max_depth):
                         raise MaxDepthError(f"Max depth reached for pool={pool_type}: next={child_level}, configured={max_depth}")
 
+                    # Consider any existing child regardless of status to honor unique (parent,pool_type,position)
                     exists = AutoPoolAccount.objects.filter(
                         parent_account=parent,
                         pool_type=pool_type,
-                        status="ACTIVE",
                         position=int(pos_try),
                     ).exists()
                     if not exists:
@@ -184,8 +183,9 @@ def find_next_placement_slot(width: int, max_depth: int, pool_type: str, start_a
 
         # WIDTH-BEFORE-DEPTH ENFORCEMENT (restricted to sentinel subtree at this level):
         # Ensure all parents at this level have all width child slots filled before proceeding deeper.
+        # Count all children regardless of status; CLOSED rows still occupy positions structurally
         total_children = AutoPoolAccount.objects.filter(
-            parent_account_id__in=current_parents, pool_type=pool_type, status="ACTIVE"
+            parent_account_id__in=current_parents, pool_type=pool_type
         ).count()
         expected_children = int(width) * len(current_parents)
         if total_children < expected_children:

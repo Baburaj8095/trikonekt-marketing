@@ -1,0 +1,50 @@
+[
+  {
+    "username": "9880125300",
+    "found": true,
+    "user_id": 208,
+    "category": "consumer",
+    "role": "user",
+    "is_staff": false,
+    "is_superuser": false,
+    "registered_by_id": 206,
+    "is_matrix_eligible": true,
+    "expected_events": 1,
+    "debug": {
+      "p150": 0,
+      "p750": 1,
+      "p759_first": false
+    },
+    "FIVE_ACTIVE": 0,
+    "THREE_ACTIVE": 0,
+    "FIVE_sample": [],
+    "THREE_sample": [],
+    "FIVE_total": 2,
+    "THREE_total": 2,
+    "REBUILD_new": []
+  },
+  {
+    "username": "9945846318",
+    "found": true,
+    "user_id": 233,
+    "category": "consumer",
+    "role": "user",
+    "is_staff": false,
+    "is_superuser": false,
+    "registered_by_id": 193,
+    "is_matrix_eligible": true,
+    "expected_events": 1,
+    "debug": {
+      "p150": 0,
+      "p750": 1,
+      "p759_first": false
+    },
+    "FIVE_ACTIVE": 0,
+    "THREE_ACTIVE": 0,
+    "FIVE_sample": [],
+    "THREE_sample": [],
+    "FIVE_total": 2,
+    "THREE_total": 2,
+    "REBUILD_new": []
+  }
+]

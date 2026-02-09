@@ -59,6 +59,21 @@ const RegisterV2 = () => {
   const location = useLocation();
   const { role: roleParam } = useParams();
 
+  const allowAgencyOverride = useMemo(() => {
+    try {
+      const params = new URLSearchParams(location.search || "");
+      const adminFlag =
+        ["1", "true", "yes"].includes(String(params.get("admin") || "").toLowerCase()) ||
+        ["1", "true", "yes"].includes(String(params.get("admin_agency_override") || "").toLowerCase());
+      const hasLevel = !!String(params.get("agency_level") || params.get("category") || "").trim();
+      // Enable override if admin flag is present OR an explicit agency level is provided in URL.
+      // Do not depend on access token to avoid cross-context issues when opened from Admin.
+      return adminFlag || hasLevel;
+    } catch {
+      return false;
+    }
+  }, [location.search]);
+
   // Role handling
   const ALLOWED_ROLES = ["user", "agency", "employee", "business"];
   const lockedRole = ALLOWED_ROLES.includes(String(roleParam || "").toLowerCase())
@@ -76,6 +91,8 @@ const RegisterV2 = () => {
     business_name: "",
     business_category: "",
     address: "",
+    commission_percent: "",
+    service_mode: "BOTH",
   });
   // Merchant categories (public) + dependent subcategories
   const [mCategories, setMCategories] = useState([]);
@@ -97,6 +114,11 @@ const RegisterV2 = () => {
 
   // Agency
   const [agencyLevel, setAgencyLevel] = useState("");
+  useEffect(() => {
+    if (role === "agency" && !allowAgencyOverride) {
+      setAgencyLevel("sub_franchise");
+    }
+  }, [role, allowAgencyOverride]);
   const mapAgencyLevelToCategory = (lvl) => {
     switch (lvl) {
       case "state_coordinator":
@@ -121,7 +143,7 @@ const RegisterV2 = () => {
     if (role === "business") return "business";
     if (role === "employee") return "employee";
     if (role === "user") return "consumer";
-    if (role === "agency") return mapAgencyLevelToCategory(agencyLevel) || "agency_state";
+    if (role === "agency") return allowAgencyOverride ? (mapAgencyLevelToCategory(agencyLevel) || "agency_state") : "agency_sub_franchise";
     return "consumer";
   };
   const prettyRole = (r) =>
@@ -166,6 +188,18 @@ const RegisterV2 = () => {
   const [selectedCity, setSelectedCity] = useState("");
   const [selectedCityId, setSelectedCityId] = useState("");
   const [pincode, setPincode] = useState("");
+  const [areaOptions, setAreaOptions] = useState([]);
+  const [selectedArea, setSelectedArea] = useState("");
+  const [areaLoading, setAreaLoading] = useState(false);
+  const areaGate = useMemo(
+    () =>
+      role === "user" &&
+      /^\d{6}$/.test(String(pincode)) &&
+      Array.isArray(areaOptions) &&
+      areaOptions.length > 0 &&
+      !selectedArea,
+    [role, pincode, areaOptions, selectedArea]
+  );
 
   // Geo assist
   const [autoLoading, setAutoLoading] = useState(true);
@@ -251,11 +285,11 @@ const RegisterV2 = () => {
         setRole(rp);
       }
       const effectiveRole = (ALLOWED_ROLES.includes(rp) ? rp : (lockedRole || role || "")).toLowerCase();
-      if (effectiveRole === "agency" && level) {
+      if (effectiveRole === "agency" && level && allowAgencyOverride) {
         setAgencyLevel(level);
       }
     } catch {}
-  }, [location.search, lockedRole]); // eslint-disable-line
+  }, [location.search, lockedRole, allowAgencyOverride]); // eslint-disable-line
 
   useEffect(() => {
     try {
@@ -292,7 +326,7 @@ const RegisterV2 = () => {
         const fromUrl = normalizeSponsor(raw || "");
         const s = normalizeSponsor(sponsorId);
         if (!s && !fromUrl) {
-          setSponsorId("TRIKONEKT");
+          setSponsorId("9999999999");
           setSponsorLocked(false); // keep editable for user to change
         }
       }
@@ -322,7 +356,10 @@ const RegisterV2 = () => {
       }
 
       if (s) nextParams.set("sponsor", s);
-      if (role === "agency") {
+      if (allowAgencyOverride) {
+        nextParams.set("admin", "1");
+      }
+      if (role === "agency" && allowAgencyOverride) {
         if (agencyLevel) nextParams.set("agency_level", agencyLevel);
       }
       const cur = params.toString();
@@ -333,7 +370,7 @@ const RegisterV2 = () => {
       }
     } catch {}
     // eslint-disable-next-line
-  }, [role, agencyLevel, sponsorId, location.pathname]);
+  }, [role, agencyLevel, sponsorId, allowAgencyOverride, location.pathname]);
 
   // Countries
   useEffect(() => {
@@ -409,23 +446,44 @@ const RegisterV2 = () => {
     const pin = String(code || "").replace(/\D/g, "");
     if (pin.length !== 6) return;
     try {
+      setAreaLoading(true);
       const resp = await API.get(`/location/pincode/${pin}/`);
       const payload = resp?.data || {};
       const detectedCity = payload.city || payload.district || "";
       const detectedState = payload.state || "";
       const detectedCountry = payload.country || "";
 
+      // Populate Area options from India Post PostOffice names; fallback to villages
+      const offices = Array.isArray(payload.post_offices) ? payload.post_offices : [];
+      const namesFromOffices = offices.map((po) => po?.name).filter(Boolean);
+      const villages = Array.isArray(payload.villages) ? payload.villages : [];
+      const allNames = Array.from(new Set([...(namesFromOffices || []), ...(villages || [])]));
+      setAreaOptions(allNames);
+      setSelectedArea("");
+      if (role === "user") {
+        setSelectedCountry("");
+        setSelectedState("");
+        setSelectedCity("");
+        setSelectedCityId("");
+      }
+
       if (detectedCity) setGeoCityName(detectedCity);
       if (detectedState) setGeoStateName(detectedState);
       if (detectedCountry) setGeoCountryName(detectedCountry);
     } catch (e) {
+      setAreaOptions([]);
+      setSelectedArea("");
       // ignore errors
+    } finally {
+      setAreaLoading(false);
     }
   };
 
   const handlePincodeManualChange = (val) => {
     const next = String(val || "").replace(/\D/g, "").slice(0, 6);
     setPincode(next);
+    setSelectedArea("");
+    setAreaOptions([]);
   };
 
   // On select changes
@@ -438,6 +496,8 @@ const RegisterV2 = () => {
     setStates([]);
     setCities([]);
     setPincode("");
+    setSelectedArea("");
+    setAreaOptions([]);
     if (value) loadStates(value);
   };
   const handleStateChange = (e) => {
@@ -447,6 +507,8 @@ const RegisterV2 = () => {
     setSelectedCityId("");
     setCities([]);
     setPincode("");
+    setSelectedArea("");
+    setAreaOptions([]);
     if (value) loadCities(value);
   };
 
@@ -487,20 +549,22 @@ const RegisterV2 = () => {
 
           // Pre-map into selects if available later
           // Country
-          if (Array.isArray(countries) && countries.length) {
-            const matchCountry = countries.find(
-              (c) =>
-                String(c?.name || "").trim().toLowerCase() ===
-                String(detectedCountry || "").trim().toLowerCase()
-            );
-            if (matchCountry) {
-              const id = String(matchCountry.id);
-              setSelectedCountry(id);
-              await loadStates(id);
+          if (role !== "user" || selectedArea) {
+            if (Array.isArray(countries) && countries.length) {
+              const matchCountry = countries.find(
+                (c) =>
+                  String(c?.name || "").trim().toLowerCase() ===
+                  String(detectedCountry || "").trim().toLowerCase()
+              );
+              if (matchCountry) {
+                const id = String(matchCountry.id);
+                setSelectedCountry(id);
+                await loadStates(id);
+              }
             }
           }
           // State
-          if (detectedState) {
+          if ((role !== "user" || selectedArea) && detectedState) {
             const st = (prevStates) =>
               (prevStates || []).find(
                 (s) =>
@@ -591,7 +655,7 @@ const RegisterV2 = () => {
 
   // Auto-map geo detected Country -> Country select (non-agency)
   useEffect(() => {
-    if (isAgency) return;
+    if (isAgency || areaGate) return;
     if (selectedCountry) return;
     const name = String(geoCountryName || "").toLowerCase();
     if (!name || !Array.isArray(countries) || !countries.length) return;
@@ -603,11 +667,11 @@ const RegisterV2 = () => {
       setSelectedCountry(id);
       loadStates(id);
     }
-  }, [isAgency, geoCountryName, countries, selectedCountry]); // eslint-disable-line
+  }, [isAgency, areaGate, geoCountryName, countries, selectedCountry]); // eslint-disable-line
 
   // Auto-map geo detected State -> State select (non-agency)
   useEffect(() => {
-    if (isAgency) return;
+    if (isAgency || areaGate) return;
     if (!selectedCountry || selectedState) return;
     const name = String(geoStateName || "").toLowerCase();
     if (!name || !Array.isArray(states) || !states.length) return;
@@ -619,11 +683,11 @@ const RegisterV2 = () => {
       setSelectedState(id);
       loadCities(id);
     }
-  }, [isAgency, selectedCountry, geoStateName, states, selectedState]); // eslint-disable-line
+  }, [isAgency, areaGate, selectedCountry, geoStateName, states, selectedState]); // eslint-disable-line
 
   // Auto-map geo detected District/City -> District select (non-agency)
   useEffect(() => {
-    if (isAgency) return;
+    if (isAgency || areaGate) return;
     if (!selectedState || selectedCity) return;
     const input = String(geoCityName || "");
     if (!input || !Array.isArray(cities) || !cities.length) return;
@@ -681,7 +745,7 @@ const RegisterV2 = () => {
       setSelectedCityId(m && m.id != null ? String(m.id) : "");
     } catch {}
   }
-  }, [isAgency, selectedState, geoCityName, cities, selectedCity]); // eslint-disable-line
+  }, [isAgency, areaGate, selectedState, geoCityName, cities, selectedCity]); // eslint-disable-line
 
   // Auto-lookup pincode -> infer district/state/country (non-agency incl. business)
   useEffect(() => {
@@ -951,6 +1015,7 @@ const RegisterV2 = () => {
       const s = normalizeSponsor(params.get("sponsor") || sponsorId);
       const parts = [];
       if (s) parts.push(`sponsor=${encodeURIComponent(s)}`);
+      if (allowAgencyOverride) parts.push("admin=1");
       if (String(r).toLowerCase() === "agency") {
         const lvl = (agencyLevel || params.get("agency_level") || params.get("category") || "").toString();
         if (lvl) parts.push(`agency_level=${encodeURIComponent(lvl)}`);
@@ -1102,8 +1167,12 @@ const RegisterV2 = () => {
       }
     }
     if (role === "agency" && !agencyLevel) {
-      setErrorMsg("Select Agency Registration Type");
-      return;
+      if (allowAgencyOverride) {
+        setErrorMsg("Select Agency Registration Type");
+        return;
+      } else {
+        setAgencyLevel("sub_franchise");
+      }
     }
     if (!sponsorId) {
       setErrorMsg("Sponsor Username is required");
@@ -1120,6 +1189,11 @@ const RegisterV2 = () => {
     if (!AGENCY_CATEGORIES.has(category)) {
       if (!selectedCountry || !selectedState || !selectedCity || !pincode) {
         setErrorMsg("Please select Country, State, District and Pincode");
+        return;
+      }
+      // Require explicit Area selection when pincode resolves to post offices
+      if (/^\d{6}$/.test(String(pincode)) && Array.isArray(areaOptions) && areaOptions.length > 0 && !selectedArea) {
+        setErrorMsg("Please select Area (Post Office)");
         return;
       }
     }
@@ -1222,6 +1296,8 @@ const RegisterV2 = () => {
               business_name: formData.business_name || "",
               business_category: formData.business_category || "",
               address: formData.address || "",
+              commission_percent: (() => { const v = parseFloat(formData.commission_percent); return Number.isFinite(v) ? v : 0; })(),
+              service_mode: ["ONLINE","OFFLINE","BOTH"].includes(String(formData.service_mode || "").toUpperCase()) ? String(formData.service_mode).toUpperCase() : "BOTH",
               sponsor_id: normalizeSponsor(sponsorId) || "",
               country: selectedCountry || null,
               state: selectedState || null,
@@ -1259,12 +1335,16 @@ const RegisterV2 = () => {
         business_name: "",
         business_category: "",
         address: "",
+        commission_percent: "",
+        service_mode: "BOTH",
       });
       setConfirmPassword("");
       setSelectedCountry("");
       setSelectedState("");
       setSelectedCity("");
       setPincode("");
+      setSelectedArea("");
+      setAreaOptions([]);
       setStates([]);
       setCities([]);
       // reset agency inputs
@@ -1381,7 +1461,7 @@ const RegisterV2 = () => {
                 <Select
                   label="Pincode"
                   value={pincode}
-                  onChange={(e) => setPincode(e.target.value)}
+                  onChange={(e) => { setPincode(e.target.value); setSelectedArea(""); setAreaOptions([]); }}
                   required
                   disabled={!selectedCity || pinByDistrictLoadingNA}
                 >
@@ -1400,10 +1480,31 @@ const RegisterV2 = () => {
                 value={pincode}
                 onChange={(e) => handlePincodeManualChange(e.target.value)}
                 inputProps={{ inputMode: "numeric", pattern: "[0-9]*", maxLength: 6 }}
-                helperText="Enter 6-digit pincode to auto-select District/State/Country"
+                helperText={role === "user" ? "Enter 6-digit pincode, then select Area to populate District/State/Country" : "Enter 6-digit pincode to auto-select District/State/Country"}
                 sx={{ mb: 2 }}
                 required
               />
+            )}
+
+
+            {/^\d{6}$/.test(String(pincode)) && (
+              <FormControl fullWidth sx={{ mb: 2 }}>
+                <InputLabel>Area -</InputLabel>
+                <Select
+                  label="Area"
+                  value={selectedArea}
+                  onChange={(e) => setSelectedArea(e.target.value)}
+                  required
+                  disabled={areaLoading || (areaOptions || []).length === 0}
+                >
+                  <MenuItem value="">-- Select --</MenuItem>
+                  {(areaOptions || []).map((name) => (
+                    <MenuItem key={name} value={name}>
+                      {name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             )}
 
             <FormControl fullWidth sx={{ mb: 2 }}>
@@ -1422,9 +1523,11 @@ const RegisterV2 = () => {
                     setSelectedCityId(m ? String(m.id) : "");
                   } catch {}
                   setPincode("");
+                  setSelectedArea("");
+                  setAreaOptions([]);
                 }}
                 required
-                disabled={!selectedState}
+                disabled={areaGate || !selectedState}
               >
                 <MenuItem value="">-- Select --</MenuItem>
                 {Array.from(
@@ -1448,7 +1551,7 @@ const RegisterV2 = () => {
                 value={selectedState}
                 onChange={handleStateChange}
                 required
-                disabled={!selectedCountry}
+                disabled={areaGate || !selectedCountry}
               >
                 <MenuItem value="">-- Select --</MenuItem>
                 {(states || []).map((s) => (
@@ -1465,6 +1568,7 @@ const RegisterV2 = () => {
                 label="Country"
                 value={selectedCountry}
                 onChange={handleCountryChange}
+                disabled={areaGate}
                 required
               >
                 {(countries || []).map((c) => (
@@ -1545,6 +1649,32 @@ const RegisterV2 = () => {
                 ))}
               </Select>
             </FormControl>
+
+            <TextField
+              fullWidth
+              label="Commission Percentage (%)"
+              name="commission_percent"
+              value={formData.commission_percent}
+              onChange={handleChange}
+              sx={{ mb: 2 }}
+              type="number"
+              inputProps={{ min: 0, max: 100, step: 0.01 }}
+              required
+            />
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>Service Mode</InputLabel>
+              <Select
+                label="Service Mode"
+                value={formData.service_mode}
+                onChange={(e) => setFormData((fd) => ({ ...fd, service_mode: String(e.target.value) }))}
+                required
+              >
+                <MenuItem value="BOTH">Both</MenuItem>
+                <MenuItem value="ONLINE">Online</MenuItem>
+                <MenuItem value="OFFLINE">Offline</MenuItem>
+              </Select>
+            </FormControl>
+
             <TextField
               fullWidth
               label="Email"
@@ -1597,7 +1727,7 @@ const RegisterV2 = () => {
                 <Select
                   label="Pincode"
                   value={pincode}
-                  onChange={(e) => setPincode(e.target.value)}
+                  onChange={(e) => { setPincode(e.target.value); setSelectedArea(""); setAreaOptions([]); }}
                   required
                   disabled={!selectedCity || pinByDistrictLoadingNA}
                 >
@@ -1616,10 +1746,30 @@ const RegisterV2 = () => {
                 value={pincode}
                 onChange={(e) => handlePincodeManualChange(e.target.value)}
                 inputProps={{ inputMode: "numeric", pattern: "[0-9]*", maxLength: 6 }}
-                helperText="Enter 6-digit pincode to auto-select District/State/Country"
+                helperText={role === "user" ? "Enter 6-digit pincode, then select Area to populate District/State/Country" : "Enter 6-digit pincode to auto-select District/State/Country"}
                 sx={{ mb: 2 }}
                 required
               />
+            )}
+
+            {/^\d{6}$/.test(String(pincode)) && (
+              <FormControl fullWidth sx={{ mb: 2 }}>
+                <InputLabel>Area -</InputLabel>
+                <Select
+                  label="Area"
+                  value={selectedArea}
+                  onChange={(e) => setSelectedArea(e.target.value)}
+                  required
+                  disabled={areaLoading || (areaOptions || []).length === 0}
+                >
+                  <MenuItem value="">-- Select --</MenuItem>
+                  {(areaOptions || []).map((name) => (
+                    <MenuItem key={name} value={name}>
+                      {name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             )}
 
             <FormControl fullWidth sx={{ mb: 2 }}>
@@ -1638,9 +1788,11 @@ const RegisterV2 = () => {
                     setSelectedCityId(m ? String(m.id) : "");
                   } catch {}
                   setPincode("");
+                  setSelectedArea("");
+                  setAreaOptions([]);
                 }}
                 required
-                disabled={!selectedState}
+                disabled={areaGate || !selectedState}
               >
                 <MenuItem value="">-- Select --</MenuItem>
                 {Array.from(
@@ -1664,7 +1816,7 @@ const RegisterV2 = () => {
                 value={selectedState}
                 onChange={handleStateChange}
                 required
-                disabled={!selectedCountry}
+                disabled={areaGate || !selectedCountry}
               >
                 <MenuItem value="">-- Select --</MenuItem>
                 {(states || []).map((s) => (
@@ -1681,6 +1833,7 @@ const RegisterV2 = () => {
                 label="Country"
                 value={selectedCountry}
                 onChange={handleCountryChange}
+                disabled={areaGate}
                 required
               >
                 {(countries || []).map((c) => (
@@ -1746,30 +1899,41 @@ const RegisterV2 = () => {
                 ),
               }}
             />
-            <FormControl fullWidth sx={{ mb: 2 }}>
-              <InputLabel>Registration Type</InputLabel>
-              <Select
-                value={agencyLevel}
+            {allowAgencyOverride ? (
+              <FormControl fullWidth sx={{ mb: 2 }}>
+                <InputLabel>Registration Type</InputLabel>
+                <Select
+                  value={agencyLevel}
+                  label="Registration Type"
+                  onChange={(e) => {
+                    setAgencyLevel(e.target.value);
+                    setAssignStates([]);
+                    setAssignDistricts([]);
+                    setSelectedDistrictAgency("");
+                    setAssignPincodes([]);
+                    setSelectedPincodeAgency("");
+                  }}
+                  required
+                  disabled
+                >
+                  <MenuItem value="state_coordinator">State Coordinator</MenuItem>
+                  <MenuItem value="state">State</MenuItem>
+                  <MenuItem value="district_coordinator">District Coordinator</MenuItem>
+                  <MenuItem value="district">District</MenuItem>
+                  <MenuItem value="pincode_coordinator">Pincode Coordinator</MenuItem>
+                  <MenuItem value="pincode">Pincode</MenuItem>
+                  <MenuItem value="sub_franchise">Sub Franchise</MenuItem>
+                </Select>
+              </FormControl>
+            ) : (
+              <TextField
+                fullWidth
                 label="Registration Type"
-                onChange={(e) => {
-                  setAgencyLevel(e.target.value);
-                  setAssignStates([]);
-                  setAssignDistricts([]);
-                  setSelectedDistrictAgency("");
-                  setAssignPincodes([]);
-                  setSelectedPincodeAgency("");
-                }}
-                required
-              >
-                <MenuItem value="state_coordinator">State Coordinator</MenuItem>
-                <MenuItem value="state">State</MenuItem>
-                <MenuItem value="district_coordinator">District Coordinator</MenuItem>
-                <MenuItem value="district">District</MenuItem>
-                <MenuItem value="pincode_coordinator">Pincode Coordinator</MenuItem>
-                <MenuItem value="pincode">Pincode</MenuItem>
-                <MenuItem value="sub_franchise">Sub Franchise</MenuItem>
-              </Select>
-            </FormControl>
+                value="Sub Franchise"
+                disabled
+                sx={{ mb: 2 }}
+              />
+            )}
 
 
             {isSC && (

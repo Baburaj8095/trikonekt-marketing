@@ -1,0 +1,12 @@
+{
+  "mode": "apply",
+  "pools": [
+    "FIVE_150",
+    "THREE_150"
+  ],
+  "create_counts": {
+    "FIVE_150": 0,
+    "THREE_150": 0
+  },
+  "errors": 118
+}

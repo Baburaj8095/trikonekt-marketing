@@ -1,0 +1,592 @@
+{
+  "scanned_users": 87,
+  "mismatches": [
+    {
+      "user_id": 101,
+      "username": "1010000001",
+      "expected": 2,
+      "five": 3,
+      "three": 0,
+      "five_deficit": -1,
+      "three_deficit": 2
+    },
+    {
+      "user_id": 102,
+      "username": "1010000002",
+      "expected": 2,
+      "five": 3,
+      "three": 0,
+      "five_deficit": -1,
+      "three_deficit": 2
+    },
+    {
+      "user_id": 103,
+      "username": "1010000003",
+      "expected": 2,
+      "five": 3,
+      "three": 0,
+      "five_deficit": -1,
+      "three_deficit": 2
+    },
+    {
+      "user_id": 104,
+      "username": "1010000004",
+      "expected": 2,
+      "five": 3,
+      "three": 0,
+      "five_deficit": -1,
+      "three_deficit": 2
+    },
+    {
+      "user_id": 105,
+      "username": "1010000005",
+      "expected": 2,
+      "five": 3,
+      "three": 0,
+      "five_deficit": -1,
+      "three_deficit": 2
+    },
+    {
+      "user_id": 120,
+      "username": "1010000006",
+      "expected": 2,
+      "five": 2,
+      "three": 0,
+      "five_deficit": 0,
+      "three_deficit": 2
+    },
+    {
+      "user_id": 121,
+      "username": "1010000007",
+      "expected": 2,
+      "five": 2,
+      "three": 0,
+      "five_deficit": 0,
+      "three_deficit": 2
+    },
+    {
+      "user_id": 122,
+      "username": "1010000008",
+      "expected": 2,
+      "five": 2,
+      "three": 0,
+      "five_deficit": 0,
+      "three_deficit": 2
+    },
+    {
+      "user_id": 124,
+      "username": "1010000009",
+      "expected": 2,
+      "five": 2,
+      "three": 0,
+      "five_deficit": 0,
+      "three_deficit": 2
+    },
+    {
+      "user_id": 125,
+      "username": "1010000010",
+      "expected": 2,
+      "five": 2,
+      "three": 3,
+      "five_deficit": 0,
+      "three_deficit": -1
+    },
+    {
+      "user_id": 126,
+      "username": "8310547774",
+      "expected": 1,
+      "five": 1,
+      "three": 0,
+      "five_deficit": 0,
+      "three_deficit": 1
+    },
+    {
+      "user_id": 128,
+      "username": "7026122552",
+      "expected": 1,
+      "five": 1,
+      "three": 0,
+      "five_deficit": 0,
+      "three_deficit": 1
+    },
+    {
+      "user_id": 129,
+      "username": "9008140507",
+      "expected": 1,
+      "five": 1,
+      "three": 0,
+      "five_deficit": 0,
+      "three_deficit": 1
+    },
+    {
+      "user_id": 133,
+      "username": "9704221726",
+      "expected": 1,
+      "five": 1,
+      "three": 0,
+      "five_deficit": 0,
+      "three_deficit": 1
+    },
+    {
+      "user_id": 135,
+      "username": "9611443183",
+      "expected": 1,
+      "five": 0,
+      "three": 1,
+      "five_deficit": 1,
+      "three_deficit": 0
+    },
+    {
+      "user_id": 136,
+      "username": "8095918105",
+      "expected": 2,
+      "five": 0,
+      "three": 3,
+      "five_deficit": 2,
+      "three_deficit": -1
+    },
+    {
+      "user_id": 137,
+      "username": "7022026569",
+      "expected": 1,
+      "five": 0,
+      "three": 1,
+      "five_deficit": 1,
+      "three_deficit": 0
+    },
+    {
+      "user_id": 139,
+      "username": "0809591810",
+      "expected": 2,
+      "five": 0,
+      "three": 3,
+      "five_deficit": 2,
+      "three_deficit": -1
+    },
+    {
+      "user_id": 150,
+      "username": "8095918106",
+      "expected": 2,
+      "five": 0,
+      "three": 3,
+      "five_deficit": 2,
+      "three_deficit": -1
+    },
+    {
+      "user_id": 185,
+      "username": "0991662908",
+      "expected": 1,
+      "five": 0,
+      "three": 1,
+      "five_deficit": 1,
+      "three_deficit": 0
+    },
+    {
+      "user_id": 187,
+      "username": "7760377601",
+      "expected": 1,
+      "five": 1,
+      "three": 0,
+      "five_deficit": 0,
+      "three_deficit": 1
+    },
+    {
+      "user_id": 188,
+      "username": "9739214809",
+      "expected": 1,
+      "five": 1,
+      "three": 0,
+      "five_deficit": 0,
+      "three_deficit": 1
+    },
+    {
+      "user_id": 189,
+      "username": "9886933927",
+      "expected": 1,
+      "five": 0,
+      "three": 0,
+      "five_deficit": 1,
+      "three_deficit": 1
+    },
+    {
+      "user_id": 190,
+      "username": "8310806917",
+      "expected": 1,
+      "five": 0,
+      "three": 0,
+      "five_deficit": 1,
+      "three_deficit": 1
+    },
+    {
+      "user_id": 193,
+      "username": "7483362779",
+      "expected": 1,
+      "five": 0,
+      "three": 1,
+      "five_deficit": 1,
+      "three_deficit": 0
+    },
+    {
+      "user_id": 194,
+      "username": "9011041780",
+      "expected": 1,
+      "five": 0,
+      "three": 1,
+      "five_deficit": 1,
+      "three_deficit": 0
+    },
+    {
+      "user_id": 202,
+      "username": "8050246566",
+      "expected": 1,
+      "five": 0,
+      "three": 1,
+      "five_deficit": 1,
+      "three_deficit": 0
+    },
+    {
+      "user_id": 203,
+      "username": "9964716666",
+      "expected": 1,
+      "five": 0,
+      "three": 1,
+      "five_deficit": 1,
+      "three_deficit": 0
+    },
+    {
+      "user_id": 206,
+      "username": "9611646548",
+      "expected": 1,
+      "five": 0,
+      "three": 1,
+      "five_deficit": 1,
+      "three_deficit": 0
+    },
+    {
+      "user_id": 207,
+      "username": "6360872571",
+      "expected": 1,
+      "five": 0,
+      "three": 1,
+      "five_deficit": 1,
+      "three_deficit": 0
+    },
+    {
+      "user_id": 208,
+      "username": "9880125300",
+      "expected": 1,
+      "five": 0,
+      "three": 1,
+      "five_deficit": 1,
+      "three_deficit": 0
+    },
+    {
+      "user_id": 209,
+      "username": "7090985119",
+      "expected": 1,
+      "five": 0,
+      "three": 1,
+      "five_deficit": 1,
+      "three_deficit": 0
+    },
+    {
+      "user_id": 210,
+      "username": "7625014226",
+      "expected": 1,
+      "five": 0,
+      "three": 1,
+      "five_deficit": 1,
+      "three_deficit": 0
+    },
+    {
+      "user_id": 211,
+      "username": "9844003051",
+      "expected": 1,
+      "five": 0,
+      "three": 1,
+      "five_deficit": 1,
+      "three_deficit": 0
+    },
+    {
+      "user_id": 215,
+      "username": "9972503473",
+      "expected": 1,
+      "five": 0,
+      "three": 1,
+      "five_deficit": 1,
+      "three_deficit": 0
+    },
+    {
+      "user_id": 216,
+      "username": "8668656825",
+      "expected": 1,
+      "five": 0,
+      "three": 1,
+      "five_deficit": 1,
+      "three_deficit": 0
+    },
+    {
+      "user_id": 220,
+      "username": "9035951871",
+      "expected": 1,
+      "five": 0,
+      "three": 1,
+      "five_deficit": 1,
+      "three_deficit": 0
+    },
+    {
+      "user_id": 222,
+      "username": "8806078267",
+      "expected": 1,
+      "five": 0,
+      "three": 1,
+      "five_deficit": 1,
+      "three_deficit": 0
+    },
+    {
+      "user_id": 224,
+      "username": "7090308016",
+      "expected": 1,
+      "five": 0,
+      "three": 1,
+      "five_deficit": 1,
+      "three_deficit": 0
+    },
+    {
+      "user_id": 228,
+      "username": "9945538015",
+      "expected": 1,
+      "five": 0,
+      "three": 1,
+      "five_deficit": 1,
+      "three_deficit": 0
+    },
+    {
+      "user_id": 229,
+      "username": "8630561213",
+      "expected": 1,
+      "five": 0,
+      "three": 2,
+      "five_deficit": 1,
+      "three_deficit": -1
+    },
+    {
+      "user_id": 233,
+      "username": "9945846318",
+      "expected": 1,
+      "five": 0,
+      "three": 1,
+      "five_deficit": 1,
+      "three_deficit": 0
+    },
+    {
+      "user_id": 236,
+      "username": "0000000001",
+      "expected": 1,
+      "five": 0,
+      "three": 1,
+      "five_deficit": 1,
+      "three_deficit": 0
+    },
+    {
+      "user_id": 237,
+      "username": "0000000002",
+      "expected": 1,
+      "five": 0,
+      "three": 1,
+      "five_deficit": 1,
+      "three_deficit": 0
+    }
+  ],
+  "totals": {
+    "parity_ok": 0,
+    "five_miss": 28,
+    "three_miss": 17,
+    "overage": 10,
+    "any_mismatch": 44
+  },
+  "samples": {
+    "first_20": [
+      {
+        "user_id": 101,
+        "username": "1010000001",
+        "expected": 2,
+        "five": 3,
+        "three": 0,
+        "five_deficit": -1,
+        "three_deficit": 2
+      },
+      {
+        "user_id": 102,
+        "username": "1010000002",
+        "expected": 2,
+        "five": 3,
+        "three": 0,
+        "five_deficit": -1,
+        "three_deficit": 2
+      },
+      {
+        "user_id": 103,
+        "username": "1010000003",
+        "expected": 2,
+        "five": 3,
+        "three": 0,
+        "five_deficit": -1,
+        "three_deficit": 2
+      },
+      {
+        "user_id": 104,
+        "username": "1010000004",
+        "expected": 2,
+        "five": 3,
+        "three": 0,
+        "five_deficit": -1,
+        "three_deficit": 2
+      },
+      {
+        "user_id": 105,
+        "username": "1010000005",
+        "expected": 2,
+        "five": 3,
+        "three": 0,
+        "five_deficit": -1,
+        "three_deficit": 2
+      },
+      {
+        "user_id": 120,
+        "username": "1010000006",
+        "expected": 2,
+        "five": 2,
+        "three": 0,
+        "five_deficit": 0,
+        "three_deficit": 2
+      },
+      {
+        "user_id": 121,
+        "username": "1010000007",
+        "expected": 2,
+        "five": 2,
+        "three": 0,
+        "five_deficit": 0,
+        "three_deficit": 2
+      },
+      {
+        "user_id": 122,
+        "username": "1010000008",
+        "expected": 2,
+        "five": 2,
+        "three": 0,
+        "five_deficit": 0,
+        "three_deficit": 2
+      },
+      {
+        "user_id": 124,
+        "username": "1010000009",
+        "expected": 2,
+        "five": 2,
+        "three": 0,
+        "five_deficit": 0,
+        "three_deficit": 2
+      },
+      {
+        "user_id": 125,
+        "username": "1010000010",
+        "expected": 2,
+        "five": 2,
+        "three": 3,
+        "five_deficit": 0,
+        "three_deficit": -1
+      },
+      {
+        "user_id": 126,
+        "username": "8310547774",
+        "expected": 1,
+        "five": 1,
+        "three": 0,
+        "five_deficit": 0,
+        "three_deficit": 1
+      },
+      {
+        "user_id": 128,
+        "username": "7026122552",
+        "expected": 1,
+        "five": 1,
+        "three": 0,
+        "five_deficit": 0,
+        "three_deficit": 1
+      },
+      {
+        "user_id": 129,
+        "username": "9008140507",
+        "expected": 1,
+        "five": 1,
+        "three": 0,
+        "five_deficit": 0,
+        "three_deficit": 1
+      },
+      {
+        "user_id": 133,
+        "username": "9704221726",
+        "expected": 1,
+        "five": 1,
+        "three": 0,
+        "five_deficit": 0,
+        "three_deficit": 1
+      },
+      {
+        "user_id": 135,
+        "username": "9611443183",
+        "expected": 1,
+        "five": 0,
+        "three": 1,
+        "five_deficit": 1,
+        "three_deficit": 0
+      },
+      {
+        "user_id": 136,
+        "username": "8095918105",
+        "expected": 2,
+        "five": 0,
+        "three": 3,
+        "five_deficit": 2,
+        "three_deficit": -1
+      },
+      {
+        "user_id": 137,
+        "username": "7022026569",
+        "expected": 1,
+        "five": 0,
+        "three": 1,
+        "five_deficit": 1,
+        "three_deficit": 0
+      },
+      {
+        "user_id": 139,
+        "username": "0809591810",
+        "expected": 2,
+        "five": 0,
+        "three": 3,
+        "five_deficit": 2,
+        "three_deficit": -1
+      },
+      {
+        "user_id": 150,
+        "username": "8095918106",
+        "expected": 2,
+        "five": 0,
+        "three": 3,
+        "five_deficit": 2,
+        "three_deficit": -1
+      },
+      {
+        "user_id": 185,
+        "username": "0991662908",
+        "expected": 1,
+        "five": 0,
+        "three": 1,
+        "five_deficit": 1,
+        "three_deficit": 0
+      }
+    ]
+  }
+}

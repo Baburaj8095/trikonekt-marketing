@@ -63,6 +63,18 @@ class BusinessRegistration(models.Model):
     subcategory = models.ForeignKey('business.MerchantSubCategory', null=True, blank=True, on_delete=models.SET_NULL, related_name='registrations')
     business_address = models.TextField()
 
+    # Commercial terms
+    commission_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    SERVICE_MODE_ONLINE = 'ONLINE'
+    SERVICE_MODE_OFFLINE = 'OFFLINE'
+    SERVICE_MODE_BOTH = 'BOTH'
+    SERVICE_MODE_CHOICES = [
+        (SERVICE_MODE_ONLINE, 'Online'),
+        (SERVICE_MODE_OFFLINE, 'Offline'),
+        (SERVICE_MODE_BOTH, 'Both'),
+    ]
+    service_mode = models.CharField(max_length=16, choices=SERVICE_MODE_CHOICES, default=SERVICE_MODE_BOTH, db_index=True)
+
     # Sponsorship and geo
     sponsor_id = models.CharField(max_length=64, blank=True)
     country = models.ForeignKey('locations.Country', null=True, blank=True, on_delete=models.SET_NULL, related_name='business_registrations')
@@ -680,7 +692,9 @@ class AutoPoolAccount(models.Model):
     @classmethod
     def create_five_150_for_user(cls, user, amount: Decimal | None = None, source_type: str = "", source_id: str = ""):
         """
-        Deterministic forced-matrix placement for FIVE_150 using GenericPlacement.
+        FIVE_150 sponsor-anchored forced matrix.
+        - Anchor to sponsor's subtree when the direct sponsor has an ACTIVE FIVE_150 entry.
+        - Otherwise, fall back to the pool sentinel root.
         """
         # Eligibility gate
         try:
@@ -692,21 +706,30 @@ class AutoPoolAccount(models.Model):
                 return None
         except Exception:
             return None
+        # Do not create non-sentinel entries for the designated root/sentinel owner
+        try:
+            if cls._is_virtual_root_user(user):
+                return None
+        except Exception:
+            pass
         from decimal import Decimal as D
         from business.services.placement import GenericPlacement
         amt = D(amount) if amount is not None else D("150.00")
+        # Sponsor-anchored: begin BFS from sponsor's subtree when available; else fallback to sentinel
+        start_id = cls._sponsor_start_entry_id_for(user, "FIVE_150")
         return GenericPlacement.place_account(
             owner=user,
             pool_type="FIVE_150",
             amount=amt,
             source_type=source_type or "",
             source_id=source_id or "",
+            start_entry_id=start_id,
         )
 
     @classmethod
     def create_three_150_for_user(cls, user, amount: Decimal | None = None, source_type: str = "SYSTEM", source_id: str = ""):
         """
-        Deterministic forced-matrix placement for THREE_150 using GenericPlacement.
+        Global auto-pool placement for THREE_150 (ignores sponsor). Starts from sentinel root.
         """
         # Eligibility gate
         try:
@@ -718,15 +741,23 @@ class AutoPoolAccount(models.Model):
                 return None
         except Exception:
             return None
+        # Do not create non-sentinel entries for the designated root/sentinel owner
+        try:
+            if cls._is_virtual_root_user(user):
+                return None
+        except Exception:
+            pass
         from decimal import Decimal as D
         from business.services.placement import GenericPlacement
         amt = D(amount) if amount is not None else D("150.00")
+        # Global pool placement: ignore sponsor anchor
         return GenericPlacement.place_account(
             owner=user,
             pool_type="THREE_150",
             amount=amt,
             source_type=source_type or "SYSTEM",
             source_id=source_id or "",
+            start_entry_id=None,
         )
 
     @classmethod
@@ -810,14 +841,26 @@ class AutoPoolAccount(models.Model):
     def _sponsor_start_entry_id_for(cls, user, pool_type: str):
         """
         Resolve sponsor-scoped BFS start entry for placement:
-        - Return earliest ACTIVE AutoPoolAccount.id for the sponsor in this pool_type
-        - If sponsor has no entry, return None (caller should fallback to sentinel)
+        - Return earliest ACTIVE non-sentinel AutoPoolAccount.id for the sponsor in this pool_type
+          (i.e., parent_account IS NOT NULL so we anchor under sponsor's positioned node)
+        - If sponsor has no positioned ACTIVE entry, return None (caller should fallback to sentinel)
         """
         try:
             sponsor = getattr(user, "registered_by", None)
             if not sponsor or not getattr(sponsor, "id", None):
                 return None
-            acc = cls.objects.filter(owner=sponsor, pool_type=pool_type, status="ACTIVE").order_by("id").first()
+            # Do not anchor to virtual root/sentinel user; force global/sentinel BFS in such cases
+            try:
+                if cls._is_virtual_root_user(sponsor):
+                    return None
+            except Exception:
+                pass
+            acc = cls.objects.filter(
+                owner=sponsor,
+                pool_type=pool_type,
+                status="ACTIVE",
+                parent_account__isnull=False,
+            ).order_by("id").first()
             return int(acc.id) if acc else None
         except Exception:
             return None
@@ -825,8 +868,9 @@ class AutoPoolAccount(models.Model):
     @classmethod
     def place_in_three_pool(cls, user, pool_type: str, amount: Decimal, source_type: str = "", source_id: str = ""):
         """
-        DEPRECATED legacy behavior removed.
-        New behavior: deterministic forced-matrix placement (TOP→DOWN→LEFT→RIGHT) independent of sponsor/self.
+        3×N placement engine.
+        - THREE_150: global auto-pool (ignore sponsor), start from sentinel.
+        - Other 3× pools (e.g., THREE_50): preserve sponsor-anchored behavior if sponsor has an entry.
         """
         # Eligibility gate
         try:
@@ -841,19 +885,22 @@ class AutoPoolAccount(models.Model):
         from decimal import Decimal as D
         from business.services.placement import GenericPlacement
         amt = D(amount or 0)
+        start_id = None if str(pool_type) == "THREE_150" else cls._sponsor_start_entry_id_for(user, pool_type)
         return GenericPlacement.place_account(
             owner=user,
             pool_type=pool_type,
             amount=amt,
             source_type=source_type or "",
             source_id=source_id or "",
+            start_entry_id=start_id,
         )
 
     @classmethod
     def place_in_five_pool(cls, user, pool_type: str, amount: Decimal, source_type: str = "", source_id: str = ""):
         """
-        DEPRECATED legacy behavior removed.
-        New behavior: deterministic forced-matrix placement (TOP→DOWN→LEFT→RIGHT) independent of sponsor/self.
+        FIVE_150 sponsor-anchored forced matrix placement.
+        - Anchor to sponsor's subtree when the direct sponsor has an ACTIVE FIVE_150 entry.
+        - Otherwise, fall back to the pool sentinel root.
         """
         # Eligibility gate
         try:
@@ -868,12 +915,15 @@ class AutoPoolAccount(models.Model):
         from decimal import Decimal as D
         from business.services.placement import GenericPlacement
         amt = D(amount or 0)
+        # Sponsor-anchored: begin BFS from sponsor's subtree when available; else fallback to sentinel
+        start_id = cls._sponsor_start_entry_id_for(user, pool_type)
         return GenericPlacement.place_account(
             owner=user,
             pool_type=pool_type,
             amount=amt,
             source_type=source_type or "",
             source_id=source_id or "",
+            start_entry_id=start_id,
         )
 
     @classmethod

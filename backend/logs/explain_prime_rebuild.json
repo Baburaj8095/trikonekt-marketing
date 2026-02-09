@@ -1,0 +1,675 @@
+{
+  "filters": {
+    "status": "APPROVED",
+    "only_user_ids": []
+  },
+  "totals": {
+    "approved_promopurchases": 78,
+    "included_first_time_events": 65,
+    "by_product_included": {
+      "150": 16,
+      "750": 49,
+      "759": 0
+    },
+    "excluded_rows": 13
+  },
+  "included_events": {
+    "150": [
+      {
+        "user_id": 32,
+        "product": "150",
+        "purchase_id": 393,
+        "ts": "2026-01-28T03:35:31.043799+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 101,
+        "product": "150",
+        "purchase_id": 394,
+        "ts": "2026-01-28T11:35:32.785035+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 102,
+        "product": "150",
+        "purchase_id": 397,
+        "ts": "2026-01-28T13:08:50.243442+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 103,
+        "product": "150",
+        "purchase_id": 400,
+        "ts": "2026-01-28T13:43:28.959306+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 104,
+        "product": "150",
+        "purchase_id": 403,
+        "ts": "2026-01-28T15:27:55.235723+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 105,
+        "product": "150",
+        "purchase_id": 406,
+        "ts": "2026-01-29T03:02:56.860516+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 120,
+        "product": "150",
+        "purchase_id": 409,
+        "ts": "2026-01-29T04:12:19.010981+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 121,
+        "product": "150",
+        "purchase_id": 411,
+        "ts": "2026-01-29T04:12:24.896715+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 122,
+        "product": "150",
+        "purchase_id": 413,
+        "ts": "2026-01-29T04:12:30.031033+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 124,
+        "product": "150",
+        "purchase_id": 415,
+        "ts": "2026-01-29T04:12:35.429234+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 125,
+        "product": "150",
+        "purchase_id": 417,
+        "ts": "2026-01-29T04:12:41.592808+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 129,
+        "product": "150",
+        "purchase_id": 424,
+        "ts": "2026-01-29T09:43:08.627129+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 136,
+        "product": "150",
+        "purchase_id": 530,
+        "ts": "2026-01-31T04:31:03.271972+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 139,
+        "product": "150",
+        "purchase_id": 509,
+        "ts": "2026-01-30T17:18:04.944534+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 150,
+        "product": "150",
+        "purchase_id": 504,
+        "ts": "2026-01-29T19:56:30.447166+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 188,
+        "product": "150",
+        "purchase_id": 494,
+        "ts": "2026-01-29T15:10:50.178074+00:00",
+        "via": "promopurchase"
+      }
+    ],
+    "750": [
+      {
+        "user_id": 32,
+        "product": "750",
+        "purchase_id": 392,
+        "ts": "2026-01-28T03:35:25.221444+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 101,
+        "product": "750",
+        "purchase_id": 395,
+        "ts": "2026-01-28T12:07:56.060296+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 102,
+        "product": "750",
+        "purchase_id": 398,
+        "ts": "2026-01-28T13:16:10.559921+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 103,
+        "product": "750",
+        "purchase_id": 401,
+        "ts": "2026-01-28T13:53:04.857194+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 104,
+        "product": "750",
+        "purchase_id": 404,
+        "ts": "2026-01-28T15:45:56.649072+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 105,
+        "product": "750",
+        "purchase_id": 407,
+        "ts": "2026-01-29T03:03:00.988470+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 120,
+        "product": "750",
+        "purchase_id": 410,
+        "ts": "2026-01-29T04:12:22.454220+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 121,
+        "product": "750",
+        "purchase_id": 412,
+        "ts": "2026-01-29T04:12:27.482121+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 122,
+        "product": "750",
+        "purchase_id": 414,
+        "ts": "2026-01-29T04:12:32.935674+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 124,
+        "product": "750",
+        "purchase_id": 416,
+        "ts": "2026-01-29T04:12:39.289534+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 125,
+        "product": "750",
+        "purchase_id": 418,
+        "ts": "2026-01-29T04:12:44.491124+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 125,
+        "product": "750",
+        "purchase_id": 499,
+        "ts": "2026-01-29T16:44:15.733335+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 125,
+        "product": "750",
+        "purchase_id": 516,
+        "ts": "2026-01-30T17:54:55.567443+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 125,
+        "product": "750",
+        "purchase_id": 520,
+        "ts": "2026-01-30T18:45:38.338364+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 125,
+        "product": "750",
+        "purchase_id": 525,
+        "ts": "2026-01-31T03:25:17.369978+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 126,
+        "product": "750",
+        "purchase_id": 422,
+        "ts": "2026-01-29T07:00:22.047255+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 128,
+        "product": "750",
+        "purchase_id": 421,
+        "ts": "2026-01-29T05:48:26.764092+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 133,
+        "product": "750",
+        "purchase_id": 426,
+        "ts": "2026-01-29T09:45:37.518599+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 135,
+        "product": "750",
+        "purchase_id": 506,
+        "ts": "2026-01-30T09:48:18.922754+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 136,
+        "product": "750",
+        "purchase_id": 531,
+        "ts": "2026-01-31T04:32:42.041202+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 136,
+        "product": "750",
+        "purchase_id": 532,
+        "ts": "2026-01-31T04:33:46.105561+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 137,
+        "product": "750",
+        "purchase_id": 507,
+        "ts": "2026-01-30T09:48:26.639716+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 139,
+        "product": "750",
+        "purchase_id": 510,
+        "ts": "2026-01-30T17:19:08.274192+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 150,
+        "product": "750",
+        "purchase_id": 503,
+        "ts": "2026-01-29T19:56:46.849476+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 150,
+        "product": "750",
+        "purchase_id": 512,
+        "ts": "2026-01-30T17:36:36.305337+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 185,
+        "product": "750",
+        "purchase_id": 505,
+        "ts": "2026-01-30T05:47:22.353766+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 187,
+        "product": "750",
+        "purchase_id": 493,
+        "ts": "2026-01-29T15:01:24.742277+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 189,
+        "product": "750",
+        "purchase_id": 496,
+        "ts": "2026-01-29T15:19:37.157138+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 190,
+        "product": "750",
+        "purchase_id": 497,
+        "ts": "2026-01-29T15:33:06.418866+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 193,
+        "product": "750",
+        "purchase_id": 534,
+        "ts": "2026-02-01T08:46:21.473157+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 194,
+        "product": "750",
+        "purchase_id": 554,
+        "ts": "2026-02-07T13:06:56.274450+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 202,
+        "product": "750",
+        "purchase_id": 535,
+        "ts": "2026-02-01T08:46:10.377789+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 203,
+        "product": "750",
+        "purchase_id": 536,
+        "ts": "2026-02-01T08:47:08.175679+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 206,
+        "product": "750",
+        "purchase_id": 545,
+        "ts": "2026-02-05T01:53:50.689568+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 207,
+        "product": "750",
+        "purchase_id": 537,
+        "ts": "2026-02-01T18:06:09.777374+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 208,
+        "product": "750",
+        "purchase_id": 544,
+        "ts": "2026-02-03T10:39:27.477488+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 209,
+        "product": "750",
+        "purchase_id": 538,
+        "ts": "2026-02-01T18:06:23.873322+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 210,
+        "product": "750",
+        "purchase_id": 539,
+        "ts": "2026-02-01T18:06:37.267668+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 211,
+        "product": "750",
+        "purchase_id": 540,
+        "ts": "2026-02-02T10:37:22.476867+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 215,
+        "product": "750",
+        "purchase_id": 541,
+        "ts": "2026-02-03T05:22:20.760358+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 216,
+        "product": "750",
+        "purchase_id": 542,
+        "ts": "2026-02-03T05:22:01.273742+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 220,
+        "product": "750",
+        "purchase_id": 543,
+        "ts": "2026-02-03T08:58:21.768186+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 222,
+        "product": "750",
+        "purchase_id": 546,
+        "ts": "2026-02-05T01:58:08.274144+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 224,
+        "product": "750",
+        "purchase_id": 548,
+        "ts": "2026-02-06T04:53:54.775907+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 228,
+        "product": "750",
+        "purchase_id": 547,
+        "ts": "2026-02-05T17:17:11.467009+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 229,
+        "product": "750",
+        "purchase_id": 549,
+        "ts": "2026-02-06T15:14:45.372738+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 233,
+        "product": "750",
+        "purchase_id": 551,
+        "ts": "2026-02-07T09:29:49.060322+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 236,
+        "product": "750",
+        "purchase_id": 552,
+        "ts": "2026-02-07T12:45:49.989118+00:00",
+        "via": "promopurchase"
+      },
+      {
+        "user_id": 237,
+        "product": "750",
+        "purchase_id": 553,
+        "ts": "2026-02-07T12:49:04.974288+00:00",
+        "via": "promopurchase"
+      }
+    ],
+    "759": []
+  },
+  "excluded_purchases": [
+    {
+      "purchase_id": 396,
+      "user_id": 101,
+      "package_code": "MONTHLY759",
+      "type": "MONTHLY",
+      "product": "759",
+      "ts": "2026-01-28T12:58:28.486513+00:00",
+      "reason": "monthly_759_not_first",
+      "first_event_ts": null,
+      "detail": {
+        "package_number": 1,
+        "boxes_len": 1,
+        "boxes_has_2plus": false
+      }
+    },
+    {
+      "purchase_id": 420,
+      "user_id": 101,
+      "package_code": "MONTHLY759",
+      "type": "MONTHLY",
+      "product": "759",
+      "ts": "2026-01-29T05:21:07.179617+00:00",
+      "reason": "monthly_759_not_first",
+      "first_event_ts": null,
+      "detail": {
+        "package_number": 1,
+        "boxes_len": 1,
+        "boxes_has_2plus": true
+      }
+    },
+    {
+      "purchase_id": 399,
+      "user_id": 102,
+      "package_code": "MONTHLY759",
+      "type": "MONTHLY",
+      "product": "759",
+      "ts": "2026-01-28T13:24:38.438616+00:00",
+      "reason": "monthly_759_not_first",
+      "first_event_ts": null,
+      "detail": {
+        "package_number": 1,
+        "boxes_len": 1,
+        "boxes_has_2plus": false
+      }
+    },
+    {
+      "purchase_id": 402,
+      "user_id": 103,
+      "package_code": "MONTHLY759",
+      "type": "MONTHLY",
+      "product": "759",
+      "ts": "2026-01-28T14:00:58.166308+00:00",
+      "reason": "monthly_759_not_first",
+      "first_event_ts": null,
+      "detail": {
+        "package_number": 1,
+        "boxes_len": 1,
+        "boxes_has_2plus": false
+      }
+    },
+    {
+      "purchase_id": 405,
+      "user_id": 104,
+      "package_code": "MONTHLY759",
+      "type": "MONTHLY",
+      "product": "759",
+      "ts": "2026-01-28T15:55:39.977758+00:00",
+      "reason": "monthly_759_not_first",
+      "first_event_ts": null,
+      "detail": {
+        "package_number": 1,
+        "boxes_len": 1,
+        "boxes_has_2plus": false
+      }
+    },
+    {
+      "purchase_id": 408,
+      "user_id": 105,
+      "package_code": "MONTHLY759",
+      "type": "MONTHLY",
+      "product": "759",
+      "ts": "2026-01-29T03:03:04.958785+00:00",
+      "reason": "monthly_759_not_first",
+      "first_event_ts": null,
+      "detail": {
+        "package_number": 1,
+        "boxes_len": 1,
+        "boxes_has_2plus": false
+      }
+    },
+    {
+      "purchase_id": 500,
+      "user_id": 125,
+      "package_code": "MONTHLY759",
+      "type": "MONTHLY",
+      "product": "759",
+      "ts": "2026-01-29T16:51:49.137209+00:00",
+      "reason": "monthly_759_not_first",
+      "first_event_ts": null,
+      "detail": {
+        "package_number": 1,
+        "boxes_len": 1,
+        "boxes_has_2plus": false
+      }
+    },
+    {
+      "purchase_id": 501,
+      "user_id": 125,
+      "package_code": "MONTHLY759",
+      "type": "MONTHLY",
+      "product": "759",
+      "ts": "2026-01-29T16:53:07.669837+00:00",
+      "reason": "monthly_759_not_first",
+      "first_event_ts": null,
+      "detail": {
+        "package_number": 1,
+        "boxes_len": 1,
+        "boxes_has_2plus": true
+      }
+    },
+    {
+      "purchase_id": 526,
+      "user_id": 125,
+      "package_code": "MONTHLY759",
+      "type": "MONTHLY",
+      "product": "759",
+      "ts": "2026-01-31T03:27:02.117650+00:00",
+      "reason": "monthly_759_not_first",
+      "first_event_ts": null,
+      "detail": {
+        "package_number": 1,
+        "boxes_len": 1,
+        "boxes_has_2plus": true
+      }
+    },
+    {
+      "purchase_id": 511,
+      "user_id": 139,
+      "package_code": "MONTHLY759",
+      "type": "MONTHLY",
+      "product": "759",
+      "ts": "2026-01-30T17:19:52.011131+00:00",
+      "reason": "monthly_759_not_first",
+      "first_event_ts": null,
+      "detail": {
+        "package_number": 1,
+        "boxes_len": 1,
+        "boxes_has_2plus": false
+      }
+    },
+    {
+      "purchase_id": 513,
+      "user_id": 150,
+      "package_code": "MONTHLY759",
+      "type": "MONTHLY",
+      "product": "759",
+      "ts": "2026-01-30T17:38:04.863886+00:00",
+      "reason": "monthly_759_not_first",
+      "first_event_ts": null,
+      "detail": {
+        "package_number": 1,
+        "boxes_len": 1,
+        "boxes_has_2plus": true
+      }
+    },
+    {
+      "purchase_id": 495,
+      "user_id": 188,
+      "package_code": "MONTHLY759",
+      "type": "MONTHLY",
+      "product": "759",
+      "ts": "2026-01-29T15:10:56.399795+00:00",
+      "reason": "monthly_759_not_first",
+      "first_event_ts": null,
+      "detail": {
+        "package_number": 1,
+        "boxes_len": 1,
+        "boxes_has_2plus": false
+      }
+    },
+    {
+      "purchase_id": 550,
+      "user_id": 229,
+      "package_code": "MONTHLY759",
+      "type": "MONTHLY",
+      "product": "759",
+      "ts": "2026-02-06T15:15:38.973229+00:00",
+      "reason": "monthly_759_not_first",
+      "first_event_ts": null,
+      "detail": {
+        "package_number": 1,
+        "boxes_len": 1,
+        "boxes_has_2plus": false
+      }
+    }
+  ]
+}

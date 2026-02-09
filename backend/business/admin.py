@@ -22,7 +22,7 @@ class BusinessRegistrationAdmin(admin.ModelAdmin):
     list_display = (
         'unique_id',
         'business_name', 'business_category', 'business_address',
-        'full_name', 'email', 'phone',
+        'full_name', 'email', 'phone', 'commission_percent', 'service_mode',
         'country', 'state', 'city', 'pincode',
         'sponsor_id',
         'review_status', 'forwarded_to', 'forwarded_at',
@@ -33,7 +33,7 @@ class BusinessRegistrationAdmin(admin.ModelAdmin):
         'business_name', 'business_category', 'business_address',
         'full_name', 'email', 'phone', 'pincode', 'sponsor_id'
     )
-    list_filter = ('review_status', 'country', 'state', 'created_at')
+    list_filter = ('review_status', 'service_mode', 'country', 'state', 'created_at')
     list_select_related = ('country', 'state', 'city', 'registered_by', 'forwarded_to')
     ordering = ('-created_at',)
     raw_id_fields = ('country', 'state', 'city', 'registered_by', 'forwarded_to')
@@ -58,7 +58,7 @@ class BusinessRegistrationAdmin(admin.ModelAdmin):
         writer.writerow([
             'unique_id',
             'business_name', 'business_category', 'business_address',
-            'full_name', 'email', 'phone',
+            'full_name', 'email', 'phone', 'commission_percent', 'service_mode',
             'country', 'state', 'city', 'pincode',
             'sponsor_id',
             'review_status', 'forwarded_to', 'forwarded_at',
@@ -68,7 +68,7 @@ class BusinessRegistrationAdmin(admin.ModelAdmin):
             writer.writerow([
                 r.unique_id,
                 r.business_name, r.business_category, r.business_address,
-                r.full_name, r.email, r.phone,
+                r.full_name, r.email, r.phone, r.commission_percent, r.service_mode,
                 str(getattr(r, 'country', '') or ''), str(getattr(r, 'state', '') or ''), str(getattr(r, 'city', '') or ''),
                 r.pincode,
                 r.sponsor_id,

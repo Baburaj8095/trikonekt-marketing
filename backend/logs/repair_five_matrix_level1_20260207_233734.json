@@ -1,0 +1,55 @@
+{
+  "pool": "FIVE_150",
+  "dry_run": true,
+  "executed_at": "20260207_233734",
+  "roots_processed": [
+    1217
+  ],
+  "results": [
+    {
+      "root_id": 1217,
+      "root_level": 0,
+      "pool": "FIVE_150",
+      "before_children": [
+        {
+          "id": 1219,
+          "owner_id": 32,
+          "username": "9999999999",
+          "position": 1,
+          "level": 1
+        },
+        {
+          "id": 1221,
+          "owner_id": 32,
+          "username": "9999999999",
+          "position": 2,
+          "level": 1
+        }
+      ],
+      "missing_positions": [],
+      "promotions": [],
+      "skipped": [],
+      "unblock_moves": [
+        {
+          "child_id": 1224,
+          "old_position": 3,
+          "new_position": 6,
+          "status": "CLOSED"
+        },
+        {
+          "child_id": 1225,
+          "old_position": 4,
+          "new_position": 7,
+          "status": "CLOSED"
+        },
+        {
+          "child_id": 1226,
+          "old_position": 5,
+          "new_position": 8,
+          "status": "CLOSED"
+        }
+      ],
+      "renumber": []
+    }
+  ]
+}

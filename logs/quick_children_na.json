@@ -1,0 +1,21 @@
+{
+  "query": "1217",
+  "user_id": null,
+  "username": null,
+  "pools": {
+    "FIVE_150": {
+      "has_entry": false,
+      "root_account_id": null,
+      "root_level": null,
+      "children": [],
+      "child_count": 0
+    },
+    "THREE_150": {
+      "has_entry": false,
+      "root_account_id": null,
+      "root_level": null,
+      "children": [],
+      "child_count": 0
+    }
+  }
+}

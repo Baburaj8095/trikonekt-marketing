@@ -1213,55 +1213,9 @@ def handle_new_user_post_save(sender, instance: CustomUser, created: bool, **kwa
     except Exception:
         cfg = None
 
-    # Auto 5-matrix placement on consumer registration (config-driven)
-    # If CommissionConfig.autopool_trigger_on_direct_referral is True, place a FIVE_150 account for the new consumer
-    # and sync matrix fields (parent/matrix_position/depth) on the user for AdminMatrix5Tree.
-    try:
-        if (
-            created
-            and cfg
-            and getattr(cfg, "autopool_trigger_on_direct_referral", False)
-            and str(getattr(instance, "category", "")).lower() == "consumer"
-            and not getattr(instance, "is_staff", False)
-            and not getattr(instance, "is_superuser", False)
-        ):
-            acc = AutoPoolAccount.create_five_150_for_user(
-                instance,
-                amount=None,
-                source_type="REGISTRATION",
-                source_id=str(getattr(instance, "id", "")),
-            )
-            if acc and getattr(acc, "parent_account", None):
-                parent_owner = getattr(acc.parent_account, "owner", None)
-                pos = getattr(acc, "position", None)
-                lvl = int(getattr(acc, "level", 0) or 0)
-                if parent_owner and pos:
-                    # Best-effort: sync matrix placement to CustomUser without breaking outer transaction.
-                    parent_id = parent_owner.id
-                    position = int(pos)
-                    level = int(lvl)
-                    # If the (parent, position) slot is already occupied, skip syncing to avoid IntegrityError.
-                    try:
-                        slot_taken = CustomUser.objects.filter(parent_id=parent_id, matrix_position=position).exclude(pk=instance.pk).exists()
-                    except Exception:
-                        slot_taken = True
-                    if not slot_taken:
-                        try:
-                            from django.db import IntegrityError
-                            # Use a nested savepoint so any integrity error rolls back only this part.
-                            with transaction.atomic():
-                                instance.parent_id = parent_id
-                                instance.matrix_position = position
-                                instance.depth = level
-                                instance.save(update_fields=["parent", "matrix_position", "depth"])
-                        except IntegrityError:
-                            # Slot taken concurrently or conflicting historical data; ignore.
-                            pass
-                        except Exception:
-                            pass
-    except Exception:
-        # best-effort; do not block user creation
-        pass
+    # Disabled: Do not create 5-matrix entries on registration.
+    # Matrix entries (FIVE_150/THREE_150) must open only after first PRIME activation (150/750/759).
+    # Previously this block created FIVE_150 on join when cfg.autopool_trigger_on_direct_referral was True.
 
     # DEFERRED: No referral/matrix payouts on registration.
     # Intentionally not calling referral.on_user_join here. Payouts will be triggered on first activation.

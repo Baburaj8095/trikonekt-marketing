@@ -1,0 +1,56 @@
+{
+  "generated_at": "2026-02-07T22:41:00.614098Z",
+  "query_identifier": "9964716666",
+  "resolved": {
+    "found": true,
+    "id": 203,
+    "username": "9964716666",
+    "phone": "9964716666",
+    "prefixed_id": "TR-0000000439"
+  },
+  "pools": {
+    "FIVE_150": {
+      "pool": "FIVE_150",
+      "fanout": 5,
+      "default_levels": 10,
+      "has_entry": false
+    },
+    "THREE_150": {
+      "pool": "THREE_150",
+      "fanout": 3,
+      "default_levels": 15,
+      "has_entry": false
+    }
+  },
+  "directs_count": 7,
+  "directs_sample": [
+    {
+      "id": 205,
+      "username": "7411134490"
+    },
+    {
+      "id": 207,
+      "username": "6360872571"
+    },
+    {
+      "id": 209,
+      "username": "7090985119"
+    },
+    {
+      "id": 210,
+      "username": "7625014226"
+    },
+    {
+      "id": 215,
+      "username": "9972503473"
+    },
+    {
+      "id": 226,
+      "username": "6360929754"
+    },
+    {
+      "id": 227,
+      "username": "9886409580"
+    }
+  ]
+}

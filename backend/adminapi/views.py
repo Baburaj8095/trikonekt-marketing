@@ -1831,6 +1831,15 @@ class AdminMatrix5Tree(APIView):
         except Exception:
             sentinel = AutoPoolAccount.objects.filter(pool_type=pool, parent_account__isnull=True).order_by("id").first()
 
+        # Resolve special head/root consumer id (defaults to 32 when unavailable)
+        try:
+            from business.models import RootConsumerConfig
+            _rc = RootConsumerConfig.get_solo()
+            _ru = _rc.get_root_user()
+            head_user_id = int(getattr(_ru, "id", 0) or 0) or 32
+        except Exception:
+            head_user_id = 32
+
         # Determine start account id:
         root_acc = None
         if start_entry_id > 0:
@@ -1840,23 +1849,15 @@ class AdminMatrix5Tree(APIView):
                 .first()
             )
         if not root_acc and display_user_id > 0:
-            # Special UI head rule: user 32
-            if display_user_id == 32:
-                root_acc = (
-                    AutoPoolAccount.objects.select_related("owner")
-                    .filter(owner_id=32, pool_type=pool, status="ACTIVE")
-                    .order_by("id")
-                    .first()
-                )
-                if not root_acc and sentinel and getattr(sentinel, "pool_type", None) == pool:
-                    root_acc = AutoPoolAccount.objects.select_related("owner").filter(id=sentinel.id).first()
-            else:
-                root_acc = (
-                    AutoPoolAccount.objects.select_related("owner")
-                    .filter(owner_id=display_user_id, pool_type=pool, status="ACTIVE")
-                    .order_by("id")
-                    .first()
-                )
+            # Prefer earliest ACTIVE entry for the requested user; fallback to sentinel only if none exists
+            root_acc = (
+                AutoPoolAccount.objects.select_related("owner")
+                .filter(owner_id=display_user_id, pool_type=pool, status="ACTIVE")
+                .order_by("id")
+                .first()
+            )
+            if not root_acc and display_user_id == head_user_id and sentinel and getattr(sentinel, "pool_type", None) == pool:
+                root_acc = AutoPoolAccount.objects.select_related("owner").filter(id=sentinel.id).first()
         if not root_acc:
             # Fallback to sentinel for this pool
             if sentinel and getattr(sentinel, "pool_type", None) == pool:
@@ -1865,12 +1866,16 @@ class AdminMatrix5Tree(APIView):
         if not root_acc:
             return Response({"detail": "No matrix root available for the requested pool."}, status=404)
 
+        # Disable special compression; always show actual L1 children including head-owned
+        head_hide_self = False
+
         # BFS over AutoPoolAccount graph, width-before-depth, per-parent fanout cap
         def serialize_node(acc, rel_level):
             return {
                 "account_id": acc.id,
                 "owner_id": getattr(acc.owner, "id", None),
                 "username": getattr(acc.owner, "username", None),
+                "username_key": getattr(acc, "username_key", None),
                 "level": int(rel_level),  # relative to requested root (root=1)
                 "abs_level": int(getattr(acc, "level", 0) or 0),  # absolute persisted level
                 "position": getattr(acc, "position", None),
@@ -1890,40 +1895,72 @@ class AdminMatrix5Tree(APIView):
         current_parent_ids = [int(root_acc.id)]
         rel_levels = {int(root_acc.id): 1}
         levels_used = 1  # count root as level 1 for response budget
+        # Track head-owned L1 account ids (used to compress display under sentinel)
+        head_l1_ids: set[int] = set()
 
         while current_parent_ids and levels_used < max_depth:
             # Fetch children for all current parents in a single query
-            rows = list(
+            qs_rows = (
                 AutoPoolAccount.objects.select_related("owner")
                 .filter(
                     pool_type=pool,
                     status="ACTIVE",
                     parent_account_id__in=current_parent_ids,
                 )
-                .order_by("parent_account_id", "position", "id")
             )
+            rows = None
+            # Special: when starting at sentinel for head user, compress out head-owned immediate children
+            if head_hide_self and levels_used == 1 and len(current_parent_ids) == 1 and int(current_parent_ids[0]) == int(getattr(root_acc, "id", 0) or 0):
+                # Build ordered L1 under sentinel without filtering head, then expand head-owned nodes into their children
+                l1 = list(qs_rows.order_by("parent_account_id", "position", "id"))
+                # Cache the head-owned L1 ids so we can attach their children directly under root for display
+                head_l1_ids = {int(getattr(r, "id", 0) or 0) for r in l1 if getattr(r, "owner_id", None) == head_user_id}
+                expanded = []
+                for r in l1:
+                    if getattr(r, "owner_id", None) == head_user_id:
+                        # Pull this node's ACTIVE children (left-to-right)
+                        gc = list(
+                            AutoPoolAccount.objects.select_related("owner")
+                            .filter(pool_type=pool, status="ACTIVE", parent_account_id=int(getattr(r, "id", 0) or 0))
+                            .order_by("position", "id")
+                        )
+                        expanded.extend(gc)
+                    else:
+                        expanded.append(r)
+                rows = expanded
+            else:
+                if head_hide_self:
+                    qs_rows = qs_rows.exclude(owner_id=head_user_id)
+                rows = list(qs_rows.order_by("parent_account_id", "position", "id"))
             if not rows:
                 break
 
             # Per-parent child cap (fanout)
             counts = {}
             next_parent_ids = []
+            # Determine if we're in the first BFS level under the requested root (sentinel)
+            first_level_special = bool(head_hide_self and levels_used == 1 and len(current_parent_ids) == 1 and int(current_parent_ids[0]) == int(getattr(root_acc, "id", 0) or 0))
             for acc in rows:
-                pid = getattr(acc, "parent_account_id", None)
-                if pid is None or int(pid) not in nodes_by_account:
+                pid_raw = getattr(acc, "parent_account_id", None)
+                # When compressing head-owned L1, attach their children directly under the root for display
+                if first_level_special and pid_raw is not None and int(pid_raw) in head_l1_ids:
+                    pid_eff = int(getattr(root_acc, "id", 0) or 0)
+                else:
+                    pid_eff = int(pid_raw) if pid_raw is not None else None
+                if pid_eff is None or pid_eff not in nodes_by_account:
                     # parent may have been pruned; skip
                     continue
-                used = counts.get(int(pid), 0)
+                used = counts.get(pid_eff, 0)
                 if used >= fanout:
                     continue
-                parent_node = nodes_by_account[int(pid)]
-                parent_rel = int(rel_levels.get(int(pid), levels_used))
+                parent_node = nodes_by_account[pid_eff]
+                parent_rel = int(rel_levels.get(pid_eff, levels_used))
                 child_rel = parent_rel + 1
                 child_node = serialize_node(acc, child_rel)
                 parent_node["children"].append(child_node)
                 nodes_by_account[int(acc.id)] = child_node
                 rel_levels[int(acc.id)] = child_rel
-                counts[int(pid)] = used + 1
+                counts[pid_eff] = used + 1
                 next_parent_ids.append(int(acc.id))
 
             if not next_parent_ids:

@@ -60,9 +60,12 @@ export default function AdminUsers() {
     let activated = "";
     let account_active = "";
     let category = "";
+    let role = "";
     try {
       const qs = typeof window !== "undefined" ? (window.location.search || "") : "";
       const params = new URLSearchParams(qs);
+      const rawRole = params.get("role") || "";
+      role = String(rawRole || "").toLowerCase();
       const rawActivated = (params.get("activated") || "").toLowerCase();
       activated = ["1","true","yes","activated"].includes(rawActivated)
         ? "1"
@@ -75,7 +78,7 @@ export default function AdminUsers() {
       category = String(rawCategory || "").toLowerCase().replace(/cordinator\b/g, "coordinator");
     } catch (_) {}
     return {
-      role: "",
+      role,
       phone: "",
       category,
       pincode: "",
@@ -253,6 +256,8 @@ export default function AdminUsers() {
     const normAccountActive = ["1","true","yes","active"].includes(rawAccountActive)
       ? "1"
       : (["0","false","no","inactive"].includes(rawAccountActive) ? "0" : "");
+    const rawRole = params.get("role") || "";
+    const normRole = String(rawRole || "").toLowerCase();
     const rawCategory = params.get("category") || "";
     const normCategory = String(rawCategory || "").toLowerCase().replace(/cordinator\b/g, "coordinator");
     setFilters((f) => {
@@ -262,6 +267,9 @@ export default function AdminUsers() {
       }
       if ((f.account_active || "") !== normAccountActive) {
         next = { ...next, account_active: normAccountActive };
+      }
+      if ((f.role || "") !== normRole) {
+        next = { ...next, role: normRole };
       }
       if ((f.category || "") !== normCategory) {
         next = { ...next, category: normCategory };
@@ -946,6 +954,26 @@ export default function AdminUsers() {
     [openEdit, setReloadKey, tempPw, isMobile, setPkgOpen, setPkgUser]
   );
 
+  // Quick-view segmented control for role/category
+  const [view, setView] = useState("all");
+  const applyView = useCallback((v) => {
+    setView(v);
+    if (v === "all") { setF("role", ""); setF("category", ""); }
+    else if (v === "consumers") { setF("role", "user"); setF("category", "consumer"); }
+    else if (v === "merchants") { setF("role", "user"); setF("category", "merchant"); }
+    else if (v === "agencies") { setF("role", "agency"); setF("category", ""); }
+    else if (v === "employees") { setF("role", "employee"); setF("category", "employee"); }
+    // Optional: column visibility per view
+    setColVis((prev) => ({
+      ...prev,
+      __packages: v === "agencies" ? true : false,
+      __commissions: v === "agencies" || v === "employees",
+      __prime150: v === "agencies" || v === "employees",
+      __prime750: v === "agencies" || v === "employees",
+      __monthly759: v === "agencies" || v === "employees",
+    }));
+  }, []);
+
   // Server-side fetcher for DataTable
   const fetcher = useCallback(
     async ({ page, pageSize, search, ordering }) => {
@@ -1160,6 +1188,33 @@ const count = Number.isFinite(countNum) ? countNum : results.length;
 
   const toolbar = (
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+      <div style={{ display: "inline-flex", gap: 6, marginRight: 8 }}>
+        {[
+          { id: "all", label: "All" },
+          { id: "consumers", label: "Consumers" },
+          { id: "merchants", label: "Merchants" },
+          { id: "agencies", label: "Agencies" },
+          { id: "employees", label: "Employees" },
+        ].map((v) => (
+          <button
+            key={v.id}
+            onClick={() => applyView(v.id)}
+            aria-pressed={view === v.id}
+            style={{
+              padding: "6px 10px",
+              borderRadius: 8,
+              border: "1px solid #e5e7eb",
+              background: view === v.id ? "#0f172a" : "#fff",
+              color: view === v.id ? "#fff" : "#0f172a",
+              cursor: "pointer",
+              fontSize: 12,
+              fontWeight: 700,
+            }}
+          >
+            {v.label}
+          </button>
+        ))}
+      </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <label style={{ fontSize: 12, color: "#64748b" }}>Density</label>
         <div style={{ display: "inline-flex", border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
@@ -1259,21 +1314,42 @@ const count = Number.isFinite(countNum) ? countNum : results.length;
         >
           New Merchant
         </button>
-        <button
-          onClick={newAgency}
-          style={{
-            padding: "8px 12px",
-            borderRadius: 8,
-            border: "1px solid #eab308",
-            background: "#fef08a",
-            color: "#92400e",
-            cursor: "pointer",
-            fontWeight: 700,
-          }}
-          title="Create a new Agency (defaults to Sub‑Franchise; you can change the category in the form)"
-        >
-          New Agency
-        </button>
+        <div style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
+          {[
+            { id: "state_coordinator", label: "New State Coord." },
+            { id: "state", label: "New State" },
+            { id: "district_coordinator", label: "New District Coord." },
+            { id: "district", label: "New District" },
+            { id: "pincode_coordinator", label: "New Pincode Coord." },
+            { id: "pincode", label: "New Pincode" },
+            { id: "sub_franchise", label: "New Sub Franchise" },
+          ].map((t) => (
+            <button
+              key={t.id}
+              onClick={() => {
+                try {
+                  window.open(
+                    `/auth/register-v2/agency?admin=1&agency_level=${encodeURIComponent(t.id)}`,
+                    "_blank"
+                  );
+                } catch (_) {}
+              }}
+              style={{
+                padding: "8px 12px",
+                borderRadius: 8,
+                border: "1px solid #eab308",
+                background: "#fef08a",
+                color: "#92400e",
+                cursor: "pointer",
+                fontWeight: 700,
+                whiteSpace: "nowrap",
+              }}
+              title={`Create ${t.label.replace(/^New /, "")}`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
       <button
         onClick={handleExport}

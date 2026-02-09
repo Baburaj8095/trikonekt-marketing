@@ -564,14 +564,14 @@ def handle_coupon_activate(task: BackgroundTask) -> None:
                             user,
                             source={"type": "ECOUPON_150", "id": code_obj.id, "code": code_obj.code},
                         )
-                        # Also perform consumer matrix distribution per admin config (exclude direct/self & agency here to avoid duplication)
+                        # Ensure matrix accounts exist (no distribution here); payouts already handled by Prime 150 engine
                         try:
                             from business.services.activation import open_matrix_accounts_for_coupon
                             open_matrix_accounts_for_coupon(
                                 user,
                                 code_obj.id,
                                 amount_150=D("150.00"),
-                                distribute=True,
+                                distribute=False,
                                 trigger="ecoupon_activate",
                                 include_direct_self=False,
                                 include_agency=False,
@@ -1389,27 +1389,48 @@ def handle_promo_approve_payouts(task: BackgroundTask) -> None:
             ).order_by("id").first()
 
             with transaction.atomic():
-                entry = existing
-                if not entry:
-                    # Amount for entry metadata (does not affect payouts)
-                    try:
-                        amt = D(str(CommissionConfig.get_solo().prime_activation_amount or "150"))
-                    except Exception:
-                        amt = D("150.00")
-                    entry = AutoPoolAccount.create_five_150_for_user(
+                # Ensure FIVE_150 and THREE_150 structural entries (idempotent per source)
+                entry5 = existing
+                entry3 = AutoPoolAccount.objects.filter(
+                    pool_type="THREE_150",
+                    status="ACTIVE",
+                    source_type="PROMO_PURCHASE_APPROVAL",
+                    source_id=str(obj.id),
+                ).order_by("id").first()
+
+                # Amount for entry metadata (does not affect payouts)
+                try:
+                    amt = D(str(CommissionConfig.get_solo().prime_activation_amount or "150"))
+                except Exception:
+                    amt = D("150.00")
+
+                if not entry5:
+                    entry5 = AutoPoolAccount.create_five_150_for_user(
                         obj.user,
                         amount=amt,
                         source_type="PROMO_PURCHASE_APPROVAL",
                         source_id=str(obj.id),
                     )
-                    if not entry:
+                    if not entry5:
                         # User not eligible or placement deferred; do not stamp audit
-                        raise RuntimeError("Matrix entry creation returned None")
+                        raise RuntimeError("Matrix entry creation returned None (FIVE_150)")
+
+                if not entry3:
+                    try:
+                        entry3 = AutoPoolAccount.place_in_three_pool(
+                            obj.user,
+                            "THREE_150",
+                            amt,
+                            source_type="PROMO_PURCHASE_APPROVAL",
+                            source_id=str(obj.id),
+                        )
+                    except Exception:
+                        entry3 = None  # best-effort; do not block payouts
 
                 # Financial event: call existing payout engine (unchanged)
                 distribute_prime_150_payouts(
                     obj.user,
-                    source={"type": "PROMO_PURCHASE_APPROVAL", "id": obj.id, "entry_id": getattr(entry, "id", None)},
+                    source={"type": "PROMO_PURCHASE_APPROVAL", "id": obj.id, "entry_id": getattr(entry5, "id", None)},
                 )
 
                 # Idempotent success marker + audit
@@ -1421,8 +1442,9 @@ def handle_promo_approve_payouts(task: BackgroundTask) -> None:
                         metadata={
                             "purchase_id": obj.id,
                             "package": getattr(obj.package, "code", None),
-                            "entry_id": getattr(entry, "id", None),
-                            "pool": "FIVE_150",
+                            "entry_id_five": getattr(entry5, "id", None),
+                            "entry_id_three": getattr(entry3, "id", None),
+                            "pools": ["FIVE_150", "THREE_150"],
                         },
                     )
                 except Exception:
@@ -1437,7 +1459,54 @@ def handle_promo_approve_payouts(task: BackgroundTask) -> None:
     # PRIME 750: reuse existing engine (no structural entry mandated here)
     elif is_prime_750:
         try:
+            from business.models import AutoPoolAccount, CommissionConfig
             from business.services.prime import distribute_prime_750_payouts
+
+            # Ensure BOTH FIVE_150 and THREE_150 structural entries (idempotent per source)
+            try:
+                amt = D(str(CommissionConfig.get_solo().prime_activation_amount or "150"))
+            except Exception:
+                amt = D("150.00")
+
+            existing5 = AutoPoolAccount.objects.filter(
+                owner=obj.user,
+                pool_type="FIVE_150",
+                status="ACTIVE",
+                source_type="PROMO_PURCHASE_APPROVAL",
+                source_id=str(obj.id),
+            ).order_by("id").first()
+            existing3 = AutoPoolAccount.objects.filter(
+                owner=obj.user,
+                pool_type="THREE_150",
+                status="ACTIVE",
+                source_type="PROMO_PURCHASE_APPROVAL",
+                source_id=str(obj.id),
+            ).order_by("id").first()
+
+            if not existing5:
+                try:
+                    existing5 = AutoPoolAccount.create_five_150_for_user(
+                        obj.user,
+                        amount=amt,
+                        source_type="PROMO_PURCHASE_APPROVAL",
+                        source_id=str(obj.id),
+                    )
+                except Exception:
+                    existing5 = None  # best-effort
+
+            if not existing3:
+                try:
+                    existing3 = AutoPoolAccount.place_in_three_pool(
+                        obj.user,
+                        "THREE_150",
+                        amt,
+                        source_type="PROMO_PURCHASE_APPROVAL",
+                        source_id=str(obj.id),
+                    )
+                except Exception:
+                    existing3 = None  # best-effort
+
+            # Payouts for PRIME 750 (unchanged)
             distribute_prime_750_payouts(
                 obj.user,
                 source={"type": "PROMO_PURCHASE_APPROVAL", "id": obj.id},
@@ -1448,7 +1517,13 @@ def handle_promo_approve_payouts(task: BackgroundTask) -> None:
                     action="promo_purchase_distributed",
                     actor=getattr(obj, "approved_by", None),
                     notes=f"Promo purchase #{obj.id} payouts done",
-                    metadata={"purchase_id": obj.id, "package": getattr(obj.package, "code", None)},
+                    metadata={
+                        "purchase_id": obj.id,
+                        "package": getattr(obj.package, "code", None),
+                        "entry_id_five": getattr(existing5, "id", None),
+                        "entry_id_three": getattr(existing3, "id", None),
+                        "pools": ["FIVE_150", "THREE_150"],
+                    },
                 )
             except Exception:
                 pass

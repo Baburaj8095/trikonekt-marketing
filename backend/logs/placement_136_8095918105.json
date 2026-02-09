@@ -1,0 +1,44 @@
+{
+  "generated_at": "2026-02-07T19:21:28.888849Z",
+  "query_identifier": "8095918105",
+  "resolved": {
+    "found": true,
+    "id": 136,
+    "username": "8095918105",
+    "phone": "8095918105",
+    "prefixed_id": "TR-0000000412"
+  },
+  "pools": {
+    "FIVE_150": {
+      "pool": "FIVE_150",
+      "fanout": 5,
+      "default_levels": 10,
+      "has_entry": false
+    },
+    "THREE_150": {
+      "pool": "THREE_150",
+      "fanout": 3,
+      "default_levels": 15,
+      "has_entry": false
+    }
+  },
+  "directs_count": 4,
+  "directs_sample": [
+    {
+      "id": 139,
+      "username": "0809591810"
+    },
+    {
+      "id": 150,
+      "username": "8095918106"
+    },
+    {
+      "id": 197,
+      "username": "1234567890"
+    },
+    {
+      "id": 198,
+      "username": "2234567891"
+    }
+  ]
+}

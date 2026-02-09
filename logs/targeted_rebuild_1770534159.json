@@ -1,0 +1,88 @@
+[
+  {
+    "username": "9880125300",
+    "user_id": 208,
+    "events": [
+      {
+        "ts": "2026-02-03 10:39:27.477488+00:00",
+        "kind": "P750",
+        "src": "PP:544"
+      }
+    ],
+    "pre_counts": {
+      "FIVE_150": {
+        "ACTIVE": 0,
+        "CLOSED": 2,
+        "PENDING": 0,
+        "TOTAL": 2
+      },
+      "THREE_150": {
+        "ACTIVE": 0,
+        "CLOSED": 2,
+        "PENDING": 0,
+        "TOTAL": 2
+      }
+    },
+    "post_counts": {
+      "FIVE_150": {
+        "ACTIVE": 0,
+        "CLOSED": 2,
+        "PENDING": 0,
+        "TOTAL": 2
+      },
+      "THREE_150": {
+        "ACTIVE": 0,
+        "CLOSED": 2,
+        "PENDING": 0,
+        "TOTAL": 2
+      }
+    },
+    "created": {
+      "THREE_150": 0,
+      "FIVE_150": 0
+    }
+  },
+  {
+    "username": "9945846318",
+    "user_id": 233,
+    "events": [
+      {
+        "ts": "2026-02-07 09:29:49.060322+00:00",
+        "kind": "P750",
+        "src": "PP:551"
+      }
+    ],
+    "pre_counts": {
+      "FIVE_150": {
+        "ACTIVE": 0,
+        "CLOSED": 2,
+        "PENDING": 0,
+        "TOTAL": 2
+      },
+      "THREE_150": {
+        "ACTIVE": 0,
+        "CLOSED": 2,
+        "PENDING": 0,
+        "TOTAL": 2
+      }
+    },
+    "post_counts": {
+      "FIVE_150": {
+        "ACTIVE": 0,
+        "CLOSED": 2,
+        "PENDING": 0,
+        "TOTAL": 2
+      },
+      "THREE_150": {
+        "ACTIVE": 0,
+        "CLOSED": 2,
+        "PENDING": 0,
+        "TOTAL": 2
+      }
+    },
+    "created": {
+      "THREE_150": 0,
+      "FIVE_150": 0
+    }
+  }
+]

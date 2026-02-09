@@ -1,0 +1,32 @@
+[
+  {
+    "username": "9880125300",
+    "found": true,
+    "user_id": 208,
+    "expected_events": 1,
+    "debug": {
+      "p150": 0,
+      "p750": 1,
+      "p759_first": false
+    },
+    "FIVE_ACTIVE": 0,
+    "THREE_ACTIVE": 0,
+    "FIVE_sample": [],
+    "THREE_sample": []
+  },
+  {
+    "username": "9945846318",
+    "found": true,
+    "user_id": 233,
+    "expected_events": 1,
+    "debug": {
+      "p150": 0,
+      "p750": 1,
+      "p759_first": false
+    },
+    "FIVE_ACTIVE": 0,
+    "THREE_ACTIVE": 0,
+    "FIVE_sample": [],
+    "THREE_sample": []
+  }
+]
