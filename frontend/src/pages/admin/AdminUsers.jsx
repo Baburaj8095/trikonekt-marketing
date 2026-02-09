@@ -1265,7 +1265,7 @@ const count = Number.isFinite(countNum) ? countNum : results.length;
         </div>
       </div>
       <div style={{ display: "inline-flex", gap: 8 }}>
-        <button
+        {/* <button
           onClick={newConsumer}
           style={{
             padding: "8px 12px",
@@ -1313,7 +1313,7 @@ const count = Number.isFinite(countNum) ? countNum : results.length;
           title="Merchant creation is disabled for now"
         >
           New Merchant
-        </button>
+        </button> */}
         <div style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
           {[
             { id: "state_coordinator", label: "New State Coord." },

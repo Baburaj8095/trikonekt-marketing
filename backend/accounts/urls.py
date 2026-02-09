@@ -37,7 +37,7 @@ from .views import (
     wallet_purchase_product,
 )
 from .token_serializers import CustomTokenRefreshView
-from .views_tree import MyFiveMatrixTeamV1
+from .views_tree import MyFiveMatrixTeamV1, FiveMatrixCountsView, MyMatrix5EntriesTree
 
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
@@ -53,6 +53,7 @@ urlpatterns = [
     path('regions/by-sponsor/', regions_by_sponsor, name='regions_by_sponsor'),
     path('hierarchy/', hierarchy, name='hierarchy'),
     path('my/matrix/tree/', MyMatrixTree.as_view(), name='my_matrix_tree'),
+    path('my/matrix/tree5/entries/', MyMatrix5EntriesTree.as_view(), name='my_matrix5_entries_tree'),
     path('matrix/tree5/', MyMatrixTreeByRoot.as_view(), name='my_matrix_tree_by_root'),
     path('my/sponsor/tree/', MySponsorTree.as_view(), name='my_sponsor_tree'),
     path('sponsor/tree/', MySponsorTreeByRoot.as_view(), name='my_sponsor_tree_by_root'),
@@ -80,4 +81,6 @@ urlpatterns = [
     path('employee/offer-letter/', OfferLetterPDFView.as_view(), name='employee_offer_letter'),
     # New: 5-matrix genealogy (self + subtree within my downline)
     path('my/genealogy/tree5/', MyFiveMatrixTeamV1.as_view(), name='my_genealogy_tree5'),
+    # Five-matrix genealogy counts (placed ACTIVE nodes only)
+    path('genealogy/5m/counts/', FiveMatrixCountsView.as_view(), name='five_matrix_counts'),
 ]

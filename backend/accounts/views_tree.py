@@ -401,3 +401,305 @@ class MyFiveMatrixTeamV1(APIView):
             pass
 
         return Response(tree, status=status.HTTP_200_OK)
+
+
+class MyMatrix5EntriesTree(APIView):
+    """
+    Authenticated user's entry-based 5/3-matrix tree (AutoPoolAccount graph), similar to AdminMatrix5Tree but restricted to the caller.
+    Query params:
+      - pool: FIVE_150 | THREE_150 | THREE_50 (default FIVE_150)
+      - max_depth: optional (default from CommissionConfig; capped to default levels and 20)
+      - start_entry_id: optional AutoPoolAccount.id (must belong to caller, ACTIVE, same pool)
+      - display_user_id/root_user_id: optional (must equal caller's id, else 403); used only to mirror admin API signature
+    Behavior:
+      - Chooses root as caller's earliest ACTIVE entry for the pool unless start_entry_id is provided (and owned by caller).
+      - BFS over ACTIVE entries, ordered (parent_account_id, position, id), per-parent fanout width (5 for FIVE_150, 3 for THREE_x).
+      - Response shape:
+        {
+          account_id, owner_id, username, username_key,
+          level, abs_level, position, status, team_count, fanout,
+          children: [...]
+        }
+      - No sentinel fallback; shows only placed ACTIVE nodes under the caller's entry.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Pool + fanout
+        pool = (request.query_params.get("pool") or "FIVE_150").strip().upper()
+        if pool not in ("FIVE_150", "THREE_150", "THREE_50"):
+            pool = "FIVE_150"
+        fanout = 5 if pool == "FIVE_150" else 3
+
+        # Depth defaults (from config; safety cap 20)
+        default_levels = 6
+        try:
+            if CommissionConfig:
+                cfg = CommissionConfig.get_solo()
+                default_levels = int(cfg.get_matrix_five_levels() if pool == "FIVE_150" else cfg.get_matrix_three_levels())
+        except Exception:
+            default_levels = 6 if pool == "FIVE_150" else 15
+        try:
+            max_depth = int(request.query_params.get("max_depth") or default_levels)
+        except Exception:
+            max_depth = default_levels
+        max_depth = max(1, min(int(max_depth), int(default_levels), 20))
+
+        # Caller and optional start params
+        me = request.user
+        try:
+            start_entry_id = int(request.query_params.get("start_entry_id") or "0")
+        except Exception:
+            start_entry_id = 0
+        # Accept display_user_id/root_user_id for signature parity, but restrict to self
+        try:
+            display_user_id = int(request.query_params.get("display_user_id") or request.query_params.get("root_user_id") or 0)
+        except Exception:
+            display_user_id = 0
+        if display_user_id and display_user_id != int(getattr(me, "id", 0) or 0):
+            return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
+
+        # Resolve root AutoPoolAccount for this user/pool
+        root_acc = None
+        if start_entry_id > 0 and AutoPoolAccount:
+            root_acc = (
+                AutoPoolAccount.objects.select_related("owner", "parent_account")
+                .filter(id=start_entry_id, owner=me, pool_type=pool, status="ACTIVE")
+                .first()
+            )
+        if not root_acc and AutoPoolAccount:
+            root_acc = (
+                AutoPoolAccount.objects.select_related("owner")
+                .filter(owner=me, pool_type=pool, status="ACTIVE")
+                .order_by("id")
+                .first()
+            )
+        if not root_acc:
+            return Response({"detail": "No ACTIVE matrix account found for this user and pool."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Serializer for nodes
+        def serialize_node(acc, rel_level: int):
+            try:
+                owner = getattr(acc, "owner", None)
+            except Exception:
+                owner = None
+            return {
+                "account_id": int(getattr(acc, "id", 0) or 0),
+                "owner_id": int(getattr(owner, "id", None) or getattr(acc, "owner_id", 0) or 0),
+                "username": getattr(owner, "username", None),
+                "username_key": getattr(acc, "username_key", None),
+                "level": int(rel_level),                        # relative to requested root (root=1)
+                "abs_level": int(getattr(acc, "level", 0) or 0),# absolute persisted level
+                "position": getattr(acc, "position", None),
+                "status": getattr(acc, "status", "ACTIVE"),
+                "team_count": 0,                                # annotated after BFS
+                "children": [],
+            }
+
+        root = serialize_node(root_acc, 1)
+        try:
+            root["fanout"] = int(fanout)
+        except Exception:
+            pass
+
+        # BFS
+        nodes_by_account = {int(root_acc.id): root}
+        current_parent_ids = [int(root_acc.id)]
+        rel_levels = {int(root_acc.id): 1}
+        levels_used = 1
+
+        while current_parent_ids and levels_used < max_depth:
+            try:
+                rows = list(
+                    AutoPoolAccount.objects.select_related("owner")
+                    .filter(pool_type=pool, status="ACTIVE", parent_account_id__in=current_parent_ids)
+                    .order_by("parent_account_id", "position", "id")
+                )
+            except Exception:
+                rows = []
+            if not rows:
+                break
+
+            counts = {}
+            next_parent_ids = []
+            for acc in rows:
+                try:
+                    pid = int(getattr(acc, "parent_account_id", 0) or 0)
+                except Exception:
+                    continue
+                if pid not in nodes_by_account:
+                    continue
+                used = counts.get(pid, 0)
+                if used >= fanout:
+                    continue
+                parent_node = nodes_by_account[pid]
+                parent_rel = int(rel_levels.get(pid, levels_used))
+                child_rel = parent_rel + 1
+                child_node = serialize_node(acc, child_rel)
+                parent_node["children"].append(child_node)
+                nodes_by_account[int(getattr(acc, "id", 0) or 0)] = child_node
+                rel_levels[int(getattr(acc, "id", 0) or 0)] = child_rel
+                counts[pid] = used + 1
+                next_parent_ids.append(int(getattr(acc, "id", 0) or 0))
+
+            if not next_parent_ids:
+                break
+            current_parent_ids = next_parent_ids
+            levels_used += 1
+
+        # Annotate team_count recursively
+        def _annotate_team(n: Dict[str, Any]) -> int:
+            try:
+                kids = n.get("children") or []
+            except Exception:
+                kids = []
+            total = 0
+            for ch in kids:
+                total += 1 + _annotate_team(ch)
+            n["team_count"] = int(total)
+            return total
+
+        try:
+            _annotate_team(root)
+        except Exception:
+            pass
+
+        return Response(root, status=status.HTTP_200_OK)
+
+
+class FiveMatrixCountsView(APIView):
+    """
+    GET /api/genealogy/5m/counts?root_id={id}&depth=10
+    Returns level-wise counts (1..depth), total, and active_levels_reached for the selected FIVE_150 root.
+    Rules:
+      - Only ACTIVE AutoPoolAccount rows are traversed (placed users only)
+      - Counts all placed ACTIVE nodes (ignore owner/user status)
+      - Exclude root from counts
+      - Depth hard-capped at 10
+      - If root_id is not provided, pick earliest created_at ACTIVE FIVE_150 account for the logged-in user
+      - No users outside the selected root subtree are counted
+      - Cycles are guarded (visited set) to avoid double counting
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Depth: default 10, cap at 10
+        try:
+            depth = int(request.query_params.get("depth") or 10)
+        except Exception:
+            depth = 10
+        depth = max(1, min(10, int(depth)))
+
+        # Resolve root
+        rid = request.query_params.get("root_id")
+        root = None
+        try:
+            if rid is not None and str(rid).strip():
+                root = (
+                    AutoPoolAccount.objects
+                    .filter(id=int(rid), pool_type="FIVE_150", status="ACTIVE", owner=request.user)
+                    .only("id", "owner_id")
+                    .first()
+                )
+                if not root:
+                    return Response({"detail": "Root not found for this user"}, status=status.HTTP_403_FORBIDDEN)
+        except Exception:
+            root = None
+
+        if not root:
+            # Earliest created_at active 5-matrix account for the logged-in user
+            try:
+                root = (
+                    AutoPoolAccount.objects
+                    .filter(owner=request.user, pool_type="FIVE_150", status="ACTIVE")
+                    .only("id", "owner_id", "created_at")
+                    .order_by("created_at", "id")
+                    .first()
+                )
+            except Exception:
+                root = None
+
+        if not root:
+            levels = [{"level": i, "team_count": 0} for i in range(1, depth + 1)]
+            return Response(
+                {
+                    "root_id": None,
+                    "matrix_type": 5,
+                    "depth": depth,
+                    "levels": levels,
+                    "total_team": 0,
+                    "active_levels_reached": 0,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        # BFS traversal restricted to this root subtree
+        levels_counts = {i: 0 for i in range(1, depth + 1)}
+        visited: Set[int] = set([int(getattr(root, "id", 0) or 0)])
+        frontier: List[int] = [int(getattr(root, "id", 0) or 0)]
+
+        for lvl in range(1, depth + 1):
+            if not frontier:
+                break
+
+            # Fetch children of current frontier strictly within FIVE_150 and ACTIVE
+            try:
+                rows = list(
+                    AutoPoolAccount.objects
+                    .filter(parent_account_id__in=frontier, pool_type="FIVE_150", status="ACTIVE")
+                    .only("id", "owner_id")
+                    .order_by("position", "id")
+                    .values("id", "owner_id")
+                )
+            except Exception:
+                rows = []
+
+            child_ids: List[int] = []
+            for r in rows:
+                try:
+                    cid = int(r.get("id") or 0)
+                except Exception:
+                    continue
+                if cid in visited:
+                    continue
+                child_ids.append(cid)
+
+
+            # Count only eligible nodes at this level; still traverse all ACTIVE nodes structurally
+            count = 0
+            for r in rows:
+                try:
+                    cid = int(r.get("id") or 0)
+                except Exception:
+                    continue
+                if cid in visited:
+                    continue
+                count += 1
+                visited.add(cid)
+
+            levels_counts[lvl] = int(count)
+            frontier = child_ids  # proceed to next level
+
+        # Build response arrays 1..depth (zeros for missing)
+        levels = [{"level": i, "team_count": int(levels_counts.get(i, 0))} for i in range(1, depth + 1)]
+        total_team = int(sum(x["team_count"] for x in levels))
+
+        # Highest contiguous active level starting from 1
+        active_reached = 0
+        for i in range(1, depth + 1):
+            if int(levels_counts.get(i, 0)) > 0:
+                active_reached = i
+            else:
+                break
+
+        return Response(
+            {
+                "root_id": int(getattr(root, "id", 0) or 0),
+                "matrix_type": 5,
+                "depth": depth,
+                "levels": levels,
+                "total_team": total_team,
+                "active_levels_reached": int(active_reached),
+            },
+            status=status.HTTP_200_OK,
+        )

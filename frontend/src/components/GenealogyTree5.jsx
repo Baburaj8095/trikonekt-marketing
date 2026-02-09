@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { getMyGenealogyTree5 } from "../api/genealogy";
+import API from "../api/api";
 
 /**
  * GenealogyTree5
@@ -18,6 +19,9 @@ export default function GenealogyTree5({
   maxDepth = 10,
   showPlaceholders = false,
   title = "Genealogy",
+  useEntriesTree = false,
+  entryRootId = null,
+  pollIntervalMs = 0,
 }) {
   const [pool, setPool] = useState(
     ["FIVE_150","THREE_150"].includes(String(initialPool).toUpperCase())
@@ -28,6 +32,7 @@ export default function GenealogyTree5({
   const [crumbs, setCrumbs] = useState([]); // Array of previous roots to allow back/up navigation
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+  const entriesMode = !!useEntriesTree || entryRootId != null;
 
   const isFive = pool === "FIVE_150";
   const maxChildren = isFive ? 5 : 3;
@@ -66,31 +71,81 @@ export default function GenealogyTree5({
   const displayName = (u) => (u?.full_name || u?.username || "").toString();
   const displayTR = (u) => (u?.username || "").toString();
 
-  const fetchRoot = useCallback(async ({ root_user_id = null, spill_from_owner_id = null } = {}) => {
+  const fetchRoot = useCallback(async ({ root_user_id = null, spill_from_owner_id = null, start_entry_id = null } = {}) => {
     setLoading(true);
     setErr("");
     try {
-      const res = await getMyGenealogyTree5({ root_user_id, max_depth: maxDepth, pool, spill_from_owner_id });
-      setRoot(res || null);
+      if (entriesMode) {
+        // Enforce start_entry_id to avoid accidental requests without it
+        const effectiveId = (start_entry_id ?? entryRootId ?? null);
+        if (!effectiveId) {
+          setLoading(false);
+          return;
+        }
+        const params = { max_depth: maxDepth, pool, start_entry_id: effectiveId };
+        const res = await API.get("/accounts/my/matrix/tree5/entries/", { params, cacheTTL: 0, dedupe: "cancelPrevious" });
+        const data = res?.data || res;
+
+        const normalize = (n) => {
+          if (!n) return null;
+          const kids = Array.isArray(n.children) ? n.children.map(normalize) : [];
+          return {
+            ...n,
+            id: n.account_id,
+            account_active: String(n.status || "") === "ACTIVE",
+            pincode: n.pincode || n.owner_pincode || null,
+            children: kids,
+          };
+        };
+
+        setRoot(normalize(data) || null);
+      } else {
+        const res = await getMyGenealogyTree5({ root_user_id, max_depth: maxDepth, pool, spill_from_owner_id });
+        setRoot(res || null);
+      }
     } catch (e) {
       setErr(e?.response?.data?.detail || e?.message || "Failed to load genealogy");
       setRoot(null);
     } finally {
       setLoading(false);
     }
-  }, [maxDepth, pool]);
+  }, [entriesMode, maxDepth, pool]);
 
   useEffect(() => {
-    // Initial load for self
-    fetchRoot({ root_user_id: null });
-  }, [fetchRoot]);
+    // Initial load (only when we have a concrete entry root in entries mode)
+    if (entriesMode) {
+      const sid = entryRootId || null;
+      if (sid) {
+        fetchRoot({ start_entry_id: sid });
+      }
+    } else {
+      fetchRoot({ root_user_id: null });
+    }
+  }, [entriesMode, entryRootId, fetchRoot]);
 
   // Re-fetch when pool changes (stay at current root if any)
   useEffect(() => {
     if (!root) return;
-    // Re-fetch same root when pool changes; keep current root, no owner spill context needed
-    fetchRoot({ root_user_id: root?.id || null, spill_from_owner_id: null });
-  }, [pool, fetchRoot]);
+    // Re-fetch same root when pool changes
+    if (entriesMode) {
+      fetchRoot({ start_entry_id: root?.id || null });
+    } else {
+      fetchRoot({ root_user_id: root?.id || null, spill_from_owner_id: null });
+    }
+  }, [pool, entriesMode, fetchRoot]);
+
+  // Optional polling when enabled via prop (disabled by default)
+  useEffect(() => {
+    if (!entriesMode) return;
+    const sid = entryRootId || null;
+    if (!sid) return;
+    const interval = Number(pollIntervalMs || 0);
+    if (!Number.isFinite(interval) || interval <= 0) return;
+    const h = setInterval(() => {
+      fetchRoot({ start_entry_id: sid });
+    }, interval);
+    return () => clearInterval(h);
+  }, [entriesMode, entryRootId, pollIntervalMs, fetchRoot]);
 
   const children = useMemo(() => {
     const arr = Array.isArray(root?.children) ? [...root.children] : [];
@@ -116,7 +171,11 @@ export default function GenealogyTree5({
     const target = crumbs[idx];
     const newTrail = crumbs.slice(0, idx);
     setCrumbs(newTrail);
-    await fetchRoot({ root_user_id: target.id });
+    if (entriesMode) {
+      await fetchRoot({ start_entry_id: target.id });
+    } else {
+      await fetchRoot({ root_user_id: target.id });
+    }
   };
 
   const goBackOne = async () => {
@@ -127,9 +186,13 @@ export default function GenealogyTree5({
   const drillDown = async (child) => {
     if (!child) return;
     if (root) {
-      setCrumbs((prev) => [...prev, { id: root.id, username: root.username, full_name: root.full_name }]);
+      setCrumbs((prev) => [...prev, { id: root.id, username: root.username, full_name: root.full_name, username_key: root.username_key }]);
     }
-    await fetchRoot({ root_user_id: child.id, spill_from_owner_id: root?.id || null });
+    if (entriesMode) {
+      await fetchRoot({ start_entry_id: child.id });
+    } else {
+      await fetchRoot({ root_user_id: child.id, spill_from_owner_id: root?.id || null });
+    }
   };
 
   return (

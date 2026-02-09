@@ -35,7 +35,7 @@ export default function ConsumerShell({ children }) {
     { to: "/user/profile", label: "Profile", icon: "users" },
     // { to: "/user/kyc", label: "KYC", icon: "shield" },
     { to: "/user/refer-earn", label: "Refer & Earn", icon: "upload" },
-    { to: "/user/wallet", label: "Wallet", icon: "wallet" },
+    { to: "/user/wallet", label: "Withdraw", icon: "wallet" },
     { to: "/user/history", label: "History", icon: "orders" },
     //{ to: "/user/my-team", label: "My Team", icon: "tree" },
     { to: "/user/genealogy-5", label: "Genealogy Tree", icon: "tree" },
