@@ -127,7 +127,7 @@ function DirectSponsorsList({ list, counts }) {
                     <Chip
                       size="small"
                       label={m?.account_active ? "Active" : "Inactive"}
-                      color={m?.account_active ? "success" : "default"}
+                      color={m?.account_active ? "success" : "error"}
                       variant={m?.account_active ? "filled" : "outlined"}
                     />
                   </Stack>

@@ -122,6 +122,8 @@ import AdminEcommerceCategories from "./pages/admin/AdminEcommerceCategories";
 import CategoryPage from "./pages/CategoryPage";
 import AdminUIConfig from "./pages/admin/AdminUIConfig";
 import AdminSeedDemoData from "./pages/admin/AdminSeedDemoData";
+import RankUpgrade from "./pages/RankUpgrade";
+import AdminRankUpgrades from "./pages/admin/AdminRankUpgrades";
 
 function LegacyAuthEntry() {
   const location = useLocation();
@@ -262,6 +264,29 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        <Route
+          path="/user/dashboard/upgrade"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <RankUpgrade />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/rank-upgrades"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminRankUpgrades />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+
         <Route
           path="/user/profile"
           element={

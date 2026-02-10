@@ -1342,9 +1342,32 @@ class TeamSummaryView(APIView):
 
         # Direct team (all direct referrals) with phone, pincode, and their direct referral counts
         try:
+            # Include legacy sponsor_id-based directs (when registered_by is NULL) alongside proper FK linkage
+            try:
+                vals = [
+                    (getattr(user, "prefixed_id", "") or "").strip(),
+                    (getattr(user, "username", "") or "").strip(),
+                    (getattr(user, "unique_id", "") or "").strip(),
+                    (getattr(user, "phone", "") or "").strip(),
+                ]
+                # Digits-only variants for username/phone and TR-XXXX dashed variant
+                digs_user = "".join(ch for ch in ((getattr(user, "username", "") or "")) if ch.isdigit())
+                digs_phone = "".join(ch for ch in ((getattr(user, "phone", "") or "")) if ch.isdigit())
+                if digs_user:
+                    vals.append(digs_user)
+                if digs_phone:
+                    vals.append(digs_phone)
+                tr = (getattr(user, "prefixed_id", "") or "").strip()
+                if tr and "-" not in tr and len(tr) > 2 and tr[:2].isalpha():
+                    vals.append(f"{tr[:2]}-{tr[2:]}")
+                idents = [s for s in {v for v in vals if v}]
+            except Exception:
+                idents = []
+            sponsored_q = Q(registered_by_id=user.id) | (Q(registered_by__isnull=True) & Q(sponsor_id__in=idents))
+
             direct_qs = (
                 CustomUser.objects
-                .filter(registered_by=user)
+                .filter(sponsored_q)
                 .annotate(direct_referrals=Count("registrations", distinct=True))
                 .order_by("-date_joined")
             )

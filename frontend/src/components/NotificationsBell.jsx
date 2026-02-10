@@ -86,19 +86,36 @@ export default function NotificationsBell() {
     }
   }, []);
 
-  // Initial load
+  // Initial load + conservative polling (only when tab is visible, plus on focus), to avoid frequent backend hits
   useEffect(() => {
     loadUnread();
     loadPinned();
-    // Poll unread periodically (1 min)
-    const t = setInterval(loadUnread, 60000);
-    return () => clearInterval(t);
+
+    const onFocus = () => {
+      try { loadUnread(); } catch (_) {}
+    };
+    const onVis = () => {
+      try {
+        if (typeof document !== "undefined" && document.visibilityState === "visible") {
+          loadUnread();
+        }
+      } catch (_) {}
+    };
+
+    if (typeof window !== "undefined") window.addEventListener("focus", onFocus);
+    if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVis);
+
+    // No background interval polling; refresh on focus/visibility only
+    return () => {
+      if (typeof window !== "undefined") window.removeEventListener("focus", onFocus);
+      if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVis);
+    };
   }, [loadUnread, loadPinned]);
 
   const handleOpen = async (e) => {
     setAnchorEl(e.currentTarget);
-    // lazily refresh inbox each time opened
-    await loadInbox();
+    // lazily refresh inbox and unread each time opened
+    await Promise.all([loadUnread(), loadInbox()]);
   };
 
   const handleClose = () => setAnchorEl(null);
@@ -246,4 +263,3 @@ export default function NotificationsBell() {
     </>
   );
 }
-

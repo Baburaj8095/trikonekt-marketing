@@ -476,6 +476,7 @@ export default function AdminShell({ children }) {
         // Optional: inspect paid boxes if needed
         { to: "/admin/dashboard/models/business/promomonthlybox", label: "Season Boxes (Paid)", icon: "box" },
         { to: "/admin/promo-purchases", label: "Promo Purchases", icon: "ticket" },
+        { to: "/admin/rank-upgrades", label: "Rank Upgrades", icon: "wallet" },
       ],
     },
     {

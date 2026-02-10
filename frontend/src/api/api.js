@@ -7,9 +7,14 @@ const rawBaseURL =
   "/api";
 let baseURL = rawBaseURL.endsWith("/") ? rawBaseURL : rawBaseURL + "/";
 
-/* In browser, FORCE baseURL to relative "/api/" so requests are same-origin and proxied by hosting (e.g., Vercel) to backend, avoiding CORS. */
+/* In browser, prefer explicit REACT_APP_API_URL if provided; otherwise fall back to relative "/api/"
+   (for CRA proxy or same-origin hosting). This avoids unwanted cancellations when no dev proxy is active. */
 if (typeof window !== "undefined") {
-  baseURL = "/api/";
+  if (process.env.REACT_APP_API_URL) {
+    baseURL = rawBaseURL.endsWith("/") ? rawBaseURL : rawBaseURL + "/";
+  } else {
+    baseURL = "/api/";
+  }
 }
 
 // Expose/debug baseURL used by the app at runtime (development only)
@@ -1230,12 +1235,40 @@ export async function notificationsRegisterDeviceToken(payload = {}) {
   const res = await API.post("/notifications/device-token/", payload);
   return res?.data || res;
 }
-export async function notificationsUnreadCount() {
-  const res = await API.get("/notifications/unread-count/", {
-    cacheTTL: 15_000,
-    dedupe: "cancelPrevious",
-  });
-  return res?.data || res;
+/* Throttle unread-count globally to prevent rapid re-fetch from multiple mounts/renders */
+let __notifUnread_lastAt = 0;
+let __notifUnread_lastData = null;
+let __notifUnread_promise = null;
+
+export async function notificationsUnreadCount(opts = {}) {
+  const { force = false, minIntervalMs = 60_000 } = opts || {};
+  const now = Date.now();
+
+  if (!force) {
+    if (__notifUnread_promise) {
+      try { return await __notifUnread_promise; } catch (_) {}
+    }
+    if (__notifUnread_lastData != null && (now - __notifUnread_lastAt) < minIntervalMs) {
+      return __notifUnread_lastData;
+    }
+  }
+
+  __notifUnread_promise = (async () => {
+    const res = await API.get("/notifications/unread-count/", {
+      cacheTTL: 15_000,
+      dedupe: "cancelPrevious",
+    });
+    const data = res?.data || res;
+    __notifUnread_lastAt = Date.now();
+    __notifUnread_lastData = data;
+    return data;
+  })();
+
+  try {
+    return await __notifUnread_promise;
+  } finally {
+    __notifUnread_promise = null;
+  }
 }
 export async function notificationsPinned() {
   const res = await API.get("/notifications/pinned/", {
@@ -1283,6 +1316,79 @@ export async function listCategoryBanners({ params = {} } = {}) {
     cacheTTL: 10_000,
     dedupe: "cancelPrevious",
   });
+  return res?.data || res;
+}
+
+
+/**
+ * MLM Ranks APIs
+ */
+export async function getRanks() {
+  const res = await API.get("/ranks/", { cacheTTL: 10_000, dedupe: "cancelPrevious" });
+  return res?.data || res;
+}
+
+export async function getUpgradeEligibility() {
+  // Increase timeout as backend may compute large referral subtree (Prime-750 gated team size).
+  // Cancel previous in-flight identical call to avoid overlapping heavy work.
+  const res = await API.get("/user/upgrade-eligibility/", { dedupe: "cancelPrevious", cacheTTL: 5000, timeout: 60000 });
+  return res?.data || res;
+}
+
+export async function initiateUpgrade({ to_rank_id }) {
+  const res = await API.post("/upgrade/initiate/", { to_rank_id });
+  return res?.data || res;
+}
+
+export async function confirmUpgradeSuccess({ upgrade_id = null, to_rank_id = null } = {}) {
+  const body = {};
+  if (upgrade_id != null) body.upgrade_id = upgrade_id;
+  if (to_rank_id != null) body.to_rank_id = to_rank_id;
+  const res = await API.post("/upgrade/success/", body, { timeout: 30000 });
+  return res?.data || res;
+}
+
+export async function createRankUpgradePayment({ upgrade_id, utr = "", remarks = "", file = null }) {
+  const fd = new FormData();
+  fd.append("upgrade_id", String(upgrade_id));
+  if (utr) fd.append("utr", String(utr));
+  if (remarks) fd.append("remarks", String(remarks));
+  if (file) fd.append("payment_proof", file);
+  const res = await API.post("/upgrade/payment-request/", fd, {
+    headers: { "Content-Type": "multipart/form-data" },
+    timeout: 30000,
+  });
+  return res?.data || res;
+}
+
+/**
+ * Admin: Rank Upgrade monitoring
+ */
+export async function adminListRankUpgrades(params = {}) {
+  const res = await API.get("/admin/rank-upgrades/", { params, dedupe: "cancelPrevious" });
+  return res?.data || res;
+}
+
+export async function adminGetUpgradeCommissions(upgrade_id) {
+  const res = await API.get(`/admin/rank-upgrades/${encodeURIComponent(upgrade_id)}/commissions/`, {
+    dedupe: "cancelPrevious",
+  });
+  return res?.data || res;
+}
+
+export async function adminListRankCommissionHolds(params = {}) {
+  const res = await API.get("/admin/rank-commission-holds/", { params, dedupe: "cancelPrevious" });
+  return res?.data || res;
+}
+
+export async function adminApproveRankUpgrade(id) {
+  const res = await API.post(`/admin/rank-upgrades/${encodeURIComponent(id)}/approve/`, {});
+  return res?.data || res;
+}
+
+export async function adminRejectRankUpgrade(id, reason = "") {
+  const body = reason ? { reason } : {};
+  const res = await API.post(`/admin/rank-upgrades/${encodeURIComponent(id)}/reject/`, body);
   return res?.data || res;
 }
 

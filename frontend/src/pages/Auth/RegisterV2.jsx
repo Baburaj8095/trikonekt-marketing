@@ -2453,11 +2453,11 @@ const RegisterV2 = () => {
             </ListItemButton>
             <ListItemButton selected={role === "agency"} onClick={() => handleSetRole("agency")}>
               <ListItemIcon><StoreIcon /></ListItemIcon>
-              <ListItemText primary="Agency" />
+              <ListItemText primary="Sub Franchise" />
             </ListItemButton>
             <ListItemButton selected={role === "employee"} onClick={() => handleSetRole("employee")}>
               <ListItemIcon><WorkIcon /></ListItemIcon>
-              <ListItemText primary="Employee" />
+              <ListItemText primary="Sarathi" />
             </ListItemButton>
             <ListItemButton selected={role === "business"} onClick={() => handleSetRole("business")}>
               <ListItemIcon><BusinessIcon /></ListItemIcon>

@@ -100,6 +100,8 @@ export default function AdminUsers() {
   const [pkgUser, setPkgUser] = useState(null);
   // Mobile responsiveness hint
   const [isMobile, setIsMobile] = useState(typeof window !== "undefined" ? window.innerWidth < 640 : false);
+  const [segmentCounts, setSegmentCounts] = useState({ all: null, consumers: null, merchants: null, agencies: null, employees: null });
+  const [countsLoading, setCountsLoading] = useState(false);
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 640);
     window.addEventListener("resize", onResize);
@@ -120,6 +122,17 @@ export default function AdminUsers() {
   function setF(key, val) {
     setFilters((f) => ({ ...f, [key]: val }));
   }
+
+  const buildBaseParamsFromFilters = useCallback((f) => {
+    const params = {};
+    Object.entries(f || {}).forEach(([k, v]) => {
+      if (k === "role" || k === "category") return;
+      if (v !== null && v !== undefined && String(v).trim() !== "") {
+        params[k] = v;
+      }
+    });
+    return params;
+  }, []);
 
   const openEdit = useCallback(async (row) => {
     try {
@@ -1186,6 +1199,59 @@ const count = Number.isFinite(countNum) ? countNum : results.length;
     }
   };
 
+  // Recompute segment counts when base filters change
+  useEffect(() => {
+    let mounted = true;
+    const paramsBase = buildBaseParamsFromFilters(filters);
+    setCountsLoading(true);
+
+    const make = async (extra) => {
+      try {
+        const res = await API.get("/api/admin/users/", {
+          params: { ...paramsBase, ...extra, page: 1, page_size: 1 },
+          dedupe: "cancelPrevious",
+          timeout: 20000,
+          retryAttempts: 0,
+        });
+        const raw = res?.data?.count;
+        if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+        if (typeof raw === "string") {
+          const n = parseInt(raw, 10);
+          if (Number.isFinite(n)) return n;
+        }
+        return null;
+      } catch (_) {
+        return null;
+      }
+    };
+
+    (async () => {
+      const [all, consumers, merchants, agencies, employees] = await Promise.all([
+        make({}),
+        make({ role: "user", category: "consumer" }),
+        make({ role: "user", category: "merchant" }),
+        make({ role: "agency" }),
+        make({ role: "employee", category: "employee" }),
+      ]);
+      if (!mounted) return;
+      setSegmentCounts({ all, consumers, merchants, agencies, employees });
+      setCountsLoading(false);
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [
+    filters.phone,
+    filters.pincode,
+    filters.state,
+    filters.kyc,
+    filters.account_active,
+    filters.activated,
+    reloadKey,
+    buildBaseParamsFromFilters,
+  ]);
+
   const toolbar = (
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
       <div style={{ display: "inline-flex", gap: 6, marginRight: 8 }}>
@@ -1211,7 +1277,7 @@ const count = Number.isFinite(countNum) ? countNum : results.length;
               fontWeight: 700,
             }}
           >
-            {v.label}
+            {v.label}{segmentCounts?.[v.id] != null ? ` (${segmentCounts[v.id]})` : ""}
           </button>
         ))}
       </div>

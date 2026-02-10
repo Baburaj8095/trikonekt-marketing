@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'core',
     'notifications',
     'jobs',
+    'mlm_ranks',
 ]
 
 MIDDLEWARE = [

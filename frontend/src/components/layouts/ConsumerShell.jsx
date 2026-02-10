@@ -39,7 +39,9 @@ export default function ConsumerShell({ children }) {
     { to: "/user/history", label: "History", icon: "orders" },
     //{ to: "/user/my-team", label: "My Team", icon: "tree" },
     { to: "/user/genealogy-5", label: "Genealogy Tree", icon: "tree" },
+
     { to: "/user/promo-packages", label: "Join Prime", icon: "star" },
+    { to: "/user/dashboard/upgrade", label: "Rank Upgrade", icon: "wallet" },
     { to: "/user/redeem-coupon", label: "My E coupons", icon: "ticket" },
     { to: "/user/my-orders", label: "My Orders", icon: "orders" },
     { to: "/trikonekt-products", label: "Trikonekt Products", icon: "box" },

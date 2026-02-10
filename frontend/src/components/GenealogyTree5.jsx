@@ -71,6 +71,50 @@ export default function GenealogyTree5({
   const displayName = (u) => (u?.full_name || u?.username || "").toString();
   const displayTR = (u) => (u?.username || "").toString();
 
+  // Render compact Prime badges for a user/node if info is available
+  const renderPrimeBadges = (u) => {
+    try {
+      const p150 = !!(u?.prime150 || u?.prime_150 || u?.prime_150_active || u?.prime150_active);
+      const p750 = !!(u?.prime750 || u?.prime_750 || u?.prime_750_active || u?.prime750_active);
+      const paid = Number(u?.monthly759 ?? u?.monthly_759_count ?? u?.monthly_boxes_paid_current ?? 0) || 0;
+      const total = Number(u?.monthlyTotal759 ?? u?.monthly_total_boxes_current ?? 0) || 0;
+      const any759 = paid > 0 || total > 0;
+
+      const label759 = any759 ? (total > 0 ? `759 ${paid}/${total}` : `759 x${paid || 1}`) : null;
+
+      if (!p150 && !p750 && !any759) return null;
+
+      const pill = (bg, text) => (
+        <span
+          key={`${bg}-${text}`}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "2px 6px",
+            borderRadius: 999,
+            fontSize: 10,
+            fontWeight: 800,
+            color: "#fff",
+            lineHeight: 1,
+          }}
+        >
+          <span style={{ background: bg, borderRadius: 999, padding: "0 0" }}>{text}</span>
+        </span>
+      );
+
+      return (
+        <>
+          {p150 ? pill("#16a34a", "150") : null}
+          {p750 ? pill("#2563eb", "750") : null}
+          {any759 ? pill("#7c3aed", label759) : null}
+        </>
+      );
+    } catch {
+      return null;
+    }
+  };
+
   const fetchRoot = useCallback(async ({ root_user_id = null, spill_from_owner_id = null, start_entry_id = null } = {}) => {
     setLoading(true);
     setErr("");
@@ -94,6 +138,11 @@ export default function GenealogyTree5({
             id: n.account_id,
             account_active: String(n.status || "") === "ACTIVE",
             pincode: n.pincode || n.owner_pincode || null,
+            // Prime flags (if backend provides; safe no-ops when absent)
+            prime150: !!(n.prime150 || n.prime_150 || n.prime_150_active || n.prime150_active),
+            prime750: !!(n.prime750 || n.prime_750 || n.prime_750_active || n.prime750_active),
+            monthly759: Number(n.monthly_759_count ?? n.monthly759 ?? n.monthly_boxes_paid_current ?? 0) || 0,
+            monthlyTotal759: (n.monthly_total_boxes_current != null ? Number(n.monthly_total_boxes_current) : null),
             children: kids,
           };
         };
@@ -104,7 +153,13 @@ export default function GenealogyTree5({
         setRoot(res || null);
       }
     } catch (e) {
-      setErr(e?.response?.data?.detail || e?.message || "Failed to load genealogy");
+      const msg = e?.message || "";
+      const code = e?.code || "";
+      if (e?.__canceled || code === "ERR_CANCELED" || /canceled|cancelled|aborted|abort|deduped/i.test(msg)) {
+        // Ignore axios cancellation/deduped requests; do not surface as an error
+        return;
+      }
+      setErr(e?.response?.data?.detail || msg || "Failed to load genealogy");
       setRoot(null);
     } finally {
       setLoading(false);
@@ -241,7 +296,10 @@ export default function GenealogyTree5({
             <div style={styles.card}>
               <AvatarIcon size={56} />
               <div style={styles.cardName}>{displayName(root) || ""}</div>
-              <div style={styles.cardTR}>TR Username: {displayTR(root) || ""}</div>
+              <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap", justifyContent: "center" }}>
+                {renderPrimeBadges(root)}
+              </div>
+              <div style={styles.cardTR}>User Id: {displayTR(root) || ""}</div>
               <div style={{ color: root?.account_active ? "#16a34a" : "#dc2626", fontSize: 12, fontWeight: 700, marginTop: 2 }}>
                 {root?.account_active ? "Active" : "Inactive"}
               </div>
@@ -260,7 +318,10 @@ export default function GenealogyTree5({
                     <div key={Number.isFinite(c.id) ? `u:${c.id}` : `u-${idx}`} style={styles.childCard} onClick={() => drillDown(c)}>
                       <AvatarIcon size={48} />
                       <div style={{ ...styles.cardName, fontSize: 14, marginTop: 6 }}>{displayName(c) || ""}</div>
-                      <div style={{ ...styles.cardTR, fontSize: 12 }}>TR Username: {displayTR(c) || ""}</div>
+                      <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap", justifyContent: "center" }}>
+                        {renderPrimeBadges(c)}
+                      </div>
+                      <div style={{ ...styles.cardTR, fontSize: 12 }}>User Id: {displayTR(c) || ""}</div>
                       <div style={{ ...styles.cardTR, fontSize: 12, color: c?.account_active ? "#16a34a" : "#dc2626", fontWeight: 700, marginTop: 2 }}>
                         {c?.account_active ? "Active" : "Inactive"}
                       </div>

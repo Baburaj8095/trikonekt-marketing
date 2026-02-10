@@ -116,8 +116,39 @@ class MyFiveMatrixTeamV1(APIView):
                                 owner_top_children_ids = [int(getattr(x, "id", 0) or 0) for x in owner_matrix_qs]
                                 if include_sponsor_fallback and len(owner_top_children_ids) < fanout:
                                     needed = fanout - len(owner_top_children_ids)
+                                    # Legacy-safe: include sponsor_id-based directs when registered_by is NULL
+                                    try:
+                                        owner_user = (
+                                            CustomUser.objects
+                                            .only("id", "username", "prefixed_id", "unique_id", "phone")
+                                            .filter(id=spill_owner_id_sec)
+                                            .first()
+                                        )
+                                    except Exception:
+                                        owner_user = None
+                                    try:
+                                        vals = [
+                                            (getattr(owner_user, "prefixed_id", "") or "").strip(),
+                                            (getattr(owner_user, "username", "") or "").strip(),
+                                            (getattr(owner_user, "unique_id", "") or "").strip(),
+                                            (getattr(owner_user, "phone", "") or "").strip(),
+                                        ]
+                                        digs_user = "".join(ch for ch in ((getattr(owner_user, "username", "") or "")) if ch.isdigit())
+                                        digs_phone = "".join(ch for ch in ((getattr(owner_user, "phone", "") or "")) if ch.isdigit())
+                                        if digs_user:
+                                            vals.append(digs_user)
+                                        if digs_phone:
+                                            vals.append(digs_phone)
+                                        tr = (getattr(owner_user, "prefixed_id", "") or "").strip()
+                                        if tr and "-" not in tr and len(tr) > 2 and tr[:2].isalpha():
+                                            vals.append(f"{tr[:2]}-{tr[2:]}")
+                                        idents = [s for s in {v for v in vals if v}]
+                                    except Exception:
+                                        idents = []
+                                    sponsored_q = Q(registered_by_id=spill_owner_id_sec) | (Q(registered_by__isnull=True) & Q(sponsor_id__in=idents))
+
                                     direct_fallback_qs = list(
-                                        CustomUser.objects.filter(registered_by_id=spill_owner_id_sec)
+                                        CustomUser.objects.filter(sponsored_q)
                                         .exclude(id__in=owner_top_children_ids)
                                         .only("id")
                                         .order_by("-id")[:needed]
@@ -199,8 +230,30 @@ class MyFiveMatrixTeamV1(APIView):
                 if include_sponsor_fallback and (not in_spill_mode) and level == 1 and len(children_qs) < fanout:
                     already_ids = set(int(getattr(c, "id", 0) or 0) for c in children_qs)
                     needed = fanout - len(children_qs)
+                    # Legacy-safe: include sponsor_id-based directs when registered_by is NULL
+                    try:
+                        vals = [
+                            (getattr(u, "prefixed_id", "") or "").strip(),
+                            (getattr(u, "username", "") or "").strip(),
+                            (getattr(u, "unique_id", "") or "").strip(),
+                            (getattr(u, "phone", "") or "").strip(),
+                        ]
+                        digs_user = "".join(ch for ch in ((getattr(u, "username", "") or "")) if ch.isdigit())
+                        digs_phone = "".join(ch for ch in ((getattr(u, "phone", "") or "")) if ch.isdigit())
+                        if digs_user:
+                            vals.append(digs_user)
+                        if digs_phone:
+                            vals.append(digs_phone)
+                        tr = (getattr(u, "prefixed_id", "") or "").strip()
+                        if tr and "-" not in tr and len(tr) > 2 and tr[:2].isalpha():
+                            vals.append(f"{tr[:2]}-{tr[2:]}")
+                        idents = [s for s in {v for v in vals if v}]
+                    except Exception:
+                        idents = []
+                    sponsored_q = Q(registered_by_id=u.id) | (Q(registered_by__isnull=True) & Q(sponsor_id__in=idents))
+
                     direct_qs = list(
-                        CustomUser.objects.filter(registered_by_id=u.id)
+                        CustomUser.objects.filter(sponsored_q)
                         .exclude(id__in=already_ids)
                         .only("id", "username", "full_name", "parent_id", "matrix_position", "depth", "account_active", "pincode")
                         .order_by("-id")[:needed]
@@ -259,8 +312,39 @@ class MyFiveMatrixTeamV1(APIView):
                 if is_first:
                     # Pending = owner's directs not already shown in owner's top row
                     try:
+                        # Legacy-safe: include sponsor_id-based directs when registered_by is NULL
+                        try:
+                            owner_user2 = (
+                                CustomUser.objects
+                                .only("id", "username", "prefixed_id", "unique_id", "phone")
+                                .filter(id=spill_owner_id)
+                                .first()
+                            )
+                        except Exception:
+                            owner_user2 = None
+                        try:
+                            vals2 = [
+                                (getattr(owner_user2, "prefixed_id", "") or "").strip(),
+                                (getattr(owner_user2, "username", "") or "").strip(),
+                                (getattr(owner_user2, "unique_id", "") or "").strip(),
+                                (getattr(owner_user2, "phone", "") or "").strip(),
+                            ]
+                            digs_user2 = "".join(ch for ch in ((getattr(owner_user2, "username", "") or "")) if ch.isdigit())
+                            digs_phone2 = "".join(ch for ch in ((getattr(owner_user2, "phone", "") or "")) if ch.isdigit())
+                            if digs_user2:
+                                vals2.append(digs_user2)
+                            if digs_phone2:
+                                vals2.append(digs_phone2)
+                            tr2 = (getattr(owner_user2, "prefixed_id", "") or "").strip()
+                            if tr2 and "-" not in tr2 and len(tr2) > 2 and tr2[:2].isalpha():
+                                vals2.append(f"{tr2[:2]}-{tr2[2:]}")
+                            idents2 = [s for s in {v for v in vals2 if v}]
+                        except Exception:
+                            idents2 = []
+                        sponsored_q2 = Q(registered_by_id=spill_owner_id) | (Q(registered_by__isnull=True) & Q(sponsor_id__in=idents2))
+
                         owner_direct_ids = list(
-                            CustomUser.objects.filter(registered_by_id=spill_owner_id)
+                            CustomUser.objects.filter(sponsored_q2)
                             .order_by("id")
                             .values_list("id", flat=True)
                         )

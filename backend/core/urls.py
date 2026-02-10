@@ -23,6 +23,7 @@ urlpatterns = [
     path('api/adminapi/', include('adminapi.urls')),
     path('api/company/', CompanyInfoView.as_view()),
     path('api/company/packages/', CompanyPackagesView.as_view()),
+    path('api/', include('mlm_ranks.urls')),
     path('api/', include('market.urls')),
     path('api/ui/', include('ui.urls')),
     # v1 aliases and public endpoints

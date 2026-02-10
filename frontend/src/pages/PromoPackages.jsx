@@ -37,6 +37,7 @@ import {
   getEcouponStoreBootstrap,
 } from "../api/api";
 import { useNavigate } from "react-router-dom";
+import RankUpgrade from "./RankUpgrade";
 
 /**
  * UI REFACTOR ONLY
@@ -1115,20 +1116,16 @@ export default function PromoPackages({ title = "Consumer Packages" } = {}) {
           indicatorColor="primary"
           sx={{ borderBottom: "1px solid", borderColor: "divider" }}
         >
-          <Tab label="Prime 150" />
           <Tab label="Prime 750" />
           <Tab label="Season" />
+          <Tab label="Rank Upgrade" />
+          <Tab label="Prime 150" />
           <Tab label="Tour" />
         </Tabs>
 
         <Box sx={{ p: 2 }}>
-          {/* PRIME 150 */}
-          {tab === 0 ? (
-            <Prime150Section reg150Pkg={reg150Pkg} prime150Active={prime150Active} onBuy={onBuy} />
-          ) : null}
-
           {/* PRIME 750 */}
-          {tab === 1 ? (
+          {tab === 0 ? (
             primePkg ? (
               <Prime750Section
                 pkg={primePkg}
@@ -1142,7 +1139,7 @@ export default function PromoPackages({ title = "Consumer Packages" } = {}) {
           ) : null}
 
           {/* SEASON */}
-          {tab === 2 ? (
+          {tab === 1 ? (
             seasonPkg ? (
               <SeasonSection
                 seasonPkg={seasonPkg}
@@ -1158,8 +1155,16 @@ export default function PromoPackages({ title = "Consumer Packages" } = {}) {
             )
           ) : null}
 
+          {/* RANK UPGRADE */}
+          {tab === 2 ? <RankUpgrade /> : null}
+
+          {/* PRIME 150 */}
+          {tab === 3 ? (
+            <Prime150Section reg150Pkg={reg150Pkg} prime150Active={prime150Active} onBuy={onBuy} />
+          ) : null}
+
           {/* TOUR */}
-          {tab === 3 ? <TourSection triHolidays={triHolidays} /> : null}
+          {tab === 4 ? <TourSection triHolidays={triHolidays} /> : null}
         </Box>
       </Paper>
 

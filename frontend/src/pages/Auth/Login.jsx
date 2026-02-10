@@ -78,7 +78,11 @@ const Login = () => {
   const location = useLocation();
   const [sponsorId, setSponsorId] = useState("");
   const [agencyLevel, setAgencyLevel] = useState("");
-
+  // Mount guard to stabilize first paint
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // If a role is locked via route param, force-select it
   useEffect(() => {
@@ -91,7 +95,11 @@ const Login = () => {
   // - When a role is locked via the URL, redirect ONLY if a session exists for that role.
   // - When no role is locked (generic auth routes), redirect to the first available session.
   // - When in Register mode, do NOT auto-redirect, even if another session exists.
+  const redirectRunRef = useRef(false); // StrictMode double-run guard
   useEffect(() => {
+    if (!mounted) return;
+    if (redirectRunRef.current) return;
+    redirectRunRef.current = true;
     try {
       const pathNow = location.pathname || "";
       if (/^\/(auth\/login|login)(\/|$)/i.test(pathNow)) return;
@@ -124,11 +132,12 @@ const Login = () => {
         }
       }
     } catch {}
-  }, [mode, lockedRole, navigate, location.search]);
+  }, [mounted, mode, lockedRole, navigate, location.search]);
 
   // Redirect legacy /login?mode=register[&role=...] links to the role-scoped register route
   // This avoids any admin-session auto-redirects that can occur on the generic /login page.
   useEffect(() => {
+    if (!mounted) return;
     try {
       const params = new URLSearchParams(location.search || "");
       const qMode = String(params.get("mode") || params.get("category") || "").toLowerCase();
@@ -143,10 +152,11 @@ const Login = () => {
         navigate(`/auth/register/${r}${qs}`, { replace: true });
       }
     } catch {}
-  }, [location.search, navigate]);
+  }, [mounted, location.search, navigate]);
 
   // Read role and mode (aka "category") from query string to preselect UI
   useEffect(() => {
+    if (!mounted) return;
     try {
       const params = new URLSearchParams(location.search);
       const qMode = (params.get("mode") || params.get("category") || "").toLowerCase();
@@ -166,7 +176,7 @@ const Login = () => {
         setSponsorId(s);
       }
     } catch {}
-  }, [location.search]);
+  }, [mounted, location.search]);
 
   // Auto-select Sub Franchise for agency register links with sponsor
   useEffect(() => {
@@ -267,11 +277,11 @@ const Login = () => {
   const [consumerSponsorDistricts, setConsumerSponsorDistricts] = useState([]);
   const [consumerSelectedState, setConsumerSelectedState] = useState("");
   const [consumerSelectedDistrict, setConsumerSelectedDistrict] = useState("");
-const [consumerDistrictPincodes, setConsumerDistrictPincodes] = useState([]);
-const [consumerPinsByState, setConsumerPinsByState] = useState([]);
-// Non-agency (Consumer/Employee/Merchant) district->pincode options via Country/State/District selects
-const [nonAgencyDistrictPincodes, setNonAgencyDistrictPincodes] = useState([]);
-const [pinByDistrictLoadingNA, setPinByDistrictLoadingNA] = useState(false);
+  const [consumerDistrictPincodes, setConsumerDistrictPincodes] = useState([]);
+  const [consumerPinsByState, setConsumerPinsByState] = useState([]);
+  // Non-agency (Consumer/Employee/Merchant) district->pincode options via Country/State/District selects
+  const [nonAgencyDistrictPincodes, setNonAgencyDistrictPincodes] = useState([]);
+  const [pinByDistrictLoadingNA, setPinByDistrictLoadingNA] = useState(false);
 
   // Normalize sponsor input to avoid passing URLs or malformed strings to the API
   const normalizeSponsor = (val) => {
@@ -327,13 +337,15 @@ const [pinByDistrictLoadingNA, setPinByDistrictLoadingNA] = useState(false);
     loadCountries();
   }, []);
 
+  // Defer localStorage hydration until mounted
   useEffect(() => {
+    if (!mounted) return;
     const saved = localStorage.getItem("remember_username");
     if (saved) {
       setFormData((fd) => ({ ...fd, username: saved }));
       setRemember(true);
     }
-  }, []);
+  }, [mounted]);
 
   const loadStates = async (countryId) => {
     try {
@@ -446,7 +458,8 @@ const [pinByDistrictLoadingNA, setPinByDistrictLoadingNA] = useState(false);
   // Auto detect location
   useEffect(() => {
     // Only run geolocation during Register and when not Agency/Business
-    if (mode !== "register" || role === "agency" || role === "business") {
+    if (mode !== "register") return;
+    if (role === "agency" || role === "business") {
       setManualMode(true);
       setAutoLoading(false);
       return;
@@ -757,7 +770,9 @@ const [pinByDistrictLoadingNA, setPinByDistrictLoadingNA] = useState(false);
 
 
   // Live Sponsor validation (register): verify sponsor exists and show identity
+  const sponsorValidateKeyRef = useRef(""); // StrictMode double-run guard
   useEffect(() => {
+    if (!mounted) return;
     if (mode !== "register") {
       setSponsorValid(null);
       return;
@@ -768,6 +783,13 @@ const [pinByDistrictLoadingNA, setPinByDistrictLoadingNA] = useState(false);
       setSponsorDisplay({ name: "", pincode: "", username: "" });
       return;
     }
+    const key = `${mode}|${s}`;
+    if (sponsorValidateKeyRef.current === key) {
+      // prevent StrictMode double-run on identical initial params
+      return;
+    }
+    sponsorValidateKeyRef.current = key;
+
     setSponsorChecking(true);
     const t = setTimeout(async () => {
       let exists = false;
@@ -803,7 +825,7 @@ const [pinByDistrictLoadingNA, setPinByDistrictLoadingNA] = useState(false);
       setSponsorChecking(false);
       clearTimeout(t);
     };
-  }, [mode, sponsorId]);
+  }, [mounted, mode, sponsorId]);
 
   // Effective pincode options for consumer/employee (intersect when both available)
   // Non-agency: load pincodes when State and District are selected
@@ -834,7 +856,7 @@ const [pinByDistrictLoadingNA, setPinByDistrictLoadingNA] = useState(false);
     })();
   }, [role, selectedCity, selectedState]);
 
-const pincodeOptionsConsumer = useMemo(() => {
+  const pincodeOptionsConsumer = useMemo(() => {
     return Array.isArray(sponsorConsumerPincodes) ? sponsorConsumerPincodes : [];
   }, [sponsorConsumerPincodes]);
 
@@ -862,7 +884,7 @@ const pincodeOptionsConsumer = useMemo(() => {
   };
   const mapUIRoleToCategory = () => {
     if (role === "business") return "business";
-    if (role === "employee") return "employee";
+    if (role === "employee") return "Sarathi";
     if (role === "user") return "consumer";
     if (role === "agency") return mapAgencyLevelToCategory(agencyLevel) || "agency_state";
     return "consumer";
@@ -1134,10 +1156,10 @@ const pincodeOptionsConsumer = useMemo(() => {
         setErrorMsg("Please select a State.");
         return false;
       }
-        if (!selectedDistrictAgency.trim()) {
-          setErrorMsg("Please select a District.");
-          return false;
-        }
+      if (!selectedDistrictAgency.trim()) {
+        setErrorMsg("Please select a District.");
+        return false;
+      }
       // ensure selectedDistrict is among sponsorDistricts for selectedState if provided
       if (
         sponsorDistricts.length &&
@@ -1218,7 +1240,7 @@ const pincodeOptionsConsumer = useMemo(() => {
     ({
       user: "Consumer",
       agency: "Agency",
-      employee: "Employee",
+      employee: "Sarathi",
       business: "Merchant",
     }[String(r || "").toLowerCase()] || String(r || ""));
 
@@ -1363,6 +1385,10 @@ const pincodeOptionsConsumer = useMemo(() => {
               onChange={handleChange}
               sx={{ mb: 2 }}
               required
+              InputLabelProps={{
+                shrink: true,
+                sx: { backgroundColor: "#fff", px: 0.5, ml: 3.5 }
+              }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -2089,6 +2115,7 @@ const pincodeOptionsConsumer = useMemo(() => {
   };
 
   // === FINAL UI (polished) ===
+  if (!mounted) return null;
   return (
     <Box
       sx={{
@@ -2205,7 +2232,7 @@ const pincodeOptionsConsumer = useMemo(() => {
               <ToggleButton value="employee" aria-label="employee" disabled={Boolean(lockedRole && lockedRole !== "employee")}>
                 <Box sx={{ display: "flex", alignItems: "center", width: "100%", justifyContent: "space-between" }}>
                   <Box sx={{ display: "flex", alignItems: "center" }}>
-                    <WorkIcon sx={{ mr: 1 }} /> Employee
+                    <WorkIcon sx={{ mr: 1 }} /> Sarathi
                   </Box>
                   {role === "employee" && <CheckCircleIcon color="success" fontSize="small" />}
                 </Box>
@@ -2224,7 +2251,7 @@ const pincodeOptionsConsumer = useMemo(() => {
           {errorMsg && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setErrorMsg("")}>{errorMsg}</Alert>}
           {successMsg && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccessMsg("")}>{successMsg}</Alert>}
 
-          <Box component="form" noValidate onSubmit={handleSubmit} className="auth-mobile-full">
+          <Box component="form" autoComplete="off" noValidate onSubmit={handleSubmit} className="auth-mobile-full">
             {!isLogin && (
               <Box>
                 {renderRegistrationFields()}
@@ -2279,14 +2306,16 @@ const pincodeOptionsConsumer = useMemo(() => {
                 label={loginField.label}
                 placeholder={loginField.placeholder}
                 type={loginField.type}
+                autoComplete="off"
                 inputProps={{ inputMode: loginField.inputMode, ...(role === "user" ? { maxLength: 10, pattern: "[0-9]*" } : {}) }}
                 onChange={handleChange}
                 sx={{ mb: 2 }}
                 required
+                InputLabelProps={{ shrink: true }}
                 InputProps={{
                   startAdornment: (
-                    <InputAdornment position="start">
-                      <AccountCircle />
+                    <InputAdornment position="start" sx={{ mr: 0.5 }}>
+                      <AccountCircle fontSize="small" />
                     </InputAdornment>
                   ),
                 }}
@@ -2299,13 +2328,18 @@ const pincodeOptionsConsumer = useMemo(() => {
               value={formData.password}
               label="Password"
               type={showPassword ? "text" : "password"}
+              autoComplete="new-password"
               onChange={handleChange}
               sx={{ mb: isLogin ? 2.5 : 3 }}
               required
+              InputLabelProps={{
+                shrink: true,
+                sx: { backgroundColor: "#fff", px: 0.5, ml: 3.5 }
+              }}
               InputProps={{
                 startAdornment: (
-                  <InputAdornment position="start">
-                    <Lock />
+                  <InputAdornment position="start" sx={{ mr: 0.5 }}>
+                    <Lock fontSize="small" />
                   </InputAdornment>
                 ),
                 endAdornment: (
@@ -2327,6 +2361,10 @@ const pincodeOptionsConsumer = useMemo(() => {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 sx={{ mb: 2 }}
                 required
+                InputLabelProps={{
+                  shrink: true,
+                  sx: { backgroundColor: "#fff", px: 0.5 }
+                }}
                 InputProps={{
                   endAdornment: (
                     <InputAdornment position="end">
@@ -2443,7 +2481,7 @@ const pincodeOptionsConsumer = useMemo(() => {
             </ListItemButton>
             <ListItemButton selected={role === "employee"} onClick={() => { setRole("employee"); setDrawerOpen(false); }}>
               <ListItemIcon><WorkIcon /></ListItemIcon>
-              <ListItemText primary="Employee" />
+              <ListItemText primary="Sarathi" />
             </ListItemButton>
             <ListItemButton selected={role === "business"} onClick={() => { setRole("business"); setDrawerOpen(false); }}>
               <ListItemIcon><BusinessIcon /></ListItemIcon>
@@ -2457,18 +2495,18 @@ const pincodeOptionsConsumer = useMemo(() => {
           color: "#000",
           boxShadow: "0 0px 15px rgba(0,0,0,0.08) !important", }}>
         <Typography variant="body2">
-                    © {new Date().getFullYear()} Trikonekt. All rights reserved.
-                  </Typography>
-                  <Typography variant="body2" sx={{ mt: 1 }}>
-                    Contact us:{" "}
-                    <Link
-                      href="mailto:contact@trikonekt.com"
-                      underline="hover"
-                      color="inherit"
-                      sx={{ fontWeight: 500 }}
-                    >
-                      contact@trikonekt.com
-                    </Link>
+          © {new Date().getFullYear()} Trikonekt. All rights reserved.
+        </Typography>
+        <Typography variant="body2" sx={{ mt: 1 }}>
+          Contact us:{" "}
+          <Link
+            href="mailto:contact@trikonekt.com"
+            underline="hover"
+            color="inherit"
+            sx={{ fontWeight: 500 }}
+          >
+            contact@trikonekt.com
+          </Link>
         </Typography>
       </Box>
     </Box>
