@@ -1344,22 +1344,20 @@ class TeamSummaryView(APIView):
         try:
             # Include legacy sponsor_id-based directs (when registered_by is NULL) alongside proper FK linkage
             try:
-                vals = [
-                    (getattr(user, "prefixed_id", "") or "").strip(),
-                    (getattr(user, "username", "") or "").strip(),
-                    (getattr(user, "unique_id", "") or "").strip(),
-                    (getattr(user, "phone", "") or "").strip(),
-                ]
-                # Digits-only variants for username/phone and TR-XXXX dashed variant
-                digs_user = "".join(ch for ch in ((getattr(user, "username", "") or "")) if ch.isdigit())
-                digs_phone = "".join(ch for ch in ((getattr(user, "phone", "") or "")) if ch.isdigit())
-                if digs_user:
-                    vals.append(digs_user)
-                if digs_phone:
-                    vals.append(digs_phone)
+                # Use only stable identifiers to avoid breakage on phone/username change
+                vals = []
                 tr = (getattr(user, "prefixed_id", "") or "").strip()
-                if tr and "-" not in tr and len(tr) > 2 and tr[:2].isalpha():
-                    vals.append(f"{tr[:2]}-{tr[2:]}")
+                if tr:
+                    vals.append(tr)
+                    # include dashed/undashed TR variants
+                    if "-" in tr:
+                        vals.append(tr.replace("-", "", 1))
+                    else:
+                        if len(tr) > 2 and tr[:2].isalpha():
+                            vals.append(f"{tr[:2]}-{tr[2:]}")
+                uid = (getattr(user, "unique_id", "") or "").strip()
+                if uid:
+                    vals.append(uid)
                 idents = [s for s in {v for v in vals if v}]
             except Exception:
                 idents = []

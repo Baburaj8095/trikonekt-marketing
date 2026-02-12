@@ -34,6 +34,7 @@ import {
   getEcouponStoreBootstrap,
   getMyLevelBonusProgress,
   getMyRankCommissionHolds,
+  listMyPromoPurchases,
 } from "../api/api";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import normalizeMediaUrl from "../utils/media";
@@ -332,6 +333,8 @@ export default function RankUpgrade() {
   const [lbProgress, setLbProgress] = useState(null);
   const [lbHolds, setLbHolds] = useState([]);
   const [lbLoading, setLbLoading] = useState(false);
+  // Approved base purchase gate (to hide Rank-1 "Achieved" unless approved)
+  const [hasApprovedBase, setHasApprovedBase] = useState(false);
 
   const amount = useMemo(() => Number(elig?.upgrade_amount || 0), [elig]);
   const gst = useMemo(() => Number((amount * 0.15).toFixed(2)), [amount]); // UI hint (backend computes authoritative)
@@ -345,13 +348,13 @@ export default function RankUpgrade() {
 
   const selAmount = useMemo(() => {
     if (!selectedRank) return Number(amount || 0);
-    const curLevel = Number(elig?.current_level || 0);
+    const curLevel = Number(elig?.achieved_level || 0);
     const targetLevel = Number(selectedRank?.level_number || 0);
     if (!targetLevel || targetLevel <= curLevel) return 0;
     return (ranks || [])
       .filter((rr) => Number(rr.level_number || 0) > curLevel && Number(rr.level_number || 0) <= targetLevel)
       .reduce((sum, rr) => sum + Number(rr.upgrade_amount || 0), 0);
-  }, [selectedRank, ranks, elig?.current_level, amount]);
+  }, [selectedRank, ranks, elig?.achieved_level, amount]);
   const selGst = useMemo(() => Number((selAmount * 0.15).toFixed(2)), [selAmount]);
   const selNet = useMemo(() => Math.max(0, selAmount - selGst), [selAmount, selGst]);
 
@@ -410,6 +413,27 @@ export default function RankUpgrade() {
     return () => { alive = false; };
   }, []);
 
+  // Load approved purchases to gate Rank-1 "Achieved"
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const hist = await listMyPromoPurchases();
+        if (!alive) return;
+        const ok = Array.isArray(hist) && hist.some((h) => {
+          const status = String(h?.status || "").toUpperCase();
+          const type = String(h?.package?.type || "").toUpperCase();
+          // Consider base "membership" purchases only (exclude MONTHLY promo boxes)
+          return status === "APPROVED" && type !== "MONTHLY";
+        });
+        setHasApprovedBase(!!ok);
+      } catch {
+        if (alive) setHasApprovedBase(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
   const nextRankMeta = useMemo(() => {
     if (!elig?.next_rank) return null;
     const match = (ranks || []).find((r) => String(r.rank_name) === String(elig.next_rank));
@@ -424,55 +448,7 @@ export default function RankUpgrade() {
         Rank Upgrade
       </Typography>
 
-      {loading ? <LinearProgress sx={{ mb: 2 }} /> : null}
-      {error ? (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      ) : null}
-
-      {/* Current Rank Card */}
-      <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-          <Typography fontWeight={800}>Current Rank</Typography>
-          <Chip size="small" color="primary" label={`L${elig?.current_level || "-"}`} />
-        </Stack>
-        <Typography fontSize={14} sx={{ mb: 1 }}>
-          {elig?.current_rank || "-"}
-        </Typography>
-        <RankProgressStepper currentLevel={elig?.current_level || 1} nextLevel={elig?.level_number || null} />
-        <Divider sx={{ my: 1.5 }} />
-        
-      </Paper>
-
-      {/* Next Rank Card */}
-      <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-          <Typography fontWeight={800}>Next Rank</Typography>
-          {elig?.eligible ? <Chip size="small" color="success" label="Eligible" /> : <Chip size="small" color="warning" label="Not Eligible" />}
-        </Stack>
-
-        {elig?.next_rank ? (
-          <>
-            <Typography fontWeight={700} fontSize={15}>
-              {elig?.next_rank} (L{elig?.level_number})
-            </Typography>
-            <Stack spacing={0.5} sx={{ mt: 1 }}>
-              <ValueRow label="Required Team Size" value={Number(elig?.team_size_required || 0)} />
-              <ValueRow label="Upgrade Amount (incl. GST)" value={`₹${Number(amount).toFixed(2)}`} />
-            </Stack>
-          </>
-        ) : (
-          <Typography color="text.secondary">You have reached the highest rank or ranks are not configured.</Typography>
-        )}
-
-        {!elig?.eligible && elig?.reason ? (
-          <Alert severity="info" sx={{ mt: 1 }}>
-            {elig.reason}
-          </Alert>
-        ) : null}
-      </Paper>
-
+      
       {/* Level Bonus Progress */}
       <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2 }}>
         <Typography fontWeight={800} sx={{ mb: 1 }}>
@@ -528,8 +504,8 @@ export default function RankUpgrade() {
             </TableHead>
             <TableBody>
               {(ranks || []).map((r) => {
-                const achieved = Number(elig?.current_level || 0) >= Number(r.level_number || 0);
-                const canBuy = !achieved && Number(r.level_number || 0) > Number(elig?.current_level || 0);
+                const achieved = Number(elig?.achieved_level || 0) >= Number(r.level_number || 0);
+                const canBuy = !achieved && Number(r.level_number || 0) > Number(elig?.achieved_level || 0);
                 const statusLabel = achieved ? "Achieved" : canBuy ? "Available" : "Locked";
                 const statusColor = achieved ? "success" : canBuy ? "info" : "default";
                 return (
@@ -566,8 +542,8 @@ export default function RankUpgrade() {
         {/* Mobile cards */}
         <Box sx={{ display: { xs: "block", sm: "none" } }}>
           {(ranks || []).map((r) => {
-            const achieved = Number(elig?.current_level || 0) >= Number(r.level_number || 0);
-            const canBuy = !achieved && Number(r.level_number || 0) > Number(elig?.current_level || 0);
+            const achieved = Number(elig?.achieved_level || 0) >= Number(r.level_number || 0);
+            const canBuy = !achieved && Number(r.level_number || 0) > Number(elig?.achieved_level || 0);
             const statusLabel = achieved ? "Achieved" : canBuy ? "Available" : "Locked";
             const statusColor = achieved ? "success" : canBuy ? "info" : "default";
             return (

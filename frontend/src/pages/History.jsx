@@ -374,11 +374,9 @@ function HistoryRow({ tx, onClick }) {
               fontWeight: 900,
               fontSize: 14,
               lineHeight: 1.25,
-              display: "-webkit-box",
-              WebkitLineClamp: 3,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
               whiteSpace: "normal",
+              wordBreak: "break-word",
+              overflowWrap: "anywhere",
             }}
           >
             {typeName}

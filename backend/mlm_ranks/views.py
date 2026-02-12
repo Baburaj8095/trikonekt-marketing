@@ -6,7 +6,7 @@ from typing import Optional
 from django.db import transaction
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
-from django.db.models import Sum
+from django.db.models import Sum, Max
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -52,6 +52,17 @@ class UserUpgradeEligibilityView(APIView):
         ur, cur = RankEligibilityService.get_or_bootstrap_user_rank(request.user)
         current_rank_name = getattr(cur, "rank_name", None)
         current_level = getattr(cur, "level_number", None)
+        # Highest approved rank level (based solely on admin-approved upgrades)
+        try:
+            hi = (
+                RankUpgrade.objects
+                .filter(user=request.user, payment_status=RankUpgrade.STATUS_SUCCESS)
+                .aggregate(m=Max("to_rank__level_number"))
+                .get("m") or 0
+            )
+            achieved_level = int(hi or 0)
+        except Exception:
+            achieved_level = 0
         # For frontend quick use:
         return Response(
             {
@@ -65,6 +76,7 @@ class UserUpgradeEligibilityView(APIView):
                 "direct_count": payload["direct_count"],
                 "current_rank": current_rank_name,
                 "current_level": current_level,
+                "achieved_level": achieved_level,
                 "reason": payload["reason"],
             }
         )
@@ -89,13 +101,25 @@ class UpgradeInitiateView(APIView):
         ur, cur_rank = RankEligibilityService.get_or_bootstrap_user_rank(user)
         to_rank = get_object_or_404(Rank, id=int(to_rank_id))
 
-        cur_level = int(getattr(cur_rank, "level_number", 0) or 0)
-        target_level = int(getattr(to_rank, "level_number", 0) or 0)
-        if target_level <= cur_level:
-            return Response({"detail": "Target rank must be higher than current rank"}, status=status.HTTP_400_BAD_REQUEST)
+        # Effective baseline = highest admin-approved rank (achieved_level).
+        # This allows a user with default L1 (but no approved upgrade) to BUY L1.
+        try:
+            hi = (
+                RankUpgrade.objects
+                .filter(user=user, payment_status=RankUpgrade.STATUS_SUCCESS)
+                .aggregate(m=Max("to_rank__level_number"))
+                .get("m") or 0
+            )
+        except Exception:
+            hi = 0
+        eff_level = int(hi or 0)
 
-        # Sum upgrade_amounts for levels (cur_level+1 .. target_level)
-        ranks = Rank.objects.filter(level_number__gt=cur_level, level_number__lte=target_level).order_by("level_number")
+        target_level = int(getattr(to_rank, "level_number", 0) or 0)
+        if target_level <= eff_level:
+            return Response({"detail": "Target rank must be higher than your approved level."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Sum upgrade_amounts for levels (eff_level+1 .. target_level)
+        ranks = Rank.objects.filter(level_number__gt=eff_level, level_number__lte=target_level).order_by("level_number")
         total_upgrade = q2(sum([q2(r.upgrade_amount) for r in ranks]) if ranks else Decimal("0.00"))
         if total_upgrade <= 0:
             return Response({"detail": "Invalid computed upgrade amount for target rank"}, status=status.HTTP_400_BAD_REQUEST)
