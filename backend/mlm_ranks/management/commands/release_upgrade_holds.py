@@ -15,7 +15,7 @@ from mlm_ranks.services.config import (
     q2,
     Prime750StatusAdapter,
 )
-from mlm_ranks.services.commission import count_direct_rank_upgrades
+from mlm_ranks.services.commission import count_directs_upgraded_to_rank1
 from mlm_ranks.services.wallet import WalletPoster
 
 
@@ -64,8 +64,7 @@ class Command(BaseCommand):
             # For LEVEL holds -> need >=5 directs who have upgraded to THIS rank level (commission.level)
             # For DIRECT holds (legacy data, if any) -> no hold under new rule, treat as eligible.
             if c.commission_type == UpgradeCommission.TYPE_LEVEL:
-                rank_level = int(getattr(c, "level", 0) or 0)
-                directs = count_direct_rank_upgrades(to_user, rank_level)
+                directs = count_directs_upgraded_to_rank1(to_user)
             else:
                 directs = 999  # direct sponsor payouts are not gated by this rule
             eligible_now = directs >= int(HOLD_REQUIRE_DIRECTS_GTE or 0)

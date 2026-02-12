@@ -264,6 +264,12 @@ class MerchantProfile(models.Model):
     )
     business_name = models.CharField(max_length=255, blank=True, default="")
     mobile_number = models.CharField(max_length=20, blank=True, default="")
+
+    commission_percent = models.DecimalField(max_digits=6, decimal_places=2, default=0)
+    service_mode = models.CharField(max_length=10, default="BOTH", db_index=True, choices=(("ONLINE", "Online"), ("OFFLINE", "Offline"), ("BOTH", "Both")))
+    address = models.TextField(blank=True, default="")
+    business_category = models.CharField(max_length=150, blank=True, default="")
+
     is_verified = models.BooleanField(default=False, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -320,3 +326,47 @@ class Shop(models.Model):
 
     def __str__(self) -> str:
         return f"Shop<{self.shop_name}> by {getattr(self.merchant, 'username', 'user')}"
+
+# =====================
+# Shop Products (per ACTIVE Shop)
+# =====================
+
+class ShopProduct(models.Model):
+    """
+    Product listed by a merchant under a specific Shop.
+    Visible to consumers when is_active=True and shop.status=ACTIVE.
+    """
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name='products')
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, default="")
+
+    # Pricing
+    mrp = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    discount_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)  # 0..100
+    price = models.DecimalField(max_digits=12, decimal_places=2)  # final price (can be computed client/server)
+
+    # Delivery modes
+    online_delivery = models.BooleanField(default=False)
+    offline_delivery = models.BooleanField(default=True)
+
+    # Inventory + visibility
+    stock_qty = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    # Media
+    image = models.ImageField(upload_to='products/shop/', null=True, blank=True, storage=MEDIA_STORAGE)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['shop', 'is_active']),
+            models.Index(fields=['is_active', 'created_at']),
+        ]
+
+    def __str__(self) -> str:
+        try:
+            return f"ShopProduct<{self.title}> (Shop#{self.shop_id})"
+        except Exception:
+            return f"ShopProduct#{self.pk}"

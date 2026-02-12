@@ -183,3 +183,65 @@ class RankUpgradePayment(models.Model):
 
     def __str__(self) -> str:
         return f"RUPay<{self.upgrade_id} {self.utr or '-'} {self.created_at:%Y-%m-%d}>"
+
+
+# ---------------- Rank-1 Five-Matrix Models ----------------
+
+class RankMatrixRoot(models.Model):
+    """
+    Rank-1 matrix root per user. Exactly one row per (user, rank=Rank-1).
+    first_upgrade_at/expiry_at define 7-day window starting at first direct approval.
+    """
+    root_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="rank_matrix_roots", db_index=True)
+    rank = models.ForeignKey(Rank, on_delete=models.PROTECT, related_name="matrix_roots", db_index=True)
+    first_upgrade_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    expiry_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        unique_together = (("root_user", "rank"),)
+        indexes = [
+            models.Index(fields=["root_user"]),
+            models.Index(fields=["rank"]),
+            models.Index(fields=["first_upgrade_at"]),
+            models.Index(fields=["expiry_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"MatrixRoot<{getattr(self.root_user, 'id', None)} R{getattr(self.rank, 'id', None)}>"
+
+
+class RankMatrixNode(models.Model):
+    """
+    Rank-1 Five-Matrix placement row under a RankMatrixRoot (root_user).
+    - parent_user: the user under whom this child sits in the root's matrix
+    - level_depth: depth from root (root's direct children = 1)
+    - position: 1..5 among siblings (children of the same parent_user)
+    """
+    root_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="rank_matrix_nodes", db_index=True)
+    placed_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="rank_matrix_as_child", db_index=True)
+    parent_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="rank_matrix_as_parent", db_index=True)
+    level_depth = models.PositiveSmallIntegerField(db_index=True)  # 1..n (root's children are 1)
+    position = models.PositiveSmallIntegerField(db_index=True)  # 1..5 among siblings
+    approved_at = models.DateTimeField(db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        unique_together = (
+            ("root_user", "placed_user"),
+            ("root_user", "parent_user", "position"),
+        )
+        ordering = ["level_depth", "approved_at", "position", "id"]
+        indexes = [
+            models.Index(fields=["root_user", "parent_user", "position"]),
+            models.Index(fields=["root_user", "placed_user"]),
+            models.Index(fields=["root_user", "level_depth"]),
+        ]
+
+    def __str__(self) -> str:
+        return (
+            f"MatrixNode<root={getattr(self.root_user, 'id', None)} "
+            f"parent={getattr(self.parent_user, 'id', None)} "
+            f"lvl={self.level_depth} pos={self.position} "
+            f"child={getattr(self.placed_user, 'id', None)}>"
+        )

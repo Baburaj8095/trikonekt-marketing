@@ -1098,23 +1098,47 @@ export default function PromoPackages({ title = "Consumer Packages" } = {}) {
         {title}
       </Typography>
 
-      {/* {(prime150Active || prime750Active || seasonActive) ? (
-        <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: "wrap" }}>
-          {prime150Active && <Chip size="small" color="success" label="Prime 150 Active" />}
-          {prime750Active && <Chip size="small" color="success" label="Prime 750 Active" />}
-          {seasonActive && <Chip size="small" color="success" label="Monthly Promo Active" />}
-        </Stack>
-      ) : null} */}
-
-      {/* Tabs: one section active at a time */}
-      <Paper elevation={0} sx={{ borderRadius: 2 }}>
+      <Box
+        sx={{
+          position: "sticky",
+          top: 0,
+          zIndex: 20,
+          bgcolor: "background.paper",
+          borderBottom: "1px solid",
+          borderColor: "divider",
+        }}
+      >
         <Tabs
           value={tab}
           onChange={(_, v) => setTab(v)}
-          variant="fullWidth"
-          textColor="primary"
-          indicatorColor="primary"
-          sx={{ borderBottom: "1px solid", borderColor: "divider" }}
+          variant="scrollable"
+          scrollButtons={false}
+          allowScrollButtonsMobile
+          TabIndicatorProps={{
+            sx: { height: 3, borderRadius: 3 },
+          }}
+          sx={{
+            px: 1,
+
+            "& .MuiTabs-flexContainer": {
+              gap: 1,
+            },
+
+            "& .MuiTab-root": {
+              textTransform: "none",
+              fontWeight: 700,
+              fontSize: 14,
+              minHeight: 48,
+              px: 2.2,
+              borderRadius: 2,
+              color: "text.secondary",
+            },
+
+            "& .Mui-selected": {
+              color: "primary.main",
+              bgcolor: "primary.50",
+            },
+          }}
         >
           <Tab label="Prime 750" />
           <Tab label="Season" />
@@ -1122,7 +1146,10 @@ export default function PromoPackages({ title = "Consumer Packages" } = {}) {
           <Tab label="Prime 150" />
           <Tab label="Tour" />
         </Tabs>
+      </Box>
 
+      
+      <Paper elevation={0} sx={{ borderRadius: 2 }}>
         <Box sx={{ p: 2 }}>
           {/* PRIME 750 */}
           {tab === 0 ? (

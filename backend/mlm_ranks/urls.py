@@ -11,6 +11,10 @@ from .views import (
     AdminCommissionHoldsView,
     AdminApproveRankUpgradeView,
     AdminRejectRankUpgradeView,
+    MyCommissionHoldsView,
+    MyLevelBonusProgressView,
+    RankMatrixTreeView,
+    RankMatrixSubtreeView,
 )
 
 urlpatterns = [
@@ -20,6 +24,11 @@ urlpatterns = [
     path("upgrade/initiate/", UpgradeInitiateView.as_view()),
     path("upgrade/success/", UpgradeSuccessView.as_view()),
     path("upgrade/payment-request/", UpgradePaymentRequestView.as_view()),
+    path("user/rank-commission-holds/", MyCommissionHoldsView.as_view()),
+    path("user/level-bonus-progress/", MyLevelBonusProgressView.as_view()),
+    # Rank-1 Five-Matrix Tree
+    path("rank-matrix/tree/", RankMatrixTreeView.as_view()),
+    path("rank-matrix/subtree/", RankMatrixSubtreeView.as_view()),
 
     # Admin APIs
     path("admin/rank-upgrades/", AdminRankUpgradesView.as_view()),

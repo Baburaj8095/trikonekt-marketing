@@ -388,6 +388,20 @@ export default function AdminUsers() {
       { field: "phone", headerName: "Mobile", minWidth: 140 },
       { field: "email", headerName: "Email", minWidth: 200, flex: 1 },
       {
+        field: "commission_percent",
+        headerName: "Commission %",
+        minWidth: 140,
+        valueFormatter: (v) => {
+          const n = parseFloat(v);
+          return Number.isFinite(n) ? `${n}%` : "";
+        },
+      },
+      {
+        field: "service_mode",
+        headerName: "Service Mode",
+        minWidth: 140,
+      },
+      {
         field: "__login",
         headerName: "Login",
         minWidth: 110,
@@ -973,7 +987,7 @@ export default function AdminUsers() {
     setView(v);
     if (v === "all") { setF("role", ""); setF("category", ""); }
     else if (v === "consumers") { setF("role", "user"); setF("category", "consumer"); }
-    else if (v === "merchants") { setF("role", "user"); setF("category", "merchant"); }
+    else if (v === "merchants") { try { window.location.assign("/admin/merchants"); } catch (_) {} return; }
     else if (v === "agencies") { setF("role", "agency"); setF("category", ""); }
     else if (v === "employees") { setF("role", "employee"); setF("category", "employee"); }
     // Optional: column visibility per view
@@ -1229,7 +1243,7 @@ const count = Number.isFinite(countNum) ? countNum : results.length;
       const [all, consumers, merchants, agencies, employees] = await Promise.all([
         make({}),
         make({ role: "user", category: "consumer" }),
-        make({ role: "user", category: "merchant" }),
+        make({ role: "business" }),
         make({ role: "agency" }),
         make({ role: "employee", category: "employee" }),
       ]);
@@ -1258,7 +1272,7 @@ const count = Number.isFinite(countNum) ? countNum : results.length;
         {[
           { id: "all", label: "All" },
           { id: "consumers", label: "Consumers" },
-          { id: "merchants", label: "Merchants" },
+          // { id: "merchants", label: "Merchants" },
           { id: "agencies", label: "Agencies" },
           { id: "employees", label: "Employees" },
         ].map((v) => (
@@ -1486,6 +1500,10 @@ const count = Number.isFinite(countNum) ? countNum : results.length;
     if (cat === "agency_state_coordinator") {
       allowed.delete("city");
       allowed.delete("pincode");
+    }
+    if (cat === "merchant") {
+      allowed.add("commission_percent");
+      allowed.add("service_mode");
     }
     let arr = (editFieldsWithNames || []).filter(
       (f) => f && allowed.has(String(f.name || ""))

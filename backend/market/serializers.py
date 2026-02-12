@@ -8,6 +8,7 @@ from .models import (
     MerchantShop,
     MerchantProfile,
     Shop,
+    ShopProduct,
 )
 from django.conf import settings
 try:
@@ -530,6 +531,10 @@ class MerchantProfileSerializer(serializers.ModelSerializer):
             'username',
             'business_name',
             'mobile_number',
+            'commission_percent',
+            'service_mode',
+            'address',
+            'business_category',
             'is_verified',
             'created_at',
         ]
@@ -540,6 +545,32 @@ class MerchantProfileSerializer(serializers.ModelSerializer):
             return getattr(obj.user, "username", None)
         except Exception:
             return None
+
+    def validate_service_mode(self, value):
+        try:
+            v = str(value or "").upper()
+        except Exception:
+            v = "BOTH"
+        allowed = {"ONLINE", "OFFLINE", "BOTH"}
+        if v not in allowed:
+            raise serializers.ValidationError("service_mode must be one of: ONLINE, OFFLINE, BOTH.")
+        return v
+
+    def validate_commission_percent(self, value):
+        try:
+            from decimal import Decimal as D
+            v = D(str(value or "0"))
+        except Exception:
+            from decimal import Decimal as D
+            v = D("0.00")
+        if v < 0:
+            v = D("0.00")
+        if v > 100:
+            v = D("100.00")
+        try:
+            return v.quantize(D("0.01"))
+        except Exception:
+            return v
 
     def update(self, instance, validated_data):
         # user/is_verified are controlled separately (admin moderation)
@@ -675,3 +706,162 @@ class ShopStatusSerializer(serializers.ModelSerializer):
         if value not in allowed:
             raise serializers.ValidationError(f"Status must be one of: {', '.join(sorted(allowed))}")
         return value
+
+
+# =====================
+# Shop Products (per ACTIVE Shop)
+# =====================
+
+class ShopProductPublicSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = ShopProduct
+        fields = [
+            'id',
+            'title',
+            'description',
+            'mrp',
+            'price',
+            'discount_percent',
+            'online_delivery',
+            'offline_delivery',
+            'stock_qty',
+            'image',
+            'image_url',
+            'created_at',
+        ]
+        read_only_fields = fields
+
+    def get_image_url(self, obj):
+        f = getattr(obj, "image", None)
+        if not f:
+            return None
+        url = None
+        # If Cloudinary-backed field, use its URL directly
+        try:
+            storage_mod = getattr(getattr(f, "storage", None), "__module__", "")
+            if "cloudinary" in storage_mod:
+                url = f.url
+        except Exception:
+            url = None
+
+        # Otherwise, if Cloudinary is active, only return Cloudinary URL when asset exists there
+        if not url and MediaCloudinaryStorage and "cloudinary" in str(getattr(settings, "DEFAULT_FILE_STORAGE", "")):
+            try:
+                name = getattr(f, "name", None)
+                if name:
+                    storage = MediaCloudinaryStorage()
+                    if hasattr(storage, "exists") and storage.exists(name):
+                        url = storage.url(name)
+            except Exception:
+                url = None
+
+        # Fallback to field URL (likely /media/... served by backend)
+        if not url:
+            try:
+                url = f.url
+            except Exception:
+                url = None
+
+        if not url:
+            return None
+        request = self.context.get("request") if hasattr(self, "context") else None
+        return request.build_absolute_uri(url) if (request and not str(url).startswith("http")) else url
+
+
+class ShopProductSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = ShopProduct
+        fields = [
+            'id',
+            'shop',
+            'title',
+            'description',
+            'mrp',
+            'price',
+            'discount_percent',
+            'online_delivery',
+            'offline_delivery',
+            'stock_qty',
+            'is_active',
+            'image',
+            'image_url',
+            'created_at',
+        ]
+        read_only_fields = ['id', 'shop', 'created_at', 'image_url']
+
+    def get_image_url(self, obj):
+        return ShopProductPublicSerializer(self.instance, context=self.context).get_image_url(obj) if obj else None
+
+    def validate(self, attrs):
+        from decimal import Decimal as D
+        # discount bounds
+        disc = attrs.get('discount_percent', getattr(self.instance, 'discount_percent', 0))
+        try:
+            d = D(str(disc or "0"))
+        except Exception:
+            d = D("0")
+        if d < 0:
+            d = D("0.00")
+        if d > 100:
+            d = D("100.00")
+        attrs['discount_percent'] = d
+
+        # at least one delivery mode
+        od = attrs.get('online_delivery', getattr(self.instance, 'online_delivery', False))
+        ofd = attrs.get('offline_delivery', getattr(self.instance, 'offline_delivery', True))
+        if not (od or ofd):
+            raise serializers.ValidationError({"delivery": "Enable at least one of online_delivery or offline_delivery."})
+
+        # compute price from mrp/discount if both provided (or normalize)
+        mrp_in = attrs.get('mrp', getattr(self.instance, 'mrp', None))
+        price_in = attrs.get('price', getattr(self.instance, 'price', None))
+        if mrp_in is not None and d is not None and (price_in is None or 'discount_percent' in attrs or 'mrp' in attrs):
+            try:
+                mrpD = D(str(mrp_in or "0"))
+                price = (mrpD * (D("1.00") - (d / D("100.00")))).quantize(D("0.01"))
+                attrs['price'] = price
+            except Exception:
+                pass
+        return attrs
+
+    def _ensure_shop_ownership_and_active(self, shop):
+        request = self.context.get('request')
+        if not request or not getattr(request, "user", None) or not request.user.is_authenticated:
+            raise serializers.ValidationError({'detail': 'Authentication required.'})
+        if getattr(request.user, "is_staff", False):
+            # staff can bypass
+            return
+        # Shop must belong to merchant and be ACTIVE
+        if getattr(shop, "merchant_id", None) != request.user.id:
+            raise serializers.ValidationError({'shop': 'You can only manage products for your own shop.'})
+        if getattr(shop, "status", None) != Shop.STATUS_ACTIVE:
+            raise serializers.ValidationError({'shop': 'Shop must be ACTIVE to add products.'})
+
+    def create(self, validated_data):
+        # Validate shop ownership + status
+        from .models import Shop as ShopModel
+        shop = validated_data.get('shop')
+        if not shop:
+            raise serializers.ValidationError({'shop': 'This field is required.'})
+        # Re-fetch with minimal fields to check owner/status when a pk is passed
+        try:
+            if not isinstance(shop, ShopModel):
+                shop = ShopModel.objects.only("id", "merchant_id", "status").get(pk=shop)
+            else:
+                shop = ShopModel.objects.only("id", "merchant_id", "status").get(pk=shop.id)
+        except ShopModel.DoesNotExist:
+            raise serializers.ValidationError({'shop': 'Shop not found.'})
+        self._ensure_shop_ownership_and_active(shop)
+        validated_data['shop'] = shop
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        # If shop is being changed (rare), validate too; otherwise validate owner against instance.shop
+        shop = validated_data.get('shop') or getattr(instance, 'shop', None)
+        if shop:
+            self._ensure_shop_ownership_and_active(shop if hasattr(shop, 'merchant_id') else instance.shop)
+        return super().update(instance, validated_data)

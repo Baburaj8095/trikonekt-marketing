@@ -32,6 +32,12 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
     activated_ecoupon_count = serializers.SerializerMethodField()
     last_promo_package = serializers.SerializerMethodField()
     admin_role = serializers.SerializerMethodField()
+    # Merchant profile fields for Admin Merchants grid
+    business_name = serializers.SerializerMethodField()
+    business_category = serializers.SerializerMethodField()
+    address = serializers.SerializerMethodField()
+    commission_percent = serializers.SerializerMethodField()
+    service_mode = serializers.SerializerMethodField()
     # Prime/Monthly purchase counts and monthly summary
     prime150_count = serializers.SerializerMethodField()
     prime750_count = serializers.SerializerMethodField()
@@ -60,6 +66,11 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
             "date_joined",
             "wallet_balance",
             "wallet_status",
+            "commission_percent",
+            "service_mode",
+            "business_name",
+            "business_category",
+            "address",
             "avatar_url",
             "is_active",
             "is_staff",
@@ -527,6 +538,49 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
             return {"id": rid, "name": name}
         except Exception:
             return None
+
+    # Merchant Profile helpers and fields
+    def _mp(self, obj):
+        try:
+            return getattr(obj, "merchant_profile", None)
+        except Exception:
+            return None
+
+    def get_business_name(self, obj):
+        mp = self._mp(obj)
+        return getattr(mp, "business_name", "") or ""
+
+    def get_business_category(self, obj):
+        mp = self._mp(obj)
+        return getattr(mp, "business_category", "") or ""
+
+    def get_address(self, obj):
+        mp = self._mp(obj)
+        return getattr(mp, "address", "") or ""
+
+    def get_commission_percent(self, obj):
+        try:
+            mp = self._mp(obj)
+            if mp is None:
+                return ""
+            val = getattr(mp, "commission_percent", None)
+            if val is None:
+                return ""
+            try:
+                return float(val)
+            except Exception:
+                from decimal import Decimal as D
+                return float(D(str(val)))
+        except Exception:
+            return ""
+
+    def get_service_mode(self, obj):
+        mp = self._mp(obj)
+        try:
+            v = (getattr(mp, "service_mode", "") or "").upper()
+        except Exception:
+            v = ""
+        return v
 
     # -------- Prime/Monthly counters and monthly summary --------
     def _approved_promo_purchases(self, obj):

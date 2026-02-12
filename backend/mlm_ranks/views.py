@@ -6,6 +6,7 @@ from typing import Optional
 from django.db import transaction
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
+from django.db.models import Sum
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -21,8 +22,9 @@ from .serializers import (
     RankUpgradePaymentSerializer,
 )
 from .services.eligibility import RankEligibilityService
-from .services.commission import CommissionDistributor
-from .services.config import q2, GST_RATE
+from .services.commission import CommissionDistributor, count_directs_upgraded_to_rank1
+from .services.config import q2, GST_RATE, HOLD_REQUIRE_DIRECTS_GTE
+from .services.five_matrix import FiveMatrixService
 
 
 class RanksListView(APIView):
@@ -176,6 +178,79 @@ class UpgradeSuccessView(APIView):
         return Response(RankUpgradeSerializer(upg).data, status=status.HTTP_200_OK)
 
 
+class MyCommissionHoldsView(APIView):
+    """
+    List current user's rank upgrade commission holds (pending/released/forfeited).
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        qs = (
+            CommissionHold.objects
+            .select_related("commission", "commission__to_user", "commission__from_user", "commission__upgrade")
+            .filter(commission__to_user_id=request.user.id)
+            .order_by("release_date", "id")
+        )
+        status_f = request.query_params.get("status")
+        if status_f:
+            qs = qs.filter(status=str(status_f).upper())
+        data = CommissionHoldSerializer(qs, many=True).data
+        return Response(data)
+
+
+class MyLevelBonusProgressView(APIView):
+    """
+    Show Level Bonus eligibility progress for current user:
+      - completed rank-1 directs count
+      - threshold (HOLD_REQUIRE_DIRECTS_GTE)
+      - summary of holds (pending/released/forfeited) and earliest pending release info
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        completed = int(count_directs_upgraded_to_rank1(user) or 0)
+        threshold = int(HOLD_REQUIRE_DIRECTS_GTE or 5)
+
+        # Holds belonging to this user (as recipient)
+        my_holds = CommissionHold.objects.filter(commission__to_user_id=user.id)
+        pending = my_holds.filter(status=CommissionHold.STATUS_PENDING)
+        released = my_holds.filter(status=CommissionHold.STATUS_RELEASED)
+        forfeited = my_holds.filter(status=CommissionHold.STATUS_FORFEITED)
+
+        # Aggregates
+        from django.db.models import Sum, Min
+        pending_count = pending.count()
+        released_count = released.count()
+        forfeited_count = forfeited.count()
+        pending_total_amount = pending.aggregate(s=Sum("hold_amount")).get("s") or 0
+        earliest_release = pending.aggregate(m=Min("release_date")).get("m")
+
+        today = timezone.now().date()
+        days_left = None
+        if earliest_release:
+            try:
+                delta = (earliest_release - today).days
+                days_left = int(delta)
+            except Exception:
+                days_left = None
+
+        payload = {
+            "completed_rank1_directs": completed,
+            "threshold": threshold,
+            "eligible_now": completed >= threshold,
+            "holds_summary": {
+                "pending_count": pending_count,
+                "released_count": released_count,
+                "forfeited_count": forfeited_count,
+                "pending_total_amount": pending_total_amount,
+                "earliest_pending_release_date": earliest_release,
+                "days_left_for_earliest": days_left,
+            },
+        }
+        return Response(payload)
+
+
 class UpgradePaymentRequestView(APIView):
     """
     User uploads UPI payment proof for an initiated rank upgrade.
@@ -214,6 +289,175 @@ class UpgradePaymentRequestView(APIView):
 
 
 # ----------------------- Admin APIs -----------------------
+
+class RankMatrixTreeView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        rid = request.query_params.get("root_user_id")
+        try:
+            rid_int = int(rid) if rid is not None and str(rid).strip() != "" else int(getattr(request.user, "id", 0) or 0)
+        except Exception:
+            rid_int = int(getattr(request.user, "id", 0) or 0)
+
+        # Authorization: consumer can view own tree; admin/staff can view any
+        if rid_int != getattr(request.user, "id", None) and not getattr(request.user, "is_staff", False):
+            return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
+
+        # Ensure root exists for visibility after purchase initiation (optional UX)
+        try:
+            from django.db.models import Q
+            has_rank1_purchase = RankUpgrade.objects.filter(
+                user_id=rid_int,
+                to_rank__level_number=1,
+                payment_status__in=[RankUpgrade.STATUS_INITIATED, RankUpgrade.STATUS_SUCCESS],
+            ).exists()
+            if has_rank1_purchase:
+                try:
+                    user_obj = request.user
+                    if getattr(user_obj, "id", None) != rid_int:
+                        from accounts.models import CustomUser
+                        user_obj = CustomUser.objects.filter(id=rid_int).first()
+                    FiveMatrixService.ensure_root_for_rank1(user_obj)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        payload = FiveMatrixService.get_tree_payload(root_user_id=rid_int, requester=request.user)
+        return Response(payload)
+
+
+class RankMatrixSubtreeView(APIView):
+    """
+    GET /rank-matrix/subtree?user_id={id}&root_user_id?={rid}
+    Returns immediate children (up to 5) of the given user inside the specified (or inferred) Rank-1 matrix root.
+    Each child contains:
+      - user_id, username
+      - placement_level (level_depth)
+      - position (1..5)
+      - approved_at
+      - current_rank (name/level)
+      - bonus_released (to parent_user from this child; LEVEL only)
+      - bonus_hold (pending holds to parent_user from this child; LEVEL only)
+      - has_children (whether this child has further placements under this root)
+    Authorization:
+      - Consumers may view only their own tree (root_user_id == request.user.id)
+      - Admin/staff may view any root
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        # Resolve root context
+        try:
+            rid = request.query_params.get("root_user_id")
+            if rid is not None and str(rid).strip() != "":
+                root_user_id = int(rid)
+            else:
+                root_user_id = int(getattr(request.user, "id", 0) or 0)
+        except Exception:
+            root_user_id = int(getattr(request.user, "id", 0) or 0)
+
+        # AuthZ
+        if root_user_id != getattr(request.user, "id", None) and not getattr(request.user, "is_staff", False):
+            return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
+
+        # Parent user whose subtree we want
+        try:
+            uid_raw = request.query_params.get("user_id")
+            parent_user_id = int(uid_raw)
+        except Exception:
+            return Response({"detail": "user_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Verify a rank-1 root exists (optional; allows empty subtree gracefully)
+        try:
+            from .models import RankMatrixRoot
+            has_root = RankMatrixRoot.objects.filter(root_user_id=root_user_id, rank__level_number=1).exists()
+            if not has_root:
+                return Response({"detail": "No Rank-1 matrix root for this user"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception:
+            pass
+
+        # Fetch immediate children under this parent within the root's matrix
+        from .models import RankMatrixNode, UserRank
+        try:
+            rows = list(
+                RankMatrixNode.objects
+                .select_related("placed_user")
+                .filter(root_user_id=root_user_id, parent_user_id=parent_user_id)
+                .order_by("position", "id")
+            )
+        except Exception:
+            rows = []
+
+        # Preload user ranks for displayed children
+        child_ids = [int(getattr(r, "placed_user_id", 0) or 0) for r in rows]
+        ranks_by_user = {}
+        if child_ids:
+            try:
+                urs = (
+                    UserRank.objects
+                    .select_related("current_rank")
+                    .filter(user_id__in=child_ids)
+                )
+                for ur in urs:
+                    ranks_by_user[int(getattr(ur, "user_id", 0) or 0)] = {
+                        "level": int(getattr(getattr(ur, "current_rank", None), "level_number", 0) or 0),
+                        "name": getattr(getattr(ur, "current_rank", None), "rank_name", None),
+                    }
+            except Exception:
+                ranks_by_user = {}
+
+        # Bonus aggregates per child -> parent (LEVEL only)
+        from .models import UpgradeCommission, CommissionHold
+        data = []
+        for n in rows:
+            pu = getattr(n, "placed_user", None)
+            cid = int(getattr(n, "placed_user_id", 0) or 0)
+            # Released level income to this parent from this child (all ranks that credited to parent over level idx used then)
+            released = q2(
+                UpgradeCommission.objects.filter(
+                    to_user_id=parent_user_id,
+                    from_user_id=cid,
+                    commission_type=UpgradeCommission.TYPE_LEVEL,
+                    status=UpgradeCommission.STATUS_CREDITED,
+                ).aggregate(s=Sum("commission_amount")).get("s") or 0
+            )
+            # Pending holds to this parent from this child
+            pending_hold = q2(
+                CommissionHold.objects.filter(
+                    commission__to_user_id=parent_user_id,
+                    commission__from_user_id=cid,
+                    commission__commission_type=UpgradeCommission.TYPE_LEVEL,
+                    status=CommissionHold.STATUS_PENDING,
+                ).aggregate(s=Sum("hold_amount")).get("s") or 0
+            )
+            # Has further children?
+            try:
+                has_kids = RankMatrixNode.objects.filter(root_user_id=root_user_id, parent_user_id=cid).exists()
+            except Exception:
+                has_kids = False
+
+            data.append({
+                "user_id": cid,
+                "username": getattr(pu, "username", None),
+                "placement_level": int(getattr(n, "level_depth", 0) or 0),
+                "position": int(getattr(n, "position", 0) or 0),
+                "approved_at": getattr(n, "approved_at", None),
+                "current_rank": ranks_by_user.get(cid, {"level": 0, "name": None}),
+                "bonus_released": released,
+                "bonus_hold": pending_hold,
+                "has_children": bool(has_kids),
+            })
+
+        payload = {
+            "root_user_id": root_user_id,
+            "parent_user_id": parent_user_id,
+            "count": len(data),
+            "children": data,
+        }
+        return Response(payload, status=status.HTTP_200_OK)
+
 
 class AdminRankUpgradesView(APIView):
     permission_classes = [permissions.IsAdminUser]
@@ -297,7 +541,12 @@ class AdminApproveRankUpgradeView(APIView):
             # If already SUCCESS but commissions not distributed yet, distribute now (idempotent)
             try:
                 if not UpgradeCommission.objects.filter(upgrade_id=upg.id).exists():
-                    CommissionDistributor.distribute(upg)
+                    lvl = int(getattr(getattr(upg, "to_rank", None), "level_number", 0) or 0)
+                    if lvl == 1:
+                        FiveMatrixService.distribute_rank1_commissions(upg)
+                        FiveMatrixService.on_rank1_approval(upg)
+                    else:
+                        CommissionDistributor.distribute(upg)
             except Exception:
                 pass
             return Response(RankUpgradeSerializer(upg).data, status=status.HTTP_200_OK)
@@ -319,7 +568,12 @@ class AdminApproveRankUpgradeView(APIView):
         ur.save(update_fields=["current_rank", "achieved_at"])
 
         try:
-            CommissionDistributor.distribute(upg)
+            lvl = int(getattr(getattr(upg, "to_rank", None), "level_number", 0) or 0)
+            if lvl == 1:
+                FiveMatrixService.distribute_rank1_commissions(upg)
+                FiveMatrixService.on_rank1_approval(upg)
+            else:
+                CommissionDistributor.distribute(upg)
         except Exception:
             # Keep upgrade SUCCESS; ops can re-run distribution via management command if needed
             pass

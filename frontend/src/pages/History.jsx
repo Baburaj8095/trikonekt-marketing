@@ -90,6 +90,19 @@ function describeSource(tx = {}) {
     return "Reward Points Earned";
   }
 
+  // Rank upgrade commissions (override labels)
+  const isRankUpgrade = st === "RANK_UPGRADE" || String(meta.kind || "").toUpperCase().startsWith("RANK_UPGRADE_");
+  if (isRankUpgrade) {
+    const orig = String(meta.orig_type || type || "").toUpperCase();
+    if (orig === "DIRECT_REF_BONUS" || type === "DIRECT_REF_BONUS") {
+      return "Rank Direct Referral Bonus";
+    }
+    if (orig === "LEVEL_BONUS" || type === "LEVEL_BONUS") {
+      const lvl = Number(meta.level ?? meta.level_index);
+      return Number.isFinite(lvl) && lvl > 0 ? `Rank Level ${lvl} Bonus` : "Rank Level Bonus";
+    }
+  }
+
   // Referral bonuses
   if (type === "DIRECT_REF_BONUS" || src === "JOIN_REFERRAL" || st === "JOIN_REFERRAL") {
     if (tier) return `Referral Bonus ${tier} Prime`;
@@ -329,8 +342,13 @@ function HistoryRow({ tx, onClick }) {
       }).format(new Date(tx.created_at))
     : "";
 
-  const levelIdx = Number(tx?.meta?.level_index);
-  const typeName = `${describeSource(tx)}${Number.isFinite(levelIdx) ? ` - Level ${levelIdx}` : ""}`;
+  const levelVal = Number(tx?.meta?.level_index ?? tx?.meta?.level);
+  const isRankUpgradeRow =
+    String(tx?.source_type || "").toUpperCase() === "RANK_UPGRADE" ||
+    String(tx?.meta?.kind || "").toUpperCase().startsWith("RANK_UPGRADE_");
+  const typeName = isRankUpgradeRow
+    ? describeSource(tx)
+    : `${describeSource(tx)}${Number.isFinite(levelVal) ? ` - Level ${levelVal}` : ""}`;
 
   return (
     <Paper
@@ -355,10 +373,12 @@ function HistoryRow({ tx, onClick }) {
             sx={{
               fontWeight: 900,
               fontSize: 14,
-              lineHeight: 1.2,
-              whiteSpace: "nowrap",
+              lineHeight: 1.25,
+              display: "-webkit-box",
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: "vertical",
               overflow: "hidden",
-              textOverflow: "ellipsis",
+              whiteSpace: "normal",
             }}
           >
             {typeName}

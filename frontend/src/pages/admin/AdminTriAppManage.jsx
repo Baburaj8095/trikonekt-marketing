@@ -21,6 +21,7 @@ import {
   TableBody,
   Box,
   Divider,
+  TableContainer,
 } from "@mui/material";
 import API from "../../api/api";
 
@@ -425,7 +426,7 @@ export default function AdminTriAppManage() {
 
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 2, md: 3 } }}>
-      <Typography variant="h5" sx={{ fontWeight: 800, mb: 1, color: "#0C2D48" }}>
+      <Typography variant="h5" sx={{ fontWeight: 800, mb: 1, color: "#0C2D48", fontSize: { xs: 20, sm: 22, md: 24 } }}>
         {appTitle}  Admin
       </Typography>
       <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>
@@ -459,8 +460,22 @@ export default function AdminTriAppManage() {
                 placeholder="TRI Holidays"
               />
             </Grid>
-            <Grid item xs={12} md={6} sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
-              <Button variant="contained" onClick={createTriApp} disabled={creatingApp}>
+            <Grid
+              item
+              xs={12}
+              md={6}
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: { xs: "flex-start", md: "flex-end" },
+              }}
+            >
+              <Button
+                variant="contained"
+                onClick={createTriApp}
+                disabled={creatingApp}
+                sx={{ width: { xs: "100%", sm: "auto" } }}
+              >
                 {creatingApp ? "Creating..." : "Create App"}
               </Button>
             </Grid>
@@ -472,40 +487,66 @@ export default function AdminTriAppManage() {
         <>
           {/* App settings */}
           <Paper elevation={1} sx={{ p: 2, borderRadius: 2, mb: 3 }}>
-            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              alignItems={{ xs: "stretch", sm: "center" }}
+              justifyContent="space-between"
+              sx={{ mb: 1 }}
+              spacing={1}
+            >
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
                 App Settings
               </Typography>
-              <Stack direction="row" spacing={1}>
-                <Button variant="contained" size="small" onClick={saveFlags} disabled={savingFlags}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ width: { xs: "100%", sm: "auto" } }}>
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={saveFlags}
+                  disabled={savingFlags}
+                  sx={{ width: { xs: "100%", sm: "auto" } }}
+                >
                   {savingFlags ? "Saving..." : "Save Settings"}
                 </Button>
               </Stack>
             </Stack>
             <Grid container spacing={2}>
               <Grid item xs={12} md={8}>
-                <Stack direction="row" spacing={2} sx={{ flexWrap: "wrap" }}>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ flexWrap: { sm: "wrap" } }}>
                   <FormControlLabel
                     control={<Checkbox checked={flag_is_active} onChange={(e) => setFlagIsActive(e.target.checked)} />}
                     label="Active"
+                    sx={{ m: 0, "& .MuiFormControlLabel-label": { wordBreak: "break-word", whiteSpace: "normal" } }}
                   />
                   <FormControlLabel
                     control={<Checkbox checked={flag_price} onChange={(e) => setFlagPrice(e.target.checked)} />}
                     label="Show Price"
+                    sx={{ m: 0, "& .MuiFormControlLabel-label": { wordBreak: "break-word", whiteSpace: "normal" } }}
                   />
                   <FormControlLabel
                     control={<Checkbox checked={flag_cart} onChange={(e) => setFlagCart(e.target.checked)} />}
                     label="Enable Add to Cart"
+                    sx={{ m: 0, "& .MuiFormControlLabel-label": { wordBreak: "break-word", whiteSpace: "normal" } }}
                   />
                   <FormControlLabel
                     control={<Checkbox checked={flag_payment} onChange={(e) => setFlagPayment(e.target.checked)} />}
                     label="Enable Payment"
+                    sx={{ m: 0, "& .MuiFormControlLabel-label": { wordBreak: "break-word", whiteSpace: "normal" } }}
                   />
                 </Stack>
               </Grid>
               <Grid item xs={12} md={4}>
-                <Stack direction="row" spacing={1} alignItems="center" justifyContent="flex-end">
-                  <Button variant="outlined" size="small" component="label">
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={1}
+                  alignItems={{ xs: "stretch", sm: "center" }}
+                  justifyContent={{ xs: "flex-start", md: "flex-end" }}
+                >
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    component="label"
+                    sx={{ width: { xs: "100%", sm: "auto" } }}
+                  >
                     {bannerFile ? "Change Banner" : "Upload Banner"}
                     <input
                       type="file"
@@ -519,12 +560,13 @@ export default function AdminTriAppManage() {
                     size="small"
                     onClick={uploadBanner}
                     disabled={!bannerFile || savingBanner}
+                    sx={{ width: { xs: "100%", sm: "auto" } }}
                   >
                     {savingBanner ? "Saving”¦" : "Save Banner"}
                   </Button>
                 </Stack>
                 {app?.banner_image ? (
-                  <Typography variant="caption" sx={{ display: "block", mt: 1, color: "text.secondary" }}>
+                  <Typography variant="caption" sx={{ display: "block", mt: 1, color: "text.secondary", wordBreak: "break-all" }}>
                     Current banner: {String(app.banner_image)}
                   </Typography>
                 ) : (
@@ -551,7 +593,7 @@ export default function AdminTriAppManage() {
                   onChange={(e) => setPName(e.target.value)}
                 />
               </Grid>
-              <Grid item xs={6} md={2}>
+              <Grid item xs={12} sm={6} md={2}>
                 <TextField
                   fullWidth
                   size="small"
@@ -562,7 +604,7 @@ export default function AdminTriAppManage() {
                   inputProps={{ min: 0, step: "0.01" }}
                 />
               </Grid>
-              <Grid item xs={6} md={2}>
+              <Grid item xs={12} sm={6} md={2}>
                 <TextField
                   select
                   fullWidth
@@ -576,7 +618,7 @@ export default function AdminTriAppManage() {
                   ))}
                 </TextField>
               </Grid>
-              <Grid item xs={6} md={1}>
+              <Grid item xs={12} sm={6} md={1}>
                 <TextField
                   fullWidth
                   size="small"
@@ -587,7 +629,7 @@ export default function AdminTriAppManage() {
                   inputProps={{ min: 0, step: 1 }}
                 />
               </Grid>
-              <Grid item xs={6} md={2}>
+              <Grid item xs={12} sm={6} md={2}>
                 <TextField
                   fullWidth
                   size="small"
@@ -599,10 +641,11 @@ export default function AdminTriAppManage() {
                   helperText="Max % redeemable via reward points"
                 />
               </Grid>
-              <Grid item xs={6} md={2} sx={{ display: "flex", alignItems: "center" }}>
+              <Grid item xs={12} sm={6} md={2} sx={{ display: "flex", alignItems: "center" }}>
                 <FormControlLabel
                   control={<Checkbox checked={pActive} onChange={(e) => setPActive(e.target.checked)} />}
                   label="Active"
+                  sx={{ m: 0, "& .MuiFormControlLabel-label": { wordBreak: "break-word", whiteSpace: "normal" } }}
                 />
               </Grid>
               <Grid item xs={12}>
@@ -617,7 +660,7 @@ export default function AdminTriAppManage() {
                 />
               </Grid>
               <Grid item xs={12} md={6}>
-                <Button variant="outlined" size="small" component="label">
+                <Button variant="outlined" size="small" component="label" sx={{ width: { xs: "100%", sm: "auto" } }}>
                   {pImage ? "Change Image" : "Upload Image"}
                   <input
                     type="file"
@@ -629,13 +672,18 @@ export default function AdminTriAppManage() {
                   />
                 </Button>
                 {pImage ? (
-                  <Typography variant="caption" sx={{ ml: 1 }}>
+                  <Typography variant="caption" sx={{ ml: 1, display: "inline-block", wordBreak: "break-all" }}>
                     {pImage.name}
                   </Typography>
                 ) : null}
               </Grid>
               <Grid item xs={12}>
-                <Stack direction="row" spacing={1} justifyContent="flex-end">
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={1}
+                  justifyContent="flex-end"
+                  sx={{ width: "100%" }}
+                >
                   <Button
                     variant="text"
                     size="small"
@@ -649,6 +697,7 @@ export default function AdminTriAppManage() {
                       setPOrder(0);
                       setPRewardPct("");
                     }}
+                    sx={{ width: { xs: "100%", sm: "auto" } }}
                   >
                     Clear
                   </Button>
@@ -657,6 +706,7 @@ export default function AdminTriAppManage() {
                     size="small"
                     onClick={createOneProduct}
                     disabled={submittingProduct}
+                    sx={{ width: { xs: "100%", sm: "auto" } }}
                   >
                     {submittingProduct ? "Saving..." : "Create Product"}
                   </Button>
@@ -672,7 +722,7 @@ export default function AdminTriAppManage() {
             </Typography>
             <Grid container spacing={2}>
               <Grid item xs={12} md={6}>
-                <Button variant="outlined" size="small" component="label">
+                <Button variant="outlined" size="small" component="label" sx={{ width: { xs: "100%", sm: "auto" } }}>
                   {bulkFiles?.length ? `Change (${bulkFiles.length})` : "Select Images"}
                   <input
                     type="file"
@@ -683,7 +733,7 @@ export default function AdminTriAppManage() {
                   />
                 </Button>
                 {bulkFiles?.length ? (
-                  <Typography variant="caption" sx={{ ml: 1 }}>
+                  <Typography variant="caption" sx={{ ml: 1, display: "inline-block" }}>
                     {bulkFiles.length} file(s) selected
                   </Typography>
                 ) : null}
@@ -700,7 +750,7 @@ export default function AdminTriAppManage() {
                   helperText="Use {n} where you want a sequence number (e.g., 'Holiday {n}')"
                 />
               </Grid>
-              <Grid item xs={6} md={2}>
+              <Grid item xs={12} sm={6} md={2}>
                 <TextField
                   fullWidth
                   size="small"
@@ -711,7 +761,7 @@ export default function AdminTriAppManage() {
                   inputProps={{ min: 0, step: "0.01" }}
                 />
               </Grid>
-              <Grid item xs={6} md={2}>
+              <Grid item xs={12} sm={6} md={2}>
                 <TextField
                   select
                   fullWidth
@@ -725,7 +775,7 @@ export default function AdminTriAppManage() {
                   ))}
                 </TextField>
               </Grid>
-              <Grid item xs={6} md={1}>
+              <Grid item xs={12} sm={6} md={1}>
                 <TextField
                   fullWidth
                   size="small"
@@ -736,7 +786,7 @@ export default function AdminTriAppManage() {
                   inputProps={{ min: 0, step: 1 }}
                 />
               </Grid>
-              <Grid item xs={6} md={2}>
+              <Grid item xs={12} sm={6} md={2}>
                 <TextField
                   fullWidth
                   size="small"
@@ -747,19 +797,26 @@ export default function AdminTriAppManage() {
                   inputProps={{ min: 0, max: 100, step: "0.01" }}
                 />
               </Grid>
-              <Grid item xs={6} md={2} sx={{ display: "flex", alignItems: "center" }}>
+              <Grid item xs={12} sm={6} md={2} sx={{ display: "flex", alignItems: "center" }}>
                 <FormControlLabel
                   control={<Checkbox checked={bulkActive} onChange={(e) => setBulkActive(e.target.checked)} />}
                   label="Active"
+                  sx={{ m: 0, "& .MuiFormControlLabel-label": { wordBreak: "break-word", whiteSpace: "normal" } }}
                 />
               </Grid>
               <Grid item xs={12}>
-                <Stack direction="row" spacing={1} justifyContent="flex-end">
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={1}
+                  justifyContent="flex-end"
+                  sx={{ width: "100%" }}
+                >
                   <Button
                     variant="contained"
                     size="small"
                     onClick={bulkUploadProducts}
                     disabled={bulkSubmitting || !bulkFiles?.length}
+                    sx={{ width: { xs: "100%", sm: "auto" } }}
                   >
                     {bulkSubmitting ? "Uploading..." : "Upload"}
                   </Button>
@@ -771,113 +828,165 @@ export default function AdminTriAppManage() {
           {/* Merchant Shops moderation (only for tri-local-store) */}
           {isLocalStore ? (
             <Paper elevation={1} sx={{ p: 2, borderRadius: 2, mb: 3 }}>
-              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                alignItems={{ xs: "stretch", sm: "center" }}
+                justifyContent="space-between"
+                sx={{ mb: 1 }}
+                spacing={1}
+              >
                 <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
                   Merchant Shops Moderation
                 </Typography>
-                <Stack direction="row" spacing={1}>
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={1}
+                  sx={{ width: { xs: "100%", sm: "auto" } }}
+                >
                   <TextField
+                    fullWidth
                     size="small"
                     label="Search"
                     value={shopQ}
                     onChange={(e) => setShopQ(e.target.value)}
                   />
                   <TextField
+                    fullWidth
                     size="small"
                     select
                     label="Status"
                     value={shopStatus}
                     onChange={(e) => setShopStatus(e.target.value)}
-                    sx={{ minWidth: 160 }}
+                    sx={{ minWidth: { xs: "auto", sm: 160 } }}
                   >
                     <MenuItem value="PENDING">Pending</MenuItem>
                     <MenuItem value="ACTIVE">Active</MenuItem>
                     <MenuItem value="REJECTED">Rejected</MenuItem>
                     <MenuItem value="ALL">All</MenuItem>
                   </TextField>
-                  <Button size="small" onClick={loadShops} disabled={shopsLoading}>
+                  <Button
+                    size="small"
+                    onClick={loadShops}
+                    disabled={shopsLoading}
+                    sx={{ width: { xs: "100%", sm: "auto" } }}
+                  >
                     {shopsLoading ? "Loading..." : "Refresh"}
                   </Button>
                 </Stack>
               </Stack>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>ID</TableCell>
-                    <TableCell>Name</TableCell>
-                    <TableCell>City</TableCell>
-                    <TableCell>Merchant (ID)</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell align="right">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {(shops || []).map((s) => (
-                    <TableRow key={s.id}>
-                      <TableCell>{s.id}</TableCell>
-                      <TableCell>{s.shop_name}</TableCell>
-                      <TableCell>{s.city}</TableCell>
-                      <TableCell>{s.merchant}</TableCell>
-                      <TableCell>
-                        <span
-                          style={{
-                            padding: "2px 8px",
-                            borderRadius: 999,
-                            fontSize: 12,
-                            color:
-                              s.status === "ACTIVE"
-                                ? "#065f46"
-                                : s.status === "REJECTED"
-                                ? "#991b1b"
-                                : "#92400e",
-                            background:
-                              s.status === "ACTIVE"
-                                ? "#d1fae5"
-                                : s.status === "REJECTED"
-                                ? "#fee2e2"
-                                : "#fef3c7",
-                            border: "1px solid rgba(0,0,0,0.06)",
-                          }}
-                        >
-                          {s.status}
-                        </span>
-                      </TableCell>
-                      <TableCell align="right">
-                        <Stack direction="row" spacing={1} justifyContent="flex-end">
-                          <Button size="small" variant="outlined" onClick={() => pendShop(s.id)}>
-                            Set Pending
-                          </Button>
-                          <Button size="small" variant="contained" onClick={() => approveShop(s.id)}>
-                            Approve
-                          </Button>
-                          <Button size="small" color="error" variant="text" onClick={() => rejectShop(s.id)}>
-                            Reject
-                          </Button>
-                        </Stack>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {(!shops || shops.length === 0) && (
+              <TableContainer sx={{ width: "100%", overflowX: "auto" }}>
+                <Table size="small" sx={{ minWidth: 720 }}>
+                  <TableHead>
                     <TableRow>
-                      <TableCell colSpan={6} align="center">
-                        <Typography variant="body2" color="text.secondary">
-                          No shops found.
-                        </Typography>
-                      </TableCell>
+                      <TableCell>ID</TableCell>
+                      <TableCell>Name</TableCell>
+                      <TableCell>City</TableCell>
+                      <TableCell>Merchant (ID)</TableCell>
+                      <TableCell>Status</TableCell>
+                      <TableCell align="right">Actions</TableCell>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                  </TableHead>
+                  <TableBody>
+                    {(shops || []).map((s) => (
+                      <TableRow key={s.id}>
+                        <TableCell>{s.id}</TableCell>
+                        <TableCell>{s.shop_name}</TableCell>
+                        <TableCell>{s.city}</TableCell>
+                        <TableCell>{s.merchant}</TableCell>
+                        <TableCell>
+                          <span
+                            style={{
+                              padding: "2px 8px",
+                              borderRadius: 999,
+                              fontSize: 12,
+                              color:
+                                s.status === "ACTIVE"
+                                  ? "#065f46"
+                                  : s.status === "REJECTED"
+                                  ? "#991b1b"
+                                  : "#92400e",
+                              background:
+                                s.status === "ACTIVE"
+                                  ? "#d1fae5"
+                                  : s.status === "REJECTED"
+                                  ? "#fee2e2"
+                                  : "#fef3c7",
+                              border: "1px solid rgba(0,0,0,0.06)",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {s.status}
+                          </span>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Stack
+                            direction={{ xs: "column", sm: "row" }}
+                            spacing={1}
+                            justifyContent="flex-end"
+                            sx={{ width: "100%" }}
+                          >
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={() => pendShop(s.id)}
+                              sx={{ width: { xs: "100%", sm: "auto" } }}
+                            >
+                              Set Pending
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              onClick={() => approveShop(s.id)}
+                              sx={{ width: { xs: "100%", sm: "auto" } }}
+                            >
+                              Approve
+                            </Button>
+                            <Button
+                              size="small"
+                              color="error"
+                              variant="text"
+                              onClick={() => rejectShop(s.id)}
+                              sx={{ width: { xs: "100%", sm: "auto" } }}
+                            >
+                              Reject
+                            </Button>
+                          </Stack>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {(!shops || shops.length === 0) && (
+                      <TableRow>
+                        <TableCell colSpan={6} align="center">
+                          <Typography variant="body2" color="text.secondary">
+                            No shops found.
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
             </Paper>
           ) : null}
 
           {/* Products list */}
           <Paper elevation={1} sx={{ p: 2, borderRadius: 2 }}>
-            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              alignItems={{ xs: "stretch", sm: "center" }}
+              justifyContent="space-between"
+              sx={{ mb: 1 }}
+              spacing={1}
+            >
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
                 Products {products?.length ? `(${products.length})` : ""}
               </Typography>
-              <Button size="small" onClick={loadProducts} disabled={prodLoading}>
+              <Button
+                size="small"
+                onClick={loadProducts}
+                disabled={prodLoading}
+                sx={{ width: { xs: "100%", sm: "auto" } }}
+              >
                 {prodLoading ? "Loading..." : "Refresh"}
               </Button>
             </Stack>
@@ -886,56 +995,58 @@ export default function AdminTriAppManage() {
                 <CircularProgress size={20} /> <Typography variant="body2">Loading products...</Typography>
               </Box>
             ) : (
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>ID</TableCell>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Price</TableCell>
-                    <TableCell>Currency</TableCell>
-                    <TableCell>Max Reward %</TableCell>
-                    <TableCell align="right">Order</TableCell>
-                    <TableCell align="center">Active</TableCell>
-                    <TableCell align="right">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {(products || [])
-                    .sort((a, b) => {
-                      const ao = Number(a.display_order || 0);
-                      const bo = Number(b.display_order || 0);
-                      if (ao !== bo) return ao - bo;
-                      return (a.id || 0) - (b.id || 0);
-                    })
-                    .map((m) => (
-                      <TableRow key={m.id}>
-                        <TableCell>{m.id}</TableCell>
-                        <TableCell>{m.name}</TableCell>
-                        <TableCell>{m.price}</TableCell>
-                        <TableCell>{m.currency || "INR"}</TableCell>
-                        <TableCell>{m.max_reward_points_percent ?? 0}%</TableCell>
-                        <TableCell align="right">{m.display_order ?? 0}</TableCell>
-                        <TableCell align="center">
-                          <Checkbox size="small" checked={!!m.is_active} onChange={() => toggleProductActive(m)} />
-                        </TableCell>
-                        <TableCell align="right">
-                          <Button size="small" color="error" variant="text" onClick={() => deleteProduct(m)}>
-                            Delete
-                          </Button>
+              <TableContainer sx={{ width: "100%", overflowX: "auto" }}>
+                <Table size="small" sx={{ minWidth: 880 }}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>ID</TableCell>
+                      <TableCell>Name</TableCell>
+                      <TableCell>Price</TableCell>
+                      <TableCell>Currency</TableCell>
+                      <TableCell>Max Reward %</TableCell>
+                      <TableCell align="right">Order</TableCell>
+                      <TableCell align="center">Active</TableCell>
+                      <TableCell align="right">Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {(products || [])
+                      .sort((a, b) => {
+                        const ao = Number(a.display_order || 0);
+                        const bo = Number(b.display_order || 0);
+                        if (ao !== bo) return ao - bo;
+                        return (a.id || 0) - (b.id || 0);
+                      })
+                      .map((m) => (
+                        <TableRow key={m.id}>
+                          <TableCell>{m.id}</TableCell>
+                          <TableCell>{m.name}</TableCell>
+                          <TableCell>{m.price}</TableCell>
+                          <TableCell>{m.currency || "INR"}</TableCell>
+                          <TableCell>{m.max_reward_points_percent ?? 0}%</TableCell>
+                          <TableCell align="right">{m.display_order ?? 0}</TableCell>
+                          <TableCell align="center">
+                            <Checkbox size="small" checked={!!m.is_active} onChange={() => toggleProductActive(m)} />
+                          </TableCell>
+                          <TableCell align="right">
+                            <Button size="small" color="error" variant="text" onClick={() => deleteProduct(m)}>
+                              Delete
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    {(!products || products.length === 0) && (
+                      <TableRow>
+                        <TableCell colSpan={8} align="center">
+                          <Typography variant="body2" color="text.secondary">
+                            No products found.
+                          </Typography>
                         </TableCell>
                       </TableRow>
-                    ))}
-                  {(!products || products.length === 0) && (
-                    <TableRow>
-                      <TableCell colSpan={8} align="center">
-                        <Typography variant="body2" color="text.secondary">
-                          No products found.
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
             )}
           </Paper>
         </>
@@ -958,4 +1069,3 @@ export default function AdminTriAppManage() {
     </Container>
   );
 }
-

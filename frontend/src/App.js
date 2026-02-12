@@ -33,6 +33,7 @@ import AdminShell from "./components/layouts/AdminShell";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminUserTree from "./pages/admin/AdminUserTree";
 import AdminUsers from "./pages/admin/AdminUsers";
+import AdminMerchants from "./pages/admin/AdminMerchants";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminKYC from "./pages/admin/AdminKYC";
 import AdminWithdrawals from "./pages/admin/AdminWithdrawals";
@@ -96,6 +97,7 @@ import BusinessShell from "./components/layouts/BusinessShell";
 import BusinessDashboard from "./pages/business/BusinessDashboard";
 import BusinessProfile from "./pages/business/BusinessProfile";
 import BusinessShops from "./pages/business/BusinessShops";
+import BusinessShopProducts from "./pages/business/BusinessShopProducts";
 import MerchantShops from "./pages/market/MerchantShops";
 import MerchantShopDetail from "./pages/market/MerchantShopDetail";
 import AgencyCoupons from "./pages/agency/AgencyCoupons";
@@ -954,6 +956,16 @@ function App() {
           }
         />
         <Route
+          path="/admin/merchants"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminMerchants />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/kyc"
           element={
             <AdminProtectedRoute>
@@ -1413,6 +1425,16 @@ function App() {
             <ProtectedRoute allowedRoles={["business"]}>
               <BusinessShell>
                 <BusinessShops />
+              </BusinessShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/business/shops/:shopId/products"
+          element={
+            <ProtectedRoute allowedRoles={["business"]}>
+              <BusinessShell>
+                <BusinessShopProducts />
               </BusinessShell>
             </ProtectedRoute>
           }

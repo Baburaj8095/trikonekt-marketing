@@ -74,10 +74,33 @@ def _normalize_list_filter(list_filter_value):
 def build_viewset(model, modeladmin):
     Serializer = build_serializer(model)
 
+    class StaffOrModelPerms(permissions.BasePermission):
+        """
+        Allow superusers/staff for all actions; otherwise fall back to DjangoModelPermissions.
+        Always allow OPTIONS/HEAD for CORS preflight and schema access.
+        """
+        def has_permission(self, request, view):
+            try:
+                m = getattr(request, "method", "").upper()
+                if m in ("OPTIONS", "HEAD"):
+                    return True
+            except Exception:
+                pass
+            try:
+                u = getattr(request, "user", None)
+                if u and getattr(u, "is_authenticated", False) and (getattr(u, "is_superuser", False) or getattr(u, "is_staff", False)):
+                    return True
+            except Exception:
+                pass
+            try:
+                return permissions.DjangoModelPermissions().has_permission(request, view)
+            except Exception:
+                return False
+
     class DynamicViewSet(viewsets.ModelViewSet):
         queryset = model.objects.all().order_by("-pk")
         serializer_class = Serializer
-        permission_classes = [permissions.DjangoModelPermissions]
+        permission_classes = [StaffOrModelPerms]
         filter_backends = [filters.SearchFilter, filters.OrderingFilter, DjangoFilterBackend]
 
         # Mirror ModelAdmin configuration for search/ordering/filters where possible

@@ -12,21 +12,41 @@ import {
   CardActions,
   Chip,
   IconButton,
-  Divider,
 } from "@mui/material";
+
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import AddLocationAltOutlinedIcon from "@mui/icons-material/AddLocationAltOutlined";
-import { listMyShops, createShop, updateShop, deleteShop } from "../../api/api";
+
+import {
+  listMyShops,
+  createShop,
+  updateShop,
+  deleteShop,
+} from "../../api/api";
+
+/* ---------------- STATUS CHIP ---------------- */
 
 function StatusChip({ status }) {
   const s = String(status || "").toUpperCase();
+
   let color = "default";
   if (s === "ACTIVE") color = "success";
   if (s === "PENDING") color = "warning";
   if (s === "REJECTED") color = "error";
-  return <Chip size="small" label={s || ""} color={color} variant={s === "ACTIVE" ? "filled" : "outlined"} />;
+
+  return (
+    <Chip
+      size="small"
+      label={s}
+      color={color}
+      variant={s === "ACTIVE" ? "filled" : "outlined"}
+      sx={{ fontWeight: 600 }}
+    />
+  );
 }
+
+/* ---------------- MAIN ---------------- */
 
 export default function BusinessShops() {
   const [shops, setShops] = useState([]);
@@ -35,7 +55,8 @@ export default function BusinessShops() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // Form state (create or edit)
+  /* ---------------- FORM ---------------- */
+
   const emptyForm = useMemo(
     () => ({
       id: null,
@@ -45,22 +66,24 @@ export default function BusinessShops() {
       latitude: "",
       longitude: "",
       contact_number: "",
-      shop_image: null, // File
-      shop_image_url: "", // Preview URL
+      shop_image: null,
+      shop_image_url: "",
     }),
     []
   );
+
   const [form, setForm] = useState(emptyForm);
 
+  /* ---------------- FETCH ---------------- */
+
   async function fetchShops() {
-    setError("");
     setLoading(true);
     try {
       const res = await listMyShops();
-      const data = Array.isArray(res) ? res : (res?.results || []);
+      const data = Array.isArray(res) ? res : res?.results || [];
       setShops(data);
-    } catch (e) {
-      setError("Failed to fetch your shops.");
+    } catch {
+      setError("Failed to fetch shops.");
     } finally {
       setLoading(false);
     }
@@ -70,292 +93,363 @@ export default function BusinessShops() {
     fetchShops();
   }, []);
 
-  const resetForm = () => {
-    setForm(emptyForm);
-  };
+  /* ---------------- FORM HELPERS ---------------- */
+
+  const resetForm = () => setForm(emptyForm);
 
   const handlePickImage = (e) => {
     const f = e?.target?.files?.[0] || null;
-    setForm((prev) => ({
-      ...prev,
+    setForm((p) => ({
+      ...p,
       shop_image: f,
-      shop_image_url: f ? URL.createObjectURL(f) : prev.shop_image_url,
+      shop_image_url: f ? URL.createObjectURL(f) : "",
     }));
   };
 
   const handleUseMyLocation = () => {
-    setError("");
-    if (!navigator?.geolocation) {
-      setError("Geolocation not supported by this browser.");
+    if (!navigator.geolocation) {
+      setError("Geolocation not supported.");
       return;
     }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords || {};
-        setForm((prev) => ({
-          ...prev,
-          latitude: latitude != null ? String(latitude) : prev.latitude,
-          longitude: longitude != null ? String(longitude) : prev.longitude,
-        }));
-      },
-      () => setError("Unable to fetch your location. Please enter manually.")
-    );
+
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const { latitude, longitude } = pos.coords;
+      setForm((p) => ({
+        ...p,
+        latitude: String(latitude),
+        longitude: String(longitude),
+      }));
+    });
   };
 
   const startEdit = (shop) => {
-    setError("");
-    setSuccess("");
     setForm({
-      id: shop?.id ?? null,
-      shop_name: shop?.shop_name || "",
-      address: shop?.address || "",
-      city: shop?.city || "",
-      latitude: shop?.latitude != null ? String(shop.latitude) : "",
-      longitude: shop?.longitude != null ? String(shop.longitude) : "",
-      contact_number: shop?.contact_number || "",
+      id: shop.id,
+      shop_name: shop.shop_name || "",
+      address: shop.address || "",
+      city: shop.city || "",
+      latitude: shop.latitude || "",
+      longitude: shop.longitude || "",
+      contact_number: shop.contact_number || "",
       shop_image: null,
-      shop_image_url: shop?.shop_image || "",
+      shop_image_url: shop.shop_image || "",
     });
-    window?.scrollTo?.({ top: 0, behavior: "smooth" });
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  /* ---------------- DELETE ---------------- */
+
   const handleDelete = async (id) => {
-    if (!id) return;
-    const ok = window.confirm("Delete this shop? This cannot be undone.");
-    if (!ok) return;
-    setError("");
-    setSuccess("");
+    if (!window.confirm("Delete this shop?")) return;
+
     try {
       await deleteShop(id);
-      setSuccess("Shop deleted.");
-      await fetchShops();
-      // If editing this shop, reset form
-      if (form.id === id) resetForm();
-    } catch (e) {
-      const msg = e?.response?.data ? JSON.stringify(e.response.data) : "Failed to delete shop.";
-      setError(typeof msg === "string" ? msg : String(msg));
+      fetchShops();
+    } catch {
+      setError("Delete failed.");
     }
   };
 
-  const handleSubmit = async (e) => {
-    e?.preventDefault?.();
-    setError("");
-    setSuccess("");
-    setSaving(true);
-    try {
-      const payload = {
-        shop_name: (form.shop_name || "").trim(),
-        address: (form.address || "").trim(),
-        city: (form.city || "").trim(),
-        latitude: form.latitude !== "" ? form.latitude : undefined,
-        longitude: form.longitude !== "" ? form.longitude : undefined,
-        contact_number: (form.contact_number || "").trim(),
-        shop_image: form.shop_image || undefined,
-      };
+  /* ---------------- SUBMIT ---------------- */
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+
+    const payload = {
+      shop_name: form.shop_name,
+      address: form.address,
+      city: form.city,
+      latitude: form.latitude,
+      longitude: form.longitude,
+      contact_number: form.contact_number,
+      shop_image: form.shop_image,
+    };
+
+    try {
       if (form.id) {
-        const updated = await updateShop(form.id, payload);
-        setSuccess("Shop updated successfully.");
-        // Replace in list
-        setShops((prev) =>
-          Array.isArray(prev)
-            ? prev.map((s) => (s.id === updated?.id ? updated : s))
-            : prev
-        );
+        await updateShop(form.id, payload);
+        setSuccess("Shop updated.");
       } else {
-        const created = await createShop(payload);
-        setSuccess("Shop created. It will be visible publicly once approved.");
-        setShops((prev) => (Array.isArray(prev) ? [created, ...prev] : [created]));
+        await createShop(payload);
+        setSuccess("Shop created.");
       }
 
       resetForm();
-    } catch (e2) {
-      const msg = e2?.response?.data ? JSON.stringify(e2.response.data) : "Failed to save shop.";
-      setError(typeof msg === "string" ? msg : String(msg));
+      fetchShops();
+    } catch {
+      setError("Save failed.");
     } finally {
       setSaving(false);
     }
   };
 
-  return (
-    <Box sx={{ p: { xs: 1, md: 2 } }}>
-      <Typography variant="h5" sx={{ fontWeight: 800, mb: 2 }}>
-        My Shops
+  /* ---------------- UI ---------------- */
+
+ return (
+  <Box
+    sx={{
+      px: 1.5,
+      pb: 4,
+      maxWidth: 520,   // Mobile-first container
+      mx: "auto",
+    }}
+  >
+    {/* TITLE */}
+    <Typography
+      variant="h5"
+      sx={{ fontWeight: 800, mb: 2 }}
+    >
+      My Shops
+    </Typography>
+
+    {/* ---------------- FORM CARD ---------------- */}
+    <Paper
+      component="form"
+      onSubmit={handleSubmit}
+      sx={{
+        p: 2,
+        mb: 3,
+        borderRadius: 4,
+        background: "#fff",
+        boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+      }}
+    >
+      <Typography fontWeight={700} mb={2}>
+        {form.id ? "Edit Shop" : "Create a New Shop"}
       </Typography>
 
-      {error ? (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>
-          {error}
-        </Alert>
-      ) : null}
-      {success ? (
-        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess("")}>
-          {success}
-        </Alert>
-      ) : null}
+      <Grid container spacing={2}>
+        <Grid item xs={12}>
+          <TextField label="Shop Name" fullWidth />
+        </Grid>
 
-      <Paper component="form" onSubmit={handleSubmit} elevation={2} sx={{ p: 2.5, mb: 2 }}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
-          {form.id ? "Edit Shop" : "Create a New Shop"}
-        </Typography>
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={6}>
-            <TextField
-              label="Shop Name"
-              fullWidth
-              required
-              value={form.shop_name}
-              onChange={(e) => setForm((p) => ({ ...p, shop_name: e.target.value }))}
-            />
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <TextField
-              label="Contact Number"
-              fullWidth
-              value={form.contact_number}
-              onChange={(e) => setForm((p) => ({ ...p, contact_number: e.target.value }))}
-              inputProps={{ inputMode: "tel" }}
-            />
-          </Grid>
-          <Grid item xs={12}>
-            <TextField
-              label="Address"
-              fullWidth
-              value={form.address}
-              onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))}
-            />
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <TextField
-              label="City"
-              fullWidth
-              value={form.city}
-              onChange={(e) => setForm((p) => ({ ...p, city: e.target.value }))}
-            />
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <TextField
-              label="Latitude"
-              fullWidth
-              value={form.latitude}
-              onChange={(e) => setForm((p) => ({ ...p, latitude: e.target.value }))}
-              placeholder="e.g., 12.9716"
-              inputProps={{ inputMode: "decimal" }}
-            />
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <TextField
-              label="Longitude"
-              fullWidth
-              value={form.longitude}
-              onChange={(e) => setForm((p) => ({ ...p, longitude: e.target.value }))}
-              placeholder="e.g., 77.5946"
-              inputProps={{ inputMode: "decimal" }}
-            />
-          </Grid>
+        <Grid item xs={12}>
+          <TextField label="Contact Number" fullWidth />
+        </Grid>
 
-          <Grid item xs={12}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
-              <Button
-                variant="outlined"
-                type="button"
-                size="small"
-                startIcon={<AddLocationAltOutlinedIcon />}
-                onClick={handleUseMyLocation}
+        <Grid item xs={12}>
+          <TextField
+            label="Address"
+            fullWidth
+            multiline
+            minRows={3}
+          />
+        </Grid>
+
+        <Grid item xs={12}>
+          <TextField label="City" fullWidth />
+        </Grid>
+
+        <Grid item xs={6}>
+          <TextField label="Latitude" fullWidth />
+        </Grid>
+
+        <Grid item xs={6}>
+          <TextField label="Longitude" fullWidth />
+        </Grid>
+
+        {/* LOCATION BUTTON */}
+        <Grid item xs={12}>
+          <Button
+            fullWidth
+            variant="outlined"
+            startIcon={<AddLocationAltOutlinedIcon />}
+            sx={{
+              py: 1.2,
+              borderRadius: 3,
+              textTransform: "none",
+              fontWeight: 600,
+            }}
+            onClick={handleUseMyLocation}
+          >
+            Use my location
+          </Button>
+        </Grid>
+
+        {/* IMAGE */}
+        <Grid item xs={12}>
+          <Button
+            fullWidth
+            component="label"
+            variant="outlined"
+            sx={{
+              py: 1.2,
+              borderRadius: 3,
+              textTransform: "none",
+              fontWeight: 600,
+            }}
+          >
+            Upload Image
+            <input hidden type="file" onChange={handlePickImage} />
+          </Button>
+        </Grid>
+
+        {/* CTA */}
+        <Grid item xs={12}>
+          <Button
+            type="submit"
+            fullWidth
+            sx={{
+              py: 1.3,
+              borderRadius: 3,
+              fontWeight: 700,
+              textTransform: "none",
+              background:
+                "linear-gradient(135deg,#0ea5e9,#22c55e)",
+              color: "#fff",
+            }}
+          >
+            Create Shop
+          </Button>
+        </Grid>
+      </Grid>
+    </Paper>
+
+    {/* ---------------- SHOPS ---------------- */}
+
+    <Typography fontWeight={700} mb={1.5}>
+      Your Shops
+    </Typography>
+
+   <Grid container spacing={1.5}>
+      {shops.map((s) => (
+        <Grid
+          item
+          key={s.id}
+          xs={6}   // 🔥 2 per row on mobile
+          sm={6}   // 2 per row tablet
+          md={4}   // 3 per row desktop
+          lg={3}   // 4 per row large
+        >
+
+        <Card
+          sx={{
+            borderRadius: 3,
+            overflow: "hidden",
+            background: "#fff",
+            boxShadow: "0 6px 16px rgba(0,0,0,0.06)",
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          {/* IMAGE */}
+          {s.shop_image && (
+            <Box
+              sx={{
+                width: "100%",
+                height: 110,        // reduced for 2-col
+                overflow: "hidden",
+              }}
+            >
+              <img
+                src={s.image_url || s.shop_image}
+                alt=""
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                }}
+              />
+            </Box>
+          )}
+
+          {/* CONTENT */}
+          <CardContent
+            sx={{
+              p: 1.2,
+              display: "flex",
+              flexDirection: "column",
+              flexGrow: 1,
+            }}
+          >
+            {/* TITLE + STATUS */}
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              alignItems="center"
+              mb={0.5}
+            >
+              <Typography
+                fontWeight={700}
+                fontSize={13}
+                noWrap
               >
-                Use my location
-              </Button>
-              <Button component="label" variant="outlined" size="small">
-                {form.shop_image ? "Change Image" : "Upload Image"}
-                <input type="file" hidden accept="image/*" onChange={handlePickImage} />
-              </Button>
-              {form.shop_image_url ? (
-                <img
-                  src={form.shop_image_url}
-                  alt="Preview"
-                  style={{ height: 48, borderRadius: 6, border: "1px solid #e5e7eb" }}
-                />
-              ) : null}
+                {s.shop_name}
+              </Typography>
+
+              <Chip
+                label={s.status}
+                size="small"
+                color={
+                  s.status === "ACTIVE"
+                    ? "success"
+                    : "warning"
+                }
+                sx={{
+                  height: 20,
+                  fontSize: 10,
+                  fontWeight: 600,
+                }}
+              />
             </Box>
-          </Grid>
 
-          <Grid item xs={12}>
-            <Box sx={{ display: "flex", gap: 1 }}>
-              <Button type="submit" variant="contained" disabled={saving}>
-                {saving ? "Saving”¦" : form.id ? "Update Shop" : "Create Shop"}
-              </Button>
-              {form.id ? (
-                <Button type="button" variant="text" onClick={resetForm}>
-                  Cancel
-                </Button>
-              ) : null}
+            {/* CITY */}
+            <Typography
+              fontSize={12}
+              color="text.secondary"
+              noWrap
+            >
+              {s.city}
+            </Typography>
+
+            {/* CONTACT */}
+            <Typography
+              fontSize={12}
+              fontWeight={600}
+              noWrap
+            >
+              {s.contact_number}
+            </Typography>
+
+            {/* ACTIONS — anchored bottom */}
+            <Box
+              mt="auto"
+              display="flex"
+              justifyContent="space-between"
+              pt={1}
+            >
+              <IconButton
+                size="small"
+                onClick={() => startEdit(s)}
+                sx={{
+                  background: "#f1f5f9",
+                  width: 32,
+                  height: 32,
+                }}
+              >
+                <EditOutlinedIcon fontSize="small" />
+              </IconButton>
+
+              <IconButton
+                size="small"
+                onClick={() => handleDelete(s.id)}
+                sx={{
+                  background: "#f1f5f9",
+                  width: 32,
+                  height: 32,
+                }}
+              >
+                <DeleteOutlineIcon fontSize="small" />
+              </IconButton>
             </Box>
-          </Grid>
-        </Grid>
-      </Paper>
-
-      <Divider sx={{ my: 2 }} />
-
-      <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
-        Your Shops
-      </Typography>
-
-      {loading ? (
-        <Typography variant="body2" color="text.secondary">Loading”¦</Typography>
-      ) : shops.length === 0 ? (
-        <Typography variant="body2" color="text.secondary">No shops yet. Create your first shop above.</Typography>
-      ) : (
-        <Grid container spacing={2}>
-          {shops.map((s) => (
-            <Grid key={s.id} item xs={12} md={6} lg={4}>
-              <Card elevation={1} sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-                <CardContent sx={{ flexGrow: 1 }}>
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                      {s.shop_name}
-                    </Typography>
-                    <StatusChip status={s.status} />
-                  </Box>
-                  {s.shop_image ? (
-                    <Box sx={{ mb: 1 }}>
-                      <img
-                        src={s.image_url || s.shop_image}
-                        alt={s.shop_name}
-                        style={{ width: "100%", maxHeight: 160, objectFit: "cover", borderRadius: 6 }}
-                      />
-                    </Box>
-                  ) : null}
-                  <Typography variant="body2" color="text.secondary">
-                    {s.address || ""}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {s.city || ""}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {s.latitude != null && s.longitude != null
-                      ? `(${s.latitude}, ${s.longitude})`
-                      : null}
-                  </Typography>
-                  <Box sx={{ mt: 0.75 }}>
-                    <Typography variant="body2"><b>Contact:</b> {s.contact_number || ""}</Typography>
-                  </Box>
-                </CardContent>
-                <CardActions sx={{ justifyContent: "space-between" }}>
-                  <Box>
-                    <IconButton size="small" onClick={() => startEdit(s)} title="Edit">
-                      <EditOutlinedIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton size="small" onClick={() => handleDelete(s.id)} title="Delete">
-                      <DeleteOutlineIcon fontSize="small" />
-                    </IconButton>
-                  </Box>
-                </CardActions>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
-      )}
-    </Box>
-  );
+          </CardContent>
+        </Card>
+      </Grid>
+      ))}
+    </Grid>
+  </Box>
+);
 }
-

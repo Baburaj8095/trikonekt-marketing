@@ -1419,6 +1419,12 @@ class WalletMe(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        # Event-driven reevaluation of rank upgrade holds on wallet fetch
+        try:
+            from mlm_ranks.services.five_matrix import FiveMatrixService
+            FiveMatrixService.reevaluate_user_holds(getattr(request.user, "id", None))
+        except Exception:
+            pass
         # If account is inactive, always show zero balances
         inactive = False
         try:

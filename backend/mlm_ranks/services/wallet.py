@@ -18,9 +18,9 @@ class WalletPoster:
     """
     Adapter around accounts.Wallet to keep mlm_ranks decoupled.
     Notes:
-      - We ALWAYS pass meta.no_withhold=True to bypass the global 75/25 streaming rule
-        for these upgrade commissions. Our own hold logic (25% for 7 days) is applied
-        at the CommissionDistributor level using CommissionHold.
+      - We allow the global 75/25 streaming rule to apply for rank upgrade payouts so that
+        75% goes to main income and 25% to self account. Our own 25% level hold (7 days)
+        remains handled via CommissionHold and is orthogonal to wallet streaming.
     """
 
     DIRECT_TX = "DIRECT_REF_BONUS"
@@ -36,7 +36,7 @@ class WalletPoster:
                 return WalletPostResult(ok=True, balance_after=None)
             w = Wallet.get_or_create_for_user(user)
             meta2 = dict(meta or {})
-            meta2["no_withhold"] = True
+            # Allow global 75/25 streaming; do not override with 'no_withhold' here.
             bal = w.credit(
                 amt,
                 tx_type=tx_type,

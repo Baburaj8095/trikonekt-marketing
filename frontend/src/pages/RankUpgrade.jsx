@@ -32,6 +32,8 @@ import {
   initiateUpgrade,
   createRankUpgradePayment,
   getEcouponStoreBootstrap,
+  getMyLevelBonusProgress,
+  getMyRankCommissionHolds,
 } from "../api/api";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import normalizeMediaUrl from "../utils/media";
@@ -326,6 +328,11 @@ export default function RankUpgrade() {
   const [selectedToRankId, setSelectedToRankId] = useState(null);
   const [selectedToRankName, setSelectedToRankName] = useState("");
 
+  // Level Bonus progress + holds (consumer visibility)
+  const [lbProgress, setLbProgress] = useState(null);
+  const [lbHolds, setLbHolds] = useState([]);
+  const [lbLoading, setLbLoading] = useState(false);
+
   const amount = useMemo(() => Number(elig?.upgrade_amount || 0), [elig]);
   const gst = useMemo(() => Number((amount * 0.15).toFixed(2)), [amount]); // UI hint (backend computes authoritative)
   const net = useMemo(() => Math.max(0, amount - gst), [amount, gst]);
@@ -383,6 +390,24 @@ export default function RankUpgrade() {
     return () => {
       alive = false;
     };
+  }, []);
+
+  // Load Level Bonus progress + holds
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      setLbLoading(true);
+      try {
+        const [p, h] = await Promise.allSettled([getMyLevelBonusProgress(), getMyRankCommissionHolds()]);
+        if (!alive) return;
+        if (p.status === "fulfilled") setLbProgress(p.value || null);
+        if (h.status === "fulfilled") setLbHolds(Array.isArray(h.value) ? h.value : []);
+      } catch {}
+      finally {
+        if (alive) setLbLoading(false);
+      }
+    })();
+    return () => { alive = false; };
   }, []);
 
   const nextRankMeta = useMemo(() => {
@@ -446,6 +471,40 @@ export default function RankUpgrade() {
             {elig.reason}
           </Alert>
         ) : null}
+      </Paper>
+
+      {/* Level Bonus Progress */}
+      <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2 }}>
+        <Typography fontWeight={800} sx={{ mb: 1 }}>
+          Level Bonus Progress
+        </Typography>
+        {lbLoading ? <LinearProgress sx={{ mb: 1 }} /> : null}
+        {lbProgress ? (
+          <Box>
+            <ValueRow
+              label="Rank-1 Directs Completed"
+              value={`${Number(lbProgress?.completed_rank1_directs || 0)} / ${Number(lbProgress?.threshold || 5)}`}
+            />
+            <ValueRow
+              label="Eligible Now"
+              value={lbProgress?.eligible_now ? "Yes" : "No"}
+            />
+            <ValueRow
+              label="Pending Holds Total"
+              value={`₹${Number(lbProgress?.holds_summary?.pending_total_amount || 0).toFixed(2)}`}
+            />
+            {lbProgress?.holds_summary?.earliest_pending_release_date ? (
+              <ValueRow
+                label="Earliest Pending Release"
+                value={`${lbProgress.holds_summary.earliest_pending_release_date} (${lbProgress.holds_summary.days_left_for_earliest ?? "-"} days)`}
+              />
+            ) : null}
+          </Box>
+        ) : (
+          <Typography color="text.secondary">
+            Level Bonus progress will appear here after you receive level commissions.
+          </Typography>
+        )}
       </Paper>
 
       {/* Rank Table (choose and buy) */}
@@ -643,10 +702,16 @@ export default function RankUpgrade() {
         onSuccess={async () => {
           setPaymentOpen(false);
           setSuccessOpen(true);
-          // Optionally refresh state
+          // Refresh eligibility + Level Bonus progress/holds
           try {
-            const eg = await getUpgradeEligibility();
-            setElig(eg || null);
+            const [eg, p, h] = await Promise.allSettled([
+              getUpgradeEligibility(),
+              getMyLevelBonusProgress(),
+              getMyRankCommissionHolds(),
+            ]);
+            if (eg.status === "fulfilled") setElig(eg.value || null);
+            if (p.status === "fulfilled") setLbProgress(p.value || null);
+            if (h.status === "fulfilled") setLbHolds(Array.isArray(h.value) ? h.value : []);
           } catch {}
         }}
       />

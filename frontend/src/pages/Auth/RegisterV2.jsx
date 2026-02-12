@@ -139,8 +139,8 @@ const RegisterV2 = () => {
         return null;
     }
   };
-  const mapUIRoleToCategory = () => {
-    if (role === "business") return "business";
+const mapUIRoleToCategory = () => {
+    if (role === "business") return "merchant";
     if (role === "employee") return "employee";
     if (role === "user") return "consumer";
     if (role === "agency") return allowAgencyOverride ? (mapAgencyLevelToCategory(agencyLevel) || "agency_state") : "agency_sub_franchise";
@@ -1148,7 +1148,7 @@ const RegisterV2 = () => {
       setErrorMsg("Enter a valid 10-digit phone number.");
       return;
     }
-    if (category === "business") {
+    if (role === "business") {
       if (!formData.email) {
         setErrorMsg("Email is required for business registration");
         return;
@@ -1277,8 +1277,8 @@ const RegisterV2 = () => {
     setSubmitting(true);
     try {
       const submittedPassword = formData.password;
-      if (category === "business") {
-        // 1) Create login-enabled Business user via Accounts API (same flow as agency/consumer)
+      if (role === "business") {
+        // 1) Create login-enabled Merchant user via Accounts API (category will be "merchant")
         const resp = await API.post("/accounts/register/", payload, { timeout: 45000 });
         const data = resp?.data || {};
         const unameRaw = data.username || "(generated)";

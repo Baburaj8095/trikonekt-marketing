@@ -10,7 +10,7 @@ try:
 except Exception:
     pisa = None  # type: ignore
 import os
-from .models import Product, PurchaseRequest, Banner, BannerItem, BannerPurchaseRequest, MerchantShop, MerchantProfile, Shop
+from .models import Product, PurchaseRequest, Banner, BannerItem, BannerPurchaseRequest, MerchantShop, MerchantProfile, Shop, ShopProduct
 from .serializers import (
     ProductSerializer,
     PurchaseRequestSerializer,
@@ -22,6 +22,8 @@ from .serializers import (
     MerchantShopSerializer,
     MerchantProfileSerializer,
     ShopSerializer,
+    ShopProductSerializer,
+    ShopProductPublicSerializer,
 )
 
 
@@ -817,6 +819,94 @@ class ShopOwnerDetail(generics.RetrieveUpdateDestroyAPIView):
     parser_classes = [parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser]
     permission_classes = [permissions.IsAuthenticated, IsShopOwner]
     queryset = Shop.objects.select_related("merchant").all()
+
+
+# =====================
+# Shop Products (per ACTIVE Shop)
+# =====================
+
+class ShopProductsPublicList(generics.ListAPIView):
+    """
+    GET /api/shops/:shop_id/products — public list of ACTIVE products for ACTIVE shop
+    Filters (optional): ordering=price|price_desc|newest|oldest
+    """
+    serializer_class = ShopProductPublicSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        shop_id = self.kwargs.get("shop_id")
+        qs = ShopProduct.objects.select_related("shop").filter(
+            shop_id=shop_id,
+            is_active=True,
+            shop__status=Shop.STATUS_ACTIVE,
+        )
+        ordering = (self.request.query_params.get("ordering") or "").lower().strip()
+        if ordering in ("price", "price_asc"):
+            qs = qs.order_by("price", "-created_at")
+        elif ordering in ("price_desc", "-price"):
+            qs = qs.order_by("-price", "-created_at")
+        elif ordering in ("oldest", "created_at"):
+            qs = qs.order_by("created_at")
+        else:
+            qs = qs.order_by("-created_at")
+        return qs
+
+
+class ShopProductsMineListCreate(generics.ListCreateAPIView):
+    """
+    GET /api/merchant/shops/:shop_id/products — list my products for this shop (owner/staff)
+    POST /api/merchant/shops/:shop_id/products — create product under this shop (owner/staff)
+    """
+    serializer_class = ShopProductSerializer
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def _get_shop(self):
+        shop_id = self.kwargs.get("shop_id")
+        try:
+            return Shop.objects.only("id", "merchant_id", "status").get(pk=shop_id)
+        except Shop.DoesNotExist:
+            return None
+
+    def get_queryset(self):
+        user = self.request.user
+        shop = self._get_shop()
+        if not shop:
+            return ShopProduct.objects.none()
+        if getattr(user, "is_staff", False) or (user and user.is_authenticated and shop.merchant_id == user.id):
+            return ShopProduct.objects.select_related("shop").filter(shop_id=shop.id).order_by("-created_at")
+        return ShopProduct.objects.none()
+
+    def perform_create(self, serializer):
+        shop = self._get_shop()
+        if not shop:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({"shop": "Shop not found."})
+        # Serializer.create will validate ownership + ACTIVE
+        serializer.save(shop=shop)
+
+
+class IsShopProductOwner(permissions.BasePermission):
+    """
+    Owner of the underlying shop (or staff).
+    """
+    def has_object_permission(self, request, view, obj):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if getattr(request.user, "is_staff", False):
+            return True
+        # obj is ShopProduct
+        return getattr(getattr(obj, "shop", None), "merchant_id", None) == request.user.id
+
+
+class ShopProductOwnerDetail(generics.RetrieveUpdateDestroyAPIView):
+    """
+    GET/PUT/PATCH/DELETE /api/merchant/products/:id — owner or staff
+    """
+    serializer_class = ShopProductSerializer
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser]
+    permission_classes = [permissions.IsAuthenticated, IsShopProductOwner]
+    queryset = ShopProduct.objects.select_related("shop").all()
 
 
 class PurchaseRequestInvoiceView(APIView):

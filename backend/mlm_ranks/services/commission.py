@@ -234,14 +234,47 @@ class CommissionDistributor:
                 now=now,
             )
 
-        # 2) Level bonus goes entirely to the specific hierarchical level equal to purchased rank
+        # 2) Level bonus to a SINGLE ancestor determined by placement depth:
+        #    Let L = placement_level (level_depth) of payer under sponsor's Rank-1 root (if found; else 1).
+        #    Let R = purchased rank level_number.
+        #    Then bonus receiver is the (L + (R - 1))-th upline of the payer (1-based), i.e. move up (R - 1) from placement parent.
         target_level = int(getattr(getattr(upgrade, "to_rank", None), "level_number", 0) or 0)
         if target_level > 0 and level_pool > 0:
-            chain = UplineService.get_uplines(payer, depth=target_level)
+            # Discover placement level L under sponsor's root
+            L = 1
+            try:
+                if sponsor and getattr(sponsor, "id", None):
+                    # Import lazily to avoid init cycles
+                    from ..models import RankMatrixRoot, RankMatrixNode  # type: ignore
+                    sponsor_root = (
+                        RankMatrixRoot.objects
+                        .filter(root_user_id=int(getattr(sponsor, "id", 0) or 0), rank__level_number=1)
+                        .only("id", "root_user_id")
+                        .first()
+                    )
+                    if sponsor_root:
+                        node = (
+                            RankMatrixNode.objects
+                            .filter(root_user_id=int(getattr(sponsor_root, "root_user_id", 0) or 0),
+                                    placed_user_id=int(getattr(payer, "id", 0) or 0))
+                            .only("level_depth")
+                            .first()
+                        )
+                        if node:
+                            L = max(1, int(getattr(node, "level_depth", 1) or 1))
+            except Exception:
+                L = 1
+
+            adjusted_idx = int(L + (target_level - 1))
+            # Cap to a reasonable search depth
+            adjusted_idx = max(1, min(adjusted_idx, 30))
+
+            chain = UplineService.get_uplines(payer, depth=adjusted_idx)
             recipient = None
-            cand = chain[target_level - 1] if len(chain) >= target_level else None
+            cand = chain[adjusted_idx - 1] if len(chain) >= adjusted_idx else None
             if cand and cls._is_recipient_eligible_for_level(cand, target_level):
                 recipient = cand
+
             if not recipient:
                 # Fallback to Company Root ID for this level share
                 try:
@@ -268,7 +301,7 @@ class CommissionDistributor:
                         status=UpgradeCommission.STATUS_CREDITED,
                     )
             else:
-                cls._apply_hold_and_credit(
+                res = cls._apply_hold_and_credit(
                     upgrade=upgrade,
                     from_user=payer,
                     to_user=recipient,
@@ -277,3 +310,9 @@ class CommissionDistributor:
                     tx_type="LEVEL",
                     now=now,
                 )
+                # Event-driven reevaluation for this recipient's holds (early release/expiry)
+                try:
+                    from .five_matrix import FiveMatrixService  # local import to avoid cycle
+                    FiveMatrixService.reevaluate_user_holds(getattr(recipient, "id", None))
+                except Exception:
+                    pass

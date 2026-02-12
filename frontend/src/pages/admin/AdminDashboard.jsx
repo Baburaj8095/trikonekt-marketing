@@ -334,6 +334,7 @@ export default function AdminDashboard() {
   const [catCounts, setCatCounts] = useState({});
   const [catErr, setCatErr] = useState("");
   const [catLoading, setCatLoading] = useState(false);
+  const [merchantsCount, setMerchantsCount] = useState(null);
 
   // Load user category counts (aggregated endpoint)
   useEffect(() => {
@@ -356,6 +357,51 @@ export default function AdminDashboard() {
       }
     }
     loadCounts();
+    return () => { mounted = false; };
+  }, []);
+
+  // Fetch merchants count to include both legacy (user.category in {merchant,business}) and role=business
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const parseCount = (raw) => {
+        if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+        if (typeof raw === "string") {
+          const n = parseInt(raw, 10);
+          if (Number.isFinite(n)) return n;
+        }
+        return 0;
+      };
+      try {
+        const [resRoleBusiness, resUserCatMerchant, resUserCatBusiness] = await Promise.all([
+          API.get("/api/admin/users/", {
+            params: { role: "business", page: 1, page_size: 1 },
+            timeout: 8000,
+            retryAttempts: 0,
+            dedupe: "cancelPrevious",
+          }),
+          API.get("/api/admin/users/", {
+            params: { role: "user", category: "merchant", page: 1, page_size: 1 },
+            timeout: 8000,
+            retryAttempts: 0,
+            dedupe: "cancelPrevious",
+          }),
+          API.get("/api/admin/users/", {
+            params: { role: "user", category: "business", page: 1, page_size: 1 },
+            timeout: 8000,
+            retryAttempts: 0,
+            dedupe: "cancelPrevious",
+          }),
+        ]);
+        const total =
+          parseCount(resRoleBusiness?.data?.count) +
+          parseCount(resUserCatMerchant?.data?.count) +
+          parseCount(resUserCatBusiness?.data?.count);
+        if (mounted) setMerchantsCount(total);
+      } catch (_) {
+        if (mounted) setMerchantsCount(null);
+      }
+    })();
     return () => { mounted = false; };
   }, []);
 
@@ -501,6 +547,13 @@ export default function AdminDashboard() {
                 palette="blue"
               />
               <Card
+                title="Merchants"
+                value={(merchantsCount ?? ((catCounts.merchant ?? 0) + (catCounts.business ?? 0)))}
+                subtitle=""
+                onClick={() => nav("/admin/merchants")}
+                palette="green"
+              />
+              <Card
                 title="State Coordinators"
                 value={(catCounts.agency_state_coordinator ?? 0)}
                 subtitle=""
@@ -527,13 +580,6 @@ export default function AdminDashboard() {
                 subtitle=""
                 onClick={() => nav("/admin/users?category=employee")}
                 palette="teal"
-              />
-              <Card
-                title="Merchants"
-                value={(catCounts.merchant ?? 0)}
-                subtitle=""
-                onClick={() => nav("/admin/users?category=merchant")}
-                palette="green"
               />
             </>
 

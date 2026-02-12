@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import GenealogyTree5 from "../../components/GenealogyTree5";
+import RankMatrixExplorer from "../../components/RankMatrixExplorer";
 import API from "../../api/api";
 import { adminGetMatrixCommissionConfig } from "../../api/api";
 import {
@@ -254,6 +255,27 @@ export default function Genealogy5() {
   const [fiveCounts, setFiveCounts] = useState(null);
   const [selectedRoot, setSelectedRoot] = useState(null);
 
+  // Rank‑1 Direct Upgrades Matrix (5‑slot) state
+  const [rankMx, setRankMx] = useState(null);
+  const [rankMxLoading, setRankMxLoading] = useState(false);
+  const [rankMxErr, setRankMxErr] = useState("");
+
+  const refetchRankMx = async () => {
+    setRankMxLoading(true);
+    setRankMxErr("");
+    try {
+      const res = await API.get("/rank-matrix/tree/", {
+        cacheTTL: 3000,
+        dedupe: "cancelPrevious",
+      });
+      setRankMx(res?.data || null);
+    } catch (_) {
+      setRankMxErr("Unable to load rank matrix.");
+    } finally {
+      setRankMxLoading(false);
+    }
+  };
+
   const role = useMemo(() => {
     try {
       return (
@@ -308,6 +330,17 @@ export default function Genealogy5() {
     return () => {
       mounted = false;
     };
+  }, []);
+
+  // Rank‑1 Direct Upgrades Matrix (5‑slot) — initial fetch (also on Refresh button)
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        await refetchRankMx();
+      } catch (_) {}
+    })();
+    return () => { alive = false; };
   }, []);
 
   // Fetch 5‑Matrix placed ACTIVE counts (level-wise)
@@ -515,6 +548,124 @@ export default function Genealogy5() {
           {err}
         </Typography>
       ) : null}
+
+      {/* Rank‑1 Matrix (Direct Upgrades) — 5-slot view */}
+      <Card variant="outlined" sx={{ borderRadius: "14px", mb: 2 }}>
+        <CardContent sx={{ p: 2 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+              Rank‑1 Matrix (Direct Upgrades)
+            </Typography>
+            <Button size="small" variant="outlined" onClick={refetchRankMx} disabled={rankMxLoading} sx={{ textTransform: "none", fontWeight: 700 }}>
+              {rankMxLoading ? "Refreshing..." : "Refresh"}
+            </Button>
+          </Stack>
+
+          {rankMxErr ? (
+            <Typography variant="body2" color="error" sx={{ mb: 1 }}>
+              {rankMxErr}
+            </Typography>
+          ) : null}
+
+          {/* Progress + Window */}
+          <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 1, mb: 1 }}>
+            <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: "10px", p: 1, textAlign: "center", bgcolor: "background.paper" }}>
+              <Typography variant="caption" color="text.secondary">Completed</Typography>
+              <Typography variant="h6" sx={{ mt: 0.25, fontWeight: 800 }}>
+                {`${Number(rankMx?.approved_count || 0)} / ${Number(rankMx?.target || 5)}`}
+              </Typography>
+            </Box>
+            <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: "10px", p: 1, textAlign: "center", bgcolor: "background.paper" }}>
+              <Typography variant="caption" color="text.secondary">Days Left</Typography>
+              <Typography variant="h6" sx={{ mt: 0.25, fontWeight: 800 }}>
+                {rankMx?.days_left == null ? "-" : String(rankMx.days_left)}
+              </Typography>
+            </Box>
+          </Box>
+
+          {/* Slots 1..5 */}
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+              gap: 1,
+              mb: 1.25,
+            }}
+          >
+            {(Array.isArray(rankMx?.placements) ? rankMx.placements.slice(0, 5) : []).map((slot, idx) => {
+              const filled = !!slot?.placed_user_id;
+              return (
+                <Box
+                  key={slot?.position || idx}
+                  sx={{
+                    p: 1,
+                    borderRadius: "10px",
+                    border: "1px solid",
+                    borderColor: filled ? "success.light" : "divider",
+                    bgcolor: filled ? "rgba(16,185,129,0.08)" : "grey.50",
+                    minHeight: 72,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "stretch",
+                    justifyContent: "space-between",
+                  }}
+                  title={filled ? `Approved: ${fmtDate(slot?.approved_at)}` : "Empty"}
+                >
+                  <Stack direction="row" alignItems="center" justifyContent="space-between">
+                    <Chip size="small" label={`#${slot?.position || idx + 1}`} color={filled ? "success" : "default"} variant={filled ? "filled" : "outlined"} />
+                  </Stack>
+                  <Box sx={{ mt: 0.5 }}>
+                    <Typography variant="caption" color="text.secondary">User</Typography>
+                    <Typography variant="body2" sx={{ fontFamily: "monospace", fontWeight: 800 }}>
+                      {filled ? (slot?.placed_username || slot?.placed_user_id) : "-"}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {filled ? `Approved: ${fmtDate(slot?.approved_at)}` : "Awaiting approval"}
+                    </Typography>
+                  </Box>
+                </Box>
+              );
+            })}
+          </Box>
+
+          {/* Income summary */}
+          <Divider sx={{ my: 1 }} />
+          <Grid container spacing={1}>
+            <Grid item xs={12} sm={4}>
+              <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: "10px", p: 1 }}>
+                <Typography variant="caption" color="text.secondary">Sponsor Earned</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 800 }}>
+                  ₹{Number(rankMx?.totals?.sponsor_released || 0).toFixed(2)}
+                </Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: "10px", p: 1 }}>
+                <Typography variant="caption" color="text.secondary">Level Released</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 800 }}>
+                  ₹{Number(rankMx?.totals?.level_released || 0).toFixed(2)}
+                </Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: "10px", p: 1 }}>
+                <Typography variant="caption" color="text.secondary">Level Hold</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 800 }}>
+                  ₹{Number(rankMx?.totals?.level_hold || 0).toFixed(2)}
+                </Typography>
+              </Box>
+            </Grid>
+          </Grid>
+
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+            Tree updates only post approval. Hold release/expiry is evaluated on events (approval, reads).
+          </Typography>
+        </CardContent>
+      </Card>
+
+      <Box sx={{ mb: 2 }}>
+        <RankMatrixExplorer />
+      </Box>
 
       {/* KPI Stat Strip — 3 equal tiles, compact, centered */}
       <Box

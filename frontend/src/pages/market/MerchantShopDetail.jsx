@@ -1,12 +1,12 @@
 ﻿import React, { useEffect, useState } from "react";
-import { Box, Typography, Chip, Button, Grid, Paper, Divider, Skeleton } from "@mui/material";
+import { Box, Typography, Chip, Button, Grid, Paper, Divider, Skeleton, Alert, Stack } from "@mui/material";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import NearMeIcon from "@mui/icons-material/NearMe";
 import PlaceIcon from "@mui/icons-material/Place";
 import PhoneIphoneIcon from "@mui/icons-material/PhoneIphone";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import { useParams, useNavigate } from "react-router-dom";
-import { getShopDetail } from "../../api/api";
+import { getShopDetail, listShopProductsPublic } from "../../api/api";
 
 export default function MerchantShopDetail() {
   const { id } = useParams();
@@ -15,6 +15,12 @@ export default function MerchantShopDetail() {
   const [shop, setShop] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+
+  // Public products for this ACTIVE shop
+  const [products, setProducts] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [prodErr, setProdErr] = useState("");
+  const [ordering, setOrdering] = useState("newest");
 
   useEffect(() => {
     let cancelled = false;
@@ -35,6 +41,27 @@ export default function MerchantShopDetail() {
       cancelled = true;
     };
   }, [id]);
+
+  // Load public products for this shop
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        setLoadingProducts(true);
+        setProdErr("");
+        const data = await listShopProductsPublic(id, ordering ? { ordering } : {});
+        const arr = Array.isArray(data) ? data : data?.results || [];
+        if (alive) setProducts(arr);
+      } catch (_) {
+        if (alive) setProdErr("Failed to load products.");
+      } finally {
+        if (alive) setLoadingProducts(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [id, ordering]);
 
   const openInMaps = () => {
     if (!shop) return;
@@ -186,9 +213,101 @@ export default function MerchantShopDetail() {
               </Box>
             </Paper>
           </Grid>
+          {/* PRODUCTS */}
+          <Grid item xs={12}>
+            <Box sx={{ mt: 2 }}>
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
+                <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                  Products
+                </Typography>
+                <Stack direction="row" spacing={1}>
+                  <Button size="small" variant={ordering === "newest" ? "contained" : "outlined"} onClick={() => setOrdering("newest")}>
+                    Newest
+                  </Button>
+                  <Button size="small" variant={ordering === "price" ? "contained" : "outlined"} onClick={() => setOrdering("price")}>
+                    Price ↑
+                  </Button>
+                  <Button size="small" variant={ordering === "price_desc" ? "contained" : "outlined"} onClick={() => setOrdering("price_desc")}>
+                    Price ↓
+                  </Button>
+                </Stack>
+              </Box>
+
+              {prodErr ? <Alert severity="error" sx={{ mb: 1 }}>{prodErr}</Alert> : null}
+
+              <Grid container spacing={1.25}>
+                {loadingProducts
+                  ? Array.from({ length: 8 }).map((_, i) => (
+                      <Grid item key={i} xs={6} sm={4} md={3}>
+                        <Skeleton variant="rectangular" height={140} sx={{ borderRadius: 2, mb: 0.5 }} />
+                        <Skeleton variant="text" width="80%" />
+                        <Skeleton variant="text" width="60%" />
+                      </Grid>
+                    ))
+                  : (products || []).map((p) => (
+                      <Grid item key={p.id} xs={6} sm={4} md={3}>
+                        <Paper elevation={1} sx={{ p: 1, borderRadius: 2, height: "100%" }}>
+                          <Box sx={{ height: 120, borderRadius: 1, overflow: "hidden", bgcolor: "#f8fafc", mb: 0.5 }}>
+                            {p.image_url ? (
+                              <img
+                                src={p.image_url}
+                                alt={p.title}
+                                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                              />
+                            ) : (
+                              <Box
+                                sx={{
+                                  width: "100%",
+                                  height: "100%",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  color: "text.secondary",
+                                  fontSize: 12,
+                                }}
+                              >
+                                No image
+                              </Box>
+                            )}
+                          </Box>
+                          <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap title={p.title}>
+                            {p.title}
+                          </Typography>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                            <Typography variant="body2">₹{Number(p.price).toFixed(2)}</Typography>
+                            {Number(p.discount_percent) > 0 ? (
+                              <Typography variant="caption" color="text.secondary" sx={{ textDecoration: "line-through" }}>
+                                ₹{Number(p.mrp).toFixed(2)}
+                              </Typography>
+                            ) : null}
+                            {Number(p.discount_percent) > 0 ? (
+                              <Chip size="small" color="success" label={`${Number(p.discount_percent).toFixed(0)}% OFF`} />
+                            ) : null}
+                          </Box>
+                          <Box sx={{ display: "flex", gap: 0.5, mt: 0.5, flexWrap: "wrap" }}>
+                            {p.online_delivery ? <Chip size="small" label="Online" /> : null}
+                            {p.offline_delivery ? <Chip size="small" label="Offline" /> : null}
+                            <Chip
+                              size="small"
+                              label={p.stock_qty > 0 ? "In stock" : "Out of stock"}
+                              color={p.stock_qty > 0 ? "default" : "warning"}
+                            />
+                          </Box>
+                        </Paper>
+                      </Grid>
+                    ))}
+                {!loadingProducts && (products || []).length === 0 ? (
+                  <Grid item xs={12}>
+                    <Typography variant="body2" color="text.secondary">
+                      No products added yet.
+                    </Typography>
+                  </Grid>
+                ) : null}
+              </Grid>
+            </Box>
+          </Grid>
         </Grid>
       )}
     </Box>
   );
 }
-

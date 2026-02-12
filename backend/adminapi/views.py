@@ -376,7 +376,7 @@ class AdminUsersList(ListAPIView):
     def get_queryset(self):
         qs = (
             CustomUser.objects
-            .select_related("country", "state", "city", "wallet", "kyc", "registered_by")
+            .select_related("country", "state", "city", "wallet", "kyc", "registered_by", "merchant_profile")
             .only(
                 # Base fields used by AdminUserNodeSerializer and filters
                 "id", "username", "full_name", "email", "role", "category",
@@ -393,6 +393,13 @@ class AdminUsersList(ListAPIView):
                 "wallet__main_balance", "wallet__balance",
                 # KYC status in list grid
                 "kyc__verified", "kyc__verified_at",
+                # Merchant profile fields used in Admin grids
+                "merchant_profile",
+                "merchant_profile__business_name",
+                "merchant_profile__business_category",
+                "merchant_profile__address",
+                "merchant_profile__commission_percent",
+                "merchant_profile__service_mode",
                 # Password metadata (status/algo only)
                 "password", "last_password_encrypted",
             )

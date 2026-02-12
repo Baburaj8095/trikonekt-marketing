@@ -8,9 +8,15 @@ const rawBaseURL =
 let baseURL = rawBaseURL.endsWith("/") ? rawBaseURL : rawBaseURL + "/";
 
 /* In browser, prefer explicit REACT_APP_API_URL if provided; otherwise fall back to relative "/api/"
-   (for CRA proxy or same-origin hosting). This avoids unwanted cancellations when no dev proxy is active. */
+   (for CRA proxy or same-origin hosting). This avoids unwanted cancellations when no dev proxy is active.
+   Additionally: when running under CRA dev server (http://localhost:3000), force relative "/api/" to leverage setupProxy and avoid CORS. */
 if (typeof window !== "undefined") {
-  if (process.env.REACT_APP_API_URL) {
+  const origin = (window.location && window.location.origin) || "";
+  const isCRADev = /^(http:\/\/localhost:3000|http:\/\/127\.0\.0\.1:3000)$/i.test(origin);
+  if (isCRADev) {
+    // Force relative API during CRA dev to leverage setupProxy and avoid CORS/preflight
+    baseURL = "/api/";
+  } else if (process.env.REACT_APP_API_URL) {
     baseURL = rawBaseURL.endsWith("/") ? rawBaseURL : rawBaseURL + "/";
   } else {
     baseURL = "/api/";
@@ -1229,6 +1235,97 @@ export async function deleteShop(id) {
 }
 
 /**
+ * Merchant Shop Products APIs
+ */
+
+// Public: list ACTIVE products for an ACTIVE shop
+export async function listShopProductsPublic(shopId, params = {}) {
+  const res = await API.get(`/shops/${encodeURIComponent(shopId)}/products/`, {
+    params,
+    dedupe: "cancelPrevious",
+    cacheTTL: 10_000,
+  });
+  return res?.data || res;
+}
+
+// Owner: list my products for a specific shop
+export async function listMyShopProducts(shopId, params = {}) {
+  const res = await API.get(`/merchant/shops/${encodeURIComponent(shopId)}/products/`, {
+    params,
+    dedupe: "cancelPrevious",
+  });
+  return res?.data || res;
+}
+
+// Owner: create a product under my shop (multipart)
+export async function createMyShopProduct(shopId, {
+  title,
+  description = "",
+  mrp,
+  discount_percent = 0,
+  price = null, // if null, server computes from mrp & discount_percent
+  online_delivery = false,
+  offline_delivery = true,
+  stock_qty = 0,
+  is_active = true,
+  image = null,
+} = {}) {
+  const fd = new FormData();
+  if (title != null) fd.append("title", String(title));
+  if (description != null) fd.append("description", String(description));
+  if (mrp != null) fd.append("mrp", String(mrp));
+  if (discount_percent != null) fd.append("discount_percent", String(discount_percent));
+  if (price != null) fd.append("price", String(price));
+  // booleans as strings so DRF parses truthy/falsy
+  fd.append("online_delivery", String(Boolean(online_delivery)));
+  fd.append("offline_delivery", String(Boolean(offline_delivery)));
+  if (stock_qty != null) fd.append("stock_qty", String(stock_qty));
+  if (is_active != null) fd.append("is_active", String(Boolean(is_active)));
+  if (image) fd.append("image", image);
+
+  const res = await API.post(
+    `/merchant/shops/${encodeURIComponent(shopId)}/products/`,
+    fd,
+    { headers: { "Content-Type": "multipart/form-data" } }
+  );
+  return res?.data || res;
+}
+
+// Owner: update a product (multipart; only provided fields are changed)
+export async function updateMyShopProduct(productId, patch = {}) {
+  const fd = new FormData();
+  const append = (k, v) => {
+    if (v === undefined) return;
+    // Pass File/Blob as-is
+    if (typeof Blob !== "undefined" && v instanceof Blob) return fd.append(k, v);
+    fd.append(k, String(v));
+  };
+  append("title", patch.title);
+  append("description", patch.description);
+  append("mrp", patch.mrp);
+  append("discount_percent", patch.discount_percent);
+  append("price", patch.price);
+  if ("online_delivery" in patch) append("online_delivery", Boolean(patch.online_delivery));
+  if ("offline_delivery" in patch) append("offline_delivery", Boolean(patch.offline_delivery));
+  append("stock_qty", patch.stock_qty);
+  if ("is_active" in patch) append("is_active", Boolean(patch.is_active));
+  if ("image" in patch && patch.image != null) append("image", patch.image);
+
+  const res = await API.patch(
+    `/merchant/products/${encodeURIComponent(productId)}/`,
+    fd,
+    { headers: { "Content-Type": "multipart/form-data" } }
+  );
+  return res?.data || res;
+}
+
+// Owner: delete a product
+export async function deleteMyShopProduct(productId) {
+  const res = await API.delete(`/merchant/products/${encodeURIComponent(productId)}/`);
+  return res?.data || res;
+}
+
+/**
  * Notifications APIs
  */
 export async function notificationsRegisterDeviceToken(payload = {}) {
@@ -1358,6 +1455,18 @@ export async function createRankUpgradePayment({ upgrade_id, utr = "", remarks =
     headers: { "Content-Type": "multipart/form-data" },
     timeout: 30000,
   });
+  return res?.data || res;
+}
+
+// User: Rank upgrade commission holds (self)
+export async function getMyRankCommissionHolds(params = {}) {
+  const res = await API.get("/user/rank-commission-holds/", { params, dedupe: "cancelPrevious" });
+  return res?.data || res;
+}
+
+// User: Level Bonus progress (Rank-1 directs vs threshold + earliest pending release)
+export async function getMyLevelBonusProgress() {
+  const res = await API.get("/user/level-bonus-progress/", { dedupe: "cancelPrevious" });
   return res?.data || res;
 }
 

@@ -169,7 +169,7 @@ CORS_ALLOWED_ORIGINS = _csv_env('CORS_ALLOWED_ORIGINS', 'https://trikonekt.com,h
 CORS_ALLOWED_ORIGIN_REGEXES = _csv_env('CORS_ALLOWED_ORIGIN_REGEXES', '^https://.*\\.vercel\\.app$,^https://.*\\.trikonekt\\.com$')
 CORS_ALLOW_ALL_ORIGINS = False if (CORS_ALLOWED_ORIGINS or CORS_ALLOWED_ORIGIN_REGEXES) else True
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_HEADERS = list(default_headers)
+CORS_ALLOW_HEADERS = list(default_headers) + ["authorization"]
 CORS_ALLOW_METHODS = list(default_methods)
 CORS_EXPOSE_HEADERS = ['Content-Disposition']
 

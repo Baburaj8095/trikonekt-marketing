@@ -21,6 +21,10 @@ from .views import (
     ShopsNearbyView,
     ShopMineListCreate,
     ShopOwnerDetail,
+    # Shop products
+    ShopProductsPublicList,
+    ShopProductsMineListCreate,
+    ShopProductOwnerDetail,
 )
 
 # Support both with and without trailing slash
@@ -58,6 +62,8 @@ urlpatterns = [
     re_path(r"^shops/nearby/?$", ShopsNearbyView.as_view(), name="shops-nearby"),
     re_path(r"^shops/?$", ShopPublicList.as_view(), name="shop-public-list"),
     re_path(r"^shops/(?P<pk>\d+)/?$", ShopPublicDetail.as_view(), name="shop-public-detail"),
+    # Public products for a shop (ACTIVE only)
+    re_path(r"^shops/(?P<shop_id>\d+)/products/?$", ShopProductsPublicList.as_view(), name="shop-products-public"),
 
     # Merchant profile (merchant only)
     re_path(r"^merchant/profile/?$", MerchantProfileMe.as_view(), name="merchant-profile-me"),
@@ -65,4 +71,7 @@ urlpatterns = [
     # Merchant's shops (owner only)
     re_path(r"^merchant/shops/?$", ShopMineListCreate.as_view(), name="shop-mine-list-create"),
     re_path(r"^merchant/shops/(?P<pk>\d+)/?$", ShopOwnerDetail.as_view(), name="shop-owner-detail"),
+    # Merchant shop products (owner only)
+    re_path(r"^merchant/shops/(?P<shop_id>\d+)/products/?$", ShopProductsMineListCreate.as_view(), name="shop-products-mine-list-create"),
+    re_path(r"^merchant/products/(?P<pk>\d+)/?$", ShopProductOwnerDetail.as_view(), name="shop-product-owner-detail"),
 ]

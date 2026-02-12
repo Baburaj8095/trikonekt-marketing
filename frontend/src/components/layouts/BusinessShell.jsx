@@ -44,10 +44,9 @@ export default function BusinessShell({ children }) {
   ];
 
   const isActive = (to, loc) => {
-    // Simple exact path + query match with nested route support for /business/shops
     const [toPath] = to.split("?");
     if (toPath === "/business/shops") {
-      return loc.pathname === "/business/shops";
+      return loc.pathname === "/business/shops" || loc.pathname.startsWith("/business/shops/");
     }
     return `${loc.pathname}${loc.search}` === to;
   };
@@ -66,4 +65,3 @@ export default function BusinessShell({ children }) {
     </ShellBase>
   );
 }
-
