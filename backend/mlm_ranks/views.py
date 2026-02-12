@@ -304,23 +304,14 @@ class RankMatrixTreeView(APIView):
         if rid_int != getattr(request.user, "id", None) and not getattr(request.user, "is_staff", False):
             return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
 
-        # Ensure root exists for visibility after purchase initiation (optional UX)
+        # Ensure root exists (unconditional, UX-friendly, idempotent)
         try:
-            from django.db.models import Q
-            has_rank1_purchase = RankUpgrade.objects.filter(
-                user_id=rid_int,
-                to_rank__level_number=1,
-                payment_status__in=[RankUpgrade.STATUS_INITIATED, RankUpgrade.STATUS_SUCCESS],
-            ).exists()
-            if has_rank1_purchase:
-                try:
-                    user_obj = request.user
-                    if getattr(user_obj, "id", None) != rid_int:
-                        from accounts.models import CustomUser
-                        user_obj = CustomUser.objects.filter(id=rid_int).first()
-                    FiveMatrixService.ensure_root_for_rank1(user_obj)
-                except Exception:
-                    pass
+            user_obj = request.user
+            if getattr(user_obj, "id", None) != rid_int:
+                from accounts.models import CustomUser
+                user_obj = CustomUser.objects.filter(id=rid_int).first()
+            if user_obj:
+                FiveMatrixService.ensure_root_for_rank1(user_obj)
         except Exception:
             pass
 
@@ -369,12 +360,24 @@ class RankMatrixSubtreeView(APIView):
         except Exception:
             return Response({"detail": "user_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Verify a rank-1 root exists (optional; allows empty subtree gracefully)
+        # Ensure a rank-1 root exists (lazy create; idempotent). Do not early-return if absent.
         try:
             from .models import RankMatrixRoot
-            has_root = RankMatrixRoot.objects.filter(root_user_id=root_user_id, rank__level_number=1).exists()
-            if not has_root:
-                return Response({"detail": "No Rank-1 matrix root for this user"}, status=status.HTTP_404_NOT_FOUND)
+            try:
+                user_obj = request.user
+                if getattr(user_obj, "id", None) != root_user_id:
+                    from accounts.models import CustomUser
+                    user_obj = CustomUser.objects.filter(id=root_user_id).first()
+                if user_obj:
+                    FiveMatrixService.ensure_root_for_rank1(user_obj)
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+        # Best-effort: ensure historical placements are materialized for this root (idempotent)
+        try:
+            FiveMatrixService.lazy_backfill_for_root(root_user_id)
         except Exception:
             pass
 
@@ -538,13 +541,17 @@ class AdminApproveRankUpgradeView(APIView):
             return Response({"detail": "Upgrade not found."}, status=status.HTTP_404_NOT_FOUND)
 
         if upg.payment_status == RankUpgrade.STATUS_SUCCESS:
-            # If already SUCCESS but commissions not distributed yet, distribute now (idempotent)
+            # If already SUCCESS, ensure placement is materialized for Rank‑1 purchase (to_rank=L1),
+            # and distribute only if commissions for this upgrade are missing. Idempotent.
             try:
+                to_lvl = int(getattr(getattr(upg, "to_rank", None), "level_number", 0) or 0)
+                is_rank1_purchase = to_lvl == 1
+                if is_rank1_purchase:
+                    # Always ensure root + placement under sponsor on read/approval re-entry
+                    FiveMatrixService.on_rank1_approval(upg)
                 if not UpgradeCommission.objects.filter(upgrade_id=upg.id).exists():
-                    lvl = int(getattr(getattr(upg, "to_rank", None), "level_number", 0) or 0)
-                    if lvl == 1:
+                    if is_rank1_purchase:
                         FiveMatrixService.distribute_rank1_commissions(upg)
-                        FiveMatrixService.on_rank1_approval(upg)
                     else:
                         CommissionDistributor.distribute(upg)
             except Exception:
@@ -568,8 +575,9 @@ class AdminApproveRankUpgradeView(APIView):
         ur.save(update_fields=["current_rank", "achieved_at"])
 
         try:
-            lvl = int(getattr(getattr(upg, "to_rank", None), "level_number", 0) or 0)
-            if lvl == 1:
+            to_lvl = int(getattr(getattr(upg, "to_rank", None), "level_number", 0) or 0)
+            is_rank1_purchase = to_lvl == 1
+            if is_rank1_purchase:
                 FiveMatrixService.distribute_rank1_commissions(upg)
                 FiveMatrixService.on_rank1_approval(upg)
             else:

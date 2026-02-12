@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import GenealogyTree5 from "../../components/GenealogyTree5";
-import RankMatrixExplorer from "../../components/RankMatrixExplorer";
+import RankMatrixTree from "../../components/RankMatrixTree";
 import API from "../../api/api";
 import { adminGetMatrixCommissionConfig } from "../../api/api";
 import {
@@ -583,49 +583,9 @@ export default function Genealogy5() {
             </Box>
           </Box>
 
-          {/* Slots 1..5 */}
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
-              gap: 1,
-              mb: 1.25,
-            }}
-          >
-            {(Array.isArray(rankMx?.placements) ? rankMx.placements.slice(0, 5) : []).map((slot, idx) => {
-              const filled = !!slot?.placed_user_id;
-              return (
-                <Box
-                  key={slot?.position || idx}
-                  sx={{
-                    p: 1,
-                    borderRadius: "10px",
-                    border: "1px solid",
-                    borderColor: filled ? "success.light" : "divider",
-                    bgcolor: filled ? "rgba(16,185,129,0.08)" : "grey.50",
-                    minHeight: 72,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "stretch",
-                    justifyContent: "space-between",
-                  }}
-                  title={filled ? `Approved: ${fmtDate(slot?.approved_at)}` : "Empty"}
-                >
-                  <Stack direction="row" alignItems="center" justifyContent="space-between">
-                    <Chip size="small" label={`#${slot?.position || idx + 1}`} color={filled ? "success" : "default"} variant={filled ? "filled" : "outlined"} />
-                  </Stack>
-                  <Box sx={{ mt: 0.5 }}>
-                    <Typography variant="caption" color="text.secondary">User</Typography>
-                    <Typography variant="body2" sx={{ fontFamily: "monospace", fontWeight: 800 }}>
-                      {filled ? (slot?.placed_username || slot?.placed_user_id) : "-"}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {filled ? `Approved: ${fmtDate(slot?.approved_at)}` : "Awaiting approval"}
-                    </Typography>
-                  </Box>
-                </Box>
-              );
-            })}
+          {/* Rank‑1 Matrix Tree (MLM‑style) */}
+          <Box sx={{ mt: 1 }}>
+            <RankMatrixTree />
           </Box>
 
           {/* Income summary */}
@@ -663,9 +623,6 @@ export default function Genealogy5() {
         </CardContent>
       </Card>
 
-      <Box sx={{ mb: 2 }}>
-        <RankMatrixExplorer />
-      </Box>
 
       {/* KPI Stat Strip — 3 equal tiles, compact, centered */}
       <Box

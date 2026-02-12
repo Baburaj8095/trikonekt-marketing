@@ -249,7 +249,7 @@ class FiveMatrixService:
                 return
             to_rank = getattr(upgrade, "to_rank", None)
             if not to_rank or int(getattr(to_rank, "level_number", 0) or 0) != 1:
-                return  # Only matrix for Rank-1
+                return  # Trigger only on Rank‑1 purchase
             approved_user = getattr(upgrade, "user", None)
             if not approved_user or not getattr(approved_user, "id", None):
                 return
@@ -264,6 +264,12 @@ class FiveMatrixService:
                     if RankMatrixRoot is not None
                     else None
                 )
+                # Ensure sponsor root lazily so historical approvals also get placed
+                if not sponsor_root and RankMatrixRoot is not None:
+                    try:
+                        sponsor_root = cls.ensure_root_for_rank1(sponsor)
+                    except Exception:
+                        sponsor_root = None
                 if sponsor_root:
                     approved_at = getattr(upgrade, "upgraded_at", None) or timezone.now()
                     cls._place_node_for_root(sponsor_root, approved_user, approved_at)
@@ -533,6 +539,179 @@ class FiveMatrixService:
             return
 
     @classmethod
+    def lazy_backfill_for_root(cls, root_user_id: int, max_scan: int = 200):
+        """
+        Best-effort backfill: if root has no first-row placements yet, scan recent approved
+        Rank‑1 upgrades and materialize placement/commissions for directs sponsored by root.
+        Safe and idempotent; skips when placements already exist.
+        """
+        if not root_user_id:
+            return
+        if RankMatrixNode is None:
+            return
+        try:
+            has_any = RankMatrixNode.objects.filter(root_user_id=int(root_user_id), level_depth=1).exists()
+        except Exception:
+            has_any = False
+        if has_any:
+            return
+        try:
+            qs = (
+                RankUpgrade.objects
+                .select_related("to_rank", "user")
+                .filter(payment_status=RankUpgrade.STATUS_SUCCESS, to_rank__level_number=1)
+                .order_by("upgraded_at", "id")[:int(max_scan)]
+            )
+            for upg in qs:
+                payer = getattr(upg, "user", None)
+                if not payer or not getattr(payer, "id", None):
+                    continue
+                sponsor = UplineService.get_direct_sponsor(payer)
+                try:
+                    sid = int(getattr(sponsor, "id", 0) or 0)
+                except Exception:
+                    sid = 0
+                if sid and sid == int(root_user_id):
+                    try:
+                        # Ensure root + place node; then distribute if this upgrade has no rows yet
+                        cls.on_rank1_approval(upg)
+                        if not UpgradeCommission.objects.filter(upgrade_id=upg.id).exists():
+                            cls.distribute_rank1_commissions(upg)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        # Second pass (commission-driven): if still no level-1 placements for this root,
+        # infer children from DIRECT (level=0) commissions paid to this root for Rank‑1 upgrades.
+        try:
+            has_any2 = False
+            if RankMatrixNode is not None:
+                has_any2 = RankMatrixNode.objects.filter(root_user_id=int(root_user_id), level_depth=1).exists()
+            if not has_any2:
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                sponsor_user = User.objects.filter(id=int(root_user_id)).only("id").first()
+                sponsor_root = None
+                if sponsor_user:
+                    sponsor_root = cls.ensure_root_for_rank1(sponsor_user)
+                if sponsor_root:
+                    cs = (
+                        UpgradeCommission.objects
+                        .select_related("upgrade", "from_user")
+                        .filter(
+                            to_user_id=int(root_user_id),
+                            commission_type=UpgradeCommission.TYPE_DIRECT,
+                            level=0,
+                            upgrade__to_rank__level_number=1,
+                        )
+                        .order_by("upgrade__upgraded_at", "id")[:int(max_scan)]
+                    )
+                    for c in cs:
+                        payer = getattr(c, "from_user", None)
+                        if not payer or not getattr(payer, "id", None):
+                            continue
+                        approved_at = (
+                            getattr(getattr(c, "upgrade", None), "upgraded_at", None)
+                            or getattr(c, "created_at", None)
+                            or timezone.now()
+                        )
+                        try:
+                            cls._place_node_for_root(sponsor_root, payer, approved_at)
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+
+        # Third pass (directs-driven): derive directs by sponsor relationship, then pick their first
+        # SUCCESS upgrade from L1 (L1→L2) to materialize placements in approval order.
+        try:
+            has_any3 = False
+            if RankMatrixNode is not None:
+                has_any3 = RankMatrixNode.objects.filter(root_user_id=int(root_user_id), level_depth=1).exists()
+            if not has_any3:
+                from django.contrib.auth import get_user_model
+                from django.db.models import Q
+                User = get_user_model()
+                sponsor_user = (
+                    User.objects
+                    .filter(id=int(root_user_id))
+                    .only("id", "username", "prefixed_id", "unique_id", "phone")
+                    .first()
+                )
+                sponsor_root = None
+                if sponsor_user:
+                    sponsor_root = cls.ensure_root_for_rank1(sponsor_user)
+                if sponsor_root and sponsor_user:
+                    # Build identifiers like accounts.views_tree (username, prefixed_id, unique_id, phone, digits + TR- dashed)
+                    try:
+                        vals = [
+                            (getattr(sponsor_user, "prefixed_id", "") or "").strip(),
+                            (getattr(sponsor_user, "username", "") or "").strip(),
+                            (getattr(sponsor_user, "unique_id", "") or "").strip(),
+                            (getattr(sponsor_user, "phone", "") or "").strip(),
+                        ]
+                    except Exception:
+                        vals = []
+                    try:
+                        digs_user = "".join(ch for ch in ((getattr(sponsor_user, "username", "") or "")) if ch.isdigit())
+                        digs_phone = "".join(ch for ch in ((getattr(sponsor_user, "phone", "") or "")) if ch.isdigit())
+                        if digs_user:
+                            vals.append(digs_user)
+                        if digs_phone:
+                            vals.append(digs_phone)
+                    except Exception:
+                        pass
+                    try:
+                        tr = (getattr(sponsor_user, "prefixed_id", "") or "").strip()
+                        if tr and "-" not in tr and len(tr) > 2 and tr[:2].isalpha():
+                            vals.append(f"{tr[:2]}-{tr[2:]}")
+                    except Exception:
+                        pass
+                    idents = [v for v in vals if v]
+
+                    # Directs: registered_by=root OR legacy sponsor_id points to root's identifiers
+                    directs_q = Q(registered_by_id=int(root_user_id)) | (Q(registered_by__isnull=True) & Q(sponsor_id__in=idents))
+                    direct_ids = list(
+                        User.objects
+                        .filter(directs_q)
+                        .order_by("id")
+                        .values_list("id", flat=True)[:int(max_scan)]
+                    )
+
+                    for cid in direct_ids:
+                        try:
+                            up = (
+                                RankUpgrade.objects
+                                .select_related("to_rank", "user")
+                                .filter(
+                                    user_id=int(cid),
+                                    payment_status=RankUpgrade.STATUS_SUCCESS,
+                                    to_rank__level_number=1,  # Rank‑1 purchase
+                                )
+                                .order_by("upgraded_at", "id")
+                                .first()
+                            )
+                            if not up:
+                                continue
+                            payer = getattr(up, "user", None)
+                            if not payer:
+                                payer = User.objects.filter(id=int(cid)).only("id").first()
+                            approved_at = (
+                                getattr(up, "upgraded_at", None)
+                                or getattr(up, "created_at", None)
+                                or timezone.now()
+                            )
+                            # Place and distribute if needed (idempotent)
+                            cls._place_node_for_root(sponsor_root, payer, approved_at)
+                            if not UpgradeCommission.objects.filter(upgrade_id=up.id).exists():
+                                cls.distribute_rank1_commissions(up)
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+
+    @classmethod
     def get_tree_payload(cls, *, root_user_id: Optional[int], requester=None) -> Dict:
         """
         Build API payload for GET /rank-matrix/tree.
@@ -568,6 +747,12 @@ class FiveMatrixService:
         first_upgrade_at = getattr(root_row, "first_upgrade_at", None)
         expiry_at = getattr(root_row, "expiry_at", None)
         now = timezone.now()
+
+        # Try to backfill placements for this root if empty (idempotent)
+        try:
+            cls.lazy_backfill_for_root(root_user_id)
+        except Exception:
+            pass
 
         # Placements ordered by approved_at ASC
         placements: List[Dict] = []
