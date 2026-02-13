@@ -338,7 +338,7 @@ class PrefixSequence(models.Model):
 # ======================
 from decimal import Decimal
 from django.db import transaction
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
 
@@ -1388,3 +1388,125 @@ def ensure_consumer_clone_for_new_superuser(sender, instance: CustomUser, create
     except Exception:
         # best-effort; never block user creation
         pass
+
+
+@receiver(pre_save, sender=CustomUser)
+def _capture_old_identifiers_on_rename(sender, instance: CustomUser, **kwargs):
+    """
+    Before saving a user, capture the OLD sponsor identifier variants if username/phone changed.
+    These will be used post-commit to relink legacy directs (registered_by is NULL, sponsor_id matches old token).
+    """
+    # Only for updates
+    if not getattr(instance, "pk", None):
+        return
+    try:
+        old = CustomUser.objects.only("id", "username", "phone", "prefixed_id", "unique_id").get(pk=instance.pk)
+    except CustomUser.DoesNotExist:
+        return
+    try:
+        old_username = (getattr(old, "username", "") or "").strip()
+        old_phone = (getattr(old, "phone", "") or "").strip()
+        old_pref = (getattr(old, "prefixed_id", "") or "").strip()
+        old_unique = (getattr(old, "unique_id", "") or "").strip()
+        new_username = (getattr(instance, "username", "") or "").strip()
+        new_phone = (getattr(instance, "phone", "") or "").strip()
+        changed = (old_username != new_username) or (old_phone != new_phone)
+        if not changed:
+            return
+        idents = set()
+        if old_pref:
+            idents.add(old_pref)
+            # include dashed/undashed TR variants
+            if "-" in old_pref:
+                idents.add(old_pref.replace("-", "", 1))
+            else:
+                if len(old_pref) > 2 and old_pref[:2].isalpha():
+                    idents.add(f"{old_pref[:2]}-{old_pref[2:]}")
+        if old_username:
+            idents.add(old_username)
+        if old_unique:
+            idents.add(old_unique)
+        digs_user = "".join(ch for ch in old_username if ch.isdigit())
+        if digs_user:
+            idents.add(digs_user)
+        digs_phone = "".join(ch for ch in old_phone if ch.isdigit())
+        if digs_phone:
+            idents.add(digs_phone)
+        # Stash on instance for post_save
+        instance._old_sponsor_idents = list({v for v in idents if v})
+        instance._identifiers_changed = True
+    except Exception:
+        # Non-blocking
+        instance._old_sponsor_idents = []
+        instance._identifiers_changed = False
+
+
+@receiver(post_save, sender=CustomUser)
+def _normalize_directs_and_labels_after_rename(sender, instance: CustomUser, created: bool, **kwargs):
+    """
+    After a username/phone edit, automatically:
+      - Link legacy children (registered_by IS NULL) whose sponsor_id matched OLD tokens, to this user via registered_by
+      - Normalize those children's sponsor_id to this user's current prefixed_id (fallback: username)
+      - Refresh AutoPoolAccount.username_key labels for this user across pools to reflect the new username
+    Idempotent and best-effort. Does nothing on create or when no identifiers changed.
+    """
+    if created:
+        return
+    try:
+        idents = list(getattr(instance, "_old_sponsor_idents", []) or [])
+        changed = bool(getattr(instance, "_identifiers_changed", False))
+    except Exception:
+        idents = []
+        changed = False
+    if not changed or not idents:
+        return
+
+    def _apply():
+        # 1) Relink legacy directs (registered_by IS NULL and sponsor_id in old tokens)
+        try:
+            new_sid = (getattr(instance, "prefixed_id", None) or getattr(instance, "username", "") or "").strip()
+            if new_sid:
+                (
+                    CustomUser.objects
+                    .filter(registered_by__isnull=True, sponsor_id__in=idents)
+                    .update(registered_by_id=instance.id, sponsor_id=new_sid)
+                )
+        except Exception:
+            # non-blocking
+            pass
+
+        # 2) Refresh AutoPoolAccount.username_key labels for display coherence
+        try:
+            from business.models import AutoPoolAccount  # local import to avoid circulars at import time
+            base = (getattr(instance, "username", "") or "").strip()
+            if not base:
+                return
+            for pt in ("FIVE_150", "THREE_150", "THREE_50"):
+                try:
+                    qs = AutoPoolAccount.objects.filter(owner=instance, pool_type=pt, status="ACTIVE").order_by("id")
+                except Exception:
+                    qs = []
+                idx = 0
+                for acc in qs:
+                    idx += 1
+                    desired = base if idx == 1 else f"{base}-{idx}"
+                    try:
+                        cur = getattr(acc, "username_key", "") or ""
+                    except Exception:
+                        cur = ""
+                    if cur != desired:
+                        acc.username_key = desired
+                        try:
+                            acc.save(update_fields=["username_key"])
+                        except Exception:
+                            # skip on save error to avoid blocking the rest
+                            continue
+        except Exception:
+            # best-effort
+            pass
+
+    # Execute after outer transaction commits, else run immediately
+    try:
+        transaction.on_commit(_apply)
+    except Exception:
+        _apply()

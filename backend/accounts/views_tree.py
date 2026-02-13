@@ -546,11 +546,38 @@ class MyMatrix5EntriesTree(APIView):
         # Resolve root AutoPoolAccount for this user/pool
         root_acc = None
         if start_entry_id > 0 and AutoPoolAccount:
-            root_acc = (
+            # Allow drilling into a child's ACTIVE entry if it lies within the caller's subtree.
+            # Security: Walk up the parent_account chain and ensure some ancestor entry is owned by the caller.
+            cand = (
                 AutoPoolAccount.objects.select_related("owner", "parent_account")
-                .filter(id=start_entry_id, owner=me, pool_type=pool, status="ACTIVE")
+                .only("id", "owner_id", "parent_account_id", "pool_type", "status")
+                .filter(id=start_entry_id, pool_type=pool, status="ACTIVE")
                 .first()
             )
+            if cand:
+                allowed = False
+                cur = cand
+                # Limit ancestry walk to avoid infinite loops; depth cap > max_depth for safety
+                for _ in range(int(max_depth) + 10):
+                    if not cur:
+                        break
+                    try:
+                        if int(getattr(cur, "owner_id", 0) or 0) == int(getattr(me, "id", 0) or 0):
+                            allowed = True
+                            break
+                    except Exception:
+                        pass
+                    pid = getattr(cur, "parent_account_id", None)
+                    if not pid:
+                        break
+                    cur = (
+                        AutoPoolAccount.objects
+                        .only("id", "owner_id", "parent_account_id", "pool_type", "status")
+                        .filter(id=pid, pool_type=pool, status="ACTIVE")
+                        .first()
+                    )
+                if allowed:
+                    root_acc = cand
         if not root_acc and AutoPoolAccount:
             root_acc = (
                 AutoPoolAccount.objects.select_related("owner")

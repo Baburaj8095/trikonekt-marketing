@@ -1065,10 +1065,35 @@ class MySponsorTree(APIView):
             }
             if level >= max_depth:
                 return node
+            # Build a robust identifier set for legacy sponsor_id matches
+            _sid_vals = []
+            try:
+                _tr = (getattr(u, "prefixed_id", "") or "").strip()
+                if _tr:
+                    _sid_vals.append(_tr)
+                    # include dashed/undashed TR variants
+                    if "-" in _tr:
+                        _sid_vals.append(_tr.replace("-", "", 1))
+                    else:
+                        if len(_tr) > 2 and _tr[:2].isalpha():
+                            _sid_vals.append(f"{_tr[:2]}-{_tr[2:]}")
+                _uid = (getattr(u, "unique_id", "") or "").strip()
+                if _uid:
+                    _sid_vals.append(_uid)
+                _uname = (getattr(u, "username", "") or "").strip()
+                if _uname:
+                    _sid_vals.append(_uname)
+                _digits = "".join(ch for ch in ((getattr(u, "phone", "") or "")) if ch.isdigit())
+                if _digits:
+                    _sid_vals.append(_digits)
+                _idents = [s for s in {v for v in _sid_vals if v}]
+            except Exception:
+                _idents = []
+
             children = list(
                 CustomUser.objects.filter(
                     Q(registered_by_id=u.id)
-                    | (Q(registered_by__isnull=True) & Q(sponsor_id__iexact=getattr(u, "prefixed_id", "")))
+                    | (Q(registered_by__isnull=True) & Q(sponsor_id__in=_idents))
                 )
                 .exclude(id=u.id)
                 .only("id", "username", "full_name")
@@ -1160,10 +1185,35 @@ class MySponsorTreeByRoot(APIView):
             }
             if level >= max_depth:
                 return node
+            # Build a robust identifier set for legacy sponsor_id matches
+            _sid_vals = []
+            try:
+                _tr = (getattr(u, "prefixed_id", "") or "").strip()
+                if _tr:
+                    _sid_vals.append(_tr)
+                    # include dashed/undashed TR variants
+                    if "-" in _tr:
+                        _sid_vals.append(_tr.replace("-", "", 1))
+                    else:
+                        if len(_tr) > 2 and _tr[:2].isalpha():
+                            _sid_vals.append(f"{_tr[:2]}-{_tr[2:]}")
+                _uid = (getattr(u, "unique_id", "") or "").strip()
+                if _uid:
+                    _sid_vals.append(_uid)
+                _uname = (getattr(u, "username", "") or "").strip()
+                if _uname:
+                    _sid_vals.append(_uname)
+                _digits = "".join(ch for ch in ((getattr(u, "phone", "") or "")) if ch.isdigit())
+                if _digits:
+                    _sid_vals.append(_digits)
+                _idents = [s for s in {v for v in _sid_vals if v}]
+            except Exception:
+                _idents = []
+
             children = list(
                 CustomUser.objects.filter(
                     Q(registered_by_id=u.id)
-                    | (Q(registered_by__isnull=True) & Q(sponsor_id__iexact=getattr(u, "prefixed_id", "")))
+                    | (Q(registered_by__isnull=True) & Q(sponsor_id__in=_idents))
                 )
                 .exclude(id=u.id)
                 .only("id", "username", "full_name")
@@ -1342,14 +1392,12 @@ class TeamSummaryView(APIView):
 
         # Direct team (all direct referrals) with phone, pincode, and their direct referral counts
         try:
-            # Include legacy sponsor_id-based directs (when registered_by is NULL) alongside proper FK linkage
+            # Build robust sponsor identifiers (prefixed_id variants, unique_id, username, phone digits)
             try:
-                # Use only stable identifiers to avoid breakage on phone/username change
                 vals = []
                 tr = (getattr(user, "prefixed_id", "") or "").strip()
                 if tr:
                     vals.append(tr)
-                    # include dashed/undashed TR variants
                     if "-" in tr:
                         vals.append(tr.replace("-", "", 1))
                     else:
@@ -1358,27 +1406,74 @@ class TeamSummaryView(APIView):
                 uid = (getattr(user, "unique_id", "") or "").strip()
                 if uid:
                     vals.append(uid)
+                uname = (getattr(user, "username", "") or "").strip()
+                if uname:
+                    vals.append(uname)
+                digits = "".join(ch for ch in ((getattr(user, "phone", "") or "")) if ch.isdigit())
+                if digits:
+                    vals.append(digits)
                 idents = [s for s in {v for v in vals if v}]
             except Exception:
                 idents = []
-            sponsored_q = Q(registered_by_id=user.id) | (Q(registered_by__isnull=True) & Q(sponsor_id__in=idents))
 
-            direct_qs = (
+            # Resolve owner id for a given sponsor token to guard against mis-attribution
+            def _owner_id_by_token(token: str):
+                try:
+                    s = (token or "").strip()
+                except Exception:
+                    s = ""
+                if not s:
+                    return None
+                q = Q(prefixed_id__iexact=s) | Q(username__iexact=s) | Q(unique_id__iexact=s)
+                digs = "".join(ch for ch in s if ch.isdigit())
+                if digs:
+                    q = q | Q(phone__iexact=digs) | Q(username__iexact=digs)
+                obj = CustomUser.objects.filter(q).only("id").first()
+                return getattr(obj, "id", None)
+
+            # Candidate pool: FK directs OR sponsor_id token match (regardless of registered_by)
+            candidates = list(
                 CustomUser.objects
-                .filter(sponsored_q)
+                .filter(Q(registered_by_id=user.id) | Q(sponsor_id__in=idents))
+                .exclude(id=user.id)
+                .only(
+                    "id", "username", "full_name", "category", "role", "date_joined",
+                    "account_active", "phone", "pincode", "registered_by_id", "sponsor_id"
+                )
+                .order_by("-date_joined")[:1000]
+            )
+
+            # Accept if: (a) proper FK link, or (b) sponsor_id resolves back to this user
+            allowed_ids = []
+            for c in candidates:
+                try:
+                    if getattr(c, "registered_by_id", None) == getattr(user, "id", None):
+                        allowed_ids.append(getattr(c, "id", None))
+                        continue
+                    sid = (getattr(c, "sponsor_id", "") or "").strip()
+                    if sid and sid in idents and _owner_id_by_token(sid) == getattr(user, "id", None):
+                        allowed_ids.append(getattr(c, "id", None))
+                except Exception:
+                    continue
+
+            base_qs = (
+                CustomUser.objects
+                .filter(id__in=[i for i in allowed_ids if i])
                 .annotate(direct_referrals=Count("registrations", distinct=True))
                 .order_by("-date_joined")
             )
-            direct_active = direct_qs.filter(account_active=True).count()
-            direct_inactive = direct_qs.filter(account_active=False).count()
+
+            direct_active = base_qs.filter(account_active=True).count()
+            direct_inactive = base_qs.filter(account_active=False).count()
+
             # Limit to reasonable number for UI; frontend can page later if needed
             direct_team = list(
-                direct_qs.values(
+                base_qs.values(
                     "id", "username", "full_name", "category", "role", "date_joined",
                     "account_active", "phone", "pincode", "direct_referrals"
                 )[:200]
             )
-            direct_counts = {"active": direct_active, "inactive": direct_inactive}
+            direct_counts = {"active": int(direct_active), "inactive": int(direct_inactive)}
         except Exception:
             direct_team = []
             direct_counts = {"active": 0, "inactive": 0}
@@ -1386,7 +1481,7 @@ class TeamSummaryView(APIView):
         return Response(
             {
                 "downline": {
-                    "direct": direct_count,
+                    "direct": (len(direct_team) if direct_team else direct_count),
                     "levels": {
                         "l1": levels_1_5[0] if len(levels_1_5) > 0 else 0,
                         "l2": levels_1_5[1] if len(levels_1_5) > 1 else 0,

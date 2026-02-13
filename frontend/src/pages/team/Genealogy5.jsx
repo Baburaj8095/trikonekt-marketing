@@ -254,6 +254,10 @@ export default function Genealogy5() {
   const [levelCounts, setLevelCounts] = useState(null);
   const [fiveCounts, setFiveCounts] = useState(null);
   const [selectedRoot, setSelectedRoot] = useState(null);
+  const [directList, setDirectList] = useState(null);
+  const [directCountsState, setDirectCountsState] = useState(null);
+  const [loadingDirects, setLoadingDirects] = useState(false);
+  const [directRefreshKey, setDirectRefreshKey] = useState(0);
 
   // Rank‑1 Direct Upgrades Matrix (5‑slot) state
   const [rankMx, setRankMx] = useState(null);
@@ -320,7 +324,12 @@ export default function Genealogy5() {
           retryAttempts: 2,
         });
         if (!mounted) return;
-        setData(res?.data || {});
+        const payload = res?.data || {};
+        setData(payload);
+        try {
+          if (Array.isArray(payload?.direct_team)) setDirectList(payload.direct_team);
+          if (payload?.direct_team_counts) setDirectCountsState(payload.direct_team_counts);
+        } catch (_) {}
         setErr("");
       } catch (e) {
         if (!mounted) return;
@@ -348,7 +357,7 @@ export default function Genealogy5() {
     let alive = true;
     (async () => {
       try {
-        const res = await API.get("/accounts/genealogy/5m/counts/?" + (selectedRoot ? "root_id=" + encodeURIComponent(String(selectedRoot)) + "&" : "") + "depth=10", {
+        const res = await API.get("/accounts/genealogy/5m/counts/?" + (selectedRoot ? "root_id=" + encodeURIComponent(String(selectedRoot)) + "&" : "") + "depth=" + encodeURIComponent(String(Number(levels?.five ?? 10))), {
           cacheTTL: 10000,
           retryAttempts: 2,
         });
@@ -370,6 +379,48 @@ export default function Genealogy5() {
       arr.find((p) => String(p?.pool_type).toUpperCase() === "FIVE_150") || null
     );
   }, [data]);
+
+  useEffect(() => {
+    let alive = true;
+    const run = async () => {
+      if (tab !== "direct") return;
+      try {
+        setLoadingDirects(true);
+        const res = await API.get("/accounts/team/summary/", { dedupe: "cancelPrevious" });
+        const payload = res?.data || res;
+        let list = Array.isArray(payload?.direct_team) ? payload.direct_team : [];
+        let counts = payload?.direct_team_counts || null;
+        const dcount = Math.max(0, Number(payload?.downline?.direct ?? 0));
+        if ((!list || list.length === 0) && dcount > 0) {
+          try {
+            const r2 = await API.get("/accounts/users/", { params: { registered_by: "me", page_size: 200 }, dedupe: "cancelPrevious" });
+            const arr = Array.isArray(r2?.data?.results) ? r2.data.results : (Array.isArray(r2?.data) ? r2.data : []);
+            list = arr.map((x) => ({
+              id: x?.id,
+              username: x?.username,
+              full_name: x?.full_name,
+              account_active: !!x?.account_active,
+              phone: x?.phone || "",
+              pincode: x?.pincode || "",
+              date_joined: x?.date_joined || null,
+              direct_referrals: x?.direct_referrals ?? undefined,
+            }));
+            const a = list.filter((m) => !!m.account_active).length;
+            counts = { active: a, inactive: Math.max(0, list.length - a) };
+          } catch (_) {}
+        }
+        if (!alive) return;
+        if (list && list.length) setDirectList(list);
+        if (counts) setDirectCountsState(counts);
+      } catch (_) {
+        // ignore
+      } finally {
+        if (alive) setLoadingDirects(false);
+      }
+    };
+    run();
+    return () => { alive = false; };
+  }, [tab, directRefreshKey]);
 
   const myPositions = useMemo(() => {
     try {
@@ -493,6 +544,9 @@ export default function Genealogy5() {
     }
   }, [fiveLevelGrid]);
 
+  // Always use placement-based entries tree (ACTIVE entries only) to match AdminUserTree behavior.
+  const useEntries = true;
+
   const activeLevelsReached = useMemo(() => {
     try {
       let active = 0;
@@ -510,15 +564,22 @@ export default function Genealogy5() {
 
   const directCount = useMemo(() => {
     try {
+      const listLen = Array.isArray(directList) ? directList.length : 0;
+      const listLenData = Array.isArray(data?.direct_team) ? data.direct_team.length : 0;
+      const countsTotal =
+        (Number(directCountsState?.active || 0) + Number(directCountsState?.inactive || 0)) || 0;
+      const countsTotalData =
+        (Number(data?.direct_team_counts?.active || 0) + Number(data?.direct_team_counts?.inactive || 0)) || 0;
       const down = data?.downline || {};
       const lvls = down?.levels || {};
       const l1 = typeof lvls?.l1 === "number" ? lvls.l1 : 0;
       const direct = typeof down?.direct === "number" ? down.direct : l1;
-      return Math.max(0, direct || 0);
+      const best = listLen || listLenData || countsTotal || countsTotalData || direct || 0;
+      return Math.max(0, Number(best) || 0);
     } catch {
       return 0;
     }
-  }, [data]);
+  }, [data, directList, directCountsState]);
 
   return (
     <Box
@@ -880,13 +941,30 @@ export default function Genealogy5() {
 
       {tab === "tree" ? (
         <Box sx={{ mb: 2, mt: 2 }}>
-          <GenealogyTree5 initialPool="FIVE_150" maxDepth={10} showPlaceholders useEntriesTree entryRootId={selectedRoot} />
+          <GenealogyTree5
+            initialPool="FIVE_150"
+            maxDepth={Number(levels?.five ?? 10)}
+            showPlaceholders
+            useEntriesTree={!!selectedRoot}
+            entryRootId={selectedRoot}
+          />
         </Box>
       ) : tab === "direct" ? (
-        <Box sx={{ mb: 2, mt : 2 }}>
+        <Box sx={{ mb: 2, mt: 2 }}>
+          <Stack direction="row" justifyContent="flex-end" sx={{ mb: 1 }}>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => setDirectRefreshKey((k) => k + 1)}
+              disabled={loadingDirects}
+              sx={{ textTransform: "none", fontWeight: 700 }}
+            >
+              {loadingDirects ? "Refreshing..." : "Reload"}
+            </Button>
+          </Stack>
           <DirectSponsorsList
-            list={Array.isArray(data?.direct_team) ? data.direct_team : []}
-            counts={data?.direct_team_counts}
+            list={Array.isArray(directList) ? directList : (Array.isArray(data?.direct_team) ? data.direct_team : [])}
+            counts={directCountsState || data?.direct_team_counts}
           />
         </Box>
       ) : (
