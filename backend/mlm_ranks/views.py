@@ -6,7 +6,7 @@ from typing import Optional
 from django.db import transaction
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
-from django.db.models import Sum, Max
+from django.db.models import Sum, Max, Prefetch
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -490,7 +490,19 @@ class AdminRankUpgradesView(APIView):
     permission_classes = [permissions.IsAdminUser]
 
     def get(self, request):
-        qs = RankUpgrade.objects.select_related("user", "from_rank", "to_rank").all().order_by("-created_at", "-id")
+        qs = (
+            RankUpgrade.objects
+            .select_related("user", "from_rank", "to_rank")
+            .prefetch_related(
+                "payments",
+                Prefetch(
+                    "commissions",
+                    queryset=UpgradeCommission.objects.select_related("to_user")
+                ),
+            )
+            .all()
+            .order_by("-created_at", "-id")
+        )
         # Filters
         user_id = request.query_params.get("user_id")
         to_rank = request.query_params.get("to_rank")

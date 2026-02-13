@@ -199,7 +199,7 @@ function UpgradeRow({ u, onViewCommissions, onApprove, onReject }) {
             sm: "grid",
           },
           gridTemplateColumns:
-            "1fr auto auto auto auto auto auto",
+            "1fr auto auto auto auto auto auto auto",
           gap: 12,
           alignItems: "center",
         }}
@@ -251,6 +251,11 @@ function UpgradeRow({ u, onViewCommissions, onApprove, onReject }) {
           {u.level_index || "-"} • Rel ₹
           {levelReleased.toFixed(2)} •
           Hold ₹{levelHeld.toFixed(2)}
+        </Typography>
+
+        <Typography textAlign="right">
+          {u.latest_payment_utr ? `UTR ${u.latest_payment_utr}` : "-"}
+          {u.latest_payment_proof ? <> · <a href={u.latest_payment_proof} target="_blank" rel="noreferrer">Proof</a></> : null}
         </Typography>
 
         <Stack
@@ -462,7 +467,7 @@ export default function AdminRankUpgrades() {
           <Box
             sx={{
               display: { xs: "none", sm: "grid" },
-              gridTemplateColumns: { sm: "1fr auto auto auto auto auto auto" },
+              gridTemplateColumns: { sm: "1fr auto auto auto auto auto auto auto" },
               gap: { sm: 12 },
               alignItems: "center",
               borderBottom: "1px solid",
@@ -479,6 +484,7 @@ export default function AdminRankUpgrades() {
             <Box sx={{ textAlign: "right" }}>Net</Box>
             <Box sx={{ textAlign: "right" }}>Sponsor</Box>
             <Box sx={{ textAlign: "right" }}>Level Owner</Box>
+            <Box sx={{ textAlign: "right" }}>Payment</Box>
             <Box sx={{ textAlign: "right" }}>Status</Box>
           </Box>
 

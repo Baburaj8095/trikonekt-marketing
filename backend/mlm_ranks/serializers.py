@@ -58,6 +58,12 @@ class RankUpgradeSerializer(serializers.ModelSerializer):
     level_held = serializers.SerializerMethodField()
     level_total = serializers.SerializerMethodField()
 
+    # Latest payment info (for admin verification)
+    latest_payment_utr = serializers.SerializerMethodField()
+    latest_payment_remarks = serializers.SerializerMethodField()
+    latest_payment_proof = serializers.SerializerMethodField()
+    latest_payment_at = serializers.SerializerMethodField()
+
     class Meta:
         model = RankUpgrade
         fields = (
@@ -86,6 +92,11 @@ class RankUpgradeSerializer(serializers.ModelSerializer):
             "level_released",
             "level_held",
             "level_total",
+            # Latest payment info
+            "latest_payment_utr",
+            "latest_payment_remarks",
+            "latest_payment_proof",
+            "latest_payment_at",
         )
         read_only_fields = ("payment_status", "upgraded_at", "created_at", "gst_amount", "net_amount", "upgrade_amount")
 
@@ -94,7 +105,41 @@ class RankUpgradeSerializer(serializers.ModelSerializer):
         agg = qs.aggregate(s=Sum("commission_amount"))
         return agg.get("s") or 0
 
+    def _get_prefetched(self, obj, rel_name):
+        try:
+            cache = getattr(obj, "_prefetched_objects_cache", {})
+            rel = cache.get(rel_name)
+            if rel is not None:
+                return list(rel)
+        except Exception:
+            pass
+        return None
+
+    def _sum_amount_in_rows(self, rows, pred):
+        try:
+            from decimal import Decimal
+            total = Decimal("0.00")
+        except Exception:
+            total = 0
+        for r in rows or []:
+            try:
+                if pred(r):
+                    total += getattr(r, "commission_amount", 0) or 0
+            except Exception:
+                continue
+        return total
+
     def get_sponsor_id(self, obj):
+        rows = self._get_prefetched(obj, "commissions")
+        if rows is not None:
+            sponsor_row = None
+            for r in rows:
+                try:
+                    if r.commission_type == UpgradeCommission.TYPE_DIRECT:
+                        sponsor_row = r  # keep last seen (roughly latest by ordering)
+                except Exception:
+                    continue
+            return getattr(getattr(sponsor_row, "to_user", None), "id", None)
         row = (
             UpgradeCommission.objects
             .filter(upgrade_id=obj.id, commission_type=UpgradeCommission.TYPE_DIRECT)
@@ -105,6 +150,16 @@ class RankUpgradeSerializer(serializers.ModelSerializer):
         return getattr(getattr(row, "to_user", None), "id", None)
 
     def get_sponsor_username(self, obj):
+        rows = self._get_prefetched(obj, "commissions")
+        if rows is not None:
+            sponsor_row = None
+            for r in rows:
+                try:
+                    if r.commission_type == UpgradeCommission.TYPE_DIRECT:
+                        sponsor_row = r
+                except Exception:
+                    continue
+            return getattr(getattr(sponsor_row, "to_user", None), "username", None)
         row = (
             UpgradeCommission.objects
             .filter(upgrade_id=obj.id, commission_type=UpgradeCommission.TYPE_DIRECT)
@@ -115,6 +170,13 @@ class RankUpgradeSerializer(serializers.ModelSerializer):
         return getattr(getattr(row, "to_user", None), "username", None)
 
     def get_sponsor_released(self, obj):
+        rows = self._get_prefetched(obj, "commissions")
+        if rows is not None:
+            return self._sum_amount_in_rows(
+                rows,
+                lambda r: getattr(r, "commission_type", None) == UpgradeCommission.TYPE_DIRECT
+                and getattr(r, "status", None) == UpgradeCommission.STATUS_CREDITED,
+            )
         qs = UpgradeCommission.objects.filter(
             upgrade_id=obj.id,
             commission_type=UpgradeCommission.TYPE_DIRECT,
@@ -123,6 +185,13 @@ class RankUpgradeSerializer(serializers.ModelSerializer):
         return self._sum_amount(qs)
 
     def get_sponsor_held(self, obj):
+        rows = self._get_prefetched(obj, "commissions")
+        if rows is not None:
+            return self._sum_amount_in_rows(
+                rows,
+                lambda r: getattr(r, "commission_type", None) == UpgradeCommission.TYPE_DIRECT
+                and getattr(r, "status", None) == UpgradeCommission.STATUS_HELD,
+            )
         qs = UpgradeCommission.objects.filter(
             upgrade_id=obj.id,
             commission_type=UpgradeCommission.TYPE_DIRECT,
@@ -131,6 +200,12 @@ class RankUpgradeSerializer(serializers.ModelSerializer):
         return self._sum_amount(qs)
 
     def get_sponsor_total(self, obj):
+        rows = self._get_prefetched(obj, "commissions")
+        if rows is not None:
+            return self._sum_amount_in_rows(
+                rows,
+                lambda r: getattr(r, "commission_type", None) == UpgradeCommission.TYPE_DIRECT,
+            )
         qs = UpgradeCommission.objects.filter(
             upgrade_id=obj.id,
             commission_type=UpgradeCommission.TYPE_DIRECT,
@@ -145,6 +220,16 @@ class RankUpgradeSerializer(serializers.ModelSerializer):
 
     def get_level_owner_id(self, obj):
         level_idx = self.get_level_index(obj)
+        rows = self._get_prefetched(obj, "commissions")
+        if rows is not None:
+            lvl_row = None
+            for r in rows:
+                try:
+                    if r.commission_type == UpgradeCommission.TYPE_LEVEL and int(getattr(r, "level", 0) or 0) == level_idx:
+                        lvl_row = r
+                except Exception:
+                    continue
+            return getattr(getattr(lvl_row, "to_user", None), "id", None)
         row = (
             UpgradeCommission.objects
             .filter(upgrade_id=obj.id, commission_type=UpgradeCommission.TYPE_LEVEL, level=level_idx)
@@ -156,6 +241,16 @@ class RankUpgradeSerializer(serializers.ModelSerializer):
 
     def get_level_owner_username(self, obj):
         level_idx = self.get_level_index(obj)
+        rows = self._get_prefetched(obj, "commissions")
+        if rows is not None:
+            lvl_row = None
+            for r in rows:
+                try:
+                    if r.commission_type == UpgradeCommission.TYPE_LEVEL and int(getattr(r, "level", 0) or 0) == level_idx:
+                        lvl_row = r
+                except Exception:
+                    continue
+            return getattr(getattr(lvl_row, "to_user", None), "username", None)
         row = (
             UpgradeCommission.objects
             .filter(upgrade_id=obj.id, commission_type=UpgradeCommission.TYPE_LEVEL, level=level_idx)
@@ -167,6 +262,14 @@ class RankUpgradeSerializer(serializers.ModelSerializer):
 
     def get_level_released(self, obj):
         level_idx = self.get_level_index(obj)
+        rows = self._get_prefetched(obj, "commissions")
+        if rows is not None:
+            return self._sum_amount_in_rows(
+                rows,
+                lambda r: getattr(r, "commission_type", None) == UpgradeCommission.TYPE_LEVEL
+                and int(getattr(r, "level", 0) or 0) == level_idx
+                and getattr(r, "status", None) == UpgradeCommission.STATUS_CREDITED,
+            )
         qs = UpgradeCommission.objects.filter(
             upgrade_id=obj.id,
             commission_type=UpgradeCommission.TYPE_LEVEL,
@@ -177,6 +280,14 @@ class RankUpgradeSerializer(serializers.ModelSerializer):
 
     def get_level_held(self, obj):
         level_idx = self.get_level_index(obj)
+        rows = self._get_prefetched(obj, "commissions")
+        if rows is not None:
+            return self._sum_amount_in_rows(
+                rows,
+                lambda r: getattr(r, "commission_type", None) == UpgradeCommission.TYPE_LEVEL
+                and int(getattr(r, "level", 0) or 0) == level_idx
+                and getattr(r, "status", None) == UpgradeCommission.STATUS_HELD,
+            )
         qs = UpgradeCommission.objects.filter(
             upgrade_id=obj.id,
             commission_type=UpgradeCommission.TYPE_LEVEL,
@@ -187,12 +298,55 @@ class RankUpgradeSerializer(serializers.ModelSerializer):
 
     def get_level_total(self, obj):
         level_idx = self.get_level_index(obj)
+        rows = self._get_prefetched(obj, "commissions")
+        if rows is not None:
+            return self._sum_amount_in_rows(
+                rows,
+                lambda r: getattr(r, "commission_type", None) == UpgradeCommission.TYPE_LEVEL
+                and int(getattr(r, "level", 0) or 0) == level_idx,
+            )
         qs = UpgradeCommission.objects.filter(
             upgrade_id=obj.id,
             commission_type=UpgradeCommission.TYPE_LEVEL,
             level=level_idx,
         )
         return self._sum_amount(qs)
+
+    # ---- Latest payment info helpers ----
+    def _get_latest_payment(self, obj):
+        rows = self._get_prefetched(obj, "payments")
+        rp = None
+        if rows:
+            try:
+                rp = rows[0]
+            except Exception:
+                rp = None
+        if rp is None:
+            try:
+                rp = obj.payments.order_by("-created_at", "-id").first()
+            except Exception:
+                rp = None
+        return rp
+
+    def get_latest_payment_utr(self, obj):
+        p = self._get_latest_payment(obj)
+        return getattr(p, "utr", None)
+
+    def get_latest_payment_remarks(self, obj):
+        p = self._get_latest_payment(obj)
+        return getattr(p, "remarks", None)
+
+    def get_latest_payment_proof(self, obj):
+        p = self._get_latest_payment(obj)
+        f = getattr(p, "payment_proof", None)
+        try:
+            return f.url if f else None
+        except Exception:
+            return None
+
+    def get_latest_payment_at(self, obj):
+        p = self._get_latest_payment(obj)
+        return getattr(p, "created_at", None)
 
 
 class UpgradeCommissionSerializer(serializers.ModelSerializer):

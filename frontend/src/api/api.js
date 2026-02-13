@@ -1474,7 +1474,7 @@ export async function getMyLevelBonusProgress() {
  * Admin: Rank Upgrade monitoring
  */
 export async function adminListRankUpgrades(params = {}) {
-  const res = await API.get("/admin/rank-upgrades/", { params, dedupe: "cancelPrevious" });
+  const res = await API.get("/admin/rank-upgrades/", { params, dedupe: "cancelPrevious", timeout: 30000 });
   return res?.data || res;
 }
 
