@@ -1,0 +1,4430 @@
+[
+  {
+    "postal_district": "HAILAKANDI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.58823529411764
+  },
+  {
+    "postal_district": "Nirmal",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "ANUPPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "KUSHI NAGAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.0
+  },
+  {
+    "postal_district": "THANJAVUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "KAMAREDDY",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "BALODA BAZAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 63.1578947368421
+  },
+  {
+    "postal_district": "UKHRUL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "KALLAKURICHI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 60.0
+  },
+  {
+    "postal_district": "BHOJPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "FATEHPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "KOPPAL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 61.53846153846154
+  },
+  {
+    "postal_district": "Ranipet",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "CHIKKAMAGALURU",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 54.54545454545454
+  },
+  {
+    "postal_district": "CHHOTAUDEPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 57.14285714285714
+  },
+  {
+    "postal_district": "DHAMTARI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Dhamar",
+    "confidence_score": 85.71428571428572
+  },
+  {
+    "postal_district": "WEST JAINTIA HILLS",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 60.0
+  },
+  {
+    "postal_district": "Bapatla",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "SAIHA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Sabha",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "KARAIKAL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "BASTAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Astara",
+    "confidence_score": 83.33333333333334
+  },
+  {
+    "postal_district": "MAJULI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Mali",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "ETAH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "JAIPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "ZUNHEBOTO",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 58.82352941176471
+  },
+  {
+    "postal_district": "Anakapalli",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "MUNGELI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "SEHORE",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "YAMUNANAGAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "YANAM",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Panamá",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "HOSHIARPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "SITAMARHI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "EAST SIANG",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "BEGUSARAI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "GURDASPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "PATNA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Batna",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "CHANGLANG",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Chagang",
+    "confidence_score": 87.5
+  },
+  {
+    "postal_district": "WEST KHASI HILLS",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 61.53846153846154
+  },
+  {
+    "postal_district": "SHAHJAHANPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 63.1578947368421
+  },
+  {
+    "postal_district": "RUPNAGAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "AIZAWL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "EAST DISTRICT",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "PONDICHERRY",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.19047619047619
+  },
+  {
+    "postal_district": "KOLASIB",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "SHAHDARA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Sadarak",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "WANAPARTHY",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "DIBANG VALLEY",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 69.56521739130434
+  },
+  {
+    "postal_district": "MURSHIDABAD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "SOUTH GOA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.19047619047619
+  },
+  {
+    "postal_district": "CHITTOOR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "Mahisagar",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.58823529411764
+  },
+  {
+    "postal_district": "ROHTAK",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "Gomati",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "DINAJPUR UTTAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 53.84615384615385
+  },
+  {
+    "postal_district": "MEDINIPUR WEST",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 59.25925925925925
+  },
+  {
+    "postal_district": "KURNOOL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "MANDLA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Mandalay",
+    "confidence_score": 85.71428571428572
+  },
+  {
+    "postal_district": "SURYAPET",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "KARAULI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Karnali",
+    "confidence_score": 85.71428571428572
+  },
+  {
+    "postal_district": "DARRANG",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "PULWAMA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "MUNGER",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "NABARANGPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 77.77777777777779
+  },
+  {
+    "postal_district": "DEVBHUMI DWARKA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 57.14285714285714
+  },
+  {
+    "postal_district": "KOLKATA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "PUNE",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Plužine",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "JALANDHAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.58823529411764
+  },
+  {
+    "postal_district": "NASHIK",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "ALAPPUZHA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "KARIMNAGAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 73.6842105263158
+  },
+  {
+    "postal_district": "REWARI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Rewa",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "RAJOURI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "HYDERABAD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 60.0
+  },
+  {
+    "postal_district": "Nandyal",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "KAUSHAMBI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "LOWER SIANG",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 78.26086956521739
+  },
+  {
+    "postal_district": "SOUTH WEST KHASI HILLS",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "LOWER DIBANG VALLEY",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 60.60606060606061
+  },
+  {
+    "postal_district": "BHAVNAGAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.58823529411764
+  },
+  {
+    "postal_district": "JALNA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "BALLIA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Bali",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "AMRITSAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "SIVASAGAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "BURHANPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "PALAKKAD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "SALEM",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "MIRZAPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "GUNTUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "DHEMAJI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 61.53846153846154
+  },
+  {
+    "postal_district": "KENDUJHAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.58823529411764
+  },
+  {
+    "postal_district": "BHARATPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "NAMSAI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Namosi",
+    "confidence_score": 83.33333333333334
+  },
+  {
+    "postal_district": "KANGPOKPI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "SIVAGANGA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Iganga",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "RAMANAGARA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "GADAG",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "NAVSARI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "SIDDHARTH NAGAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 53.333333333333336
+  },
+  {
+    "postal_district": "BALOD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "NALBARI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "WEST SINGHBHUM",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 58.06451612903225
+  },
+  {
+    "postal_district": "RUDRA PRAYAG",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 64.0
+  },
+  {
+    "postal_district": "WEST KAMENG",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 73.6842105263158
+  },
+  {
+    "postal_district": "DEWAS",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "WARANGAL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "DHULE",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "CHAMPHAI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "CHITTORGARH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 69.56521739130434
+  },
+  {
+    "postal_district": "SOUTH GARO HILLS",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "MEDINIPUR EAST",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 59.25925925925925
+  },
+  {
+    "postal_district": "EAST SINGHBUM",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 60.86956521739131
+  },
+  {
+    "postal_district": "MOKOKCHUNG",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 63.1578947368421
+  },
+  {
+    "postal_district": "EAST KAMENG",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 73.6842105263158
+  },
+  {
+    "postal_district": "GANGANAGAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.0
+  },
+  {
+    "postal_district": "DAKSHINA KANNADA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 58.33333333333333
+  },
+  {
+    "postal_district": "SURAJPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "BOUDH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "KANNUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "AKOLA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Akmola",
+    "confidence_score": 90.9090909090909
+  },
+  {
+    "postal_district": "SONITPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "MEDCHAL MALKAJGIRI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 51.85185185185186
+  },
+  {
+    "postal_district": "RAMGARH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "Y.S.R.",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "SPSR NELLORE",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 64.0
+  },
+  {
+    "postal_district": "AJMER",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "DINDORI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "JAMTARA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "Sepahijala",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 63.1578947368421
+  },
+  {
+    "postal_district": "BANKA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Batna",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "AURAIYA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "PATHANKOT",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "FATEHABAD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "TENKASI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "SHAHDOL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "HANUMANGARH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Nanumanga",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "SAMBA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Saba",
+    "confidence_score": 88.88888888888889
+  },
+  {
+    "postal_district": "EAST KHASI HILLS",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.06896551724138
+  },
+  {
+    "postal_district": "FARIDKOT",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "NAGAUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Angaur",
+    "confidence_score": 83.33333333333334
+  },
+  {
+    "postal_district": "KANPUR DEHAT",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 60.0
+  },
+  {
+    "postal_district": "COIMBATORE",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.58823529411764
+  },
+  {
+    "postal_district": "JANJGIR-CHAMPA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 60.86956521739131
+  },
+  {
+    "postal_district": "RAJGARH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "SIDDIPET",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 61.53846153846154
+  },
+  {
+    "postal_district": "SUKMA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "Budgam",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "PERAMBALUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.0
+  },
+  {
+    "postal_district": "NARAYANPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.58823529411764
+  },
+  {
+    "postal_district": "VIZIANAGARAM",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 60.0
+  },
+  {
+    "postal_district": "SOUTH DISTRICT",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 68.96551724137932
+  },
+  {
+    "postal_district": "TINSUKIA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "BARNALA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "CHURACHANDPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 64.0
+  },
+  {
+    "postal_district": "24 PARAGANAS SOUTH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 58.82352941176471
+  },
+  {
+    "postal_district": "TIKAMGARH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "VADODARA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "BARPETA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "VIJAYNAGAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "TAWANG",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Taiwan",
+    "confidence_score": 83.33333333333334
+  },
+  {
+    "postal_district": "NAMAKKAL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "RATLAM",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "BHARUCH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "DEOGARH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "GODDA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "GONDIA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "PALI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Pailin",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "CHURU",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Chuuk",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "VIKARABAD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "SHIMLA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Sila",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "Mulugu",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "TAPI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Taipei",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "VIDISHA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "KOTTAYAM",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "MANCHERIAL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "BHADRADRI KOTHAGUDEM",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 50.0
+  },
+  {
+    "postal_district": "BENGALURU RURAL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 60.0
+  },
+  {
+    "postal_district": "RAISEN",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "SURGUJA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "LOWER SUBANSIRI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.0
+  },
+  {
+    "postal_district": "CHAMPAWAT",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 77.77777777777779
+  },
+  {
+    "postal_district": "PAURI GARHWAL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 58.33333333333333
+  },
+  {
+    "postal_district": "JANGOAN",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "LUDHIANA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "PRATAPGARH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "BETUL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "SIKAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "BALANGIR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "GURUGRAM",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "NICOBARS",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "JOGULAMBA GADWAL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 56.00000000000001
+  },
+  {
+    "postal_district": "UPPER SIANG",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "GARHWA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "NEEMUCH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "AMBALA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Qabala",
+    "confidence_score": 83.33333333333334
+  },
+  {
+    "postal_district": "Kakinada",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "NAGAON",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Nagano",
+    "confidence_score": 83.33333333333334
+  },
+  {
+    "postal_district": "SANGLI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Sanguié",
+    "confidence_score": 83.33333333333334
+  },
+  {
+    "postal_district": "KRA DAADI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "GAYA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Guayas",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "MEDAK",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "DHARWAD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "GIR SOMNATH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.58823529411764
+  },
+  {
+    "postal_district": "MAHASAMUND",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 63.1578947368421
+  },
+  {
+    "postal_district": "VIRUDHUNAGAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 60.0
+  },
+  {
+    "postal_district": "SRI MUKTSAR SAHIB",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 55.172413793103445
+  },
+  {
+    "postal_district": "JASHPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "KARNAL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Karnali",
+    "confidence_score": 92.3076923076923
+  },
+  {
+    "postal_district": "AHMADABAD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Madaba",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "CHANDAULI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.0
+  },
+  {
+    "postal_district": "PORBANDAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "PEREN",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "MAYILADUTHURAI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 57.14285714285714
+  },
+  {
+    "postal_district": "GANJAM",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Ganja",
+    "confidence_score": 90.9090909090909
+  },
+  {
+    "postal_district": "KHAMMAM",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "RAE BARELI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 63.1578947368421
+  },
+  {
+    "postal_district": "CHHATARPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "FARIDABAD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "SANGRUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "PURBI CHAMPARAN",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 58.33333333333333
+  },
+  {
+    "postal_district": "SITAPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "Noklak",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 61.53846153846154
+  },
+  {
+    "postal_district": "GOLAGHAT",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "SANGAREDDY",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "KOTA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Kotayk",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "JAUNPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "JHABUA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "NAGPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "PATHANAMTHITTA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 61.53846153846154
+  },
+  {
+    "postal_district": "KOKRAJHAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "EAST GARO HILLS",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 64.28571428571428
+  },
+  {
+    "postal_district": "SHEOPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "RAMPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Amur",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "DADRA AND NAGAR HAVELI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.96774193548387
+  },
+  {
+    "postal_district": "KAPURTHALA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.58823529411764
+  },
+  {
+    "postal_district": "South Tripura",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.0
+  },
+  {
+    "postal_district": "KOHIMA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Kagoshima",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "BATHINDA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "UDAIPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "MAHABUBABAD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 60.0
+  },
+  {
+    "postal_district": "24 PARAGANAS NORTH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 59.25925925925925
+  },
+  {
+    "postal_district": "SHAJAPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "DATIA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "BILASPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Bilasuvar",
+    "confidence_score": 82.35294117647058
+  },
+  {
+    "postal_district": "Palnadu",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "HARDA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Hardap",
+    "confidence_score": 90.9090909090909
+  },
+  {
+    "postal_district": "PANNA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Panamá",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "LONGLENG",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "KATNI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Kočani",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "MATHURA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "KATHUA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Atua",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "KODERMA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "KACHCHH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 61.53846153846154
+  },
+  {
+    "postal_district": "North Tripura",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.0
+  },
+  {
+    "postal_district": "WASHIM",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "KALIMPONG",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "BOTAD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "RAIPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "SINDHUDURG",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "SAGAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Saga",
+    "confidence_score": 88.88888888888889
+  },
+  {
+    "postal_district": "Konaseema",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "ANUGUL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "KOLLAM",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "MUMBAI SUBURBAN",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 60.86956521739131
+  },
+  {
+    "postal_district": "JUNAGADH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "NAINITAL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "PARBHANI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "GORAKHPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "KISHANGANJ",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "SIRMAUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "EAST NIMAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.58823529411764
+  },
+  {
+    "postal_district": "RAIGARH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "WARDHA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "KONDAGAON",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.58823529411764
+  },
+  {
+    "postal_district": "JAYASHANKAR BHUPALAPALLY",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 48.78048780487805
+  },
+  {
+    "postal_district": "KALABURAGI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.58823529411764
+  },
+  {
+    "postal_district": "PURULIA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "BARMER",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "CUTTACK",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "UTTAR KASHI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "CHARKI DADRI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "RAJSAMAND",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "KANPUR NAGAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 63.1578947368421
+  },
+  {
+    "postal_district": "AYODHYA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 61.53846153846154
+  },
+  {
+    "postal_district": "SAHEBGANJ",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "NANDED",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "JAMMU",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "GUMLA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Gunma",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "CHITRAKOOT",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "EAST GODAVARI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "WEST KARBI ANGLONG",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "JALORE",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "ALIGARH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "NONEY",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "DHANBAD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "BANSWARA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "BALESHWAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.58823529411764
+  },
+  {
+    "postal_district": "HATHRAS",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "BARAN",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Baranya",
+    "confidence_score": 83.33333333333334
+  },
+  {
+    "postal_district": "HARIDWAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "MUMBAI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "MALKANGIRI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "LAKSHADWEEP DISTRICT",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.96774193548387
+  },
+  {
+    "postal_district": "BHADOHI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "ADILABAD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Jalilabad",
+    "confidence_score": 82.35294117647058
+  },
+  {
+    "postal_district": "PAKKE KESSANG",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 58.33333333333333
+  },
+  {
+    "postal_district": "NORTH AND MIDDLE ANDAMAN",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 63.41463414634146
+  },
+  {
+    "postal_district": "VILLUPURAM",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 58.82352941176471
+  },
+  {
+    "postal_district": "NARMADA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "SHI YOMI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 58.82352941176471
+  },
+  {
+    "postal_district": "Khowai",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "SURENDRANAGAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 63.1578947368421
+  },
+  {
+    "postal_district": "GANDERBAL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "DHARMAPURI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "WEST SIANG",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "BHADRAK",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "SAHARSA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "BANDIPORA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.58823529411764
+  },
+  {
+    "postal_district": "DEHRADUN",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "UTTARA KANNADA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Uttarakhand",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "SARAN",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Sarandë",
+    "confidence_score": 90.9090909090909
+  },
+  {
+    "postal_district": "RAJKOT",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 61.53846153846154
+  },
+  {
+    "postal_district": "BHIND",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "REASI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "HOWRAH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 61.53846153846154
+  },
+  {
+    "postal_district": "SABAR KANTHA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "ROHTAS",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "LEH LADAKH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "TEHRI GARHWAL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 54.54545454545454
+  },
+  {
+    "postal_district": "INDORE",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Indre",
+    "confidence_score": 90.9090909090909
+  },
+  {
+    "postal_district": "BONGAIGAON",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "IMPHAL WEST",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "GADCHIROLI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 58.82352941176471
+  },
+  {
+    "postal_district": "PASCHIM BARDHAMAN",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 55.172413793103445
+  },
+  {
+    "postal_district": "JAISALMER",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "PILIBHIT",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "JODHPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "SHEOHAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "CHANDEL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "BAGALKOT",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "IMPHAL EAST",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "JHUNJHUNU",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 61.53846153846154
+  },
+  {
+    "postal_district": "Amethi",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "SURAT",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "DURG",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "MEERUT",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Meru",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "GAUTAM BUDDHA NAGAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 55.172413793103445
+  },
+  {
+    "postal_district": "ETAWAH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "KAIMUR (BHABUA)",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "PASHCHIM CHAMPARAN",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 54.054054054054056
+  },
+  {
+    "postal_district": "GANDHINAGAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "GIRIDIH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "KANKER",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Çankırı",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "BARWANI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 77.77777777777779
+  },
+  {
+    "postal_district": "Unakoti",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "MALERKOTLA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.58823529411764
+  },
+  {
+    "postal_district": "BALAGHAT",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "JAMUI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Jambi",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "SIDHI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Sindh",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "PATAN",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Pattani",
+    "confidence_score": 83.33333333333334
+  },
+  {
+    "postal_district": "JHAJJAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "ERNAKULAM",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "NAWADA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "MOGA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Mogila",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "PAPUM PARE",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "KINNAUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "FARRUKHABAD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "KAMLE",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Kwale",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "CHANDRAPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.0
+  },
+  {
+    "postal_district": "MAHENDRAGARH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 63.63636363636363
+  },
+  {
+    "postal_district": "ERODE",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "YAVATMAL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "KAITHAL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "MAU",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Muş",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "KHAWZAWL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "RAMBAN",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "ALMORA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Zamora",
+    "confidence_score": 83.33333333333334
+  },
+  {
+    "postal_district": "SAMASTIPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.58823529411764
+  },
+  {
+    "postal_district": "SAITUAL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "MAHARAJGANJ",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.0
+  },
+  {
+    "postal_district": "LEPARADA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "COOCHBEHAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 60.0
+  },
+  {
+    "postal_district": "GARIYABAND",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "Alluri Sitharama Raju",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 55.00000000000001
+  },
+  {
+    "postal_district": "IDUKKI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "Kasganj",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "KASARAGOD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "KANGRA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Kagera",
+    "confidence_score": 83.33333333333334
+  },
+  {
+    "postal_district": "KODAGU",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "PURBA BARDHAMAN",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 64.51612903225806
+  },
+  {
+    "postal_district": "PALAMU",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Lamu",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "KORBA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Torba",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "NAGAPATTINAM",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 63.63636363636363
+  },
+  {
+    "postal_district": "CACHAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Cañar",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "Annamayya",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "UDALGURI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "PHEK",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "BUNDI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "JHALAWAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "Eluru",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "JHARSUGUDA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "JIND",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Jičín",
+    "confidence_score": 85.71428571428572
+  },
+  {
+    "postal_district": "TIRUCHIRAPPALLI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 57.14285714285714
+  },
+  {
+    "postal_district": "KARBI ANGLONG",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 63.1578947368421
+  },
+  {
+    "postal_district": "KRISHNAGIRI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 63.1578947368421
+  },
+  {
+    "postal_district": "Narayanpet",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "SULTANPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 69.56521739130434
+  },
+  {
+    "postal_district": "UDHAMPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "JHANSI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "MON",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Mono",
+    "confidence_score": 85.71428571428572
+  },
+  {
+    "postal_district": "UPPER SUBANSIRI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "THOUBAL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "PANCHKULA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 61.53846153846154
+  },
+  {
+    "postal_district": "HAPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Apure",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "THANE",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "LAWNGTLAI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "HOOGHLY",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "BOKARO",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "NANDURBAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "JALGAON",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "SIWAN",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Aswan",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "SAHARANPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "NTR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "VIJAYAPURA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 63.1578947368421
+  },
+  {
+    "postal_district": "MORBI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "SONEPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 61.53846153846154
+  },
+  {
+    "postal_district": "BIDAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Bihar",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "NORTH DISTRICT",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "RAJNANDGAON",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "KAKCHING",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Kachin",
+    "confidence_score": 85.71428571428572
+  },
+  {
+    "postal_district": "OSMANABAD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "BANKURA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "NUH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "MADHUBANI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "WOKHA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "SANT KABEER NAGAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 64.28571428571428
+  },
+  {
+    "postal_district": "KARGIL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "RI BHOI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 61.53846153846154
+  },
+  {
+    "postal_district": "MALDAH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "DHOLPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 61.53846153846154
+  },
+  {
+    "postal_district": "Parvathipuram Manyam",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 56.25
+  },
+  {
+    "postal_district": "CHENGALPATTU",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 57.14285714285714
+  },
+  {
+    "postal_district": "Biswanath",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "SIMDEGA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "RAYAGADA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "DUNGARPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "BISHNUPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 58.82352941176471
+  },
+  {
+    "postal_district": "VISAKHAPATANAM",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 60.86956521739131
+  },
+  {
+    "postal_district": "DIU",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "SHIVPURI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "KHUNTI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "SIROHI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "PEDDAPALLI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 58.82352941176471
+  },
+  {
+    "postal_district": "TUMAKURU",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "AMROHA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "GOALPARA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "PUDUKKOTTAI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 60.0
+  },
+  {
+    "postal_district": "SARAIKELA KHARSAWAN",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 60.60606060606061
+  },
+  {
+    "postal_district": "BIJAPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "LAKHISARAI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.58823529411764
+  },
+  {
+    "postal_district": "KUMURAM BHEEM ASIFABAD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 48.484848484848484
+  },
+  {
+    "postal_district": "SAMBHAL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Sabha",
+    "confidence_score": 83.33333333333334
+  },
+  {
+    "postal_district": "ARARIA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Harari",
+    "confidence_score": 83.33333333333334
+  },
+  {
+    "postal_district": "SHAMLI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "NORTH GOA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "North Gaza",
+    "confidence_score": 84.21052631578947
+  },
+  {
+    "postal_district": "DIMAPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "LOHIT",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "RANCHI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "CUDDALORE",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 63.1578947368421
+  },
+  {
+    "postal_district": "LALITPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "Sri Sathya Sai",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 58.33333333333333
+  },
+  {
+    "postal_district": "GOPALGANJ",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "DARBHANGA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 77.77777777777779
+  },
+  {
+    "postal_district": "BELAGAVI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "SOLAN",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Smolyan",
+    "confidence_score": 83.33333333333334
+  },
+  {
+    "postal_district": "SRIKAKULAM",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "DIMA HASAO",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 63.1578947368421
+  },
+  {
+    "postal_district": "POONCH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "JIRIBAM",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 61.53846153846154
+  },
+  {
+    "postal_district": "Tirupathur",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "PRAKASAM",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "KUPWARA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Kwara",
+    "confidence_score": 83.33333333333334
+  },
+  {
+    "postal_district": "MAMIT",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "KANCHIPURAM",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "DINAJPUR DAKSHIN",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 54.54545454545454
+  },
+  {
+    "postal_district": "HINGOLI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "NALGONDA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "BAREILLY",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "JORHAT",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "SATNA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Batna",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "WEST GODAVARI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "DAMOH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "NA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Nan",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "PURNIA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "BARGARH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "NAGARKURNOOL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "SIRSA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "MANDYA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "AZAMGARH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "LATUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "BEED",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "VAISHALI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "BARABANKI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "THRISSUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "NUAPADA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "Shahid Bhagat Singh Nagar",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 53.65853658536586
+  },
+  {
+    "postal_district": "VALSAD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "BHOPAL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "DAUSA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "WEST DISTRICT",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "UDAM SINGH NAGAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 57.14285714285714
+  },
+  {
+    "postal_district": "HARDOI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "BARAMULLA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "SONBHADRA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "CHHINDWARA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "KENDRAPARA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.58823529411764
+  },
+  {
+    "postal_district": "DIBRUGARH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "S.A.S Nagar",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "DHENKANAL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "KANNIYAKUMARI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 64.0
+  },
+  {
+    "postal_district": "TUTICORIN",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "THIRUVANANTHAPURAM",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 60.0
+  },
+  {
+    "postal_district": "KHAGARIA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "DANTEWADA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "UNA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Guna",
+    "confidence_score": 85.71428571428572
+  },
+  {
+    "postal_district": "ALWAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "DODA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Dodoma",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "MALAPPURAM",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.58823529411764
+  },
+  {
+    "postal_district": "MORENA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Modena",
+    "confidence_score": 83.33333333333334
+  },
+  {
+    "postal_district": "BAKSA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Basra",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "KHORDHA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "KALAHANDI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 77.77777777777779
+  },
+  {
+    "postal_district": "KURUNG KUMEY",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 52.63157894736843
+  },
+  {
+    "postal_district": "SHRAVASTI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.58823529411764
+  },
+  {
+    "postal_district": "SENAPATI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "HOJAI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Khojali",
+    "confidence_score": 83.33333333333334
+  },
+  {
+    "postal_district": "TIRAP",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "NALANDA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Nagaland",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "ALIRAJPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "SHIVAMOGGA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "KANDHAMAL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Kandal",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "MAHABUBNAGAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "FAZILKA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "MANDI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Masindi",
+    "confidence_score": 83.33333333333334
+  },
+  {
+    "postal_district": "LUNGLEI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "HASSAN",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "BHAGALPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "TONK",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "ANANTAPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "LAKHIMPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "CHAMBA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Hama",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "JEHANABAD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "PRAYAGRAJ",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "KABIRDHAM",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "RAICHUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "BANDA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Ibanda",
+    "confidence_score": 90.9090909090909
+  },
+  {
+    "postal_district": "LATEHAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "MADURAI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "AGAR MALWA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.58823529411764
+  },
+  {
+    "postal_district": "ARWAL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Awdal",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "BHANDARA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "KURUKSHETRA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 63.1578947368421
+  },
+  {
+    "postal_district": "RAIGAD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Riga",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "UDUPI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "KIPHIRE",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "SHOPIAN",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "KATIHAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "CHATRA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "KHARGONE",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "NAYAGARH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "MAHESANA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "MADHEPURA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "CHENNAI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "PANIPAT",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "HOSHANGABAD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.58823529411764
+  },
+  {
+    "postal_district": "KAMRUP METRO",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 60.0
+  },
+  {
+    "postal_district": "Bajali",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Bali",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "NORTH GARO HILLS",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "AMBEDKAR NAGAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 60.0
+  },
+  {
+    "postal_district": "THIRUVALLUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 58.82352941176471
+  },
+  {
+    "postal_district": "ARVALLI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "UNNAO",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "RAMANATHAPURAM",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 69.56521739130434
+  },
+  {
+    "postal_district": "BANAS KANTHA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "TENGNOUPAL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 63.1578947368421
+  },
+  {
+    "postal_district": "JALAUN",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "LONGDING",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "RANGA REDDY",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 58.82352941176471
+  },
+  {
+    "postal_district": "KULGAM",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Kuldīga",
+    "confidence_score": 83.33333333333334
+  },
+  {
+    "postal_district": "AHMEDNAGAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "Soreng",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "HISAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "LOHARDAGA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "DHAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Dhofar",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "RATNAGIRI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Ratanakiri",
+    "confidence_score": 84.21052631578947
+  },
+  {
+    "postal_district": "BUDAUN",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "SINGRAULI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 73.6842105263158
+  },
+  {
+    "postal_district": "Gaurella Pendra Marwahi",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 56.41025641025641
+  },
+  {
+    "postal_district": "SOUTH WEST GARO HILLS",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 64.51612903225806
+  },
+  {
+    "postal_district": "SRINAGAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "PALGHAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "UMARIA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Umbria",
+    "confidence_score": 83.33333333333334
+  },
+  {
+    "postal_district": "TIRUPPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "JAMNAGAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "BAGESHWAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "PANCH MAHALS",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 60.0
+  },
+  {
+    "postal_district": "NADIA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Nandi",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "MAHE",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Marche",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "EAST JAINTIA HILLS",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.06896551724138
+  },
+  {
+    "postal_district": "BHILWARA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "KAMJONG",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "West Tripura",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 73.6842105263158
+  },
+  {
+    "postal_district": "MORADABAD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Madaba",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "MAHOBA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "FIROZEPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "BUXAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "YADADRI BHUVANAGIRI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 56.25
+  },
+  {
+    "postal_district": "BHIWANI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "SEONI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "ANAND",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Nandi",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "PATIALA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Patillas",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "CHARAIDEO",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "THE NILGIRIS",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 57.14285714285714
+  },
+  {
+    "postal_district": "Tarn Taran",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "BIJNOR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "YADGIR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "THIRUVARUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "GONDA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "SHEIKHPURA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "BENGALURU URBAN",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 59.25925925925925
+  },
+  {
+    "postal_district": "SIANG",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Tsirang ",
+    "confidence_score": 83.33333333333334
+  },
+  {
+    "postal_district": "KAMRUP",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "KOLHAPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "MARIGAON",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Maricao",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "CHIRANG",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Hiran",
+    "confidence_score": 83.33333333333334
+  },
+  {
+    "postal_district": "GHAZIPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "KARUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "MUZAFFARPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 55.55555555555556
+  },
+  {
+    "postal_district": "AGRA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Xagħra",
+    "confidence_score": 88.88888888888889
+  },
+  {
+    "postal_district": "MYSURU",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "DEORIA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "HAVERI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Havering",
+    "confidence_score": 85.71428571428572
+  },
+  {
+    "postal_district": "DEOGHAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "PHERZAWL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 61.53846153846154
+  },
+  {
+    "postal_district": "KISHTWAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "VELLORE",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "Niwari",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Niari",
+    "confidence_score": 90.9090909090909
+  },
+  {
+    "postal_district": "Alipurduar",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "BAHRAICH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "SAMBALPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "HAMIRPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "PITHORAGARH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 63.1578947368421
+  },
+  {
+    "postal_district": "DINDIGUL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "MANDSAUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "MAINPURI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Manipur",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "Jagitial",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "LAHUL AND SPITI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 58.06451612903225
+  },
+  {
+    "postal_district": "TAMENGLONG",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "NEW DELHI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "SONIPAT",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "DANG",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Madang",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "DHUBRI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "BIRBHUM",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "BALRAMPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.58823529411764
+  },
+  {
+    "postal_district": "MANSA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Manisa",
+    "confidence_score": 90.9090909090909
+  },
+  {
+    "postal_district": "SOLAPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "AURANGABAD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.58823529411764
+  },
+  {
+    "postal_district": "AMRAVATI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "VARANASI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Varakļāni",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "KHEDA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Kedah",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "RAJANNA SIRCILLA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 61.53846153846154
+  },
+  {
+    "postal_district": "LUCKNOW",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 61.53846153846154
+  },
+  {
+    "postal_district": "FIROZABAD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "JAGATSINGHAPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 60.86956521739131
+  },
+  {
+    "postal_district": "Ariyalur",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "NARSINGHPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "FATEHGARH SAHIB",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 52.17391304347826
+  },
+  {
+    "postal_district": "KULLU",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "CHIKKABALLAPURA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 54.54545454545454
+  },
+  {
+    "postal_district": "SUNDARGARH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "PALWAL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "THENI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Terni",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "GWALIOR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "ANANTNAG",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "DOHAD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Doha",
+    "confidence_score": 88.88888888888889
+  },
+  {
+    "postal_district": "DUMKA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "SAWAI MADHOPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 58.33333333333333
+  },
+  {
+    "postal_district": "BASTI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Asti",
+    "confidence_score": 88.88888888888889
+  },
+  {
+    "postal_district": "UJJAIN",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "Tirupati",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "Jhargram",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "KARIMGANJ",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "SOUTH SALMARA MANCACHAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 60.0
+  },
+  {
+    "postal_district": "BAGHPAT",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "MUZAFFARNAGAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 60.86956521739131
+  },
+  {
+    "postal_district": "BIKANER",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "HANUMAKONDA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.0
+  },
+  {
+    "postal_district": "AMRELI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "ANJAW",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Ganja",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "KOZHIKODE",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 61.53846153846154
+  },
+  {
+    "postal_district": "Pakyong",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "KANNAUJ",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "GAJAPATI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "JALPAIGURI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.58823529411764
+  },
+  {
+    "postal_district": "TIRUNELVELI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "Dhalai",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "BALLARI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "KRISHNA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "NIZAMABAD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 77.77777777777779
+  },
+  {
+    "postal_district": "WEST GARO HILLS",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "CHITRADURGA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "BEMETARA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "KOLAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Kolda",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "DAMAN",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Adıyaman",
+    "confidence_score": 83.33333333333334
+  },
+  {
+    "postal_district": "SERCHHIP",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "SUPAUL",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Paul",
+    "confidence_score": 80.0
+  },
+  {
+    "postal_district": "WAYANAD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 72.72727272727273
+  },
+  {
+    "postal_district": "PAKUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "SATARA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Astara",
+    "confidence_score": 83.33333333333334
+  },
+  {
+    "postal_district": "BULANDSHAHR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "CHAMARAJANAGARA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "JAJAPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "DAVANGERE",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "TIRUVANNAMALAI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 60.86956521739131
+  },
+  {
+    "postal_district": "KHERI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "SOUTH ANDAMANS",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 76.92307692307692
+  },
+  {
+    "postal_district": "PURI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": "Uri",
+    "confidence_score": 85.71428571428572
+  },
+  {
+    "postal_district": "HAZARIBAGH",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "DARJEELING",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 70.0
+  },
+  {
+    "postal_district": "ASHOKNAGAR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 63.1578947368421
+  },
+  {
+    "postal_district": "KOREA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 75.0
+  },
+  {
+    "postal_district": "BULDHANA",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  },
+  {
+    "postal_district": "MAYURBHANJ",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "Hnahthial",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 63.1578947368421
+  },
+  {
+    "postal_district": "GHAZIABAD",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 77.77777777777779
+  },
+  {
+    "postal_district": "JABALPUR",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 62.5
+  },
+  {
+    "postal_district": "KORAPUT",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 61.53846153846154
+  },
+  {
+    "postal_district": "CHAMOLI",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 66.66666666666667
+  },
+  {
+    "postal_district": "TUENSANG",
+    "issue": "Missing in master dataset",
+    "closest_master_match": null,
+    "confidence_score": 71.42857142857143
+  }
+]

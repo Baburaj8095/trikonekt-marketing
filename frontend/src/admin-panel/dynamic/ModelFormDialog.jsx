@@ -863,8 +863,8 @@ export default function ModelFormDialog({
         const status = err?.response?.status;
         const methodNotAllowed = status === 405;
         const unsupported = status === 415;
-        // For Admin Users edit, fallback to PUT with full payload on any failure
-        const shouldFallbackPut = methodNotAllowed || unsupported || (isAdminUsersRoute && isEdit);
+        // Fallback to PUT only when PATCH is not supported (405) or content type unsupported (415)
+        const shouldFallbackPut = methodNotAllowed || unsupported;
         if (shouldFallbackPut) {
           if (process.env.NODE_ENV !== "production") {
             try {

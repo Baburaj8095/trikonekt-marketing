@@ -192,6 +192,13 @@ const mapUIRoleToCategory = () => {
   const [areaOptions, setAreaOptions] = useState([]);
   const [selectedArea, setSelectedArea] = useState("");
   const [areaLoading, setAreaLoading] = useState(false);
+  // India Post hierarchy states
+  const [ipLoading, setIpLoading] = useState(false);
+  const [ipError, setIpError] = useState("");
+  const [ipTaluk, setIpTaluk] = useState("");
+  const [ipDistrict, setIpDistrict] = useState("");
+  const [ipState, setIpState] = useState("");
+  const [ipCountry, setIpCountry] = useState("");
   const areaGate = useMemo(
     () =>
       role === "user" &&
@@ -243,6 +250,9 @@ const mapUIRoleToCategory = () => {
   const isPC = currentCategory === "agency_pincode_coordinator";
   const isPincodeCat = currentCategory === "agency_pincode";
   const isSubFranchiseCat = currentCategory === "agency_sub_franchise";
+  const useIndiaPostFlow = useMemo(() => {
+    return role === "user" || role === "employee" || role === "business" || (role === "agency" && isSubFranchiseCat);
+  }, [role, isSubFranchiseCat]);
 
   // Effects: font + lock role
   useEffect(() => {
@@ -442,6 +452,75 @@ const mapUIRoleToCategory = () => {
     }
   };
 
+  // India Post pincode lookup to populate hierarchy (Area/Taluk/District/State/Country)
+  const fetchFromIndiaPostPin = async (code) => {
+    const pin = String(code || "").replace(/\D/g, "");
+    if (!/^[1-9][0-9]{5}$/.test(pin)) return;
+    setIpLoading(true);
+    setAreaLoading(true);
+    setIpError("");
+    try {
+      // Use HTTPS India Post public API (CORS-enabled)
+      const resp = await fetch(`http://www.postalpincode.in/api/pincode/${pin}`);
+      let data = null;
+      try {
+        data = await resp.json();
+      } catch {
+        data = null;
+      }
+      const body = Array.isArray(data) ? data[0] : data;
+      const status = body?.Status || body?.status;
+      const offices = body?.PostOffice || body?.postOffice;
+      if (String(status) !== "Success" || !Array.isArray(offices) || offices.length === 0) {
+        setIpError("Invalid Pincode");
+        setAreaOptions([]);
+        setSelectedArea("");
+        setIpTaluk("");
+        setIpDistrict("");
+        setIpState("");
+        setIpCountry("");
+        return;
+      }
+      // Area/Post Office names
+      const names = Array.from(new Set((offices || []).map((o) => o?.Name || o?.name).filter(Boolean)));
+      setAreaOptions(names);
+      setSelectedArea("");
+
+      // Taluk/Tehsil (pick first non-empty)
+      const taluks = Array.from(new Set((offices || []).map((o) => o?.Taluk || o?.taluk).filter(Boolean)));
+      const taluk = taluks[0] || "";
+      setIpTaluk(taluk);
+
+      // District/State/Country
+      const dist = (offices.find((o) => o?.District) || {})?.District || "";
+      const st = (offices.find((o) => o?.State) || {})?.State || "";
+      const ctry = (offices.find((o) => o?.Country) || {})?.Country || "India";
+      setIpDistrict(dist);
+      setIpState(st);
+      setIpCountry(ctry || "India");
+
+      // Feed geo-name hints so existing auto-mapping effects can map to selects
+      if (dist) setGeoCityName(dist);
+      if (st) setGeoStateName(st);
+      setGeoCountryName(ctry || "India");
+
+      // For consumer flow, reset selects so they auto-map after Area selection
+      if (role === "user") {
+        setSelectedCountry("");
+        setSelectedState("");
+        setSelectedCity("");
+        setSelectedCityId("");
+      }
+    } catch (_) {
+      // Fallback to existing backend pin lookup to preserve legacy behavior
+      try { await fetchFromBackendPin(code); } catch {}
+      setIpError("Invalid Pincode");
+    } finally {
+      setIpLoading(false);
+      setAreaLoading(false);
+    }
+  };
+  
   // Lookup location by pincode and set geo names (will be auto-mapped into selects)
   const fetchFromBackendPin = async (code) => {
     const pin = String(code || "").replace(/\D/g, "");
@@ -485,6 +564,12 @@ const mapUIRoleToCategory = () => {
     setPincode(next);
     setSelectedArea("");
     setAreaOptions([]);
+    // reset india post hierarchy fields on pincode change
+    setIpError("");
+    setIpTaluk("");
+    setIpDistrict("");
+    setIpState("");
+    setIpCountry("");
   };
 
   // On select changes
@@ -692,9 +777,15 @@ const mapUIRoleToCategory = () => {
     if (!selectedState || selectedCity) return;
     const input = String(geoCityName || "");
     if (!input || !Array.isArray(cities) || !cities.length) return;
-    const norm = (v) => String(v || "").trim().toLowerCase();
+    const strip = (v) =>
+      String(v || "")
+        .toLowerCase()
+        .replace(/\([^)]*\)/g, " ") // drop things like "(KAR)"
+        .replace(/[^a-z\s]/g, " ")   // keep only letters/spaces
+        .replace(/\s+/g, " ")
+        .trim();
     const variants = (s) => {
-      const b = norm(s);
+      const b = strip(s);
       const map = {
         "bengaluru": ["bangalore"],
         "bengaluru urban": ["bangalore urban"],
@@ -704,25 +795,28 @@ const mapUIRoleToCategory = () => {
         "tumakuru": ["tumkur"],
         "chikkamagaluru": ["chikmagalur"],
         "belagavi": ["belgaum"],
-        "vijayapura": ["bijapur"],
+        "vijayapura": ["bijapur", "bijapaur", "bijapura", "vijapura"],
         "ballari": ["bellary"],
         "kalaburagi": ["gulbarga", "kalaburgi"],
         "kalaburgi": ["kalaburagi", "gulbarga"],
       };
       const set = new Set([b]);
       for (const [k, arr] of Object.entries(map)) {
-        if (b === k || arr.includes(b)) {
+        if (b === k || (arr || []).includes(b)) {
           set.add(k);
           for (const x of arr) set.add(x);
         }
       }
+      // also split tokens to allow partials like "bijapur kar" -> "bijapur"
+      b.split(" ").forEach((tok) => tok && set.add(tok));
       return Array.from(set);
     };
     const cityList = (cities || [])
       .map((c) => c?.name || c?.Name || c?.city || c?.City)
       .filter(Boolean);
-    const nlist = cityList.map((n) => ({ raw: n, key: norm(n) }));
+    const nlist = cityList.map((n) => ({ raw: n, key: strip(n) }));
     const vset = new Set(variants(input));
+    const vlist = Array.from(vset);
     let chosen = null;
     // exact match on any variant
     for (const item of nlist) {
@@ -731,17 +825,18 @@ const mapUIRoleToCategory = () => {
         break;
       }
     }
-    // fallback: substring contains
+    // fallback: any direction substring match with any variant
     if (!chosen) {
-      const base = norm(input);
-      chosen = nlist.find((it) => it.key.includes(base))?.raw || null;
+      chosen =
+        nlist.find((it) => vlist.some((v) => it.key.includes(v) || v.includes(it.key)))?.raw ||
+        null;
     }
   if (chosen) {
     setSelectedCity(chosen);
     try {
       const m = (cities || []).find((c) => {
-        const nm = String(c?.name || c?.Name || c?.city || c?.City || "").trim().toLowerCase();
-        return nm === norm(chosen);
+        const nm = strip(c?.name || c?.Name || c?.city || c?.City || "");
+        return nm === strip(chosen);
       });
       setSelectedCityId(m && m.id != null ? String(m.id) : "");
     } catch {}
@@ -753,10 +848,10 @@ const mapUIRoleToCategory = () => {
     if (isAgency) return;
     const code = String(pincode || "").trim();
     if (code.replace(/\D/g, "").length === 6) {
-      const t = setTimeout(() => fetchFromBackendPin(code), 400);
+      const t = setTimeout(() => (useIndiaPostFlow ? fetchFromIndiaPostPin(code) : fetchFromBackendPin(code)), 400);
       return () => clearTimeout(t);
     }
-  }, [isAgency, pincode]); // eslint-disable-line
+  }, [isAgency, pincode, useIndiaPostFlow]); // eslint-disable-line
 
   // Sponsor live validation
   useEffect(() => {
@@ -897,6 +992,51 @@ const mapUIRoleToCategory = () => {
       loadCities(selectedState);
     }
   }, [isDC, isDistrictCat, isSubFranchiseCat, isPC, isPincodeCat, selectedState]); // eslint-disable-line
+
+  // Auto-map India Post hierarchy to agency Sub-Franchise assignment (hidden UI)
+  useEffect(() => {
+    if (!isSubFranchiseCat) return;
+    const target = String(ipCountry || "India").trim().toLowerCase();
+    if (!selectedCountry && Array.isArray(countries) && countries.length) {
+      const m = countries.find((c) => String(c?.name || "").trim().toLowerCase() === target);
+      if (m) {
+        const id = String(m.id);
+        setSelectedCountry(id);
+        loadStates(id);
+      }
+    }
+  }, [isSubFranchiseCat, ipCountry, countries, selectedCountry]); // eslint-disable-line
+
+  useEffect(() => {
+    if (!isSubFranchiseCat) return;
+    if (!selectedCountry || !ipState) return;
+    if (Array.isArray(states) && states.length) {
+      const m = states.find(
+        (s) => String(s?.name || "").trim().toLowerCase() === String(ipState).trim().toLowerCase()
+      );
+      if (m && String(selectedState) !== String(m.id)) {
+        const sid = String(m.id);
+        setSelectedState(sid);
+        loadCities(sid);
+      }
+    }
+  }, [isSubFranchiseCat, selectedCountry, ipState, states, selectedState]); // eslint-disable-line
+
+  useEffect(() => {
+    if (!isSubFranchiseCat) return;
+    if (!selectedState || !ipDistrict) return;
+    if (!selectedDistrictAgency) {
+      setSelectedDistrictAgency(String(ipDistrict));
+    }
+  }, [isSubFranchiseCat, selectedState, ipDistrict, selectedDistrictAgency]); // eslint-disable-line
+
+  useEffect(() => {
+    if (!isSubFranchiseCat) return;
+    const pin = String(pincode || "").replace(/\D/g, "");
+    if (/^\d{6}$/.test(pin)) {
+      setSelectedPincodeAgency(pin);
+    }
+  }, [isSubFranchiseCat, pincode]); // eslint-disable-line
 
   const districtOptions = useMemo(() => {
     if (isSubFranchiseCat) {
@@ -1241,6 +1381,8 @@ const mapUIRoleToCategory = () => {
       phone: phoneDigits,
       sponsor_id: effectiveSponsor,
       category,
+      // Persist Area (Post Office / Village) chosen on the registration screen
+      area: selectedArea || "",
     };
 
     if (!AGENCY_CATEGORIES.has(category)) {
@@ -1397,6 +1539,113 @@ const mapUIRoleToCategory = () => {
     }
   };
 
+  // Render India Post hierarchy block (Pincode → Area → Taluk → District → State → Country)
+  const renderHierarchyFields = () => {
+    const validPin = /^[1-9][0-9]{5}$/.test(String(pincode || ""));
+    const disabled = !validPin || ipLoading;
+    return (
+      <>
+        <TextField
+          fullWidth
+          label="Pincode"
+          value={pincode}
+          onChange={(e) => handlePincodeManualChange(e.target.value)}
+          inputProps={{ inputMode: "numeric", pattern: "[0-9]*", maxLength: 6 }}
+          helperText="Enter pincode to auto-fill location"
+          sx={{ mb: 2 }}
+          required
+        />
+
+        {ipLoading && (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+            <CircularProgress size={16} />
+            <Typography variant="body2" color="text.secondary">
+              Fetching location...
+            </Typography>
+          </Box>
+        )}
+
+        {ipError && (
+          <Alert severity="error" sx={{ mb: 1 }}>{ipError}</Alert>
+        )}
+
+        {validPin && (Array.isArray(areaOptions) && areaOptions.length > 0) && (
+          areaOptions.length > 10 ? (
+            <Autocomplete
+              freeSolo={false}
+              options={(areaOptions || []).map(String)}
+              value={String(selectedArea || "")}
+              onChange={(_, newValue) => setSelectedArea(newValue || "")}
+              onInputChange={(_, newInputValue) => {}}
+              isOptionEqualToValue={(option, value) => String(option) === String(value)}
+              disabled={disabled}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  fullWidth
+                  label="Post Office / Village"
+                  required
+                  sx={{ mb: 2 }}
+                />
+              )}
+            />
+          ) : (
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>Post Office / Village</InputLabel>
+              <Select
+                label="Post Office / Village"
+                value={selectedArea}
+                onChange={(e) => setSelectedArea(e.target.value)}
+                required
+                disabled={disabled}
+              >
+                <MenuItem value="">-- Select --</MenuItem>
+                {(areaOptions || []).map((name) => (
+                  <MenuItem key={name} value={name}>
+                    {name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )
+        )}
+
+        <TextField
+          fullWidth
+          label="Taluk / Tehsil"
+          value={ipTaluk}
+          onChange={(e) => setIpTaluk(e.target.value)}
+          sx={{ mb: 2 }}
+          disabled={!validPin || ipLoading}
+        />
+
+        <TextField
+          fullWidth
+          label="District"
+          value={ipDistrict}
+          sx={{ mb: 2 }}
+          disabled
+        />
+
+        <TextField
+          fullWidth
+          label="State"
+          value={ipState}
+          sx={{ mb: 2 }}
+          disabled
+        />
+
+        <TextField
+          fullWidth
+          label="Country"
+          value={ipCountry || "India"}
+          sx={{ mb: 2 }}
+          disabled
+        />
+      </>
+    );
+  };
+  
   // Render registration fields by role
   const renderRegistrationFields = () => {
     switch (role) {
@@ -1456,6 +1705,8 @@ const mapUIRoleToCategory = () => {
                 ),
               }}
             />
+            {useIndiaPostFlow && renderHierarchyFields()}
+            <Box sx={{ display: useIndiaPostFlow ? "none" : "block" }}>
             {selectedCity && (nonAgencyDistrictPincodes || []).length > 0 ? (
               <Autocomplete
                 freeSolo
@@ -1587,6 +1838,7 @@ const mapUIRoleToCategory = () => {
                 ))}
               </Select>
             </FormControl>
+            </Box>
           </>
         );
       case "business":
@@ -1730,6 +1982,8 @@ const mapUIRoleToCategory = () => {
               minRows={2}
               required
             />
+            {useIndiaPostFlow && renderHierarchyFields()}
+            <Box sx={{ display: useIndiaPostFlow ? "none" : "block" }}>
             {selectedCity && (nonAgencyDistrictPincodes || []).length > 0 ? (
               <Autocomplete
                 freeSolo
@@ -1860,6 +2114,7 @@ const mapUIRoleToCategory = () => {
                 ))}
               </Select>
             </FormControl>
+            </Box>
           </>
         );
       case "agency":
@@ -1996,74 +2251,11 @@ const mapUIRoleToCategory = () => {
             )}
 
             {(isSubFranchiseCat) && (
-              <>
-                <FormControl fullWidth sx={{ mb: 2 }}>
-                  <InputLabel>Country</InputLabel>
-                  <Select
-                    label="Country"
-                    value={selectedCountry}
-                    onChange={handleCountryChange}
-                  >
-                    {(countries || []).map((c) => (
-                      <MenuItem key={c.id} value={String(c.id)}>{c.name}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <FormControl fullWidth sx={{ mb: 2 }}>
-                  <InputLabel>State</InputLabel>
-                  <Select
-                    label="State"
-                    value={selectedState}
-                    onChange={(e) => {
-                      setSelectedState(e.target.value);
-                      setAssignDistricts([]);
-                      setSelectedDistrictAgency("");
-                      setSelectedPincodeAgency("");
-                    }}
-                    disabled={!selectedCountry}
-                  >
-                    <MenuItem value="">-- Select --</MenuItem>
-                    {(states || []).map((s) => (
-                      <MenuItem key={s.id} value={String(s.id)}>{s.name}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <FormControl fullWidth sx={{ mb: 2 }}>
-                  <InputLabel>City/District</InputLabel>
-                  <Select
-                    label="City/District"
-                    value={selectedDistrictAgency}
-                    onChange={(e) => {
-                      setSelectedDistrictAgency(e.target.value);
-                      setSelectedPincodeAgency("");
-                    }}
-                    disabled={!selectedState}
-                  >
-                    <MenuItem value="">-- Select --</MenuItem>
-                    {(districtOptions || []).map((d) => (
-                      <MenuItem key={d} value={d}>{d}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <FormControl fullWidth sx={{ mb: 2 }}>
-                  <InputLabel>Pincode</InputLabel>
-                  <Select
-                    label="Pincode"
-                    value={selectedPincodeAgency}
-                    onChange={(e) => setSelectedPincodeAgency(e.target.value)}
-                    disabled={!selectedState || !selectedDistrictAgency}
-                  >
-                    <MenuItem value="">-- Select --</MenuItem>
-                    {(pincodeOptions || []).map((pin) => (
-                      <MenuItem key={pin} value={pin}>{pin}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </>
+              <Box sx={{ mb: 2 }}>
+                {renderHierarchyFields()}
+              </Box>
             )}
+
 
             {(isStateCat || isDC || isDistrictCat || isPC || isPincodeCat) && (
               <FormControl fullWidth sx={{ mb: 2 }}>

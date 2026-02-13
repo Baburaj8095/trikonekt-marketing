@@ -15,6 +15,7 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
     country_name = serializers.SerializerMethodField()
     district_name = serializers.SerializerMethodField()
     area = serializers.SerializerMethodField()
+    taluk_name = serializers.SerializerMethodField()
     sponsor_id = serializers.SerializerMethodField()
     wallet_balance = serializers.SerializerMethodField()
     wallet_status = serializers.SerializerMethodField()
@@ -59,6 +60,7 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
             "phone",
             "pincode",
             "area",
+            "taluk_name",
             "district_name",
             "state_name",
             "country_name",
@@ -180,9 +182,76 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
             return ""
 
     def get_area(self, obj):
+        """
+        Area name to display in admin grids.
+        Priority:
+          1) Explicit user.address (set from 'area' during registration)
+          2) Best-effort from offline pincode index: first Post Office/Village name
+        """
         try:
-            cat = (getattr(obj, "category", "") or "").lower()
-            return (getattr(obj, "address", "") or "") if cat == "consumer" else ""
+            # 1) Direct address on user, if present
+            addr = (getattr(obj, "address", "") or "").strip()
+            if addr:
+                return addr
+            # 2) Fallback via offline pincode map
+            pin = str(getattr(obj, "pincode", "") or "").strip()
+            if not pin:
+                return ""
+            offline = PINCODES_OFFLINE.get(pin) or {}
+            try:
+                offices = list(offline.get("post_offices") or [])
+            except Exception:
+                offices = []
+            for po in offices:
+                try:
+                    name = (po.get("Name") or po.get("name") or "").strip()
+                except Exception:
+                    name = ""
+                if name:
+                    return name
+            # Optional: fallback to first village string when post_offices absent
+            try:
+                villages = list(offline.get("villages") or [])
+            except Exception:
+                villages = []
+            if villages:
+                try:
+                    v0 = str(villages[0] or "").strip()
+                    if v0:
+                        return v0
+                except Exception:
+                    pass
+            return ""
+        except Exception:
+            return ""
+
+    def get_taluk_name(self, obj):
+        """
+        Taluk/Tehsil derived from pincode using offline cache.
+        Avoid network calls in list views for performance; detail views may enrich separately if needed.
+        """
+        try:
+            pin = str(getattr(obj, "pincode", "") or "").strip()
+            if not pin:
+                return ""
+            offline = PINCODES_OFFLINE.get(pin) or {}
+            # Direct taluk field
+            tal = (offline.get("taluk") or "").strip() if isinstance(offline.get("taluk"), str) else ""
+            if tal:
+                return tal
+            # Inspect post_offices entries
+            try:
+                offices = list(offline.get("post_offices") or [])
+            except Exception:
+                offices = []
+            for po in offices:
+                try:
+                    t = (po.get("Taluk") or po.get("taluk") or "").strip()
+                except Exception:
+                    t = ""
+                if t:
+                    return t
+            return ""
         except Exception:
             return ""
 
