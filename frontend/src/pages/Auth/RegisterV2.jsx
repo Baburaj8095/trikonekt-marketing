@@ -30,6 +30,7 @@ import {
   ToggleButtonGroup,
   Avatar,
   Link,
+  Autocomplete,
 } from "@mui/material";
 
 import {
@@ -1456,23 +1457,31 @@ const mapUIRoleToCategory = () => {
               }}
             />
             {selectedCity && (nonAgencyDistrictPincodes || []).length > 0 ? (
-              <FormControl fullWidth sx={{ mb: 2 }}>
-                <InputLabel>Pincode</InputLabel>
-                <Select
-                  label="Pincode"
-                  value={pincode}
-                  onChange={(e) => { setPincode(e.target.value); setSelectedArea(""); setAreaOptions([]); }}
-                  required
-                  disabled={!selectedCity || pinByDistrictLoadingNA}
-                >
-                  <MenuItem value="">-- Select --</MenuItem>
-                  {(nonAgencyDistrictPincodes || []).map((pin) => (
-                    <MenuItem key={pin} value={pin}>
-                      {pin}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <Autocomplete
+                freeSolo
+                options={(nonAgencyDistrictPincodes || []).map(String)}
+                value={String(pincode || "")}
+                onInputChange={(_, newInputValue) => handlePincodeManualChange(newInputValue)}
+                onChange={(_, newValue) => handlePincodeManualChange(newValue || "")}
+                isOptionEqualToValue={(option, value) => String(option) === String(value)}
+                disabled={!selectedCity || pinByDistrictLoadingNA}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    fullWidth
+                    label="Pincode"
+                    inputProps={{
+                      ...params.inputProps,
+                      inputMode: "numeric",
+                      pattern: "[0-9]*",
+                      maxLength: 6,
+                    }}
+                    helperText={role === "user" ? "Enter 6-digit pincode, then select Area to populate District/State/Country" : "Enter 6-digit pincode to auto-select District/State/Country"}
+                    sx={{ mb: 2 }}
+                    required
+                  />
+                )}
+              />
             ) : (
               <TextField
                 fullWidth
@@ -1722,23 +1731,31 @@ const mapUIRoleToCategory = () => {
               required
             />
             {selectedCity && (nonAgencyDistrictPincodes || []).length > 0 ? (
-              <FormControl fullWidth sx={{ mb: 2 }}>
-                <InputLabel>Pincode</InputLabel>
-                <Select
-                  label="Pincode"
-                  value={pincode}
-                  onChange={(e) => { setPincode(e.target.value); setSelectedArea(""); setAreaOptions([]); }}
-                  required
-                  disabled={!selectedCity || pinByDistrictLoadingNA}
-                >
-                  <MenuItem value="">-- Select --</MenuItem>
-                  {(nonAgencyDistrictPincodes || []).map((pin) => (
-                    <MenuItem key={pin} value={pin}>
-                      {pin}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <Autocomplete
+                freeSolo
+                options={(nonAgencyDistrictPincodes || []).map(String)}
+                value={String(pincode || "")}
+                onInputChange={(_, newInputValue) => handlePincodeManualChange(newInputValue)}
+                onChange={(_, newValue) => handlePincodeManualChange(newValue || "")}
+                isOptionEqualToValue={(option, value) => String(option) === String(value)}
+                disabled={!selectedCity || pinByDistrictLoadingNA}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    fullWidth
+                    label="Pincode"
+                    inputProps={{
+                      ...params.inputProps,
+                      inputMode: "numeric",
+                      pattern: "[0-9]*",
+                      maxLength: 6,
+                    }}
+                    helperText={role === "user" ? "Enter 6-digit pincode, then select Area to populate District/State/Country" : "Enter 6-digit pincode to auto-select District/State/Country"}
+                    sx={{ mb: 2 }}
+                    required
+                  />
+                )}
+              />
             ) : (
               <TextField
                 fullWidth
