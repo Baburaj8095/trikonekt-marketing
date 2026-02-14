@@ -56,24 +56,24 @@ function Select({ label, value, onChange, options, style }) {
 export default function AdminUsers() {
   // Filters applied to server fetch
   const [filters, setFilters] = useState(() => {
-    // Initialize from URL so first request uses the correct filters, avoiding an initial unfiltered call
+    // Default to "All" unless URL explicitly specifies role/category
     let activated = "";
     let account_active = "";
-    let category = "";
     let role = "";
+    let category = "";
     try {
       const qs = typeof window !== "undefined" ? (window.location.search || "") : "";
       const params = new URLSearchParams(qs);
+      const rawActivated = (params.get("activated") || "").toLowerCase();
+      activated = ["1", "true", "yes", "activated"].includes(rawActivated)
+        ? "1"
+        : (["0", "false", "no", "inactive", "not_activated", "unactivated", "notactivated"].includes(rawActivated) ? "0" : "");
+      const rawAccountActive = (params.get("account_active") || "").toLowerCase();
+      account_active = ["1", "true", "yes", "active"].includes(rawAccountActive)
+        ? "1"
+        : (["0", "false", "no", "inactive"].includes(rawAccountActive) ? "0" : "");
       const rawRole = params.get("role") || "";
       role = String(rawRole || "").toLowerCase();
-      const rawActivated = (params.get("activated") || "").toLowerCase();
-      activated = ["1","true","yes","activated"].includes(rawActivated)
-        ? "1"
-        : (["0","false","no","inactive","not_activated","unactivated","notactivated"].includes(rawActivated) ? "0" : "");
-      const rawAccountActive = (params.get("account_active") || "").toLowerCase();
-      account_active = ["1","true","yes","active"].includes(rawAccountActive)
-        ? "1"
-        : (["0","false","no","inactive"].includes(rawAccountActive) ? "0" : "");
       const rawCategory = params.get("category") || "";
       category = String(rawCategory || "").toLowerCase().replace(/cordinator\b/g, "coordinator");
     } catch (_) {}
@@ -257,36 +257,28 @@ export default function AdminUsers() {
     };
   }, []);
 
-  // Sync URL query filters (activated, account_active, category) from location
+  // Sync filters from URL; role/category apply only if explicitly present
   const location = useLocation();
   useEffect(() => {
     const params = new URLSearchParams(location.search || "");
     const rawActivated = (params.get("activated") || "").toLowerCase();
-    const normActivated = ["1","true","yes","activated"].includes(rawActivated)
+    const normActivated = ["1", "true", "yes", "activated"].includes(rawActivated)
       ? "1"
-      : (["0","false","no","inactive","not_activated","unactivated","notactivated"].includes(rawActivated) ? "0" : "");
+      : (["0", "false", "no", "inactive", "not_activated", "unactivated", "notactivated"].includes(rawActivated) ? "0" : "");
     const rawAccountActive = (params.get("account_active") || "").toLowerCase();
-    const normAccountActive = ["1","true","yes","active"].includes(rawAccountActive)
+    const normAccountActive = ["1", "true", "yes", "active"].includes(rawAccountActive)
       ? "1"
-      : (["0","false","no","inactive"].includes(rawAccountActive) ? "0" : "");
+      : (["0", "false", "no", "inactive"].includes(rawAccountActive) ? "0" : "");
     const rawRole = params.get("role") || "";
     const normRole = String(rawRole || "").toLowerCase();
     const rawCategory = params.get("category") || "";
     const normCategory = String(rawCategory || "").toLowerCase().replace(/cordinator\b/g, "coordinator");
     setFilters((f) => {
       let next = f;
-      if ((f.activated || "") !== normActivated) {
-        next = { ...next, activated: normActivated };
-      }
-      if ((f.account_active || "") !== normAccountActive) {
-        next = { ...next, account_active: normAccountActive };
-      }
-      if ((f.role || "") !== normRole) {
-        next = { ...next, role: normRole };
-      }
-      if ((f.category || "") !== normCategory) {
-        next = { ...next, category: normCategory };
-      }
+      if ((f.activated || "") !== normActivated) next = { ...next, activated: normActivated };
+      if ((f.account_active || "") !== normAccountActive) next = { ...next, account_active: normAccountActive };
+      if ((f.role || "") !== normRole) next = { ...next, role: normRole };
+      if ((f.category || "") !== normCategory) next = { ...next, category: normCategory };
       return next;
     });
   }, [location.search]);
@@ -1217,58 +1209,52 @@ const count = Number.isFinite(countNum) ? countNum : results.length;
     }
   };
 
-  // Recompute segment counts when base filters change
+  // Lightweight segment counts — single aggregated call (avoid 5 onload requests)
   useEffect(() => {
     let mounted = true;
-    const paramsBase = buildBaseParamsFromFilters(filters);
     setCountsLoading(true);
-
-    const make = async (extra) => {
-      try {
-        const res = await API.get("/api/admin/users/", {
-          params: { ...paramsBase, ...extra, page: 1, page_size: 1 },
-          dedupe: "cancelPrevious",
-          timeout: 20000,
-          retryAttempts: 0,
-        });
-        const raw = res?.data?.count;
-        if (typeof raw === "number" && Number.isFinite(raw)) return raw;
-        if (typeof raw === "string") {
-          const n = parseInt(raw, 10);
-          if (Number.isFinite(n)) return n;
-        }
-        return null;
-      } catch (_) {
-        return null;
-      }
-    };
-
     (async () => {
-      const [all, consumers, merchants, agencies, employees] = await Promise.all([
-        make({}),
-        make({ role: "user", category: "consumer" }),
-        make({ role: "business" }),
-        make({ role: "agency" }),
-        make({ role: "employee", category: "employee" }),
-      ]);
-      if (!mounted) return;
-      setSegmentCounts({ all, consumers, merchants, agencies, employees });
-      setCountsLoading(false);
+      try {
+        const res = await API.get("admin/users/category-counts/", {
+          timeout: 15000,
+          retryAttempts: 0,
+          dedupe: "cancelPrevious",
+        });
+        const c = res?.data || {};
+        const num = (v) => {
+          const n = Number(v);
+          return Number.isFinite(n) ? n : 0;
+        };
+        const agencies =
+          num(c.agency_state_coordinator) +
+          num(c.agency_state) +
+          num(c.agency_district_coordinator) +
+          num(c.agency_district) +
+          num(c.agency_pincode_coordinator) +
+          num(c.agency_pincode) +
+          num(c.agency_sub_franchise);
+        const merchants = num(c.business) + num(c.merchant) + num(c.role_business);
+        const all = Number.isFinite(Number(c.all)) ? Number(c.all) : (Number.isFinite(Number(c.total)) ? Number(c.total) : null);
+        if (mounted) {
+          setSegmentCounts({
+            all,
+            consumers: Number.isFinite(Number(c.consumer)) ? Number(c.consumer) : null,
+            merchants: merchants || null,
+            agencies: agencies || null,
+            employees: Number.isFinite(Number(c.employee)) ? Number(c.employee) : null,
+          });
+        }
+      } catch (_) {
+        if (mounted) {
+          // Keep UI responsive; counts are optional
+          setSegmentCounts({ all: null, consumers: null, merchants: null, agencies: null, employees: null });
+        }
+      } finally {
+        if (mounted) setCountsLoading(false);
+      }
     })();
-
-    return () => {
-      mounted = false;
-    };
-  }, [
-    filters.phone,
-    filters.pincode,
-    filters.state,
-    filters.kyc,
-    filters.account_active,
-    filters.activated,
-    reloadKey,
-    buildBaseParamsFromFilters,
-  ]);
+    return () => { mounted = false; };
+  }, [reloadKey]);
 
   const toolbar = (
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>

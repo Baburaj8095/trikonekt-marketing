@@ -554,6 +554,21 @@ export default function AdminDashboard() {
                 palette="green"
               />
               <Card
+                title="Agencies"
+                value={(
+                  (catCounts.agency_state_coordinator ?? 0) +
+                  (catCounts.agency_state ?? 0) +
+                  (catCounts.agency_district_coordinator ?? 0) +
+                  (catCounts.agency_district ?? 0) +
+                  (catCounts.agency_pincode_coordinator ?? 0) +
+                  (catCounts.agency_pincode ?? 0) +
+                  (catCounts.agency_sub_franchise ?? 0)
+                )}
+                subtitle=""
+                onClick={() => nav("/admin/users?role=agency")}
+                palette="orange"
+              />
+              <Card
                 title="State Coordinators"
                 value={(catCounts.agency_state_coordinator ?? 0)}
                 subtitle=""
