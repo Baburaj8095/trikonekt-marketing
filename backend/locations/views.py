@@ -291,6 +291,45 @@ def reverse_geocode(request):
     # Include raw sources only in DEBUG-like scenarios? Keep minimal to reduce payload
     return Response(result, status=status.HTTP_200_OK)
 
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def postal_legacy_pincode_proxy(request, pin: str):
+    """
+    Server-side proxy to legacy India Post endpoint over HTTP to avoid browser Mixed Content.
+    Calls: http://www.postalpincode.in/api/pincode/{pin}
+    Returns upstream JSON (list with Status/PostOffice) or 502 on upstream errors.
+    """
+    pin = (pin or "").strip()
+    if not pin.isdigit() or len(pin) != 6:
+        return Response({"detail": "Invalid pincode. Must be 6 digits."}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        upstream = session.get(
+            f"http://www.postalpincode.in/api/pincode/{pin}",
+            headers=POSTAL_HEADERS,
+            timeout=15,
+        )
+        try:
+            payload = upstream.json()
+        except Exception:
+            # Some edge cases return text/html; wrap safely
+            payload = {"raw": upstream.text}
+        if upstream.status_code == 200:
+            return Response(payload, status=status.HTTP_200_OK)
+        return Response(
+            {
+                "detail": "Upstream error",
+                "upstream_status": upstream.status_code,
+                "data": payload,
+            },
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+    except Exception as e:
+        return Response(
+            {"detail": f"Lookup failed: {type(e).__name__}"},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def debug_counts(request):

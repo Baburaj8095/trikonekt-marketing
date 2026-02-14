@@ -216,6 +216,9 @@ const mapUIRoleToCategory = () => {
   const [geoStateName, setGeoStateName] = useState("");
   const [geoCityName, setGeoCityName] = useState("");
   const geoRequestedRef = useRef(false);
+  // Pincode fetch sequencing and abort to prevent stale overwrites
+  const pinReqSeqRef = useRef(0);
+  const pinAbortRef = useRef(null);
 
   // Agency region selections/data
   const [allStatesList, setAllStatesList] = useState([]); // for State Coordinator
@@ -456,68 +459,91 @@ const mapUIRoleToCategory = () => {
   const fetchFromIndiaPostPin = async (code) => {
     const pin = String(code || "").replace(/\D/g, "");
     if (!/^[1-9][0-9]{5}$/.test(pin)) return;
+
+    // Invalidate any older requests and abort inflight before starting a new one
+    const seq = ++pinReqSeqRef.current;
+    try { pinAbortRef.current?.abort?.(); } catch (_) {}
+    let controller = null;
+    try {
+      if (typeof AbortController !== "undefined") {
+        controller = new AbortController();
+        pinAbortRef.current = controller;
+      }
+    } catch (_) {}
+
     setIpLoading(true);
     setAreaLoading(true);
     setIpError("");
     try {
-      // Use HTTPS India Post public API (CORS-enabled)
-      const resp = await fetch(`http://www.postalpincode.in/api/pincode/${pin}`);
-      let data = null;
-      try {
-        data = await resp.json();
-      } catch {
-        data = null;
-      }
+      // Call server-side proxy to legacy India Post endpoint to avoid Mixed Content
+      const resp = await API.get(`/location/pincode/legacy/${pin}/`, { timeout: 15000, signal: controller ? controller.signal : undefined });
+      // Ignore if a newer request has started
+      if (seq !== pinReqSeqRef.current) return;
+      const data = resp?.data;
       const body = Array.isArray(data) ? data[0] : data;
       const status = body?.Status || body?.status;
       const offices = body?.PostOffice || body?.postOffice;
       if (String(status) !== "Success" || !Array.isArray(offices) || offices.length === 0) {
-        setIpError("Invalid Pincode");
-        setAreaOptions([]);
-        setSelectedArea("");
-        setIpTaluk("");
-        setIpDistrict("");
-        setIpState("");
-        setIpCountry("");
+        if (seq === pinReqSeqRef.current) {
+          setIpError("Invalid Pincode");
+          setAreaOptions([]);
+          setSelectedArea("");
+          setIpTaluk("");
+          setIpDistrict("");
+          setIpState("");
+          setIpCountry("");
+        }
         return;
       }
       // Area/Post Office names
       const names = Array.from(new Set((offices || []).map((o) => o?.Name || o?.name).filter(Boolean)));
-      setAreaOptions(names);
-      setSelectedArea("");
+      if (seq === pinReqSeqRef.current) {
+        setAreaOptions(names);
+        setSelectedArea("");
+      }
 
       // Taluk/Tehsil (pick first non-empty)
       const taluks = Array.from(new Set((offices || []).map((o) => o?.Taluk || o?.taluk).filter(Boolean)));
       const taluk = taluks[0] || "";
-      setIpTaluk(taluk);
+      if (seq === pinReqSeqRef.current) setIpTaluk(taluk);
 
       // District/State/Country
       const dist = (offices.find((o) => o?.District) || {})?.District || "";
       const st = (offices.find((o) => o?.State) || {})?.State || "";
       const ctry = (offices.find((o) => o?.Country) || {})?.Country || "India";
-      setIpDistrict(dist);
-      setIpState(st);
-      setIpCountry(ctry || "India");
+      if (seq === pinReqSeqRef.current) {
+        setIpDistrict(dist);
+        setIpState(st);
+        setIpCountry(ctry || "India");
+      }
 
       // Feed geo-name hints so existing auto-mapping effects can map to selects
-      if (dist) setGeoCityName(dist);
-      if (st) setGeoStateName(st);
-      setGeoCountryName(ctry || "India");
+      if (seq === pinReqSeqRef.current) {
+        if (dist) setGeoCityName(dist);
+        if (st) setGeoStateName(st);
+        setGeoCountryName(ctry || "India");
+      }
 
       // For consumer flow, reset selects so they auto-map after Area selection
-      if (role === "user") {
+      if (seq === pinReqSeqRef.current && role === "user") {
         setSelectedCountry("");
         setSelectedState("");
         setSelectedCity("");
         setSelectedCityId("");
       }
-    } catch (_) {
+    } catch (err) {
+      // Ignore cancellations/aborts
+      if (err && (err.__canceled || err.code === "ERR_CANCELED" || /aborted|abort|canceled|cancelled/i.test(String(err.message || "")))) {
+        return;
+      }
       // Fallback to existing backend pin lookup to preserve legacy behavior
       try { await fetchFromBackendPin(code); } catch {}
-      setIpError("Invalid Pincode");
+      if (seq === pinReqSeqRef.current) setIpError("Invalid Pincode");
     } finally {
-      setIpLoading(false);
-      setAreaLoading(false);
+      if (seq === pinReqSeqRef.current) {
+        setIpLoading(false);
+        setAreaLoading(false);
+      }
     }
   };
   
@@ -525,9 +551,22 @@ const mapUIRoleToCategory = () => {
   const fetchFromBackendPin = async (code) => {
     const pin = String(code || "").replace(/\D/g, "");
     if (pin.length !== 6) return;
+
+    // Invalidate older requests and abort any inflight one
+    const seq = ++pinReqSeqRef.current;
+    try { pinAbortRef.current?.abort?.(); } catch (_) {}
+    let controller = null;
+    try {
+      if (typeof AbortController !== "undefined") {
+        controller = new AbortController();
+        pinAbortRef.current = controller;
+      }
+    } catch (_) {}
+
     try {
       setAreaLoading(true);
-      const resp = await API.get(`/location/pincode/${pin}/`);
+      const resp = await API.get(`/location/pincode/${pin}/`, { signal: controller ? controller.signal : undefined });
+      if (seq !== pinReqSeqRef.current) return;
       const payload = resp?.data || {};
       const detectedCity = payload.city || payload.district || "";
       const detectedState = payload.state || "";
@@ -538,28 +577,42 @@ const mapUIRoleToCategory = () => {
       const namesFromOffices = offices.map((po) => po?.name).filter(Boolean);
       const villages = Array.isArray(payload.villages) ? payload.villages : [];
       const allNames = Array.from(new Set([...(namesFromOffices || []), ...(villages || [])]));
-      setAreaOptions(allNames);
-      setSelectedArea("");
-      if (role === "user") {
+      if (seq === pinReqSeqRef.current) {
+        setAreaOptions(allNames);
+        setSelectedArea("");
+      }
+      if (seq === pinReqSeqRef.current && role === "user") {
         setSelectedCountry("");
         setSelectedState("");
         setSelectedCity("");
         setSelectedCityId("");
       }
 
-      if (detectedCity) setGeoCityName(detectedCity);
-      if (detectedState) setGeoStateName(detectedState);
-      if (detectedCountry) setGeoCountryName(detectedCountry);
+      if (seq === pinReqSeqRef.current) {
+        if (detectedCity) setGeoCityName(detectedCity);
+        if (detectedState) setGeoStateName(detectedState);
+        if (detectedCountry) setGeoCountryName(detectedCountry);
+      }
     } catch (e) {
-      setAreaOptions([]);
-      setSelectedArea("");
-      // ignore errors
+      // Ignore cancellations/aborts
+      if (e && (e.__canceled || e.code === "ERR_CANCELED" || /aborted|abort|canceled|cancelled/i.test(String(e.message || "")))) {
+        return;
+      }
+      if (seq === pinReqSeqRef.current) {
+        setAreaOptions([]);
+        setSelectedArea("");
+      }
+      // ignore other errors
     } finally {
-      setAreaLoading(false);
+      if (seq === pinReqSeqRef.current) setAreaLoading(false);
     }
   };
 
   const handlePincodeManualChange = (val) => {
+    // Abort any in-flight pincode lookup and invalidate previous results
+    try { pinAbortRef.current?.abort?.(); } catch (_) {}
+    pinReqSeqRef.current += 1;
+
     const next = String(val || "").replace(/\D/g, "").slice(0, 6);
     setPincode(next);
     setSelectedArea("");
@@ -725,12 +778,6 @@ const mapUIRoleToCategory = () => {
           )
         );
         setNonAgencyDistrictPincodes(pins);
-        // Keep valid selection and avoid overriding an already valid 6-digit pin
-        setPincode((prev) => {
-          const prevNorm = String(prev || "").replace(/\D/g, "").slice(0, 6);
-          if (/^\d{6}$/.test(prevNorm) && pins.includes(prevNorm)) return prevNorm;
-          return pins[0] || prevNorm || "";
-        });
       } catch {
         setNonAgencyDistrictPincodes([]);
       } finally {
@@ -1616,7 +1663,7 @@ const mapUIRoleToCategory = () => {
           value={ipTaluk}
           onChange={(e) => setIpTaluk(e.target.value)}
           sx={{ mb: 2 }}
-          disabled={!validPin || ipLoading}
+          disabled
         />
 
         <TextField
