@@ -470,10 +470,24 @@ def distribute_prime_150_payouts(
     opened_any = False
     created_five = []
     created_three = []
+    # Reuse existing structural entries for this purchase to avoid duplicates when called from approval handler
+    try:
+        _pre5 = list(AutoPoolAccount.objects.filter(owner=consumer, pool_type="FIVE_150", status="ACTIVE", source_type=src_type, source_id=src_id).order_by("id"))
+    except Exception:
+        _pre5 = []
+    try:
+        _pre3 = list(AutoPoolAccount.objects.filter(owner=consumer, pool_type="THREE_150", status="ACTIVE", source_type=src_type, source_id=src_id).order_by("id"))
+    except Exception:
+        _pre3 = []
+    _has_pre = bool(_pre5 or _pre3)
     if perform_matrix:
-        count_eff = max(0, int(cfg_count150))
-        if count_eff > 0:
-            if eff_enable_5:
+        if _has_pre:
+            created_five = _pre5
+            created_three = _pre3
+            opened_any = bool(created_five or created_three)
+        else:
+            count_eff = max(0, int(cfg_count150))
+            if eff_enable_5 and count_eff > 0:
                 for _ in range(count_eff):
                     try:
                         acc5 = AutoPoolAccount.create_five_150_for_user(
@@ -886,10 +900,25 @@ def distribute_prime_750_payouts(
     opened_any = False
     created_five = []
     created_three = []
+    # Reuse existing structural entries for this purchase to avoid duplicates when called from approval handler
+    try:
+        _pre5 = list(AutoPoolAccount.objects.filter(owner=consumer, pool_type="FIVE_150", status="ACTIVE", source_type=src_type, source_id=src_id).order_by("id"))
+    except Exception:
+        _pre5 = []
+    try:
+        _pre3 = list(AutoPoolAccount.objects.filter(owner=consumer, pool_type="THREE_150", status="ACTIVE", source_type=src_type, source_id=src_id).order_by("id"))
+    except Exception:
+        _pre3 = []
+    _has_pre = bool(_pre5 or _pre3)
     if perform_matrix:
-        count_eff = max(0, int(cfg_count750))
-        if enable_5 and count_eff > 0:
-            for _ in range(count_eff):
+        if _has_pre:
+            created_five = _pre5
+            created_three = _pre3
+            opened_any = bool(created_five or created_three)
+        else:
+            count_eff = max(0, int(cfg_count750))
+            if enable_5 and count_eff > 0:
+                for _ in range(count_eff):
                 try:
                     acc5 = AutoPoolAccount.create_five_150_for_user(
                         consumer,
