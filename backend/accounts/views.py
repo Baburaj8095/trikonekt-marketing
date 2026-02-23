@@ -1390,33 +1390,32 @@ class TeamSummaryView(APIView):
             except Exception:
                 pass
 
-        # Direct team (all direct referrals) with phone, pincode, and their direct referral counts
+        # Direct team (effective sponsor-based directs) with phone, pincode, and their direct referral counts
+        # Rule:
+        # - If a child's sponsor_id resolves to a valid user, that resolved sponsor is authoritative.
+        # - Else fallback to registered_by.
+        # This ensures admin sponsor_id changes reflect in Direct Summary immediately.
         try:
-            # Build robust sponsor identifiers (prefixed_id variants, unique_id, username, phone digits)
-            try:
-                vals = []
-                tr = (getattr(user, "prefixed_id", "") or "").strip()
-                if tr:
-                    vals.append(tr)
-                    if "-" in tr:
-                        vals.append(tr.replace("-", "", 1))
-                    else:
-                        if len(tr) > 2 and tr[:2].isalpha():
-                            vals.append(f"{tr[:2]}-{tr[2:]}")
-                uid = (getattr(user, "unique_id", "") or "").strip()
-                if uid:
-                    vals.append(uid)
-                uname = (getattr(user, "username", "") or "").strip()
-                if uname:
-                    vals.append(uname)
-                digits = "".join(ch for ch in ((getattr(user, "phone", "") or "")) if ch.isdigit())
-                if digits:
-                    vals.append(digits)
-                idents = [s for s in {v for v in vals if v}]
-            except Exception:
-                idents = []
+            # Build robust identifiers for current user to discover sponsor_id token matches.
+            vals = []
+            tr = (getattr(user, "prefixed_id", "") or "").strip()
+            if tr:
+                vals.append(tr)
+                if "-" in tr:
+                    vals.append(tr.replace("-", "", 1))
+                elif len(tr) > 2 and tr[:2].isalpha():
+                    vals.append(f"{tr[:2]}-{tr[2:]}")
+            uid = (getattr(user, "unique_id", "") or "").strip()
+            if uid:
+                vals.append(uid)
+            uname = (getattr(user, "username", "") or "").strip()
+            if uname:
+                vals.append(uname)
+            digits = "".join(ch for ch in ((getattr(user, "phone", "") or "")) if ch.isdigit())
+            if digits:
+                vals.append(digits)
+            idents = [s for s in {v for v in vals if v}]
 
-            # Resolve owner id for a given sponsor token to guard against mis-attribution
             def _owner_id_by_token(token: str):
                 try:
                     s = (token or "").strip()
@@ -1431,7 +1430,7 @@ class TeamSummaryView(APIView):
                 obj = CustomUser.objects.filter(q).only("id").first()
                 return getattr(obj, "id", None)
 
-            # Candidate pool: FK directs OR sponsor_id token match (regardless of registered_by)
+            # Candidate pool: old FK links and current sponsor token matches
             candidates = list(
                 CustomUser.objects
                 .filter(Q(registered_by_id=user.id) | Q(sponsor_id__in=idents))
@@ -1440,25 +1439,31 @@ class TeamSummaryView(APIView):
                     "id", "username", "full_name", "category", "role", "date_joined",
                     "account_active", "phone", "pincode", "registered_by_id", "sponsor_id"
                 )
-                .order_by("-date_joined")[:1000]
+                .order_by("-date_joined")[:1500]
             )
 
-            # Accept if: (a) proper FK link, or (b) sponsor_id resolves back to this user
+            # Accept only effective directs for current user
             allowed_ids = []
             for c in candidates:
                 try:
-                    if getattr(c, "registered_by_id", None) == getattr(user, "id", None):
-                        allowed_ids.append(getattr(c, "id", None))
-                        continue
                     sid = (getattr(c, "sponsor_id", "") or "").strip()
-                    if sid and sid in idents and _owner_id_by_token(sid) == getattr(user, "id", None):
-                        allowed_ids.append(getattr(c, "id", None))
+                    if sid:
+                        owner = _owner_id_by_token(sid)
+                        if owner is not None:
+                            if owner == user.id:
+                                allowed_ids.append(c.id)
+                            # sponsor_id resolved to some other user -> do not fallback to registered_by
+                            continue
+                    # fallback path only when sponsor_id is blank/unresolvable
+                    if getattr(c, "registered_by_id", None) == user.id:
+                        allowed_ids.append(c.id)
                 except Exception:
                     continue
 
             base_qs = (
                 CustomUser.objects
                 .filter(id__in=[i for i in allowed_ids if i])
+                .exclude(id=user.id)
                 .annotate(direct_referrals=Count("registrations", distinct=True))
                 .order_by("-date_joined")
             )
@@ -1481,7 +1486,9 @@ class TeamSummaryView(APIView):
         return Response(
             {
                 "downline": {
-                    "direct": (len(direct_team) if direct_team else direct_count),
+                    # Keep direct count aligned with effective direct_team list to avoid UI fallback
+                    # paths reintroducing stale registered_by-only rows.
+                    "direct": int(len(direct_team or [])),
                     "levels": {
                         "l1": levels_1_5[0] if len(levels_1_5) > 0 else 0,
                         "l2": levels_1_5[1] if len(levels_1_5) > 1 else 0,

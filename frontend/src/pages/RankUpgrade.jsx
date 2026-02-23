@@ -230,9 +230,8 @@ function RankPaymentSheet({ open, onClose, data, onSuccess }) {
         </Alert>
 
         <TextField
-          label="Transaction / UTR ID"
+          label="Transaction / UTR ID (Optional)"
           fullWidth
-          required
           sx={{ mt: 2 }}
           value={txnId}
           onChange={(e) => setTxnId(e.target.value)}
@@ -247,7 +246,7 @@ function RankPaymentSheet({ open, onClose, data, onSuccess }) {
           fullWidth
           variant="contained"
           sx={{ mt: 3, height: 52 }}
-          disabled={!txnId || submitting}
+          disabled={!file || submitting}
           onClick={async () => {
             setSubmitting(true);
             setErrorMsg("");
@@ -440,6 +439,14 @@ export default function RankUpgrade() {
     return match || null;
   }, [ranks, elig?.next_rank]);
 
+  // Effective achieved level for UI gating:
+  // If base purchase is not approved yet, keep user at level 0 so L1 stays buyable.
+  const effectiveAchievedLevel = useMemo(() => {
+    const apiLevel = Number(elig?.achieved_level || 0);
+    if (!hasApprovedBase) return 0;
+    return Math.max(0, apiLevel);
+  }, [elig?.achieved_level, hasApprovedBase]);
+
   const canUpgrade = !!elig?.eligible && !!elig?.next_rank && Number(amount) > 0;
 
   return (
@@ -504,9 +511,11 @@ export default function RankUpgrade() {
             </TableHead>
             <TableBody>
               {(ranks || []).map((r) => {
-                const achieved = Number(elig?.achieved_level || 0) >= Number(r.level_number || 0);
-                const canBuy = !achieved && Number(r.level_number || 0) > Number(elig?.achieved_level || 0);
-                const statusLabel = achieved ? "Achieved" : canBuy ? "Available" : "Locked";
+                const level = Number(r.level_number || 0);
+                const achieved = effectiveAchievedLevel >= level;
+                // Sequential unlock only: allow buying only the immediate next level
+                const canBuy = level === effectiveAchievedLevel + 1;
+                const statusLabel = achieved ? "Purchased" : canBuy ? "Available" : "Locked";
                 const statusColor = achieved ? "success" : canBuy ? "info" : "default";
                 return (
                   <TableRow key={r.id}>
@@ -529,7 +538,7 @@ export default function RankUpgrade() {
                           setInitDialog(true);
                         }}
                       >
-                        {achieved ? "Achieved" : canBuy ? "BUY" : "Locked"}
+                        {achieved ? "Purchased" : canBuy ? "BUY" : "Locked"}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -542,9 +551,11 @@ export default function RankUpgrade() {
         {/* Mobile cards */}
         <Box sx={{ display: { xs: "block", sm: "none" } }}>
           {(ranks || []).map((r) => {
-            const achieved = Number(elig?.achieved_level || 0) >= Number(r.level_number || 0);
-            const canBuy = !achieved && Number(r.level_number || 0) > Number(elig?.achieved_level || 0);
-            const statusLabel = achieved ? "Achieved" : canBuy ? "Available" : "Locked";
+            const level = Number(r.level_number || 0);
+            const achieved = effectiveAchievedLevel >= level;
+            // Sequential unlock only: allow buying only the immediate next level
+            const canBuy = level === effectiveAchievedLevel + 1;
+            const statusLabel = achieved ? "Purchased" : canBuy ? "Available" : "Locked";
             const statusColor = achieved ? "success" : canBuy ? "info" : "default";
             return (
               <Paper key={r.id} variant="outlined" sx={{ p: 1.25, mb: 1, borderRadius: 1.5 }}>
@@ -574,7 +585,7 @@ export default function RankUpgrade() {
                       setInitDialog(true);
                     }}
                   >
-                    {achieved ? "Achieved" : canBuy ? "BUY" : "Locked"}
+                    {achieved ? "Purchased" : canBuy ? "BUY" : "Locked"}
                   </Button>
                 </Stack>
               </Paper>
@@ -582,7 +593,7 @@ export default function RankUpgrade() {
           })}
         </Box>
         <Alert severity="info" sx={{ mt: 1 }}>
-          You can upgrade to any higher rank. Payable equals the cumulative cost from your current level up to the selected rank. Achieved ranks are marked.
+          Rank upgrades are sequential. First buy L1, then L2, and so on. Only your immediate next level is enabled.
         </Alert>
       </Paper>
 

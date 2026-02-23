@@ -193,9 +193,8 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
         </Alert>
 
         <TextField
-          label="Transaction / UTR ID"
+          label="Transaction / UTR ID (Optional)"
           fullWidth
-          required
           sx={{ mt: 2 }}
           value={txnId}
           onChange={(e) => setTxnId(e.target.value)}
@@ -210,7 +209,7 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
           fullWidth
           variant="contained"
           sx={{ mt: 3, height: 52 }}
-          disabled={!txnId || submitting}
+          disabled={!file || submitting}
           onClick={async () => {
             setSubmitting(true);
             setErrorMsg("");
@@ -560,4 +559,5 @@ export default function TriAppPage() {
     </Box>
   );
 }
+
 

@@ -742,29 +742,116 @@ class PromoPurchaseSerializer(serializers.ModelSerializer):
         except Exception:
             return ""
 
-    def get_sponsor_user_id(self, obj):
+    def _resolve_sponsor_user(self, obj):
+        """
+        Resolve sponsor user for API display with this priority:
+        1) Resolve from user.sponsor_id (code) against prefixed_id/username/unique_id/phone
+        2) Fallback to user.registered_by
+       
+        This keeps sponsor detail fields consistent with sponsor_code when possible.
+        """
         try:
             u = getattr(obj, "user", None)
-            reg = getattr(u, "registered_by", None)
-            return getattr(reg, "id", None)
+        except Exception:
+            u = None
+        if not u:
+            return None
+
+        # serializer-level cache to avoid repeated lookups per row
+        try:
+            cache = getattr(self, "_sponsor_user_cache", None)
+            if cache is None:
+                cache = {}
+                setattr(self, "_sponsor_user_cache", cache)
+            uid = getattr(u, "id", None)
+            if uid in cache:
+                return cache.get(uid)
+        except Exception:
+            cache = None
+            uid = None
+
+        sponsor = None
+        code = str(getattr(u, "sponsor_id", "") or "").strip()
+
+        if code:
+            try:
+                from django.db.models import Q
+                from accounts.models import CustomUser
+
+                code_lower = code.lower()
+                code_digits = "".join(ch for ch in code if ch.isdigit())
+                code_nodash = code.replace("-", "")
+
+                q = (
+                    Q(prefixed_id__iexact=code)
+                    | Q(username__iexact=code)
+                    | Q(unique_id=code)
+                    | Q(phone__iexact=code)
+                )
+                if code_digits and code_digits != code:
+                    q = q | Q(username__iexact=code_digits) | Q(phone__iexact=code_digits)
+                if code_nodash and code_nodash != code and code_nodash != code_digits:
+                    q = q | Q(prefixed_id__iexact=code_nodash)
+
+                candidates = list(CustomUser.objects.filter(q).only("id", "username", "full_name", "prefixed_id", "unique_id", "phone")[:10])
+
+                if candidates:
+                    def _score(c):
+                        try:
+                            p = str(getattr(c, "prefixed_id", "") or "").lower()
+                            un = str(getattr(c, "username", "") or "").lower()
+                            uq = str(getattr(c, "unique_id", "") or "")
+                            ph = str(getattr(c, "phone", "") or "")
+                            ph_digits = "".join(ch for ch in ph if ch.isdigit())
+                            if p == code_lower:
+                                return 0
+                            if un == code_lower:
+                                return 1
+                            if uq == code:
+                                return 2
+                            if ph == code or (code_digits and ph_digits == code_digits):
+                                return 3
+                            if code_nodash and p.replace("-", "") == code_nodash:
+                                return 4
+                        except Exception:
+                            pass
+                        return 99
+
+                    sponsor = sorted(candidates, key=_score)[0]
+            except Exception:
+                sponsor = None
+
+        if not sponsor:
+            sponsor = getattr(u, "registered_by", None)
+
+        try:
+            if cache is not None and uid is not None:
+                cache[uid] = sponsor
+        except Exception:
+            pass
+
+        return sponsor
+
+    def get_sponsor_user_id(self, obj):
+        try:
+            s = self._resolve_sponsor_user(obj)
+            return getattr(s, "id", None)
         except Exception:
             return None
 
     def get_sponsor_username(self, obj):
         try:
-            u = getattr(obj, "user", None)
-            reg = getattr(u, "registered_by", None)
-            return getattr(reg, "username", None)
+            s = self._resolve_sponsor_user(obj)
+            return getattr(s, "username", None)
         except Exception:
             return None
 
     def get_sponsor_full_name(self, obj):
         try:
-            u = getattr(obj, "user", None)
-            reg = getattr(u, "registered_by", None)
-            if not reg:
+            s = self._resolve_sponsor_user(obj)
+            if not s:
                 return ""
-            return (getattr(reg, "full_name", "") or getattr(reg, "username", "") or "")
+            return (getattr(s, "full_name", "") or getattr(s, "username", "") or "")
         except Exception:
             return ""
 

@@ -192,6 +192,7 @@ export default function AdminPromoPurchases() {
     try {
       await adminApprovePromoPurchase(r.id);
       await fetchRows();
+      alert(`Purchase #${r.id} approved successfully.`);
     } catch (e) {
       alert(e?.response?.data?.detail || "Failed to approve");
     }

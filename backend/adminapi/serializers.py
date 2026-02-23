@@ -1097,6 +1097,8 @@ class AdminUserEditSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         # Accept only whitelisted fields from admin edit dialog and grid toggles
         password = validated_data.pop("password", None)
+        sponsor_relink_requested = False
+        sponsor_target_user = None
 
         # Extract assignment arrays (admin-only, write-only)
         assign_states = validated_data.pop("assign_states", None)
@@ -1139,6 +1141,64 @@ class AdminUserEditSerializer(serializers.ModelSerializer):
                 if isinstance(sid, str):
                     validated_data["sponsor_id"] = sid.strip()
 
+                sponsor_relink_requested = True
+                sponsor_raw = str(validated_data.get("sponsor_id") or "").strip()
+
+                def _resolve_sponsor_user(token: str):
+                    s = (token or "").strip()
+                    if not s:
+                        return None
+
+                    # 1) Prefer explicit identifiers
+                    user_obj = (
+                        CustomUser.objects.filter(prefixed_id__iexact=s).first()
+                        or CustomUser.objects.filter(username__iexact=s).first()
+                        or CustomUser.objects.filter(unique_id__iexact=s).first()
+                    )
+                    if user_obj:
+                        return user_obj
+
+                    # 2) Numeric candidate: PK / phone / username digits
+                    digits = "".join(ch for ch in s if ch.isdigit())
+                    if digits and digits == s:
+                        try:
+                            user_obj = CustomUser.objects.filter(id=int(digits)).first()
+                        except Exception:
+                            user_obj = None
+                        if user_obj:
+                            return user_obj
+                        user_obj = (
+                            CustomUser.objects.filter(phone__iexact=digits).first()
+                            or CustomUser.objects.filter(username__iexact=digits).first()
+                        )
+                        if user_obj:
+                            return user_obj
+
+                    # 3) TR-like dashed/undashed variant
+                    try:
+                        if len(s) > 2 and s[:2].isalpha():
+                            var = s.replace("-", "", 1) if "-" in s else f"{s[:2]}-{s[2:]}"
+                            user_obj = (
+                                CustomUser.objects.filter(prefixed_id__iexact=var).first()
+                                or CustomUser.objects.filter(username__iexact=var).first()
+                            )
+                            if user_obj:
+                                return user_obj
+                    except Exception:
+                        pass
+
+                    return None
+
+                if sponsor_raw:
+                    sponsor_target_user = _resolve_sponsor_user(sponsor_raw)
+                    if not sponsor_target_user:
+                        raise serializers.ValidationError({"sponsor_id": "Sponsor not found."})
+                    if int(getattr(sponsor_target_user, "id", 0) or 0) == int(getattr(instance, "id", 0) or 0):
+                        raise serializers.ValidationError({"sponsor_id": "A user cannot sponsor themselves."})
+                else:
+                    # Explicit clear from admin should unlink direct sponsor relationship too.
+                    sponsor_target_user = None
+
         # Normalize phone to digits and stage username update if phone provided
         new_username = None
         if "phone" in validated_data:
@@ -1156,6 +1216,11 @@ class AdminUserEditSerializer(serializers.ModelSerializer):
 
         # Persist basic field updates (account_active, phone, pincode, sponsor_id)
         instance = super().update(instance, validated_data)
+
+        # Keep FK genealogy relationship consistent with edited Sponsor ID.
+        # Team/Genealogy/Promo views primarily rely on registered_by.
+        if sponsor_relink_requested:
+            instance.registered_by = sponsor_target_user
 
         # Apply explicit username if provided, else sync username from phone change
         if explicit_username:
@@ -1257,6 +1322,19 @@ class AdminUserEditSerializer(serializers.ModelSerializer):
             instance.save()
         except Exception:
             instance.save()
+
+        # Fail-safe: ensure edited sponsor linkage is persisted even if legacy save paths
+        # or concurrent hooks leave registered_by stale.
+        try:
+            if sponsor_relink_requested:
+                target_id = int(getattr(sponsor_target_user, "id", 0) or 0) or None
+                current_id = getattr(instance, "registered_by_id", None)
+                if current_id != target_id:
+                    CustomUser.objects.filter(pk=instance.pk).update(registered_by_id=target_id)
+                    instance.registered_by_id = target_id
+        except Exception:
+            # Best-effort; do not block admin edit flow
+            pass
 
         # Cascade sponsor_id when username changes: update all users whose sponsor_id equals old username
         try:
