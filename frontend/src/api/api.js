@@ -1338,7 +1338,7 @@ let __notifUnread_lastData = null;
 let __notifUnread_promise = null;
 
 export async function notificationsUnreadCount(opts = {}) {
-  const { force = false, minIntervalMs = 60_000 } = opts || {};
+  const { force = false, minIntervalMs = 100_000 } = opts || {};
   const now = Date.now();
 
   if (!force) {

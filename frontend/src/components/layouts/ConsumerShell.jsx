@@ -35,6 +35,7 @@ export default function ConsumerShell({ children }) {
     { to: "/user/profile", label: "Profile", icon: "users" },
     // { to: "/user/kyc", label: "KYC", icon: "shield" },
     { to: "/user/refer-earn", label: "Refer & Earn", icon: "upload" },
+    { to: "/user/upload-wallet", label: "Upload to Wallet", icon: "upload" },
     { to: "/user/wallet", label: "Withdraw", icon: "wallet" },
     { to: "/user/history", label: "History", icon: "orders" },
     //{ to: "/user/my-team", label: "My Team", icon: "tree" },
@@ -69,7 +70,7 @@ export default function ConsumerShell({ children }) {
 
   return (
     <ShellBase
-      title={displayName}
+      title=" "
       menu={menu}
       isActive={isActive}
       onLogout={onLogout}

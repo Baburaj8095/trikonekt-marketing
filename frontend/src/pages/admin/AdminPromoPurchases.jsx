@@ -143,7 +143,7 @@ export default function AdminPromoPurchases() {
       { value: "", label: "Any kind" },
       { value: "150", label: "Prime 150" },
       { value: "750", label: "Prime 750" },
-      { value: "759", label: "Monthly (₹759)" },
+      { value: "759", label: "Monthly / Season (₹1000)" },
       { value: "monthly", label: "Monthly (all)" },
     ],
     []
@@ -322,7 +322,7 @@ export default function AdminPromoPurchases() {
             const userLabel = r.user_username ? `${r.user_username} ${r.user_id ? `(#${r.user_id})` : ""}` : (r.user_id ? `#${r.user_id}` : "");
             const sponsorLabel = r.sponsor_username ? r.sponsor_username : (r.sponsor_user_id ? `#${r.sponsor_user_id}` : (r.sponsor_code || ""));
             const pkgName = pkg.name || pkg.code || "";
-            const pkgPrice = Number(pkg.price || 0);
+            const displayUnitPrice = isMonthly ? 1000 : Number(pkg.price || 0);
             const amountPaid = Number(r.amount_paid || 0);
 
             return (
@@ -362,7 +362,7 @@ export default function AdminPromoPurchases() {
                 <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
                   <div style={{ fontWeight: 700, color: "#0f172a" }}>{pkgName}</div>
                   <div style={{ fontSize: 12, color: "#64748b" }}>
-                    ₹{pkgPrice.toFixed(2)}{monText}
+                    ₹{displayUnitPrice.toFixed(2)}{monText}
                   </div>
                   {isMonthly ? (
                     <div style={{ fontSize: 12, color: "#475569" }}>
@@ -438,7 +438,7 @@ export default function AdminPromoPurchases() {
           const userLabel = r.user_username ? `${r.user_username} ${r.user_id ? `(#${r.user_id})` : ""}` : (r.user_id ? `#${r.user_id}` : "");
           const sponsorLabel = r.sponsor_username ? r.sponsor_username : (r.sponsor_user_id ? `#${r.sponsor_user_id}` : (r.sponsor_code || ""));
           const pkgName = pkg.name || pkg.code || "";
-          const pkgPrice = Number(pkg.price || 0);
+          const displayUnitPrice = isMonthly ? 1000 : Number(pkg.price || 0);
           const amountPaid = Number(r.amount_paid || 0);
 
           return (
@@ -485,7 +485,7 @@ export default function AdminPromoPurchases() {
               <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>Package</div>
               <div style={{ fontWeight: 700, color: "#0f172a" }}>{pkgName}</div>
               <div style={{ fontSize: 12, color: "#475569" }}>
-                Type: {pkg.type || ""} • Price: ₹{pkgPrice.toFixed(2)}{monText}
+                Type: {pkg.type || ""} • Price: ₹{displayUnitPrice.toFixed(2)}{monText}
               </div>
 
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 4 }}>

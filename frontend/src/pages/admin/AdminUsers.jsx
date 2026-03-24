@@ -643,7 +643,7 @@ export default function AdminUsers() {
       },
       {
         field: "__monthly759",
-        headerName: "Monthly 759",
+        headerName: "Monthly 1000",
         minWidth: 190,
         sortable: false,
         filterable: false,

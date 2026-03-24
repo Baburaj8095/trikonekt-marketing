@@ -1588,66 +1588,59 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"detail": "KYC verification required to request withdrawal.", "code": "KYC_REQUIRED"})
 
         # Wallet balance must be >= 500 and >= requested amount
+        # Note: use main_balance (main income) as the eligibility metric (align with /wallet/me/history top.main_income_balance)
         w = Wallet.get_or_create_for_user(user)
         try:
-            wd = Decimal(w.withdrawable_balance or 0)
+            mb = Decimal(w.main_balance or 0)
         except Exception:
-            wd = Decimal("0")
-        if wd < Decimal("500"):
-            short = (Decimal("500") - wd)
+            mb = Decimal("0")
+        if mb < Decimal("500"):
+            short = (Decimal("500") - mb)
             raise serializers.ValidationError({
-                "detail": "Minimum withdrawable balance ₹500 required to enable withdrawals.",
+                "detail": "Minimum main wallet balance ₹500 required to enable withdrawals.",
                 "code": "INSUFFICIENT_MIN_BALANCE",
                 "short_by": str(short.quantize(Decimal("0.01"))),
             })
         per_tx_cap = Decimal("750.00")
-        max_now = wd if wd < per_tx_cap else per_tx_cap
+        max_now = mb if mb < per_tx_cap else per_tx_cap
         if amount > max_now:
             raise serializers.ValidationError({
                 "detail": f"Max per request is ₹{per_tx_cap.quantize(Decimal('0.00'))}. Available to withdraw now: ₹{max_now.quantize(Decimal('0.00'))}.",
                 "code": "AMOUNT_EXCEEDS_CAP_OR_BALANCE",
             })
 
-        # Enforce Wednesday 7PM-9PM IST window
         IST = ZoneInfo("Asia/Kolkata")
         now_local = timezone.now().astimezone(IST)
 
-        # Compute this week's Sunday date (Mon=0..Sun=6)
-        days_since_sun = (now_local.weekday() + 1) % 7
-        sun_date = now_local.date() - timedelta(days=days_since_sun)
+        WITHDRAWAL_DAY = 2
+        START_TIME = time(0, 0)
+        END_TIME = time(23, 59, 59)
 
-        window_start_local = datetime.combine(sun_date, time(18, 0), IST)  # 6:00 PM IST
-        window_end_local = datetime.combine(sun_date, time(23, 59, 59), IST)  # 11:59 PM IST
-
-        # Determine current/next window info
-        if now_local < window_start_local:
-            next_window_start_local = window_start_local
-        elif now_local > window_end_local:
-            next_window_start_local = datetime.combine(sun_date + timedelta(days=7), time(18, 0), IST)
-        else:
-            next_window_start_local = window_start_local
-
-        if not (window_start_local <= now_local <= window_end_local):
+        if now_local.weekday() != WITHDRAWAL_DAY:
+            days_ahead = (WITHDRAWAL_DAY - now_local.weekday() + 7) % 7
+            days_ahead = days_ahead or 7
+            next_window_start_local = datetime.combine(now_local.date() + timedelta(days=days_ahead), START_TIME, IST)
             raise serializers.ValidationError({
-                "detail": "Withdrawals can be requested only on Sunday between 6:00 PM and 11:59 PM (IST).",
-                "code": "WINDOW_CLOSED",
+                "detail": "Withdrawals are allowed only on Wednesday (12:00 AM to 11:59 PM IST).",
                 "next_window_at": next_window_start_local.astimezone(dt_timezone.utc).isoformat(),
                 "next_window_at_ist": next_window_start_local.isoformat(),
             })
 
-        # Limit to 1 request per weekly window (this Sunday 18:00–23:59 IST)
+        window_start_local = datetime.combine(now_local.date(), START_TIME, IST)
+        window_end_local = datetime.combine(now_local.date(), END_TIME, IST)
+
         window_start_utc = window_start_local.astimezone(dt_timezone.utc)
         window_end_utc = window_end_local.astimezone(dt_timezone.utc)
+
         exists_in_window = WithdrawalRequest.objects.filter(
             user=user,
             requested_at__gte=window_start_utc,
             requested_at__lte=window_end_utc,
         ).exclude(status="rejected").exists()
         if exists_in_window:
-            next_window_start_local = datetime.combine(sun_date + timedelta(days=7), time(18, 0), IST)
+            next_window_start_local = datetime.combine(now_local.date() + timedelta(days=7), START_TIME, IST)
             raise serializers.ValidationError({
-                "detail": "Only one withdrawal request is allowed per weekly window.",
-                "code": "WEEKLY_LIMIT_REACHED",
+                "detail": "Only one withdrawal request is allowed per Wednesday.",
                 "next_window_at": next_window_start_local.astimezone(dt_timezone.utc).isoformat(),
                 "next_window_at_ist": next_window_start_local.isoformat(),
             })

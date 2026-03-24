@@ -126,6 +126,7 @@ import AdminUIConfig from "./pages/admin/AdminUIConfig";
 import AdminSeedDemoData from "./pages/admin/AdminSeedDemoData";
 import RankUpgrade from "./pages/RankUpgrade";
 import AdminRankUpgrades from "./pages/admin/AdminRankUpgrades";
+import UploadToWallet from "./pages/UploadToWallet";
 
 function LegacyAuthEntry() {
   const location = useLocation();
@@ -211,7 +212,7 @@ function App() {
           path="/user/dashboard2"
           element={
             <ProtectedRoute allowedRoles={["user"]}>
-              <DashboardContent embedded />
+              <UserDashboardV2 embedded />
             </ProtectedRoute>
           }
         />
@@ -232,6 +233,16 @@ function App() {
             <ProtectedRoute allowedRoles={["user"]}>
               <ConsumerShell>
                 <ConsumerCoupon />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/upload-wallet"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <UploadToWallet />
               </ConsumerShell>
             </ProtectedRoute>
           }

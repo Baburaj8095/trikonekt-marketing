@@ -3013,20 +3013,11 @@ class CouponActivateView(APIView):
                                     dist_ok = True
                                 except Exception:
                                     dist_ok = False
-                                # Also perform consumer matrix distribution per admin config (exclude direct/self & agency here to avoid duplication)
-                                try:
-                                    from business.services.activation import open_matrix_accounts_for_coupon
-                                    open_matrix_accounts_for_coupon(
-                                        request.user,
-                                        code_obj.id,
-                                        amount_150=D("150.00"),
-                                        distribute=True,
-                                        trigger="ecoupon_activate",
-                                        include_direct_self=False,
-                                        include_agency=False,
-                                    )
-                                except Exception:
-                                    pass
+                                # NOTE:
+                                # Do NOT call open_matrix_accounts_for_coupon() here.
+                                # distribute_prime_150_payouts() already opens exactly one FIVE_150 and one THREE_150 entry
+                                # (when enabled) and pays matrix bonuses. Calling open_matrix_accounts_for_coupon again creates
+                                # duplicate matrix entries and inflates the "Self Account" count.
                                 if dist_ok:
                                     try:
                                         AuditTrail.objects.create(

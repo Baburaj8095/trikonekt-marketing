@@ -22,7 +22,7 @@ function fmtAmount(value) {
 }
 
 function computeWeeklyWindowLocal() {
-  // Compute current week's Wednesday 6:00 PM to 11:59 PM window using local time
+  // Compute current week's Wednesday 12:00 AM to Thursday 12:00 AM window using local time
   const now = new Date();
 
   // JS weekday: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
@@ -38,21 +38,21 @@ function computeWeeklyWindowLocal() {
 
   // Window start/end (local time)
   const currentStart = new Date(currentWed);
-  currentStart.setHours(18, 0, 0, 0); // 6:00 PM
+  currentStart.setHours(0, 0, 0, 0); // Wednesday 12:00 AM
   const currentEnd = new Date(currentWed);
-  currentEnd.setHours(23, 59, 59, 999); // 11:59 PM
+  currentEnd.setHours(23, 59, 59, 999); // Wednesday 11:59:59.999 PM
 
-  // Open state
-  const isOpen = now >= currentStart && now < currentEnd;
+  // Open state (whole 24 hours of Wednesday)
+  const isOpen = now >= currentStart && now <= currentEnd;
 
   // Next window start
-  let nextStart = new Date(currentStart);
-  if (now >= currentEnd) {
+  let nextStart = new Date(currentWed);
+  if (now > currentEnd) {
     // next week's Wednesday
-    nextStart = new Date(currentStart);
     nextStart.setDate(nextStart.getDate() + 7);
-  } else if (now < currentStart) {
-    nextStart = new Date(currentStart);
+  } else {
+    // current week's Wednesday or upcoming Wednesday
+    nextStart = new Date(currentWed);
   }
 
   return { isOpen, nextWindowAt: nextStart, currentStart, currentEnd };
@@ -151,7 +151,7 @@ export default function Wallet() {
         const status = String(w.status || "").toLowerCase();
         if (status === "rejected") return false;
         const dt = w.requested_at ? new Date(w.requested_at) : null;
-        return dt && dt >= wi.currentStart && dt < wi.currentEnd;
+        return dt && dt >= wi.currentStart && dt <= wi.currentEnd;
       });
     } catch {
       return false;
@@ -160,11 +160,11 @@ export default function Wallet() {
 
   const disableReason = useMemo(() => {
     if (!kyc?.verified) return "KYC verification required";
-    if (Number(withdrawableBalance) < 500) return "Minimum withdrawable balance ₹500 required";
-    if (!windowInfo?.isOpen) return "Withdrawals are allowed only on Wednesday 6:00 PM to 11:59 PM (IST)";
+    if (Number(mainBalance) < 500) return "Minimum withdrawable balance ₹500 required";
+    if (!windowInfo?.isOpen) return "Withdrawals are allowed only on Wednesday (24 hours).";
     if (inWindowCooldown) return "You have already requested a withdrawal in this week's window";
     return "";
-  }, [kyc, withdrawableBalance, windowInfo, inWindowCooldown]);
+  }, [kyc, mainBalance, windowInfo, inWindowCooldown]);
 
   useEffect(() => {
     const id = setInterval(() => setWindowInfo(computeWeeklyWindowLocal()), 30000);
@@ -305,7 +305,7 @@ export default function Wallet() {
       return;
     }
     const perTxnCap = 750;
-    const maxAvail = Math.min(Number(withdrawableBalance), perTxnCap);
+    const maxAvail = Math.min(Number(mainBalance), perTxnCap);
     if (amtNum > maxAvail) {
       setWdrErr(`Max per request is ₹${fmtAmount(perTxnCap)}. Available to withdraw now: ₹${fmtAmount(maxAvail)}.`);
       return;
@@ -431,14 +431,14 @@ export default function Wallet() {
                   Please complete KYC in the KYC section.
                 </Alert>
               ) : null}
-              {Number(withdrawableBalance) < 500 ? (
+              {Number(mainBalance) < 500 ? (
                 <Alert severity="warning" sx={{ mb: 1 }}>
                   Minimum Balance to Withdraw 500
                 </Alert>
               ) : null}
               {!windowInfo?.isOpen ? (
                 <Alert severity="info" sx={{ mb: 1 }}>
-                  Withdrawals open on Wednesday between 6:00 PM and 11:59 PM (IST).{" "}
+                  Withdrawals open all day on Wednesday.
                 </Alert>
               ) : null}
               {inWindowCooldown ? (

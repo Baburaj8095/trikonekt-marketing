@@ -522,6 +522,21 @@ class PromoPackageSerializer(serializers.ModelSerializer):
             "monthly_meta",
         ]
 
+    def to_representation(self, obj):
+        data = super().to_representation(obj)
+        try:
+            if str(getattr(obj, "type", "")) == "MONTHLY":
+                data["price"] = "1000.00"
+                if data.get("name"):
+                    data["name"] = str(data["name"]).replace("759", "1000")
+                if data.get("description"):
+                    data["description"] = str(data["description"]).replace("₹759", "₹1000").replace("759", "1000")
+                if data.get("code"):
+                    data["code"] = str(data["code"]).replace("759", "1000")
+        except Exception:
+            pass
+        return data
+
     def get_promo_products(self, obj):
         try:
             items = obj.promo_products.filter(is_active=True).select_related("product").order_by("display_order", "id")
@@ -1179,7 +1194,10 @@ class PromoPurchaseSerializer(serializers.ModelSerializer):
         except Exception:
             qty = 1
         try:
-            unit = getattr(pp.package, "price", 0) or 0
+            if str(getattr(pp.package, "type", "")) == "MONTHLY":
+                unit = 1000
+            else:
+                unit = getattr(pp.package, "price", 0) or 0
         except Exception:
             unit = 0
         try:

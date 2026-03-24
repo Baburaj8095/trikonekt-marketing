@@ -60,7 +60,7 @@ const getPlanOptions = (price) => {
   if (approx(price, 150)) return ["Redeem points"];
   // Prime 750: only two options  Redeem or Product (no separate E‑Coupons option)
   if (approx(price, 750)) return ["Redeem", "Exclusive products"];
-  if (approx(price, 759))
+  if (approx(price, 1000))
     return ["Electronics", "Home Appliances", "Furniture", "Travel & Tourism"];
   return [];
 };
@@ -448,7 +448,7 @@ function Prime150Section({ reg150Pkg, prime150Active, onBuy }) {
 /**
  * SeasonSection  Season-first flow
  * - Season selector (Season 1 active; others locked unless admin exposes)
- * - Plan selector under Season 1: Registration ₹150 | Season Prime ₹759
+ * - Plan selector under Season 1: Registration ₹150 | Season Prime ₹1000
  * - Box grid (4x3) visible only for Season Prime
  */
 function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, seasonsHints = [], seasonActive }) {
@@ -495,9 +495,9 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
   }, [enabledNumbers, selectedSeason]);
 
   // Plans (only for Season 1 per sketch)
-  const [plan, setPlan] = useState("SEASON759"); // "REG150" | "SEASON759"
+  const [plan, setPlan] = useState("SEASON1000"); // "REG150" | "SEASON1000"
   useEffect(() => {
-    if (selectedSeason !== 1) setPlan("SEASON759");
+    if (selectedSeason !== 1) setPlan("SEASON1000");
   }, [selectedSeason]);
 
   // Locked boxes from history for current season
@@ -556,7 +556,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
 
   const canBuy = !!seasonPkg && selectedBoxes.length > 0;
 
-  const amount = 759 * Math.max(0, selectedBoxes.length);
+  const amount = 1000 * Math.max(0, selectedBoxes.length);
 
   return (
     <Box sx={{ p: 2 }}>
@@ -621,9 +621,9 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
           
           <RadioGroup value={plan} onChange={(e) => setPlan(e.target.value)}>
             <FormControlLabel
-              value="SEASON759"
+              value="SEASON1000"
               control={<Radio size="small" />}
-              label="Season Prime ₹759"
+              label="Season Prime ₹1000"
             />
           </RadioGroup>
         </Box>
@@ -639,7 +639,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
       <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
         ③ Select Months
       </Typography>
-      {plan === "SEASON759" ? (
+      {plan === "SEASON1000" ? (
         <>
           <Box
             sx={{
@@ -698,12 +698,12 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
         sx={{ mt: 2, height: 48, textTransform: "none", fontWeight: 800 }}
         disabled={!canBuy}
         onClick={() => {
-          onBuy({
-            pkg: seasonPkg,
-            amount,
-            uiMeta: { plan: "Season Prime ₹759", selectedSeason, selectedBoxes },
-            purchasePayload: { package_number: selectedSeason, boxes: selectedBoxes },
-          });
+            onBuy({
+              pkg: seasonPkg,
+              amount,
+              uiMeta: { plan: "Season Prime ₹1000", selectedSeason, selectedBoxes },
+              purchasePayload: { package_number: selectedSeason, boxes: selectedBoxes },
+            });
         }}
       >
         BUY SEASON
@@ -770,12 +770,12 @@ function PromoSection({ seasonPkg, history, onBuy, seasonActive }) {
   };
 
   const canBuy = !!seasonPkg && selectedBoxes.length > 0;
-  const amount = 759 * Math.max(0, selectedBoxes.length);
+  const amount = 1000 * Math.max(0, selectedBoxes.length);
 
   return (
     <Box sx={{ p: 2 }}>
       <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5 }}>
-        Monthly Promo 759 {seasonActive ? <Chip size="small" color="success" sx={{ ml: 1 }} label="Active" /> : null}
+        Monthly Promo 1000 {seasonActive ? <Chip size="small" color="success" sx={{ ml: 1 }} label="Active" /> : null}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
         Pick months to include in this promotion.
@@ -969,7 +969,7 @@ export default function PromoPackages({ title = "Consumer Packages" } = {}) {
       return withMeta || monthlyCandidates[0];
     }
     // Fallback (legacy heuristic): closest price ~759
-    return pkgs.find((p) => approx(p?.price, 759)) || null;
+    return pkgs.find((p) => approx(p?.price, 1000)) || null;
   }, [packages]);
 
   const reg150Pkg = useMemo(() => {

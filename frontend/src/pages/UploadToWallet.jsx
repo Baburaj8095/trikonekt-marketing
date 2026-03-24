@@ -1,0 +1,409 @@
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  CircularProgress,
+  Divider,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
+import QrCode2RoundedIcon from "@mui/icons-material/QrCode2Rounded";
+import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
+import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
+import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceWalletRounded";
+import normalizeMediaUrl from "../utils/media";
+import API, { getEcouponStoreBootstrap } from "../api/api";
+import { useNavigate } from "react-router-dom";
+
+function readStoredUser() {
+  try {
+    const raw =
+      localStorage.getItem("user_user") ||
+      sessionStorage.getItem("user_user") ||
+      localStorage.getItem("user") ||
+      sessionStorage.getItem("user");
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+export default function UploadToWallet() {
+  const navigate = useNavigate();
+  const storedUser = useMemo(() => readStoredUser(), []);
+
+  const [loading, setLoading] = useState(true);
+  const [screenError, setScreenError] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+  const [paymentConfig, setPaymentConfig] = useState(null);
+  const [profile, setProfile] = useState(null);
+
+  const [form, setForm] = useState({
+    amount: "",
+    utr: "",
+    bill: null,
+  });
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      try {
+        setLoading(true);
+        setScreenError("");
+
+        const [boot, profileRes] = await Promise.allSettled([
+          getEcouponStoreBootstrap(),
+          API.get("/accounts/profile/"),
+        ]);
+
+        if (!mounted) return;
+
+        if (boot.status === "fulfilled") {
+          setPaymentConfig(boot.value?.payment_config || null);
+        }
+
+        if (profileRes.status === "fulfilled") {
+          setProfile(profileRes.value?.data || null);
+        }
+      } catch {
+        if (!mounted) return;
+        setScreenError("Failed to load upload to wallet details.");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const consumerId =
+    storedUser?.username ||
+    profile?.username ||
+    profile?.phone ||
+    "-";
+
+  const consumerName =
+    storedUser?.full_name ||
+    profile?.full_name ||
+    storedUser?.name ||
+    "Consumer";
+
+  const billName = form.bill?.name || "";
+
+  const onChange = (field) => (event) => {
+    const value = event?.target?.value ?? "";
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const onFileChange = (event) => {
+    const file = event?.target?.files?.[0] || null;
+    setForm((prev) => ({ ...prev, bill: file }));
+  };
+
+  const onSubmit = async (event) => {
+    event.preventDefault();
+    setScreenError("");
+    setSuccessMsg("");
+
+    if (!String(form.amount || "").trim()) {
+      setScreenError("Please enter the amount.");
+      return;
+    }
+
+    if (!String(form.utr || "").trim()) {
+      setScreenError("Please enter the UTR number.");
+      return;
+    }
+
+    if (!form.bill) {
+      setScreenError("Please upload the bill or payment screenshot.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      setSuccessMsg(
+        "Upload to Wallet screen is ready. Backend submission API is not yet available, so this submission is kept as UI-only for now."
+      );
+      setForm({ amount: "", utr: "", bill: null });
+    } catch {
+      setScreenError("Failed to submit upload request.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Box sx={{ maxWidth: 900, mx: "auto", px: { xs: 1, sm: 2 }, py: 2 }}>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        justifyContent="space-between"
+        alignItems={{ xs: "flex-start", sm: "center" }}
+        spacing={1.5}
+        sx={{ mb: 2 }}
+      >
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 800, color: "#0C2D48" }}>
+            Upload to Wallet
+          </Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.5 }}>
+            Add your payment details and upload the supporting bill as shown in the sketch.
+          </Typography>
+        </Box>
+
+        <Button
+          variant="outlined"
+          startIcon={<HistoryRoundedIcon />}
+          onClick={() => navigate("/user/history")}
+          sx={{ textTransform: "none", borderRadius: 2 }}
+        >
+          History
+        </Button>
+      </Stack>
+
+      {screenError ? (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {screenError}
+        </Alert>
+      ) : null}
+
+      {successMsg ? (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          {successMsg}
+        </Alert>
+      ) : null}
+
+      <Paper
+        elevation={0}
+        sx={{
+          borderRadius: 4,
+          border: "1px solid #E2E8F0",
+          overflow: "hidden",
+        }}
+      >
+        <Box
+          sx={{
+            px: { xs: 2, sm: 3 },
+            py: 2,
+            background: "linear-gradient(135deg, #0C2D48 0%, #145DA0 100%)",
+            color: "#fff",
+          }}
+        >
+          <Stack direction="row" spacing={1.25} alignItems="center">
+            <Box
+              sx={{
+                width: 46,
+                height: 46,
+                borderRadius: 2.5,
+                bgcolor: "rgba(255,255,255,0.14)",
+                display: "grid",
+                placeItems: "center",
+              }}
+            >
+              <AccountBalanceWalletRoundedIcon />
+            </Box>
+            <Box>
+              <Typography sx={{ fontWeight: 800, fontSize: 18 }}>
+                Wallet Upload Request
+              </Typography>
+              <Typography sx={{ fontSize: 13, opacity: 0.85 }}>
+                Consumer details are auto-shown below.
+              </Typography>
+            </Box>
+          </Stack>
+        </Box>
+
+        <Box sx={{ p: { xs: 2, sm: 3 } }}>
+          {loading ? (
+            <Box sx={{ py: 6, display: "grid", placeItems: "center" }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <Stack spacing={2.5}>
+              <Paper
+                variant="outlined"
+                sx={{ p: 2, borderRadius: 3, bgcolor: "#F8FAFC", borderColor: "#E2E8F0" }}
+              >
+                <Stack spacing={1.25}>
+                  <Chip
+                    label="Auto Show"
+                    color="primary"
+                    size="small"
+                    sx={{ width: "fit-content", fontWeight: 700 }}
+                  />
+                  <Typography sx={{ fontWeight: 600 }}>
+                    Consumer ID: <Box component="span" sx={{ fontWeight: 400 }}>{consumerId}</Box>
+                  </Typography>
+                  <Typography sx={{ fontWeight: 600 }}>
+                    Consumer Name: <Box component="span" sx={{ fontWeight: 400 }}>{consumerName}</Box>
+                  </Typography>
+                </Stack>
+              </Paper>
+
+              <Box component="form" onSubmit={onSubmit}>
+                <Stack spacing={2.5}>
+                  <TextField
+                    label="Amount"
+                    placeholder="Enter amount"
+                    size="small"
+                    fullWidth
+                    type="number"
+                    value={form.amount}
+                    onChange={onChange("amount")}
+                    inputProps={{ min: 0, step: "0.01" }}
+                  />
+
+                  <Paper
+                    variant="outlined"
+                    sx={{
+                      p: 2,
+                      borderRadius: 3,
+                      borderStyle: "dashed",
+                      borderColor: "#CBD5E1",
+                    }}
+                  >
+                    <Stack spacing={1.5}>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <QrCode2RoundedIcon color="primary" />
+                        <Typography sx={{ fontWeight: 700 }}>Payment Scanner</Typography>
+                      </Stack>
+
+                      {paymentConfig?.upi_qr_image_url ? (
+                        <Box
+                          component="img"
+                          src={normalizeMediaUrl(paymentConfig.upi_qr_image_url)}
+                          alt="Payment scanner"
+                          sx={{
+                            width: 170,
+                            height: 170,
+                            objectFit: "contain",
+                            borderRadius: 2,
+                            border: "1px solid #E2E8F0",
+                            bgcolor: "#fff",
+                            p: 1,
+                          }}
+                        />
+                      ) : (
+                        <Box
+                          sx={{
+                            width: 170,
+                            height: 170,
+                            borderRadius: 2,
+                            border: "1px solid #E2E8F0",
+                            bgcolor: "#F8FAFC",
+                            display: "grid",
+                            placeItems: "center",
+                            color: "text.secondary",
+                            textAlign: "center",
+                            px: 2,
+                          }}
+                        >
+                          QR scanner not configured yet.
+                        </Box>
+                      )}
+
+                      {paymentConfig?.upi_id ? (
+                        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                          UPI ID: <b>{paymentConfig.upi_id}</b>
+                        </Typography>
+                      ) : null}
+                    </Stack>
+                  </Paper>
+
+                  <TextField
+                    label="UTR No"
+                    placeholder="Enter UTR number"
+                    size="small"
+                    fullWidth
+                    value={form.utr}
+                    onChange={onChange("utr")}
+                  />
+
+                  <Paper
+                    variant="outlined"
+                    sx={{ p: 2, borderRadius: 3, borderColor: "#E2E8F0" }}
+                  >
+                    <Stack
+                      direction={{ xs: "column", sm: "row" }}
+                      spacing={1.5}
+                      justifyContent="space-between"
+                      alignItems={{ xs: "flex-start", sm: "center" }}
+                    >
+                      <Box>
+                        <Typography sx={{ fontWeight: 700, mb: 0.25 }}>
+                          Upload Bill
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                          Upload the payment screenshot, receipt, or bill.
+                        </Typography>
+                        {billName ? (
+                          <Typography variant="body2" sx={{ mt: 1, color: "#145DA0", fontWeight: 600 }}>
+                            Selected: {billName}
+                          </Typography>
+                        ) : null}
+                      </Box>
+
+                      <Button
+                        component="label"
+                        variant="outlined"
+                        startIcon={<UploadFileRoundedIcon />}
+                        sx={{ textTransform: "none", borderRadius: 2 }}
+                      >
+                        Choose File
+                        <input
+                          type="file"
+                          hidden
+                          accept="image/*,.pdf"
+                          onChange={onFileChange}
+                        />
+                      </Button>
+                    </Stack>
+                  </Paper>
+
+                  <Divider />
+
+                  <Stack
+                    direction={{ xs: "column", sm: "row" }}
+                    spacing={1.25}
+                    justifyContent="flex-start"
+                  >
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      disabled={submitting}
+                      sx={{
+                        minWidth: 160,
+                        textTransform: "none",
+                        borderRadius: 2,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {submitting ? "Submitting..." : "Submit"}
+                    </Button>
+
+                    <Button
+                      variant="text"
+                      onClick={() => navigate("/user/history")}
+                      sx={{ textTransform: "none", fontWeight: 700 }}
+                    >
+                      View History
+                    </Button>
+                  </Stack>
+                </Stack>
+              </Box>
+            </Stack>
+          )}
+        </Box>
+      </Paper>
+    </Box>
+  );
+}

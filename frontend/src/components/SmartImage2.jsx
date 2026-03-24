@@ -1,8 +1,8 @@
-﻿import { Box } from "@mui/material";
+import { Box } from "@mui/material";
 
 const MAP = {
   hero: {
-    ratio: "16 / 9",
+    maxHeight: 220,
     fit: "cover",
     bg: "#e5e7eb",
     priority: true,
@@ -17,7 +17,6 @@ const MAP = {
     fit: "cover",
     bg: "#ffffff",
   },
-
   promo: {
     ratio: "auto",
     fit: "contain",
@@ -28,14 +27,41 @@ const MAP = {
 export default function SmartImage2({ src, type = "product", sx = {} }) {
   const cfg = MAP[type];
 
+  if (type === "hero") {
+    return (
+      <Box
+        sx={{
+          bgcolor: cfg.bg,
+          overflow: "hidden",
+          width: "100%",
+          maxHeight: cfg.maxHeight,
+          lineHeight: 0,
+          ...sx,
+        }}
+      >
+        <img
+          src={src}
+          alt=""
+          loading="eager"
+          style={{
+            width: "100%",
+            height: "100%",
+            maxHeight: cfg.maxHeight,
+            objectFit: "cover",
+            display: "block",
+          }}
+        />
+      </Box>
+    );
+  }
+
   return (
     <Box
       sx={{
         bgcolor: cfg.bg,
         borderRadius: 2,
         overflow: "hidden",
-        aspectRatio:
-          cfg.ratio && cfg.ratio !== "auto" ? cfg.ratio : undefined,
+        aspectRatio: cfg.ratio && cfg.ratio !== "auto" ? cfg.ratio : undefined,
         ...sx,
       }}
     >
@@ -47,11 +73,10 @@ export default function SmartImage2({ src, type = "product", sx = {} }) {
           width: "100%",
           height: "100%",
           maxHeight: "100%",
-          objectFit: cfg.fit, // ðŸ”¥ contain for promo
+          objectFit: cfg.fit,
           display: "block",
         }}
       />
     </Box>
   );
 }
-

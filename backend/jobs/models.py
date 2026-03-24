@@ -564,21 +564,12 @@ def handle_coupon_activate(task: BackgroundTask) -> None:
                             user,
                             source={"type": "ECOUPON_150", "id": code_obj.id, "code": code_obj.code},
                         )
-                        # Ensure matrix accounts exist (no distribution here); payouts already handled by Prime 150 engine
-                        try:
-                            from business.services.activation import open_matrix_accounts_for_coupon
-                            open_matrix_accounts_for_coupon(
-                                user,
-                                code_obj.id,
-                                amount_150=D("150.00"),
-                                distribute=False,
-                                trigger="ecoupon_activate",
-                                include_direct_self=False,
-                                include_agency=False,
-                            )
-                        except Exception:
-                            # best-effort: do not fail the prime engine audit if matrix distribution errors
-                            pass
+                        # NOTE:
+                        # Do NOT call open_matrix_accounts_for_coupon() here.
+                        # The Prime 150 engine already opens the required FIVE_150 + THREE_150 entries
+                        # and pays matrix bonuses. Calling open_matrix_accounts_for_coupon() again uses
+                        # source_type="ECOUPON" (vs Prime engine's "ECOUPON_150") and creates a second set
+                        # of matrix entries, which is what caused the observed double-entry + inflated self counts.
                         AuditTrail.objects.create(
                             action="prime_150_distributed",
                             actor=user,
