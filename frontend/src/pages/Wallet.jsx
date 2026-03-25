@@ -143,28 +143,12 @@ export default function Wallet() {
   });
   const onWdrChange = (e) => setWdrForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
-  const inWindowCooldown = useMemo(() => {
-    const wi = windowInfo;
-    if (!wi || !wi.currentStart || !wi.currentEnd) return false;
-    try {
-      return (myWithdrawals || []).some((w) => {
-        const status = String(w.status || "").toLowerCase();
-        if (status === "rejected") return false;
-        const dt = w.requested_at ? new Date(w.requested_at) : null;
-        return dt && dt >= wi.currentStart && dt <= wi.currentEnd;
-      });
-    } catch {
-      return false;
-    }
-  }, [myWithdrawals, windowInfo]);
-
   const disableReason = useMemo(() => {
     if (!kyc?.verified) return "KYC verification required";
     if (Number(mainBalance) < 500) return "Minimum withdrawable balance ₹500 required";
     if (!windowInfo?.isOpen) return "Withdrawals are allowed only on Wednesday (24 hours).";
-    if (inWindowCooldown) return "You have already requested a withdrawal in this week's window";
     return "";
-  }, [kyc, mainBalance, windowInfo, inWindowCooldown]);
+  }, [kyc, mainBalance, windowInfo]);
 
   useEffect(() => {
     const id = setInterval(() => setWindowInfo(computeWeeklyWindowLocal()), 30000);
@@ -441,11 +425,7 @@ export default function Wallet() {
                   Withdrawals open all day on Wednesday.
                 </Alert>
               ) : null}
-              {inWindowCooldown ? (
-                <Alert severity="warning" sx={{ mb: 1 }}>
-                  You have already requested a withdrawal in this week's window.
-                </Alert>
-              ) : null}
+              {/* The user can request as many withdrawals as they want within the Wednesday window. */}
             </Paper>
 
             <Paper

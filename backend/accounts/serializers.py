@@ -1632,18 +1632,8 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
         window_start_utc = window_start_local.astimezone(dt_timezone.utc)
         window_end_utc = window_end_local.astimezone(dt_timezone.utc)
 
-        exists_in_window = WithdrawalRequest.objects.filter(
-            user=user,
-            requested_at__gte=window_start_utc,
-            requested_at__lte=window_end_utc,
-        ).exclude(status="rejected").exists()
-        if exists_in_window:
-            next_window_start_local = datetime.combine(now_local.date() + timedelta(days=7), START_TIME, IST)
-            raise serializers.ValidationError({
-                "detail": "Only one withdrawal request is allowed per Wednesday.",
-                "next_window_at": next_window_start_local.astimezone(dt_timezone.utc).isoformat(),
-                "next_window_at_ist": next_window_start_local.isoformat(),
-            })
+        # Removed: Restriction to only one withdrawal request per Wednesday.
+        # The user can now request multiple withdrawals within the Wednesday window.
 
         # If bank method and missing fields, hydrate from KYC
         if method == "bank" and (not bank_acc or not ifsc):
