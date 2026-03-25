@@ -647,46 +647,10 @@ class Wallet(models.Model):
             if cur_self < D("250.00"):
                 break
 
-            # Try to allocate one ₹150 e‑coupon for this user; if none available, stop (retain reserve for later)
+            # Use self-reserve ₹150 for PRIME 150 activation instead of allocating an e‑coupon.
+            # Do not attempt to allocate a CouponCode here; activation will be handled by the Prime engine.
             coupon_applied = False
             coupon_code_val = None
-            try:
-                base_qs = CouponCode.objects.filter(
-                    issued_channel="e_coupon",
-                    value=D("150.00"),
-                    status="AVAILABLE",
-                    assigned_agency__isnull=True,
-                    assigned_employee__isnull=True,
-                    assigned_consumer__isnull=True,
-                )
-                try:
-                    locking_qs = base_qs.select_for_update(skip_locked=True)
-                except Exception:
-                    locking_qs = base_qs
-                pick_ids = list(locking_qs.order_by("serial", "id").values_list("id", flat=True)[:1])
-                if not pick_ids:
-                    break  # no coupon stock; stop applying further packs for now
-                affected = (
-                    CouponCode.objects.filter(id__in=pick_ids)
-                    .filter(
-                        issued_channel="e_coupon",
-                        status="AVAILABLE",
-                        assigned_agency__isnull=True,
-                        assigned_employee__isnull=True,
-                        assigned_consumer__isnull=True,
-                    )
-                    .update(assigned_consumer_id=self.user_id, status="SOLD")
-                )
-                if affected:
-                    coupon_applied = True
-                    try:
-                        cobj = CouponCode.objects.filter(id=pick_ids[0]).only("code").first()
-                        coupon_code_val = getattr(cobj, "code", None)
-                    except Exception:
-                        coupon_code_val = None
-            except Exception:
-                # On any error resolving coupon, stop to avoid partial consumption
-                break
 
             # Deduct the pack from self-reserve and overall balance
             w.self_account_balance = (w.self_account_balance or D("0")) - D("250.00")
@@ -721,17 +685,30 @@ class Wallet(models.Model):
                 }
             )
 
-            # Record coupon issued marker if applied
-            if coupon_applied:
+            # Record prime purchase marker (₹150 used for Prime 150 activation)
+            try:
                 WalletTransaction.objects.create(
                     user=self.user,
                     amount=D("-150.00"),
                     balance_after=w.balance,
-                    type="AUTO_ECOUPON_ISSUED",
+                    type="AUTO_PURCHASE_DEBIT",
                     source_type="SELF_250_PACK",
-                    source_id="",
-                    meta={"source_type": "SELF_250_PACK", "coupon_code": coupon_code_val},
+                    source_id=str(pack_index) if pack_index is not None else "",
+                    meta={"source_type": "SELF_250_PACK", "purchase": "PRIME_150", "pack_index": pack_index},
                 )
+            except Exception:
+                pass
+
+            # Trigger Prime 150 payout engine (idempotent by source_type + source_id)
+            try:
+                from business.services.prime import distribute_prime_150_payouts
+                distribute_prime_150_payouts(
+                    self.user,
+                    source={"type": "SELF_250_PACK", "id": str(pack_index) if pack_index is not None else ""}
+                )
+            except Exception:
+                # best-effort; do not roll back pack application
+                pass
 
             # Sponsor and company portions (₹50 each). If no sponsor, route sponsor portion to company.
             sponsor_bonus = D("50.00")
@@ -773,8 +750,8 @@ class Wallet(models.Model):
                     actor=self.user,
                     notes="Applied SELF_250_PACK",
                     metadata={
-                        "coupon_applied": bool(coupon_applied),
-                        "coupon_code": coupon_code_val,
+                        "prime_used": True,
+                        "pack_index": pack_index,
                         "sponsor_id": getattr(sponsor_recipient, "id", None),
                         "company_id": getattr(company_user, "id", None),
                     },

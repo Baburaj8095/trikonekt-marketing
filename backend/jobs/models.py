@@ -360,6 +360,14 @@ def handle_coupon_activate(task: BackgroundTask) -> None:
     if not user:
         return
 
+    # Guard: SELF_250_PACK activations are processed synchronously by the self-account rule.
+    # Skip background coupon_activate tasks for SELF_250_PACK to avoid duplicate payouts.
+    try:
+        if str(source.get("type") or "").upper() == "SELF_250_PACK":
+            return
+    except Exception:
+        pass
+
     # Normalize source for e-coupon activations: attach CouponCode.id for traceability
     code_obj = None
     try:
