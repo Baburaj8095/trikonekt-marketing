@@ -28,6 +28,28 @@ function fmtAmount(value) {
   return num.toFixed(2);
 }
 
+function maskUsernameMid(u) {
+  const s = String(u || "").trim();
+  // Mask only numeric-looking usernames (phone-based) and keep others as-is.
+  if (!/^\d{8,}$/.test(s)) return s;
+  if (s.length <= 4) return s;
+  // Example: 8095918105 -> 8095****105
+  const prefix = s.slice(0, 4);
+  const suffix = s.slice(-3);
+  return `${prefix}****${suffix}`;
+}
+
+function counterpartyLabel(tx = {}) {
+  // Prefer metadata from wallet credit calls
+  const meta = tx?.meta || {};
+  const from = meta.from_user || meta.tr_username || meta.username;
+  const fromId = meta.from_user_id || meta.user_id;
+  const u = from ? maskUsernameMid(from) : "";
+  if (u) return `From ${u}`;
+  if (fromId) return `From ID ${fromId}`;
+  return "";
+}
+
 function humanizeType(t) {
   const map = {
     WITHDRAWABLE_CREDIT: "Income Credited",
@@ -381,6 +403,12 @@ function HistoryRow({ tx, onClick }) {
           >
             {typeName}
           </Typography>
+
+          {counterpartyLabel(tx) ? (
+            <Typography sx={{ fontSize: 12, color: "text.secondary", mt: 0.15 }}>
+              {counterpartyLabel(tx)}
+            </Typography>
+          ) : null}
 
           <Typography sx={{ fontSize: 12, color: "text.secondary", mt: 0.25 }}>
             {dateStr} {timeStr ? `• ${timeStr}` : ""}

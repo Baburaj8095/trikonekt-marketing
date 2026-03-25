@@ -508,6 +508,29 @@ def distribute_prime_150_payouts(
                         except Exception:
                             pass
 
+        # DEBUG: if 5-matrix opened but 3-matrix did not, stamp an audit to make the failure visible.
+        # This helps diagnose cases where 3-matrix is disabled/skipped due to config or placement constraints.
+        try:
+            if eff_enable_5 and eff_enable_3 and created_five and not created_three:
+                from coupons.models import AuditTrail
+                AuditTrail.objects.create(
+                    action="debug_prime150_three_not_opened",
+                    actor=consumer,
+                    notes="Prime150 opened 5-matrix but did not open 3-matrix",
+                    metadata={
+                        "source_type": src_type,
+                        "source_id": src_id,
+                        "mode": mode150,
+                        "count": int(cfg_count150),
+                        "eff_enable_5": bool(eff_enable_5),
+                        "eff_enable_3": bool(eff_enable_3),
+                        "created_five": int(len(created_five)),
+                        "created_three": int(len(created_three)),
+                    },
+                )
+        except Exception:
+            pass
+
         # Distribute matrix payouts for each created account (fixed_amounts preferred, else percents)
         try:
             if opened_any:
@@ -571,8 +594,12 @@ def distribute_prime_150_payouts(
                     three_levels = int(cfg2.get_matrix_three_levels())
                     row3_150 = dict(cm3.get("150", {}) or {})
                     fixed3 = list(row3_150.get("fixed_amounts") or getattr(cfg2, "three_matrix_amounts_json", []) or [])
-                    if not fixed3:
-                        fixed3 = [5] + [0] * 14
+                    # IMPORTANT:
+                    # Do NOT inject any hardcoded fallback schedule here.
+                    # If fixed3 is empty (all zeros / missing) we should fall back to percents config,
+                    # otherwise 3-matrix may appear "not working" because it pays nothing.
+                    if fixed3 and all((float(x or 0) == 0.0) for x in fixed3):
+                        fixed3 = []
                     if fixed3:
                         for acc in created_three:
                             upline15 = _matrix_ancestors(acc, depth=three_levels) or _resolve_upline(consumer, depth=three_levels)
