@@ -432,13 +432,13 @@ export default function AgencyWallet() {
       setWdrErr("Enter a valid amount.");
       return;
     }
-    const perTxnCap = 750;
-    const maxAvail = Math.min(Number(displayWithdrawWallet), perTxnCap);
-    if (amtNum > maxAvail) {
+    // No fixed per-request cap. Allow withdrawing up to available withdrawable wallet balance.
+    const availableToWithdraw = Number(displayWithdrawWallet || 0);
+    if (amtNum > availableToWithdraw) {
       setWdrErr(
-        `Max per request is ₹${fmtAmount(
-          perTxnCap
-        )}. Available to withdraw now: ₹${fmtAmount(maxAvail)}.`
+        `Amount cannot exceed your available balance (₹${fmtAmount(
+          availableToWithdraw
+        )}).`
       );
       return;
     }
@@ -755,12 +755,12 @@ export default function AgencyWallet() {
                   type="number"
                   inputProps={{
                     inputMode: "decimal",
-                    max: Math.min(Number(displayWithdrawWallet || 0), 750),
+                    max: Number(displayWithdrawWallet || 0),
                     step: "0.01",
                   }}
-                  helperText={`Available this request: ₹ ${fmtAmount(
-                    Math.min(Number(displayWithdrawWallet || 0), 750)
-                  )} (cap ₹750)`}
+                  helperText={`Available to withdraw: ₹ ${fmtAmount(
+                    Number(displayWithdrawWallet || 0)
+                  )}`}
                   required
                 />
                 <TextField

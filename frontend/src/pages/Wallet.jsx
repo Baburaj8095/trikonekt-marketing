@@ -288,10 +288,11 @@ export default function Wallet() {
       setWdrErr("Enter a valid amount.");
       return;
     }
-    const perTxnCap = 750;
-    const maxAvail = Math.min(Number(mainBalance), perTxnCap);
-    if (amtNum > maxAvail) {
-      setWdrErr(`Max per request is ₹${fmtAmount(perTxnCap)}. Available to withdraw now: ₹${fmtAmount(maxAvail)}.`);
+    // No fixed per-request cap. User can withdraw up to available wallet balance.
+    // Prefer withdrawableBalance (net) when provided by backend; fallback to mainBalance.
+    const availableToWithdraw = Number(withdrawableBalance || mainBalance || 0);
+    if (amtNum > availableToWithdraw) {
+      setWdrErr(`Amount cannot exceed your available balance (₹${fmtAmount(availableToWithdraw)}).`);
       return;
     }
     const payload = {
@@ -514,7 +515,7 @@ export default function Wallet() {
                     value={wdrForm.amount}
                     onChange={onWdrChange}
                     type="number"
-                    inputProps={{ inputMode: "decimal", max: Math.min(Number(mainBalance || 0), 750), step: "0.01" }}
+                    inputProps={{ inputMode: "decimal", max: Number(withdrawableBalance || mainBalance || 0), step: "0.01" }}
                     required
                   />
 

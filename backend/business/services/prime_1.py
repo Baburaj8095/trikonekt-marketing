@@ -554,7 +554,16 @@ def distribute_prime_150_payouts(
                                     continue
                                 if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
                                     continue
-                                meta = {"source": "FIVE_MATRIX_150_FIXED", "source_type": src_type, "source_id": src_id, "level_index": idx + 1, "fixed": True, "trigger": "PRIME_150"}
+                                meta = {
+                                    "source": "FIVE_MATRIX_150_FIXED",
+                                    "source_type": src_type,
+                                    "source_id": src_id,
+                                    "level_index": idx + 1,
+                                    "fixed": True,
+                                    "trigger": "PRIME_150",
+                                    "from_user_id": getattr(consumer, "id", None),
+                                    "from_user": getattr(consumer, "username", None),
+                                }
                                 _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_FIVE", meta=meta, source_type=src_type, source_id=src_id)
                                 _update_matrix_progress(recipient, pool_type="FIVE_150", level=idx + 1, amount=amt)
                     else:
@@ -576,7 +585,16 @@ def distribute_prime_150_payouts(
                                     continue
                                 if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
                                     continue
-                                meta = {"source": "FIVE_MATRIX_150", "source_type": src_type, "source_id": src_id, "level_index": idx + 1, "percent": str(pct), "trigger": "PRIME_150"}
+                                meta = {
+                                    "source": "FIVE_MATRIX_150",
+                                    "source_type": src_type,
+                                    "source_id": src_id,
+                                    "level_index": idx + 1,
+                                    "percent": str(pct),
+                                    "trigger": "PRIME_150",
+                                    "from_user_id": getattr(consumer, "id", None),
+                                    "from_user": getattr(consumer, "username", None),
+                                }
                                 _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_FIVE", meta=meta, source_type=src_type, source_id=src_id)
                                 _update_matrix_progress(recipient, pool_type="FIVE_150", level=idx + 1, amount=amt)
 
@@ -604,7 +622,16 @@ def distribute_prime_150_payouts(
                                     continue
                                 if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
                                     continue
-                                meta = {"source": "THREE_MATRIX_150_FIXED", "source_type": src_type, "source_id": src_id, "level_index": idx + 1, "fixed": True, "trigger": "PRIME_150"}
+                                meta = {
+                                    "source": "THREE_MATRIX_150_FIXED",
+                                    "source_type": src_type,
+                                    "source_id": src_id,
+                                    "level_index": idx + 1,
+                                    "fixed": True,
+                                    "trigger": "PRIME_150",
+                                    "from_user_id": getattr(consumer, "id", None),
+                                    "from_user": getattr(consumer, "username", None),
+                                }
                                 _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_THREE", meta=meta, source_type=src_type, source_id=src_id)
                                 _update_matrix_progress(recipient, pool_type="THREE_150", level=idx + 1, amount=amt)
                     else:
@@ -626,7 +653,16 @@ def distribute_prime_150_payouts(
                                     continue
                                 if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
                                     continue
-                                meta = {"source": "THREE_MATRIX_150", "source_type": src_type, "source_id": src_id, "level_index": idx + 1, "percent": str(pct), "trigger": "PRIME_150"}
+                                meta = {
+                                    "source": "THREE_MATRIX_150",
+                                    "source_type": src_type,
+                                    "source_id": src_id,
+                                    "level_index": idx + 1,
+                                    "percent": str(pct),
+                                    "trigger": "PRIME_150",
+                                    "from_user_id": getattr(consumer, "id", None),
+                                    "from_user": getattr(consumer, "username", None),
+                                }
                                 _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_THREE", meta=meta, source_type=src_type, source_id=src_id)
                                 _update_matrix_progress(recipient, pool_type="THREE_150", level=idx + 1, amount=amt)
         except Exception:
@@ -997,7 +1033,16 @@ def distribute_prime_750_payouts(
                                     continue
                                 if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
                                     continue
-                                meta = {"source": "FIVE_MATRIX_750_FIXED", "source_type": src_type, "source_id": src_id, "level_index": idx + 1, "fixed": True, "trigger": "PRIME_750"}
+                                meta = {
+                                    "source": "FIVE_MATRIX_750_FIXED",
+                                    "source_type": src_type,
+                                    "source_id": src_id,
+                                    "level_index": idx + 1,
+                                    "fixed": True,
+                                    "trigger": "PRIME_750",
+                                    "from_user_id": getattr(consumer, "id", None),
+                                    "from_user": getattr(consumer, "username", None),
+                                }
                                 _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_FIVE", meta=meta, source_type=src_type, source_id=src_id)
                                 _update_matrix_progress(recipient, pool_type="FIVE_150", level=idx + 1, amount=amt)
                     else:
@@ -1019,7 +1064,16 @@ def distribute_prime_750_payouts(
                                     continue
                                 if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
                                     continue
-                                meta = {"source": "FIVE_MATRIX_750", "source_type": src_type, "source_id": src_id, "level_index": idx + 1, "percent": str(pct), "trigger": "PRIME_750"}
+                                meta = {
+                                    "source": "FIVE_MATRIX_750",
+                                    "source_type": src_type,
+                                    "source_id": src_id,
+                                    "level_index": idx + 1,
+                                    "percent": str(pct),
+                                    "trigger": "PRIME_750",
+                                    "from_user_id": getattr(consumer, "id", None),
+                                    "from_user": getattr(consumer, "username", None),
+                                }
                                 _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_FIVE", meta=meta, source_type=src_type, source_id=src_id)
                                 _update_matrix_progress(recipient, pool_type="FIVE_150", level=idx + 1, amount=amt)
 
@@ -1052,7 +1106,16 @@ def distribute_prime_750_payouts(
                                     continue
                                 if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
                                     continue
-                                meta = {"source": "THREE_MATRIX_750_FIXED", "source_type": src_type, "source_id": src_id, "level_index": idx + 1, "fixed": True, "trigger": "PRIME_750"}
+                                meta = {
+                                    "source": "THREE_MATRIX_750_FIXED",
+                                    "source_type": src_type,
+                                    "source_id": src_id,
+                                    "level_index": idx + 1,
+                                    "fixed": True,
+                                    "trigger": "PRIME_750",
+                                    "from_user_id": getattr(consumer, "id", None),
+                                    "from_user": getattr(consumer, "username", None),
+                                }
                                 _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_THREE", meta=meta, source_type=src_type, source_id=src_id)
                                 _update_matrix_progress(recipient, pool_type="THREE_150", level=idx + 1, amount=amt)
                     else:
@@ -1074,7 +1137,16 @@ def distribute_prime_750_payouts(
                                     continue
                                 if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
                                     continue
-                                meta = {"source": "THREE_MATRIX_750", "source_type": src_type, "source_id": src_id, "level_index": idx + 1, "percent": str(pct), "trigger": "PRIME_750"}
+                                meta = {
+                                    "source": "THREE_MATRIX_750",
+                                    "source_type": src_type,
+                                    "source_id": src_id,
+                                    "level_index": idx + 1,
+                                    "percent": str(pct),
+                                    "trigger": "PRIME_750",
+                                    "from_user_id": getattr(consumer, "id", None),
+                                    "from_user": getattr(consumer, "username", None),
+                                }
                                 _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_THREE", meta=meta, source_type=src_type, source_id=src_id)
                                 _update_matrix_progress(recipient, pool_type="THREE_150", level=idx + 1, amount=amt)
         except Exception:
