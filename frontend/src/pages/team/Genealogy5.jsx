@@ -439,6 +439,22 @@ export default function Genealogy5() {
     }
   }, [data]);
 
+  // Self Account bifurcation counts (ACTIVE positions from team summary)
+  const selfCounts = useMemo(() => {
+    try {
+      const arr = Array.isArray(myPositions) ? myPositions : [];
+      const five = arr.filter((p) => String(p?.pool_type) === "FIVE_150").length;
+      const three = arr.filter((p) => String(p?.pool_type) === "THREE_150").length;
+      return {
+        five: Math.max(0, Number(five) || 0),
+        three: Math.max(0, Number(three) || 0),
+        total: Math.max(0, Number(arr.length) || 0),
+      };
+    } catch {
+      return { five: 0, three: 0, total: 0 };
+    }
+  }, [myPositions]);
+
   const fiveRootsList = useMemo(() => {
     try {
       const arr = Array.isArray(myPositions) ? myPositions : [];
@@ -744,7 +760,7 @@ export default function Genealogy5() {
             Self Account
           </Typography>
           <Typography variant="h6" sx={{ mt: 0.25, fontWeight: 800 }}>
-            {String(myPositions.length)}
+            {`5:${selfCounts.five} | 3:${selfCounts.three}`}
           </Typography>
         </Box>
       </Box>

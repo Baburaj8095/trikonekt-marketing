@@ -270,6 +270,16 @@ class CommissionConfig(models.Model):
     )
     enable_geo_distribution_on_activation = models.BooleanField(default=False)
 
+    # ==========================
+    # Withdrawals Window Config
+    # ==========================
+    # Admin-configurable: which weekday and what time window (IST) withdrawals are allowed.
+    # weekday follows Python datetime.weekday(): Monday=0 .. Sunday=6
+    withdrawals_enabled = models.BooleanField(default=True)
+    withdrawals_weekday = models.PositiveSmallIntegerField(default=2, help_text="0=Mon .. 6=Sun")
+    withdrawals_start_time = models.TimeField(default=timezone.datetime.strptime("00:00", "%H:%M").time)
+    withdrawals_end_time = models.TimeField(default=timezone.datetime.strptime("23:59", "%H:%M").time)
+
     # Trikonekt toggles and fixed-amount configs
     enable_franchise_on_join = models.BooleanField(default=True)
     enable_franchise_on_purchase = models.BooleanField(default=True)
@@ -354,6 +364,47 @@ class CommissionConfig(models.Model):
             return self._D(str(v))
         except Exception:
             return self._D("3.00")
+
+    # ----------------------
+    # Withdrawals window
+    # ----------------------
+    def get_withdrawals_window(self) -> dict:
+        """Returns admin-configured withdrawals window.
+
+        Shape:
+          {
+            enabled: bool,
+            weekday: int (0=Mon..6=Sun),
+            start_time: datetime.time,
+            end_time: datetime.time
+          }
+
+        Note: window is interpreted in IST at request time.
+        """
+        try:
+            enabled = bool(getattr(self, "withdrawals_enabled", True))
+        except Exception:
+            enabled = True
+        try:
+            weekday = int(getattr(self, "withdrawals_weekday", 2) or 0)
+        except Exception:
+            weekday = 2
+        # Clamp weekday
+        if weekday < 0 or weekday > 6:
+            weekday = 2
+        try:
+            st = getattr(self, "withdrawals_start_time", None)
+        except Exception:
+            st = None
+        try:
+            et = getattr(self, "withdrawals_end_time", None)
+        except Exception:
+            et = None
+        # Fallback defaults
+        from datetime import time
+        st = st if st is not None else time(0, 0)
+        et = et if et is not None else time(23, 59, 59)
+        return {"enabled": enabled, "weekday": weekday, "start_time": st, "end_time": et}
 
     def get_auto_block_config(self) -> dict:
         """

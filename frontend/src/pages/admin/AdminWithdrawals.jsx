@@ -165,6 +165,24 @@ export default function AdminWithdrawals() {
   // Withdrawal tax percent (TDS) configured by admin
   const [withdrawTaxPercent, setWithdrawTaxPercent] = useState(0);
 
+  // Admin-configurable withdrawals window
+  const weekdayOptions = useMemo(
+    () => [
+      { value: 0, label: "Monday" },
+      { value: 1, label: "Tuesday" },
+      { value: 2, label: "Wednesday" },
+      { value: 3, label: "Thursday" },
+      { value: 4, label: "Friday" },
+      { value: 5, label: "Saturday" },
+      { value: 6, label: "Sunday" },
+    ],
+    []
+  );
+  const [windowCfg, setWindowCfg] = useState({ enabled: true, weekday: 2, start_time: "00:00", end_time: "23:59" });
+  const [windowSaving, setWindowSaving] = useState(false);
+  const [windowErr, setWindowErr] = useState("");
+  const [windowOk, setWindowOk] = useState("");
+
   function setF(key, val) {
     setFilters((f) => ({ ...f, [key]: val }));
   }
@@ -213,8 +231,51 @@ export default function AdminWithdrawals() {
       const res = await API.get("/admin/commission/master/", { cacheTTL: 10_000, dedupe: "cancelPrevious" });
       const pct = Number(res?.data?.tax?.percent ?? 0);
       setWithdrawTaxPercent(Number.isFinite(pct) ? pct : 0);
+
+      const wwin = res?.data?.withdrawals_window;
+      if (wwin) {
+        setWindowCfg({
+          enabled: Boolean(wwin?.enabled ?? true),
+          weekday: Number(wwin?.weekday ?? 2),
+          start_time: String(wwin?.start_time ?? "00:00").slice(0, 5),
+          end_time: String(wwin?.end_time ?? "23:59").slice(0, 5),
+        });
+      }
     } catch (_) {
       setWithdrawTaxPercent(0);
+    }
+  }
+
+  async function saveWithdrawalsWindow() {
+    setWindowSaving(true);
+    setWindowErr("");
+    setWindowOk("");
+    try {
+      const payload = {
+        withdrawals_window: {
+          enabled: Boolean(windowCfg.enabled),
+          weekday: Number(windowCfg.weekday),
+          start_time: String(windowCfg.start_time || "00:00").slice(0, 5),
+          end_time: String(windowCfg.end_time || "23:59").slice(0, 5),
+        },
+      };
+      const res = await API.patch("/admin/commission/master/", payload);
+      const wwin = res?.data?.withdrawals_window;
+      if (wwin) {
+        setWindowCfg({
+          enabled: Boolean(wwin?.enabled ?? true),
+          weekday: Number(wwin?.weekday ?? 2),
+          start_time: String(wwin?.start_time ?? "00:00").slice(0, 5),
+          end_time: String(wwin?.end_time ?? "23:59").slice(0, 5),
+        });
+      }
+      setWindowOk("Saved");
+      // auto-hide
+      setTimeout(() => setWindowOk(""), 2500);
+    } catch (e) {
+      setWindowErr(e?.response?.data?.detail || "Failed to save withdrawal window");
+    } finally {
+      setWindowSaving(false);
     }
   }
 
@@ -358,6 +419,73 @@ export default function AdminWithdrawals() {
             Withdrawal Tax: <b>{Number(taxLabel).toFixed(2)}%</b>
           </div>
           </div>
+        </div>
+      </div>
+
+      {/* Withdrawals Window Config */}
+      <div
+        style={{
+          border: "1px solid #e2e8f0",
+          borderRadius: 12,
+          padding: 12,
+          background: "#fff",
+          marginBottom: 12,
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontWeight: 900, color: "#0f172a" }}>Withdrawals Window</div>
+            <div style={{ color: "#64748b", fontSize: 13 }}>
+              Configure when users can request withdrawals (IST). This affects both frontend messages and backend enforcement.
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {windowOk ? <Badge color="#065f46" bg="#d1fae5">{windowOk}</Badge> : null}
+            {windowErr ? <Badge color="#991b1b" bg="#fee2e2">{windowErr}</Badge> : null}
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: isDesktop ? "repeat(4, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))",
+            gap: 12,
+            marginTop: 12,
+          }}
+        >
+          <Select
+            label="Enabled"
+            value={windowCfg.enabled ? "yes" : "no"}
+            onChange={(v) => setWindowCfg((s) => ({ ...s, enabled: v === "yes" }))}
+            options={[
+              { value: "yes", label: "Enabled" },
+              { value: "no", label: "Disabled" },
+            ]}
+          />
+          <Select
+            label="Weekday"
+            value={String(windowCfg.weekday)}
+            onChange={(v) => setWindowCfg((s) => ({ ...s, weekday: Number(v) }))}
+            options={weekdayOptions.map((o) => ({ value: String(o.value), label: o.label }))}
+          />
+          <TextInput
+            label="Start Time (24h)"
+            type="time"
+            value={windowCfg.start_time}
+            onChange={(v) => setWindowCfg((s) => ({ ...s, start_time: v }))}
+          />
+          <TextInput
+            label="End Time (24h)"
+            type="time"
+            value={windowCfg.end_time}
+            onChange={(v) => setWindowCfg((s) => ({ ...s, end_time: v }))}
+          />
+        </div>
+
+        <div style={{ marginTop: 12, display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <PrimaryButton disabled={windowSaving} onClick={saveWithdrawalsWindow} style={{ width: isMobile ? "100%" : 180 }}>
+            {windowSaving ? "Saving..." : "Save"}
+          </PrimaryButton>
         </div>
       </div>
 
@@ -656,6 +784,7 @@ export default function AdminWithdrawals() {
     </div>
   );
 }
+
 
 
 

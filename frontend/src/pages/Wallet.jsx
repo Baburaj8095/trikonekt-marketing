@@ -21,41 +21,53 @@ function fmtAmount(value) {
   return num.toFixed(2);
 }
 
-function computeWeeklyWindowLocal() {
-  // Compute current week's Wednesday 12:00 AM to Thursday 12:00 AM window using local time
+function computeWindowLocal(cfg) {
+  // cfg: { enabled, weekday(0=Mon..6=Sun), start_time:'HH:MM', end_time:'HH:MM' }
+  // Uses the browser's local timezone; backend enforcement is done in IST.
   const now = new Date();
+  const enabled = Boolean(cfg?.enabled ?? true);
+  // JS weekday: 0=Sun..6=Sat. Python weekday: 0=Mon..6=Sun.
+  const pyWeekday = Number(cfg?.weekday ?? 2);
+  const jsTargetDay = (pyWeekday + 1) % 7;
 
-  // JS weekday: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+  const parseHHMM = (s, fallback) => {
+    try {
+      const [hh, mm] = String(s || "").split(":").map((x) => Number(x));
+      if (!Number.isFinite(hh) || !Number.isFinite(mm)) return fallback;
+      if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return fallback;
+      return { hh, mm };
+    } catch {
+      return fallback;
+    }
+  };
+
+  const st = parseHHMM(cfg?.start_time, { hh: 0, mm: 0 });
+  const et = parseHHMM(cfg?.end_time, { hh: 23, mm: 59 });
+
+  // Find the date for this week's target weekday
   const day = now.getDay();
+  const daysSinceTarget = ((day - jsTargetDay) + 7) % 7;
+  const baseDate = new Date(now);
+  baseDate.setHours(0, 0, 0, 0);
+  baseDate.setDate(baseDate.getDate() - daysSinceTarget);
 
-  // Days since this week's Wednesday
-  const daysSinceWed = ((day - 3) + 7) % 7;
+  const start = new Date(baseDate);
+  start.setHours(st.hh, st.mm, 0, 0);
+  const end = new Date(baseDate);
+  end.setHours(et.hh, et.mm, 59, 999);
 
-  // Get this week's Wednesday date
-  const currentWed = new Date(now);
-  currentWed.setHours(0, 0, 0, 0);
-  currentWed.setDate(currentWed.getDate() - daysSinceWed);
-
-  // Window start/end (local time)
-  const currentStart = new Date(currentWed);
-  currentStart.setHours(0, 0, 0, 0); // Wednesday 12:00 AM
-  const currentEnd = new Date(currentWed);
-  currentEnd.setHours(23, 59, 59, 999); // Wednesday 11:59:59.999 PM
-
-  // Open state (whole 24 hours of Wednesday)
-  const isOpen = now >= currentStart && now <= currentEnd;
-
-  // Next window start
-  let nextStart = new Date(currentWed);
-  if (now > currentEnd) {
-    // next week's Wednesday
-    nextStart.setDate(nextStart.getDate() + 7);
-  } else {
-    // current week's Wednesday or upcoming Wednesday
-    nextStart = new Date(currentWed);
+  // If end is <= start, treat as crossing midnight to next day
+  if (end <= start) {
+    end.setDate(end.getDate() + 1);
   }
 
-  return { isOpen, nextWindowAt: nextStart, currentStart, currentEnd };
+  const isOpen = enabled && now >= start && now <= end;
+
+  // Compute next window start
+  let nextStart = new Date(start);
+  if (now > end) nextStart.setDate(nextStart.getDate() + 7);
+  if (now < start) nextStart = start;
+  return { isOpen, enabled, nextWindowAt: nextStart, currentStart: start, currentEnd: end };
 }
 
 export default function Wallet() {
@@ -71,7 +83,8 @@ export default function Wallet() {
   const [redeemPoints, setRedeemPoints] = useState({ self: 0, refer: 0 });
   const [nextBlock, setNextBlock] = useState({ completed_in_current_block: "0.00", remaining_to_next_block: "1000.00", progress_percent: 0 });
   const [kyc, setKyc] = useState({ verified: false });
-  const [windowInfo, setWindowInfo] = useState(computeWeeklyWindowLocal());
+  const [withdrawalsWindowCfg, setWithdrawalsWindowCfg] = useState({ enabled: true, weekday: 2, start_time: "00:00", end_time: "23:59" });
+  const [windowInfo, setWindowInfo] = useState(computeWindowLocal(withdrawalsWindowCfg));
   const [primeInfo, setPrimeInfo] = useState({ has150: false, has750: false, hasMonthly: false, primeDate: null, monthlyDate: null });
   const [rewards, setRewards] = useState({ total: 0, redeemed: 0 });
   const [todayEarning, setTodayEarning] = useState(0);
@@ -147,14 +160,15 @@ export default function Wallet() {
   const disableReason = useMemo(() => {
     if (!kyc?.verified) return "KYC verification required";
     if (Number(mainBalance) < 500) return "Minimum withdrawable balance ₹500 required";
-    if (!windowInfo?.isOpen) return "Withdrawals are allowed only on Wednesday (24 hours).";
+    if (!windowInfo?.enabled) return "Withdrawals are currently disabled.";
+    if (!windowInfo?.isOpen) return "Withdrawals are not allowed right now.";
     return "";
   }, [kyc, mainBalance, windowInfo]);
 
   useEffect(() => {
-    const id = setInterval(() => setWindowInfo(computeWeeklyWindowLocal()), 30000);
+    const id = setInterval(() => setWindowInfo(computeWindowLocal(withdrawalsWindowCfg)), 30000);
     return () => clearInterval(id);
-  }, []);
+  }, [withdrawalsWindowCfg]);
 
   useEffect(() => {
     let mounted = true;
@@ -203,7 +217,25 @@ export default function Wallet() {
         const wlist = Array.isArray(mw?.data) ? mw.data : mw?.data?.results || [];
         setMyWithdrawals(wlist || []);
         setKyc(kycRes?.data || { verified: false });
-        setWindowInfo(computeWeeklyWindowLocal());
+        // Load withdrawals window from admin master config
+        try {
+          const cfgRes = await API.get("/admin/commission/master/", { cacheTTL: 10_000, dedupe: "cancelPrevious" });
+          const wwin = cfgRes?.data?.withdrawals_window;
+          if (wwin) {
+            const cfg = {
+              enabled: Boolean(wwin?.enabled ?? true),
+              weekday: Number(wwin?.weekday ?? 2),
+              start_time: String(wwin?.start_time ?? "00:00").slice(0, 5),
+              end_time: String(wwin?.end_time ?? "23:59").slice(0, 5),
+            };
+            setWithdrawalsWindowCfg(cfg);
+            setWindowInfo(computeWindowLocal(cfg));
+          } else {
+            setWindowInfo(computeWindowLocal(withdrawalsWindowCfg));
+          }
+        } catch (_) {
+          setWindowInfo(computeWindowLocal(withdrawalsWindowCfg));
+        }
       } catch (e) {
         if (!mounted) return;
         setErr("Failed to load wallet. Please try again.");
@@ -424,7 +456,7 @@ export default function Wallet() {
               ) : null}
               {!windowInfo?.isOpen ? (
                 <Alert severity="info" sx={{ mb: 1 }}>
-                  Withdrawals open all day on Wednesday.
+                  Withdrawals are not allowed right now.
                 </Alert>
               ) : null}
               {/* The user can request as many withdrawals as they want within the Wednesday window. */}

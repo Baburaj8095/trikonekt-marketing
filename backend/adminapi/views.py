@@ -2686,6 +2686,12 @@ class AdminMasterCommissionConfig(APIView):
         payload = {
             "tax": {"percent": self._float(cfg.get_tax_percent())},
             "withdrawal": {"sponsor_percent": self._float(cfg.get_withdrawal_sponsor_percent())},
+            "withdrawals_window": {
+                "enabled": bool(getattr(cfg, "withdrawals_enabled", True)),
+                "weekday": int(getattr(cfg, "withdrawals_weekday", 2) or 0),
+                "start_time": (getattr(cfg, "withdrawals_start_time", None).strftime("%H:%M") if getattr(cfg, "withdrawals_start_time", None) else "00:00"),
+                "end_time": (getattr(cfg, "withdrawals_end_time", None).strftime("%H:%M") if getattr(cfg, "withdrawals_end_time", None) else "23:59"),
+            },
             "company_user": ({"id": getattr(cu, "id", None), "username": getattr(cu, "username", None)} if cu else None),
             "upline": upline,
             "geo": geo_global,
@@ -2928,6 +2934,53 @@ class AdminMasterCommissionConfig(APIView):
                 master["withdrawal"] = w
             except Exception:
                 return Response({"detail": "withdrawal.sponsor_percent must be a number"}, status=400)
+
+        # Withdrawals window (global)
+        wwin = data.get("withdrawals_window")
+        if isinstance(wwin, dict):
+            # enabled
+            if "enabled" in wwin:
+                try:
+                    cfg.withdrawals_enabled = bool(wwin.get("enabled"))
+                except Exception:
+                    cfg.withdrawals_enabled = True
+            # weekday (0=Mon..6=Sun)
+            if "weekday" in wwin:
+                try:
+                    wday = int(wwin.get("weekday"))
+                except Exception:
+                    return Response({"detail": "withdrawals_window.weekday must be an integer 0..6"}, status=400)
+                if wday < 0 or wday > 6:
+                    return Response({"detail": "withdrawals_window.weekday must be between 0 and 6"}, status=400)
+                cfg.withdrawals_weekday = wday
+            # start_time / end_time in HH:MM (24h)
+            from datetime import time as _time
+            def _parse_hhmm(val, field_name):
+                if val is None:
+                    return None
+                s = str(val).strip()
+                try:
+                    parts = s.split(":")
+                    if len(parts) != 2:
+                        raise ValueError("bad")
+                    hh = int(parts[0])
+                    mm = int(parts[1])
+                    if hh < 0 or hh > 23 or mm < 0 or mm > 59:
+                        raise ValueError("range")
+                    return _time(hh, mm)
+                except Exception:
+                    raise ValueError(f"{field_name} must be in HH:MM 24-hour format")
+
+            if "start_time" in wwin:
+                try:
+                    cfg.withdrawals_start_time = _parse_hhmm(wwin.get("start_time"), "withdrawals_window.start_time")
+                except ValueError as ve:
+                    return Response({"detail": str(ve)}, status=400)
+            if "end_time" in wwin:
+                try:
+                    cfg.withdrawals_end_time = _parse_hhmm(wwin.get("end_time"), "withdrawals_window.end_time")
+                except ValueError as ve:
+                    return Response({"detail": str(ve)}, status=400)
 
         up = data.get("upline")
         if isinstance(up, dict):

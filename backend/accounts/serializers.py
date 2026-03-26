@@ -1612,22 +1612,58 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
         IST = ZoneInfo("Asia/Kolkata")
         now_local = timezone.now().astimezone(IST)
 
-        WITHDRAWAL_DAY = 2
-        START_TIME = time(0, 0)
-        END_TIME = time(23, 59, 59)
+        # Admin-configured withdrawals window (fallback to Wednesday full-day)
+        try:
+            from business.models import CommissionConfig
+            cfg = CommissionConfig.get_solo()
+            wwin = cfg.get_withdrawals_window()
+            enabled = bool(wwin.get("enabled", True))
+            withdrawal_day = int(wwin.get("weekday", 2))
+            start_t = wwin.get("start_time") or time(0, 0)
+            end_t = wwin.get("end_time") or time(23, 59, 59)
+        except Exception:
+            enabled = True
+            withdrawal_day = 2
+            start_t = time(0, 0)
+            end_t = time(23, 59, 59)
 
-        if now_local.weekday() != WITHDRAWAL_DAY:
-            days_ahead = (WITHDRAWAL_DAY - now_local.weekday() + 7) % 7
-            days_ahead = days_ahead or 7
-            next_window_start_local = datetime.combine(now_local.date() + timedelta(days=days_ahead), START_TIME, IST)
+        if not enabled:
             raise serializers.ValidationError({
-                "detail": "Withdrawals are allowed only on Wednesday (12:00 AM to 11:59 PM IST).",
+                "detail": "Withdrawals are currently disabled by admin.",
+                "code": "WITHDRAWALS_DISABLED",
+            })
+
+        # Enforce same-day weekday
+        if now_local.weekday() != withdrawal_day:
+            days_ahead = (withdrawal_day - now_local.weekday() + 7) % 7
+            days_ahead = days_ahead or 7
+            next_window_start_local = datetime.combine(now_local.date() + timedelta(days=days_ahead), start_t, IST)
+            raise serializers.ValidationError({
+                "detail": "Withdrawals are not allowed right now. Please try in the next configured window.",
+                "code": "WITHDRAWALS_WINDOW_CLOSED",
                 "next_window_at": next_window_start_local.astimezone(dt_timezone.utc).isoformat(),
                 "next_window_at_ist": next_window_start_local.isoformat(),
             })
 
-        window_start_local = datetime.combine(now_local.date(), START_TIME, IST)
-        window_end_local = datetime.combine(now_local.date(), END_TIME, IST)
+        window_start_local = datetime.combine(now_local.date(), start_t, IST)
+        window_end_local = datetime.combine(now_local.date(), end_t, IST)
+
+        # Support windows that cross midnight (e.g., 18:00 -> 02:00 next day)
+        if window_end_local <= window_start_local:
+            window_end_local = window_end_local + timedelta(days=1)
+
+        if not (window_start_local <= now_local <= window_end_local):
+            # If we're before start, next window is today at start; else next week's configured day
+            if now_local < window_start_local:
+                next_window_start_local = window_start_local
+            else:
+                next_window_start_local = datetime.combine(now_local.date() + timedelta(days=7), start_t, IST)
+            raise serializers.ValidationError({
+                "detail": "Withdrawals are not allowed right now. Please try in the next configured window.",
+                "code": "WITHDRAWALS_WINDOW_CLOSED",
+                "next_window_at": next_window_start_local.astimezone(dt_timezone.utc).isoformat(),
+                "next_window_at_ist": next_window_start_local.isoformat(),
+            })
 
         window_start_utc = window_start_local.astimezone(dt_timezone.utc)
         window_end_utc = window_end_local.astimezone(dt_timezone.utc)
