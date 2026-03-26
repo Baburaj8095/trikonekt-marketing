@@ -2897,10 +2897,20 @@ right={
   }
 
   function renderTabWithdraw() {
+    const taxDirty =
+      mServer &&
+      Number(Number(mForm.tax_percent).toFixed(2)) !==
+        Number(Number(mServer.tax_percent).toFixed(2));
     const sponsorDirty =
       mServer &&
       Number(Number(mForm.withdrawal_sponsor_percent).toFixed(2)) !==
         Number(Number(mServer.withdrawal_sponsor_percent).toFixed(2));
+
+    async function onWithdrawTaxSave() {
+      const tp = Number(Number(mForm.tax_percent || 0).toFixed(2));
+      if (!isFinite(tp)) return;
+      await onMasterSave({ tax: { percent: tp } });
+    }
 
     async function onWithdrawSave() {
       const sp = Number(Number(mForm.withdrawal_sponsor_percent || 0).toFixed(2));
@@ -2910,6 +2920,42 @@ right={
 
     return (
       <>
+        <Section
+          title="Withdrawal Tax / TDS"
+          subtitle="Tax percent deducted from consumer withdrawal amount (separate from Sponsor Percent)."
+          right={
+            <button
+              type="button"
+              onClick={onWithdrawTaxSave}
+              disabled={mLoading || mSaving || !taxDirty}
+              style={{
+                height: 36,
+                padding: "0 16px",
+                borderRadius: 8,
+                border: "1px solid #0b8d2b",
+                background: taxDirty ? "#10b981" : "#86efac",
+                color: "#052e16",
+                fontWeight: 900,
+                cursor: mLoading || mSaving || !taxDirty ? "not-allowed" : "pointer",
+              }}
+            >
+              {mSaving ? "Saving..." : taxDirty ? "Save Changes" : "Saved"}
+            </button>
+          }
+        >
+          {mLoading ? (
+            <div style={{ color: "#64748b" }}>Loading...</div>
+          ) : (
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <Input
+                label="Withdrawal Tax / TDS Percent (%)"
+                value={mForm.tax_percent}
+                onChange={(v) => onMChange("tax_percent", v)}
+              />
+            </div>
+          )}
+        </Section>
+
         <Section
           title="Withdrawal Commission"
           subtitle="Sponsor commission percent applied on withdrawals (global)."
@@ -3063,7 +3109,10 @@ right={
     (activeTab === TABS.ACT150 && (mDirty || m150Dirty || mx150Dirty)) ||
     (activeTab === TABS.ACT750 && (mDirty || m750Dirty || mx750Dirty)) ||
     (activeTab === TABS.ACT759 && (m759Dirty || m759MonthlyDirty || mx759Dirty)) ||
-    (activeTab === TABS.WITHDRAW && (mServer && Number(Number(mForm.withdrawal_sponsor_percent||0).toFixed(2)) !== Number(Number(mServer?.withdrawal_sponsor_percent||0).toFixed(2))))
+    (activeTab === TABS.WITHDRAW && (
+      (mServer && Number(Number(mForm.withdrawal_sponsor_percent||0).toFixed(2)) !== Number(Number(mServer?.withdrawal_sponsor_percent||0).toFixed(2))) ||
+      (mServer && Number(Number(mForm.tax_percent||0).toFixed(2)) !== Number(Number(mServer?.tax_percent||0).toFixed(2)))
+    ))
   );
   const tabLoading = (
     (activeTab === TABS.ACT150 && (mLoading || m150Loading || mx150Loading)) ||
@@ -3086,10 +3135,18 @@ right={
         if (m759Dirty || m759MonthlyDirty) await onM759Save();
         if (mx759Dirty) await onMx759Save();
       } else if (activeTab === TABS.WITHDRAW) {
+        const taxDirty =
+          mServer &&
+          Number(Number(mForm.tax_percent || 0).toFixed(2)) !==
+            Number(Number(mServer.tax_percent || 0).toFixed(2));
         const sponsorDirty =
           mServer &&
           Number(Number(mForm.withdrawal_sponsor_percent).toFixed(2)) !==
             Number(Number(mServer.withdrawal_sponsor_percent).toFixed(2));
+        if (taxDirty) {
+          const tp = Number(Number(mForm.tax_percent || 0).toFixed(2));
+          await onMasterSave({ tax: { percent: tp } });
+        }
         if (sponsorDirty) {
           const sp = Number(Number(mForm.withdrawal_sponsor_percent || 0).toFixed(2));
           await onMasterSave({ withdrawal: { sponsor_percent: sp } });

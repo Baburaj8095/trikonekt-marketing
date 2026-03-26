@@ -2,6 +2,13 @@
 import useMediaQuery from "@mui/material/useMediaQuery";
 import API from "../../api/api";
 
+function q2(n) {
+  const x = Number(n || 0);
+  if (!Number.isFinite(x)) return 0;
+  // Match backend style: 2 decimals
+  return Math.floor(x * 100) / 100;
+}
+
 function TextInput({ label, value, onChange, placeholder, type = "text", style }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -155,6 +162,9 @@ export default function AdminWithdrawals() {
   const [rows, setRows] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
 
+  // Withdrawal tax percent (TDS) configured by admin
+  const [withdrawTaxPercent, setWithdrawTaxPercent] = useState(0);
+
   function setF(key, val) {
     setFilters((f) => ({ ...f, [key]: val }));
   }
@@ -198,7 +208,18 @@ export default function AdminWithdrawals() {
     }
   }
 
+  async function fetchWithdrawTax() {
+    try {
+      const res = await API.get("/admin/commission/master/", { cacheTTL: 10_000, dedupe: "cancelPrevious" });
+      const pct = Number(res?.data?.tax?.percent ?? 0);
+      setWithdrawTaxPercent(Number.isFinite(pct) ? pct : 0);
+    } catch (_) {
+      setWithdrawTaxPercent(0);
+    }
+  }
+
   useEffect(() => {
+    fetchWithdrawTax();
     fetchWithdrawals();
   }, []);
 
@@ -229,6 +250,11 @@ export default function AdminWithdrawals() {
     const totalPending = pending.reduce((s, r) => s + Number(r.amount || 0), 0);
     return { pendingCount: pending.length, pendingAmount: totalPending };
   }, [rows]);
+
+  const taxLabel = useMemo(() => {
+    const pct = Number(withdrawTaxPercent || 0);
+    return Number.isFinite(pct) ? pct : 0;
+  }, [withdrawTaxPercent]);
 
   const formatDateTime = (value) => {
     if (!value) return "";
@@ -317,6 +343,20 @@ export default function AdminWithdrawals() {
             >
               Pending: <b>{summary.pendingCount}</b> • Amount: <b>₹{summary.pendingAmount.toFixed(2)}</b>
             </div>
+
+          <div
+            style={{
+              color: "#334155",
+              fontSize: 14,
+              padding: "10px 12px",
+              border: "1px solid #e2e8f0",
+              borderRadius: 8,
+              background: "#fff",
+              width: isMobile ? "100%" : "auto",
+            }}
+          >
+            Withdrawal Tax: <b>{Number(taxLabel).toFixed(2)}%</b>
+          </div>
           </div>
         </div>
       </div>
@@ -431,6 +471,9 @@ export default function AdminWithdrawals() {
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {rows.map((r) => {
             const statusBadge = getStatusBadge(r);
+            const gross = Number(r.amount || 0);
+            const taxAmt = q2(gross * Number(taxLabel || 0) / 100);
+            const net = q2(gross - taxAmt);
             return (
               <div
                 key={r.id}
@@ -461,6 +504,15 @@ export default function AdminWithdrawals() {
                     <div style={{ fontSize: 11, color: "#64748b" }}>Amount</div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>
                       ₹{Number(r.amount || 0).toFixed(2)}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#64748b" }}>After Tax</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: "#0f172a" }}>
+                      ₹{Number(net || 0).toFixed(2)}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#64748b" }}>
+                      Tax {Number(taxLabel).toFixed(2)}% = ₹{Number(taxAmt || 0).toFixed(2)}
                     </div>
                   </div>
                   <div>
@@ -519,7 +571,7 @@ export default function AdminWithdrawals() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "80px 160px 1.2fr 120px 120px 120px 180px 220px",
+                  gridTemplateColumns: "80px 160px 1.2fr 120px 120px 110px 130px 180px 220px",
                   gap: 8,
                   padding: 12,
                   background: "#f8fafc",
@@ -534,6 +586,8 @@ export default function AdminWithdrawals() {
                 <div>Name</div>
                 <div>Amount</div>
                 <div>Method</div>
+                <div>Tax %</div>
+                <div>Final</div>
                 <div>Status</div>
                 <div>Requested</div>
                 <div>Actions</div>
@@ -542,12 +596,15 @@ export default function AdminWithdrawals() {
               <div>
                 {rows.map((r) => {
                   const statusBadge = getStatusBadge(r);
+                  const gross = Number(r.amount || 0);
+                  const taxAmt = q2(gross * Number(taxLabel || 0) / 100);
+                  const net = q2(gross - taxAmt);
                   return (
                     <div
                       key={r.id}
                       style={{
                         display: "grid",
-                        gridTemplateColumns: "80px 160px 1.2fr 120px 120px 120px 180px 220px",
+                        gridTemplateColumns: "80px 160px 1.2fr 120px 120px 110px 130px 180px 220px",
                         gap: 8,
                         padding: 12,
                         borderBottom: "1px solid #e2e8f0",
@@ -560,6 +617,8 @@ export default function AdminWithdrawals() {
                       <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.full_name || ""}</div>
                       <div style={{ fontWeight: 700 }}>₹{Number(r.amount || 0).toFixed(2)}</div>
                       <div>{r.method?.toUpperCase?.() || ""}</div>
+                      <div>{Number(taxLabel).toFixed(2)}%</div>
+                      <div style={{ fontWeight: 800 }}>₹{Number(net || 0).toFixed(2)}</div>
                       <div>{statusBadge}</div>
                       <div style={{ color: "#334155" }}>{formatDateTime(r.requested_at)}</div>
                       <div
@@ -597,5 +656,6 @@ export default function AdminWithdrawals() {
     </div>
   );
 }
+
 
 

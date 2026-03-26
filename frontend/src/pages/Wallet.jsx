@@ -88,10 +88,11 @@ export default function Wallet() {
   // Show Withdraw Wallet as Income minus 10% TDS (preview for UI display)
   const computedNetPreview = useMemo(() => {
     const gross = Number(mainBalance || 0);
-    const tdsPct = 10; // fixed 10% TDS as per requirement
+    // Use admin-configured withdrawal tax percent from backend wallet payload
+    const tdsPct = Number(taxPercent || 0);
     const net = gross - (gross * tdsPct / 100);
     return net < 0 ? 0 : net;
-  }, [mainBalance]);
+  }, [mainBalance, taxPercent]);
 
   // Sum of money earnings (wallet credits) per spec: direct refer, 5/3 matrix, global incomes, withdrawal benefits, any bonus
   const grossMoneyIncome = useMemo(() => {
@@ -450,6 +451,9 @@ export default function Wallet() {
                   </Typography>
                   <Typography sx={{ fontSize: 24, fontWeight: 900, mt: 0.2 }}>
                     ₹ {fmtAmount(mainBalance)}
+                  </Typography>
+                  <Typography sx={{ fontSize: 12, color: "text.secondary", fontWeight: 700, mt: 0.4 }}>
+                    Tax/TDS: {Number(taxPercent || 0).toFixed(2)}% • After tax: ₹ {fmtAmount(computedNetPreview)}
                   </Typography>
                 </Box>
 
