@@ -1375,14 +1375,33 @@ const mapUIRoleToCategory = () => {
     }
     // For non-agency, ensure location selections
     if (!AGENCY_CATEGORIES.has(category)) {
-      if (!selectedCountry || !selectedState || !selectedCity || !pincode) {
-        setErrorMsg("Please select Country, State, District and Pincode");
+      // In IndiaPost mode we rely on postal-derived hierarchy fields (ip*) and send names to backend.
+      // Do NOT block submission on selectedCountry/selectedState/selectedCity because those are derived
+      // via name-matching and can fail for spelling variants (e.g., Davangere/Davanagere).
+      const pinOk = /^\d{6}$/.test(String(pincode || "").replace(/\D/g, ""));
+      if (!pinOk) {
+        setErrorMsg("Please enter a valid 6-digit Pincode");
         return;
       }
+
       // Require explicit Area selection when pincode resolves to post offices
-      if (/^\d{6}$/.test(String(pincode)) && Array.isArray(areaOptions) && areaOptions.length > 0 && !selectedArea) {
+      if (Array.isArray(areaOptions) && areaOptions.length > 0 && !selectedArea) {
         setErrorMsg("Please select Area (Post Office)");
         return;
+      }
+
+      // In manual (non-IndiaPost) mode, still require explicit selects.
+      if (!useIndiaPostFlow) {
+        if (!selectedCountry || !selectedState || !selectedCity) {
+          setErrorMsg("Please select Country, State and District");
+          return;
+        }
+      } else {
+        // IndiaPost mode: ensure postal hierarchy resolved
+        if (!String(ipState || "").trim() || !String(ipDistrict || "").trim()) {
+          setErrorMsg("Please enter a valid Pincode to auto-fill State and District");
+          return;
+        }
       }
     }
 
@@ -1433,15 +1452,27 @@ const mapUIRoleToCategory = () => {
     };
 
     if (!AGENCY_CATEGORIES.has(category)) {
-      Object.assign(payload, {
-        country: selectedCountry || null,
-        state: selectedState || null,
-        city: cityId ?? (selectedCityId && /^\d+$/.test(String(selectedCityId)) ? Number(selectedCityId) : null),
-        pincode,
-        country_name: geoCountryName || "",
-        state_name: geoStateName || "",
-        city_name: geoCityName || "",
-      });
+      // In IndiaPost mode, prefer sending postal-derived names to backend so it can resolve FKs.
+      // This avoids fragile frontend name->id matching.
+      if (useIndiaPostFlow) {
+        Object.assign(payload, {
+          pincode,
+          country_name: String(ipCountry || geoCountryName || "India"),
+          state_name: String(ipState || geoStateName || ""),
+          city_name: String(ipDistrict || geoCityName || ""),
+          // IDs are optional; omit to let backend derive.
+        });
+      } else {
+        Object.assign(payload, {
+          country: selectedCountry || null,
+          state: selectedState || null,
+          city: cityId ?? (selectedCityId && /^\d+$/.test(String(selectedCityId)) ? Number(selectedCityId) : null),
+          pincode,
+          country_name: geoCountryName || "",
+          state_name: geoStateName || "",
+          city_name: geoCityName || "",
+        });
+      }
     }
 
     if (category === "agency_state_coordinator") {

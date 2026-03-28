@@ -525,17 +525,16 @@ class RegisterSerializer(serializers.ModelSerializer):
         # Keep a reference for use in create()
         self._sponsor_user = sponsor_user
 
-        # Require explicit geo selection for Consumer and Employee
-        if category in ('consumer', 'employee'):
+        # Pincode-first geo input:
+        # For Consumer, Employee, and Merchant/Business registrations we require a valid 6-digit pincode,
+        # but we do NOT require explicit Country/State/City FK selections.
+        #
+        # Reason: frontend may submit postal-derived strings (country_name/state_name/city_name)
+        # and/or only pincode + area. We resolve/derive FKs in create() (offline cache + India Post).
+        if category in ('consumer', 'employee', 'merchant', 'business'):
             pin_val = (attrs.get('pincode') or '').strip()
             if not pin_val or not pin_val.isdigit() or len(pin_val) != 6:
                 raise serializers.ValidationError({'pincode': '6-digit pincode is required.'})
-            if not attrs.get('country'):
-                raise serializers.ValidationError({'country': 'Country selection is required.'})
-            if not attrs.get('state'):
-                raise serializers.ValidationError({'state': 'State selection is required.'})
-            if not attrs.get('city'):
-                raise serializers.ValidationError({'city': 'District selection is required.'})
 
         # Enforce per-role username uniqueness (and special consumer rule)
         try:
@@ -667,13 +666,14 @@ class RegisterSerializer(serializers.ModelSerializer):
         category = validated_data.pop('category', 'consumer') or 'consumer'
         area = (validated_data.pop('area', '') or '').strip()
 
-        # Best-effort fallback: derive country/state/district (city) from pincode for Consumer, Employee and Sub-Franchise
+        # Best-effort fallback: derive country/state/district (city) from pincode for
+        # Consumer, Employee, Merchant/Business and Sub-Franchise.
         try:
             from locations.views import PINCODES_OFFLINE
         except Exception:
             PINCODES_OFFLINE = {}
         try:
-            fallback_cats = {'consumer', 'employee', 'agency_sub_franchise'}
+            fallback_cats = {'consumer', 'employee', 'merchant', 'business', 'agency_sub_franchise'}
             pin_digits = ''.join(c for c in (pincode or '') if c.isdigit())
             if (not country or not state or not city) and pin_digits and len(pin_digits) == 6 and category in fallback_cats:
                 meta = PINCODES_OFFLINE.get(pin_digits) or {}

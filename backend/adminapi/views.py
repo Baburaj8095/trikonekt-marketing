@@ -2982,6 +2982,22 @@ class AdminMasterCommissionConfig(APIView):
                 except ValueError as ve:
                     return Response({"detail": str(ve)}, status=400)
 
+            # Persist withdrawals window fields immediately.
+            # Note: These fields live on CommissionConfig model (not in master_commission_json).
+            try:
+                cfg.save(update_fields=[
+                    "withdrawals_enabled",
+                    "withdrawals_weekday",
+                    "withdrawals_start_time",
+                    "withdrawals_end_time",
+                    "updated_at",
+                ])
+            except Exception:
+                try:
+                    cfg.save()
+                except Exception:
+                    pass
+
         up = data.get("upline")
         if isinstance(up, dict):
             u = dict(master.get("upline") or {})

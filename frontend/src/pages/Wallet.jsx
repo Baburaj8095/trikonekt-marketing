@@ -70,6 +70,29 @@ function computeWindowLocal(cfg) {
   return { isOpen, enabled, nextWindowAt: nextStart, currentStart: start, currentEnd: end };
 }
 
+function weekdayLabel(pyWeekday) {
+  const w = Number(pyWeekday ?? 2);
+  const map = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+  ];
+  return map[w] || "Wednesday";
+}
+
+function hhmm(s, fallback) {
+  try {
+    const v = String(s || "").slice(0, 5);
+    return /^\d{2}:\d{2}$/.test(v) ? v : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export default function Wallet() {
   const [loading, setLoading] = useState(true);
   const [balance, setBalance] = useState("0.00"); // legacy total (for backward compatibility)
@@ -161,9 +184,14 @@ export default function Wallet() {
     if (!kyc?.verified) return "KYC verification required";
     if (Number(mainBalance) < 500) return "Minimum withdrawable balance ₹500 required";
     if (!windowInfo?.enabled) return "Withdrawals are currently disabled.";
-    if (!windowInfo?.isOpen) return "Withdrawals are not allowed right now.";
+    if (!windowInfo?.isOpen) {
+      const day = weekdayLabel(withdrawalsWindowCfg?.weekday);
+      const st = hhmm(withdrawalsWindowCfg?.start_time, "00:00");
+      const et = hhmm(withdrawalsWindowCfg?.end_time, "23:59");
+      return `Withdrawals are allowed only on ${day} between ${st} and ${et} (IST).`;
+    }
     return "";
-  }, [kyc, mainBalance, windowInfo]);
+  }, [kyc, mainBalance, windowInfo, withdrawalsWindowCfg]);
 
   useEffect(() => {
     const id = setInterval(() => setWindowInfo(computeWindowLocal(withdrawalsWindowCfg)), 30000);
@@ -454,9 +482,14 @@ export default function Wallet() {
                   Minimum Balance to Withdraw 500
                 </Alert>
               ) : null}
-              {!windowInfo?.isOpen ? (
+              {!windowInfo?.enabled ? (
+                <Alert severity="warning" sx={{ mb: 1 }}>
+                  Withdrawals are currently disabled.
+                </Alert>
+              ) : null}
+              {windowInfo?.enabled && !windowInfo?.isOpen ? (
                 <Alert severity="info" sx={{ mb: 1 }}>
-                  Withdrawals are not allowed right now.
+                  {disableReason}
                 </Alert>
               ) : null}
               {/* The user can request as many withdrawals as they want within the Wednesday window. */}
