@@ -906,6 +906,22 @@ class RegisterSerializer(serializers.ModelSerializer):
                 sel_pin = getattr(self, '_selected_pincode', None)
                 if sel_pin:
                     user.pincode = sel_pin
+                    # Sub-franchise should be able to sponsor consumers; persist their pincode assignment.
+                    # This keeps region hierarchy consistent and enables sponsor-scoped region queries.
+                    try:
+                        AgencyRegionAssignment.objects.get_or_create(
+                            user=user,
+                            level='pincode',
+                            defaults={
+                                'pincode': sel_pin,
+                                'state': getattr(self, '_selected_state', None),
+                                'district': getattr(self, '_selected_district', None),
+                            },
+                            pincode=sel_pin,
+                        )
+                    except Exception:
+                        # best-effort; do not block registration
+                        pass
                 # Best-effort: if UI provided state/district, reflect them in profile now
                 sel_state = getattr(self, '_selected_state', None)
                 sel_district = getattr(self, '_selected_district', None)
@@ -945,11 +961,17 @@ class RegisterSerializer(serializers.ModelSerializer):
                 s_name = (meta2.get('state') or '').strip()
                 d_name = (meta2.get('district') or '').strip()
 
-                # Online fallback via India Post if offline cache lacks data
+                # Online fallback via India Post if offline cache lacks data.
+                # Use the same configured retrying Session as locations.views (and same headers)
+                # so behavior matches the API endpoints used by frontend.
                 if not (c_name and s_name) or (not d_name):
                     try:
-                        import requests
-                        r = requests.get(f"https://api.postalpincode.in/pincode/{pin_digits2}", timeout=10)
+                        from locations.views import session as _session, POSTAL_HEADERS as _POSTAL_HEADERS
+                        r = _session.get(
+                            f"https://api.postalpincode.in/pincode/{pin_digits2}",
+                            headers=_POSTAL_HEADERS,
+                            timeout=15,
+                        )
                         if r.status_code == 200:
                             arr = r.json() or []
                             if isinstance(arr, list) and arr:
