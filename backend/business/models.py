@@ -580,9 +580,29 @@ class CommissionConfig(models.Model):
         m = self._m()
         try:
             v = int(m.get("matrix_three", {}).get("levels", "") or 0)
-            return v if v > 0 else int(self.three_matrix_levels or 15)
+            if v > 0:
+                return v
         except Exception:
-            return int(self.three_matrix_levels or 15)
+            pass
+        # Fallback to admin product-screen overrides when global matrix_three.levels is absent.
+        # This keeps structural placement depth aligned with AdminCommissionDistribute's
+        # product matrix tabs without changing placement semantics.
+        try:
+            cm3 = dict(m.get("consumer_matrix_3", {}) or {})
+            candidate_levels = []
+            for key in ("150", "750", "759", "rs759", "prime759", "prime_759", "monthly_759", "monthly759"):
+                row = dict(cm3.get(key, {}) or {})
+                try:
+                    lvl = int(row.get("levels", 0) or 0)
+                    if lvl > 0:
+                        candidate_levels.append(lvl)
+                except Exception:
+                    continue
+            if candidate_levels:
+                return max(candidate_levels)
+        except Exception:
+            pass
+        return int(self.three_matrix_levels or 15)
 
     def get_matrix_three_fixed_amounts(self) -> list[_D]:
         m = self._m()
@@ -614,9 +634,29 @@ class CommissionConfig(models.Model):
         m = self._m()
         try:
             v = int(m.get("matrix_five", {}).get("levels", "") or 0)
-            return v if v > 0 else int(self.five_matrix_levels or 6)
+            if v > 0:
+                return v
         except Exception:
-            return int(self.five_matrix_levels or 6)
+            pass
+        # Fallback to admin product-screen overrides when global matrix_five.levels is absent.
+        # Placement code only knows the pool type, so use the highest configured FIVE_150 depth
+        # from the admin-managed product tabs as the safe structural depth.
+        try:
+            cm5 = dict(m.get("consumer_matrix_5", {}) or {})
+            candidate_levels = []
+            for key in ("150", "750", "759", "rs759", "prime759", "prime_759", "monthly_759", "monthly759"):
+                row = dict(cm5.get(key, {}) or {})
+                try:
+                    lvl = int(row.get("levels", 0) or 0)
+                    if lvl > 0:
+                        candidate_levels.append(lvl)
+                except Exception:
+                    continue
+            if candidate_levels:
+                return max(candidate_levels)
+        except Exception:
+            pass
+        return int(self.five_matrix_levels or 6)
 
     def get_matrix_five_fixed_amounts(self) -> list[_D]:
         m = self._m()

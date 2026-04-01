@@ -1571,8 +1571,7 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
         """
         Create a withdrawal request with the following business rules:
         - KYC must be verified
-        - Withdrawable balance must be >= ₹500 (enable threshold)
-        - Per request cap is ₹750 (or current withdrawable balance, whichever is lower)
+        - Requested amount must not exceed the user's available main wallet balance
         - Only one request allowed within each Sunday 6:00 PM–11:59 PM (IST) window
         - Requests can only be made on Sunday between 18:00 and 23:59 IST
         """
@@ -1609,26 +1608,22 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
         if not kyc or not getattr(kyc, "verified", False):
             raise serializers.ValidationError({"detail": "KYC verification required to request withdrawal.", "code": "KYC_REQUIRED"})
 
-        # Wallet balance must be >= 500 and >= requested amount
+        # Wallet balance must be sufficient for the requested amount
         # Note: use main_balance (main income) as the eligibility metric (align with /wallet/me/history top.main_income_balance)
         w = Wallet.get_or_create_for_user(user)
         try:
             mb = Decimal(w.main_balance or 0)
         except Exception:
             mb = Decimal("0")
-        if mb < Decimal("500"):
-            short = (Decimal("500") - mb)
+        if mb <= Decimal("0"):
             raise serializers.ValidationError({
-                "detail": "Minimum main wallet balance ₹500 required to enable withdrawals.",
-                "code": "INSUFFICIENT_MIN_BALANCE",
-                "short_by": str(short.quantize(Decimal("0.01"))),
+                "detail": "Insufficient main wallet balance for withdrawal.",
+                "code": "INSUFFICIENT_BALANCE",
             })
-        per_tx_cap = Decimal("750.00")
-        max_now = mb if mb < per_tx_cap else per_tx_cap
-        if amount > max_now:
+        if amount > mb:
             raise serializers.ValidationError({
-                "detail": f"Max per request is ₹{per_tx_cap.quantize(Decimal('0.00'))}. Available to withdraw now: ₹{max_now.quantize(Decimal('0.00'))}.",
-                "code": "AMOUNT_EXCEEDS_CAP_OR_BALANCE",
+                "detail": f"Available to withdraw now: ₹{mb.quantize(Decimal('0.00'))}.",
+                "code": "AMOUNT_EXCEEDS_BALANCE",
             })
 
         IST = ZoneInfo("Asia/Kolkata")

@@ -127,6 +127,7 @@ import AdminSeedDemoData from "./pages/admin/AdminSeedDemoData";
 import RankUpgrade from "./pages/RankUpgrade";
 import AdminRankUpgrades from "./pages/admin/AdminRankUpgrades";
 import UploadToWallet from "./pages/UploadToWallet";
+import TeamWallet from "./screens/TeamWallet";
 
 function LegacyAuthEntry() {
   const location = useLocation();
@@ -253,6 +254,16 @@ function App() {
             <ProtectedRoute allowedRoles={["user"]}>
               <ConsumerShell>
                 <Wallet />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/team-wallet"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <TeamWallet />
               </ConsumerShell>
             </ProtectedRoute>
           }
