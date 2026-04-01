@@ -19,8 +19,11 @@ from locations.models import State
 from django.http import HttpResponse
 from django.conf import settings
 from django.utils import timezone
+from django.core.cache import cache
+from django.core.mail import send_mail
 from django.contrib.staticfiles import finders
 from io import BytesIO
+import random
 import os
 try:
     from xhtml2pdf import pisa
@@ -1714,10 +1717,18 @@ class WalletMe(APIView):
             last_prime = PromoPurchase.objects.filter(user=request.user, package__type="PRIME", status="APPROVED").order_by("-approved_at").first()
             last_prime_date = getattr(last_prime, "approved_at", None)
             monthly_active_count = PromoMonthlyBox.objects.filter(user=request.user).count()
+            monthly_pending_count = PromoPurchase.objects.filter(user=request.user, package__type="MONTHLY", status="PENDING").count()
+            approved_season_numbers = list(
+                PromoMonthlyBox.objects.filter(user=request.user)
+                .values_list("package_number", flat=True)
+                .distinct()
+            )
         except Exception:
             prime_active_count = 0
             last_prime_date = None
             monthly_active_count = 0
+            monthly_pending_count = 0
+            approved_season_numbers = []
 
         # Spin & Win eligibility
         try:
@@ -1741,6 +1752,25 @@ class WalletMe(APIView):
         except Exception:
             self_activated = 0
             monthly_self_benefit = 0
+
+        # Derived transfer wallet balances from ledger-only buckets
+        try:
+            from decimal import Decimal as D
+
+            def _wallet_sum(credit_types, debit_types=None):
+                credit = tx_all.filter(type__in=list(credit_types or []), amount__gt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")
+                debit = tx_all.filter(type__in=list(debit_types or []), amount__lt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")
+                return str((D(str(credit)) + D(str(debit))).quantize(D("0.01")))
+
+            shopping_wallet_balance = _wallet_sum(["SHOPPING_WALLET_CREDIT"], ["SHOPPING_WALLET_DEBIT"])
+            internal_wallet_balance = _wallet_sum(["INTERNAL_WALLET_CREDIT"], ["INTERNAL_WALLET_DEBIT"])
+            wallet_transfer_total = _wallet_sum(["WALLET_TO_WALLET_IN"], ["WALLET_TO_WALLET_OUT"])
+            withdrawal_wallet_balance = str((D(str(getattr(w, "withdrawable_balance", 0) or 0))).quantize(D("0.01")))
+        except Exception:
+            shopping_wallet_balance = "0.00"
+            internal_wallet_balance = "0.00"
+            wallet_transfer_total = "0.00"
+            withdrawal_wallet_balance = str(getattr(w, "withdrawable_balance", 0) or 0)
 
         return Response({
             "balance": str(w.balance),                       # total (legacy)
@@ -1773,6 +1803,8 @@ class WalletMe(APIView):
             "prime": {
                 "activeCount": int(prime_active_count),
                 "monthlyActiveCount": int(monthly_active_count),
+                "monthlyPendingCount": int(monthly_pending_count),
+                "seasonNumbers": [int(x) for x in approved_season_numbers if x is not None],
                 "lastActiveDate": last_prime_date,
             },
             "today": {
@@ -1802,8 +1834,258 @@ class WalletMe(APIView):
             },
             "limits": {
                 "minWithdraw": 500
+            },
+            "transfer_wallets": {
+                "shopping": str(shopping_wallet_balance),
+                "internal": str(internal_wallet_balance),
+                "walletToWallet": str(wallet_transfer_total),
+                "withdrawal": str(withdrawal_wallet_balance),
+            },
+            "smart_purchase": {
+                "seasonPurchasedCount": int(monthly_active_count),
+                "seasonPendingCount": int(monthly_pending_count),
+                "seasonNumbers": [int(x) for x in approved_season_numbers if x is not None],
             }
         }, status=status.HTTP_200_OK)
+
+
+def _resolve_consumer_user(identifier):
+    s = str(identifier or "").strip()
+    if not s:
+        return None
+    digits = "".join(ch for ch in s if ch.isdigit())
+    q = Q(username__iexact=s) | Q(prefixed_id__iexact=s) | Q(unique_id__iexact=s)
+    if digits:
+        q = q | Q(phone__iexact=digits)
+    user = CustomUser.objects.filter(q, category="consumer").first()
+    return user
+
+
+def _otp_cache_key(user_id, purpose):
+    return f"wallet_transfer_otp:{user_id}:{purpose}"
+
+
+def _send_wallet_otp(user, purpose, otp):
+    recipient = getattr(user, "email", None)
+    if not recipient:
+        raise serializers.ValidationError({"detail": "Email is required to send OTP."})
+    subject = "Trikonekt Wallet Transfer OTP"
+    message = (
+        f"Hello {getattr(user, 'full_name', '') or getattr(user, 'username', 'User')},\n\n"
+        f"Your OTP for {purpose.replace('_', ' ')} is: {otp}\n"
+        "This OTP is valid for 10 minutes.\n\n"
+        "If you did not request this, please ignore this email.\n\n"
+        "Regards,\nTrikonekt Team"
+    )
+    send_mail(
+        subject,
+        message,
+        getattr(settings, "DEFAULT_FROM_EMAIL", None) or getattr(settings, "EMAIL_HOST_USER", None),
+        [recipient],
+        fail_silently=False,
+    )
+
+
+def _move_main_to_derived_wallet(user, amount, target_type, extra_meta=None):
+    from decimal import Decimal as D
+
+    amount = D(str(amount or "0"))
+    if amount <= D("0"):
+        raise serializers.ValidationError({"amount": "Amount must be greater than 0."})
+
+    wallet = Wallet.get_or_create_for_user(user)
+    with transaction.atomic():
+        wallet = Wallet.objects.select_for_update().get(pk=wallet.pk)
+        if D(str(getattr(wallet, "main_balance", 0) or 0)) < amount:
+            raise serializers.ValidationError({"detail": "Insufficient main wallet balance."})
+
+        meta = {"target_wallet": target_type, **(extra_meta or {})}
+
+        if target_type == "withdrawal":
+            wallet.main_balance = (wallet.main_balance or D("0")) - amount
+            wallet.withdrawable_balance = (wallet.withdrawable_balance or D("0")) + amount
+            wallet.save(update_fields=["main_balance", "withdrawable_balance", "updated_at"])
+            WalletTransaction.objects.create(
+                user=user,
+                amount=amount * D("-1"),
+                balance_after=wallet.balance,
+                type="WITHDRAWAL_WALLET_TRANSFER_OUT",
+                source_type="MAIN_TO_WITHDRAWAL",
+                source_id="",
+                meta=meta,
+            )
+            WalletTransaction.objects.create(
+                user=user,
+                amount=amount,
+                balance_after=wallet.balance,
+                type="WITHDRAWAL_WALLET_CREDIT",
+                source_type="MAIN_TO_WITHDRAWAL",
+                source_id="",
+                meta=meta,
+            )
+            return {"status": "ok", "wallet": "withdrawal", "amount": str(amount)}
+
+        credit_type_map = {
+            "shopping": "SHOPPING_WALLET_CREDIT",
+            "internal": "INTERNAL_WALLET_CREDIT",
+        }
+        debit_type_map = {
+            "shopping": "SHOPPING_WALLET_TRANSFER_OUT",
+            "internal": "INTERNAL_WALLET_TRANSFER_OUT",
+        }
+        if target_type not in credit_type_map:
+            raise serializers.ValidationError({"detail": "Unsupported wallet transfer type."})
+
+        wallet.main_balance = (wallet.main_balance or D("0")) - amount
+        wallet.save(update_fields=["main_balance", "updated_at"])
+        WalletTransaction.objects.create(
+            user=user,
+            amount=amount * D("-1"),
+            balance_after=wallet.balance,
+            type=debit_type_map[target_type],
+            source_type=f"MAIN_TO_{target_type.upper()}",
+            source_id="",
+            meta=meta,
+        )
+        WalletTransaction.objects.create(
+            user=user,
+            amount=amount,
+            balance_after=wallet.balance,
+            type=credit_type_map[target_type],
+            source_type=f"MAIN_TO_{target_type.upper()}",
+            source_id="",
+            meta=meta,
+        )
+    return {"status": "ok", "wallet": target_type, "amount": str(amount)}
+
+
+class WalletTransferConsumerLookup(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        identifier = request.query_params.get("consumer_id") or request.query_params.get("identifier")
+        user = _resolve_consumer_user(identifier)
+        if not user:
+            return Response({"detail": "Consumer not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response({
+            "id": user.id,
+            "username": user.username,
+            "prefixed_id": getattr(user, "prefixed_id", "") or "",
+            "full_name": getattr(user, "full_name", "") or "",
+            "pincode": getattr(user, "pincode", "") or "",
+        })
+
+
+class WalletTransferOtpRequest(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        transfer_type = str(request.data.get("transfer_type") or "").strip().lower()
+        amount = request.data.get("amount")
+        target_consumer_id = request.data.get("target_consumer_id") or request.data.get("consumer_id")
+
+        allowed = {"shopping", "internal", "wallet_to_wallet", "withdrawal"}
+        if transfer_type not in allowed:
+            return Response({"detail": "Invalid transfer_type."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            from decimal import Decimal as D
+            amount_d = D(str(amount or "0"))
+        except Exception:
+            return Response({"detail": "Invalid amount."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if amount_d <= 0:
+            return Response({"detail": "Amount must be greater than 0."}, status=status.HTTP_400_BAD_REQUEST)
+
+        recipient = None
+        if transfer_type == "wallet_to_wallet":
+            recipient = _resolve_consumer_user(target_consumer_id)
+            if not recipient:
+                return Response({"detail": "Recipient consumer not found."}, status=status.HTTP_404_NOT_FOUND)
+            if recipient.id == request.user.id:
+                return Response({"detail": "You cannot transfer to yourself."}, status=status.HTTP_400_BAD_REQUEST)
+
+        otp = f"{random.randint(100000, 999999)}"
+        key = _otp_cache_key(request.user.id, transfer_type)
+        cache.set(
+            key,
+            {
+                "otp": otp,
+                "amount": str(amount_d),
+                "transfer_type": transfer_type,
+                "target_consumer_id": getattr(recipient, "id", None),
+            },
+            timeout=600,
+        )
+        _send_wallet_otp(request.user, transfer_type, otp)
+        return Response({"detail": "OTP sent to your registered email.", "expires_in": 600})
+
+
+class WalletTransferConfirm(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from decimal import Decimal as D
+
+        transfer_type = str(request.data.get("transfer_type") or "").strip().lower()
+        otp = str(request.data.get("otp") or "").strip()
+        key = _otp_cache_key(request.user.id, transfer_type)
+        payload = cache.get(key)
+        if not payload or str(payload.get("otp")) != otp:
+            return Response({"detail": "Invalid or expired OTP."}, status=status.HTTP_400_BAD_REQUEST)
+
+        amount = D(str(payload.get("amount") or "0"))
+        target_consumer_id = payload.get("target_consumer_id")
+
+        if transfer_type in {"shopping", "internal", "withdrawal"}:
+            result = _move_main_to_derived_wallet(request.user, amount, transfer_type)
+            cache.delete(key)
+            return Response(result, status=status.HTTP_200_OK)
+
+        if transfer_type == "wallet_to_wallet":
+            recipient = CustomUser.objects.filter(id=target_consumer_id, category="consumer").first()
+            if not recipient:
+                return Response({"detail": "Recipient consumer not found."}, status=status.HTTP_404_NOT_FOUND)
+
+            sender_wallet = Wallet.get_or_create_for_user(request.user)
+            with transaction.atomic():
+                sender_wallet = Wallet.objects.select_for_update().get(pk=sender_wallet.pk)
+                if D(str(getattr(sender_wallet, "main_balance", 0) or 0)) < amount:
+                    return Response({"detail": "Insufficient main wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
+                sender_wallet.main_balance = (sender_wallet.main_balance or D("0")) - amount
+                sender_wallet.save(update_fields=["main_balance", "updated_at"])
+                WalletTransaction.objects.create(
+                    user=request.user,
+                    amount=amount * D("-1"),
+                    balance_after=sender_wallet.balance,
+                    type="WALLET_TO_WALLET_OUT",
+                    source_type="WALLET_TO_WALLET",
+                    source_id=str(recipient.id),
+                    meta={"to_user_id": recipient.id, "to_user": recipient.username},
+                )
+
+                receiver_wallet = Wallet.get_or_create_for_user(recipient)
+                receiver_wallet.credit(
+                    amount,
+                    tx_type="WALLET_TO_WALLET_IN",
+                    meta={"from_user_id": request.user.id, "from_user": request.user.username, "no_withhold": True},
+                    source_type="WALLET_TO_WALLET",
+                    source_id=str(request.user.id),
+                )
+
+            cache.delete(key)
+            return Response({
+                "status": "ok",
+                "wallet": "wallet_to_wallet",
+                "amount": str(amount),
+                "recipient": {
+                    "id": recipient.id,
+                    "username": recipient.username,
+                    "full_name": getattr(recipient, "full_name", "") or "",
+                },
+            })
+
+        return Response({"detail": "Invalid transfer_type."}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class WalletTransactionSerializer(serializers.ModelSerializer):

@@ -35,6 +35,9 @@ from .views import (
     wallet_me_banks,
     wallet_purchase_ecoupon,
     wallet_purchase_product,
+    WalletTransferConsumerLookup,
+    WalletTransferOtpRequest,
+    WalletTransferConfirm,
 )
 from .token_serializers import CustomTokenRefreshView
 from .views_tree import MyFiveMatrixTeamV1, FiveMatrixCountsView, MyMatrix5EntriesTree
@@ -63,6 +66,9 @@ urlpatterns = [
     path('wallet/me/transactions/', WalletTransactionsList.as_view(), name='wallet_transactions'),
     path('wallet/me/history/', wallet_me_history, name='wallet_me_history'),
     path('wallet/me/banks/', wallet_me_banks, name='wallet_me_banks'),
+    path('wallet/transfer/lookup-consumer/', WalletTransferConsumerLookup.as_view(), name='wallet_transfer_lookup_consumer'),
+    path('wallet/transfer/request-otp/', WalletTransferOtpRequest.as_view(), name='wallet_transfer_request_otp'),
+    path('wallet/transfer/confirm/', WalletTransferConfirm.as_view(), name='wallet_transfer_confirm'),
     path('wallet/purchase/ecoupon/', wallet_purchase_ecoupon, name='wallet_purchase_ecoupon'),
     path('wallet/purchase/product/', wallet_purchase_product, name='wallet_purchase_product'),
     # KYC + Withdrawals

@@ -430,10 +430,12 @@ export default function ShellBase({
           }}
         >
           {(isMobile && !sidebarOpen) ? null : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, minHeight: "100%" }}>
               <div style={{ color: "#cbd5e1", fontWeight: 900, fontSize: 14, padding: "2px 4px 10px" }}>
                 {title} Menu
               </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1, minHeight: 0 }}>
 
               {(() => {
                 const nodes = [];
@@ -555,9 +557,11 @@ export default function ShellBase({
                 }
                 return nodes;
               })()}
+              </div>
 
-              <div style={{ marginTop: 8, borderTop: "1px solid #0b1220" }} />
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "8px 4px" }}>
+              <div style={{ marginTop: "auto", paddingTop: 8 }}>
+                <div style={{ borderTop: "1px solid #0b1220" }} />
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "8px 4px", flexWrap: "wrap" }}>
                 <div style={{ color: "#64748b", fontSize: 11 }}>
                   {footerText || `© ${new Date().getFullYear()}`}
                 </div>
@@ -577,6 +581,7 @@ export default function ShellBase({
                     Logout
                   </button>
                 ) : null}
+                </div>
               </div>
             </div>
           )}
