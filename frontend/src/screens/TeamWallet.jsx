@@ -8,7 +8,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Grid,
   LinearProgress,
   MenuItem,
   Paper,
@@ -19,7 +18,6 @@ import {
 import API from "../api/api";
 import WalletCard from "../components/WalletCard";
 
-// Icon components for actions
 import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import PaymentsIcon from "@mui/icons-material/Payments";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
@@ -42,45 +40,26 @@ function fmtAmount(value) {
 const TRANSFER_OPTIONS = [
   {
     value: "shopping",
-    label: "Transfer to Shopping Wallet",
-    helper: "Use this wallet for shopping in consumer dashboard and for product purchases.",
+    label: "To Shopping Wallet",
+    helper: "Use for shopping in consumer dashboard and product purchases.",
   },
   {
     value: "internal",
-    label: "Transfer to Buy Package from Internal Wallet",
+    label: "Buy Package (Internal)",
     helper: "Use this wallet to buy promo packages internally.",
   },
   {
     value: "wallet_to_wallet",
-    label: "Wallet to Wallet Transfer",
-    helper: "Transfer wallet amount to another consumer by passing valid consumer ID and mail OTP.",
+    label: "Wallet to Wallet",
+    helper: "Transfer to another consumer via consumer ID + mail OTP.",
   },
   {
     value: "withdrawal",
-    label: "Transfer to Withdrawal Wallet",
-    helper: "Move amount from main wallet to withdrawal wallet before bank withdrawal.",
+    label: "To Withdrawal Wallet",
+    helper: "Move amount to withdrawal wallet before bank withdrawal.",
   },
 ];
 
-function KpiCard({ title, value, subtitle, tone = "primary" }) {
-  return (
-    <Paper elevation={0} sx={{ p: 2, borderRadius: 3, border: "1px solid #e5e7eb", height: "100%" }}>
-      <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
-        {title}
-      </Typography>
-      <Typography sx={{ fontSize: 22, fontWeight: 900, color: `${tone}.main`, mt: 0.5 }}>
-        {value}
-      </Typography>
-      {subtitle ? (
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          {subtitle}
-        </Typography>
-      ) : null}
-    </Paper>
-  );
-}
-
-// Wallet definitions with slNo mapping
 const WALLET_DEFINITIONS = [
   { slNo: 1, name: "Total Earning Wallet", section: "core" },
   { slNo: 2, name: "Self Rebirth Wallet", section: "core" },
@@ -89,7 +68,7 @@ const WALLET_DEFINITIONS = [
   { slNo: 5, name: "Main Wallet", section: "core", highlight: true },
   { slNo: 6, name: "Package Buy / Upload Wallet", section: "operational" },
   { slNo: 7, name: "Shopping Wallet", section: "operational" },
-  { slNo: 8, name: "Buy Package from Internal Wallet", section: "operational" },
+  { slNo: 8, name: "Buy Package (Internal)", section: "operational" },
   { slNo: 9, name: "Wallet to Wallet Transfer", section: "operational" },
   { slNo: 10, name: "Withdrawal Wallet", section: "operational" },
   { slNo: 11, name: "Franchise Referral Wallet", section: "rewards" },
@@ -98,6 +77,53 @@ const WALLET_DEFINITIONS = [
   { slNo: 14, name: "BOP Meeting Spin & Win", section: "rewards" },
   { slNo: 15, name: "Reward Gift", section: "rewards" },
 ];
+
+// Compact stat pill for the summary bar
+function StatPill({ label, value, color = "#0f172a" }) {
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        px: "12px",
+        py: "6px",
+        bgcolor: "#fff",
+        borderRadius: "8px",
+        border: "1px solid #e2e8f0",
+        minWidth: 80,
+        flexShrink: 0,
+      }}
+    >
+      <Typography sx={{ fontSize: 14, fontWeight: 800, color, lineHeight: 1.2 }}>
+        {value}
+      </Typography>
+      <Typography sx={{ fontSize: 10, color: "#94a3b8", mt: "2px", textAlign: "center" }}>
+        {label}
+      </Typography>
+    </Box>
+  );
+}
+
+// Section header with accent bar
+function SectionHeader({ title, accentColor = "primary.main" }) {
+  return (
+    <Stack direction="row" alignItems="center" spacing="6px" sx={{ mb: "10px" }}>
+      <Box
+        sx={{
+          width: 3,
+          height: 16,
+          bgcolor: accentColor,
+          borderRadius: "2px",
+          flexShrink: 0,
+        }}
+      />
+      <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#334155" }}>
+        {title}
+      </Typography>
+    </Stack>
+  );
+}
 
 export default function TeamWallet() {
   const [loading, setLoading] = useState(true);
@@ -143,7 +169,7 @@ export default function TeamWallet() {
       );
     } catch (err) {
       console.error("Failed to fetch wallet data:", err);
-      setError("Failed to load team wallet data. Please try again.");
+      setError("Failed to load wallet data. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -162,17 +188,18 @@ export default function TeamWallet() {
   const limits = walletData?.limits || {};
   const kycVerified = Boolean(kycData?.verified);
 
-  const withdrawalsList = useMemo(() => {
-    return Array.isArray(withdrawals) ? withdrawals : [];
-  }, [withdrawals]);
+  const withdrawalsList = useMemo(
+    () => (Array.isArray(withdrawals) ? withdrawals : []),
+    [withdrawals]
+  );
 
-  const withdrawnTotal = useMemo(() => {
-    return withdrawalsList
-      .filter((item) => String(item?.status || "").toLowerCase() === "approved")
-      .reduce((sum, item) => sum + Number(item?.amount || 0), 0);
-  }, [withdrawalsList]);
-
-  const latestWithdrawalItems = useMemo(() => withdrawalsList.slice(0, 5), [withdrawalsList]);
+  const withdrawnTotal = useMemo(
+    () =>
+      withdrawalsList
+        .filter((item) => String(item?.status || "").toLowerCase() === "approved")
+        .reduce((sum, item) => sum + Number(item?.amount || 0), 0),
+    [withdrawalsList]
+  );
 
   const totalEarningBonus = useMemo(
     () => Number(walletData?.totals?.allEarnings || 0),
@@ -189,40 +216,37 @@ export default function TeamWallet() {
       switch (def.slNo) {
         case 1:
           amount = totalEarningBonus;
-          label = `Overall total earnings including already withdrawn amount`;
           icon = <AccountBalanceWalletIcon />;
+          label = "Incl. withdrawn amount";
           break;
         case 2:
           amount = Number(top?.self_account_balance || walletData?.self_account_balance || 0);
           icon = <SwapHorizIcon />;
-          label = `${coupons?.selfActivated || 0} self rebirth IDs activated`;
+          label = `${coupons?.selfActivated || 0} IDs activated`;
           break;
         case 3:
           amount = Number(top?.shopping_rewards_points || 0);
           icon = <CardGiftcardIcon />;
-          label = "History-style shopping rewards amount";
+          label = "Shopping rewards";
           break;
         case 4:
           amount = Number(top?.redeem_points || walletData?.redeem_points?.self || 0);
           icon = <RedeemIcon />;
-          label = "Redeem points shown same as history";
+          label = "Redeem points";
           break;
         case 5:
           amount = Number(walletData?.main_balance || walletData?.balance || 0);
           icon = <AccountBalanceWalletIcon />;
-          label = "Main source wallet for all 4 transfers";
+          label = "Source for all transfers";
           actions = [
-            {
-              label: "Transfer",
-              onClick: () => setTransferOpen(true),
-            },
+            { label: "Transfer", onClick: () => setTransferOpen(true) },
             {
               label: "Withdraw",
               onClick: () => (window.location.href = "/user/wallet"),
               disabled: !kycVerified,
             },
             {
-              label: "Buy Package",
+              label: "Buy Pkg",
               onClick: () => (window.location.href = "/user/promo-packages"),
             },
           ];
@@ -230,27 +254,27 @@ export default function TeamWallet() {
         case 6:
           amount = Number(walletData?.balance || 0);
           icon = <LocalShippingIcon />;
-          label = "Upload / package buy funding wallet";
+          label = "Package buy & upload";
           break;
         case 7:
           amount = Number(transferWallets?.shopping || 0);
           icon = <ShoppingCartIcon />;
-          label = "Used to shop in consumer dashboard";
+          label = "Consumer shopping";
           break;
         case 8:
           amount = Number(transferWallets?.internal || 0);
           icon = <StoreIcon />;
-          label = "Used to buy promo packages internally";
+          label = "Buy promo internally";
           break;
         case 9:
           amount = Number(transferWallets?.walletToWallet || 0);
           icon = <SwapHorizIcon />;
-          label = "Consumer to consumer transfer value";
+          label = "Consumer transfer";
           break;
         case 10:
           amount = Number(transferWallets?.withdrawal || walletData?.withdrawable_balance || 0);
           icon = <PaymentsIcon />;
-          label = `Withdrawn so far ₹${fmtAmount(withdrawnTotal)} • Min ₹${limits?.minWithdraw || 500}`;
+          label = `Min ₹${limits?.minWithdraw || 500}`;
           actions = [
             {
               label: "Withdraw",
@@ -262,49 +286,41 @@ export default function TeamWallet() {
         case 11:
           amount = Number(income?.franchise || 0);
           icon = <PeopleIcon />;
-          label = "Franchise referral earnings";
+          label = "Franchise referrals";
           break;
         case 12:
           amount = Number(smartPurchase?.seasonPurchasedCount || 0);
           icon = <CasinoIcon />;
-          label = `Purchased ${smartPurchase?.seasonPurchasedCount || 0}, Pending ${smartPurchase?.seasonPendingCount || 0}`;
+          label = `Pending ${smartPurchase?.seasonPendingCount || 0}`;
           break;
         case 13:
           amount = Number(prime?.activeCount || 0);
           icon = <VerifiedUserIcon />;
-          label = `Prime active ${prime?.activeCount || 0}`;
+          label = `Active ${prime?.activeCount || 0}`;
           break;
         case 14:
           amount = walletData?.today?.spinEligible ? 1 : 0;
           icon = <WorkIcon />;
-          label = walletData?.today?.spinEligible ? "Spin available today" : "No active spin today";
+          label = walletData?.today?.spinEligible ? "Spin available" : "No spin today";
           break;
         case 15:
           amount = Number(walletData?.totals?.allEarnings || 0);
           icon = <EmojiEventsIcon />;
-          label = "Reward gift equivalent of total earnings";
+          label = "Total reward gift";
           break;
         default:
           amount = 0;
       }
 
-      return {
-        ...def,
-        amount,
-        icon,
-        label,
-        actions,
-      };
+      return { ...def, amount, icon, label, actions };
     });
   }, [coupons, income, kycVerified, limits, prime, smartPurchase, top, totalEarningBonus, transferWallets, walletData]);
 
-  // Group wallets by section
-  const sections = useMemo(() => {
-    const core = wallets.filter((w) => w.section === "core");
-    const operational = wallets.filter((w) => w.section === "operational");
-    const rewards = wallets.filter((w) => w.section === "rewards");
-    return { core, operational, rewards };
-  }, [wallets]);
+  const sections = useMemo(() => ({
+    core: wallets.filter((w) => w.section === "core"),
+    operational: wallets.filter((w) => w.section === "operational"),
+    rewards: wallets.filter((w) => w.section === "rewards"),
+  }), [wallets]);
 
   const transferPreviewText = useMemo(
     () => TRANSFER_OPTIONS.find((item) => item.value === transferForm.transfer_type)?.helper || "",
@@ -381,9 +397,11 @@ export default function TeamWallet() {
 
   if (loading) {
     return (
-      <Box sx={{ p: 3 }}>
+      <Box sx={{ px: 2, pt: 3 }}>
         <LinearProgress />
-        <Typography sx={{ mt: 2, textAlign: "center" }}>Loading wallets...</Typography>
+        <Typography sx={{ mt: 2, textAlign: "center", fontSize: 13, color: "#94a3b8" }}>
+          Loading wallets…
+        </Typography>
       </Box>
     );
   }
@@ -391,176 +409,134 @@ export default function TeamWallet() {
   return (
     <Box
       sx={{
-        maxWidth: 1200,
+        maxWidth: 480,
         mx: "auto",
-        px: { xs: 2, sm: 3 },
-        py: { xs: 2, sm: 3 },
-        bgcolor: "#f7fafc",
+        px: "12px",
+        py: "12px",
+        bgcolor: "#f8fafc",
         minHeight: "100vh",
       }}
     >
-      <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={2} sx={{ mb: 3 }}>
-        <Stack direction="row" alignItems="center" spacing={2}>
-          <AccountBalanceWalletIcon color="primary" sx={{ fontSize: 32 }} />
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: "#0C2D48" }}>
-              Team Wallet
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Wallet balances, earnings, redeem points and transfers in one screen
-            </Typography>
-          </Box>
+      {/* ── Header ── */}
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: "12px" }}>
+        <Stack direction="row" alignItems="center" spacing="8px">
+          <AccountBalanceWalletIcon sx={{ fontSize: 22, color: "#2563eb" }} />
+          <Typography sx={{ fontSize: 17, fontWeight: 800, color: "#0f172a" }}>
+            Team Wallet
+          </Typography>
         </Stack>
-        <Stack direction="row" spacing={1} flexWrap="wrap">
-          <Chip color={kycVerified ? "success" : "warning"} label={kycVerified ? "KYC Verified" : "KYC Pending"} />
-          <Chip color="primary" label={`Main Wallet ₹${fmtAmount(walletData?.main_balance)}`} />
-        </Stack>
+        <Chip
+          size="small"
+          color={kycVerified ? "success" : "warning"}
+          label={kycVerified ? "KYC ✓" : "KYC Pending"}
+          sx={{ fontSize: 11, height: 24 }}
+        />
       </Stack>
 
-      {error ? <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert> : null}
-      {success ? <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert> : null}
+      {/* ── Alerts ── */}
+      {error && (
+        <Alert severity="error" sx={{ mb: "8px", py: "2px", fontSize: 12 }}>
+          {error}
+        </Alert>
+      )}
+      {success && (
+        <Alert severity="success" sx={{ mb: "8px", py: "2px", fontSize: 12 }}>
+          {success}
+        </Alert>
+      )}
 
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <KpiCard title="Total Earning Wallet" value={`₹ ${fmtAmount(totalEarningBonus)}`} subtitle="Overall total earnings including withdrawn and current wallet earnings" tone="success" />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <KpiCard title="Main Wallet" value={`₹ ${fmtAmount(top?.main_income_balance || walletData?.main_balance)}`} subtitle="Source wallet for shopping, internal, wallet-to-wallet and withdrawal" tone="primary" />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <KpiCard title="Self Rebirth IDs" value={`${coupons?.selfActivated || 0}`} subtitle={`Reserve earned ₹ ${fmtAmount(top?.self_account_balance)}`} tone="warning" />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <KpiCard title="Redeem Points" value={`${fmtAmount(top?.redeem_points)} pts`} subtitle="Same amount source already used in history" tone="secondary" />
-        </Grid>
-      </Grid>
+      {/* ── Stats strip ── */}
+      <Box
+        sx={{
+          display: "flex",
+          gap: "8px",
+          overflowX: "auto",
+          pb: "4px",
+          mb: "14px",
+          scrollbarWidth: "none",
+          "&::-webkit-scrollbar": { display: "none" },
+        }}
+      >
+        <StatPill
+          label="Total Earnings"
+          value={`₹${fmtAmount(totalEarningBonus)}`}
+          color="#16a34a"
+        />
+        <StatPill
+          label="Main Wallet"
+          value={`₹${fmtAmount(walletData?.main_balance)}`}
+          color="#2563eb"
+        />
+        <StatPill
+          label="Redeem Pts"
+          value={`${fmtAmount(top?.redeem_points)} pts`}
+          color="#7c3aed"
+        />
+        <StatPill
+          label="Withdrawn"
+          value={`₹${fmtAmount(withdrawnTotal)}`}
+          color="#b45309"
+        />
+        <StatPill
+          label="Self Rebirth"
+          value={String(coupons?.selfActivated || 0)}
+          color="#0369a1"
+        />
+      </Box>
 
-      <Paper elevation={0} sx={{ p: 3, borderRadius: 3, mb: 3, border: "1px solid #e5e7eb", bgcolor: "#fff" }}>
-        <Typography variant="h6" sx={{ fontWeight: 800, mb: 2, color: "#0C2D48" }}>
-          Main Wallet Transfer Options
-        </Typography>
-        <Grid container spacing={2}>
-          {TRANSFER_OPTIONS.map((option) => (
-            <Grid item xs={12} md={6} key={option.value}>
-              <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, height: "100%" }}>
-                <Typography sx={{ fontWeight: 800 }}>{option.label}</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, mb: 1.5 }}>
-                  {option.helper}
-                </Typography>
-                <Button
-                  variant="outlined"
-                  onClick={() => {
-                    setTransferForm({ transfer_type: option.value, amount: "", consumer_id: "", otp: "" });
-                    setLookupResult(null);
-                    setOtpRequested(false);
-                    setTransferOpen(true);
-                  }}
-                >
-                  Start Transfer
-                </Button>
-              </Paper>
-            </Grid>
-          ))}
-        </Grid>
-      </Paper>
-
-      <Paper elevation={0} sx={{ p: 3, borderRadius: 3, mb: 3, border: "1px solid #e5e7eb", bgcolor: "#fff" }}>
-        <Typography variant="h6" sx={{ fontWeight: 800, mb: 2, color: "#0C2D48" }}>
-          Smart Purchase Plan Wallet KPI
-        </Typography>
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={4}>
-            <KpiCard title="Purchased Seasons" value={String(smartPurchase?.seasonPurchasedCount || 0)} subtitle={`Season numbers: ${(smartPurchase?.seasonNumbers || []).join(", ") || "-"}`} tone="primary" />
-          </Grid>
-          <Grid item xs={12} sm={4}>
-            <KpiCard title="Pending Seasons" value={String(smartPurchase?.seasonPendingCount || prime?.monthlyPendingCount || 0)} subtitle="Pending season promo packages" tone="warning" />
-          </Grid>
-          <Grid item xs={12} sm={4}>
-            <KpiCard title="Prime Active" value={String(prime?.activeCount || 0)} subtitle={`Monthly active count ${prime?.monthlyActiveCount || 0}`} tone="success" />
-          </Grid>
-        </Grid>
-      </Paper>
-
-      <Paper elevation={0} sx={{ p: 3, borderRadius: 3, mb: 3, border: "1px solid #e5e7eb", bgcolor: "#fff" }}>
-        <Typography variant="h6" sx={{ fontWeight: 800, mb: 2, color: "#0C2D48" }}>
-          Withdrawal Summary & History
-        </Typography>
-        <Grid container spacing={2} sx={{ mb: 2 }}>
-          <Grid item xs={12} sm={4}>
-            <KpiCard title="Total Withdrawn" value={`₹ ${fmtAmount(withdrawnTotal)}`} subtitle="Approved withdrawal amount" tone="warning" />
-          </Grid>
-          <Grid item xs={12} sm={4}>
-            <KpiCard title="Withdrawal Requests" value={String(withdrawalsList.length)} subtitle="All withdrawal history entries" tone="primary" />
-          </Grid>
-          <Grid item xs={12} sm={4}>
-            <KpiCard title="Current Withdrawable" value={`₹ ${fmtAmount(walletData?.withdrawable_balance)}`} subtitle="Current withdrawal wallet balance" tone="success" />
-          </Grid>
-        </Grid>
-
-        {latestWithdrawalItems.length ? (
-          <Stack spacing={1.25}>
-            {latestWithdrawalItems.map((item, index) => (
-              <Paper key={`${item?.id || index}-${item?.requested_at || index}`} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-                <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1}>
-                  <Box>
-                    <Typography sx={{ fontWeight: 700 }}>₹ {fmtAmount(item?.amount)}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {item?.requested_at ? new Date(item.requested_at).toLocaleString() : "No date"}
-                    </Typography>
-                  </Box>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Chip
-                      size="small"
-                      color={String(item?.status || "").toLowerCase() === "approved" ? "success" : String(item?.status || "").toLowerCase() === "rejected" ? "error" : "warning"}
-                      label={String(item?.status || "pending").toUpperCase()}
-                    />
-                    {item?.payout_ref ? <Chip size="small" variant="outlined" label={`Ref: ${item.payout_ref}`} /> : null}
-                  </Stack>
-                </Stack>
-              </Paper>
-            ))}
-          </Stack>
-        ) : (
-          <Alert severity="info">No withdrawal history found yet.</Alert>
-        )}
-      </Paper>
-
-      <Paper elevation={0} sx={{ p: 3, borderRadius: 3, mb: 3, border: "1px solid #e5e7eb", bgcolor: "#fff" }}>
-        <Typography
-          variant="h6"
+      {/* ── Transfer quick-actions ── */}
+      <Box sx={{ mb: "14px" }}>
+        <SectionHeader title="Quick Transfer" />
+        <Box
           sx={{
-            mb: 2.5,
-            fontWeight: 800,
-            color: "#0C2D48",
             display: "flex",
-            alignItems: "center",
-            gap: 1,
+            gap: "8px",
+            flexWrap: "wrap",
           }}
         >
-          <Box
-            sx={{
-              width: 4,
-              height: 24,
-              bgcolor: "primary.main",
-              borderRadius: 2,
-            }}
-          />
-          Core Wallets
-        </Typography>
+          {TRANSFER_OPTIONS.map((option) => (
+            <Button
+              key={option.value}
+              size="small"
+              variant="outlined"
+              onClick={() => {
+                setTransferForm({ transfer_type: option.value, amount: "", consumer_id: "", otp: "" });
+                setLookupResult(null);
+                setOtpRequested(false);
+                setTransferOpen(true);
+              }}
+              sx={{
+                fontSize: 11,
+                fontWeight: 700,
+                borderRadius: "8px",
+                px: "10px",
+                py: "5px",
+                borderColor: "#cbd5e1",
+                color: "#334155",
+                textTransform: "none",
+                lineHeight: 1.3,
+              }}
+            >
+              {option.label}
+            </Button>
+          ))}
+        </Box>
+      </Box>
+
+      {/* ── Core Wallets ── */}
+      <Box sx={{ mb: "14px" }}>
+        <SectionHeader title="Core Wallets" />
         <Box
           sx={{
             display: "flex",
             flexWrap: "wrap",
-            gap: 1.5,
-            alignItems: "stretch",
+            gap: "8px",
           }}
         >
           {sections.core.map((wallet) => (
             <Box
               key={wallet.slNo}
-              sx={{
-                flex: { xs: "1 1 100%", md: "0 0 calc(50% - 6px)" },
-              }}
+              sx={{ flex: "0 0 calc(50% - 4px)", minWidth: 0 }}
             >
               <WalletCard
                 slNo={wallet.slNo}
@@ -570,49 +546,26 @@ export default function TeamWallet() {
                 label={wallet.label}
                 actions={wallet.actions}
                 highlight={wallet.highlight}
-                sx={{ height: "100%" }}
               />
             </Box>
           ))}
         </Box>
-      </Paper>
+      </Box>
 
-      <Paper elevation={0} sx={{ p: 3, borderRadius: 3, mb: 3, border: "1px solid #e5e7eb", bgcolor: "#fff" }}>
-        <Typography
-          variant="h6"
-          sx={{
-            mb: 2.5,
-            fontWeight: 800,
-            color: "#0C2D48",
-            display: "flex",
-            alignItems: "center",
-            gap: 1,
-          }}
-        >
-          <Box
-            sx={{
-              width: 4,
-              height: 24,
-              bgcolor: "primary.main",
-              borderRadius: 2,
-            }}
-          />
-          Operational Wallets
-        </Typography>
+      {/* ── Operational Wallets ── */}
+      <Box sx={{ mb: "14px" }}>
+        <SectionHeader title="Operational Wallets" />
         <Box
           sx={{
             display: "flex",
             flexWrap: "wrap",
-            gap: 1.5,
-            alignItems: "stretch",
+            gap: "8px",
           }}
         >
           {sections.operational.map((wallet) => (
             <Box
               key={wallet.slNo}
-              sx={{
-                flex: { xs: "1 1 100%", md: "0 0 calc(50% - 6px)" },
-              }}
+              sx={{ flex: "0 0 calc(50% - 4px)", minWidth: 0 }}
             >
               <WalletCard
                 slNo={wallet.slNo}
@@ -621,49 +574,26 @@ export default function TeamWallet() {
                 icon={wallet.icon}
                 label={wallet.label}
                 actions={wallet.actions}
-                sx={{ height: "100%" }}
               />
             </Box>
           ))}
         </Box>
-      </Paper>
+      </Box>
 
-      <Paper elevation={0} sx={{ p: 3, borderRadius: 3, mb: 3, border: "1px solid #e5e7eb", bgcolor: "#fff" }}>
-        <Typography
-          variant="h6"
-          sx={{
-            mb: 2.5,
-            fontWeight: 800,
-            color: "#0C2D48",
-            display: "flex",
-            alignItems: "center",
-            gap: 1,
-          }}
-        >
-          <Box
-            sx={{
-              width: 4,
-              height: 24,
-              bgcolor: "success.main",
-              borderRadius: 2,
-            }}
-          />
-          Rewards & Feature Wallets
-        </Typography>
+      {/* ── Rewards & Feature Wallets ── */}
+      <Box sx={{ mb: "14px" }}>
+        <SectionHeader title="Rewards & Features" accentColor="success.main" />
         <Box
           sx={{
             display: "flex",
             flexWrap: "wrap",
-            gap: 1.5,
-            alignItems: "stretch",
+            gap: "8px",
           }}
         >
           {sections.rewards.map((wallet) => (
             <Box
               key={wallet.slNo}
-              sx={{
-                flex: { xs: "1 1 100%", md: "0 0 calc(50% - 6px)" },
-              }}
+              sx={{ flex: "0 0 calc(50% - 4px)", minWidth: 0 }}
             >
               <WalletCard
                 slNo={wallet.slNo}
@@ -672,50 +602,115 @@ export default function TeamWallet() {
                 icon={wallet.icon}
                 label={wallet.label}
                 actions={wallet.actions}
-                sx={{ height: "100%" }}
               />
             </Box>
           ))}
         </Box>
-      </Paper>
+      </Box>
 
-      <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid #e5e7eb", bgcolor: "#fff" }}>
-        <Typography variant="h6" sx={{ fontWeight: 800, color: "#0C2D48", mb: 2 }}>
-          Withdrawal and Bank Information
-        </Typography>
-        {banksData?.banks?.length ? (
-          banksData.banks.map((bank) => (
-            <Paper key={bank.id} variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 1.5 }}>
-              <Typography sx={{ fontWeight: 700 }}>{bank.label}</Typography>
-              <Typography variant="body2" color="text.secondary">
-                A/C: {bank.account_number_masked || bank.account_number_full || "-"} • IFSC: {bank.ifsc || "-"}
-              </Typography>
-            </Paper>
-          ))
+      {/* ── Withdrawal history ── */}
+      <Box sx={{ mb: "14px" }}>
+        <SectionHeader title="Recent Withdrawals" />
+        {withdrawalsList.slice(0, 5).length ? (
+          <Stack spacing="6px">
+            {withdrawalsList.slice(0, 5).map((item, index) => (
+              <Box
+                key={`${item?.id || index}`}
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  bgcolor: "#fff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "8px",
+                  px: "12px",
+                  py: "8px",
+                }}
+              >
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
+                    ₹{fmtAmount(item?.amount)}
+                  </Typography>
+                  <Typography sx={{ fontSize: 10, color: "#94a3b8" }}>
+                    {item?.requested_at
+                      ? new Date(item.requested_at).toLocaleDateString()
+                      : "—"}
+                  </Typography>
+                </Box>
+                <Chip
+                  size="small"
+                  color={
+                    String(item?.status || "").toLowerCase() === "approved"
+                      ? "success"
+                      : String(item?.status || "").toLowerCase() === "rejected"
+                        ? "error"
+                        : "warning"
+                  }
+                  label={String(item?.status || "pending").toUpperCase()}
+                  sx={{ fontSize: 10, height: 22 }}
+                />
+              </Box>
+            ))}
+          </Stack>
         ) : (
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            No bank details found in KYC. Please update KYC before withdrawal transfer.
+          <Typography sx={{ fontSize: 12, color: "#94a3b8", textAlign: "center", py: "8px" }}>
+            No withdrawal history yet.
+          </Typography>
+        )}
+      </Box>
+
+      {/* ── Bank info ── */}
+      <Box sx={{ mb: "14px" }}>
+        <SectionHeader title="Bank Linked" />
+        {banksData?.banks?.length ? (
+          <Stack spacing="6px">
+            {banksData.banks.map((bank) => (
+              <Box
+                key={bank.id}
+                sx={{
+                  bgcolor: "#fff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "8px",
+                  px: "12px",
+                  py: "8px",
+                }}
+              >
+                <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
+                  {bank.label}
+                </Typography>
+                <Typography sx={{ fontSize: 11, color: "#64748b", mt: "2px" }}>
+                  {bank.account_number_masked || bank.account_number_full || "—"} · {bank.ifsc || "—"}
+                </Typography>
+              </Box>
+            ))}
+          </Stack>
+        ) : (
+          <Alert severity="warning" sx={{ fontSize: 12, py: "4px" }}>
+            No bank details. Update KYC before withdrawal.
           </Alert>
         )}
-      </Paper>
+      </Box>
 
-      <Alert severity="info" sx={{ mt: 3 }}>
-        <Typography variant="body2">
-          <strong>Main Wallet:</strong> You can now transfer to Shopping Wallet, Buy Package from Internal Wallet,
-          Wallet to Wallet transfer, and Withdrawal Wallet. Wallet to Wallet transfer uses valid consumer ID and mail OTP.
-        </Typography>
-      </Alert>
-
-      <Dialog open={transferOpen} onClose={() => !actionLoading && setTransferOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Main Wallet Transfer</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ pt: 1 }}>
+      {/* ── Transfer Dialog ── */}
+      <Dialog
+        open={transferOpen}
+        onClose={() => !actionLoading && setTransferOpen(false)}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{ sx: { borderRadius: "16px", mx: "12px" } }}
+      >
+        <DialogTitle sx={{ fontSize: 15, fontWeight: 800, pb: 1 }}>
+          Main Wallet Transfer
+        </DialogTitle>
+        <DialogContent sx={{ pt: "4px !important" }}>
+          <Stack spacing="12px">
             <TextField
               select
               label="Transfer Type"
               value={transferForm.transfer_type}
               onChange={(e) => handleTransferChange("transfer_type", e.target.value)}
               fullWidth
+              size="small"
             >
               {TRANSFER_OPTIONS.map((option) => (
                 <MenuItem key={option.value} value={option.value}>
@@ -723,60 +718,89 @@ export default function TeamWallet() {
                 </MenuItem>
               ))}
             </TextField>
-            <Alert severity="info">{transferPreviewText}</Alert>
+            <Alert severity="info" sx={{ fontSize: 12, py: "2px" }}>
+              {transferPreviewText}
+            </Alert>
             <TextField
               label="Amount"
               type="number"
               value={transferForm.amount}
               onChange={(e) => handleTransferChange("amount", e.target.value)}
               fullWidth
+              size="small"
             />
-
-            {transferForm.transfer_type === "wallet_to_wallet" ? (
+            {transferForm.transfer_type === "wallet_to_wallet" && (
               <>
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                <Stack direction="row" spacing="8px">
                   <TextField
-                    label="Consumer ID / Username / TR Code"
+                    label="Consumer ID / TR Code"
                     value={transferForm.consumer_id}
                     onChange={(e) => handleTransferChange("consumer_id", e.target.value)}
                     fullWidth
+                    size="small"
                   />
-                  <Button variant="outlined" onClick={handleConsumerLookup}>
-                    Validate
+                  <Button variant="outlined" size="small" onClick={handleConsumerLookup}>
+                    Verify
                   </Button>
                 </Stack>
-                {lookupResult ? (
-                  <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-                    <Typography sx={{ fontWeight: 700 }}>{lookupResult.full_name || lookupResult.username}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {lookupResult.username} • {lookupResult.prefixed_id || "No prefixed id"}
+                {lookupResult && (
+                  <Box
+                    sx={{
+                      bgcolor: "#f0fdf4",
+                      border: "1px solid #bbf7d0",
+                      borderRadius: "8px",
+                      p: "10px",
+                    }}
+                  >
+                    <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
+                      {lookupResult.full_name || lookupResult.username}
                     </Typography>
-                  </Paper>
-                ) : null}
+                    <Typography sx={{ fontSize: 11, color: "#64748b" }}>
+                      {lookupResult.username} · {lookupResult.prefixed_id || "—"}
+                    </Typography>
+                  </Box>
+                )}
               </>
-            ) : null}
-
-            {otpRequested ? (
+            )}
+            {otpRequested && (
               <TextField
                 label="Mail OTP"
                 value={transferForm.otp}
                 onChange={(e) => handleTransferChange("otp", e.target.value)}
                 fullWidth
+                size="small"
               />
-            ) : null}
+            )}
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={() => setTransferOpen(false)} disabled={actionLoading}>
+        <DialogActions sx={{ px: "16px", pb: "16px", gap: "8px" }}>
+          <Button
+            onClick={() => setTransferOpen(false)}
+            disabled={actionLoading}
+            size="small"
+            sx={{ fontSize: 13 }}
+          >
             Cancel
           </Button>
           {!otpRequested ? (
-            <Button variant="contained" onClick={handleRequestOtp} disabled={actionLoading}>
-              {actionLoading ? "Sending OTP..." : "Send OTP"}
+            <Button
+              variant="contained"
+              onClick={handleRequestOtp}
+              disabled={actionLoading}
+              size="small"
+              sx={{ fontSize: 13 }}
+            >
+              {actionLoading ? "Sending…" : "Send OTP"}
             </Button>
           ) : (
-            <Button variant="contained" onClick={handleConfirmTransfer} disabled={actionLoading}>
-              {actionLoading ? "Processing..." : "Confirm Transfer"}
+            <Button
+              variant="contained"
+              onClick={handleConfirmTransfer}
+              disabled={actionLoading}
+              size="small"
+              sx={{ fontSize: 13 }}
+            >
+              {actionLoading ? "Processing…" : "Confirm"}
             </Button>
           )}
         </DialogActions>

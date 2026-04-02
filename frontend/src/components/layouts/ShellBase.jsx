@@ -293,7 +293,7 @@ export default function ShellBase({
   style={{
     position: "sticky",
     top: 0,
-    zIndex: 30,
+    zIndex: 1060,
     height: 56,
     display: "grid",
     gridTemplateColumns: "48px 1fr max-content",
@@ -401,7 +401,7 @@ export default function ShellBase({
             position: "fixed",
             inset: 0,
             background: "rgba(15,23,42,0.35)",
-            zIndex: 20,
+            zIndex: 1040,
           }}
         />
       ) : null}
@@ -414,7 +414,7 @@ export default function ShellBase({
             position: "fixed",
             top: topOffset,
             left: 0,
-            zIndex: 25,
+            zIndex: 1050,
             width: isMobile ? (sidebarOpen ? sidebarWidth : 0) : sidebarWidth,
             minWidth: isMobile ? (sidebarOpen ? sidebarWidth : 0) : sidebarWidth,
             height: `calc(100dvh - ${topOffset}px)`,

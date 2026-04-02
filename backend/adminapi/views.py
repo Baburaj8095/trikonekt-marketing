@@ -1995,6 +1995,16 @@ class AdminMatrix5Tree(APIView):
         except Exception:
             pass
 
+        # Override root team_count with actual DB total (BFS is depth-limited so
+        # the recursive count only reflects visible nodes, not the real total).
+        try:
+            real_total = AutoPoolAccount.objects.filter(
+                pool_type=pool, status="ACTIVE", parent_account__isnull=False,
+            ).count()
+            root["team_count"] = int(real_total)
+        except Exception:
+            pass
+
         return Response(root, status=200)
 
 

@@ -8,6 +8,10 @@ from django.db import transaction, IntegrityError
 from django.db.models import Count, Max
 
 from business.models import AutoPoolAccount, CommissionConfig
+try:
+    from coupons.models import AuditTrail
+except Exception:
+    AuditTrail = None
 
 
 class PlacementError(RuntimeError):
@@ -252,9 +256,28 @@ class GenericPlacement:
             max_depth = d if max_depth is None else max_depth
 
         # Find the slot (locks parent row)
-        parent, position, child_level = find_next_placement_slot(
-            int(width), int(max_depth), pool_type, start_account_id=int(start_entry_id) if start_entry_id else None
-        )
+        try:
+            parent, position, child_level = find_next_placement_slot(
+                int(width), int(max_depth), pool_type, start_account_id=int(start_entry_id) if start_entry_id else None
+            )
+        except MaxDepthError as mde:
+            # Record an audit trail entry for operational visibility before re-raising
+            try:
+                if AuditTrail is not None:
+                    AuditTrail.objects.create(
+                        action="placement_max_depth",
+                        actor=None,
+                        notes=str(mde),
+                        metadata={
+                            "pool_type": pool_type,
+                            "owner_id": getattr(owner, "id", None),
+                            "start_entry_id": int(start_entry_id) if start_entry_id else None,
+                            "configured_max_depth": int(max_depth),
+                        },
+                    )
+            except Exception:
+                pass
+            raise
 
         # Compute deterministic display key (compatible with existing suffix behavior)
         uname = AutoPoolAccount._next_username_key(owner, pool_type)
@@ -293,6 +316,24 @@ class GenericPlacement:
                     # Re-throw a clear error; caller can decide to retry externally
                     raise NoCapacityError(f"Lost race creating account for {pool_type} (parent={getattr(parent, 'id', None)} pos={position}); retry later")
                 # Recompute a slot and try again
-                parent, position, child_level = find_next_placement_slot(
-                    int(width), int(max_depth), pool_type, start_account_id=int(start_entry_id) if start_entry_id else None
-                )
+                try:
+                    parent, position, child_level = find_next_placement_slot(
+                        int(width), int(max_depth), pool_type, start_account_id=int(start_entry_id) if start_entry_id else None
+                    )
+                except MaxDepthError as mde:
+                    try:
+                        if AuditTrail is not None:
+                            AuditTrail.objects.create(
+                                action="placement_max_depth",
+                                actor=None,
+                                notes=str(mde),
+                                metadata={
+                                    "pool_type": pool_type,
+                                    "owner_id": getattr(owner, "id", None),
+                                    "start_entry_id": int(start_entry_id) if start_entry_id else None,
+                                    "configured_max_depth": int(max_depth),
+                                },
+                            )
+                    except Exception:
+                        pass
+                    raise

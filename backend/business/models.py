@@ -631,19 +631,21 @@ class CommissionConfig(models.Model):
             return []
 
     def get_matrix_five_levels(self) -> int:
+        import logging
+        logger = logging.getLogger(__name__)
+
         m = self._m()
+        # Top-level matrix_five.levels (legacy/global)
+        top_v = 0
         try:
-            v = int(m.get("matrix_five", {}).get("levels", "") or 0)
-            if v > 0:
-                return v
+            top_v = int(m.get("matrix_five", {}).get("levels", "") or 0)
         except Exception:
-            pass
-        # Fallback to admin product-screen overrides when global matrix_five.levels is absent.
-        # Placement code only knows the pool type, so use the highest configured FIVE_150 depth
-        # from the admin-managed product tabs as the safe structural depth.
+            top_v = 0
+
+        # Consumer/product-specific overrides (preferred if present)
+        candidate_levels = []
         try:
             cm5 = dict(m.get("consumer_matrix_5", {}) or {})
-            candidate_levels = []
             for key in ("150", "750", "759", "rs759", "prime759", "prime_759", "monthly_759", "monthly759"):
                 row = dict(cm5.get(key, {}) or {})
                 try:
@@ -652,11 +654,27 @@ class CommissionConfig(models.Model):
                         candidate_levels.append(lvl)
                 except Exception:
                     continue
-            if candidate_levels:
-                return max(candidate_levels)
         except Exception:
-            pass
-        return int(self.five_matrix_levels or 6)
+            candidate_levels = []
+
+        max_candidate = max(candidate_levels) if candidate_levels else 0
+
+        # Decide effective depth: prefer the product-specific max, but fall back to top-level or DB field.
+        effective = max(max_candidate, int(self.five_matrix_levels or 0), top_v)
+
+        # Warn when legacy top-level value conflicts with product overrides to help ops diagnose
+        if top_v > 0 and max_candidate > 0 and top_v != max_candidate:
+            logger.warning(
+                "matrix_five levels mismatch: top=%s vs consumer_product_max=%s; using=%s",
+                top_v,
+                max_candidate,
+                effective,
+            )
+
+        # If nothing configured, fall back to a safe default (6)
+        if effective <= 0:
+            return 6
+        return int(effective)
 
     def get_matrix_five_fixed_amounts(self) -> list[_D]:
         m = self._m()
@@ -781,7 +799,15 @@ class AutoPoolAccount(models.Model):
         )
 
     @classmethod
-    def create_five_150_for_user(cls, user, amount: Decimal | None = None, source_type: str = "", source_id: str = ""):
+    def create_five_150_for_user(
+        cls,
+        user,
+        amount: Decimal | None = None,
+        source_type: str = "",
+        source_id: str = "",
+        start_entry_id: int | None = None,
+        max_allowed: int = 1,
+    ):
         """
         FIVE_150 sponsor-anchored forced matrix.
         - Anchor to sponsor's subtree when the direct sponsor has an ACTIVE FIVE_150 entry.
@@ -807,7 +833,40 @@ class AutoPoolAccount(models.Model):
         from business.services.placement import GenericPlacement
         amt = D(amount) if amount is not None else D("150.00")
         # Sponsor-anchored: begin BFS from sponsor's subtree when available; else fallback to sentinel
-        start_id = cls._sponsor_start_entry_id_for(user, "FIVE_150")
+        # Idempotency / per-source guard:
+        # NOTE: Allow unlimited RECOVERY sources (batch fix); other sources respect max_allowed
+        try:
+            if source_type and source_id:
+                # RECOVERY sources are allowed unlimited (for batch reconciliation)
+                if str(source_type).upper() != "RECOVERY":
+                    existing_same_source = cls.objects.filter(
+                        owner=user, pool_type="FIVE_150", source_type=str(source_type), source_id=str(source_id)
+                    ).count()
+                    if existing_same_source >= int(max_allowed or 1):
+                        try:
+                            logger.info(
+                                "skip create_five_150_for_user: already created for same source",
+                                extra={"user_id": getattr(user, "id", None), "source_type": source_type, "source_id": source_id, "max_allowed": max_allowed},
+                            )
+                        except Exception:
+                            pass
+                        return None
+            else:
+                # No source info: respect max_allowed limit on total count
+                existing_total = cls.objects.filter(owner=user, pool_type="FIVE_150").count()
+                if existing_total >= int(max_allowed or 1):
+                    try:
+                        logger.info(
+                            "skip create_five_150_for_user: owner already has max FIVE_150",
+                            extra={"user_id": getattr(user, "id", None), "existing_total": existing_total, "max_allowed": max_allowed},
+                        )
+                    except Exception:
+                        pass
+                    return None
+        except Exception:
+            pass
+
+        start_id = cls._sponsor_start_entry_id_for(user, "FIVE_150") if start_entry_id is None else start_entry_id
         return GenericPlacement.place_account(
             owner=user,
             pool_type="FIVE_150",
@@ -818,7 +877,14 @@ class AutoPoolAccount(models.Model):
         )
 
     @classmethod
-    def create_three_150_for_user(cls, user, amount: Decimal | None = None, source_type: str = "SYSTEM", source_id: str = ""):
+    def create_three_150_for_user(
+        cls,
+        user,
+        amount: Decimal | None = None,
+        source_type: str = "SYSTEM",
+        source_id: str = "",
+        max_allowed: int = 1,
+    ):
         """
         Global auto-pool placement for THREE_150 (ignores sponsor). Starts from sentinel root.
         """
@@ -841,6 +907,39 @@ class AutoPoolAccount(models.Model):
         from decimal import Decimal as D
         from business.services.placement import GenericPlacement
         amt = D(amount) if amount is not None else D("150.00")
+        # Idempotency / per-source guard for THREE_150
+        # NOTE: Allow unlimited RECOVERY sources (batch fix); other sources respect max_allowed
+        try:
+            if source_type and source_id:
+                # RECOVERY sources are allowed unlimited (for batch reconciliation)
+                if str(source_type).upper() != "RECOVERY":
+                    existing_same_source = cls.objects.filter(
+                        owner=user, pool_type="THREE_150", source_type=str(source_type), source_id=str(source_id)
+                    ).count()
+                    if existing_same_source >= int(max_allowed or 1):
+                        try:
+                            logger.info(
+                                "skip create_three_150_for_user: already created for same source",
+                                extra={"user_id": getattr(user, "id", None), "source_type": source_type, "source_id": source_id, "max_allowed": max_allowed},
+                            )
+                        except Exception:
+                            pass
+                        return None
+            else:
+                # No source info: respect max_allowed limit on total count
+                existing_total = cls.objects.filter(owner=user, pool_type="THREE_150").count()
+                if existing_total >= int(max_allowed or 1):
+                    try:
+                        logger.info(
+                            "skip create_three_150_for_user: owner already has max THREE_150",
+                            extra={"user_id": getattr(user, "id", None), "existing_total": existing_total, "max_allowed": max_allowed},
+                        )
+                    except Exception:
+                        pass
+                    return None
+        except Exception:
+            pass
+
         # Global pool placement: ignore sponsor anchor
         return GenericPlacement.place_account(
             owner=user,

@@ -1,0 +1,23 @@
+TIMELINE-BASED RECONCILIATION FIX SUMMARY
+================================================================================
+
+Analysis Date: 2026-04-02T10:02:50.835249Z
+Lookback Window: 60 days
+Mode: DRY-RUN
+
+ORPHANED ACCOUNTS TO DELETE (External Commands):
+--------------------------------------------------------------------------------
+FIVE_150 orphaned: 205
+THREE_150 orphaned: 150
+TOTAL TO DELETE: 355
+
+MISSING ACCOUNTS TO CREATE (Valid Transactions):
+--------------------------------------------------------------------------------
+FIVE_150 missing: 138
+THREE_150 missing: 159
+TOTAL TO CREATE: 297
+
+NET RESULT:
+--------------------------------------------------------------------------------
+Before: 652 discrepancies
+After:  0 discrepancies (all transactions matched to accounts)

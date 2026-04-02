@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Paper, Typography, Stack, Avatar, Button, Chip } from "@mui/material";
+import { Box, Paper, Typography, Stack, Button } from "@mui/material";
 
 const WalletCard = ({
   slNo,
@@ -9,132 +9,132 @@ const WalletCard = ({
   label,
   actions,
   highlight = false,
+  sx = {},
 }) => {
   return (
     <Paper
-      elevation={highlight ? 2 : 0}
+      elevation={0}
       sx={{
-  p: { xs: 1.2, sm: 2 },
-  borderRadius: 3,
-  border: highlight ? "2px solid" : "1px solid",
-  borderColor: highlight ? "primary.main" : "#e5e7eb",
-  bgcolor: highlight ? "primary.light" : "#fff",
-
-  // ✅ FIX 2: Equal height cards
-  height: "100%",
-  display: "flex",
-  flexDirection: "column",
-  justifyContent: "space-between",
-
-  // ✅ FIX 3: Prevent layout breaking
-  minWidth: 0,
-  overflow: "hidden",
-
-  position: "relative",
-  transition: "all 0.2s ease",
-
-  "&:hover": {
-    transform: "translateY(-2px)",
-    boxShadow: highlight
-      ? "0 8px 20px rgba(14,165,233,0.3)"
-      : "0 4px 12px rgba(0,0,0,0.08)",
-  },
-}}
+        p: "10px 12px",
+        borderRadius: "10px",
+        border: highlight ? "1.5px solid" : "1px solid",
+        borderColor: highlight ? "primary.main" : "#e2e8f0",
+        bgcolor: highlight ? "#eff6ff" : "#fff",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        minWidth: 0,
+        overflow: "hidden",
+        cursor: "pointer",
+        userSelect: "none",
+        transition: "transform 0.15s ease, box-shadow 0.15s ease",
+        "&:active": {
+          transform: "scale(0.97)",
+        },
+        "&:hover": {
+          boxShadow: highlight
+            ? "0 4px 14px rgba(37,99,235,0.18)"
+            : "0 2px 8px rgba(0,0,0,0.07)",
+        },
+        ...sx,
+      }}
     >
-      {/* SlNo */}
-      <Chip
-        label={`#${slNo}`}
-        size="small"
-        sx={{
-          alignSelf: "flex-start",
-          mb: 0.5,
-          height: 20,
-          fontSize: 10,
-          bgcolor: highlight ? "#fff" : "#e0f2fe",
-          color: highlight ? "#0ea5e9" : "#0284c7",
-        }}
-      />
-
-      {/* Header */}
-      <Stack direction="row" spacing={1} alignItems="center">
-        <Avatar
+      {/* Icon + Title row */}
+      <Stack direction="row" spacing="6px" alignItems="flex-start">
+        <Box
           sx={{
-            width: { xs: 28, sm: 34 },
-            height: { xs: 28, sm: 34 },
-            fontSize: 16,
-            bgcolor: highlight ? "#0284c7" : "#f1f5f9",
-            color: highlight ? "#fff" : "#0f172a",
+            width: 28,
+            height: 28,
+            borderRadius: "7px",
+            bgcolor: highlight ? "#2563eb" : "#f1f5f9",
+            color: highlight ? "#fff" : "#334155",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+            "& svg": { fontSize: 16 },
           }}
         >
           {icon || "💼"}
-        </Avatar>
+        </Box>
 
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography
             sx={{
-              fontSize: { xs: 11, sm: 13 },
-              fontWeight: 700,
-              lineHeight: 1.2,
+              fontSize: 12,
+              fontWeight: 600,
+              lineHeight: 1.25,
+              color: "#334155",
               display: "-webkit-box",
               WebkitLineClamp: 2,
               WebkitBoxOrient: "vertical",
               overflow: "hidden",
+              wordBreak: "break-word",
             }}
           >
             {name}
           </Typography>
-
-          {label && (
-            <Typography
-              sx={{
-                fontSize: 10,
-                opacity: 0.7,
-              }}
-            >
-              {label}
-            </Typography>
-          )}
         </Box>
       </Stack>
 
       {/* Amount */}
       <Typography
         sx={{
-          mt: 1,
+          mt: "6px",
           fontWeight: 800,
-          fontSize: { xs: 16, sm: 20 },
+          fontSize: 17,
+          color: highlight ? "#1d4ed8" : "#0f172a",
+          letterSpacing: "-0.3px",
+          lineHeight: 1,
         }}
       >
-        ₹ {Number(amount || 0).toFixed(2)}
+        ₹{Number(amount || 0).toFixed(2)}
       </Typography>
+
+      {/* Subtitle label */}
+      {label && (
+        <Typography
+          sx={{
+            mt: "3px",
+            fontSize: 10,
+            color: "#94a3b8",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {label}
+        </Typography>
+      )}
 
       {/* Actions */}
       {actions?.length > 0 && (
         <Stack
           direction="row"
-          spacing={0.5}
-          sx={{
-            mt: 1,
-            overflowX: "auto",
-          }}
+          spacing="4px"
+          sx={{ mt: "8px", flexWrap: "wrap", gap: "4px" }}
         >
           {actions.map((a, i) => (
             <Button
               key={i}
               size="small"
-              variant="contained"
-              onClick={a.onClick}
+              variant={highlight ? "contained" : "outlined"}
+              onClick={(e) => {
+                e.stopPropagation();
+                a.onClick?.();
+              }}
               disabled={a.disabled}
               sx={{
                 fontSize: 10,
-                px: 1,
-                py: 0.3,
-                minWidth: 60,
-                bgcolor: highlight ? "#fff" : "#0ea5e9",
-                color: highlight ? "#0284c7" : "#fff",
-                "&:hover": {
-                  bgcolor: highlight ? "#e0f2fe" : "#0284c7",
-                },
+                px: "8px",
+                py: "2px",
+                minWidth: 0,
+                borderRadius: "6px",
+                lineHeight: 1.4,
+                fontWeight: 700,
+                ...(highlight
+                  ? { bgcolor: "#2563eb", color: "#fff" }
+                  : { borderColor: "#cbd5e1", color: "#475569" }),
               }}
             >
               {a.label}
