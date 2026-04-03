@@ -2632,6 +2632,137 @@ def _xhtml2pdf_link_callback(uri, rel):
     return uri
 
 
+# ====================
+# Direct Sponsor Member Detail API
+# ====================
+
+class DirectMemberDetailView(APIView):
+    """
+    GET /api/accounts/direct/member-detail/?user_id=<id>
+    Returns detailed info for a direct sponsor member of the logged-in user:
+    - Basic info (consumer_id, name, registration_date, package_activation_date)
+    - Entry package status (Join Subscription / 750)
+    - Smart seasons: each season (Coupon) with list of months (1–12) where user made a purchase
+    - Prime ranks: all rank levels with Active/Inactive status for the user
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        raw_id = request.query_params.get("user_id", "").strip()
+        if not raw_id:
+            return Response({"detail": "user_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            target_id = int(raw_id)
+        except (ValueError, TypeError):
+            return Response({"detail": "user_id must be a valid integer."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            target = CustomUser.objects.get(id=target_id)
+        except CustomUser.DoesNotExist:
+            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # ── Basic info ──
+        result = {
+            "consumer_id": target.username or "",
+            "full_name": target.full_name or "",
+            "phone": target.phone or "",
+            "registration_date": target.date_joined,
+            "package_activation_date": target.first_purchase_activated_at,
+            "account_active": bool(target.account_active),
+        }
+
+        # ── Entry Package (Join Subscription – 750 denomination) ──
+        try:
+            from coupons.models import CouponCode, ECouponOrder
+            has_coupon_750 = CouponCode.objects.filter(
+                assigned_consumer=target,
+                value__gte=700,
+                value__lte=800,
+            ).exists()
+            has_ecoupon_750 = ECouponOrder.objects.filter(
+                buyer=target,
+                denomination_snapshot__gte=700,
+                denomination_snapshot__lte=800,
+                status="APPROVED",
+            ).exists()
+            has_entry = has_coupon_750 or has_ecoupon_750 or bool(target.account_active)
+        except Exception:
+            has_entry = bool(target.account_active)
+        result["entry_package"] = {
+            "name": "Join Subscription",
+            "amount": 750,
+            "status": "Active" if has_entry else "Inactive",
+        }
+
+        # ── Smart Seasons (monthly 150/759 ecoupon purchases per season) ──
+        try:
+            from coupons.models import Coupon, CouponCode as CC
+            from django.db.models import Q as DQ
+            season_q = DQ(code__istartswith="season") | DQ(title__istartswith="season") | DQ(campaign__istartswith="season")
+            seasons = list(Coupon.objects.filter(season_q).order_by("created_at").values(
+                "id", "title", "code", "is_active", "valid_from", "valid_to", "created_at"
+            ))
+            now_dt = timezone.now()
+            smart_seasons = []
+            for s in seasons:
+                start_dt = s["valid_from"] or s["created_at"]
+                is_active = bool(s["is_active"])
+                if s["valid_from"] and s["valid_to"]:
+                    is_active = is_active and (s["valid_from"] <= now_dt <= s["valid_to"])
+                # Purchases: ecoupons assigned to user in this season (denominations 150 or 759)
+                codes = list(CC.objects.filter(
+                    assigned_consumer=target,
+                    coupon_id=s["id"],
+                    value__in=[150, 759],
+                ).order_by("created_at").values_list("created_at", flat=True))
+                months_purchased = set()
+                for dt in codes:
+                    month_diff = (dt.year - start_dt.year) * 12 + (dt.month - start_dt.month) + 1
+                    if 1 <= month_diff <= 12:
+                        months_purchased.add(month_diff)
+                smart_seasons.append({
+                    "id": s["id"],
+                    "name": s["title"] or s["code"],
+                    "is_active": is_active,
+                    "months_purchased": sorted(months_purchased),
+                })
+            result["smart_seasons"] = smart_seasons
+        except Exception:
+            result["smart_seasons"] = []
+
+        # ── Prime Ranks ──
+        try:
+            from mlm_ranks.models import Rank, RankUpgrade, UserRank
+            all_ranks = list(Rank.objects.order_by("level_number").values(
+                "id", "rank_name", "level_number", "upgrade_amount"
+            ))
+            successful_to = set(
+                RankUpgrade.objects.filter(
+                    user=target, payment_status="SUCCESS"
+                ).values_list("to_rank_id", flat=True)
+            )
+            try:
+                ur = UserRank.objects.select_related("current_rank").get(user=target)
+                current_level = getattr(ur.current_rank, "level_number", 0)
+            except Exception:
+                current_level = 0
+            prime_ranks = []
+            for rank in all_ranks:
+                achieved = rank["id"] in successful_to or rank["level_number"] <= current_level
+                prime_ranks.append({
+                    "id": rank["id"],
+                    "name": rank["rank_name"],
+                    "level": rank["level_number"],
+                    "amount": float(rank["upgrade_amount"] or 0),
+                    "status": "Active" if achieved else "Inactive",
+                })
+            result["prime_ranks"] = prime_ranks
+        except Exception:
+            result["prime_ranks"] = []
+
+        return Response(result, status=status.HTTP_200_OK)
+
+
 class OfferLetterPDFView(APIView):
     """
     Generate a dynamic Employment Offer Letter (PDF) for the logged-in employee.

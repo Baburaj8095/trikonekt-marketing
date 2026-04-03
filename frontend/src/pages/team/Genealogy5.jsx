@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import API, { adminGetMatrixCommissionConfig } from "../../api/api";
-import TreeTab from "../../components/genealogy/TreeTab";
 import EarningsTab from "../../components/genealogy/EarningsTab";
 import ProgressTab from "../../components/genealogy/ProgressTab";
+import DirectSponsorTab from "../../components/genealogy/DirectSponsorTab";
+import FiveMatrixTab from "../../components/genealogy/FiveMatrixTab";
+import ThreeMatrixTab from "../../components/genealogy/ThreeMatrixTab";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -18,7 +20,7 @@ const C = {
 };
 
 // ─── Tab order (used for swipe direction) ─────────────────────────────────────
-const TAB_ORDER = ["tree", "earnings", "progress"];
+const TAB_ORDER = ["directs", "five_matrix", "three_matrix", "earnings", "progress"];
 
 // ─── SVG Icons ────────────────────────────────────────────────────────────────
 const TreeIcon = () => (
@@ -77,10 +79,75 @@ const ProgressIcon = () => (
   </svg>
 );
 
+const DirectsIcon = () => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="9" cy="7" r="3" />
+    <path d="M3 20c0-3.3 2.7-6 6-6h.5" />
+    <circle cx="17" cy="11" r="2.5" />
+    <path d="M15 20c0-2.8 1.8-5 4-5" />
+    <path d="M21 20c0-2.8-1.8-5-4-5" />
+  </svg>
+);
+
+const FiveMatrixIcon = () => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="2" y="2" width="4" height="4" rx="1" />
+    <rect x="10" y="2" width="4" height="4" rx="1" />
+    <rect x="18" y="2" width="4" height="4" rx="1" />
+    <rect x="6" y="11" width="4" height="4" rx="1" />
+    <rect x="14" y="11" width="4" height="4" rx="1" />
+    <line x1="4" y1="6" x2="8" y2="11" />
+    <line x1="12" y1="6" x2="8" y2="11" />
+    <line x1="12" y1="6" x2="16" y2="11" />
+    <line x1="20" y1="6" x2="16" y2="11" />
+  </svg>
+);
+
+const ThreeMatrixIcon = () => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="12" cy="4" r="2.5" />
+    <circle cx="4.5" cy="18" r="2.5" />
+    <circle cx="19.5" cy="18" r="2.5" />
+    <circle cx="12" cy="18" r="2.5" />
+    <line x1="12" y1="6.5" x2="12" y2="15.5" />
+    <line x1="12" y1="6.5" x2="4.5" y2="15.5" />
+    <line x1="12" y1="6.5" x2="19.5" y2="15.5" />
+  </svg>
+);
+
 const TABS = [
-  { id: "tree", label: "Genealogy Tree", Icon: TreeIcon },
-  { id: "earnings", label: "Rank Upgrade", Icon: EarningsIcon },
-  { id: "progress", label: "Self Account", Icon: ProgressIcon },
+  { id: "directs",      label: "Direct",     Icon: DirectsIcon },
+  { id: "five_matrix",  label: "5 Matrix",   Icon: FiveMatrixIcon },
+  { id: "three_matrix", label: "3 Matrix",   Icon: ThreeMatrixIcon },
+  { id: "earnings",     label: "Rank Up",    Icon: EarningsIcon },
+  // { id: "progress",     label: "Account",    Icon: ProgressIcon },
 ];
 
 // ─── AppTabBar ───────────────────────────────────────────────────────────────
@@ -242,13 +309,15 @@ export default function Genealogy5() {
   const [levels, setLevels] = useState({ five: 10, three: 15 });
 
   // ── Navigation ──
-  const [tab, setTab] = useState("tree");
+  const [tab, setTab] = useState("directs");
   const [tabDir, setTabDir] = useState(1); // +1 = forward, -1 = backward
 
   // ── Matrix progress ──
   const [levelCounts, setLevelCounts] = useState(null);
   const [fiveCounts, setFiveCounts] = useState(null);
+  const [threeCounts, setThreeCounts] = useState(null);
   const [selectedRoot, setSelectedRoot] = useState(null);
+  const [selectedThreeRoot, setSelectedThreeRoot] = useState(null);
 
   // ── Direct team ──
   const [directList, setDirectList] = useState(null);
@@ -396,7 +465,8 @@ export default function Genealogy5() {
             ? "root_id=" + encodeURIComponent(String(selectedRoot)) + "&"
             : "") +
           "depth=" +
-          encodeURIComponent(String(Number(levels?.five ?? 10)));
+          encodeURIComponent(String(Number(levels?.five ?? 10))) +
+          "&pool=FIVE_150";
         const res = await API.get("/accounts/genealogy/5m/counts/?" + qs, {
           cacheTTL: 10000,
           retryAttempts: 2,
@@ -410,11 +480,44 @@ export default function Genealogy5() {
     };
   }, [selectedRoot, levels]);
 
+  // ── 3-matrix level counts (per selected three root) ──
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const qs =
+          (selectedThreeRoot
+            ? "root_id=" + encodeURIComponent(String(selectedThreeRoot)) + "&"
+            : "") +
+          "depth=" +
+          encodeURIComponent(String(Number(levels?.three ?? 15))) +
+          "&pool=THREE_150";
+        const res = await API.get("/accounts/genealogy/5m/counts/?" + qs, {
+          cacheTTL: 10000,
+          retryAttempts: 2,
+        });
+        if (!alive) return;
+        setThreeCounts(res?.data || null);
+      } catch (_) {}
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [selectedThreeRoot, levels]);
+
   // ── 5-matrix progress from summary ──
   const fiveProgress = useMemo(() => {
     const arr = Array.isArray(data?.matrix_progress) ? data.matrix_progress : [];
     return (
       arr.find((p) => String(p?.pool_type).toUpperCase() === "FIVE_150") || null
+    );
+  }, [data]);
+
+  // ── 3-matrix progress from summary ──
+  const threeProgress = useMemo(() => {
+    const arr = Array.isArray(data?.matrix_progress) ? data.matrix_progress : [];
+    return (
+      arr.find((p) => String(p?.pool_type).toUpperCase() === "THREE_150") || null
     );
   }, [data]);
 
@@ -458,11 +561,11 @@ export default function Genealogy5() {
     };
   }, [fiveProgress, levels]);
 
-  // ── Direct team: load when "progress" tab activates ──
+  // ── Direct team: load when "directs" or "progress" tab activates ──
   useEffect(() => {
     let alive = true;
     const run = async () => {
-      if (tab !== "progress") return;
+      if (tab !== "progress" && tab !== "directs") return;
       try {
         setLoadingDirects(true);
         const res = await API.get("/accounts/team/summary/", {
@@ -547,12 +650,36 @@ export default function Genealogy5() {
     }
   }, [myPositions]);
 
+  // ── Derived: active 3-matrix roots list ──
+  const threeRootsList = useMemo(() => {
+    try {
+      const rows = myPositions.filter(
+        (p) =>
+          String(p?.pool_type) === "THREE_150" &&
+          String(p?.status || "").toUpperCase() === "ACTIVE"
+      );
+      return [...rows].sort(
+        (a, b) =>
+          new Date(a?.created_at || 0) - new Date(b?.created_at || 0)
+      );
+    } catch {
+      return [];
+    }
+  }, [myPositions]);
+
   // ── Auto-select first root ──
   useEffect(() => {
     if (!selectedRoot && fiveRootsList.length > 0) {
       setSelectedRoot(fiveRootsList[0]?.id || null);
     }
   }, [fiveRootsList, selectedRoot]);
+
+  // ── Auto-select first 3-matrix root ──
+  useEffect(() => {
+    if (!selectedThreeRoot && threeRootsList.length > 0) {
+      setSelectedThreeRoot(threeRootsList[0]?.id || null);
+    }
+  }, [threeRootsList, selectedThreeRoot]);
 
   // ── Derived: fiveLevelGrid ──
   const fiveLevelGrid = useMemo(() => {
@@ -589,6 +716,61 @@ export default function Genealogy5() {
     }
     return active;
   }, [fiveLevelGrid]);
+
+  // ── Derived: threeLevelGrid ──
+  const threeLevelGrid = useMemo(() => {
+    if (threeCounts?.levels && Array.isArray(threeCounts.levels)) {
+      return threeCounts.levels.map((x) => ({
+        sn: Number(x.level),
+        level: Number(x.level),
+        count: Number(x.team_count || 0),
+      }));
+    }
+    const plc = threeProgress?.per_level_counts || {};
+    const maxL = Math.max(1, Number(levels?.three ?? 15));
+    return Array.from({ length: maxL }, (_, i) => ({
+      sn: i + 1,
+      level: i + 1,
+      count: Math.max(0, parseInt(plc[String(i + 1)] ?? 0, 10) || 0),
+    }));
+  }, [threeCounts, threeProgress, levels]);
+
+  // ── Derived: totalThreeTeam ──
+  const totalThreeTeam = useMemo(
+    () => (threeLevelGrid || []).reduce((acc, r) => acc + Number(r?.count || 0), 0),
+    [threeLevelGrid]
+  );
+
+  // ── Derived: threeActiveLevelsReached ──
+  const threeActiveLevelsReached = useMemo(() => {
+    let active = 0;
+    for (let i = 1; i <= threeLevelGrid.length; i += 1) {
+      const row = threeLevelGrid.find((r) => Number(r.level) === i);
+      if (row && Number(row.count || 0) > 0) active = i;
+      else break;
+    }
+    return active;
+  }, [threeLevelGrid]);
+
+  // ── Derived: totalFiveEarning / totalThreeEarning ──
+  const totalFiveEarning = useMemo(
+    () => {
+      // 1st priority: wallet-level totals from summary API
+      const fromTotals = Number(data?.totals?.autopool_five || 0);
+      if (fromTotals > 0) return fromTotals;
+      // 2nd: UserMatrixProgress total_earned
+      return Number(fiveProgress?.total_earned || 0);
+    },
+    [data, fiveProgress]
+  );
+  const totalThreeEarning = useMemo(
+    () => {
+      const fromTotals = Number(data?.totals?.autopool_three || 0);
+      if (fromTotals > 0) return fromTotals;
+      return Number(threeProgress?.total_earned || 0);
+    },
+    [data, threeProgress]
+  );
 
   // ── Derived: directCount ──
   const directCount = useMemo(() => {
@@ -674,12 +856,41 @@ export default function Genealogy5() {
                 padding: "16px 16px 64px",
               }}
             >
-              {/* ── Tree Tab ── */}
-              {tab === "tree" && (
-                <TreeTab
-                  selectedRoot={selectedRoot}
+              {/* ── Direct Sponsor Tab ── */}
+              {tab === "directs" && (
+                <DirectSponsorTab
+                  directList={resolvedDirectList}
+                  loading={loadingDirects}
+                  onRefresh={() => setDirectRefreshKey((k) => k + 1)}
+                />
+              )}
+
+              {/* ── 5 Matrix & Chart Tab ── */}
+              {tab === "five_matrix" && (
+                <FiveMatrixTab
                   fiveRootsList={fiveRootsList}
+                  selectedRoot={selectedRoot}
                   setSelectedRoot={setSelectedRoot}
+                  fiveLevelGrid={fiveLevelGrid}
+                  fiveCounts={fiveCounts}
+                  totalTeam={totalTeam}
+                  activeLevelsReached={activeLevelsReached}
+                  totalFiveEarning={totalFiveEarning}
+                  levels={levels}
+                />
+              )}
+
+              {/* ── 3 Matrix Tree Tab ── */}
+              {tab === "three_matrix" && (
+                <ThreeMatrixTab
+                  threeRootsList={threeRootsList}
+                  selectedThreeRoot={selectedThreeRoot}
+                  setSelectedThreeRoot={setSelectedThreeRoot}
+                  threeLevelGrid={threeLevelGrid}
+                  threeCounts={threeCounts}
+                  totalThreeTeam={totalThreeTeam}
+                  activeLevelsReached={threeActiveLevelsReached}
+                  totalThreeEarning={totalThreeEarning}
                   levels={levels}
                 />
               )}

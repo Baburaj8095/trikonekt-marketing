@@ -759,12 +759,19 @@ class FiveMatrixCountsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        # Depth: default 10, cap at 10
+        # Pool: FIVE_150 (default) or THREE_150
+        pool = str(request.query_params.get("pool") or "FIVE_150").strip().upper()
+        if pool not in ("FIVE_150", "THREE_150"):
+            pool = "FIVE_150"
+        branch_factor = 3 if pool == "THREE_150" else 5
+
+        # Depth: cap at 15 for THREE, 10 for FIVE
+        max_cap = 15 if pool == "THREE_150" else 10
         try:
-            depth = int(request.query_params.get("depth") or 10)
+            depth = int(request.query_params.get("depth") or max_cap)
         except Exception:
-            depth = 10
-        depth = max(1, min(10, int(depth)))
+            depth = max_cap
+        depth = max(1, min(max_cap, int(depth)))
 
         # Resolve root
         rid = request.query_params.get("root_id")
@@ -773,7 +780,7 @@ class FiveMatrixCountsView(APIView):
             if rid is not None and str(rid).strip():
                 root = (
                     AutoPoolAccount.objects
-                    .filter(id=int(rid), pool_type="FIVE_150", status="ACTIVE", owner=request.user)
+                    .filter(id=int(rid), pool_type=pool, status="ACTIVE", owner=request.user)
                     .only("id", "owner_id")
                     .first()
                 )
@@ -783,11 +790,11 @@ class FiveMatrixCountsView(APIView):
             root = None
 
         if not root:
-            # Earliest created_at active 5-matrix account for the logged-in user
+            # Earliest created_at active account for the logged-in user
             try:
                 root = (
                     AutoPoolAccount.objects
-                    .filter(owner=request.user, pool_type="FIVE_150", status="ACTIVE")
+                    .filter(owner=request.user, pool_type=pool, status="ACTIVE")
                     .only("id", "owner_id", "created_at")
                     .order_by("created_at", "id")
                     .first()
@@ -796,11 +803,13 @@ class FiveMatrixCountsView(APIView):
                 root = None
 
         if not root:
-            levels = [{"level": i, "team_count": 0} for i in range(1, depth + 1)]
+            levels = [{"level": i, "team_count": 0, "max_count": branch_factor ** i} for i in range(1, depth + 1)]
             return Response(
                 {
                     "root_id": None,
-                    "matrix_type": 5,
+                    "pool": pool,
+                    "branch_factor": branch_factor,
+                    "matrix_type": branch_factor,
                     "depth": depth,
                     "levels": levels,
                     "total_team": 0,
@@ -818,11 +827,11 @@ class FiveMatrixCountsView(APIView):
             if not frontier:
                 break
 
-            # Fetch children of current frontier strictly within FIVE_150 and ACTIVE
+            # Fetch children of current frontier strictly within pool and ACTIVE
             try:
                 rows = list(
                     AutoPoolAccount.objects
-                    .filter(parent_account_id__in=frontier, pool_type="FIVE_150", status="ACTIVE")
+                    .filter(parent_account_id__in=frontier, pool_type=pool, status="ACTIVE")
                     .only("id", "owner_id")
                     .order_by("position", "id")
                     .values("id", "owner_id")
@@ -857,7 +866,14 @@ class FiveMatrixCountsView(APIView):
             frontier = child_ids  # proceed to next level
 
         # Build response arrays 1..depth (zeros for missing)
-        levels = [{"level": i, "team_count": int(levels_counts.get(i, 0))} for i in range(1, depth + 1)]
+        levels = [
+            {
+                "level": i,
+                "team_count": int(levels_counts.get(i, 0)),
+                "max_count": branch_factor ** i,
+            }
+            for i in range(1, depth + 1)
+        ]
         total_team = int(sum(x["team_count"] for x in levels))
 
         # Highest contiguous active level starting from 1
@@ -868,14 +884,36 @@ class FiveMatrixCountsView(APIView):
             else:
                 break
 
+        # Count fully completed levels (team_count >= max_count)
+        levels_completed = sum(1 for x in levels if x["team_count"] >= x["max_count"] and x["max_count"] > 0)
+
+        # Per-pool earning for the current user
+        total_earned = "0"
+        try:
+            from accounts.models import WalletTransaction
+            from django.db.models import Sum
+            tx_type = "AUTOPOOL_BONUS_FIVE" if pool == "FIVE_150" else "AUTOPOOL_BONUS_THREE"
+            earned = (
+                WalletTransaction.objects
+                .filter(user=request.user, type=tx_type, amount__gt=0)
+                .aggregate(total=Sum("amount"))["total"]
+            )
+            total_earned = str(earned or 0)
+        except Exception:
+            pass
+
         return Response(
             {
                 "root_id": int(getattr(root, "id", 0) or 0),
-                "matrix_type": 5,
+                "pool": pool,
+                "branch_factor": branch_factor,
+                "matrix_type": branch_factor,
                 "depth": depth,
                 "levels": levels,
                 "total_team": total_team,
                 "active_levels_reached": int(active_reached),
+                "levels_completed": int(levels_completed),
+                "total_earned": total_earned,
             },
             status=status.HTTP_200_OK,
         )

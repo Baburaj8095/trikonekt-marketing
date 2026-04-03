@@ -15,6 +15,7 @@ from .views import (
     MyLevelBonusProgressView,
     RankMatrixTreeView,
     RankMatrixSubtreeView,
+    RankMatrixBFSView,
 )
 
 urlpatterns = [
@@ -29,6 +30,7 @@ urlpatterns = [
     # Rank-1 Five-Matrix Tree
     path("rank-matrix/tree/", RankMatrixTreeView.as_view()),
     path("rank-matrix/subtree/", RankMatrixSubtreeView.as_view()),
+    path("rank-matrix/tree-bfs/", RankMatrixBFSView.as_view()),
 
     # Admin APIs
     path("admin/rank-upgrades/", AdminRankUpgradesView.as_view()),

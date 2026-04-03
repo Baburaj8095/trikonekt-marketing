@@ -38,6 +38,8 @@ from .views import (
     WalletTransferConsumerLookup,
     WalletTransferOtpRequest,
     WalletTransferConfirm,
+    # Direct sponsor member detail
+    DirectMemberDetailView,
 )
 from .token_serializers import CustomTokenRefreshView
 from .views_tree import MyFiveMatrixTeamV1, FiveMatrixCountsView, MyMatrix5EntriesTree
@@ -89,4 +91,6 @@ urlpatterns = [
     path('my/genealogy/tree5/', MyFiveMatrixTeamV1.as_view(), name='my_genealogy_tree5'),
     # Five-matrix genealogy counts (placed ACTIVE nodes only)
     path('genealogy/5m/counts/', FiveMatrixCountsView.as_view(), name='five_matrix_counts'),
+    # Direct sponsor member detail
+    path('direct/member-detail/', DirectMemberDetailView.as_view(), name='direct_member_detail'),
 ]

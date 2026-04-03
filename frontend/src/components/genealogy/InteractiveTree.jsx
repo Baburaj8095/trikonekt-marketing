@@ -64,17 +64,42 @@ function normalizeEntry(n) {
   const kids = Array.isArray(n.children) ? n.children.map(normalizeEntry) : [];
   return {
     ...n,
-    id:             n.id || n.account_id || n.owner_id,
-    account_active: String(n.status || n.account_active || false).toUpperCase() === "ACTIVE",
-    direct_count:   Number(n.direct_count) || 0,
-    team_count:     Number(n.team_count) || 0,
+    id:              n.id || n.account_id || n.owner_id,
+    account_active:  String(n.status || n.account_active || false).toUpperCase() === "ACTIVE",
+    direct_count:    Number(n.direct_count) || 0,
+    team_count:      Number(n.team_count) || 0,
     matrix_position: Number(n.position || n.matrix_position) || 0,
-    children:       kids,
+    children:        kids,
   };
 }
 
-async function apiFetchRoot({ useEntries, entryRootId, pool }) {
+function normalizeRankNode(n) {
+  if (!n) return null;
+  const kids = Array.isArray(n.children) ? n.children.map(normalizeRankNode) : [];
+  return {
+    ...n,
+    id:              n.user_id || n.id,
+    account_active:  String(n.status || "ACTIVE").toUpperCase() === "ACTIVE",
+    direct_count:    Number(n.direct_count) || 0,
+    team_count:      Number(n.team_count) || 0,
+    matrix_position: Number(n.position || n.matrix_position) || 0,
+    children:        kids,
+  };
+}
+
+async function apiFetchRoot({ useEntries, entryRootId, pool, useRankMatrix, rankStartUserId, rankRootUserId }) {
   try {
+    if (useRankMatrix) {
+      const params = { max_depth: 2 };
+      if (rankStartUserId) params.start_user_id = rankStartUserId;
+      if (rankRootUserId)  params.root_user_id  = rankRootUserId;
+      const res = await API.get("/rank-matrix/tree-bfs/", {
+        params,
+        cacheTTL: 0, dedupe: "cancelPrevious",
+      });
+      return normalizeRankNode(res?.data) || null;
+    }
+
     if (useEntries) {
       // Entry-based mode: use the entries endpoint directly so each position
       // pill shows its specific entry subtree (AutoPoolAccount graph).
@@ -86,12 +111,10 @@ async function apiFetchRoot({ useEntries, entryRootId, pool }) {
       });
       const entry = entryRes?.data;
       if (!entry) return null;
-      console.log(`[apiFetchRoot entries] entry tree loaded, account_id:`, entry.account_id, 'children:', entry.children?.length || 0);
       return normalizeEntry(entry);
     }
 
     const res = await getMyGenealogyTree5({ max_depth: 2, pool });
-    console.log(`[apiFetchRoot genealogy] root, children count:`, res?.children?.length || 0);
     return res || null;
   } catch (err) {
     console.error(`[apiFetchRoot] Error:`, err);
@@ -99,24 +122,32 @@ async function apiFetchRoot({ useEntries, entryRootId, pool }) {
   }
 }
 
-async function apiFetchKids(nodeId, { useEntries, pool }) {
+async function apiFetchKids(nodeId, { useEntries, pool, useRankMatrix, rankRootUserId }) {
   try {
+    if (useRankMatrix) {
+      const params = { start_user_id: nodeId, max_depth: 1 };
+      if (rankRootUserId) params.root_user_id = rankRootUserId;
+      const res = await API.get("/rank-matrix/tree-bfs/", {
+        params,
+        cacheTTL: 0, dedupe: "cancelPrevious",
+      });
+      const data = res?.data;
+      return Array.isArray(data?.children) ? data.children.map(normalizeRankNode) : null;
+    }
+
     if (useEntries) {
       // Entry-based mode: nodeId is an account_id (AutoPoolAccount.id).
-      // Fetch the entry subtree and return its children.
       const res = await API.get("/accounts/my/matrix/tree5/entries/", {
         params: { start_entry_id: nodeId, max_depth: 1, pool },
         cacheTTL: 0, dedupe: "cancelPrevious",
       });
       const data = res?.data;
       const children = Array.isArray(data?.children) ? data.children.map(normalizeEntry) : null;
-      console.log(`[apiFetchKids entries] nodeId=${nodeId}, children count:`, children?.length || 0);
       return children;
     }
 
     const res = await getMyGenealogyTree5({ root_user_id: nodeId, max_depth: 1, pool });
     const children = Array.isArray(res?.children) ? res.children : null;
-    console.log(`[apiFetchKids] nodeId=${nodeId}, children count:`, children?.length || 0);
     return children;
   } catch (err) {
     console.error(`[apiFetchKids] Error for nodeId=${nodeId}:`, err);
@@ -372,7 +403,11 @@ export default function InteractiveTree({
   entryRootId    = null,
   useEntriesTree = false,
   pool           = "FIVE_150",
-  onNodeSelect   = null,  // callback when user double-clicks a child node
+  onNodeSelect   = null,  // callback when user taps a child node to drill down
+  // Rank-matrix mode (mutually exclusive with useEntriesTree)
+  useRankMatrix  = false,
+  rankStartUserId = null, // user_id to start BFS from (defaults to root)
+  rankRootUserId  = null, // root_user_id for the rank matrix
 }) {
   const slots = maxSlots(pool);
 
@@ -441,7 +476,7 @@ export default function InteractiveTree({
       // Fetch children for root if not yet loaded
       if (!inFlight.current.has(nodeId)) {
         inFlight.current.add(nodeId);
-        const opts = { useEntries: useEntriesTree, pool };
+        const opts = { useEntries: useEntriesTree, pool, useRankMatrix, rankRootUserId };
         apiFetchKids(nodeId, opts).then(apiKids => {
           const kids = apiKids || [];
           inFlight.current.delete(nodeId);
@@ -453,7 +488,7 @@ export default function InteractiveTree({
       }
       return { ...prev, _loading: true };
     });
-  }, [useEntriesTree, pool, slots, tree, onNodeSelect]);
+  }, [useEntriesTree, pool, slots, tree, onNodeSelect, useRankMatrix, rankRootUserId]);
 
   // ── Initial load ──
   useEffect(() => {
@@ -463,21 +498,17 @@ export default function InteractiveTree({
     inFlight.current.clear();
 
     (async () => {
-      const raw = await apiFetchRoot({ useEntries: useEntriesTree, entryRootId, pool });
+      const raw = await apiFetchRoot({
+        useEntries: useEntriesTree, entryRootId, pool,
+        useRankMatrix, rankStartUserId, rankRootUserId,
+      });
       if (!alive) return;
       if (!raw) {
-        console.warn(`[InteractiveTree] No API data available`);
         setInitLoad(false);
         return;
       }
 
-      // Children may be inline (max_depth>=2) or empty (leaf node)
       const inlineKids = Array.isArray(raw.children) ? raw.children : [];
-      
-      console.log(`[InteractiveTree] Root loaded. Children count: ${inlineKids.length}`);
-      if (inlineKids.length > 0) {
-        console.log(`[InteractiveTree] First child data:`, inlineKids[0]);
-      }
 
       const rootNode = {
         ...raw,
@@ -492,7 +523,7 @@ export default function InteractiveTree({
     })();
 
     return () => { alive = false; };
-  }, [entryRootId, useEntriesTree, pool, slots]); // eslint-disable-line
+  }, [entryRootId, useEntriesTree, pool, slots, useRankMatrix, rankStartUserId, rankRootUserId]); // eslint-disable-line
 
   // ── Pointer pan (mouse) ──
   const onPD = useCallback((e) => {

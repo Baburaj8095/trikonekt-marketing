@@ -486,6 +486,181 @@ class RankMatrixSubtreeView(APIView):
         return Response(payload, status=status.HTTP_200_OK)
 
 
+class RankMatrixBFSView(APIView):
+    """
+    GET /rank-matrix/tree-bfs/
+    Returns a BFS tree of Rank-1 matrix nodes in the same shape as the FIVE_150
+    entries endpoint, so InteractiveTree.jsx can render it identically.
+
+    Params:
+      - start_user_id  : user_id to root the BFS from (defaults to caller / root_user_id)
+      - root_user_id   : which Rank-1 matrix root to query (defaults to caller)
+      - max_depth      : depth to fetch inline (default 2, capped at 5)
+
+    Response shape matches /accounts/my/matrix/tree5/entries/:
+      {
+        "user_id": 395, "username": "...", "full_name": "...", "root_user_id": 395,
+        "level": 1, "position": 0, "status": "ACTIVE",
+        "team_count": N, "direct_count": M,
+        "children": [ { same shape ... }, ... ]
+      }
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        # ── Resolve root_user_id ──
+        rid = request.query_params.get("root_user_id")
+        try:
+            root_user_id = int(rid) if rid and str(rid).strip() != "" else int(getattr(request.user, "id", 0) or 0)
+        except Exception:
+            root_user_id = int(getattr(request.user, "id", 0) or 0)
+
+        if root_user_id != getattr(request.user, "id", None) and not getattr(request.user, "is_staff", False):
+            return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
+
+        # ── Resolve start_user_id ──
+        suid_raw = request.query_params.get("start_user_id")
+        try:
+            start_user_id = int(suid_raw) if suid_raw and str(suid_raw).strip() != "" else root_user_id
+        except Exception:
+            start_user_id = root_user_id
+
+        # ── max_depth ──
+        try:
+            max_depth = max(1, min(5, int(request.query_params.get("max_depth", 2))))
+        except Exception:
+            max_depth = 2
+
+        from .models import RankMatrixNode
+        from accounts.models import CustomUser
+
+        # ── Lazy-create root + backfill ──
+        try:
+            user_obj = request.user if getattr(request.user, "id", None) == root_user_id else CustomUser.objects.filter(id=root_user_id).first()
+            if user_obj:
+                FiveMatrixService.ensure_root_for_rank1(user_obj)
+                FiveMatrixService.lazy_backfill_for_root(root_user_id)
+        except Exception:
+            pass
+
+        # ── Fetch start_user info ──
+        try:
+            start_user_obj = CustomUser.objects.filter(id=start_user_id).first()
+        except Exception:
+            start_user_obj = None
+
+        # ── Fetch RankMatrixNode for start_user (gives position/level) ──
+        start_rnode = None
+        if start_user_id != root_user_id:
+            try:
+                start_rnode = RankMatrixNode.objects.filter(
+                    root_user_id=root_user_id, placed_user_id=start_user_id
+                ).first()
+            except Exception:
+                pass
+
+        def make_node(user, rnode=None):
+            uid = int(getattr(user, "id", 0) or 0) if user else 0
+            fn = (getattr(user, "first_name", "") or "").strip()
+            ln = (getattr(user, "last_name", "") or "").strip()
+            return {
+                "user_id":      uid,
+                "username":     getattr(user, "username", None),
+                "full_name":    f"{fn} {ln}".strip(),
+                "root_user_id": root_user_id,
+                "level":        int(getattr(rnode, "level_depth", 1) or 1) if rnode else 1,
+                "position":     int(getattr(rnode, "position", 0) or 0) if rnode else 0,
+                "approved_at":  getattr(rnode, "approved_at", None) if rnode else None,
+                "status":       "ACTIVE",
+                "team_count":   0,
+                "direct_count": 0,
+                "children":     [],
+            }
+
+        root_node = make_node(start_user_obj, start_rnode)
+
+        # ── BFS ──
+        nodes_by_uid = {start_user_id: root_node}
+        frontier = [start_user_id]
+        levels_done = 1
+
+        while frontier and levels_done < max_depth:
+            try:
+                rows = list(
+                    RankMatrixNode.objects.select_related("placed_user")
+                    .filter(root_user_id=root_user_id, parent_user_id__in=frontier)
+                    .order_by("parent_user_id", "position", "id")
+                )
+            except Exception:
+                rows = []
+            if not rows:
+                break
+
+            counts = {}
+            next_frontier = []
+            for row in rows:
+                pid = int(getattr(row, "parent_user_id", 0) or 0)
+                pu = getattr(row, "placed_user", None)
+                if not pu or pid not in nodes_by_uid:
+                    continue
+                cid = int(getattr(row, "placed_user_id", 0) or 0)
+                if counts.get(pid, 0) >= 5:
+                    continue
+                child_node = make_node(pu, row)
+                nodes_by_uid[pid]["children"].append(child_node)
+                nodes_by_uid[cid] = child_node
+                counts[pid] = counts.get(pid, 0) + 1
+                next_frontier.append(cid)
+
+            if not next_frontier:
+                break
+            frontier = next_frontier
+            levels_done += 1
+
+        # ── Accurate team_count + direct_count via full-depth BFS ──
+        try:
+            parent_to_children: dict = {}
+            all_ids = list(nodes_by_uid.keys())
+            visited: set = set(all_ids)
+
+            while all_ids:
+                child_rows = list(
+                    RankMatrixNode.objects.filter(
+                        root_user_id=root_user_id,
+                        parent_user_id__in=all_ids,
+                    ).values("placed_user_id", "parent_user_id")
+                )
+                next_ids = []
+                for row in child_rows:
+                    pid = int(row["parent_user_id"] or 0)
+                    cid = int(row["placed_user_id"] or 0)
+                    parent_to_children.setdefault(pid, []).append(cid)
+                    if cid not in visited:
+                        visited.add(cid)
+                        next_ids.append(cid)
+                all_ids = next_ids
+
+            count_memo: dict = {}
+
+            def _count_all(nid):
+                if nid in count_memo:
+                    return count_memo[nid]
+                kids = parent_to_children.get(nid, [])
+                total = len(kids)
+                for kid in kids:
+                    total += _count_all(kid)
+                count_memo[nid] = total
+                return total
+
+            for uid, node in nodes_by_uid.items():
+                node["direct_count"] = len(parent_to_children.get(uid, []))
+                node["team_count"] = _count_all(uid)
+        except Exception:
+            pass
+
+        return Response(root_node, status=status.HTTP_200_OK)
+
+
 class AdminRankUpgradesView(APIView):
     permission_classes = [permissions.IsAdminUser]
 

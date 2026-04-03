@@ -1,5 +1,5 @@
 import React from "react";
-import RankMatrixTree from "../RankMatrixTree";
+import RankTreeTab from "./RankTreeTab";
 
 const C = {
   primary: "#4f46e5",
@@ -341,7 +341,7 @@ export default function EarningsTab({
             {rankMxErr}
           </div>
         ) : (
-          <RankMatrixTree />
+          <RankTreeTab rankRootUserId={rankMx?.root?.root_user_id || null} />
         )}
       </div>
 
