@@ -810,7 +810,9 @@ class AutoPoolAccount(models.Model):
     ):
         """
         FIVE_150 sponsor-anchored forced matrix.
-        - Anchor to sponsor's subtree when the direct sponsor has an ACTIVE FIVE_150 entry.
+        - 1st entry: Anchor to sponsor's subtree when the direct sponsor has an ACTIVE FIVE_150 entry.
+        - 2nd+ entries: Anchor BFS under user's own base (first) FIVE_150 entry
+          so subsequent self-accounts cluster beneath the user's own subtree.
         - Otherwise, fall back to the pool sentinel root.
         """
         # Eligibility gate
@@ -866,7 +868,23 @@ class AutoPoolAccount(models.Model):
         except Exception:
             pass
 
-        start_id = cls._sponsor_start_entry_id_for(user, "FIVE_150") if start_entry_id is None else start_entry_id
+        # For 2nd+ entries: anchor BFS under user's own base (first) FIVE_150 entry
+        # so that subsequent self-accounts cluster beneath the user's own subtree.
+        # 1st entry still anchors to sponsor's subtree as before.
+        if start_entry_id is not None:
+            start_id = start_entry_id
+        else:
+            own_base = cls._base_self_account(user, "FIVE_150")
+            if own_base:
+                # User already has at least one FIVE_150 entry → place under it
+                start_id = int(own_base.id)
+            else:
+                # First entry → anchor to sponsor's subtree
+                start_id = cls._sponsor_start_entry_id_for(user, "FIVE_150")
+        # If no anchor resolved, fall back to global pool root
+        if start_id is None:
+            root = cls.objects.filter(parent_account__isnull=True, pool_type="FIVE_150").first()
+            start_id = root.id if root else None
         return GenericPlacement.place_account(
             owner=user,
             pool_type="FIVE_150",
@@ -1031,9 +1049,9 @@ class AutoPoolAccount(models.Model):
     def _sponsor_start_entry_id_for(cls, user, pool_type: str):
         """
         Resolve sponsor-scoped BFS start entry for placement:
-        - Return earliest ACTIVE non-sentinel AutoPoolAccount.id for the sponsor in this pool_type
-          (i.e., parent_account IS NOT NULL so we anchor under sponsor's positioned node)
-        - If sponsor has no positioned ACTIVE entry, return None (caller should fallback to sentinel)
+        - Return sponsor's PRIMARY entry (entry_idx=1) in this pool_type
+          so placement spreads consistently under sponsor's main account
+        - If sponsor doesn't have entry_idx=1, fall back to global root
         """
         try:
             sponsor = getattr(user, "registered_by", None)
@@ -1045,12 +1063,13 @@ class AutoPoolAccount(models.Model):
                     return None
             except Exception:
                 pass
+            # Get sponsor's PRIMARY entry (entry_idx=1) - their first account in this matrix
             acc = cls.objects.filter(
                 owner=sponsor,
                 pool_type=pool_type,
+                user_entry_index=1,
                 status="ACTIVE",
-                parent_account__isnull=False,
-            ).order_by("id").first()
+            ).first()
             return int(acc.id) if acc else None
         except Exception:
             return None
@@ -1089,7 +1108,8 @@ class AutoPoolAccount(models.Model):
     def place_in_five_pool(cls, user, pool_type: str, amount: Decimal, source_type: str = "", source_id: str = ""):
         """
         FIVE_150 sponsor-anchored forced matrix placement.
-        - Anchor to sponsor's subtree when the direct sponsor has an ACTIVE FIVE_150 entry.
+        - 1st entry: Anchor to sponsor's subtree when the direct sponsor has an ACTIVE FIVE_150 entry.
+        - 2nd+ entries: Anchor BFS under user's own base (first) entry so self-accounts cluster together.
         - Otherwise, fall back to the pool sentinel root.
         """
         # Eligibility gate
@@ -1105,8 +1125,13 @@ class AutoPoolAccount(models.Model):
         from decimal import Decimal as D
         from business.services.placement import GenericPlacement
         amt = D(amount or 0)
-        # Sponsor-anchored: begin BFS from sponsor's subtree when available; else fallback to sentinel
-        start_id = cls._sponsor_start_entry_id_for(user, pool_type)
+        # For 2nd+ FIVE_150 entries: BFS under user's own base entry (self-clustering)
+        # 1st entry still anchors to sponsor's subtree
+        own_base = cls._base_self_account(user, pool_type)
+        if own_base:
+            start_id = int(own_base.id)
+        else:
+            start_id = cls._sponsor_start_entry_id_for(user, pool_type)
         return GenericPlacement.place_account(
             owner=user,
             pool_type=pool_type,

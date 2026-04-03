@@ -296,8 +296,27 @@ export default function GenealogyTree5({
             <div style={styles.card}>
               <AvatarIcon size={56} />
               <div style={styles.cardName}>{displayName(root) || ""}</div>
-              <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap", justifyContent: "center" }}>
+              <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap", justifyContent: "center", alignItems: "center" }}>
                 {renderPrimeBadges(root)}
+                {root?.has_self_account ? (
+                  <span
+                    title={`Self account: ${root?.self_account_status || "ACTIVE"}`}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: "2px 6px",
+                      borderRadius: 999,
+                      fontSize: 10,
+                      fontWeight: 800,
+                      color: "#fff",
+                      lineHeight: 1,
+                      backgroundColor: root?.self_account_status === "ACTIVE" ? "#16a34a" : "#f59e0b",
+                    }}
+                  >
+                    SELF
+                  </span>
+                ) : null}
               </div>
               <div style={styles.cardTR}>User Id: {displayTR(root) || ""}</div>
               <div style={{ color: root?.account_active ? "#16a34a" : "#dc2626", fontSize: 12, fontWeight: 700, marginTop: 2 }}>
@@ -318,8 +337,27 @@ export default function GenealogyTree5({
                     <div key={Number.isFinite(c.id) ? `u:${c.id}` : `u-${idx}`} style={styles.childCard} onClick={() => drillDown(c)}>
                       <AvatarIcon size={48} />
                       <div style={{ ...styles.cardName, fontSize: 14, marginTop: 6 }}>{displayName(c) || ""}</div>
-                      <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap", justifyContent: "center" }}>
+                      <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap", justifyContent: "center", alignItems: "center" }}>
                         {renderPrimeBadges(c)}
+                        {c?.has_self_account ? (
+                          <span
+                            title={`Self account: ${c?.self_account_status || "ACTIVE"}`}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              padding: "2px 5px",
+                              borderRadius: 999,
+                              fontSize: 9,
+                              fontWeight: 700,
+                              color: "#fff",
+                              lineHeight: 1,
+                              backgroundColor: c?.self_account_status === "ACTIVE" ? "#16a34a" : "#f59e0b",
+                            }}
+                          >
+                            SELF
+                          </span>
+                        ) : null}
                       </div>
                       <div style={{ ...styles.cardTR, fontSize: 12 }}>User Id: {displayTR(c) || ""}</div>
                       <div style={{ ...styles.cardTR, fontSize: 12, color: c?.account_active ? "#16a34a" : "#dc2626", fontWeight: 700, marginTop: 2 }}>

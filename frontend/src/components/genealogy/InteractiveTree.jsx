@@ -64,11 +64,11 @@ function normalizeEntry(n) {
   const kids = Array.isArray(n.children) ? n.children.map(normalizeEntry) : [];
   return {
     ...n,
-    id:             n.account_id != null ? n.account_id : n.id,
-    account_active: String(n.status || "").toUpperCase() === "ACTIVE",
+    id:             n.id || n.account_id || n.owner_id,
+    account_active: String(n.status || n.account_active || false).toUpperCase() === "ACTIVE",
     direct_count:   Number(n.direct_count) || 0,
     team_count:     Number(n.team_count) || 0,
-    matrix_position: Number(n.matrix_position) || 0,
+    matrix_position: Number(n.position || n.matrix_position) || 0,
     children:       kids,
   };
 }
@@ -76,78 +76,56 @@ function normalizeEntry(n) {
 async function apiFetchRoot({ useEntries, entryRootId, pool }) {
   try {
     if (useEntries) {
+      // Entry-based mode: use the entries endpoint directly so each position
+      // pill shows its specific entry subtree (AutoPoolAccount graph).
       if (!entryRootId) return null;
-      const res = await API.get("/accounts/my/matrix/tree5/entries/", {
-        params: { start_entry_id: entryRootId, max_depth: 2, pool },  // Fetch 2 levels to get real children data
+
+      const entryRes = await API.get("/accounts/my/matrix/tree5/entries/", {
+        params: { start_entry_id: entryRootId, max_depth: 2, pool },
         cacheTTL: 0, dedupe: "cancelPrevious",
       });
-      const data = normalizeEntry(res?.data || null);
-      console.log(`[apiFetchRoot entries] root, children count:`, data?.children?.length || 0);
-      return data;
+      const entry = entryRes?.data;
+      if (!entry) return null;
+      console.log(`[apiFetchRoot entries] entry tree loaded, account_id:`, entry.account_id, 'children:', entry.children?.length || 0);
+      return normalizeEntry(entry);
     }
-    const res = await getMyGenealogyTree5({ max_depth: 2, pool });  // Fetch 2 levels to get real children data
-    console.log(`[apiFetchRoot genealogy] root, children count:`, res?.children?.length || 0, 'data:', res);
+
+    const res = await getMyGenealogyTree5({ max_depth: 2, pool });
+    console.log(`[apiFetchRoot genealogy] root, children count:`, res?.children?.length || 0);
     return res || null;
-  } catch (err) { 
+  } catch (err) {
     console.error(`[apiFetchRoot] Error:`, err);
-    return null; 
+    return null;
   }
 }
 
 async function apiFetchKids(nodeId, { useEntries, pool }) {
   try {
     if (useEntries) {
+      // Entry-based mode: nodeId is an account_id (AutoPoolAccount.id).
+      // Fetch the entry subtree and return its children.
       const res = await API.get("/accounts/my/matrix/tree5/entries/", {
         params: { start_entry_id: nodeId, max_depth: 1, pool },
         cacheTTL: 0, dedupe: "cancelPrevious",
       });
-      const data = normalizeEntry(res?.data || null);
-      const children = Array.isArray(data?.children) ? data.children : null;
+      const data = res?.data;
+      const children = Array.isArray(data?.children) ? data.children.map(normalizeEntry) : null;
       console.log(`[apiFetchKids entries] nodeId=${nodeId}, children count:`, children?.length || 0);
       return children;
     }
+
     const res = await getMyGenealogyTree5({ root_user_id: nodeId, max_depth: 1, pool });
     const children = Array.isArray(res?.children) ? res.children : null;
-    console.log(`[apiFetchKids genealogy] nodeId=${nodeId}, children count:`, children?.length || 0, 'API response:', res);
+    console.log(`[apiFetchKids] nodeId=${nodeId}, children count:`, children?.length || 0);
     return children;
-  } catch (err) { 
+  } catch (err) {
     console.error(`[apiFetchKids] Error for nodeId=${nodeId}:`, err);
-    return null; 
+    return null;
   }
 }
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
-let _mid = 8000;
-function mockChild(pos) {
-  const id = `m${++_mid}`;
-  return {
-    id, username: id, full_name: `User ${id}`,
-    account_active: Math.random() > 0.3,
-    team_count:     Math.floor(Math.random() * 6),
-    direct_count:   Math.floor(Math.random() * 3),
-    has_children:   Math.random() > 0.45,
-    matrix_position: pos,
-    children: [],
-  };
-}
-async function mockRoot(slots) {
-  await new Promise(r => setTimeout(r, 280));
-  const id = "mock-root";
-  return {
-    id, username: "You", full_name: "My Account",
-    account_active: true, team_count: slots, direct_count: slots,
-    has_children: true, matrix_position: 0,
-    children: Array.from({ length: slots }, (_, i) =>
-      Math.random() > 0.25 ? mockChild(i + 1) : null
-    ).filter(Boolean),
-  };
-}
-async function mockKids(slots) {
-  await new Promise(r => setTimeout(r, 320));
-  return Array.from({ length: slots }, (_, i) =>
-    Math.random() > 0.35 ? mockChild(i + 1) : null
-  ).filter(Boolean);
-}
+// ─── Mock data (disabled – kept only as dev reference) ────────────────────────
+// No mock fallback: if the API returns no data, show empty slots.
 
 // ─── Build fixed-slot child array (length = maxSlots) ─────────────────────────
 /**
@@ -295,7 +273,7 @@ const SvgNode = React.memo(function SvgNode({ n, onTap, isRoot }) {
         animation: "itPop .22s ease",
       }}
       onClick={canTap ? () => onTap(n.id) : undefined}
-      title={!n.isRoot && n.hasKids ? "Tap to expand/collapse · Double-tap to drill down" : n.hasKids ? "Tap to expand/collapse" : ""}
+      title={!n.isRoot ? "Tap to view this member's tree" : n.hasKids ? "Tap to expand/collapse" : ""}
     >
       <circle r={NR} cx={0} cy={0}
         fill={fill} stroke={stroke} strokeWidth={sw}
@@ -429,14 +407,9 @@ export default function InteractiveTree({
     };
   }, [tree, slots]);
 
-  // ── Tap: expand / collapse ──
+  // ── Tap: click child → drill down; click root → expand/collapse ──
   const handleTap = useCallback((nodeId) => {
-    const now = Date.now();
-    const lastTap = tapTime.current[nodeId] || 0;
-    const isDoubleClick = now - lastTap < 300;
-    tapTime.current[nodeId] = now;
-
-    // If double-click on non-root node and callback exists, call it
+    // Helper to find a node in the tree
     function findNodeById(nd, id) {
       if (!nd) return null;
       if (String(nd.id) === id) return nd;
@@ -448,54 +421,37 @@ export default function InteractiveTree({
       return null;
     }
 
-    if (isDoubleClick && tree) {
-      const node = findNodeById(tree, nodeId);
-      if (node && String(node.id) !== String(tree.id) && onNodeSelect) {
-        // This is a double-click on a non-root node
-        onNodeSelect(String(nodeId));
-        return;
-      }
+    if (!tree) return;
+    const node = findNodeById(tree, nodeId);
+    if (!node) return;
+
+    // Non-root node: single click drills down into it
+    if (String(node.id) !== String(tree.id) && onNodeSelect) {
+      onNodeSelect(String(nodeId));
+      return;
     }
 
-    // Single click: expand/collapse
+    // Root node: toggle expand/collapse
     setTree(prev => {
       if (!prev) return prev;
+      if (String(prev.id) !== nodeId) return prev;
+      if (prev._expanded) return { ...prev, _expanded: false };
+      if (prev._kids) return { ...prev, _expanded: true };
 
-      function visit(nd) {
-        if (!nd) return nd;
-        if (String(nd.id) === nodeId) {
-          if (nd._expanded) return { ...nd, _expanded: false }; // collapse
-          if (nd._kids) return { ...nd, _expanded: true };      // expand cached
-
-          // Launch fetch
-          if (!inFlight.current.has(nodeId)) {
-            inFlight.current.add(nodeId);
-            const opts = { useEntries: useEntriesTree, pool };
-            apiFetchKids(nodeId, opts).then(async apiKids => {
-              const kids = (apiKids && apiKids.length > 0)
-                ? apiKids
-                : await mockKids(slots);
-              inFlight.current.delete(nodeId);
-              setTree(p2 => {
-                if (!p2) return p2;
-                function inject(n2) {
-                  if (!n2) return n2;
-                  if (String(n2.id) === nodeId) {
-                    return { ...n2, _kids: kids, _loading: false, _expanded: true };
-                  }
-                  if (!n2._kids) return n2;
-                  return { ...n2, _kids: n2._kids.map(inject) };
-                }
-                return inject(p2);
-              });
-            });
-          }
-          return { ...nd, _loading: true };
-        }
-        if (!nd._kids) return nd;
-        return { ...nd, _kids: nd._kids.map(visit) };
+      // Fetch children for root if not yet loaded
+      if (!inFlight.current.has(nodeId)) {
+        inFlight.current.add(nodeId);
+        const opts = { useEntries: useEntriesTree, pool };
+        apiFetchKids(nodeId, opts).then(apiKids => {
+          const kids = apiKids || [];
+          inFlight.current.delete(nodeId);
+          setTree(p2 => {
+            if (!p2) return p2;
+            return { ...p2, _kids: kids, _loading: false, _expanded: true };
+          });
+        });
       }
-      return visit(prev);
+      return { ...prev, _loading: true };
     });
   }, [useEntriesTree, pool, slots, tree, onNodeSelect]);
 
@@ -507,59 +463,32 @@ export default function InteractiveTree({
     inFlight.current.clear();
 
     (async () => {
-      let raw = await apiFetchRoot({ useEntries: useEntriesTree, entryRootId, pool });
+      const raw = await apiFetchRoot({ useEntries: useEntriesTree, entryRootId, pool });
       if (!alive) return;
       if (!raw) {
-        console.warn(`[InteractiveTree] No API data, using mock root`);
-        raw = await mockRoot(slots);
+        console.warn(`[InteractiveTree] No API data available`);
+        setInitLoad(false);
+        return;
       }
-      if (!alive) return;
 
-      const inlineKids = Array.isArray(raw.children) && raw.children.length > 0
-        ? raw.children : null;
+      // Children may be inline (max_depth>=2) or empty (leaf node)
+      const inlineKids = Array.isArray(raw.children) ? raw.children : [];
       
-      console.log(`[InteractiveTree] Root loaded. Has inline children: ${!!inlineKids}, count: ${inlineKids?.length || 0}`);
-      if (inlineKids && inlineKids.length > 0) {
+      console.log(`[InteractiveTree] Root loaded. Children count: ${inlineKids.length}`);
+      if (inlineKids.length > 0) {
         console.log(`[InteractiveTree] First child data:`, inlineKids[0]);
       }
 
       const rootNode = {
         ...raw,
         children:  undefined,
-        _kids:     inlineKids || null,
-        _expanded: !!inlineKids,
-        _loading:  !inlineKids,
+        _kids:     inlineKids,
+        _expanded: true,
+        _loading:  false,
       };
 
       setTree(rootNode);
       setInitLoad(false);
-
-      if (!inlineKids) {
-        const rid = String(raw.id);
-        inFlight.current.add(rid);
-        let apiKids = await apiFetchKids(rid, { useEntries: useEntriesTree, pool });
-        if (!alive) return;
-        if (!apiKids || apiKids.length === 0) {
-          console.warn(`[InteractiveTree] No children from apiFetchKids, using mock`);
-          apiKids = await mockKids(slots);
-        }
-        if (!alive) return;
-        inFlight.current.delete(rid);
-        console.log(`[InteractiveTree] Got ${apiKids?.length || 0} children from API or mock`);
-        setTree(prev => {
-          if (!prev) return prev;
-          return { ...prev, _kids: apiKids, _loading: false, _expanded: true };
-        });
-      } else {
-        // Normalize inline children to ensure they have all required fields
-        const normalized = inlineKids.map(child => {
-          if (!child.username && !child.full_name) {
-            console.warn(`[InteractiveTree] Child missing username/fullName:`, child);
-          }
-          return child;
-        });
-        console.log(`[InteractiveTree] Using ${normalized.length} inline children from API`);
-      }
     })();
 
     return () => { alive = false; };

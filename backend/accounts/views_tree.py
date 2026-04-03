@@ -195,6 +195,8 @@ class MyFiveMatrixTeamV1(APIView):
                 "depth": getattr(u, "depth", 0),
                 "autopool_level": None,   # annotated later
                 "autopool_status": None,  # annotated later
+                "has_self_account": False,  # annotated later (entry_idx >= 1)
+                "self_account_status": None,  # annotated later (status of entry_idx=1)
                 "account_active": bool(getattr(u, "account_active", False)),
                 "pincode": getattr(u, "pincode", None),
                 "team_count": 0,          # annotated later
@@ -427,10 +429,11 @@ class MyFiveMatrixTeamV1(APIView):
         # Annotate autopool (absolute entry level/status) for all encountered owners using earliest account per owner with preference ACTIVE
         if AutoPoolAccount and encountered_ids:
             info: Dict[int, Dict[str, Any]] = {}
+            self_acct_info: Dict[int, Dict[str, Any]] = {}
             try:
                 rows = list(
                     AutoPoolAccount.objects.filter(owner_id__in=encountered_ids, pool_type=pool)
-                    .only("id", "owner_id", "status", "level")
+                    .only("id", "owner_id", "status", "level", "user_entry_index")
                     .order_by("owner_id", "status", "id")
                 )
                 # Prefer ACTIVE; else pick first seen
@@ -438,17 +441,30 @@ class MyFiveMatrixTeamV1(APIView):
                     oid = int(getattr(r, "owner_id", 0) or 0)
                     if oid <= 0:
                         continue
+                    entry_idx = int(getattr(r, "user_entry_index", 0) or 0)
                     cur = info.get(oid)
                     st = str(getattr(r, "status", "") or "")
                     lvl = int(getattr(r, "level", 0) or 0)
+                    
+                    # Track general autopool info (any entry)
                     if cur is None:
                         info[oid] = {"autopool_level": lvl, "autopool_status": st}
                     else:
                         # If current is not ACTIVE and this one is ACTIVE, replace
                         if st == "ACTIVE" and (cur.get("autopool_status") or "") != "ACTIVE":
                             info[oid] = {"autopool_level": lvl, "autopool_status": st}
+                    
+                    # Track self account info (entry_idx >= 1)
+                    if entry_idx >= 1:
+                        if oid not in self_acct_info:
+                            self_acct_info[oid] = {"has_self_account": True, "self_account_status": st}
+                        else:
+                            # Prefer ACTIVE for self account status
+                            if st == "ACTIVE" and self_acct_info[oid].get("self_account_status") != "ACTIVE":
+                                self_acct_info[oid]["self_account_status"] = st
             except Exception:
                 info = {}
+                self_acct_info = {}
 
             def annotate_autopool(n: Dict[str, Any]):
                 try:
@@ -459,6 +475,13 @@ class MyFiveMatrixTeamV1(APIView):
                 if row:
                     n["autopool_level"] = row.get("autopool_level")
                     n["autopool_status"] = row.get("autopool_status")
+                
+                # Annotate self account info
+                self_row = self_acct_info.get(oid)
+                if self_row:
+                    n["has_self_account"] = self_row.get("has_self_account", False)
+                    n["self_account_status"] = self_row.get("self_account_status")
+                
                 for c in (n.get("children") or []):
                     annotate_autopool(c)
 
@@ -557,8 +580,8 @@ class MyMatrix5EntriesTree(APIView):
             if cand:
                 allowed = False
                 cur = cand
-                # Limit ancestry walk to avoid infinite loops; depth cap > max_depth for safety
-                for _ in range(int(max_depth) + 10):
+                # Limit ancestry walk to avoid infinite loops; generous cap for deep drill-down
+                for _ in range(50):
                     if not cur:
                         break
                     try:
@@ -594,16 +617,23 @@ class MyMatrix5EntriesTree(APIView):
                 owner = getattr(acc, "owner", None)
             except Exception:
                 owner = None
+            full_name = ""
+            if owner:
+                fn = getattr(owner, "first_name", "") or ""
+                ln = getattr(owner, "last_name", "") or ""
+                full_name = f"{fn} {ln}".strip()
             return {
                 "account_id": int(getattr(acc, "id", 0) or 0),
                 "owner_id": int(getattr(owner, "id", None) or getattr(acc, "owner_id", 0) or 0),
                 "username": getattr(owner, "username", None),
+                "full_name": full_name,
                 "username_key": getattr(acc, "username_key", None),
                 "level": int(rel_level),                        # relative to requested root (root=1)
                 "abs_level": int(getattr(acc, "level", 0) or 0),# absolute persisted level
                 "position": getattr(acc, "position", None),
                 "status": getattr(acc, "status", "ACTIVE"),
                 "team_count": 0,                                # annotated after BFS
+                "direct_count": 0,                              # annotated after BFS
                 "children": [],
             }
 
@@ -658,22 +688,57 @@ class MyMatrix5EntriesTree(APIView):
             current_parent_ids = next_parent_ids
             levels_used += 1
 
-        # Annotate team_count recursively
-        def _annotate_team(n: Dict[str, Any]) -> int:
-            try:
-                kids = n.get("children") or []
-            except Exception:
-                kids = []
-            total = 0
-            for ch in kids:
-                total += 1 + _annotate_team(ch)
-            n["team_count"] = int(total)
-            return total
-
+        # Annotate team_count and direct_count using a full-depth BFS from all
+        # loaded nodes — this gives accurate counts even when max_depth < actual depth.
         try:
-            _annotate_team(root)
+            parent_to_children: Dict[int, List[int]] = {}
+            frontier: List[int] = list(nodes_by_account.keys())
+            visited_ids: set = set(frontier)
+
+            while frontier:
+                children_rows = list(
+                    AutoPoolAccount.objects.filter(
+                        pool_type=pool,
+                        status="ACTIVE",
+                        parent_account_id__in=frontier,
+                    ).values("id", "parent_account_id")
+                )
+                next_frontier: List[int] = []
+                for row in children_rows:
+                    pid = int(row["parent_account_id"] or 0)
+                    cid = int(row["id"] or 0)
+                    parent_to_children.setdefault(pid, []).append(cid)
+                    if cid not in visited_ids:
+                        visited_ids.add(cid)
+                        next_frontier.append(cid)
+                frontier = next_frontier
+
+            count_memo: Dict[int, int] = {}
+
+            def _count_all(nid: int) -> int:
+                if nid in count_memo:
+                    return count_memo[nid]
+                kids = parent_to_children.get(nid, [])
+                total = len(kids)
+                for kid in kids:
+                    total += _count_all(kid)
+                count_memo[nid] = total
+                return total
+
+            for acc_id, node in nodes_by_account.items():
+                node["direct_count"] = len(parent_to_children.get(acc_id, []))
+                node["team_count"] = _count_all(acc_id)
         except Exception:
-            pass
+            # Fallback: count only loaded descendants
+            def _annotate_team(n: Dict[str, Any]) -> int:
+                kids = n.get("children") or []
+                n["direct_count"] = len(kids)
+                total = 0
+                for ch in kids:
+                    total += 1 + _annotate_team(ch)
+                n["team_count"] = int(total)
+                return total
+            _annotate_team(root)
 
         return Response(root, status=status.HTTP_200_OK)
 

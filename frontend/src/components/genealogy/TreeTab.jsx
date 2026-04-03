@@ -18,6 +18,18 @@ export default function TreeTab({
   const hasPools =
     Array.isArray(fiveRootsList) && fiveRootsList.length > 0;
 
+  // Build unique display labels: use base username + entry index to avoid duplicates
+  const pillLabels = React.useMemo(() => {
+    if (!hasPools) return {};
+    const labels = {};
+    const base = (fiveRootsList[0]?.username_key || "").replace(/-\d+$/, "");
+    fiveRootsList.forEach((r, i) => {
+      const idx = r.user_entry_index || (i + 1);
+      labels[r.id] = idx === 1 ? base : `${base}-${idx}`;
+    });
+    return labels;
+  }, [fiveRootsList, hasPools]);
+
   return (
     <div>
       {/* ── Position selector pills ── */}
@@ -71,7 +83,7 @@ export default function TreeTab({
                     outline: "none",
                   }}
                 >
-                  {r.username_key || `Position #${r.id}`}
+                  {pillLabels[r.id] || r.username_key || `Position #${r.id}`}
                 </button>
               );
             })}
@@ -92,7 +104,7 @@ export default function TreeTab({
             marginBottom: 8,
           }}
         >
-          💡 <strong>Tap</strong> to expand/collapse · <strong>Double-tap</strong> a node to drill down
+          💡 <strong>Tap</strong> a member to view their tree
         </div>
         {selectedRoot && (
           <button

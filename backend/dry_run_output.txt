@@ -1,0 +1,464 @@
+﻿DRY RUN: 157 entries need to move under their base entry
+================================================================================
+  WOULD MOVE entry 10223 (7259718783-2) owner=351
+    FROM: parent=9134 pos=5 level=4
+    TO:   parent=9363 pos=1 level=4
+  WOULD MOVE entry 10170 (8630561213-2) owner=229
+    FROM: parent=9116 pos=4 level=4
+    TO:   parent=9497 pos=1 level=5
+  WOULD MOVE entry 10281 (7667661155-2) owner=396
+    FROM: parent=9150 pos=3 level=4
+    TO:   parent=9591 pos=1 level=5
+  WOULD MOVE entry 10216 (8296532730-2) owner=341
+    FROM: parent=9129 pos=2 level=4
+    TO:   parent=9415 pos=1 level=5
+  WOULD MOVE entry 10217 (8296532730-2) owner=341
+    FROM: parent=9129 pos=3 level=4
+    TO:   parent=9415 pos=1 level=5
+  WOULD MOVE entry 10218 (8296532730-2) owner=341
+    FROM: parent=9129 pos=4 level=4
+    TO:   parent=9415 pos=1 level=5
+  WOULD MOVE entry 10219 (8296532730-2) owner=341
+    FROM: parent=9129 pos=5 level=4
+    TO:   parent=9415 pos=1 level=5
+  WOULD MOVE entry 10220 (8296532730-2) owner=341
+    FROM: parent=9134 pos=2 level=4
+    TO:   parent=9415 pos=1 level=5
+  WOULD MOVE entry 10248 (6363627549-2) owner=364
+    FROM: parent=9141 pos=2 level=4
+    TO:   parent=9283 pos=1 level=8
+  SKIP entry 8532 (1010000001-2) owner=101: has 70 descendants, cannot safely move
+  SKIP entry 8533 (1010000001-3) owner=101: has 95 descendants, cannot safely move
+  WOULD MOVE entry 10212 (8088028078-2) owner=337
+    FROM: parent=9128 pos=2 level=4
+    TO:   parent=9377 pos=1 level=5
+  WOULD MOVE entry 10283 (7019942432-2) owner=399
+    FROM: parent=9150 pos=5 level=4
+    TO:   parent=9606 pos=1 level=5
+  WOULD MOVE entry 10150 (1010000009-2) owner=124
+    FROM: parent=9093 pos=5 level=4
+    TO:   parent=9216 pos=1 level=4
+  WOULD MOVE entry 10141 (1010000003-2) owner=103
+    FROM: parent=8993 pos=4 level=4
+    TO:   parent=9561 pos=1 level=5
+  WOULD MOVE entry 10142 (1010000003-2) owner=103
+    FROM: parent=8993 pos=5 level=4
+    TO:   parent=9561 pos=1 level=5
+  WOULD MOVE entry 10148 (1010000007-2) owner=121
+    FROM: parent=9093 pos=3 level=4
+    TO:   parent=10101 pos=1 level=4
+  WOULD MOVE entry 10165 (9739214809-2) owner=188
+    FROM: parent=9110 pos=3 level=4
+    TO:   parent=9540 pos=1 level=5
+  WOULD MOVE entry 10151 (1010000011-2) owner=125
+    FROM: parent=9094 pos=1 level=4
+    TO:   parent=9523 pos=1 level=5
+  WOULD MOVE entry 10152 (1010000011-2) owner=125
+    FROM: parent=9094 pos=2 level=4
+    TO:   parent=9523 pos=1 level=5
+  WOULD MOVE entry 10153 (1010000011-2) owner=125
+    FROM: parent=9095 pos=3 level=4
+    TO:   parent=9523 pos=1 level=5
+  WOULD MOVE entry 10154 (1010000011-2) owner=125
+    FROM: parent=9095 pos=4 level=4
+    TO:   parent=9523 pos=1 level=5
+  WOULD MOVE entry 8730 (7019693711-2) owner=286
+    FROM: parent=8724 pos=2 level=4
+    TO:   parent=8728 pos=1 level=5
+  WOULD MOVE entry 10213 (7760899296-2) owner=338
+    FROM: parent=9128 pos=3 level=4
+    TO:   parent=9367 pos=1 level=4
+  WOULD MOVE entry 10214 (7760899296-2) owner=338
+    FROM: parent=9128 pos=4 level=4
+    TO:   parent=9367 pos=1 level=4
+  WOULD MOVE entry 10147 (1010000006-2) owner=120
+    FROM: parent=9093 pos=2 level=4
+    TO:   parent=9552 pos=1 level=5
+  WOULD MOVE entry 10171 (9353697599-2) owner=232
+    FROM: parent=9116 pos=5 level=4
+    TO:   parent=9381 pos=1 level=5
+  WOULD MOVE entry 10224 (8197681842-2) owner=357
+    FROM: parent=9135 pos=2 level=4
+    TO:   parent=9355 pos=1 level=4
+  WOULD MOVE entry 10143 (1010000004-2) owner=104
+    FROM: parent=9091 pos=2 level=4
+    TO:   parent=9558 pos=1 level=5
+  WOULD MOVE entry 10144 (1010000004-2) owner=104
+    FROM: parent=9091 pos=3 level=4
+    TO:   parent=9558 pos=1 level=5
+  WOULD MOVE entry 10250 (8762144668-2) owner=366
+    FROM: parent=9141 pos=4 level=4
+    TO:   parent=9275 pos=1 level=8
+  WOULD MOVE entry 10282 (9448576996-2) owner=397
+    FROM: parent=9150 pos=4 level=4
+    TO:   parent=9567 pos=1 level=8
+  WOULD MOVE entry 10222 (9886155705-2) owner=347
+    FROM: parent=9134 pos=4 level=4
+    TO:   parent=9349 pos=1 level=4
+  WOULD MOVE entry 10145 (1010000005-2) owner=105
+    FROM: parent=9091 pos=4 level=4
+    TO:   parent=9554 pos=1 level=5
+  WOULD MOVE entry 10146 (1010000005-2) owner=105
+    FROM: parent=9091 pos=5 level=4
+    TO:   parent=9554 pos=1 level=5
+  WOULD MOVE entry 10276 (7975274750-2) owner=395
+    FROM: parent=9149 pos=2 level=4
+    TO:   parent=9213 pos=3 level=4
+  WOULD MOVE entry 10277 (7975274750-2) owner=395
+    FROM: parent=9149 pos=3 level=4
+    TO:   parent=9213 pos=3 level=4
+  WOULD MOVE entry 10278 (7975274750-2) owner=395
+    FROM: parent=9149 pos=4 level=4
+    TO:   parent=9213 pos=3 level=4
+  WOULD MOVE entry 10279 (7975274750-2) owner=395
+    FROM: parent=9149 pos=5 level=4
+    TO:   parent=9213 pos=3 level=4
+  WOULD MOVE entry 10280 (7975274750-2) owner=395
+    FROM: parent=9150 pos=2 level=4
+    TO:   parent=9213 pos=3 level=4
+  WOULD MOVE entry 10271 (8971221010-2) owner=387
+    FROM: parent=9146 pos=5 level=4
+    TO:   parent=9230 pos=1 level=7
+  WOULD MOVE entry 8738 (9972003031-2) owner=295
+    FROM: parent=8724 pos=4 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 8872 (9972003031-3) owner=295
+    FROM: parent=8724 pos=5 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10183 (9972003031-4) owner=295
+    FROM: parent=9119 pos=5 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10184 (9972003031-4) owner=295
+    FROM: parent=9120 pos=2 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10185 (9972003031-4) owner=295
+    FROM: parent=9120 pos=3 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10186 (9972003031-4) owner=295
+    FROM: parent=9120 pos=4 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10187 (9972003031-4) owner=295
+    FROM: parent=9120 pos=5 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10188 (9972003031-4) owner=295
+    FROM: parent=9121 pos=2 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10189 (9972003031-4) owner=295
+    FROM: parent=9121 pos=3 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10190 (9972003031-4) owner=295
+    FROM: parent=9121 pos=4 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10191 (9972003031-4) owner=295
+    FROM: parent=9121 pos=5 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10192 (9972003031-4) owner=295
+    FROM: parent=9123 pos=2 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10193 (9972003031-4) owner=295
+    FROM: parent=9123 pos=3 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10194 (9972003031-4) owner=295
+    FROM: parent=9123 pos=4 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10195 (9972003031-4) owner=295
+    FROM: parent=9123 pos=5 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10196 (9972003031-4) owner=295
+    FROM: parent=9124 pos=2 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10197 (9972003031-4) owner=295
+    FROM: parent=9124 pos=3 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10198 (9972003031-4) owner=295
+    FROM: parent=9124 pos=4 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10199 (9972003031-4) owner=295
+    FROM: parent=9124 pos=5 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10200 (9972003031-4) owner=295
+    FROM: parent=9125 pos=2 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10201 (9972003031-4) owner=295
+    FROM: parent=9125 pos=3 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10202 (9972003031-4) owner=295
+    FROM: parent=9125 pos=4 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10203 (9972003031-4) owner=295
+    FROM: parent=9125 pos=5 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10204 (9972003031-4) owner=295
+    FROM: parent=9126 pos=2 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10205 (9972003031-4) owner=295
+    FROM: parent=9126 pos=3 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10206 (9972003031-4) owner=295
+    FROM: parent=9126 pos=4 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10207 (9972003031-4) owner=295
+    FROM: parent=9126 pos=5 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10208 (9972003031-4) owner=295
+    FROM: parent=9127 pos=2 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10209 (9972003031-4) owner=295
+    FROM: parent=9127 pos=3 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10210 (9972003031-4) owner=295
+    FROM: parent=9127 pos=4 level=4
+    TO:   parent=9222 pos=1 level=6
+  WOULD MOVE entry 10155 (8088822445-2) owner=134
+    FROM: parent=9095 pos=5 level=4
+    TO:   parent=8728 pos=1 level=5
+  WOULD MOVE entry 10156 (8088822445-2) owner=134
+    FROM: parent=9097 pos=2 level=4
+    TO:   parent=8728 pos=1 level=5
+  WOULD MOVE entry 10157 (8088822445-2) owner=134
+    FROM: parent=9097 pos=3 level=4
+    TO:   parent=8728 pos=1 level=5
+  WOULD MOVE entry 10158 (8088822445-2) owner=134
+    FROM: parent=9097 pos=4 level=4
+    TO:   parent=8728 pos=1 level=5
+  WOULD MOVE entry 10169 (8884328797-2) owner=223
+    FROM: parent=9116 pos=3 level=4
+    TO:   parent=9439 pos=1 level=5
+  WOULD MOVE entry 10221 (9945490244-2) owner=343
+    FROM: parent=9134 pos=3 level=4
+    TO:   parent=9411 pos=1 level=5
+  WOULD MOVE entry 10247 (7975073946-2) owner=363
+    FROM: parent=9140 pos=5 level=4
+    TO:   parent=9287 pos=1 level=8
+  SKIP entry 8884 (9448631918-4) owner=362: has 9 descendants, cannot safely move
+  SKIP entry 9295 (9448631918-7) owner=362: has 1 descendants, cannot safely move
+  WOULD MOVE entry 10225 (9448631918-4) owner=362
+    FROM: parent=9135 pos=3 level=4
+    TO:   parent=8880 pos=2 level=6
+  WOULD MOVE entry 10226 (9448631918-4) owner=362
+    FROM: parent=9135 pos=4 level=4
+    TO:   parent=8880 pos=2 level=6
+  WOULD MOVE entry 10227 (9448631918-4) owner=362
+    FROM: parent=9135 pos=5 level=4
+    TO:   parent=8880 pos=2 level=6
+  WOULD MOVE entry 10228 (9448631918-4) owner=362
+    FROM: parent=9136 pos=2 level=4
+    TO:   parent=8880 pos=2 level=6
+  WOULD MOVE entry 10229 (9448631918-4) owner=362
+    FROM: parent=9136 pos=3 level=4
+    TO:   parent=8880 pos=2 level=6
+  WOULD MOVE entry 10230 (9448631918-4) owner=362
+    FROM: parent=9136 pos=4 level=4
+    TO:   parent=8880 pos=2 level=6
+  WOULD MOVE entry 10231 (9448631918-4) owner=362
+    FROM: parent=9136 pos=5 level=4
+    TO:   parent=8880 pos=2 level=6
+  WOULD MOVE entry 10232 (9448631918-4) owner=362
+    FROM: parent=9137 pos=2 level=4
+    TO:   parent=8880 pos=2 level=6
+  WOULD MOVE entry 10233 (9448631918-4) owner=362
+    FROM: parent=9137 pos=3 level=4
+    TO:   parent=8880 pos=2 level=6
+  WOULD MOVE entry 10234 (9448631918-4) owner=362
+    FROM: parent=9137 pos=4 level=4
+    TO:   parent=8880 pos=2 level=6
+  WOULD MOVE entry 10235 (9448631918-4) owner=362
+    FROM: parent=9137 pos=5 level=4
+    TO:   parent=8880 pos=2 level=6
+  WOULD MOVE entry 10236 (9448631918-4) owner=362
+    FROM: parent=9138 pos=2 level=4
+    TO:   parent=8880 pos=2 level=6
+  WOULD MOVE entry 10237 (9448631918-4) owner=362
+    FROM: parent=9138 pos=3 level=4
+    TO:   parent=8880 pos=2 level=6
+  WOULD MOVE entry 10238 (9448631918-4) owner=362
+    FROM: parent=9138 pos=4 level=4
+    TO:   parent=8880 pos=2 level=6
+  WOULD MOVE entry 10239 (9448631918-4) owner=362
+    FROM: parent=9138 pos=5 level=4
+    TO:   parent=8880 pos=2 level=6
+  WOULD MOVE entry 10240 (9448631918-4) owner=362
+    FROM: parent=9139 pos=2 level=4
+    TO:   parent=8880 pos=2 level=6
+  WOULD MOVE entry 10241 (9448631918-4) owner=362
+    FROM: parent=9139 pos=3 level=4
+    TO:   parent=8880 pos=2 level=6
+  WOULD MOVE entry 10242 (9448631918-4) owner=362
+    FROM: parent=9139 pos=4 level=4
+    TO:   parent=8880 pos=2 level=6
+  WOULD MOVE entry 10243 (9448631918-4) owner=362
+    FROM: parent=9139 pos=5 level=4
+    TO:   parent=8880 pos=2 level=6
+  WOULD MOVE entry 10244 (9448631918-4) owner=362
+    FROM: parent=9140 pos=2 level=4
+    TO:   parent=8880 pos=2 level=6
+  WOULD MOVE entry 10245 (9448631918-4) owner=362
+    FROM: parent=9140 pos=3 level=4
+    TO:   parent=8880 pos=2 level=6
+  WOULD MOVE entry 10246 (9448631918-4) owner=362
+    FROM: parent=9140 pos=4 level=4
+    TO:   parent=8880 pos=2 level=6
+  SKIP entry 9223 (9742162600-2) owner=327: has 1 descendants, cannot safely move
+  WOULD MOVE entry 10139 (1010000002-2) owner=102
+    FROM: parent=9090 pos=3 level=3
+    TO:   parent=9564 pos=1 level=5
+  WOULD MOVE entry 10140 (1010000002-2) owner=102
+    FROM: parent=8993 pos=2 level=4
+    TO:   parent=9564 pos=1 level=5
+  WOULD MOVE entry 10215 (7975807547-2) owner=340
+    FROM: parent=9128 pos=5 level=4
+    TO:   parent=9385 pos=1 level=5
+  WOULD MOVE entry 10173 (9113805694-2) owner=277
+    FROM: parent=9117 pos=3 level=4
+    TO:   parent=9389 pos=2 level=5
+  WOULD MOVE entry 10174 (9113805694-2) owner=277
+    FROM: parent=9117 pos=4 level=4
+    TO:   parent=9389 pos=2 level=5
+  WOULD MOVE entry 10175 (9113805694-2) owner=277
+    FROM: parent=9117 pos=5 level=4
+    TO:   parent=9389 pos=2 level=5
+  WOULD MOVE entry 10176 (9113805694-2) owner=277
+    FROM: parent=9118 pos=2 level=4
+    TO:   parent=9389 pos=2 level=5
+  WOULD MOVE entry 10177 (9113805694-2) owner=277
+    FROM: parent=9118 pos=3 level=4
+    TO:   parent=9389 pos=2 level=5
+  WOULD MOVE entry 10178 (9113805694-2) owner=277
+    FROM: parent=9118 pos=4 level=4
+    TO:   parent=9389 pos=2 level=5
+  WOULD MOVE entry 10179 (9113805694-2) owner=277
+    FROM: parent=9118 pos=5 level=4
+    TO:   parent=9389 pos=2 level=5
+  WOULD MOVE entry 10180 (9113805694-2) owner=277
+    FROM: parent=9119 pos=2 level=4
+    TO:   parent=9389 pos=2 level=5
+  WOULD MOVE entry 10181 (9113805694-2) owner=277
+    FROM: parent=9119 pos=3 level=4
+    TO:   parent=9389 pos=2 level=5
+  WOULD MOVE entry 10182 (9113805694-2) owner=277
+    FROM: parent=9119 pos=4 level=4
+    TO:   parent=9389 pos=2 level=5
+  SKIP entry 9227 (8971130697-2) owner=391: has 1 descendants, cannot safely move
+  WOULD MOVE entry 10272 (8971130697-3) owner=391
+    FROM: parent=9148 pos=2 level=4
+    TO:   parent=9226 pos=1 level=6
+  WOULD MOVE entry 10273 (8971130697-3) owner=391
+    FROM: parent=9148 pos=3 level=4
+    TO:   parent=9226 pos=1 level=6
+  WOULD MOVE entry 10274 (8971130697-3) owner=391
+    FROM: parent=9148 pos=4 level=4
+    TO:   parent=9226 pos=1 level=6
+  WOULD MOVE entry 10275 (8971130697-3) owner=391
+    FROM: parent=9148 pos=5 level=4
+    TO:   parent=9226 pos=1 level=6
+  SKIP entry 9255 (6360983677-7) owner=368: has 1 descendants, cannot safely move
+  WOULD MOVE entry 10251 (6360983677-3) owner=368
+    FROM: parent=9141 pos=5 level=4
+    TO:   parent=8995 pos=1 level=8
+  WOULD MOVE entry 10252 (6360983677-3) owner=368
+    FROM: parent=9142 pos=2 level=4
+    TO:   parent=8995 pos=1 level=8
+  WOULD MOVE entry 10253 (6360983677-3) owner=368
+    FROM: parent=9142 pos=3 level=4
+    TO:   parent=8995 pos=1 level=8
+  WOULD MOVE entry 10254 (6360983677-3) owner=368
+    FROM: parent=9142 pos=4 level=4
+    TO:   parent=8995 pos=1 level=8
+  WOULD MOVE entry 10255 (6360983677-3) owner=368
+    FROM: parent=9142 pos=5 level=4
+    TO:   parent=8995 pos=1 level=8
+  WOULD MOVE entry 10256 (6360983677-3) owner=368
+    FROM: parent=9143 pos=2 level=4
+    TO:   parent=8995 pos=1 level=8
+  WOULD MOVE entry 10257 (6360983677-3) owner=368
+    FROM: parent=9143 pos=3 level=4
+    TO:   parent=8995 pos=1 level=8
+  WOULD MOVE entry 10258 (6360983677-3) owner=368
+    FROM: parent=9143 pos=4 level=4
+    TO:   parent=8995 pos=1 level=8
+  WOULD MOVE entry 10259 (6360983677-3) owner=368
+    FROM: parent=9143 pos=5 level=4
+    TO:   parent=8995 pos=1 level=8
+  WOULD MOVE entry 10260 (8050483066-2) owner=372
+    FROM: parent=9144 pos=2 level=4
+    TO:   parent=9246 pos=1 level=7
+  SKIP entry 9272 (9113977746-2) owner=367: has 1 descendants, cannot safely move
+  WOULD MOVE entry 10261 (9448649538-2) owner=374
+    FROM: parent=9144 pos=3 level=4
+    TO:   parent=9234 pos=1 level=9
+  WOULD MOVE entry 10262 (9448649538-2) owner=374
+    FROM: parent=9144 pos=4 level=4
+    TO:   parent=9234 pos=1 level=9
+  WOULD MOVE entry 10263 (9448649538-2) owner=374
+    FROM: parent=9144 pos=5 level=4
+    TO:   parent=9234 pos=1 level=9
+  WOULD MOVE entry 10264 (9448649538-2) owner=374
+    FROM: parent=9145 pos=2 level=4
+    TO:   parent=9234 pos=1 level=9
+  WOULD MOVE entry 10265 (9448649538-2) owner=374
+    FROM: parent=9145 pos=3 level=4
+    TO:   parent=9234 pos=1 level=9
+  WOULD MOVE entry 10266 (9448649538-2) owner=374
+    FROM: parent=9145 pos=4 level=4
+    TO:   parent=9234 pos=1 level=9
+  WOULD MOVE entry 10267 (9448649538-2) owner=374
+    FROM: parent=9145 pos=5 level=4
+    TO:   parent=9234 pos=1 level=9
+  WOULD MOVE entry 10268 (9448649538-2) owner=374
+    FROM: parent=9146 pos=2 level=4
+    TO:   parent=9234 pos=1 level=9
+  WOULD MOVE entry 10269 (9448649538-2) owner=374
+    FROM: parent=9146 pos=3 level=4
+    TO:   parent=9234 pos=1 level=9
+  WOULD MOVE entry 10249 (9113669914-2) owner=365
+    FROM: parent=9141 pos=3 level=4
+    TO:   parent=9279 pos=1 level=8
+  WOULD MOVE entry 10172 (9449114006-2) owner=275
+    FROM: parent=9117 pos=2 level=4
+    TO:   parent=9359 pos=1 level=4
+  SKIP entry 9269 (8095918105-4) owner=136: has 1 descendants, cannot safely move
+  WOULD MOVE entry 10159 (8095918105-3) owner=136
+    FROM: parent=9097 pos=5 level=4
+    TO:   parent=9266 pos=2 level=4
+  WOULD MOVE entry 10160 (8095918105-3) owner=136
+    FROM: parent=9108 pos=2 level=4
+    TO:   parent=9266 pos=2 level=4
+  WOULD MOVE entry 10163 (8095918106-2) owner=150
+    FROM: parent=9108 pos=5 level=4
+    TO:   parent=9528 pos=1 level=5
+  WOULD MOVE entry 10164 (8095918106-2) owner=150
+    FROM: parent=9110 pos=2 level=4
+    TO:   parent=9528 pos=1 level=5
+  WOULD MOVE entry 10161 (0809591810-2) owner=139
+    FROM: parent=9108 pos=3 level=4
+    TO:   parent=9531 pos=1 level=5
+  WOULD MOVE entry 10162 (0809591810-2) owner=139
+    FROM: parent=9108 pos=4 level=4
+    TO:   parent=9531 pos=1 level=5
+  WOULD MOVE entry 10166 (7483362779-2) owner=193
+    FROM: parent=9110 pos=4 level=4
+    TO:   parent=9520 pos=1 level=5
+  WOULD MOVE entry 10167 (9880125300-2) owner=208
+    FROM: parent=9110 pos=5 level=4
+    TO:   parent=9504 pos=1 level=7
+  WOULD MOVE entry 10168 (9880125300-2) owner=208
+    FROM: parent=9116 pos=2 level=4
+    TO:   parent=9504 pos=1 level=7
+  WOULD MOVE entry 10149 (1010000008-2) owner=122
+    FROM: parent=9093 pos=4 level=4
+    TO:   parent=9549 pos=1 level=5
+  WOULD MOVE entry 10211 (9740157221-2) owner=319
+    FROM: parent=9127 pos=5 level=4
+    TO:   parent=9345 pos=1 level=4
+  WOULD MOVE entry 10270 (7760872131-2) owner=380
+    FROM: parent=9146 pos=4 level=4
+    TO:   parent=9218 pos=1 level=8
+
+================================================================================
+Summary (DRY RUN):
+  Would move: 148
+  Skipped (has children): 9
+  Skipped (no slot): 0
+  Errors: 0
+
+To apply: python scripts/fix_five150_self_clustering.py --apply
