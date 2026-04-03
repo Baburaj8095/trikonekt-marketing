@@ -80,12 +80,58 @@ export default function TreeTab({
       )}
 
       {/* ── Interactive react-flow tree ── */}
+      <div style={{ marginBottom: 12 }}>
+        <div
+          style={{
+            background: "#ede9fe",
+            color: C.primary,
+            padding: "8px 12px",
+            borderRadius: 10,
+            fontSize: 11,
+            fontWeight: 600,
+            marginBottom: 8,
+          }}
+        >
+          💡 <strong>Tap</strong> to expand/collapse · <strong>Double-tap</strong> a node to drill down
+        </div>
+        {selectedRoot && (
+          <button
+            onClick={() => setSelectedRoot(null)}
+            style={{
+              background: C.surface,
+              color: C.primary,
+              border: `1.5px solid ${C.border}`,
+              padding: "6px 12px",
+              borderRadius: 8,
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: "pointer",
+              transition: "all 0.2s",
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.background = C.primary;
+              e.target.style.color = C.surface;
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = C.surface;
+              e.target.style.color = C.primary;
+            }}
+          >
+            ← Back to Your Root
+          </button>
+        )}
+      </div>
+
       <InteractiveTree
         key={String(selectedRoot)}          /* remount when root changes */
         entryRootId={selectedRoot}
         useEntriesTree={!!selectedRoot}
         pool="FIVE_150"
         maxDepth={Number(levels?.five ?? 10)}
+        onNodeSelect={(nodeId) => {
+          /* When user double-clicks a child node, switch to it as the new root */
+          setSelectedRoot(nodeId ? Number(nodeId) : null);
+        }}
       />
 
       {/* Legend */}

@@ -37,9 +37,9 @@ const EMPTY = "#f9fafb";
 const NR   = 28;          // node radius
 const ND   = NR * 2;      // node diameter
 const HGAP = 18;          // horizontal gap between siblings
-const VGAP = 130;         // vertical gap between levels (extra for phone/count labels)
-const LBH  = 26;          // label area height below circle (username)
-const NODE_TOTAL_H = ND + LBH + 38; // circle + username + count + phone
+const VGAP = 160;         // vertical gap between levels (extra for all labels)
+const LBH  = 28;          // label area height below circle (for 5 fields: ID, username, direct, team, position)
+const NODE_TOTAL_H = ND + LBH + 50; // circle + labels for ID, username, direct count, team count, position
 
 // ─── CSS keyframes (injected once) ───────────────────────────────────────────
 (function injectKF() {
@@ -66,6 +66,9 @@ function normalizeEntry(n) {
     ...n,
     id:             n.account_id != null ? n.account_id : n.id,
     account_active: String(n.status || "").toUpperCase() === "ACTIVE",
+    direct_count:   Number(n.direct_count) || 0,
+    team_count:     Number(n.team_count) || 0,
+    matrix_position: Number(n.matrix_position) || 0,
     children:       kids,
   };
 }
@@ -75,14 +78,20 @@ async function apiFetchRoot({ useEntries, entryRootId, pool }) {
     if (useEntries) {
       if (!entryRootId) return null;
       const res = await API.get("/accounts/my/matrix/tree5/entries/", {
-        params: { start_entry_id: entryRootId, max_depth: 1, pool },
+        params: { start_entry_id: entryRootId, max_depth: 2, pool },  // Fetch 2 levels to get real children data
         cacheTTL: 0, dedupe: "cancelPrevious",
       });
-      return normalizeEntry(res?.data || null);
+      const data = normalizeEntry(res?.data || null);
+      console.log(`[apiFetchRoot entries] root, children count:`, data?.children?.length || 0);
+      return data;
     }
-    const res = await getMyGenealogyTree5({ max_depth: 1, pool });
+    const res = await getMyGenealogyTree5({ max_depth: 2, pool });  // Fetch 2 levels to get real children data
+    console.log(`[apiFetchRoot genealogy] root, children count:`, res?.children?.length || 0, 'data:', res);
     return res || null;
-  } catch { return null; }
+  } catch (err) { 
+    console.error(`[apiFetchRoot] Error:`, err);
+    return null; 
+  }
 }
 
 async function apiFetchKids(nodeId, { useEntries, pool }) {
@@ -93,11 +102,18 @@ async function apiFetchKids(nodeId, { useEntries, pool }) {
         cacheTTL: 0, dedupe: "cancelPrevious",
       });
       const data = normalizeEntry(res?.data || null);
-      return Array.isArray(data?.children) ? data.children : null;
+      const children = Array.isArray(data?.children) ? data.children : null;
+      console.log(`[apiFetchKids entries] nodeId=${nodeId}, children count:`, children?.length || 0);
+      return children;
     }
     const res = await getMyGenealogyTree5({ root_user_id: nodeId, max_depth: 1, pool });
-    return Array.isArray(res?.children) ? res.children : null;
-  } catch { return null; }
+    const children = Array.isArray(res?.children) ? res.children : null;
+    console.log(`[apiFetchKids genealogy] nodeId=${nodeId}, children count:`, children?.length || 0, 'API response:', res);
+    return children;
+  } catch (err) { 
+    console.error(`[apiFetchKids] Error for nodeId=${nodeId}:`, err);
+    return null; 
+  }
 }
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
@@ -108,6 +124,7 @@ function mockChild(pos) {
     id, username: id, full_name: `User ${id}`,
     account_active: Math.random() > 0.3,
     team_count:     Math.floor(Math.random() * 6),
+    direct_count:   Math.floor(Math.random() * 3),
     has_children:   Math.random() > 0.45,
     matrix_position: pos,
     children: [],
@@ -118,7 +135,8 @@ async function mockRoot(slots) {
   const id = "mock-root";
   return {
     id, username: "You", full_name: "My Account",
-    account_active: true, team_count: slots, has_children: true,
+    account_active: true, team_count: slots, direct_count: slots,
+    has_children: true, matrix_position: 0,
     children: Array.from({ length: slots }, (_, i) =>
       Math.random() > 0.25 ? mockChild(i + 1) : null
     ).filter(Boolean),
@@ -166,18 +184,31 @@ function flattenTree(node, pid, pCx, pCy, cx, cy, slots, out) {
     Number(node.team_count) > 0 ||
     (Array.isArray(node._kids) && node._kids.some(Boolean));
 
+  // Calculate direct count from visible children or from pre-expanded children
+  let directCount = 0;
+  if (Array.isArray(node._kids) && node._kids.length > 0) {
+    directCount = node._kids.length;
+  } else if (Array.isArray(node.children) && node.children.length > 0) {
+    directCount = node.children.length;
+  } else if (Number(node.direct_count) > 0) {
+    directCount = Number(node.direct_count);
+  }
+
   out.nodes.push({
     id, cx, cy,
-    username:   node.username || id,
-    fullName:   node.full_name || "",
-    phone:      String(node.phone || node.mobile || node.phone_number || ""),
-    isActive:   node.account_active !== false,
-    isRoot:     pid === null,
-    isExpanded: !!node._expanded,
-    isLoading:  !!node._loading,
+    username:     node.username || id,
+    fullName:     node.full_name || "",
+    phone:        String(node.phone || node.mobile || node.phone_number || ""),
+    userId:       String(node.id) || "",
+    isActive:     node.account_active !== false,
+    isRoot:       pid === null,
+    isExpanded:   !!node._expanded,
+    isLoading:    !!node._loading,
     hasKids,
-    kidCount:   Number(node.team_count) || 0,
-    isEmpty:    false,
+    kidCount:     Number(node.team_count) || 0,
+    directCount:  directCount,
+    matrixPos:    Number(node.matrix_position) || 0,
+    isEmpty:      false,
   });
 
   if (pid !== null) {
@@ -220,7 +251,7 @@ function flattenTree(node, pid, pCx, pCy, cx, cy, slots, out) {
 }
 
 // ─── SVG: single node ─────────────────────────────────────────────────────────
-const SvgNode = React.memo(function SvgNode({ n, onTap }) {
+const SvgNode = React.memo(function SvgNode({ n, onTap, isRoot }) {
   if (n.isEmpty) {
     return (
       <g transform={`translate(${n.cx},${n.cy})`}>
@@ -253,15 +284,18 @@ const SvgNode = React.memo(function SvgNode({ n, onTap }) {
     ? "drop-shadow(0 0 5px rgba(79,70,229,.22))"
     : "none";
   const hint = n.isLoading ? "" : n.isExpanded ? "▲" : n.hasKids ? "▼" : "";
+  const canTap = (n.hasKids || !n.isRoot) && !n.isLoading;
+  const posLabel = n.matrixPos > 0 ? `Pos #${n.matrixPos}` : "Root";
 
   return (
     <g
       transform={`translate(${n.cx},${n.cy})`}
       style={{
-        cursor: n.hasKids && !n.isLoading ? "pointer" : "default",
+        cursor: canTap ? "pointer" : "default",
         animation: "itPop .22s ease",
       }}
-      onClick={n.hasKids && !n.isLoading ? () => onTap(n.id) : undefined}
+      onClick={canTap ? () => onTap(n.id) : undefined}
+      title={!n.isRoot && n.hasKids ? "Tap to expand/collapse · Double-tap to drill down" : n.hasKids ? "Tap to expand/collapse" : ""}
     >
       <circle r={NR} cx={0} cy={0}
         fill={fill} stroke={stroke} strokeWidth={sw}
@@ -297,6 +331,12 @@ const SvgNode = React.memo(function SvgNode({ n, onTap }) {
         </g>
       )}
 
+      {/* Drill-down indicator for non-root nodes with children */}
+      {!n.isRoot && n.hasKids && !n.isExpanded && !n.isLoading && (
+        <circle r={3} cx={-(NR - 5)} cy={NR - 5}
+          fill={PRI} stroke={WHITE} strokeWidth={1} opacity={0.7} />
+      )}
+
       {hint ? (
         <text x={0} y={NR + 12} textAnchor="middle"
           style={{ fontSize: 9, fill: n.isExpanded ? PRI : SUB, fontWeight: 700, userSelect: "none" }}>
@@ -304,25 +344,35 @@ const SvgNode = React.memo(function SvgNode({ n, onTap }) {
         </text>
       ) : null}
 
-      {/* Username label */}
+      {/* User ID / Username label */}
       <text x={0} y={NR + LBH} textAnchor="middle"
-        style={{ fontSize: 10, fontWeight: 800, fill: TXT, userSelect: "none" }}>
-        {n.username.length > 9 ? n.username.slice(0, 8) + "…" : n.username}
+        style={{ fontSize: 9, fontWeight: 700, fill: TXT, userSelect: "none" }}>
+        {(n.userId || n.id).slice(0, 12)}
+      </text>
+
+      {/* Username - show full name if available, otherwise username */}
+      <text x={0} y={NR + LBH + 11} textAnchor="middle"
+        style={{ fontSize: 8, fontWeight: 600, fill: SUB, userSelect: "none" }}>
+        {(n.fullName || n.username).length > 12 ? (n.fullName || n.username).slice(0, 11) + "…" : (n.fullName || n.username)}
+      </text>
+
+      {/* Direct count */}
+      <text x={0} y={NR + LBH + 21} textAnchor="middle"
+        style={{ fontSize: 8, fontWeight: 600, fill: "#059669", userSelect: "none" }}>
+        D: {n.directCount}
       </text>
 
       {/* Team count */}
-      <text x={0} y={NR + LBH + 13} textAnchor="middle"
-        style={{ fontSize: 9, fontWeight: 700, fill: PRI, userSelect: "none" }}>
-        {`C: ${n.kidCount}`}
+      <text x={0} y={NR + LBH + 31} textAnchor="middle"
+        style={{ fontSize: 8, fontWeight: 700, fill: PRI, userSelect: "none" }}>
+        T: {n.kidCount}
       </text>
 
-      {/* Phone number */}
-      {n.phone ? (
-        <text x={0} y={NR + LBH + 25} textAnchor="middle"
-          style={{ fontSize: 8, fontWeight: 600, fill: SUB, userSelect: "none" }}>
-          {n.phone.length > 10 ? n.phone.slice(-10) : n.phone}
-        </text>
-      ) : null}
+      {/* Matrix Position */}
+      <text x={0} y={NR + LBH + 41} textAnchor="middle"
+        style={{ fontSize: 7, fontWeight: 600, fill: GRAY, userSelect: "none", fontStyle: "italic" }}>
+        {posLabel}
+      </text>
     </g>
   );
 });
@@ -344,6 +394,7 @@ export default function InteractiveTree({
   entryRootId    = null,
   useEntriesTree = false,
   pool           = "FIVE_150",
+  onNodeSelect   = null,  // callback when user double-clicks a child node
 }) {
   const slots = maxSlots(pool);
 
@@ -356,6 +407,7 @@ export default function InteractiveTree({
   const drag     = useRef(null);
   const pinch    = useRef(null);
   const inFlight = useRef(new Set());
+  const tapTime  = useRef({});  // { nodeId: lastTapTime }
 
   // ── Computed flat graph ──
   const { nodes, edges, viewBox } = useMemo(() => {
@@ -379,6 +431,33 @@ export default function InteractiveTree({
 
   // ── Tap: expand / collapse ──
   const handleTap = useCallback((nodeId) => {
+    const now = Date.now();
+    const lastTap = tapTime.current[nodeId] || 0;
+    const isDoubleClick = now - lastTap < 300;
+    tapTime.current[nodeId] = now;
+
+    // If double-click on non-root node and callback exists, call it
+    function findNodeById(nd, id) {
+      if (!nd) return null;
+      if (String(nd.id) === id) return nd;
+      if (!nd._kids) return null;
+      for (const kid of nd._kids) {
+        const found = findNodeById(kid, id);
+        if (found) return found;
+      }
+      return null;
+    }
+
+    if (isDoubleClick && tree) {
+      const node = findNodeById(tree, nodeId);
+      if (node && String(node.id) !== String(tree.id) && onNodeSelect) {
+        // This is a double-click on a non-root node
+        onNodeSelect(String(nodeId));
+        return;
+      }
+    }
+
+    // Single click: expand/collapse
     setTree(prev => {
       if (!prev) return prev;
 
@@ -418,7 +497,7 @@ export default function InteractiveTree({
       }
       return visit(prev);
     });
-  }, [useEntriesTree, pool, slots]);
+  }, [useEntriesTree, pool, slots, tree, onNodeSelect]);
 
   // ── Initial load ──
   useEffect(() => {
@@ -430,11 +509,19 @@ export default function InteractiveTree({
     (async () => {
       let raw = await apiFetchRoot({ useEntries: useEntriesTree, entryRootId, pool });
       if (!alive) return;
-      if (!raw) raw = await mockRoot(slots);
+      if (!raw) {
+        console.warn(`[InteractiveTree] No API data, using mock root`);
+        raw = await mockRoot(slots);
+      }
       if (!alive) return;
 
       const inlineKids = Array.isArray(raw.children) && raw.children.length > 0
         ? raw.children : null;
+      
+      console.log(`[InteractiveTree] Root loaded. Has inline children: ${!!inlineKids}, count: ${inlineKids?.length || 0}`);
+      if (inlineKids && inlineKids.length > 0) {
+        console.log(`[InteractiveTree] First child data:`, inlineKids[0]);
+      }
 
       const rootNode = {
         ...raw,
@@ -452,13 +539,26 @@ export default function InteractiveTree({
         inFlight.current.add(rid);
         let apiKids = await apiFetchKids(rid, { useEntries: useEntriesTree, pool });
         if (!alive) return;
-        if (!apiKids || apiKids.length === 0) apiKids = await mockKids(slots);
+        if (!apiKids || apiKids.length === 0) {
+          console.warn(`[InteractiveTree] No children from apiFetchKids, using mock`);
+          apiKids = await mockKids(slots);
+        }
         if (!alive) return;
         inFlight.current.delete(rid);
+        console.log(`[InteractiveTree] Got ${apiKids?.length || 0} children from API or mock`);
         setTree(prev => {
           if (!prev) return prev;
           return { ...prev, _kids: apiKids, _loading: false, _expanded: true };
         });
+      } else {
+        // Normalize inline children to ensure they have all required fields
+        const normalized = inlineKids.map(child => {
+          if (!child.username && !child.full_name) {
+            console.warn(`[InteractiveTree] Child missing username/fullName:`, child);
+          }
+          return child;
+        });
+        console.log(`[InteractiveTree] Using ${normalized.length} inline children from API`);
       }
     })();
 
@@ -567,7 +667,9 @@ export default function InteractiveTree({
         </defs>
         <rect x="-6000" y="-6000" width="12000" height="12000" fill="url(#igrid)" />
         {edges.map(e => <SvgEdge key={e.id} e={e} />)}
-        {nodes.map(n => <SvgNode key={n.id} n={n} onTap={handleTap} />)}
+        {nodes.map(n => (
+          <SvgNode key={n.id} n={n} onTap={handleTap} isRoot={tree && String(tree.id) === n.id} />
+        ))}
       </svg>
 
       {/* Hint */}

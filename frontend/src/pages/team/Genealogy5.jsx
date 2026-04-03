@@ -78,9 +78,9 @@ const ProgressIcon = () => (
 );
 
 const TABS = [
-  { id: "tree", label: "Tree", Icon: TreeIcon },
-  { id: "earnings", label: "Earnings", Icon: EarningsIcon },
-  { id: "progress", label: "Progress", Icon: ProgressIcon },
+  { id: "tree", label: "Genealogy Tree", Icon: TreeIcon },
+  { id: "earnings", label: "Rank Upgrade", Icon: EarningsIcon },
+  { id: "progress", label: "Self Account", Icon: ProgressIcon },
 ];
 
 // ─── AppTabBar ───────────────────────────────────────────────────────────────
