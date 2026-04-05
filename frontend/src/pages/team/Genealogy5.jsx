@@ -319,6 +319,10 @@ export default function Genealogy5() {
   const [selectedRoot, setSelectedRoot] = useState(null);
   const [selectedThreeRoot, setSelectedThreeRoot] = useState(null);
 
+  // ── Category selection (Subscription 750 / Smart SSP / Self Rebirth) ──
+  const [fiveCategory, setFiveCategory] = useState(null);   // null = auto (first available)
+  const [threeCategory, setThreeCategory] = useState(null); // null = auto (first available)
+
   // ── Direct team ──
   const [directList, setDirectList] = useState(null);
   const [directCountsState, setDirectCountsState] = useState(null);
@@ -625,6 +629,9 @@ export default function Genealogy5() {
           status: p?.status,
           level: p?.level,
           user_entry_index: p?.user_entry_index,
+          source_type: p?.source_type || "",
+          source_id: p?.source_id || "",
+          inferred_category: p?.inferred_category || "",
           created_at: p?.created_at,
         })
       );
@@ -871,6 +878,8 @@ export default function Genealogy5() {
                   fiveRootsList={fiveRootsList}
                   selectedRoot={selectedRoot}
                   setSelectedRoot={setSelectedRoot}
+                  fiveCategory={fiveCategory}
+                  setFiveCategory={setFiveCategory}
                   fiveLevelGrid={fiveLevelGrid}
                   fiveCounts={fiveCounts}
                   totalTeam={totalTeam}
@@ -886,6 +895,8 @@ export default function Genealogy5() {
                   threeRootsList={threeRootsList}
                   selectedThreeRoot={selectedThreeRoot}
                   setSelectedThreeRoot={setSelectedThreeRoot}
+                  threeCategory={threeCategory}
+                  setThreeCategory={setThreeCategory}
                   threeLevelGrid={threeLevelGrid}
                   threeCounts={threeCounts}
                   totalThreeTeam={totalThreeTeam}

@@ -921,13 +921,19 @@ class AdminPromoPurchaseApproveView(APIView):
                     # Monthly 759 payouts (enqueue as background jobs). First purchased box gets the first-month direct bonus.
                     try:
                         from jobs.models import enqueue_monthly_759
+                        # "First month" = box 1 is being purchased for the first time this season.
+                        # We check whether box 1 was already paid BEFORE this transaction.
+                        box1_already_paid = PromoMonthlyBox.objects.filter(
+                            user=obj.user, package=obj.package, package_number=number, box_number=1
+                        ).exclude(purchase=obj).exists()
                         box_tasks = []
                         for idx, b in enumerate(boxes):
                             try:
                                 bn = int(b)
                             except Exception:
                                 bn = None
-                            is_first = bool(prev_count == 0 and idx == 0)
+                            # is_first = True only when box 1 is included and not previously paid
+                            is_first = bool(bn == 1 and not box1_already_paid)
                             box_tasks.append({"package_number": number, "box_number": bn, "is_first": is_first})
                         if box_tasks:
                             batch_size = int(os.environ.get("MONTHLY_759_BATCH", "50"))

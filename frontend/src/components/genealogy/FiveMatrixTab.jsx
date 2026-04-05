@@ -27,6 +27,75 @@ const C = {
   shadow:    "0 2px 12px rgba(79,70,229,0.08)",
 };
 
+// ─── Account category definitions ──────────────────────────────────────────
+const ACCOUNT_CATEGORIES = [
+  {
+    id: "SUBSCRIPTION_750",
+    label: "Subscription Joining 750",
+    hint: "5-matrix accounts from ₹750 promo package",
+    match: (src) => {
+      const s = (src || "").toUpperCase();
+      return (
+        s.includes("PROMO_PURCHASE") ||
+        s.includes("PROMO_PURCHASE_APPROVAL") ||
+        s.includes("PRIME_750") ||
+        s.includes("SUBSCRIPTION_750")
+      );
+    },
+  },
+  {
+    id: "SMART_SSP",
+    label: "Smart SSP",
+    hint: "Monthly 759/1000 — opens matrix on 1st month of each season only",
+    match: (src) => {
+      const s = (src || "").toUpperCase();
+      return s.includes("MONTHLY_759") || s.includes("MONTHLY_1000") || s.includes("SMART_SSP");
+    },
+  },
+  {
+    id: "SELF_REBIRTH",
+    label: "Self Rebirth Account",
+    hint: "E-coupon 150 activation or self-account allocation",
+    match: (src) => {
+      const s = (src || "").toUpperCase();
+      return (
+        s.includes("ECOUPON") ||
+        s.includes("COUPON_150") ||
+        s.includes("PRIME_150") ||
+        s.includes("PRIME150") ||
+        s.includes("SELF_250") ||
+        s.includes("SELF_ACCOUNT") ||
+        s.includes("SELF_REBIRTH")
+      );
+    },
+  },
+];
+
+/** Classify a source_type string into one of the 3 category IDs (or "OTHER") */
+function classifySource(sourceType) {
+  for (const cat of ACCOUNT_CATEGORIES) {
+    if (cat.match(sourceType)) return cat.id;
+  }
+  // Unknown sources should not be counted under any purchase-driven category
+  return "OTHER";
+}
+
+function categoryForRow(r) {
+  return (r?.inferred_category || "") || classifySource(r?.source_type);
+}
+
+/** Extract season number from Smart SSP source_id (format: "{purchase_id}:{pkg_no}:{box_no}") */
+function extractSeasonNumber(sourceId) {
+  try {
+    const parts = String(sourceId || "").split(":");
+    if (parts.length >= 2) {
+      const n = parseInt(parts[1], 10);
+      if (!isNaN(n) && n > 0) return n;
+    }
+  } catch (_) {}
+  return null;
+}
+
 // ─── KPI card ──────────────────────────────────────────────────────────────
 function KpiCard({ label, value, accent }) {
   return (
@@ -185,6 +254,8 @@ export default function FiveMatrixTab({
   fiveRootsList  = [],
   selectedRoot   = null,
   setSelectedRoot,
+  fiveCategory   = null,
+  setFiveCategory,
   fiveLevelGrid  = [],
   fiveCounts     = null,
   totalTeam      = 0,
@@ -193,6 +264,37 @@ export default function FiveMatrixTab({
   levels         = { five: 10 },
 }) {
   const hasPools = fiveRootsList.length > 0;
+
+  // ── Classify each position into a category ──
+  const categorizedPools = React.useMemo(() => {
+    const map = {};
+    for (const cat of ACCOUNT_CATEGORIES) {
+      map[cat.id] = fiveRootsList.filter((r) => categoryForRow(r) === cat.id);
+    }
+    return map;
+  }, [fiveRootsList]);
+
+  // ── Determine active category (fall back to first non-empty one) ──
+  const activeCategory = React.useMemo(() => {
+    if (fiveCategory && categorizedPools[fiveCategory]?.length > 0) return fiveCategory;
+    for (const cat of ACCOUNT_CATEGORIES) {
+      if (categorizedPools[cat.id]?.length > 0) return cat.id;
+    }
+    return ACCOUNT_CATEGORIES[0].id;
+  }, [fiveCategory, categorizedPools]);
+
+  // ── Pools available for selected category ──
+  const activePools = categorizedPools[activeCategory] || [];
+
+  // ── Ensure selectedRoot stays valid within active category ──
+  React.useEffect(() => {
+    if (activePools.length > 0) {
+      const ids = activePools.map((r) => r.id);
+      if (!ids.includes(selectedRoot)) {
+        setSelectedRoot(activePools[0]?.id ?? null);
+      }
+    }
+  }, [activeCategory, fiveRootsList]);
 
   // Levels completed from API or compute locally
   const levelsCompleted = fiveCounts?.levels_completed ??
@@ -215,13 +317,86 @@ export default function FiveMatrixTab({
   const getPositionLabel = (r, i) => {
     const base = (r.username_key || "").replace(/-\d+$/, "");
     const idx = r.user_entry_index || (i + 1);
-    return idx === 1 ? base : `${base}-${idx}`;
+    const baseLabel = idx === 1 ? base : `${base}-${idx}`;
+    // For Smart SSP: append season number
+    if (categoryForRow(r) === "SMART_SSP") {
+      const season = extractSeasonNumber(r.source_id);
+      return season ? `${baseLabel} (Season ${season})` : baseLabel;
+    }
+    return baseLabel;
   };
 
   return (
     <div>
-      {/* ── Account selector ── */}
+      {/* ── Category type selector ── */}
       {hasPools && (
+        <div style={{ marginBottom: 12 }}>
+          <label
+            style={{
+              display: "block",
+              fontSize: 11,
+              fontWeight: 700,
+              color: C.textSec,
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              marginBottom: 6,
+            }}
+          >
+            Account Type
+          </label>
+          <div
+            style={{
+              display: "flex",
+              gap: 6,
+              flexWrap: "wrap",
+            }}
+          >
+            {ACCOUNT_CATEGORIES.map((cat) => {
+              const count = (categorizedPools[cat.id] || []).length;
+              const isActive = activeCategory === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => {
+                    setFiveCategory && setFiveCategory(cat.id);
+                  }}
+                  title={cat.hint}
+                  style={{
+                    flex: "1 1 0",
+                    minWidth: 0,
+                    padding: "8px 6px",
+                    borderRadius: 10,
+                    border: `1.5px solid ${isActive ? C.primary : C.border}`,
+                    background: isActive ? C.primaryL : C.surface,
+                    color: isActive ? C.primary : C.textSec,
+                    fontSize: 11,
+                    fontWeight: isActive ? 700 : 500,
+                    lineHeight: 1.3,
+                    cursor: count > 0 ? "pointer" : "default",
+                    opacity: count === 0 ? 0.45 : 1,
+                    textAlign: "center",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  <div style={{ marginBottom: 2 }}>{cat.label}</div>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 800,
+                      color: isActive ? C.primary : C.textSec,
+                    }}
+                  >
+                    {count} {count === 1 ? "ID" : "IDs"}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Account ID selector (filtered by category) ── */}
+      {activePools.length > 0 && (
         <div style={{ marginBottom: 16 }}>
           <label
             style={{
@@ -234,7 +409,7 @@ export default function FiveMatrixTab({
               marginBottom: 6,
             }}
           >
-            Your 5‑Matrix Accounts
+            {ACCOUNT_CATEGORIES.find((c) => c.id === activeCategory)?.label || "Account"} ID
           </label>
           <select
             value={selectedRoot ?? ""}
@@ -260,12 +435,31 @@ export default function FiveMatrixTab({
               cursor: "pointer",
             }}
           >
-            {fiveRootsList.map((r, i) => (
+            {activePools.map((r, i) => (
               <option key={r.id} value={r.id}>
                 {getPositionLabel(r, i)}
               </option>
             ))}
           </select>
+        </div>
+      )}
+
+      {/* ── No IDs for selected category ── */}
+      {hasPools && activePools.length === 0 && (
+        <div
+          style={{
+            background: "#f9fafb",
+            border: `1.5px dashed ${C.border}`,
+            borderRadius: 12,
+            padding: "14px 16px",
+            textAlign: "center",
+            color: C.textSec,
+            fontSize: 12,
+            fontWeight: 600,
+            marginBottom: 16,
+          }}
+        >
+          No accounts in this category yet.
         </div>
       )}
 

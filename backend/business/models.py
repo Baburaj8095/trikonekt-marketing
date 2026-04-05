@@ -825,12 +825,6 @@ class AutoPoolAccount(models.Model):
                 return None
         except Exception:
             return None
-        # Do not create non-sentinel entries for the designated root/sentinel owner
-        try:
-            if cls._is_virtual_root_user(user):
-                return None
-        except Exception:
-            pass
         from decimal import Decimal as D
         from business.services.placement import GenericPlacement
         amt = D(amount) if amount is not None else D("150.00")
@@ -916,12 +910,6 @@ class AutoPoolAccount(models.Model):
                 return None
         except Exception:
             return None
-        # Do not create non-sentinel entries for the designated root/sentinel owner
-        try:
-            if cls._is_virtual_root_user(user):
-                return None
-        except Exception:
-            pass
         from decimal import Decimal as D
         from business.services.placement import GenericPlacement
         amt = D(amount) if amount is not None else D("150.00")

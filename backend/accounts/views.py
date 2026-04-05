@@ -1350,7 +1350,7 @@ class TeamSummaryView(APIView):
             pos_qs = (
                 AutoPoolAccount.objects
                 .filter(owner=user, status="ACTIVE", pool_type__in=["FIVE_150", "THREE_150"])
-                .only("id", "username_key", "pool_type", "status", "level", "user_entry_index", "created_at")
+                .only("id", "username_key", "pool_type", "status", "level", "user_entry_index", "source_type", "source_id", "created_at")
                 .order_by("pool_type", "user_entry_index", "id")
             )
             my_positions = [
@@ -1361,12 +1361,113 @@ class TeamSummaryView(APIView):
                     "status": getattr(p, "status", "") or "",
                     "level": int(getattr(p, "level", 0) or 0),
                     "user_entry_index": int(getattr(p, "user_entry_index", 0) or 0),
+                    "source_type": getattr(p, "source_type", "") or "",
+                    "source_id": getattr(p, "source_id", "") or "",
                     "created_at": getattr(p, "created_at", None),
                 }
                 for p in pos_qs
             ]
         except Exception:
             my_positions = []
+
+        # Infer category for RECOVERY/RESTORATION/SENTINEL positions using purchase history
+        try:
+            from business.models import PromoPurchase as _PP
+            from collections import Counter as _Counter
+
+            # Ambiguous sources should be bucketed by purchase-history sequence rather than by raw tag.
+            # This prevents legacy BACKFILL rows from inflating counts beyond actual approved purchases.
+            _AMBIG = {"RECOVERY", "RESTORATION", "SENTINEL", "RECONCILIATION", "", "BACKFILL_750", "BACKFILL_150"}
+
+            def _classify_src_py(src):
+                """Python-side mirror of the JS classifySource() function."""
+                s = (src or "").upper()
+                if any(x in s for x in ("PROMO_PURCHASE", "PRIME_750", "SUBSCRIPTION_750")):
+                    return "SUBSCRIPTION_750"
+                if any(x in s for x in ("MONTHLY_759", "MONTHLY_1000", "SMART_SSP")):
+                    return "SMART_SSP"
+                if any(x in s for x in ("ECOUPON", "COUPON_150", "SELF_250", "SELF_ACCOUNT", "SELF_REBIRTH", "PRIME_150", "PRIME150")):
+                    return "SELF_REBIRTH"
+                return None
+
+            # Build expected category sequences from chronological purchase history
+            _purchases = list(
+                _PP.objects.filter(user=user, status="APPROVED")
+                .select_related("package")
+                .order_by("approved_at", "id")
+            )
+            _five_seq = []
+            _three_seq = []
+            _seen_seasons = set()
+            for _p in _purchases:
+                _pkg = getattr(_p, "package", None)
+                if not _pkg:
+                    continue
+                _ptype = str(getattr(_pkg, "type", "") or "")
+                _pcode = str(getattr(_pkg, "code", "") or "").upper()
+                if _ptype == "PRIME":
+                    if "750" in _pcode:
+                        _five_seq.append("SUBSCRIPTION_750")
+                        _three_seq.append("SUBSCRIPTION_750")
+                    elif "150" in _pcode:
+                        # Self Rebirth should create seats in BOTH matrices.
+                        _five_seq.append("SELF_REBIRTH")
+                        _three_seq.append("SELF_REBIRTH")
+                elif _ptype == "MONTHLY":
+                    # Only the first approved purchase per (package, package_number/season) opens matrix
+                    _sk = (getattr(_pkg, "id", None), getattr(_p, "package_number", None))
+                    if _sk not in _seen_seasons:
+                        _seen_seasons.add(_sk)
+                        _five_seq.append("SMART_SSP")
+                        _three_seq.append("SMART_SSP")
+
+            # Count categories already covered by non-ambiguous (explicitly tagged) positions
+            _five_counts = _Counter()
+            _three_counts = _Counter()
+            for _pos in my_positions:
+                _src = (_pos.get("source_type") or "").upper()
+                _pool = _pos.get("pool_type", "")
+                if _src in _AMBIG:
+                    continue
+                _cat = _classify_src_py(_pos.get("source_type", ""))
+                if _cat:
+                    if _pool == "FIVE_150":
+                        _five_counts[_cat] += 1
+                    elif _pool == "THREE_150":
+                        _three_counts[_cat] += 1
+
+            # Build the remaining expected sequence (remove already-covered items from the front)
+            def _remaining_iter(seq, counts):
+                left = dict(counts)
+                rem = []
+                for c in seq:
+                    if left.get(c, 0) > 0:
+                        left[c] -= 1
+                    else:
+                        rem.append(c)
+                return iter(rem)
+
+            _five_iter = _remaining_iter(_five_seq, _five_counts)
+            _three_iter = _remaining_iter(_three_seq, _three_counts)
+
+            # Assign inferred_category to each position
+            for _pos in my_positions:
+                _src = (_pos.get("source_type") or "").upper()
+                _pool = _pos.get("pool_type", "")
+                if _src not in _AMBIG or _src == "SENTINEL":
+                    # Already has a meaningful source_type; JS classifySource will handle it
+                    _pos["inferred_category"] = ""
+                    continue
+                if _pool == "FIVE_150":
+                    # If we have more ambiguous seats than known purchase history can explain,
+                    # bucket the remainder into SELF_REBIRTH so they remain visible in UI.
+                    _pos["inferred_category"] = next(_five_iter, "SELF_REBIRTH")
+                elif _pool == "THREE_150":
+                    _pos["inferred_category"] = next(_three_iter, "SELF_REBIRTH")
+                else:
+                    _pos["inferred_category"] = ""
+        except Exception:
+            pass
 
         # Recent team members (latest 10)
         recent_team = list(
