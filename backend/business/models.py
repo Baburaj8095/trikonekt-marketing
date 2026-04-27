@@ -14,6 +14,14 @@ except Exception:
 import logging
 logger = logging.getLogger(__name__)
 
+
+def _default_withdrawals_start_time():
+    return timezone.datetime.strptime("00:00", "%H:%M").time()
+
+
+def _default_withdrawals_end_time():
+    return timezone.datetime.strptime("23:59", "%H:%M").time()
+
 def is_matrix_eligible(u) -> bool:
     """
     Matrix Eligibility:
@@ -277,8 +285,8 @@ class CommissionConfig(models.Model):
     # weekday follows Python datetime.weekday(): Monday=0 .. Sunday=6
     withdrawals_enabled = models.BooleanField(default=True)
     withdrawals_weekday = models.PositiveSmallIntegerField(default=2, help_text="0=Mon .. 6=Sun")
-    withdrawals_start_time = models.TimeField(default=timezone.datetime.strptime("00:00", "%H:%M").time)
-    withdrawals_end_time = models.TimeField(default=timezone.datetime.strptime("23:59", "%H:%M").time)
+    withdrawals_start_time = models.TimeField(default=_default_withdrawals_start_time)
+    withdrawals_end_time = models.TimeField(default=_default_withdrawals_end_time)
 
     # Trikonekt toggles and fixed-amount configs
     enable_franchise_on_join = models.BooleanField(default=True)

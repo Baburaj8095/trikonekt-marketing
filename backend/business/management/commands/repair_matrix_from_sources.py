@@ -22,7 +22,28 @@ class ExpectedSeat:
     kind: str
 
 
-_MONTHLY_SOURCE_TYPES = {"MONTHLY_759", "MONTHLY_1000", "SMART_SSP"}
+# Monthly roots are Smart SSP entries that should appear under Smart SSP dropdown.
+# New convention (2026-04): the season's first month uses MONTHLY_FIRST_SEASON-{season}
+# so the UI can show a stable label.
+_MONTHLY_SOURCE_TYPES = {"MONTHLY_759", "MONTHLY_1000", "SMART_SSP", "MONTHLY_FIRST_SEASON"}
+
+
+def _is_monthly_source_type(source_type: str) -> bool:
+    """Return True if this AutoPoolAccount.source_type represents a MONTHLY/Smart SSP seat.
+
+    Supports:
+      - legacy exact tags (MONTHLY_759, MONTHLY_1000, SMART_SSP)
+      - new season-specific tag prefix: MONTHLY_FIRST_SEASON-{season}
+    """
+    try:
+        st = str(source_type or "").strip().upper()
+    except Exception:
+        st = ""
+    if not st:
+        return False
+    if st.startswith("MONTHLY_FIRST_SEASON"):
+        return True
+    return st in _MONTHLY_SOURCE_TYPES
 
 
 def _monthly_season_from_source_id(source_id: str) -> int:
@@ -58,6 +79,14 @@ def _monthly_season_from_source_id(source_id: str) -> int:
         except Exception:
             continue
     return 0
+
+
+def _monthly_first_season_source_type(season: int) -> str:
+    try:
+        season_int = int(season or 0)
+    except Exception:
+        season_int = 0
+    return f"MONTHLY_FIRST_SEASON-{season_int}" if season_int > 0 else "MONTHLY_FIRST_SEASON"
 
 
 def _q2(x) -> Decimal:
@@ -178,7 +207,8 @@ class Command(BaseCommand):
                 "BACKFILL_750",
             }
         if kind == "MONTHLY":
-            return {s, "MONTHLY_759", "MONTHLY_1000", "SMART_SSP"}
+            # include new season-specific tag and legacy tags
+            return {s, "MONTHLY_759", "MONTHLY_1000", "SMART_SSP", "MONTHLY_FIRST_SEASON"}
         if kind == "SELF_REBIRTH":
             return {
                 s,
@@ -374,12 +404,13 @@ class Command(BaseCommand):
 
             # Use a season-aware source_id format that the frontend can label.
             src_id = f"{int(p.get('id') or 0)}:{pkg_no_int}:{int(box_no)}"
-            # Prefer using MONTHLY_759 tag (matcher expects 759/1000). If package code contains 1000, use MONTHLY_1000.
-            src_type = "MONTHLY_759"
+            # New tag: season-first month must be visible in UI Smart SSP dropdown as Season N.
+            # We keep the seat source_id format unchanged so existing season extract works.
+            src_type = _monthly_first_season_source_type(pkg_no_int)
             try:
                 pcode = str(p.get("package__code") or "").upper()
-                if "1000" in pcode:
-                    src_type = "MONTHLY_1000"
+                # Keep 1000 info in meta for future differentiation if needed.
+                # For now, UI groups both under SMART_SSP, and seat identity is season-specific.
             except Exception:
                 pass
 
@@ -489,7 +520,7 @@ class Command(BaseCommand):
                 if not oid or not pt:
                     continue
                 existing_types_by_key[(oid, pt, sid)].add(st)
-                if st.upper() in _MONTHLY_SOURCE_TYPES:
+                if _is_monthly_source_type(st):
                     season = _monthly_season_from_source_id(sid)
                     if season > 0:
                         existing_monthly_seasons.add((oid, pt, season))
@@ -575,7 +606,9 @@ class Command(BaseCommand):
                 owner_id__in=user_ids,
                 status="ACTIVE",
                 pool_type__in=["FIVE_150", "THREE_150"],
-                source_type__in=list(_MONTHLY_SOURCE_TYPES),
+            ).filter(
+                Q(source_type__in=list(_MONTHLY_SOURCE_TYPES))
+                | Q(source_type__istartswith="MONTHLY_FIRST_SEASON")
             ).only("id", "owner_id", "pool_type", "source_type", "source_id", "created_at", "parent_account")
 
             groups: DefaultDict[Tuple[int, str, int], List[AutoPoolAccount]] = defaultdict(list)

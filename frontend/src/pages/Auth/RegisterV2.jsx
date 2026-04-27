@@ -2734,21 +2734,9 @@ const mapUIRoleToCategory = () => {
           </Box>
           <Divider />
           <List>
-            <ListItemButton selected={role === "user"} onClick={() => handleSetRole("user")}>
+            <ListItemButton selected={role === "user"} onClick={() => { handleSetRole("user"); setDrawerOpen(false); }}>
               <ListItemIcon><PersonIcon /></ListItemIcon>
               <ListItemText primary="Consumer" />
-            </ListItemButton>
-            <ListItemButton selected={role === "agency"} onClick={() => handleSetRole("agency")}>
-              <ListItemIcon><StoreIcon /></ListItemIcon>
-              <ListItemText primary="Sub Franchise" />
-            </ListItemButton>
-            <ListItemButton selected={role === "employee"} onClick={() => handleSetRole("employee")}>
-              <ListItemIcon><WorkIcon /></ListItemIcon>
-              <ListItemText primary="Sarathi" />
-            </ListItemButton>
-            <ListItemButton selected={role === "business"} onClick={() => handleSetRole("business")}>
-              <ListItemIcon><BusinessIcon /></ListItemIcon>
-              <ListItemText primary="Merchant" />
             </ListItemButton>
           </List>
         </Box>

@@ -1676,39 +1676,12 @@ const RegisterV2 = () => {
 
         <Box sx={{ mt: 3 }}>
           <Grid container spacing={2}>
-            <Grid item xs={6}>
+            <Grid item xs={12}>
               <CategoryCard
                 title="Consumer"
                 subtitle="For individual users"
                 value="user"
                 icon={<PersonIcon sx={{ color: "#1976d2" }} />}
-              />
-            </Grid>
-
-            <Grid item xs={6}>
-              <CategoryCard
-                title="Agency"
-                subtitle="For business agencies"
-                value="agency"
-                icon={<StoreIcon sx={{ color: "#1976d2" }} />}
-              />
-            </Grid>
-
-            <Grid item xs={6}>
-              <CategoryCard
-                title="Employee"
-                subtitle="For company staff"
-                value="employee"
-                icon={<WorkIcon sx={{ color: "#1976d2" }} />}
-              />
-            </Grid>
-
-            <Grid item xs={6}>
-              <CategoryCard
-                title="Merchant"
-                subtitle="For store owners"
-                value="business"
-                icon={<BusinessIcon sx={{ color: "#1976d2" }} />}
               />
             </Grid>
           </Grid>

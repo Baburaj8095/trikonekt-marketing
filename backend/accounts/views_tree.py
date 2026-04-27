@@ -1,4 +1,4 @@
-from typing import Dict, Any, List, Set
+from typing import Dict, Any, List, Set, Tuple
 
 from django.db.models import Q
 from rest_framework.views import APIView
@@ -892,10 +892,32 @@ class FiveMatrixCountsView(APIView):
         try:
             from accounts.models import WalletTransaction
             from django.db.models import Sum
-            tx_type = "AUTOPOOL_BONUS_FIVE" if pool == "FIVE_150" else "AUTOPOOL_BONUS_THREE"
+            from django.db.models import Q
+
+            orig_type = "AUTOPOOL_BONUS_FIVE" if pool == "FIVE_150" else "AUTOPOOL_BONUS_THREE"
+            root_id = int(getattr(root, "id", 0) or 0)
             earned = (
                 WalletTransaction.objects
-                .filter(user=request.user, type=tx_type, amount__gt=0)
+                .filter(user=request.user, amount__gt=0)
+                .filter(
+                    Q(matrix_account_id=root_id)
+                    | (
+                        Q(matrix_account__isnull=True)
+                        & (
+                            Q(meta__matrix_root=root_id)
+                            | Q(meta__matrix_root=str(root_id))
+                            | Q(meta__matrix_root__account_id=root_id)
+                            | Q(meta__matrix_root__account_id=str(root_id))
+                        )
+                    )
+                )
+                .filter(
+                    Q(type=orig_type)
+                    | (
+                        Q(type__in=("INCOME_CREDIT_75", "SELF_ACCOUNT_CREDIT"))
+                        & Q(meta__orig_type=orig_type)
+                    )
+                )
                 .aggregate(total=Sum("amount"))["total"]
             )
             total_earned = str(earned or 0)
@@ -914,6 +936,243 @@ class FiveMatrixCountsView(APIView):
                 "active_levels_reached": int(active_reached),
                 "levels_completed": int(levels_completed),
                 "total_earned": total_earned,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+def _infer_root_category(source_type: str, source_id: str) -> str:
+    """Lightweight, stable category classifier for UI breakdown.
+
+    Note: After running `repair_matrix_from_sources`, roots should have clean
+    source_type tags (PRIME_750 / MONTHLY_FIRST_SEASON-{season} / SELF_ACCOUNT_250 / ECOUPON_150_ACTIVATED / PRIME_150).
+    """
+    try:
+        s = str(source_type or "").strip().upper()
+    except Exception:
+        s = ""
+
+    if any(x in s for x in ("PRIME_750", "SUBSCRIPTION_750", "PROMO_PURCHASE")):
+        return "SUBSCRIPTION_750"
+
+    if any(x in s for x in ("MONTHLY_759", "MONTHLY_1000", "SMART_SSP", "MONTHLY_FIRST_SEASON")):
+        return "SMART_SSP"
+
+    if any(x in s for x in ("SELF_ACCOUNT", "SELF_250", "ECOUPON", "COUPON_150", "PRIME_150", "PRIME150", "SELF_REBIRTH")):
+        return "SELF_REBIRTH"
+
+    # Fallback: infer Smart SSP by its source_id format: "{purchase_id}:{season}:{box}"
+    try:
+        parts = str(source_id or "").split(":")
+        if len(parts) >= 2:
+            season = int(parts[1])
+            if season > 0:
+                return "SMART_SSP"
+    except Exception:
+        pass
+
+    return "OTHER"
+
+
+def _extract_matrix_root_id(meta: object) -> int:
+    """Best-effort extraction of matrix root account id from WalletTransaction.meta.
+
+    Supported formats seen historically:
+      - meta["matrix_root"] = <int>
+      - meta["matrix_root"] = "<int>"
+      - meta["matrix_root"] = {"account_id": <int>}  (or string)
+      - meta["matrix_root"] = {"account_id": {"id": <int>}} (defensive)
+    """
+    try:
+        if not isinstance(meta, dict):
+            return 0
+        mr = meta.get("matrix_root")
+        if mr is None:
+            return 0
+        if isinstance(mr, int):
+            return int(mr)
+        if isinstance(mr, str):
+            mr_s = mr.strip()
+            return int(mr_s) if mr_s.isdigit() else 0
+        if isinstance(mr, dict):
+            acc = mr.get("account_id")
+            if isinstance(acc, int):
+                return int(acc)
+            if isinstance(acc, str):
+                acc_s = acc.strip()
+                return int(acc_s) if acc_s.isdigit() else 0
+            if isinstance(acc, dict):
+                # Sometimes nested
+                inner = acc.get("id") or acc.get("pk")
+                try:
+                    return int(inner)
+                except Exception:
+                    return 0
+    except Exception:
+        return 0
+    return 0
+
+
+class MyMatrixRootsBreakdownView(APIView):
+    """Return per-seat (root) earnings breakdown for the authenticated user.
+
+    Goal: power UI to show counts + earnings per ID for:
+      - PRIME 750 (SUBSCRIPTION_750)
+      - Smart SSP (MONTHLY 759/1000 season-first)
+      - Self Rebirth (Self allocation 250 / ecoupon 150 / prime 150)
+
+    NOTE:
+      - This endpoint does NOT compute genealogy team counts.
+      - It reads wallet transactions and attributes earnings to the matrix root id.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def _collect_roots(self, request, pool: str) -> List[Dict[str, Any]]:
+        try:
+            from business.models import AutoPoolAccount
+
+            qs = (
+                AutoPoolAccount.objects
+                .filter(owner=request.user, status="ACTIVE", pool_type=pool)
+                .only(
+                    "id",
+                    "pool_type",
+                    "source_type",
+                    "source_id",
+                    "created_at",
+                    "user_entry_index",
+                    "username_key",
+                )
+                .order_by("created_at", "id")
+            )
+            out = []
+            for p in qs:
+                out.append(
+                    {
+                        "id": int(getattr(p, "id", 0) or 0),
+                        "pool_type": getattr(p, "pool_type", "") or "",
+                        "source_type": getattr(p, "source_type", "") or "",
+                        "source_id": getattr(p, "source_id", "") or "",
+                        "created_at": getattr(p, "created_at", None),
+                        "user_entry_index": int(getattr(p, "user_entry_index", 0) or 0),
+                        "username_key": getattr(p, "username_key", "") or "",
+                    }
+                )
+            return out
+        except Exception:
+            return []
+
+    def _attach_earnings(self, request, pool: str, roots: List[Dict[str, Any]]) -> None:
+        """Populate roots[i]['total_earned'] using WalletTransaction rows."""
+        if not roots:
+            return
+
+        root_ids = {int(r.get("id") or 0) for r in roots if int(r.get("id") or 0) > 0}
+        if not root_ids:
+            return
+
+        orig_type = "AUTOPOOL_BONUS_FIVE" if pool == "FIVE_150" else "AUTOPOOL_BONUS_THREE"
+
+        # Aggregate in Python to support legacy meta-based attribution too.
+        try:
+            from decimal import Decimal as D
+            from django.db.models import Q
+            from .models import WalletTransaction
+
+            sums: Dict[int, D] = {rid: D("0") for rid in root_ids}
+
+            rows = (
+                WalletTransaction.objects
+                .filter(user=request.user, amount__gt=0)
+                .filter(
+                    Q(type=orig_type)
+                    | (
+                        Q(type__in=("INCOME_CREDIT_75", "SELF_ACCOUNT_CREDIT"))
+                        & Q(meta__orig_type=orig_type)
+                    )
+                )
+                .only("amount", "type", "matrix_account_id", "meta")
+                .iterator(chunk_size=2000)
+            )
+
+            for tx in rows:
+                try:
+                    amt = D(str(getattr(tx, "amount", "0") or "0"))
+                except Exception:
+                    continue
+
+                rid = 0
+                try:
+                    mid = getattr(tx, "matrix_account_id", None)
+                    if mid:
+                        rid = int(mid)
+                except Exception:
+                    rid = 0
+
+                if rid <= 0 or rid not in root_ids:
+                    try:
+                        rid = _extract_matrix_root_id(getattr(tx, "meta", None) or {})
+                    except Exception:
+                        rid = 0
+
+                if rid in sums:
+                    sums[rid] = sums[rid] + amt
+
+            for r in roots:
+                rid2 = int(r.get("id") or 0)
+                r["total_earned"] = str(sums.get(rid2, D("0")))
+        except Exception:
+            # Best-effort: default 0
+            for r in roots:
+                r["total_earned"] = "0"
+
+    def get(self, request):
+        # Collect roots for both pools
+        five_roots = self._collect_roots(request, "FIVE_150")
+        three_roots = self._collect_roots(request, "THREE_150")
+
+        # Classify
+        for r in five_roots:
+            r["category"] = _infer_root_category(r.get("source_type", ""), r.get("source_id", ""))
+        for r in three_roots:
+            r["category"] = _infer_root_category(r.get("source_type", ""), r.get("source_id", ""))
+
+        # Attach earnings
+        self._attach_earnings(request, "FIVE_150", five_roots)
+        self._attach_earnings(request, "THREE_150", three_roots)
+
+        # Totals by category
+        def totals(rows: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+            out: Dict[str, Dict[str, Any]] = {}
+            try:
+                from decimal import Decimal as D
+            except Exception:
+                D = None  # type: ignore
+            for rr in rows:
+                cat = str(rr.get("category") or "OTHER")
+                out.setdefault(cat, {"count": 0, "earned": "0"})
+                out[cat]["count"] = int(out[cat]["count"]) + 1
+                try:
+                    if D is not None:
+                        out[cat]["earned"] = str(D(str(out[cat]["earned"])) + D(str(rr.get("total_earned") or "0")))
+                except Exception:
+                    # ignore numeric issues
+                    pass
+            return out
+
+        return Response(
+            {
+                "five": {
+                    "pool": "FIVE_150",
+                    "roots": five_roots,
+                    "totals_by_category": totals(five_roots),
+                },
+                "three": {
+                    "pool": "THREE_150",
+                    "roots": three_roots,
+                    "totals_by_category": totals(three_roots),
+                },
             },
             status=status.HTTP_200_OK,
         )

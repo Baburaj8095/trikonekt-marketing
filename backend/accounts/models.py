@@ -356,7 +356,15 @@ class Wallet(models.Model):
         return f"Wallet<{self.user.username}> ₹{self.balance}"
 
     @transaction.atomic
-    def credit(self, amount: Decimal, tx_type: str, meta: dict | None = None, source_type: str | None = None, source_id: str | None = None):
+    def credit(
+        self,
+        amount: Decimal,
+        tx_type: str,
+        meta: dict | None = None,
+        source_type: str | None = None,
+        source_id: str | None = None,
+        matrix_account_id: int | None = None,
+    ):
         """
         Credit logic with dual-wallet support:
         - COMMISSION_CREDIT: withhold cfg.tax_percent to company wallet, add gross to main, net to withdrawable.
@@ -423,7 +431,8 @@ class Wallet(models.Model):
                 type="INCOME_CREDIT_75",
                 source_type=source_type or '',
                 source_id=str(source_id) if source_id is not None else '',
-                meta=meta_main
+                meta=meta_main,
+                matrix_account_id=matrix_account_id,
             )
 
 
@@ -436,7 +445,8 @@ class Wallet(models.Model):
                     type="SELF_ACCOUNT_CREDIT",
                     source_type=source_type or '',
                     source_id=str(source_id) if source_id is not None else '',
-                    meta={**(meta or {}), "ledger": "SELF_ACCOUNT", "split": "STREAM_75_25", "orig_type": str(tx_type)}
+                    meta={**(meta or {}), "ledger": "SELF_ACCOUNT", "split": "STREAM_75_25", "orig_type": str(tx_type)},
+                    matrix_account_id=matrix_account_id,
                 )
 
             # Apply micro-packs (₹250) from self reserve for active users
@@ -462,12 +472,21 @@ class Wallet(models.Model):
             type=tx_type,
             source_type=source_type or '',
             source_id=str(source_id) if source_id is not None else '',
-            meta=meta2
+            meta=meta2,
+            matrix_account_id=matrix_account_id,
         )
         return w.balance
 
     @transaction.atomic
-    def debit(self, amount: Decimal, tx_type: str, meta: dict | None = None, source_type: str | None = None, source_id: str | None = None):
+    def debit(
+        self,
+        amount: Decimal,
+        tx_type: str,
+        meta: dict | None = None,
+        source_type: str | None = None,
+        source_id: str | None = None,
+        matrix_account_id: int | None = None,
+    ):
         from decimal import Decimal as D
         amt = D(amount or 0)
         if amt <= 0:
@@ -510,7 +529,8 @@ class Wallet(models.Model):
             type=tx_type,
             source_type=source_type or '',
             source_id=str(source_id) if source_id is not None else '',
-            meta=meta or {}
+            meta=meta or {},
+            matrix_account_id=matrix_account_id,
         )
         return w.balance
 
@@ -814,6 +834,14 @@ class WalletTransaction(models.Model):
     type = models.CharField(max_length=32, choices=TYPE_CHOICES, db_index=True)
     source_type = models.CharField(max_length=64, blank=True, default='')
     source_id = models.CharField(max_length=64, blank=True, default='')
+    matrix_account = models.ForeignKey(
+        'business.AutoPoolAccount',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='wallet_transactions',
+        db_index=True,
+    )
     meta = models.JSONField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -821,6 +849,7 @@ class WalletTransaction(models.Model):
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['user', 'type']),
+            models.Index(fields=['user', 'matrix_account']),
             models.Index(fields=['created_at']),
         ]
 

@@ -208,6 +208,17 @@ function App() {
           }
         />
 
+        <Route
+          path="/franchise/ecommerce"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <EcommerceUser embedded />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+
        
         <Route
           path="/user/dashboard2"

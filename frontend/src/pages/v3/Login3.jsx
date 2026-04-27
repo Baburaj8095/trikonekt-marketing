@@ -204,6 +204,7 @@ const Login3 = () => {
     business_category: "",
     address: "",
   });
+  const [loginContext, setLoginContext] = useState("consumer");
   const handleChange = (e) =>
     setFormData((fd) => ({ ...fd, [e.target.name]: e.target.value }));
 
@@ -1193,6 +1194,9 @@ const Login3 = () => {
         sessionStorage.removeItem("user");
       } catch (_) {}
 
+      try {
+        store.setItem(`login_context_${ns}`, loginContext === "team" ? "team" : "consumer");
+      } catch (_) {}
       store.setItem(`token_${ns}`, access);
       if (refreshTok) store.setItem(`refresh_${ns}`, refreshTok);
       store.setItem(`role_${ns}`, roleEffective || tokenRole || "user");
@@ -2050,27 +2054,40 @@ const Login3 = () => {
             )}
 
             {isLogin && (
-              <TextField
-                size="small"
-                fullWidth
-                name="username"
-                value={formData.username}
-                placeholder="Email"
-                type={loginField.type}
-                inputProps={{ inputMode: loginField.inputMode }}
-                onChange={handleChange}
-                sx={{ mb: 2 }}
-                required
-                className="v3-input"
-                InputLabelProps={{ shrink: false }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <AccountCircle />
-                    </InputAdornment>
-                  ),
-                }}
-              />
+              <Box sx={{ mb: 2 }}>
+                <ToggleButtonGroup
+                  value={loginContext}
+                  exclusive
+                  onChange={(_, v) => v && setLoginContext(v)}
+                  size="small"
+                  fullWidth
+                  sx={{ mb: 1 }}
+                >
+                  <ToggleButton value="consumer">Consumer Login</ToggleButton>
+                  <ToggleButton value="team">Team Login</ToggleButton>
+                </ToggleButtonGroup>
+                <TextField
+                  size="small"
+                  fullWidth
+                  name="username"
+                  value={formData.username}
+                  placeholder="Email"
+                  type={loginField.type}
+                  inputProps={{ inputMode: loginField.inputMode }}
+                  onChange={handleChange}
+                  sx={{ mb: 2 }}
+                  required
+                  className="v3-input"
+                  InputLabelProps={{ shrink: false }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <AccountCircle />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Box>
             )}
 
             <TextField

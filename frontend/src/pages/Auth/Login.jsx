@@ -224,6 +224,7 @@ const Login = () => {
     business_category: "",
     address: "",
   });
+  const [loginContext, setLoginContext] = useState("consumer");
   const handleChange = (e) => {
     const { name, value } = e.target;
     if (name === "username" && role === "user") {
@@ -1322,6 +1323,10 @@ const Login = () => {
           sessionStorage.removeItem("user");
         } catch (_) {}
 
+        // Persist login context chosen by the user (consumer | team)
+        try {
+          store.setItem(`login_context_${ns}`, loginContext === "team" ? "team" : "consumer");
+        } catch (_) {}
         store.setItem(`token_${ns}`, access);
         if (refreshTok) store.setItem(`refresh_${ns}`, refreshTok);
         store.setItem(`role_${ns}`, roleEffective || tokenRole || "user");
@@ -2299,27 +2304,40 @@ const Login = () => {
             )}
 
             {isLogin && (
-              <TextField
-                fullWidth
-                name="username"
-                value={formData.username}
-                label={loginField.label}
-                placeholder={loginField.placeholder}
-                type={loginField.type}
-                autoComplete="off"
-                inputProps={{ inputMode: loginField.inputMode, ...(role === "user" ? { maxLength: 10, pattern: "[0-9]*" } : {}) }}
-                onChange={handleChange}
-                sx={{ mb: 2 }}
-                required
-                InputLabelProps={{ shrink: true }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start" sx={{ mr: 0.5 }}>
-                      <AccountCircle fontSize="small" />
-                    </InputAdornment>
-                  ),
-                }}
-              />
+              <Box sx={{ mb: 2 }}>
+                <ToggleButtonGroup
+                  value={loginContext}
+                  exclusive
+                  onChange={(_, v) => v && setLoginContext(v)}
+                  size="small"
+                  fullWidth
+                  sx={{ mb: 1 }}
+                >
+                  <ToggleButton value="consumer">Consumer Login</ToggleButton>
+                  <ToggleButton value="team">Team Login</ToggleButton>
+                </ToggleButtonGroup>
+                <TextField
+                  fullWidth
+                  name="username"
+                  value={formData.username}
+                  label={loginField.label}
+                  placeholder={loginField.placeholder}
+                  type={loginField.type}
+                  autoComplete="off"
+                  inputProps={{ inputMode: loginField.inputMode, ...(role === "user" ? { maxLength: 10, pattern: "[0-9]*" } : {}) }}
+                  onChange={handleChange}
+                  sx={{ mb: 2 }}
+                  required
+                  InputLabelProps={{ shrink: true }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start" sx={{ mr: 0.5 }}>
+                        <AccountCircle fontSize="small" />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Box>
             )}
 
             <TextField
@@ -2474,18 +2492,6 @@ const Login = () => {
             <ListItemButton selected={role === "user"} onClick={() => { setRole("user"); setDrawerOpen(false); }}>
               <ListItemIcon><PersonIcon /></ListItemIcon>
               <ListItemText primary="Consumer" />
-            </ListItemButton>
-            <ListItemButton selected={role === "agency"} onClick={() => { setRole("agency"); setDrawerOpen(false); }}>
-              <ListItemIcon><StoreIcon /></ListItemIcon>
-              <ListItemText primary="Agency" />
-            </ListItemButton>
-            <ListItemButton selected={role === "employee"} onClick={() => { setRole("employee"); setDrawerOpen(false); }}>
-              <ListItemIcon><WorkIcon /></ListItemIcon>
-              <ListItemText primary="Sarathi" />
-            </ListItemButton>
-            <ListItemButton selected={role === "business"} onClick={() => { setRole("business"); setDrawerOpen(false); }}>
-              <ListItemIcon><BusinessIcon /></ListItemIcon>
-              <ListItemText primary="Merchant" />
             </ListItemButton>
           </List>
         </Box>

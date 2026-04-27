@@ -28,6 +28,26 @@ const C = {
 };
 
 // ─── Account category definitions ──────────────────────────────────────────
+function looksLikeSmartSspSourceId(sourceId) {
+  // Smart SSP source_id usually: "{purchase_id}:{package_number}:{box_number}"
+  // Some legacy rows may be missing a clean source_type; this heuristic keeps them visible.
+  try {
+    const parts = String(sourceId || "").split(":");
+    if (parts.length < 2) return false;
+    const purchaseId = parseInt(parts[0], 10);
+    const season = parseInt(parts[1], 10);
+    const box = parts.length >= 3 ? parseInt(parts[2], 10) : null;
+
+    if (Number.isNaN(season) || season <= 0) return false;
+    // purchaseId is typically numeric, but avoid being overly strict for safety.
+    if (!Number.isNaN(purchaseId) && purchaseId <= 0) return false;
+    if (box != null && (Number.isNaN(box) || box <= 0)) return false;
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 const ACCOUNT_CATEGORIES = [
   {
     id: "SUBSCRIPTION_750",
@@ -49,7 +69,15 @@ const ACCOUNT_CATEGORIES = [
     hint: "Monthly 759/1000 — opens matrix on 1st month of each season only",
     match: (src) => {
       const s = (src || "").toUpperCase();
-      return s.includes("MONTHLY_759") || s.includes("MONTHLY_1000") || s.includes("SMART_SSP");
+      return (
+        s.includes("MONTHLY_759") ||
+        s.includes("MONTHLY_1000") ||
+        s.includes("MONTHLY_FIRST_SEASON") ||
+        s.includes("SMART_SSP") ||
+        // legacy tags seen in some historical rows
+        s.includes("ECOUPON_759") ||
+        s.includes("ECOUPON_1000")
+      );
     },
   },
   {
@@ -69,19 +97,31 @@ const ACCOUNT_CATEGORIES = [
       );
     },
   },
+  {
+    id: "OTHER",
+    label: "Other / Legacy",
+    hint: "Fallback bucket for unknown/legacy source tags (should be rare)",
+    match: () => false,
+  },
 ];
 
 /** Classify a source_type string into one of the 3 category IDs (or "OTHER") */
-function classifySource(sourceType) {
+function classifySource(sourceType, sourceId) {
   for (const cat of ACCOUNT_CATEGORIES) {
     if (cat.match(sourceType)) return cat.id;
   }
+  // If tag is missing/unknown, infer Smart SSP by its source_id format.
+  if (looksLikeSmartSspSourceId(sourceId)) return "SMART_SSP";
   // Unknown sources should not be counted under any purchase-driven category
   return "OTHER";
 }
 
 function categoryForRow(r) {
-  return (r?.inferred_category || "") || classifySource(r?.source_type);
+  // Only trust inferred_category if it's one of the known categories.
+  // (Avoids future backend values causing the row to disappear from ALL UI filters.)
+  const inferred = String(r?.inferred_category || "").trim().toUpperCase();
+  if (inferred && ACCOUNT_CATEGORIES.some((c) => c.id === inferred)) return inferred;
+  return classifySource(r?.source_type, r?.source_id);
 }
 
 /** Extract season number from Smart SSP source_id (format: "{purchase_id}:{pkg_no}:{box_no}") */
@@ -94,6 +134,12 @@ function extractSeasonNumber(sourceId) {
     }
   } catch (_) {}
   return null;
+}
+
+function fmtMoney(v) {
+  const n = Number(v || 0);
+  if (!Number.isFinite(n)) return "0.00";
+  return n.toFixed(2);
 }
 
 // ─── KPI card ──────────────────────────────────────────────────────────────
@@ -315,15 +361,23 @@ export default function FiveMatrixTab({
 
   // Build display name for each account position
   const getPositionLabel = (r, i) => {
-    const base = (r.username_key || "").replace(/-\d+$/, "");
-    const idx = r.user_entry_index || (i + 1);
-    const baseLabel = idx === 1 ? base : `${base}-${idx}`;
+    const key = String(r?.username_key || "").trim();
+    const base = key.replace(/-\d+$/, "");
+    const idx = r?.user_entry_index || (i + 1);
+    const baseLabel = key || (idx === 1 ? base : `${base}-${idx}`) || `ID ${idx}`;
     // For Smart SSP: append season number
+    const earned = r?.total_earned;
+    const earnedLabel =
+      earned != null && earned !== ""
+        ? ` • Earned ₹${fmtMoney(earned)}`
+        : "";
+
     if (categoryForRow(r) === "SMART_SSP") {
       const season = extractSeasonNumber(r.source_id);
-      return season ? `${baseLabel} (Season ${season})` : baseLabel;
+      const core = season ? `${baseLabel} (Season ${season})` : baseLabel;
+      return `${core}${earnedLabel}`;
     }
-    return baseLabel;
+    return `${baseLabel}${earnedLabel}`;
   };
 
   return (

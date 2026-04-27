@@ -180,6 +180,18 @@ export default function Wallet() {
   });
   const onWdrChange = (e) => setWdrForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
+  const recentWithdrawals = useMemo(() => {
+    const list = Array.isArray(myWithdrawals) ? myWithdrawals : [];
+    const sorted = [...list].sort((a, b) => {
+      const da = a?.requested_at || a?.created_at || a?.updated_at;
+      const db = b?.requested_at || b?.created_at || b?.updated_at;
+      const ta = da ? new Date(da).getTime() : 0;
+      const tb = db ? new Date(db).getTime() : 0;
+      return tb - ta;
+    });
+    return sorted.slice(0, 5);
+  }, [myWithdrawals]);
+
   const disableReason = useMemo(() => {
     if (!kyc?.verified) return "KYC verification required";
     if (Number(mainBalance) < 500) return "Minimum withdrawable balance ₹500 required";
@@ -607,6 +619,84 @@ export default function Wallet() {
                   </Typography>
                 </Stack>
               </Box>
+            </Paper>
+
+            <Paper
+              elevation={0}
+              sx={{
+                p: 1.4,
+                borderRadius: 2.5,
+                border: "1px solid",
+                borderColor: "#EEF2F6",
+                bgcolor: "#fff",
+              }}
+            >
+              <Typography
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 900,
+                  color: "text.secondary",
+                  letterSpacing: 0.6,
+                  textTransform: "uppercase",
+                  mb: 1,
+                }}
+              >
+                Recent Withdrawals
+              </Typography>
+
+              {recentWithdrawals.length ? (
+                <Stack spacing={1}>
+                  {recentWithdrawals.map((item, index) => (
+                    <Paper
+                      key={`${item?.id || index}`}
+                      elevation={0}
+                      sx={{
+                        p: 1.15,
+                        borderRadius: 2,
+                        border: "1px solid",
+                        borderColor: "#EEF2F6",
+                        bgcolor: "#fff",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0C2D48" }}>
+                          ₹ {fmtAmount(item?.amount)}
+                        </Typography>
+                        <Typography sx={{ fontSize: 12, color: "text.secondary", mt: 0.15 }}>
+                          {item?.requested_at || item?.created_at
+                            ? new Date(item.requested_at || item.created_at).toLocaleString()
+                            : "—"}
+                        </Typography>
+                      </Box>
+
+                      <Chip
+                        size="small"
+                        label={String(item?.status || "pending").toUpperCase()}
+                        color={
+                          String(item?.status || "").toLowerCase() === "approved"
+                            ? "success"
+                            : String(item?.status || "").toLowerCase() === "rejected"
+                              ? "error"
+                              : "warning"
+                        }
+                        sx={{
+                          height: 20,
+                          fontSize: 11,
+                          fontWeight: 800,
+                          borderRadius: 999,
+                        }}
+                      />
+                    </Paper>
+                  ))}
+                </Stack>
+              ) : (
+                <Typography variant="body2" sx={{ color: "text.secondary", p: 1 }}>
+                  No withdrawal history yet.
+                </Typography>
+              )}
             </Paper>
           </Stack>
         </Grid>
