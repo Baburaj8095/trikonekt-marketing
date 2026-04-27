@@ -772,15 +772,15 @@ class AutoPoolAccount(models.Model):
             # Backfill / repair speed indexes (see migration 0034_autopool_backfill_speed_indexes)
             models.Index(
                 fields=["owner", "pool_type", "status", "source_id"],
-                name="idx_ap_owner_pool_status_sourceid",
+                name="ap_owner_pool_stat_sid",
             ),
             models.Index(
                 fields=["owner", "pool_type", "status", "source_type"],
-                name="idx_ap_owner_pool_status_sourcetype",
+                name="ap_owner_pool_stat_st",
             ),
             models.Index(
                 fields=["pool_type", "status", "source_type", "source_id"],
-                name="idx_ap_pool_status_type_id",
+                name="ap_pool_stat_st_sid",
             ),
         ]
         constraints = [

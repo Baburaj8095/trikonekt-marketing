@@ -13,21 +13,24 @@ class Migration(migrations.Migration):
             model_name="autopoolaccount",
             index=models.Index(
                 fields=["owner", "pool_type", "status", "source_id"],
-                name="idx_ap_owner_pool_status_sourceid",
+                # Keep <= 30 chars for cross-DB compatibility
+                name="ap_owner_pool_stat_sid",
             ),
         ),
         migrations.AddIndex(
             model_name="autopoolaccount",
             index=models.Index(
                 fields=["owner", "pool_type", "status", "source_type"],
-                name="idx_ap_owner_pool_status_sourcetype",
+                # Keep <= 30 chars for cross-DB compatibility
+                name="ap_owner_pool_stat_st",
             ),
         ),
         migrations.AddIndex(
             model_name="autopoolaccount",
             index=models.Index(
                 fields=["pool_type", "status", "source_type", "source_id"],
-                name="idx_ap_pool_status_type_id",
+                # Keep <= 30 chars for cross-DB compatibility
+                name="ap_pool_stat_st_sid",
             ),
         ),
     ]
