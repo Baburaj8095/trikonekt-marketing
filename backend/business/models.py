@@ -672,12 +672,25 @@ class CommissionConfig(models.Model):
 
         # Warn when legacy top-level value conflicts with product overrides to help ops diagnose
         if top_v > 0 and max_candidate > 0 and top_v != max_candidate:
-            logger.warning(
-                "matrix_five levels mismatch: top=%s vs consumer_product_max=%s; using=%s",
-                top_v,
-                max_candidate,
-                effective,
-            )
+            # Avoid log spam during bulk operations (repair/backfill can call this hundreds of times).
+            # We only need to see this warning once per process.
+            try:
+                if not getattr(self, "_mx5_levels_mismatch_warned", False):
+                    logger.warning(
+                        "matrix_five levels mismatch: top=%s vs consumer_product_max=%s; using=%s",
+                        top_v,
+                        max_candidate,
+                        effective,
+                    )
+                    setattr(self, "_mx5_levels_mismatch_warned", True)
+            except Exception:
+                # Best-effort: still warn if attribute setting fails
+                logger.warning(
+                    "matrix_five levels mismatch: top=%s vs consumer_product_max=%s; using=%s",
+                    top_v,
+                    max_candidate,
+                    effective,
+                )
 
         # If nothing configured, fall back to a safe default (6)
         if effective <= 0:

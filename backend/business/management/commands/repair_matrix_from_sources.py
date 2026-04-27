@@ -12,6 +12,7 @@ from django.db import connection
 from django.db.models import Q
 from django.utils import timezone
 from datetime import timedelta
+from django.db import close_old_connections
 
 
 @dataclass(frozen=True)
@@ -157,10 +158,26 @@ class Command(BaseCommand):
             default=200,
             help="Apply mode: commit creations in chunks (default 200).",
         )
+
+        parser.add_argument(
+            "--progress-every",
+            type=int,
+            default=100,
+            help="Apply mode: print a progress line every N seats processed (default 100).",
+        )
         parser.add_argument(
             "--cleanup-monthly-duplicates",
             action="store_true",
             help="Apply mode: close duplicate MONTHLY seats per (user, pool, season) when safe (no children).",
+        )
+
+        parser.add_argument(
+            "--cleanup-prime750-duplicates",
+            action="store_true",
+            help=(
+                "Apply mode: close duplicate PRIME_750 seats per (user, pool, promo_purchase_id) when safe (no ACTIVE children). "
+                "This does NOT delete; it only changes status ACTIVE -> CLOSED for extra duplicates."
+            ),
         )
 
         parser.add_argument(
@@ -378,6 +395,13 @@ class Command(BaseCommand):
         existing_types = existing_types_by_key.get(key) or set()
         if not existing_types:
             return False
+
+        # Stronger idempotency guard (generic):
+        # If ANY ACTIVE seat already exists for the same (owner, pool_type, source_id), do not create another.
+        # This prevents duplicate creation when historical rows used legacy/incorrect source_type tags.
+        # Monthly is excluded because it is season-based (we de-dupe by season above).
+        if seat.kind != "MONTHLY":
+            return True
         equiv = self._equivalent_source_types_for(seat.source_type, seat.kind)
         return bool(set(t.upper() for t in existing_types).intersection(set(x.upper() for x in (equiv or set()))))
 
@@ -426,7 +450,9 @@ class Command(BaseCommand):
         rebirth_only_three = bool(options.get("rebirth_only_three"))
         verbose = bool(options.get("verbose"))
         batch_size = int(options.get("batch_size") or 200)
+        progress_every = int(options.get("progress_every") or 100)
         cleanup_monthly_dupes = bool(options.get("cleanup_monthly_duplicates"))
+        cleanup_prime750_dupes = bool(options.get("cleanup_prime750_duplicates"))
         normalize_tags = bool(options.get("normalize_source_tags"))
         normalize_tags_sql = bool(options.get("normalize_source_tags_sql"))
 
@@ -745,7 +771,7 @@ class Command(BaseCommand):
             if tag_updates_count > len(tag_updates_preview):
                 self.stdout.write(f"  ... and {tag_updates_count - len(tag_updates_preview)} more")
 
-        if not missing and not (do_apply and (cleanup_monthly_dupes or normalize_tags)):
+        if not missing and not (do_apply and (cleanup_monthly_dupes or cleanup_prime750_dupes or normalize_tags)):
             self.stdout.write(self.style.SUCCESS("Nothing to do."))
             return
         if not missing:
@@ -776,36 +802,61 @@ class Command(BaseCommand):
 
         created = 0
         failed = 0
+        processed = 0
         # Apply in chunks; each seat is wrapped in a savepoint so one failure doesn't poison the whole run.
         for i in range(0, len(missing), max(1, batch_size)):
             chunk = missing[i : i + max(1, batch_size)]
-            with transaction.atomic():
-                for s in chunk:
-                    u = users_by_id.get(int(s.user_id))
-                    if not u:
-                        failed += 1
-                        if verbose:
-                            self.stdout.write(self.style.WARNING(
-                                f"failed user={s.user_id} pool={s.pool_type} src={s.source_type}:{s.source_id} kind={s.kind}"
-                            ))
-                        continue
+            # IMPORTANT:
+            # Do NOT wrap large chunks in a single outer transaction.
+            # Placement internally uses transactions/locks; keeping a long outer atomic can lead to
+            # "idle in transaction" sessions that block DDL and slow down the system.
+            for s in chunk:
+                processed += 1
+                u = users_by_id.get(int(s.user_id))
+                if not u:
+                    failed += 1
+                    if verbose:
+                        self.stdout.write(self.style.WARNING(
+                            f"failed user={s.user_id} pool={s.pool_type} src={s.source_type}:{s.source_id} kind={s.kind}"
+                        ))
+                    continue
+
+                # Ensure we don't keep stale/long-lived connections in bad states.
+                # This also helps avoid long "idle in transaction" sessions when iterators/cursors are used.
+                try:
+                    close_old_connections()
+                except Exception:
+                    pass
+
+                try:
+                    # One savepoint per seat: failures won't poison the whole run.
+                    with transaction.atomic():
+                        ok = self._create_seat(seat=s, user=u)
+                except Exception:
+                    ok = False
+
+                if ok:
+                    created += 1
+                    if verbose:
+                        self.stdout.write(self.style.SUCCESS(
+                            f"created user={s.user_id} pool={s.pool_type} src={s.source_type}:{s.source_id} kind={s.kind}"
+                        ))
+                else:
+                    failed += 1
+                    if verbose:
+                        self.stdout.write(self.style.WARNING(
+                            f"failed user={s.user_id} pool={s.pool_type} src={s.source_type}:{s.source_id} kind={s.kind}"
+                        ))
+
+                if progress_every > 0 and processed % max(1, progress_every) == 0:
                     try:
-                        with transaction.atomic():
-                            ok = self._create_seat(seat=s, user=u)
+                        # Use plain output for maximum compatibility.
+                        # Some environments/styles can swallow NOTICE formatting during long runs.
+                        self.stdout.write(
+                            f"Progress: processed={processed}/{len(missing)} created={created} failed={failed}"
+                        )
                     except Exception:
-                        ok = False
-                    if ok:
-                        created += 1
-                        if verbose:
-                            self.stdout.write(self.style.SUCCESS(
-                                f"created user={s.user_id} pool={s.pool_type} src={s.source_type}:{s.source_id} kind={s.kind}"
-                            ))
-                    else:
-                        failed += 1
-                        if verbose:
-                            self.stdout.write(self.style.WARNING(
-                                f"failed user={s.user_id} pool={s.pool_type} src={s.source_type}:{s.source_id} kind={s.kind}"
-                            ))
+                        pass
 
         # Optional cleanup: close duplicate MONTHLY seats per season when safe.
         if cleanup_monthly_dupes:
@@ -860,6 +911,71 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.MIGRATE_HEADING("Monthly Cleanup"))
                 self.stdout.write(f"  Duplicate MONTHLY seats closed : {closed}")
                 self.stdout.write(f"  Skipped (has children/error)    : {skipped}")
+
+        # Optional cleanup: close duplicate PRIME_750 seats per (user, pool, promo_purchase_id) when safe.
+        # This prevents UI confusion and fixes historical duplicate creation.
+        if cleanup_prime750_dupes:
+            closed = 0
+            skipped = 0
+            skipped_examples: List[Tuple[int, str, str, int]] = []  # (owner_id,pool,source_id,children)
+            prime_qs = AutoPoolAccount.objects.filter(
+                owner_id__in=user_ids,
+                status="ACTIVE",
+                pool_type__in=["FIVE_150", "THREE_150"],
+                source_type="PRIME_750",
+            ).only("id", "owner_id", "pool_type", "source_type", "source_id", "created_at", "parent_account")
+
+            groups2: DefaultDict[Tuple[int, str, str], List[AutoPoolAccount]] = defaultdict(list)
+            for a in prime_qs:
+                sid = str(getattr(a, "source_id", "") or "")
+                if not sid:
+                    continue
+                groups2[(int(a.owner_id), str(a.pool_type), sid)].append(a)
+
+            for _gkey, arr in groups2.items():
+                if len(arr) <= 1:
+                    continue
+                # Prefer keeping the one with children; else keep the oldest (lowest id)
+                def _score2(x: AutoPoolAccount) -> Tuple[int, int]:
+                    try:
+                        child_ct = x.children.filter(status="ACTIVE").count()
+                    except Exception:
+                        child_ct = 0
+                    # higher is better: has_children first; then older id (smaller id)
+                    return (1 if child_ct > 0 else 0, -int(x.id))
+
+                keep = sorted(arr, key=_score2, reverse=True)[0]
+                for a in arr:
+                    if a.id == keep.id:
+                        continue
+                    try:
+                        child_ct = a.children.filter(status="ACTIVE").count()
+                    except Exception:
+                        child_ct = 0
+                    if child_ct > 0:
+                        skipped += 1
+                        if len(skipped_examples) < 10:
+                            skipped_examples.append(
+                                (int(a.owner_id), str(a.pool_type), str(a.source_id), int(child_ct))
+                            )
+                        continue
+                    try:
+                        AutoPoolAccount.objects.filter(id=a.id, status="ACTIVE").update(status="CLOSED")
+                        closed += 1
+                    except Exception:
+                        skipped += 1
+
+            if verbose or closed or skipped:
+                self.stdout.write("")
+                self.stdout.write(self.style.MIGRATE_HEADING("PRIME_750 Cleanup"))
+                self.stdout.write(f"  Duplicate PRIME_750 seats closed : {closed}")
+                self.stdout.write(f"  Skipped (has children/error)     : {skipped}")
+                if skipped_examples:
+                    self.stdout.write("  Sample skipped (has children):")
+                    for (oid, pt, sid, cc) in skipped_examples:
+                        self.stdout.write(
+                            f"    owner_id={oid} pool={pt} source_id={sid} active_children={cc}"
+                        )
 
         # Optional tag normalization: update source_type in-place for existing ACTIVE seats.
         if normalize_tags:
