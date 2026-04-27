@@ -8,6 +8,7 @@ from typing import DefaultDict, Dict, Iterable, List, Optional, Sequence, Set, T
 
 from django.core.management.base import BaseCommand, CommandParser
 from django.db import transaction
+from django.db import connection
 from django.db.models import Q
 from django.utils import timezone
 from datetime import timedelta
@@ -162,6 +163,128 @@ class Command(BaseCommand):
             help="Apply mode: close duplicate MONTHLY seats per (user, pool, season) when safe (no children).",
         )
 
+        parser.add_argument(
+            "--normalize-source-tags",
+            action="store_true",
+            help=(
+                "Normalize existing ACTIVE AutoPoolAccount.source_type values to canonical tags derived from sources. "
+                "Does not delete/recreate seats. Canonical tags include PRIME_750 / PRIME_150 / SELF_ACCOUNT_250 / "
+                "ECOUPON_150_ACTIVATED / MONTHLY_FIRST_SEASON-{season}."
+            ),
+        )
+
+        parser.add_argument(
+            "--normalize-source-tags-sql",
+            action="store_true",
+            help=(
+                "Postgres-only fast path for --normalize-source-tags. Performs set-based SQL UPDATEs instead of Python iteration. "
+                "Falls back silently if not Postgres."
+            ),
+        )
+
+    def _is_postgres(self) -> bool:
+        try:
+            return connection.vendor == "postgresql"
+        except Exception:
+            return False
+
+    def _normalize_tags_sql(self, *, user_ids: Sequence[int], verbose: bool = False) -> int:
+        """Fast Postgres-only tag normalization.
+
+        Updates business_autopoolaccount.source_type in bulk for ACTIVE seats:
+          - PROMO_PURCHASE_APPROVAL/other legacy prime tags -> PRIME_750
+          - MONTHLY/SMART/SSP tags -> MONTHLY_FIRST_SEASON-<season>
+
+        Note: This is intentionally conservative and only updates rows we can infer safely.
+        """
+        if not user_ids:
+            return 0
+        if not self._is_postgres():
+            return 0
+
+        # We keep SQL in small statements for safety + explainability.
+        # 1) PRIME_750: update promo purchase seats with legacy tags.
+        #    Join on source_id = promopurchase.id (stored as string in source_id).
+        user_id_list = list({int(x) for x in user_ids if int(x) > 0})
+        if not user_id_list:
+            return 0
+
+        updated_total = 0
+        with connection.cursor() as cur:
+            # PRIME 750 canonical tag
+            cur.execute(
+                """
+                UPDATE business_autopoolaccount a
+                SET source_type = 'PRIME_750'
+                FROM business_promopurchase pp
+                JOIN business_promopackage pkg ON pkg.id = pp.package_id
+                WHERE a.status = 'ACTIVE'
+                  AND a.pool_type IN ('FIVE_150','THREE_150')
+                  AND a.owner_id = ANY(%s)
+                  AND pp.id::text = a.source_id
+                  AND pp.status = 'APPROVED'
+                  AND pkg.type = 'PRIME'
+                  AND upper(pkg.code) LIKE '%%750%%'
+                  AND upper(coalesce(a.source_type,'')) IN (
+                        'PROMO_PURCHASE_APPROVAL',
+                        'PROMO_PURCHASE',
+                        'SUBSCRIPTION_750',
+                        'BACKFILL_750',
+                        'PRIME750'
+                  )
+                """,
+                [user_id_list],
+            )
+            updated_total += int(getattr(cur, "rowcount", 0) or 0)
+
+            # MONTHLY canonical tag: MONTHLY_FIRST_SEASON-<season>
+            # Infer season from source_id patterns:
+            #   - '<purchase_id>:<season>:<box>'
+            #   - 'admin_s<season>:<..>'
+            # We only update rows that look monthly-ish.
+            cur.execute(
+                """
+                UPDATE business_autopoolaccount a
+                SET source_type = (
+                    'MONTHLY_FIRST_SEASON-' || (
+                        CASE
+                            WHEN a.source_id ~* '^admin_s\\d+:' THEN
+                                substring(a.source_id from '^admin_s(\\d+):')
+                            WHEN a.source_id ~ '^[0-9]+:[0-9]+:' THEN
+                                split_part(a.source_id, ':', 2)
+                            ELSE NULL
+                        END
+                    )
+                )
+                WHERE a.status = 'ACTIVE'
+                  AND a.pool_type IN ('FIVE_150','THREE_150')
+                  AND a.owner_id = ANY(%s)
+                  AND (
+                        upper(coalesce(a.source_type,'')) LIKE '%%MONTHLY%%'
+                        OR upper(coalesce(a.source_type,'')) LIKE '%%SMART%%'
+                        OR upper(coalesce(a.source_type,'')) LIKE '%%SSP%%'
+                  )
+                  AND (
+                        a.source_id ~* '^admin_s\\d+:'
+                        OR a.source_id ~ '^[0-9]+:[0-9]+:'
+                  )
+                  AND upper(coalesce(a.source_type,'')) NOT LIKE 'MONTHLY_FIRST_SEASON%%'
+                """,
+                [user_id_list],
+            )
+            updated_total += int(getattr(cur, "rowcount", 0) or 0)
+
+        if verbose:
+            try:
+                self.stdout.write(self.style.NOTICE(f"SQL tag normalization updated rows: {updated_total}"))
+            except Exception:
+                pass
+        return updated_total
+
+    def _should_use_sql_tag_normalization(self, *, do_apply: bool, normalize_tags: bool, normalize_tags_sql: bool) -> bool:
+        # Only applies when asked and when DB backend supports it.
+        return bool(do_apply and normalize_tags and normalize_tags_sql and self._is_postgres())
+
     def _root_user_ids(self) -> Set[int]:
         ids: Set[int] = set()
         try:
@@ -304,6 +427,8 @@ class Command(BaseCommand):
         verbose = bool(options.get("verbose"))
         batch_size = int(options.get("batch_size") or 200)
         cleanup_monthly_dupes = bool(options.get("cleanup_monthly_duplicates"))
+        normalize_tags = bool(options.get("normalize_source_tags"))
+        normalize_tags_sql = bool(options.get("normalize_source_tags_sql"))
 
         from business.models import PromoPurchase
         from accounts.models import WalletTransaction
@@ -538,7 +663,89 @@ class Command(BaseCommand):
                 break
 
         self.stdout.write(self.style.NOTICE(f"Missing seats to create: {len(missing)}"))
-        if not missing and not (do_apply and cleanup_monthly_dupes):
+
+        # ----------------------------
+        # Optional: normalize existing source_type tags (no delete/recreate)
+        # ----------------------------
+        # Build desired source_type per (user,pool,source_id) from expected seats.
+        desired_by_key: Dict[Tuple[int, str, str], str] = {}
+        try:
+            for s in expected:
+                desired_by_key[(int(s.user_id), str(s.pool_type), str(s.source_id))] = str(s.source_type)
+        except Exception:
+            desired_by_key = {}
+
+        tag_updates_preview: List[Tuple[int, str, str, str, str]] = []  # (id, pool, source_id, old, new)
+        tag_updates_count = 0
+        if normalize_tags:
+            try:
+                # Postgres fast path: do normalization in SQL (much faster for full-history runs).
+                # In apply mode, if SQL normalization is enabled, we will run it and then skip the expensive Python bulk_update.
+                used_sql_norm = self._should_use_sql_tag_normalization(
+                    do_apply=do_apply,
+                    normalize_tags=normalize_tags,
+                    normalize_tags_sql=normalize_tags_sql,
+                )
+                sql_updated = 0
+                if used_sql_norm:
+                    sql_updated = self._normalize_tags_sql(user_ids=user_ids, verbose=verbose)
+
+                # Iterate all existing ACTIVE accounts for the user set.
+                # Monthly is handled by season extraction even if source_id format is legacy.
+                existing_qs = (
+                    AutoPoolAccount.objects.filter(
+                        owner_id__in=user_ids,
+                        status="ACTIVE",
+                        pool_type__in=["FIVE_150", "THREE_150"],
+                    )
+                    .only("id", "owner_id", "pool_type", "source_type", "source_id")
+                    .iterator(chunk_size=2000)
+                )
+
+                # Apply canonical tag for monthly seats based on parsed season.
+                # This works even when source_id is "admin_s1:1:1" or other legacy patterns.
+                def _monthly_canonical_for(acc_source_id: str) -> str:
+                    season = _monthly_season_from_source_id(acc_source_id)
+                    return _monthly_first_season_source_type(season)
+
+                for a in existing_qs:
+                    try:
+                        oid = int(getattr(a, "owner_id", 0) or 0)
+                        pt = str(getattr(a, "pool_type", "") or "")
+                        sid = str(getattr(a, "source_id", "") or "")
+                        old = str(getattr(a, "source_type", "") or "")
+                        aid = int(getattr(a, "id", 0) or 0)
+                    except Exception:
+                        continue
+                    if not oid or not pt or not aid:
+                        continue
+
+                    new_tag = ""
+                    # Priority 1: Monthly seats are always canonicalized by season.
+                    if _is_monthly_source_type(old) or (sid and _monthly_season_from_source_id(sid) > 0 and ("MONTHLY" in old.upper() or "SSP" in old.upper() or "SMART" in old.upper())):
+                        new_tag = _monthly_canonical_for(sid)
+                    else:
+                        # Priority 2: Exact expected-key match (PRIME_750 / PRIME_150 / SELF_ACCOUNT_250 / ECOUPON_150_ACTIVATED)
+                        new_tag = desired_by_key.get((oid, pt, sid)) or ""
+
+                    if new_tag and str(old).strip().upper() != str(new_tag).strip().upper():
+                        tag_updates_count += 1
+                        if len(tag_updates_preview) < 25:
+                            tag_updates_preview.append((aid, pt, sid, old, new_tag))
+            except Exception:
+                tag_updates_preview = []
+                tag_updates_count = 0
+
+        if normalize_tags:
+            self.stdout.write("")
+            self.stdout.write(self.style.MIGRATE_HEADING("Source Tag Normalization"))
+            self.stdout.write(f"  Seats requiring source_type update : {tag_updates_count}")
+            for (aid, pt, sid, old, new_tag) in tag_updates_preview:
+                self.stdout.write(f"  would_update id={aid} pool={pt} source_id={sid} {old} -> {new_tag}")
+            if tag_updates_count > len(tag_updates_preview):
+                self.stdout.write(f"  ... and {tag_updates_count - len(tag_updates_preview)} more")
+
+        if not missing and not (do_apply and (cleanup_monthly_dupes or normalize_tags)):
             self.stdout.write(self.style.SUCCESS("Nothing to do."))
             return
         if not missing:
@@ -551,7 +758,10 @@ class Command(BaseCommand):
                 self.stdout.write(f"  would_create user={s.user_id} pool={s.pool_type} src={s.source_type}:{s.source_id} kind={s.kind}")
             if len(missing) > len(sample):
                 self.stdout.write(f"  ... and {len(missing) - len(sample)} more")
-            self.stdout.write(self.style.WARNING("Dry-run complete. Re-run with --apply to create missing seats."))
+            self.stdout.write(self.style.WARNING(
+                "Dry-run complete. Re-run with --apply to create missing seats"
+                + (" and --normalize-source-tags to normalize tags." if normalize_tags else ".")
+            ))
             return
 
         # Preload users to avoid per-seat user queries.
@@ -650,6 +860,67 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.MIGRATE_HEADING("Monthly Cleanup"))
                 self.stdout.write(f"  Duplicate MONTHLY seats closed : {closed}")
                 self.stdout.write(f"  Skipped (has children/error)    : {skipped}")
+
+        # Optional tag normalization: update source_type in-place for existing ACTIVE seats.
+        if normalize_tags:
+            # If Postgres SQL path was enabled in apply-mode, skip Python bulk_update entirely.
+            updated = 0
+            if self._should_use_sql_tag_normalization(
+                do_apply=do_apply,
+                normalize_tags=normalize_tags,
+                normalize_tags_sql=normalize_tags_sql,
+            ):
+                try:
+                    updated = 0  # already updated by SQL; we don't double-run
+                except Exception:
+                    updated = 0
+            else:
+                try:
+                    # Re-scan existing rows and apply updates using bulk_update.
+                    to_update = []
+                    existing_qs2 = (
+                        AutoPoolAccount.objects.filter(
+                            owner_id__in=user_ids,
+                            status="ACTIVE",
+                            pool_type__in=["FIVE_150", "THREE_150"],
+                        )
+                        .only("id", "owner_id", "pool_type", "source_type", "source_id")
+                        .iterator(chunk_size=2000)
+                    )
+
+                    for a in existing_qs2:
+                        oid = int(getattr(a, "owner_id", 0) or 0)
+                        pt = str(getattr(a, "pool_type", "") or "")
+                        sid = str(getattr(a, "source_id", "") or "")
+                        old = str(getattr(a, "source_type", "") or "")
+
+                        new_tag = ""
+                        if _is_monthly_source_type(old) or (
+                            sid
+                            and _monthly_season_from_source_id(sid) > 0
+                            and ("MONTHLY" in old.upper() or "SSP" in old.upper() or "SMART" in old.upper())
+                        ):
+                            new_tag = _monthly_first_season_source_type(_monthly_season_from_source_id(sid))
+                        else:
+                            new_tag = desired_by_key.get((oid, pt, sid)) or ""
+
+                        if new_tag and old.strip().upper() != new_tag.strip().upper():
+                            a.source_type = new_tag
+                            to_update.append(a)
+
+                    if to_update:
+                        for i in range(0, len(to_update), max(1, batch_size)):
+                            chunk = to_update[i : i + max(1, batch_size)]
+                            AutoPoolAccount.objects.bulk_update(
+                                chunk, ["source_type"], batch_size=max(1, batch_size)
+                            )
+                        updated = len(to_update)
+                except Exception:
+                    updated = 0
+
+            self.stdout.write("")
+            self.stdout.write(self.style.MIGRATE_HEADING("Source Tag Normalization"))
+            self.stdout.write(f"  Seats updated (source_type)     : {updated}")
 
         self.stdout.write("")
         self.stdout.write(self.style.MIGRATE_HEADING("Repair Summary"))

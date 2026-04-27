@@ -769,6 +769,19 @@ class AutoPoolAccount(models.Model):
             models.Index(fields=["username_key", "status"]),
             models.Index(fields=["pool_type", "status"]),
             models.Index(fields=["parent_account", "pool_type", "position"]),
+            # Backfill / repair speed indexes (see migration 0034_autopool_backfill_speed_indexes)
+            models.Index(
+                fields=["owner", "pool_type", "status", "source_id"],
+                name="idx_ap_owner_pool_status_sourceid",
+            ),
+            models.Index(
+                fields=["owner", "pool_type", "status", "source_type"],
+                name="idx_ap_owner_pool_status_sourcetype",
+            ),
+            models.Index(
+                fields=["pool_type", "status", "source_type", "source_id"],
+                name="idx_ap_pool_status_type_id",
+            ),
         ]
         constraints = [
             models.UniqueConstraint(
