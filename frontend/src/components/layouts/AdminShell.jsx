@@ -1,8 +1,16 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import API, { ensureFreshAccess, getAccessToken } from "../../api/api";
 import { getAdminMeta } from "../../admin-panel/api/adminMeta";
+import ShellBase from "./ShellBase";
 
+/**
+ * AdminShell (ShellBase-powered)
+ *
+ * Refactored to use the shared ShellBase layout (same family as AgencyShell) so
+ * the admin UI stays consistent and it is easier to add additional navigation
+ * such as user-category bifurcation tabs.
+ */
 export default function AdminShell({ children }) {
   const loc = useLocation();
   const navigate = useNavigate();
@@ -19,78 +27,9 @@ export default function AdminShell({ children }) {
     };
   }, []);
 
-  // Responsive flags
-  const [isMobile, setIsMobile] = useState(
-    typeof window !== "undefined" ? window.innerWidth < 1024 : false
-  );
-  // Sidebar: open on desktop, closed by default on mobile
-  const [sidebarOpen, setSidebarOpen] = useState(
-    typeof window !== "undefined" ? window.innerWidth >= 1024 : true
-  );
-
-  // Desktop mini/rail mode (icons only)
-  const [mini, setMini] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("admin.sidebar.mini") === "1";
-  });
-
-  // Collapsible group open state (persisted)
-  const [groupOpen, setGroupOpen] = useState(() => {
-    if (typeof window === "undefined") return {};
-    try {
-      return JSON.parse(localStorage.getItem("admin.sidebar.groups") || "{}");
-    } catch {
-      return {};
-    }
-  });
-
-  useEffect(() => {
-    function onResize() {
-      const m = window.innerWidth < 1024;
-      setIsMobile(m);
-      setSidebarOpen(!m); // force open on desktop, closed on mobile
-    }
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-
-  // Close drawer on route change (mobile only)
-  useEffect(() => {
-    if (isMobile) setSidebarOpen(false);
-  }, [loc.pathname, isMobile]);
-
-  // Persist mini mode (desktop only)
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("admin.sidebar.mini", mini ? "1" : "0");
-    }
-  }, [mini]);
-
-  // Persist group states
-  function updateGroupOpen(updater) {
-    setGroupOpen((prev) => {
-      const next = typeof updater === "function" ? updater(prev) : updater;
-      try {
-        localStorage.setItem("admin.sidebar.groups", JSON.stringify(next));
-      } catch {}
-      return next;
-    });
-  }
-  function toggleGroup(key) {
-    updateGroupOpen((prev) => ({ ...prev, [key]: !prev[key] }));
-  }
-  function isGroupOpen(key, hasActive, effectiveMini) {
-    if (effectiveMini) return true; // always show children when mini (no headers)
-    const v = groupOpen[key];
-    if (v === undefined) return hasActive; // default open if a child is active
-    return v;
-  }
-
-  // Admin auth ping removed to avoid extra network call
   const [authErr, setAuthErr] = useState("");
   const [adminInfo, setAdminInfo] = useState(null);
   const [rbacPerms, setRbacPerms] = useState(null);
-
 
   // Ensure admin/staff auth; redirect to admin login on 401/403
   useEffect(() => {
@@ -105,16 +44,17 @@ export default function AdminShell({ children }) {
           await new Promise((r) => setTimeout(r, 100));
           tries += 1;
         }
-        try { await ensureFreshAccess(); } catch (_) {}
+        try {
+          await ensureFreshAccess();
+        } catch (_) {}
 
-        // Ensure Authorization header explicitly using any available token
         const __tk = (typeof getAccessToken === "function" ? getAccessToken() : null) || null;
         const __cfg = { timeout: 8000, retryAttempts: 0, dedupe: "cancelPrevious" };
-        if (__tk) {
-          __cfg.headers = { Authorization: `Bearer ${__tk}` };
-        }
+        if (__tk) __cfg.headers = { Authorization: `Bearer ${__tk}` };
+
         const res = await API.get("admin/ping/", __cfg);
         if (cancelled) return;
+
         const d = res?.data || {};
         if (!d?.is_staff && !d?.is_superuser) {
           setAuthErr("Not authorized for admin area.");
@@ -122,7 +62,12 @@ export default function AdminShell({ children }) {
             navigate("/admin/login", { replace: true, state: { from: { pathname: loc.pathname } } });
           } catch (_) {}
         } else {
-          setAdminInfo({ is_superuser: !!d.is_superuser, is_staff: !!d.is_staff, username: d.user, modules: d.modules || null });
+          setAdminInfo({
+            is_superuser: !!d.is_superuser,
+            is_staff: !!d.is_staff,
+            username: d.user,
+            modules: d.modules || null,
+          });
         }
       } catch (e) {
         if (cancelled) return;
@@ -140,7 +85,9 @@ export default function AdminShell({ children }) {
     }
 
     run();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [loc.pathname, navigate]);
 
   // Fetch RBAC permissions from /api/admin/me/ once adminInfo is available
@@ -153,20 +100,19 @@ export default function AdminShell({ children }) {
 
     async function fetchPerms() {
       try {
-        // Wait for any access token then refresh to ensure Authorization header
         let tries = 0;
         while (!getAccessToken() && tries < 20) {
           await new Promise((r) => setTimeout(r, 100));
           tries += 1;
         }
-        try { await ensureFreshAccess(); } catch (_) {}
+        try {
+          await ensureFreshAccess();
+        } catch (_) {}
 
-        // Ensure Authorization header explicitly using any available token
         const __tk2 = (typeof getAccessToken === "function" ? getAccessToken() : null) || null;
         const __cfg2 = { timeout: 8000, retryAttempts: 0 };
-        if (__tk2) {
-          __cfg2.headers = { Authorization: `Bearer ${__tk2}` };
-        }
+        if (__tk2) __cfg2.headers = { Authorization: `Bearer ${__tk2}` };
+
         const res = await API.get("admin/me/", __cfg2);
         if (!cancelled) {
           const perms = Array.isArray(res?.data?.permissions) ? res.data.permissions : [];
@@ -183,7 +129,7 @@ export default function AdminShell({ children }) {
     };
   }, [adminInfo]);
 
-  // Admin metrics for badges (KYC, Withdrawals) ”“ fetch only on dashboard route
+  // Admin metrics for badges (KYC, Withdrawals) — fetch only on dashboard route
   const [metrics, setMetrics] = useState(null);
   useEffect(() => {
     let cancelled = false;
@@ -211,7 +157,7 @@ export default function AdminShell({ children }) {
     };
   }, [loc.pathname]);
 
-  // Dynamic admin models metadata (loaded, not yet displayed by default)
+  // Dynamic admin models metadata (loaded only for models route)
   const [models, setModels] = useState([]);
   const [modelsErr, setModelsErr] = useState("");
   useEffect(() => {
@@ -245,135 +191,6 @@ export default function AdminShell({ children }) {
     return g;
   }, [models]);
 
-  // Route active detection
-  function isRouteActive(to) {
-    // Keep models index active for nested routes
-    if (to === "/admin/dashboard/models") {
-      return loc.pathname.startsWith("/admin/dashboard/models");
-    }
-    // Default: active if exact or nested under this specific link
-    return loc.pathname === to || loc.pathname.startsWith(to + "/");
-  }
-
-  // Minimal, generic icons to avoid external deps
-  function Icon({ name, active }) {
-    const stroke = active ? "#0ea5e9" : "#94a3b8";
-    const size = 18;
-    switch (name) {
-      case "dashboard":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="3" y="3" width="7" height="9" />
-            <rect x="14" y="3" width="7" height="5" />
-            <rect x="14" y="10" width="7" height="11" />
-            <rect x="3" y="14" width="7" height="7" />
-          </svg>
-        );
-      case "users":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" />
-            <circle cx="9" cy="7" r="4" />
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-          </svg>
-        );
-      case "tree":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M12 2v7" />
-            <circle cx="12" cy="11" r="2" />
-            <path d="M6 22v-6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v6" />
-          </svg>
-        );
-      case "upload":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="17 8 12 3 7 8" />
-            <line x1="12" y1="3" x2="12" y2="15" />
-          </svg>
-        );
-      case "shield":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-          </svg>
-        );
-      case "wallet":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="2" y="6" width="20" height="12" rx="2" />
-            <circle cx="16" cy="12" r="1.5" />
-          </svg>
-        );
-      case "ticket":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M3 9h18v6H3z" />
-            <path d="M7 9v6M17 9v6" />
-          </svg>
-        );
-      case "briefcase":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="3" y="7" width="18" height="14" rx="2" />
-            <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-          </svg>
-        );
-      case "chart":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <line x1="3" y1="21" x2="21" y2="21" />
-            <rect x="7" y="10" width="3" height="8" />
-            <rect x="12" y="6" width="3" height="12" />
-            <rect x="17" y="13" width="3" height="5" />
-          </svg>
-        );
-      case "matrix5":
-      case "matrix3":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <circle cx="12" cy="5" r="2" />
-            <circle cx="6" cy="12" r="2" />
-            <circle cx="18" cy="12" r="2" />
-            <path d="M12 7v3M10 12h4" />
-          </svg>
-        );
-      case "pool":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M2 18c2 1.5 4 1.5 6 0s4-1.5 6 0 4 1.5 6 0" />
-            <path d="M2 14c2 1.5 4 1.5 6 0s4-1.5 6 0 4 1.5 6 0" />
-          </svg>
-        );
-      case "box":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M21 16V8a2 2 0 0 0-1.2-1.8l-6-3a2 2 0 0 0-1.6 0l-6 3A2 2 0 0 0 5 8v8a2 2 0 0 0 1.2 1.8l6 3a2 2 0 0 0 1.6 0l6-3A2 2 0 0 0 21 16z" />
-            <path d="M3.3 7L12 12l8.7-5" />
-          </svg>
-        );
-      case "image":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <circle cx="8.5" cy="8.5" r="1.5" />
-            <path d="M21 15l-5-5L5 21" />
-          </svg>
-        );
-      case "orders":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="3" y="4" width="18" height="14" rx="2" />
-            <path d="M7 8h10M7 12h6" />
-          </svg>
-        );
-      default:
-        return null;
-    }
-  }
-
   // Module gating: map routes to admin module keys returned by /api/admin/ping
   function routeToModule(to) {
     if (!to) return null;
@@ -395,153 +212,143 @@ export default function AdminShell({ children }) {
       to.startsWith("/admin/lucky-draw") ||
       to.startsWith("/admin/promo-purchases") ||
       to.startsWith("/admin/promo-package-products") ||
+      to.startsWith("/admin/agency-prime-requests") ||
       to.startsWith("/admin/tri/") ||
       to.startsWith("/admin/dashboard/models/business/")
-    ) return "promo";
+    )
+      return "promo";
     if (to.startsWith("/admin/notifications")) return "support";
     return null;
   }
 
-  // Navigation groups
-  const groups = [
-    {
-      key: "user",
-      label: "User Management",
-      items: [
-        { to: "/admin/users", label: "Users", icon: "users" },
-        { to: "/admin/user-tree", label: "Genealogy", icon: "tree" },
-      ],
-    },
-     {
-      key: "administration",
-      label: "Administration",
-      items: [
-        { to: "/admin_user", label: "Admin Users", icon: "users", rbacAnyOf: ["manage_users", "show_users"] },
-        { to: "/role", label: "Roles", icon: "shield", rbacAnyOf: ["manage_roles", "show_roles"] },
-        { to: "/permission", label: "Permissions", icon: "shield", rbacAnyOf: ["manage_permissions", "show_permissions"] },
-        { to: "/user_permission", label: "User Permission Mapping", icon: "shield", rbacAnyOf: ["manage_roles", "manage_permissions", "show_roles", "show_permissions"] },
-      ],
-    },
-    {
-      key: "catalog",
-      label: "Catalog",
-      items: [
-        { to: "/admin/ecommerce-categories", label: "Categories", icon: "box" },
-        { to: "/admin/products", label: "Products", icon: "box" },
-        { to: "/admin/seed-demo", label: "Seed Demo Data", icon: "upload" }
-      ],
-    },
-    {
-      key: "ops",
-      label: "Operations",
-      items: [
-        { to: "/admin/packages", label: "Packages", icon: "box" },
-        // { to: "/admin/banners", label: "Banners", icon: "image" },
-        // { to: "/admin/orders", label: "Orders", icon: "orders" },
-        { to: "/admin/payments", label: "Payments", icon: "wallet" },
-        { to: "/admin/agency-prime-requests", label: "Agency Prime Requests", icon: "wallet" },
-        // { to: "/admin/uploads", label: "Uploads", icon: "upload" },
-      ],
-    },
-    {
-      key: "merchant_config",
-      label: "Merchant Config",
-      items: [
-        { to: "/admin/merchant-categories", label: "Merchant Categories", icon: "box" },
-        { to: "/admin/merchant-subcategories", label: "Merchant Subcategories", icon: "box" },
-      ],
-    },
-    {
-      key: "compliance",
-      label: "Compliance & Finance",
-      items: [
-        { to: "/admin/kyc", label: "KYC", icon: "shield" },
-        { to: "/admin/withdrawals", label: "Withdrawals", icon: "wallet" },
-        { to: "/admin/support", label: "Support", icon: "ticket" },
-      ],
-    },
-    {
-      key: "promotions",
-      label: "Promotions",
-      items: [
-        { to: "/admin/lucky-draw", label: "Lucky Draw", icon: "ticket" },
-        { to: "/admin/e-coupons", label: "E‑Coupons", icon: "ticket" },
-        // Promo packages and related admin models inside AdminShell
-        { to: "/admin/dashboard/models/business/promopackage", label: "Promo Packages", icon: "box" },
-        // { to: "/admin/dashboard/models/business/promoebook", label: "Promo E‑Books (Library)", icon: "box" },
-        // { to: "/admin/dashboard/models/business/promopackageebook", label: "Package â†’ E‑Books Mapping", icon: "box" },
-        { to: "/admin/promo-package-products", label: "Upload Promo Products (₹750)", icon: "upload" },
-        { to: "/admin/dashboard/models/business/promopackageproduct", label: "Promo Products (₹750)", icon: "box" },
-        { to: "/admin/dashboard/models/business/promomonthlypackage", label: "Season Numbers", icon: "box" },
-        // Optional: inspect paid boxes if needed
-        { to: "/admin/dashboard/models/business/promomonthlybox", label: "Season Boxes (Paid)", icon: "box" },
-        { to: "/admin/promo-purchases", label: "Promo Purchases", icon: "ticket" },
-        { to: "/admin/rank-upgrades", label: "Rank Upgrades", icon: "wallet" },
-      ],
-    },
-    {
-      key: "tri",
-      label: "TRI Apps",
-      items: [
-        { to: "/admin/tri/tri-holidays", label: "Manage TRI Holidays", icon: "box" },
-        { to: "/admin/tri/tri-ev", label: "Manage TRI EV Vehicles", icon: "box" },
-        { to: "/admin/tri/tri-furniture", label: "Manage TRI Furniture", icon: "box" },
-        { to: "/admin/tri/tri-electronics", label: "Manage TRI Electronics", icon: "box" },
-        { to: "/admin/tri/tri-properties", label: "Manage TRI Properties", icon: "box" },
-        { to: "/admin/tri/tri-saving", label: "Manage TRI Saving", icon: "box" },
-        { to: "/admin/tri/tri-local-store", label: "Manage Local Store", icon: "box" },
-      ],
-    },
-    {
-      key: "reports",
-      label: "Reports & Business",
-      items: [
-        { to: "/admin/reports", label: "Reports", icon: "chart" },
-        { to: "/admin/business", label: "Business", icon: "briefcase" },
-      ],
-    },
-   
-    {
-      key: "commissions",
-      label: "Commissions & Matrix",
-      items: [
-        // { to: "/admin/matrix/five", label: "5‑Matrix", icon: "matrix5" },
-        // { to: "/admin/matrix/three", label: "3‑Matrix", icon: "matrix3" },
-        // { to: "/admin/commissions/matrix", label: "Matrix Commission", icon: "wallet" },
-        // { to: "/admin/commissions/levels", label: "Level Commission", icon: "wallet" },
-        { to: "/admin/commissions/distribute", label: "Commission Distribute", icon: "wallet" },
-        { to: "/admin/commissions/history", label: "Commission History", icon: "wallet" },
-        // { to: "/admin/rewards/points", label: "Rewards Points", icon: "chart" },
-        { to: "/admin/autopool", label: "Auto Commission", icon: "pool" },
-      ],
-    },
-    {
-      key: "engagement",
-      label: "Engagement",
-      items: [
-        { to: "/admin/notifications", label: "Notifications", icon: "ticket" }
-      ],
-    },
-    {
-      key: "dev",
-      label: "Developer Tools",
-      requiresSuperuser: true,
-      items: [{ to: "/admin/dashboard/models", label: "Developer Service", icon: "box" }],
-    },
-  ];
+  const groups = useMemo(
+    () => [
+      {
+        key: "user",
+        label: "User Management",
+        items: [
+          { to: "/admin/users", label: "Users", icon: "users" },
+          { to: "/admin/user-tree", label: "Genealogy", icon: "tree" },
+        ],
+      },
+      {
+        key: "administration",
+        label: "Administration",
+        items: [
+          { to: "/admin_user", label: "Admin Users", icon: "users", rbacAnyOf: ["manage_users", "show_users"] },
+          { to: "/role", label: "Roles", icon: "shield", rbacAnyOf: ["manage_roles", "show_roles"] },
+          { to: "/permission", label: "Permissions", icon: "shield", rbacAnyOf: ["manage_permissions", "show_permissions"] },
+          {
+            to: "/user_permission",
+            label: "User Permission Mapping",
+            icon: "shield",
+            rbacAnyOf: ["manage_roles", "manage_permissions", "show_roles", "show_permissions"],
+          },
+        ],
+      },
+      {
+        key: "catalog",
+        label: "Catalog",
+        items: [
+          { to: "/admin/ecommerce-categories", label: "Categories", icon: "box" },
+          { to: "/admin/products", label: "Products", icon: "box" },
+          { to: "/admin/seed-demo", label: "Seed Demo Data", icon: "upload" },
+        ],
+      },
+      {
+        key: "ops",
+        label: "Operations",
+        items: [
+          { to: "/admin/packages", label: "Packages", icon: "box" },
+          { to: "/admin/payments", label: "Payments", icon: "wallet" },
+          { to: "/admin/agency-prime-requests", label: "Agency Prime Requests", icon: "wallet" },
+        ],
+      },
+      {
+        key: "merchant_config",
+        label: "Merchant Config",
+        items: [
+          { to: "/admin/merchant-categories", label: "Merchant Categories", icon: "box" },
+          { to: "/admin/merchant-subcategories", label: "Merchant Subcategories", icon: "box" },
+        ],
+      },
+      {
+        key: "compliance",
+        label: "Compliance & Finance",
+        items: [
+          { to: "/admin/kyc", label: "KYC", icon: "shield" },
+          { to: "/admin/withdrawals", label: "Withdrawals", icon: "wallet" },
+          { to: "/admin/support", label: "Support", icon: "ticket" },
+        ],
+      },
+      {
+        key: "promotions",
+        label: "Promotions",
+        items: [
+          { to: "/admin/lucky-draw", label: "Lucky Draw", icon: "ticket" },
+          { to: "/admin/e-coupons", label: "E‑Coupons", icon: "ticket" },
+          { to: "/admin/dashboard/models/business/promopackage", label: "Promo Packages", icon: "box" },
+          { to: "/admin/promo-package-products", label: "Upload Promo Products (₹750)", icon: "upload" },
+          { to: "/admin/dashboard/models/business/promopackageproduct", label: "Promo Products (₹750)", icon: "box" },
+          { to: "/admin/dashboard/models/business/promomonthlypackage", label: "Season Numbers", icon: "box" },
+          { to: "/admin/dashboard/models/business/promomonthlybox", label: "Season Boxes (Paid)", icon: "box" },
+          { to: "/admin/promo-purchases", label: "Promo Purchases", icon: "ticket" },
+          { to: "/admin/rank-upgrades", label: "Rank Upgrades", icon: "wallet" },
+        ],
+      },
+      {
+        key: "tri",
+        label: "TRI Apps",
+        items: [
+          { to: "/admin/tri/tri-holidays", label: "Manage TRI Holidays", icon: "box" },
+          { to: "/admin/tri/tri-ev", label: "Manage TRI EV Vehicles", icon: "box" },
+          { to: "/admin/tri/tri-furniture", label: "Manage TRI Furniture", icon: "box" },
+          { to: "/admin/tri/tri-electronics", label: "Manage TRI Electronics", icon: "box" },
+          { to: "/admin/tri/tri-properties", label: "Manage TRI Properties", icon: "box" },
+          { to: "/admin/tri/tri-saving", label: "Manage TRI Saving", icon: "box" },
+          { to: "/admin/tri/tri-local-store", label: "Manage Local Store", icon: "box" },
+        ],
+      },
+      {
+        key: "reports",
+        label: "Reports & Business",
+        items: [
+          { to: "/admin/reports", label: "Reports", icon: "chart" },
+          { to: "/admin/business", label: "Business", icon: "briefcase" },
+        ],
+      },
+      {
+        key: "commissions",
+        label: "Commissions & Matrix",
+        items: [
+          { to: "/admin/commissions/distribute", label: "Commission Distribute", icon: "wallet" },
+          { to: "/admin/commissions/history", label: "Commission History", icon: "wallet" },
+          { to: "/admin/autopool", label: "Auto Commission", icon: "pool" },
+        ],
+      },
+      {
+        key: "engagement",
+        label: "Engagement",
+        items: [{ to: "/admin/notifications", label: "Notifications", icon: "ticket" }],
+      },
+      {
+        key: "dev",
+        label: "Developer Tools",
+        requiresSuperuser: true,
+        items: [{ to: "/admin/dashboard/models", label: "Developer Service", icon: "box" }],
+      },
+    ],
+    []
+  );
 
   const visibleGroups = useMemo(() => {
-    if (!adminInfo) {
-      // Hide superuser-only sections until we know privileges
-      return groups.filter((g) => !g.requiresSuperuser);
-    }
+    if (!adminInfo) return groups.filter((g) => !g.requiresSuperuser);
     return groups.filter((g) => (g.requiresSuperuser ? !!adminInfo.is_superuser : true));
-  }, [adminInfo]);
+  }, [adminInfo, groups]);
 
-  const flatItems = React.useMemo(() => {
-    const items = visibleGroups.flatMap((g) => g.items);
-    const mods = adminInfo && adminInfo.modules ? adminInfo.modules : null;
-    // Helper: RBAC check (any-of)
+  const menu = useMemo(() => {
+    const mods = adminInfo?.modules || null;
+
     const allowRBAC = (it) => {
       if (adminInfo?.is_superuser) return true;
       const any = it?.rbacAnyOf;
@@ -549,108 +356,54 @@ export default function AdminShell({ children }) {
       if (!Array.isArray(rbacPerms)) return false;
       return any.some((c) => rbacPerms.includes(c));
     };
-    if (!mods) {
-      // When modules map isn't available, filter by RBAC only (if loaded)
-      return items.filter((it) => allowRBAC(it));
-    }
-    return items.filter((it) => {
+
+    const filterItem = (it) => {
+      if (!allowRBAC(it)) return false;
+      if (!mods) return true;
       const mk = routeToModule(it.to);
-      const modOk = !mk || !!mods[mk];
-      if (!modOk) return false;
-      return allowRBAC(it);
+      return !mk || !!mods[mk];
+    };
+
+    const out = [];
+
+    out.push({ to: "/admin/dashboard", label: "Dashboard", icon: "dashboard" });
+
+    // Quick user-category bifurcation (requested): each links to AdminUsers with query params.
+    // AdminUsers already reads URLSearchParams(role/category) and applies server-side filters.
+    out.push({ type: "section", label: "Users — Quick Filters", collapsible: true, groupChildren: true });
+    out.push({ to: "/admin/users", label: "All Users", icon: "users" });
+    out.push({ to: "/admin/users?category=consumer", label: "Consumers", icon: "users" });
+    out.push({ to: "/admin/users?category=merchant", label: "Business / Merchant", icon: "briefcase" });
+    out.push({ to: "/admin/users?category=employee", label: "Sarathi / Employee", icon: "users" });
+    out.push({ to: "/admin/users?category=agency_state_coordinator", label: "Agency: State Coordinator", icon: "users" });
+    out.push({ to: "/admin/users?category=agency_state", label: "Agency: State", icon: "users" });
+    out.push({ to: "/admin/users?category=agency_district_coordinator", label: "Agency: District Coordinator", icon: "users" });
+    out.push({ to: "/admin/users?category=agency_district", label: "Agency: District", icon: "users" });
+    out.push({ to: "/admin/users?category=agency_pincode_coordinator", label: "Agency: Pincode Coordinator", icon: "users" });
+    out.push({ to: "/admin/users?category=agency_pincode", label: "Agency: Pincode", icon: "users" });
+    out.push({ to: "/admin/users?category=agency_sub_franchise", label: "Agency: Sub Franchise", icon: "users" });
+
+    visibleGroups.forEach((g) => {
+      const items = (g.items || []).filter(filterItem);
+      if (!items.length) return;
+      out.push({ type: "section", label: g.label, collapsible: true, groupChildren: true });
+      // Attach badge counts to specific routes if available
+      out.push(
+        ...items.map((it) => {
+          if (typeof it?.to !== "string") return it;
+          if (it.to.startsWith("/admin/kyc")) return { ...it, badge: getBadgeFor("/admin/kyc") };
+          if (it.to.startsWith("/admin/withdrawals")) return { ...it, badge: getBadgeFor("/admin/withdrawals") };
+          return it;
+        })
+      );
     });
-  }, [visibleGroups, adminInfo, rbacPerms]);
 
-  function NavLink({ to, label, icon, compact, badge }) {
-    const active = isRouteActive(to);
-    const badgeVal = typeof badge === "number" ? badge : (badge ? Number(badge) : 0);
-    const showBadge = !!badgeVal && badgeVal > 0;
-    const badgeText = badgeVal > 99 ? "99+" : String(badgeVal);
-    return (
-      <Link
-        to={to}
-        title={label}
-        style={{
-          position: "relative",
-          display: "flex",
-          alignItems: "center",
-          gap: compact ? 0 : 10,
-          justifyContent: compact ? "center" : "flex-start",
-          padding: compact ? "10px 0" : "10px 12px",
-          borderRadius: 8,
-          color: active ? "#0ea5e9" : "#cbd5e1",
-          textDecoration: "none",
-          background: active ? "rgba(14,165,233,0.12)" : "transparent",
-          border: active ? "1px solid rgba(14,165,233,0.35)" : "1px solid transparent",
-        }}
-      >
-        <Icon name={icon} active={active} />
-        {!compact ? (
-          <>
-            <span style={{ fontWeight: active ? 700 : 600, fontSize: 14 }}>{label}</span>
-            {showBadge ? (
-              <span
-                aria-label="count"
-                style={{
-                  marginLeft: "auto",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  minWidth: 18,
-                  height: 18,
-                  padding: "0 6px",
-                  borderRadius: 999,
-                  background: "#ef4444",
-                  color: "#fff",
-                  fontSize: 11,
-                  fontWeight: 800,
-                  lineHeight: "18px",
-                }}
-              >
-                {badgeText}
-              </span>
-            ) : null}
-          </>
-        ) : null}
-        {compact && showBadge ? (
-          <span
-            aria-hidden="true"
-            style={{
-              position: "absolute",
-              top: 4,
-              right: 6,
-              minWidth: 16,
-              height: 16,
-              padding: "0 4px",
-              borderRadius: 999,
-              background: "#ef4444",
-              color: "#fff",
-              fontSize: 10,
-              fontWeight: 800,
-              lineHeight: "16px",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {badgeText}
-          </span>
-        ) : null}
-      </Link>
-    );
-  }
+    if (modelsErr) {
+      out.push({ type: "section", label: `Models: ${modelsErr}`, collapsible: false, groupChildren: false });
+    }
 
-  const headerHeightMobile = 56;
-  const sidebarWidthFull = 260;
-  const sidebarWidthMini = 72;
-  const sidebarGap = 20;
-  const topOffset = isMobile ? headerHeightMobile : 0;
-  const effectiveMini = !isMobile && mini;
-
-  // Helpers to compute group active/open
-  function groupHasActive(g) {
-    return g.items.some((it) => isRouteActive(it.to));
-  }
+    return out;
+  }, [adminInfo, rbacPerms, visibleGroups, modelsErr, metrics]);
 
   function getBadgeFor(to) {
     try {
@@ -669,252 +422,66 @@ export default function AdminShell({ children }) {
     }
   }
 
+  // ShellBase's isActive checks exact including query by default; for admin we want nested paths too.
+  const isActive = (to, location) => {
+    const toStr = String(to || "");
+    const toPath = toStr.split("?")[0];
+    if (toPath === "/admin/dashboard/models") return String(location.pathname || "").startsWith("/admin/dashboard/models");
+    return location.pathname === toPath || location.pathname.startsWith(toPath + "/") || `${location.pathname}${location.search}` === toStr;
+  };
+
+  const rightPill = useMemo(() => {
+    const who = adminInfo?.username ? String(adminInfo.username) : "Admin";
+    return (
+      <span
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "4px 10px",
+          borderRadius: 999,
+          border: "1px solid #e2e8f0",
+          background: "#f8fafc",
+          color: "#0f172a",
+          fontSize: 12,
+          fontWeight: 800,
+          whiteSpace: "nowrap",
+        }}
+        title={who}
+      >
+        {who}
+      </span>
+    );
+  }, [adminInfo]);
+
   return (
-    <div className="admin-scope" style={{ minHeight: "100vh", background: "#f1f5f9" }}>
-      {/* Top bar: shown only on mobile */}
-      {isMobile ? (
-        <div
-          style={{
-            position: "sticky",
-            top: 0,
-            zIndex: 30,
-            height: headerHeightMobile,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "0 12px",
-            borderBottom: "1px solid #e2e8f0",
-            background: "#ffffff",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <button
-              aria-label="Toggle sidebar"
-              onClick={() => setSidebarOpen((v) => !v)}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 36,
-                height: 36,
-                borderRadius: 8,
-                border: "1px solid #e2e8f0",
-                background: "#fff",
-                cursor: "pointer",
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <line x1="3" y1="6" x2="21" y2="6"></line>
-                <line x1="3" y1="12" x2="21" y2="12"></line>
-                <line x1="3" y1="18" x2="21" y2="18"></line>
-              </svg>
-            </button>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              <span style={{ fontWeight: 900, color: "#0f172a", fontSize: 18 }}>Admin</span>
-              <span style={{ color: "#64748b", fontSize: 12 }}>Control Panel</span>
-            </div>
+    <div className="admin-scope">
+      <ShellBase
+        title="Admin"
+        menu={menu}
+        isActive={isActive}
+        footerText={`© ${new Date().getFullYear()} Admin Console`}
+        rightHeaderContent={rightPill}
+        rootPaths={["/admin/dashboard", "/admin/users"]}
+        onBackFallbackPath="/admin/dashboard"
+      >
+        {authErr ? (
+          <div
+            style={{
+              marginBottom: 12,
+              padding: "10px 12px",
+              borderRadius: 8,
+              background: "#FEF2F2",
+              color: "#991B1B",
+              border: "1px solid #FCA5A5",
+            }}
+          >
+            {authErr}
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      {/* Backdrop for mobile drawer */}
-      {isMobile && sidebarOpen ? (
-        <div
-          onClick={() => setSidebarOpen(false)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(15,23,42,0.35)",
-            zIndex: 20,
-          }}
-        />
-      ) : null}
-
-      {/* Layout */}
-      <div style={{ display: "flex", alignItems: "stretch" }}>
-        {/* Sidebar: permanent on desktop, drawer on mobile */}
-        <aside
-          style={{
-            position: "fixed",
-            top: topOffset,
-            left: 0,
-            zIndex: 25,
-            width: isMobile ? (sidebarOpen ? sidebarWidthFull : 0) : (effectiveMini ? sidebarWidthMini : sidebarWidthFull),
-            minWidth: isMobile ? (sidebarOpen ? sidebarWidthFull : 0) : (effectiveMini ? sidebarWidthMini : sidebarWidthFull),
-            height: `calc(100dvh - ${topOffset}px)`,
-            overflowY: "auto",
-            overflowX: "hidden",
-            WebkitOverflowScrolling: "touch",
-            overscrollBehavior: "contain",
-            touchAction: "pan-y",
-            transition: isMobile ? "width 200ms ease, min-width 200ms ease" : "width 150ms ease, min-width 150ms ease",
-            background: "#0f172a",
-            borderRight: "1px solid #0b1220",
-            padding: isMobile && !sidebarOpen ? 0 : "12px",
-          }}
-        >
-          {isMobile && !sidebarOpen ? null : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {/* Desktop header inside sidebar */}
-              {!isMobile ? (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: effectiveMini ? "center" : "space-between", padding: "4px 4px 8px" }}>
-                  {!effectiveMini ? (
-                    <div style={{ color: "#cbd5e1", fontWeight: 900, fontSize: 14 }}>Admin Menu</div>
-                  ) : null}
-                  <button
-                    aria-label="Toggle mini sidebar"
-                    onClick={() => setMini((v) => !v)}
-                    title={effectiveMini ? "Expand sidebar" : "Collapse to icons"}
-                    style={{
-                      marginLeft: "auto",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      width: 32,
-                      height: 32,
-                      borderRadius: 8,
-                      border: "1px solid #0b1220",
-                      background: "#0c1427",
-                      cursor: "pointer",
-                    }}
-                  >
-                    {/* Simple chevron icon */}
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      {effectiveMini ? (
-                        <>
-                          <polyline points="9 18 15 12 9 6" />
-                        </>
-                      ) : (
-                        <>
-                          <polyline points="15 18 9 12 15 6" />
-                        </>
-                      )}
-                    </svg>
-                  </button>
-                </div>
-              ) : (
-                <div style={{ color: "#cbd5e1", fontWeight: 900, fontSize: 14, padding: "2px 4px 6px" }}>Admin Menu</div>
-              )}
-
-              {/* Always show Dashboard on top */}
-              <NavLink to="/admin/dashboard" label="Dashboard" icon="dashboard" compact={effectiveMini} badge={getBadgeFor("/admin/dashboard")} />
-
-              {/* In mini mode, flatten all links; in full mode, show collapsible groups */}
-              {effectiveMini ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {flatItems.map((it) => (
-                    <NavLink key={it.to} to={it.to} label={it.label} icon={it.icon} compact badge={getBadgeFor(it.to)} />
-                  ))}
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {visibleGroups.map((g) => {
-                    const active = groupHasActive(g);
-                    const open = isGroupOpen(g.key, active, effectiveMini);
-                    return (
-                      <div key={g.key} style={{}}>
-                        <button
-                          onClick={() => toggleGroup(g.key)}
-                          aria-expanded={open}
-                          style={{
-                            width: "100%",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            padding: "8px 10px",
-                            borderRadius: 8,
-                            border: "1px solid #0b1220",
-                            background: active ? "#0c1427" : "#0a1120",
-                            color: active ? "#93c5fd" : "#94a3b8",
-                            cursor: "pointer",
-                          }}
-                        >
-                          <span style={{ fontWeight: 700, fontSize: 12, letterSpacing: 0.2 }}>{g.label}</span>
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke={active ? "#93c5fd" : "#94a3b8"}
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 120ms ease" }}
-                            aria-hidden="true"
-                          >
-                            <polyline points="9 18 15 12 9 6" />
-                          </svg>
-                        </button>
-                        {open ? (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 6 }}>
-                            {(adminInfo && adminInfo.modules
-                              ? g.items.filter((it) => {
-                                  const mk = routeToModule(it.to);
-                                  const modOk = !mk || adminInfo.modules[mk];
-                                  if (!modOk) return false;
-                                  if (adminInfo?.is_superuser) return true;
-                                  const any = it?.rbacAnyOf;
-                                  if (!any || !Array.isArray(any) || any.length === 0) return true;
-                                  if (!Array.isArray(rbacPerms)) return false;
-                                  return any.some((c) => rbacPerms.includes(c));
-                                })
-                              : g.items.filter((it) => {
-                                  if (adminInfo?.is_superuser) return true;
-                                  const any = it?.rbacAnyOf;
-                                  if (!any || !Array.isArray(any) || any.length === 0) return true;
-                                  if (!Array.isArray(rbacPerms)) return false;
-                                  return any.some((c) => rbacPerms.includes(c));
-                                })
-                            ).map((it) => (
-                              <NavLink key={it.to} to={it.to} label={it.label} icon={it.icon} compact={false} badge={getBadgeFor(it.to)} />
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              <div style={{ marginTop: 8, borderTop: "1px solid #0b1220" }} />
-              <div style={{ color: "#64748b", fontSize: 11, padding: "8px 4px" }}>
-                © {new Date().getFullYear()} Admin Console
-              </div>
-            </div>
-          )}
-        </aside>
-
-        {/* Main content */}
-        <main
-          className="tk-main"
-          style={{
-            flex: 1,
-            minWidth: 0,
-            padding: isMobile ? 12 : 16,
-            marginLeft: isMobile ? 0 : ((effectiveMini ? sidebarWidthMini : sidebarWidthFull) + sidebarGap),
-            width: "100%",
-          }}
-        >
-          <div style={{ width: "100%", margin: "0 auto", maxWidth: 1400 }}>
-            {authErr ? (
-              <div
-                style={{
-                  marginBottom: 12,
-                  padding: "10px 12px",
-                  borderRadius: 8,
-                  background: "#FEF2F2",
-                  color: "#991B1B",
-                  border: "1px solid #FCA5A5",
-                }}
-              >
-                {authErr}
-              </div>
-            ) : null}
-            {children}
-          </div>
-        </main>
-      </div>
+        {children}
+      </ShellBase>
     </div>
   );
 }
-

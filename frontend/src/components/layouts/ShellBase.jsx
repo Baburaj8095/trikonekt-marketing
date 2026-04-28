@@ -11,7 +11,7 @@ import { useCartStore } from "../../store/cartStore";
  *
  * Props:
  * - title: string (used in mobile header and sidebar title)
- * - menu: Array<{ to: string; label: string; icon?: string }>
+ * - menu: Array<{ to: string; label: string; icon?: string; badge?: number|string }>
  * - isActive?: (to: string, location: ReturnType<useLocation>) => boolean
  * - onLogout?: () => void (if provided, Logout button is shown in sidebar footer)
  * - footerText?: string
@@ -211,8 +211,11 @@ export default function ShellBase({
   const cartItems = useCartStore((s) => s.items);
   const cartCount = Array.isArray(cartItems) ? cartItems.reduce((sum, i) => sum + (i.qty || 0), 0) : 0;
 
-  function NavLink({ to, label, icon }) {
+  function NavLink({ to, label, icon, badge }) {
     const active = activeCheck(to, loc);
+    const badgeVal = typeof badge === "number" ? badge : (badge ? Number(badge) : 0);
+    const showBadge = Number.isFinite(badgeVal) && badgeVal > 0;
+    const badgeText = badgeVal > 99 ? "99+" : String(badgeVal);
     return (
       <Link
         to={to}
@@ -233,7 +236,31 @@ export default function ShellBase({
         }}
       >
         {icon ? <Icon name={icon} active={active} /> : null}
-        <span style={{ fontWeight: active ? 700 : 600, fontSize: 14 }}>{label}</span>
+        <span style={{ fontWeight: active ? 700 : 600, fontSize: 14, flex: 1, minWidth: 0 }}>{label}</span>
+        {showBadge ? (
+          <span
+            aria-label="count"
+            style={{
+              marginLeft: 8,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              minWidth: 18,
+              height: 18,
+              padding: "0 6px",
+              borderRadius: 999,
+              background: "#ef4444",
+              color: "#fff",
+              fontSize: 11,
+              fontWeight: 800,
+              lineHeight: "18px",
+              flexShrink: 0,
+            }}
+            title={badgeText}
+          >
+            {badgeText}
+          </span>
+        ) : null}
       </Link>
     );
   }
@@ -536,6 +563,7 @@ export default function ShellBase({
                                 to={c.to}
                                 label={c.label}
                                 icon={c.icon}
+                                badge={c.badge}
                               />
                             ))}
                           </div>
@@ -552,6 +580,7 @@ export default function ShellBase({
                       to={it.to}
                       label={it.label}
                       icon={it.icon}
+                      badge={it.badge}
                     />
                   );
                 }

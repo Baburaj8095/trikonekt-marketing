@@ -653,6 +653,32 @@ export default function AdminWithdrawals() {
                     <div style={{ fontSize: 11, color: "#64748b" }}>Requested</div>
                     <div style={{ fontSize: 13, color: "#0f172a" }}>{formatDateTime(r.requested_at)}</div>
                   </div>
+
+                  {/* Extra details (if present in API response) */}
+                  {r?.phone ? (
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <div style={{ fontSize: 11, color: "#64748b" }}>Phone</div>
+                      <div style={{ fontSize: 13, color: "#0f172a" }}>{r.phone}</div>
+                    </div>
+                  ) : null}
+                  {r?.pincode ? (
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <div style={{ fontSize: 11, color: "#64748b" }}>Pincode</div>
+                      <div style={{ fontSize: 13, color: "#0f172a" }}>{r.pincode}</div>
+                    </div>
+                  ) : null}
+                  {r?.bank_account_number || r?.account_number ? (
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <div style={{ fontSize: 11, color: "#64748b" }}>Bank Account</div>
+                      <div style={{ fontSize: 13, color: "#0f172a" }}>{r.bank_account_number || r.account_number}</div>
+                    </div>
+                  ) : null}
+                  {r?.ifsc_code || r?.ifsc ? (
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <div style={{ fontSize: 11, color: "#64748b" }}>IFSC</div>
+                      <div style={{ fontSize: 13, color: "#0f172a" }}>{r.ifsc_code || r.ifsc}</div>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -699,7 +725,7 @@ export default function AdminWithdrawals() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "80px 160px 1.2fr 120px 120px 110px 130px 180px 220px",
+                  gridTemplateColumns: "80px 160px 1.2fr 140px 120px 120px 160px 110px 130px 180px 220px",
                   gap: 8,
                   padding: 12,
                   background: "#f8fafc",
@@ -712,8 +738,11 @@ export default function AdminWithdrawals() {
                 <div>ID</div>
                 <div>User</div>
                 <div>Name</div>
+                <div>Phone</div>
                 <div>Amount</div>
                 <div>Method</div>
+                <div>Bank / IFSC</div>
+                <div>Pincode</div>
                 <div>Tax %</div>
                 <div>Final</div>
                 <div>Status</div>
@@ -732,7 +761,7 @@ export default function AdminWithdrawals() {
                       key={r.id}
                       style={{
                         display: "grid",
-                        gridTemplateColumns: "80px 160px 1.2fr 120px 120px 110px 130px 180px 220px",
+                        gridTemplateColumns: "80px 160px 1.2fr 140px 120px 120px 160px 110px 130px 180px 220px",
                         gap: 8,
                         padding: 12,
                         borderBottom: "1px solid #e2e8f0",
@@ -743,8 +772,20 @@ export default function AdminWithdrawals() {
                       <div style={{ color: "#0f172a", fontWeight: 700 }}>{r.id}</div>
                       <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.username}</div>
                       <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.full_name || ""}</div>
+                      <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.phone || ""}</div>
                       <div style={{ fontWeight: 700 }}>₹{Number(r.amount || 0).toFixed(2)}</div>
                       <div>{r.method?.toUpperCase?.() || ""}</div>
+                      <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {(r.bank_account_number || r.account_number) ? (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                            <span style={{ fontWeight: 700 }}>{r.bank_account_number || r.account_number}</span>
+                            <span style={{ color: "#64748b", fontSize: 12 }}>{r.ifsc_code || r.ifsc || ""}</span>
+                          </div>
+                        ) : (
+                          <span style={{ color: "#94a3b8" }}>—</span>
+                        )}
+                      </div>
+                      <div>{r.pincode || ""}</div>
                       <div>{Number(taxLabel).toFixed(2)}%</div>
                       <div style={{ fontWeight: 800 }}>₹{Number(net || 0).toFixed(2)}</div>
                       <div>{statusBadge}</div>
@@ -784,6 +825,7 @@ export default function AdminWithdrawals() {
     </div>
   );
 }
+
 
 
 

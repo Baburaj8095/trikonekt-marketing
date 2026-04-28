@@ -866,6 +866,7 @@ class AdminWithdrawalSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source="user.username", read_only=True)
     full_name = serializers.CharField(source="user.full_name", read_only=True)
     phone = serializers.CharField(source="user.phone", read_only=True)
+    pincode = serializers.CharField(source="user.pincode", read_only=True)
 
     class Meta:
         model = WithdrawalRequest
@@ -875,6 +876,7 @@ class AdminWithdrawalSerializer(serializers.ModelSerializer):
             "username",
             "full_name",
             "phone",
+            "pincode",
             "amount",
             "method",
             "upi_id",
