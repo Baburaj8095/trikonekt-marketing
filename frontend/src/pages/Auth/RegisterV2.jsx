@@ -76,12 +76,24 @@ const RegisterV2 = () => {
   }, [location.search]);
 
   // Role handling
+  // Public registration must only allow Consumer registration.
+  // Agency/Franchise registrations are created only from AdminUsers via:
+  //   /auth/register-v2/agency?admin=1&agency_level=...
+  // so we keep the agency implementation but hide it by default.
   const ALLOWED_ROLES = ["user", "agency", "employee", "business"];
   const lockedRole = ALLOWED_ROLES.includes(String(roleParam || "").toLowerCase())
     ? String(roleParam).toLowerCase()
     : null;
   const [role, setRole] = useState(lockedRole || "user");
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // If this is a public register route (no admin override), force Consumer.
+  // This ensures the registration page shows only Consumer registration.
+  useEffect(() => {
+    if (!allowAgencyOverride && role !== "user") {
+      setRole("user");
+    }
+  }, [allowAgencyOverride, role]);
 
   // Form + auth states
   const [formData, setFormData] = useState({
@@ -1185,6 +1197,8 @@ const mapUIRoleToCategory = () => {
 
   const handleRoleChange = (_, v) => {
     if (lockedRole) return;
+    // Public registration: Consumer only
+    if (!allowAgencyOverride) return;
     if (v) setRole(v);
   };
   const handleChange = (e) => {
@@ -1197,6 +1211,12 @@ const mapUIRoleToCategory = () => {
     }
   };
   const handleSetRole = (r) => {
+    // Public registration: Consumer only
+    if (!allowAgencyOverride && String(r).toLowerCase() !== "user") {
+      setRole("user");
+      setDrawerOpen(false);
+      return;
+    }
     setRole(r);
     try {
       const params = new URLSearchParams(location.search || "");

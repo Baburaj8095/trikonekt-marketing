@@ -128,6 +128,7 @@ import RankUpgrade from "./pages/RankUpgrade";
 import AdminRankUpgrades from "./pages/admin/AdminRankUpgrades";
 import UploadToWallet from "./pages/UploadToWallet";
 import TeamWallet from "./screens/TeamWallet";
+import FranchiseDashboard from "./components/franchise/FranchiseDashboard";
 
 function LegacyAuthEntry() {
   const location = useLocation();
@@ -218,6 +219,21 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* Franchise (Geo agency) Routes */}
+        <Route
+          path="/franchise/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <FranchiseDashboard />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Franchise main entry */}
+        <Route path="/franchise" element={<Navigate to="/franchise/dashboard" replace />} />
 
        
         <Route

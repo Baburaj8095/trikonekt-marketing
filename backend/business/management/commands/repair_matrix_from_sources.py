@@ -199,6 +199,15 @@ class Command(BaseCommand):
             ),
         )
 
+        parser.add_argument(
+            "--include-ineligible-users",
+            action="store_true",
+            help=(
+                "Include source events for users that are NOT matrix-eligible (non-consumer/agency/business/etc) in the expected-seat calculation. "
+                "By default, ineligible users are excluded so the reported 'Missing seats' reflects only seats that can actually be created."
+            ),
+        )
+
     def _is_postgres(self) -> bool:
         try:
             return connection.vendor == "postgresql"
@@ -455,6 +464,7 @@ class Command(BaseCommand):
         cleanup_prime750_dupes = bool(options.get("cleanup_prime750_duplicates"))
         normalize_tags = bool(options.get("normalize_source_tags"))
         normalize_tags_sql = bool(options.get("normalize_source_tags_sql"))
+        include_ineligible_users = bool(options.get("include_ineligible_users"))
 
         from business.models import PromoPurchase
         from accounts.models import WalletTransaction
@@ -642,11 +652,63 @@ class Command(BaseCommand):
             return
 
         expected = list(dict.fromkeys(expected))  # stable de-dupe
+
+        # Filter out non-matrix-eligible users by default.
+        # Otherwise the command reports "Missing seats" that can never be created because _create_seat()
+        # intentionally refuses to place seats for non-consumer/agency/business roles.
+        from accounts.models import CustomUser
+        from business.models import is_matrix_eligible
+
+        all_user_ids = sorted(set(int(s.user_id) for s in expected if int(s.user_id) > 0))
+        users_by_id_all: Dict[int, object] = {}
+        eligible_user_ids: Set[int] = set()
+        ineligible_user_ids: Set[int] = set()
+        if all_user_ids:
+            for u in CustomUser.objects.filter(id__in=all_user_ids).only(
+                "id", "username", "role", "category", "is_staff", "is_superuser", "account_active"
+            ):
+                users_by_id_all[int(u.id)] = u
+            for uid in all_user_ids:
+                u = users_by_id_all.get(int(uid))
+                if u and is_matrix_eligible(u):
+                    eligible_user_ids.add(int(uid))
+                else:
+                    ineligible_user_ids.add(int(uid))
+
+        ineligible_seats = [s for s in expected if int(s.user_id) in ineligible_user_ids]
+        eligible_expected = expected if include_ineligible_users else [s for s in expected if int(s.user_id) in eligible_user_ids]
+
         self.stdout.write(
             self.style.NOTICE(
-                f"Expected seats from sources: {len(expected)} (mode={'APPLY' if do_apply else 'DRY-RUN'})"
+                "Expected seats from sources: "
+                + str(len(expected))
+                + f" (eligible={len(eligible_expected)} skipped_ineligible={len(ineligible_seats)} mode={'APPLY' if do_apply else 'DRY-RUN'})"
             )
         )
+
+        if (not include_ineligible_users) and ineligible_seats:
+            # Print a small report so ops can fix category/role mismatches in user records.
+            by_user: DefaultDict[int, int] = defaultdict(int)
+            for s in ineligible_seats:
+                by_user[int(s.user_id)] += 1
+            self.stdout.write("")
+            self.stdout.write(self.style.WARNING("Ineligible source events skipped (not matrix-eligible users)"))
+            self.stdout.write(f"  users : {len(by_user)}")
+            self.stdout.write(f"  seats : {len(ineligible_seats)}")
+            shown = 0
+            for uid, ct in sorted(by_user.items(), key=lambda x: (-x[1], x[0])):
+                if shown >= 10:
+                    break
+                u = users_by_id_all.get(int(uid))
+                self.stdout.write(
+                    f"  user_id={uid} username={getattr(u,'username','')} role={getattr(u,'role','')} category={getattr(u,'category','')} skipped_seats={ct}"
+                )
+                shown += 1
+            if len(by_user) > shown:
+                self.stdout.write(f"  ... and {len(by_user) - shown} more")
+
+        # Continue using eligible_expected for all subsequent calculations.
+        expected = eligible_expected
 
         # Bulk prefetch existing active seats for involved users to avoid per-seat DB .exists() calls.
         from business.models import AutoPoolAccount
@@ -791,12 +853,10 @@ class Command(BaseCommand):
             return
 
         # Preload users to avoid per-seat user queries.
-        from accounts.models import CustomUser
-
         users_by_id: Dict[int, object] = {}
         if user_ids:
             for u in CustomUser.objects.filter(id__in=user_ids).only(
-                "id", "username", "category", "is_staff", "is_superuser"
+                "id", "username", "category", "role", "is_staff", "is_superuser", "account_active"
             ):
                 users_by_id[int(u.id)] = u
 
