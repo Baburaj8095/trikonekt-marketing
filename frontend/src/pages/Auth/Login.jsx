@@ -1346,11 +1346,16 @@ const Login = () => {
         if (!tokenRole) throw new Error("Token missing role claim");
 
         // Determine effective app namespace from token role/category
+        // IMPORTANT: Some legacy agency accounts may have role="user" but category="agency_*".
+        // For routing/storage we must treat those as agency.
+        const catLower = String(payload?.category || "").toLowerCase();
         const roleEffective =
           payload?.role_effective ||
-          (String(payload?.category || "").toLowerCase() === "business" ? "business" : tokenRole);
+          (catLower === "business" || catLower === "merchant" ? "business" : tokenRole);
 
-        const ns = (payload?.is_staff || payload?.is_superuser) ? "admin" : (roleEffective || tokenRole || "user");
+        const isAdmin = Boolean(payload?.is_staff || payload?.is_superuser);
+        const isAgencyActor = String(tokenRole || "").toLowerCase() === "agency" || catLower.startsWith("agency_") || catLower === "company" || catLower === "company_manager";
+        const ns = isAdmin ? "admin" : (isAgencyActor ? "agency" : (roleEffective || tokenRole || "user"));
         const store = localStorage;
 
         // Clean legacy non-namespaced keys to avoid cross-role collisions
@@ -1366,6 +1371,7 @@ const Login = () => {
         } catch (_) {}
 
         // Persist login context chosen by the user (consumer | team)
+        // Franchise/agency namespace still stores this key for compatibility, but remains "team" for this screen.
         try {
           store.setItem(`login_context_${ns}`, loginContext === "team" ? "team" : "consumer");
         } catch (_) {}
@@ -1426,7 +1432,9 @@ const Login = () => {
               setErrorMsg("This account is not allowed for Franchise Login.");
               return;
             }
-            navigate(`/franchise/dashboard`, { replace: true });
+            // Keep agency login behavior under /agency/*.
+            // We expose the new franchise UI screens inside the agency area.
+            navigate(`/agency/franchise-dashboard`, { replace: true });
             return;
           }
 

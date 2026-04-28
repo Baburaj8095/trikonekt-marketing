@@ -370,7 +370,7 @@ function FranchiseDashboard() {
                     </IconButton>
 
                     <IconButton
-                      onClick={() => navigate("/user/franchise-wallet")}
+                      onClick={() => navigate("/agency/franchise-wallet")}
                       sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "white" }}
                     >
                       <CurrencyRupeeRoundedIcon />

@@ -129,6 +129,9 @@ import AdminRankUpgrades from "./pages/admin/AdminRankUpgrades";
 import UploadToWallet from "./pages/UploadToWallet";
 import TeamWallet from "./screens/TeamWallet";
 import FranchiseDashboard from "./components/franchise/FranchiseDashboard";
+import FranchiseWalletPlaceholder from "./components/franchise/FranchiseWalletPlaceholder";
+import TransactionHistory from "./components/franchise/pages/TransactionHistory";
+import WithdrawalHistory from "./components/franchise/pages/WithdrawalHistory";
 
 function LegacyAuthEntry() {
   const location = useLocation();
@@ -227,6 +230,48 @@ function App() {
             <ProtectedRoute allowedRoles={["agency"]}>
               <AgencyShell>
                 <FranchiseDashboard />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Agency - Franchise screens (new UI, kept inside the existing /agency area) */}
+        <Route
+          path="/agency/franchise-dashboard"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <FranchiseDashboard />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agency/franchise-wallet"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <FranchiseWalletPlaceholder />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agency/transactions"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <TransactionHistory />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agency/withdrawals"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <WithdrawalHistory />
               </AgencyShell>
             </ProtectedRoute>
           }

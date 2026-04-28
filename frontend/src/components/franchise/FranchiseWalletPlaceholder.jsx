@@ -425,8 +425,8 @@ const MobileWalletRowCard = ({
 export default function FranchiseWalletPlaceholder() {
   const navigate = useNavigate();
   const actionRoutes = {
-  "Transaction History": "/user/transactions",
-  "Withdrawal History": "/user/withdrawals",
+  "Transaction History": "/agency/transactions",
+  "Withdrawal History": "/agency/withdrawals",
 };
   const location = useLocation();
   const theme = useTheme();
@@ -434,9 +434,9 @@ export default function FranchiseWalletPlaceholder() {
 
   const backTarget = useMemo(
     () =>
-      location.pathname.startsWith("/user/")
-        ? "/user/franchise-dashboard"
-        : "/demo/franchise-dashboard",
+      location.pathname.startsWith("/agency/")
+        ? "/agency/dashboard"
+        : "/agency/dashboard",
     [location.pathname]
   );
 
