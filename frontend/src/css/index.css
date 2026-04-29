@@ -184,6 +184,8 @@ a {
   }
 }
 
-.MuiGrid-item {
-  width: 100% !important;
-}
+/* IMPORTANT:
+   Do NOT globally force all MUI Grid items to width:100%.
+   This breaks responsive grids (e.g., dashboards with xs=6, sm=4 etc.).
+   If a specific screen needs full-width enforcement, scope the CSS to that screen.
+*/

@@ -219,6 +219,7 @@ export default function AdminShell({ children }) {
       return "promo";
     if (to.startsWith("/admin/notifications")) return "support";
     if (to.startsWith("/admin/franchise/")) return "promo";
+    if (to.startsWith("/admin/team-consumer/")) return "promo";
     return null;
   }
 
@@ -304,6 +305,15 @@ export default function AdminShell({ children }) {
         items: [
           { to: "/admin/franchise/achievers", label: "Achievers", icon: "users" },
           { to: "/admin/franchise/wishing-banners", label: "Wishing Banners", icon: "box" },
+        ],
+      },
+
+      {
+        key: "team_consumer",
+        label: "Team / Consumer",
+        items: [
+          { to: "/admin/team-consumer/wishing-banners", label: "Wishing Banners", icon: "box" },
+          { to: "/admin/team-consumer/top-achievers", label: "Top Achievers", icon: "users" },
         ],
       },
       {

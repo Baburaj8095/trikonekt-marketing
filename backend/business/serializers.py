@@ -8,6 +8,8 @@ from .models import (
     MerchantSubCategory,
     FranchiseAchiever,
     WishingBanner,
+    TeamConsumerWishingBanner,
+    TeamConsumerTopAchiever,
 )
 from locations.models import Country, State, City
 
@@ -61,6 +63,56 @@ class WishingBannerSerializer(serializers.ModelSerializer):
             if not getattr(obj, "image", None):
                 return None
             return obj.image.url
+        except Exception:
+            return None
+
+
+class TeamConsumerWishingBannerSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TeamConsumerWishingBanner
+        fields = [
+            "id",
+            "title",
+            "image",
+            "image_url",
+            "is_active",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at", "image_url"]
+
+    def get_image_url(self, obj):
+        try:
+            f = getattr(obj, "image", None)
+            return f.url if f else None
+        except Exception:
+            return None
+
+
+class TeamConsumerTopAchieverSerializer(serializers.ModelSerializer):
+    photo_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TeamConsumerTopAchiever
+        fields = [
+            "id",
+            "name",
+            "achieved",
+            "sort_order",
+            "is_active",
+            "photo",
+            "photo_url",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at", "photo_url"]
+
+    def get_photo_url(self, obj):
+        try:
+            f = getattr(obj, "photo", None)
+            return f.url if f else None
         except Exception:
             return None
 

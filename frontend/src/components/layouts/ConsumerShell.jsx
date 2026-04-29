@@ -42,9 +42,13 @@ export default function ConsumerShell({ children }) {
 
   const menu = useMemo(() => {
     // Team Login should only see:
-    // kyc, team-wallet, history, support, withdrawal, genealogy-5, upload to wallet.
+    // team-dashboard, profile, join prime, rank upgrade + essentials.
     if (isTeamLogin) {
       return [
+        { to: "/user/team-dashboard", label: "Dashboard", icon: "dashboard" },
+        { to: "/user/profile", label: "Profile", icon: "users" },
+        { to: "/user/promo-packages", label: "Join Prime", icon: "star" },
+        { to: "/user/dashboard/upgrade", label: "Rank Upgrade", icon: "wallet" },
         { to: "/user/genealogy-5", label: "Genealogy Tree", icon: "tree" },
         { to: "/user/kyc", label: "KYC", icon: "shield" },
         { to: "/user/team-wallet", label: "Team Wallet", icon: "wallet" },
@@ -104,8 +108,8 @@ export default function ConsumerShell({ children }) {
       isActive={isActive}
       onLogout={onLogout}
       footerText={`Logged in as: ${displayName}`}
-      rootPaths={isTeamLogin ? ["/user/genealogy-5"] : ["/user/dashboard"]}
-      onBackFallbackPath={isTeamLogin ? "/user/genealogy-5" : "/user/dashboard"}
+      rootPaths={isTeamLogin ? ["/user/team-dashboard"] : ["/user/dashboard"]}
+      onBackFallbackPath={isTeamLogin ? "/user/team-dashboard" : "/user/dashboard"}
     >
       {children}
     </ShellBase>

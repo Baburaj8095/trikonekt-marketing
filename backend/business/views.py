@@ -29,6 +29,8 @@ from .models import (
     AgencyPackagePaymentRequest,
     FranchiseAchiever,
     WishingBanner,
+    TeamConsumerWishingBanner,
+    TeamConsumerTopAchiever,
 )
 from .serializers import (
     BusinessRegistrationSerializer,
@@ -38,6 +40,8 @@ from .serializers import (
     AgencyPackagePaymentRequestSerializer,
     FranchiseAchieverSerializer,
     WishingBannerSerializer,
+    TeamConsumerWishingBannerSerializer,
+    TeamConsumerTopAchieverSerializer,
 )
 
 
@@ -229,27 +233,84 @@ class FranchiseAchieversPublicView(APIView):
 
 
 class AdminFranchiseAchieverListCreateView(generics.ListCreateAPIView):
-    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess]
+    # Admin UI route: /admin/franchise/* is gated under the "promo" module in frontend.
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("promo")]
     serializer_class = FranchiseAchieverSerializer
     queryset = FranchiseAchiever.objects.all().order_by("sort_order", "-created_at", "id")
 
 
 class AdminFranchiseAchieverDetailView(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess]
+    # Admin UI route: /admin/franchise/* is gated under the "promo" module in frontend.
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("promo")]
     serializer_class = FranchiseAchieverSerializer
     queryset = FranchiseAchiever.objects.all()
 
 
 class AdminWishingBannerListCreateView(generics.ListCreateAPIView):
-    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess]
+    # Admin UI route: /admin/franchise/* is gated under the "promo" module in frontend.
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("promo")]
     serializer_class = WishingBannerSerializer
     queryset = WishingBanner.objects.all().order_by("-created_at", "-id")
 
 
 class AdminWishingBannerDetailView(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess]
+    # Admin UI route: /admin/franchise/* is gated under the "promo" module in frontend.
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("promo")]
     serializer_class = WishingBannerSerializer
     queryset = WishingBanner.objects.all()
+
+
+# ==========================================
+# Team/Consumer dashboard: public + admin CRUD
+# ==========================================
+class TeamConsumerWishingBannersPublicView(APIView):
+    """Consumer-facing endpoint to fetch active wishing banners for team dashboard."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        qs = TeamConsumerWishingBanner.objects.filter(is_active=True).order_by("-created_at", "-id")
+        ser = TeamConsumerWishingBannerSerializer(qs, many=True, context={"request": request})
+        return Response({"results": ser.data}, status=status.HTTP_200_OK)
+
+
+class TeamConsumerTopAchieversPublicView(APIView):
+    """Consumer-facing endpoint to fetch active top achievers for team dashboard."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        qs = TeamConsumerTopAchiever.objects.filter(is_active=True).order_by("sort_order", "-created_at", "id")
+        ser = TeamConsumerTopAchieverSerializer(qs, many=True, context={"request": request})
+        return Response({"results": ser.data}, status=status.HTTP_200_OK)
+
+
+class AdminTeamConsumerWishingBannerListCreateView(generics.ListCreateAPIView):
+    # Admin UI route: /admin/team-consumer/* is gated under the "promo" module in frontend.
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("promo")]
+    serializer_class = TeamConsumerWishingBannerSerializer
+    queryset = TeamConsumerWishingBanner.objects.all().order_by("-created_at", "-id")
+
+
+class AdminTeamConsumerWishingBannerDetailView(generics.RetrieveUpdateDestroyAPIView):
+    # Admin UI route: /admin/team-consumer/* is gated under the "promo" module in frontend.
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("promo")]
+    serializer_class = TeamConsumerWishingBannerSerializer
+    queryset = TeamConsumerWishingBanner.objects.all()
+
+
+class AdminTeamConsumerTopAchieverListCreateView(generics.ListCreateAPIView):
+    # Admin UI route: /admin/team-consumer/* is gated under the "promo" module in frontend.
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("promo")]
+    serializer_class = TeamConsumerTopAchieverSerializer
+    queryset = TeamConsumerTopAchiever.objects.all().order_by("sort_order", "-created_at", "id")
+
+
+class AdminTeamConsumerTopAchieverDetailView(generics.RetrieveUpdateDestroyAPIView):
+    # Admin UI route: /admin/team-consumer/* is gated under the "promo" module in frontend.
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("promo")]
+    serializer_class = TeamConsumerTopAchieverSerializer
+    queryset = TeamConsumerTopAchiever.objects.all()
 
 logger = logging.getLogger(__name__)
 

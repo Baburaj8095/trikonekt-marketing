@@ -1438,10 +1438,10 @@ const Login = () => {
             return;
           }
 
-          // Team login should land on Genealogy-5 screen.
+          // Team login should land on the Team Dashboard screen.
           // This is still under the consumer/user namespace.
           if (loginMode === "team") {
-            navigate(`/user/genealogy-5`, { replace: true });
+            navigate(`/user/team-dashboard`, { replace: true });
             return;
           }
 

@@ -1842,6 +1842,47 @@ class WishingBanner(models.Model):
         return self.title or f"WishingBanner#{self.pk}"
 
 
+# ======================================
+# Team/Consumer Dashboard (Admin managed)
+# ======================================
+class TeamConsumerWishingBanner(models.Model):
+    """Admin-managed wishing banner images for Team/Consumer dashboard."""
+
+    title = models.CharField(max_length=180, blank=True, default="")
+    image = models.ImageField(upload_to="team_consumer/wishing_banners/", null=True, blank=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        verbose_name = "Team/Consumer Wishing Banner"
+        verbose_name_plural = "Team/Consumer Wishing Banners"
+
+    def __str__(self):
+        return self.title or f"TeamConsumerWishingBanner#{self.pk}"
+
+
+class TeamConsumerTopAchiever(models.Model):
+    """Admin-managed top achievers displayed in Team/Consumer dashboard."""
+
+    name = models.CharField(max_length=180, blank=True, default="")
+    achieved = models.CharField(max_length=220, blank=True, default="")
+    sort_order = models.IntegerField(default=0, db_index=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    photo = models.ImageField(upload_to="team_consumer/top_achievers/", null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["sort_order", "-created_at", "id"]
+        verbose_name = "Team/Consumer Top Achiever"
+        verbose_name_plural = "Team/Consumer Top Achievers"
+
+    def __str__(self):
+        return self.name or f"TeamConsumerTopAchiever#{self.pk}"
+
+
 class AgencyPackageAssignment(models.Model):
     """
     Assign a Package to an Agency (CustomUser with role/category agency_*).

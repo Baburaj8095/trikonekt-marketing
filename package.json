@@ -1,0 +1,11 @@
+{
+  "name": "trikonekt-marketing",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "frontend:start": "npm --prefix frontend run start",
+    "frontend:build": "npm --prefix frontend run build"
+  }
+}

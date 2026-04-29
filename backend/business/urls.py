@@ -51,6 +51,14 @@ from .views import (
     AdminFranchiseAchieverDetailView,
     AdminWishingBannerListCreateView,
     AdminWishingBannerDetailView,
+
+    # Team/Consumer dashboard banners + achievers
+    TeamConsumerWishingBannersPublicView,
+    TeamConsumerTopAchieversPublicView,
+    AdminTeamConsumerWishingBannerListCreateView,
+    AdminTeamConsumerWishingBannerDetailView,
+    AdminTeamConsumerTopAchieverListCreateView,
+    AdminTeamConsumerTopAchieverDetailView,
 )
 
 urlpatterns = [
@@ -117,4 +125,16 @@ urlpatterns = [
     path('admin/franchise/achievers/<int:pk>/', AdminFranchiseAchieverDetailView.as_view(), name='admin_franchise_achiever_detail'),
     path('admin/franchise/wishing-banners/', AdminWishingBannerListCreateView.as_view(), name='admin_franchise_wishing_banners'),
     path('admin/franchise/wishing-banners/<int:pk>/', AdminWishingBannerDetailView.as_view(), name='admin_franchise_wishing_banner_detail'),
+
+    # ==========================
+    # Team/Consumer Dashboard helpers
+    # ==========================
+    path('team-consumer/wishing-banners/', TeamConsumerWishingBannersPublicView.as_view(), name='team_consumer_wishing_banners'),
+    path('team-consumer/top-achievers/', TeamConsumerTopAchieversPublicView.as_view(), name='team_consumer_top_achievers'),
+
+    # Admin CRUD (Team/Consumer)
+    path('admin/team-consumer/wishing-banners/', AdminTeamConsumerWishingBannerListCreateView.as_view(), name='admin_team_consumer_wishing_banners'),
+    path('admin/team-consumer/wishing-banners/<int:pk>/', AdminTeamConsumerWishingBannerDetailView.as_view(), name='admin_team_consumer_wishing_banner_detail'),
+    path('admin/team-consumer/top-achievers/', AdminTeamConsumerTopAchieverListCreateView.as_view(), name='admin_team_consumer_top_achievers'),
+    path('admin/team-consumer/top-achievers/<int:pk>/', AdminTeamConsumerTopAchieverDetailView.as_view(), name='admin_team_consumer_top_achiever_detail'),
 ]

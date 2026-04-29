@@ -39,6 +39,8 @@ import AdminKYC from "./pages/admin/AdminKYC";
 import AdminWithdrawals from "./pages/admin/AdminWithdrawals";
 import AdminFranchiseAchievers from "./pages/admin/AdminFranchiseAchievers";
 import AdminFranchiseWishingBanners from "./pages/admin/AdminFranchiseWishingBanners";
+import AdminTeamConsumerWishingBanners from "./pages/admin/AdminTeamConsumerWishingBanners";
+import AdminTeamConsumerTopAchievers from "./pages/admin/AdminTeamConsumerTopAchievers";
 import AdminMatrixFive from "./pages/admin/AdminMatrixFive";
 import AdminMatrixThree from "./pages/admin/AdminMatrixThree";
 import AdminAutopool from "./pages/admin/AdminAutopool";
@@ -130,6 +132,7 @@ import RankUpgrade from "./pages/RankUpgrade";
 import AdminRankUpgrades from "./pages/admin/AdminRankUpgrades";
 import UploadToWallet from "./pages/UploadToWallet";
 import TeamWallet from "./screens/TeamWallet";
+import TeamDashboard from "./pages/team/TeamDashboard";
 import FranchiseDashboard from "./components/franchise/FranchiseDashboard";
 import FranchiseWalletPlaceholder from "./components/franchise/FranchiseWalletPlaceholder";
 import TransactionHistory from "./components/franchise/pages/TransactionHistory";
@@ -411,6 +414,17 @@ function App() {
             <ProtectedRoute allowedRoles={["user"]}>
               <ConsumerShell>
                 <Genealogy5 />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/user/team-dashboard"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <TeamDashboard />
               </ConsumerShell>
             </ProtectedRoute>
           }
@@ -1082,27 +1096,49 @@ function App() {
           }
         />
 
-          {/* Franchise: Admin-managed achievers + wishing banners */}
-          <Route
-            path="/admin/franchise/achievers"
-            element={
-              <AdminProtectedRoute>
-                <AdminShell>
-                  <AdminFranchiseAchievers />
-                </AdminShell>
-              </AdminProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/franchise/wishing-banners"
-            element={
-              <AdminProtectedRoute>
-                <AdminShell>
-                  <AdminFranchiseWishingBanners />
-                </AdminShell>
-              </AdminProtectedRoute>
-            }
-          />
+        {/* Franchise: Admin-managed achievers + wishing banners */}
+        <Route
+          path="/admin/franchise/achievers"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminFranchiseAchievers />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/franchise/wishing-banners"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminFranchiseWishingBanners />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+
+        {/* Team/Consumer: Admin-managed wishing banners + top achievers */}
+        <Route
+          path="/admin/team-consumer/wishing-banners"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminTeamConsumerWishingBanners />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/team-consumer/top-achievers"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminTeamConsumerTopAchievers />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
         <Route
           path="/admin/matrix"
           element={
