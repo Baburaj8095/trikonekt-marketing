@@ -37,6 +37,7 @@ import PlayCircleOutlineRoundedIcon from "@mui/icons-material/PlayCircleOutlineR
 import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded";
 import AddShoppingCartRoundedIcon from "@mui/icons-material/AddShoppingCartRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import GiftCardCarousel from "../../components/business/GiftCardCarousel";
 
 const UI = {
   bg: "#dbe8fb",
@@ -1165,13 +1166,9 @@ function BusinessDashboard() {
           <Box id="tri-gift-section">
             <SectionShell
               title="Tri Gift Card"
-              subtitle="Footer-linked gift card access section"
+              subtitle="Purchase digital gift cards from top brands"
             >
-              <QuickAccessCard
-                title="Tri Gift Card"
-                description="This area is directly accessible from the footer for gift-card related actions."
-                buttonLabel="Open Gift Card"
-              />
+              <GiftCardCarousel />
             </SectionShell>
           </Box>
         </Stack>
