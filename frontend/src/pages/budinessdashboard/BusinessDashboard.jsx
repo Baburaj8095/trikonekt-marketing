@@ -724,6 +724,45 @@ function QuickAccessCard({ title, description, buttonLabel }) {
   );
 }
 
+function StickyDeliveryButton({ onClick }) {
+  return (
+    <Box
+      sx={{
+        position: "sticky",
+        top: { xs: 74, sm: 78 },
+        zIndex: 20,
+        mb: 1.35,
+        mx: -0.25,
+        pt: 0.2,
+        pb: 0.85,
+        bgcolor: UI.surface,
+      }}
+    >
+      <Button
+        fullWidth
+        variant="contained"
+        onClick={onClick}
+        sx={{
+          minHeight: 44,
+          borderRadius: 999,
+          textTransform: "none",
+          fontWeight: 900,
+          fontSize: 12.5,
+          bgcolor: UI.primary,
+          color: UI.onPrimary,
+          boxShadow: "0 10px 22px rgba(15,82,186,0.20)",
+          "&:hover": {
+            bgcolor: UI.secondary,
+            boxShadow: "0 10px 22px rgba(15,82,186,0.20)",
+          },
+        }}
+      >
+        Tri Sarathi Delivery
+      </Button>
+    </Box>
+  );
+}
+
 function AppDrawer({ open, onClose, onAction }) {
   return (
     <Drawer
@@ -1103,25 +1142,8 @@ function BusinessDashboard() {
             <SectionShell
               title="Deals for You"
               subtitle="Discounted products picked for your account"
-              action={
-                <Button
-                  variant="outlined"
-                  sx={{
-                    borderRadius: 999,
-                    textTransform: "none",
-                    fontWeight: 800,
-                    fontSize: 11,
-                    px: 1.4,
-                    py: 0.6,
-                    borderColor: alpha(UI.primary, 0.28),
-                    color: UI.primary,
-                    flexShrink: 0,
-                  }}
-                >
-                  Tri Sarathi Delivery
-                </Button>
-              }
             >
+              <StickyDeliveryButton onClick={() => navigate("/business/tri-sarathi-delivery")} />
               <Box
                 sx={{
                   display: "grid",

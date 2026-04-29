@@ -102,6 +102,7 @@ import BusinessProfile from "./pages/business/BusinessProfile";
 import BusinessShops from "./pages/business/BusinessShops";
 import BusinessShopProducts from "./pages/business/BusinessShopProducts";
 import InventoryPage from "./pages/business/InventoryPage";
+import TriSarathiDelivery from "./pages/business/TriSarathiDelivery";
 import MerchantShops from "./pages/market/MerchantShops";
 import MerchantShopDetail from "./pages/market/MerchantShopDetail";
 import AgencyCoupons from "./pages/agency/AgencyCoupons";
@@ -1591,6 +1592,14 @@ function App() {
               <BusinessShell>
                 <InventoryPage />
               </BusinessShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/business/tri-sarathi-delivery"
+          element={
+            <ProtectedRoute allowedRoles={["business"]}>
+              <TriSarathiDelivery />
             </ProtectedRoute>
           }
         />
