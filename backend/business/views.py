@@ -12,6 +12,7 @@ import time
 import logging
 import os
 from jobs.models import BackgroundTask
+from django.utils.dateparse import parse_datetime
 from .models import (
     BusinessRegistration,
     MerchantCategory,
@@ -43,6 +44,149 @@ from .serializers import (
     TeamConsumerWishingBannerSerializer,
     TeamConsumerTopAchieverSerializer,
 )
+
+
+# ==========================
+# Hubble (Gift Cards) SDK
+# ==========================
+from core.hubble import generate_hubble_sso_jwt, build_hubble_web_sdk_url, verify_hubble_webhook
+from .hubble_models import HubbleWebhookEvent
+
+
+def _digits_only(v: str) -> str:
+    try:
+        return "".join(ch for ch in str(v or "") if ch.isdigit())
+    except Exception:
+        return ""
+
+
+def _resolve_user_from_hubble_subject(subject: str):
+    """Hubble webhook `userId` maps to customer_id provided at init.
+
+    We use JWT SSO `sub` as that identifier. We default to using our CustomUser.pk as string.
+    """
+    from accounts.models import CustomUser
+
+    s = str(subject or "").strip()
+    if not s:
+        return None
+    # 1) numeric -> PK
+    if s.isdigit():
+        return CustomUser.objects.filter(pk=int(s)).first()
+    # 2) try username
+    return CustomUser.objects.filter(username=s).first()
+
+
+class HubbleIframeUrlView(APIView):
+    """Return a short-lived iframe URL for Hubble Web SDK.
+
+    GET /api/business/hubble/iframe-url/
+    Response: { "iframeUrl": "https://sdk...", "token": "...", "expiresIn": 60 }
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        u = request.user
+        token = generate_hubble_sso_jwt(
+            subject=str(getattr(u, "id", "")),
+            name=str(getattr(u, "full_name", "") or getattr(u, "username", "") or ""),
+            email=str(getattr(u, "email", "") or ""),
+            phone_number=_digits_only(getattr(u, "phone", "") or ""),
+            cohorts=[str(getattr(u, "category", "") or "consumer")],
+        )
+        iframe_url = build_hubble_web_sdk_url(token=token)
+        return Response({"iframeUrl": iframe_url, "token": token, "expiresIn": 60})
+
+
+class HubbleWebhookReceiverView(APIView):
+    """Receive Hubble webhooks.
+
+    POST /api/business/hubble/webhook/
+    - Verifies X-Verify signature.
+    - Stores raw event (idempotent) in business.HubbleWebhookEvent.
+    - Enqueues background processing task.
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        raw_body: bytes = request.body or b""
+        x_verify = request.headers.get("X-Verify") or request.META.get("HTTP_X_VERIFY") or ""
+
+        if not verify_hubble_webhook(raw_body=raw_body, x_verify=str(x_verify or "")):
+            return Response({"detail": "Invalid signature"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        # Parse JSON (best-effort)
+        try:
+            import json
+
+            payload = json.loads(raw_body.decode("utf-8") or "{}")
+        except Exception:
+            payload = None
+
+        event_type = ""
+        tx_ref = ""
+        order_status = ""
+
+        try:
+            if isinstance(payload, dict) and payload.get("event"):
+                event_type = str(payload.get("event") or "")
+            elif isinstance(payload, dict) and payload.get("orderStatus"):
+                event_type = "TRANSACTION"
+        except Exception:
+            event_type = ""
+
+        try:
+            if isinstance(payload, dict):
+                tx_ref = str(payload.get("transactionReferenceId") or "")
+                order_status = str(payload.get("orderStatus") or "")
+        except Exception:
+            tx_ref = ""
+            order_status = ""
+
+        # Idempotency key:
+        # - Transaction: txRef:status
+        # - Brand events: event + details.id
+        idem = ""
+        if tx_ref:
+            idem = f"hubble:tx:{tx_ref}:{order_status or 'NA'}"
+        else:
+            try:
+                details = payload.get("details") if isinstance(payload, dict) else None
+                did = details.get("id") if isinstance(details, dict) else ""
+                idem = f"hubble:event:{event_type}:{did or 'NA'}"
+            except Exception:
+                idem = f"hubble:event:{event_type}:NA"
+
+        # Store event (idempotent)
+        try:
+            evt, created = HubbleWebhookEvent.objects.get_or_create(
+                idempotency_key=idem,
+                defaults={
+                    "event_type": event_type,
+                    "transaction_reference_id": tx_ref,
+                    "status": order_status,
+                    "x_verify": str(x_verify or "")[:256],
+                    "raw_body": (raw_body.decode("utf-8", errors="replace") or "")[:2000000],
+                    "payload": payload,
+                },
+            )
+        except Exception as e:
+            return Response({"detail": f"Failed to store event: {e}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Enqueue processing (idempotent by event id)
+        try:
+            BackgroundTask.enqueue(
+                task_type="hubble_webhook_process",
+                payload={"event_id": int(evt.id)},
+                idempotency_key=f"hubble_webhook_process:{evt.id}",
+            )
+        except Exception:
+            # Do not fail webhook
+            pass
+
+        return Response({"ok": True, "id": evt.id, "created": bool(created)})
 
 
 class _IsAgencyUser(permissions.BasePermission):

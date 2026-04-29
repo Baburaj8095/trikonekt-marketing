@@ -1503,6 +1503,79 @@ register_handler("promo_approve_payouts", handle_promo_approve_payouts)
 
 
 # -----------------------
+# Hubble webhook handler
+# -----------------------
+
+
+def handle_hubble_webhook_process(task: BackgroundTask) -> None:
+    """Process stored Hubble webhook events.
+
+    Payload: { "event_id": int }
+    
+    Current behavior:
+    - Marks the webhook event processed.
+    - (Optional/Extend) Can be used to credit wallet/reward points based on COMPLETED/REVERSED.
+
+    IMPORTANT:
+    Hubble SDK transaction webhooks represent redemption/purchase events happening inside the iframe.
+    We keep this handler idempotent by relying on HubbleWebhookEvent.idempotency_key uniqueness.
+    """
+    payload = task.payload or {}
+    event_id = payload.get("event_id")
+    if not event_id:
+        return
+
+    from django.utils import timezone
+
+    from business.hubble_models import HubbleWebhookEvent
+
+    evt = HubbleWebhookEvent.objects.filter(pk=int(event_id)).first()
+    if not evt:
+        return
+    if evt.process_status == HubbleWebhookEvent.STATUS_DONE:
+        return
+
+    # Mark as processing
+    try:
+        evt.process_status = HubbleWebhookEvent.STATUS_PROCESSING
+        evt.process_error = ""
+        evt.save(update_fields=["process_status", "process_error"])
+    except Exception:
+        pass
+
+    try:
+        # Example mapping place-holder:
+        # If you want to credit wallet / points, do it here.
+        # payload schema for transaction webhook:
+        #  - transactionReferenceId
+        #  - orderStatus: COMPLETED|FAILED|REVERSED
+        #  - amount, discountAmount, timestamp
+        #  - userId
+        p = evt.payload or {}
+        status_val = str(p.get("orderStatus") or evt.status or "").upper()
+        tx_ref = str(p.get("transactionReferenceId") or evt.transaction_reference_id or "")
+
+        # TODO: Implement actual internal ledger mapping if desired.
+        # For now, we only store + acknowledge.
+
+        evt.process_status = HubbleWebhookEvent.STATUS_DONE
+        evt.processed_at = timezone.now()
+        evt.save(update_fields=["process_status", "processed_at"])
+    except Exception as e:
+        evt.process_status = HubbleWebhookEvent.STATUS_FAILED
+        try:
+            evt.process_error = f"{type(e).__name__}: {e}"
+        except Exception:
+            evt.process_error = "Failed"
+        evt.processed_at = timezone.now()
+        evt.save(update_fields=["process_status", "process_error", "processed_at"])
+        raise
+
+
+register_handler("hubble_webhook_process", handle_hubble_webhook_process)
+
+
+# -----------------------
 # Helper enqueue functions
 # -----------------------
 

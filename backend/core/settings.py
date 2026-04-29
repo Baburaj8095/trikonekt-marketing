@@ -240,3 +240,23 @@ NOTIFICATIONS_PUSH_ENABLED = os.environ.get('NOTIFICATIONS_PUSH_ENABLED', 'False
 # Dev-performance flag: skip heavy allocation/distribution during promo purchase approval.
 # Default True in DEBUG to avoid long requests against remote databases; override via env in prod.
 SKIP_HEAVY_ON_APPROVE = os.environ.get('SKIP_HEAVY_ON_APPROVE', 'True' if DEBUG else 'False').lower() in ('1', 'true', 'yes')
+
+# ==========================
+# Hubble (Gift Cards) SDK
+# ==========================
+# Web SDK base URL. Use dev in non-production.
+HUBBLE_SDK_BASE_URL = os.environ.get('HUBBLE_SDK_BASE_URL', 'https://sdk.dev.myhubble.money')
+# Partner client id (used as JWT 'iss' for JWT SSO)
+HUBBLE_CLIENT_ID = os.environ.get('HUBBLE_CLIENT_ID', '')
+
+# NOTE: Hubble Web docs mention appSecret query param; do NOT expose it to frontend.
+# Some partners still use it; keep supported as optional config.
+HUBBLE_APP_SECRET = os.environ.get('HUBBLE_APP_SECRET', '')
+
+# RSA private key (PEM) used to sign JWT (RS256) for SSO.
+# Provide either full PEM in env, or a file path.
+HUBBLE_JWT_PRIVATE_KEY_PEM = os.environ.get('HUBBLE_JWT_PRIVATE_KEY_PEM', '')
+HUBBLE_JWT_PRIVATE_KEY_PATH = os.environ.get('HUBBLE_JWT_PRIVATE_KEY_PATH', '')
+
+# Webhook verification secret (HMAC-SHA256 base64 signature in X-Verify)
+HUBBLE_WEBHOOK_SECRET = os.environ.get('HUBBLE_WEBHOOK_SECRET', '')

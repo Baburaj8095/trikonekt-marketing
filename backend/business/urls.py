@@ -43,6 +43,10 @@ from .views import (
     MatrixTreeView,
     AdminMatrixEnforceSentinelView,
 
+    # Hubble (Gift Cards)
+    HubbleIframeUrlView,
+    HubbleWebhookReceiverView,
+
     # Franchise dashboard / admin-managed banners+achievers
     FranchiseDashboardMetricsView,
     FranchiseWishingBannersPublicView,
@@ -137,4 +141,10 @@ urlpatterns = [
     path('admin/team-consumer/wishing-banners/<int:pk>/', AdminTeamConsumerWishingBannerDetailView.as_view(), name='admin_team_consumer_wishing_banner_detail'),
     path('admin/team-consumer/top-achievers/', AdminTeamConsumerTopAchieverListCreateView.as_view(), name='admin_team_consumer_top_achievers'),
     path('admin/team-consumer/top-achievers/<int:pk>/', AdminTeamConsumerTopAchieverDetailView.as_view(), name='admin_team_consumer_top_achiever_detail'),
+
+    # ==========================
+    # Hubble (Gift Cards)
+    # ==========================
+    path('hubble/iframe-url/', HubbleIframeUrlView.as_view(), name='hubble_iframe_url'),
+    path('hubble/webhook/', HubbleWebhookReceiverView.as_view(), name='hubble_webhook'),
 ]

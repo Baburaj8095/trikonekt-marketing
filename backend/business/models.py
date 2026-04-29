@@ -14,6 +14,13 @@ except Exception:
 import logging
 logger = logging.getLogger(__name__)
 
+# Ensure Hubble webhook models are registered under the business app.
+# We keep them in a separate module to avoid bloating this file.
+try:
+    from .hubble_models import HubbleWebhookEvent  # noqa: F401
+except Exception:
+    HubbleWebhookEvent = None
+
 
 def _default_withdrawals_start_time():
     return timezone.datetime.strptime("00:00", "%H:%M").time()

@@ -137,6 +137,7 @@ import FranchiseDashboard from "./components/franchise/FranchiseDashboard";
 import FranchiseWalletPlaceholder from "./components/franchise/FranchiseWalletPlaceholder";
 import TransactionHistory from "./components/franchise/pages/TransactionHistory";
 import WithdrawalHistory from "./components/franchise/pages/WithdrawalHistory";
+import HubbleGiftCards from "./pages/HubbleGiftCards";
 
 function LegacyAuthEntry() {
   const location = useLocation();
@@ -311,6 +312,17 @@ function App() {
             <ProtectedRoute allowedRoles={["user"]}>
               <ConsumerShell>
                 <ConsumerCoupon />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/user/gift-cards"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <HubbleGiftCards />
               </ConsumerShell>
             </ProtectedRoute>
           }
