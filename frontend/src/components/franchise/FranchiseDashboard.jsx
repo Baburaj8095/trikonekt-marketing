@@ -1,7 +1,10 @@
-﻿import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import API from "../../api/api";
+
 import {
+  Alert,
   Avatar,
   Box,
   Card,
@@ -11,24 +14,22 @@ import {
   Divider,
   Grid,
   Paper,
+  Skeleton,
   Stack,
   Typography,
+  IconButton,
 } from "@mui/material";
+
 import TrendingUpOutlinedIcon from "@mui/icons-material/TrendingUpOutlined";
-import PeopleOutlineIcon from "@mui/icons-material/PeopleOutline";
-import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
-import StorefrontOutlinedIcon from "@mui/icons-material/StorefrontOutlined";
-import BusinessCenterOutlinedIcon from "@mui/icons-material/BusinessCenterOutlined";
-import SupportAgentOutlinedIcon from "@mui/icons-material/SupportAgentOutlined";
-import HubOutlinedIcon from "@mui/icons-material/HubOutlined";
-import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined";
-import IconButton from "@mui/material/IconButton";
+import ApartmentOutlinedIcon from "@mui/icons-material/ApartmentOutlined";
+import StoreOutlinedIcon from "@mui/icons-material/StoreOutlined";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
+import WorkOutlineOutlinedIcon from "@mui/icons-material/WorkOutlineOutlined";
 import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneRounded";
 import CurrencyRupeeRoundedIcon from "@mui/icons-material/AccountBalanceWallet";
 import PublicRoundedIcon from "@mui/icons-material/MyLocation";
-import ApartmentOutlinedIcon from "@mui/icons-material/ApartmentOutlined";
 
 const COLORS = {
   primary: "#0ea5e9",
@@ -42,101 +43,13 @@ const COLORS = {
   border: "#e5e7eb",
 };
 
-const achievers = [
-  { rank: "#1", name: "Prakash Kumar", value: "₹2.5L", color: COLORS.success, photo: "https://i.pravatar.cc/120?img=12" },
-  { rank: "#2", name: "Priya Sharma", value: "₹2.2L", color: COLORS.primary, photo: "https://i.pravatar.cc/120?img=15" },
-  { rank: "#3", name: "Amit Patel", value: "₹2.1L", color: COLORS.primaryDark, photo: "https://i.pravatar.cc/120?img=10" },
-  { rank: "#4", name: "Sneha Reddy", value: "₹1.9L", color: COLORS.secondary, photo: "https://i.pravatar.cc/120?img=18" },
-  { rank: "#5", name: "Vikram Singh", value: "₹1.8L", color: COLORS.success, photo: "https://i.pravatar.cc/120?img=22" },
-  { rank: "#6", name: "Meera Nair", value: "₹1.7L", color: COLORS.primary, photo: "https://i.pravatar.cc/120?img=20" },
-];
+function AchieverCard({ name, subtitle, achieved, photoUrl }) {
+  const initials = useMemo(() => {
+    const t = String(name || "").trim();
+    if (!t) return "A";
+    return t.split(/\s+/).slice(0, 2).map((x) => x[0]).join("").toUpperCase();
+  }, [name]);
 
-const pincodeOverviewMetrics = [
-  {
-    title: "Pincode Total Consumers",
-    value: "1,245",
-    icon: <PeopleOutlineIcon />,
-    accent: COLORS.primary,
-  },
-  {
-    title: "Pincode Captain Office",
-    value: "12",
-    icon: <BusinessCenterOutlinedIcon />,
-    accent: COLORS.success,
-  },
-  {
-    title: "Pincode Sarathi Count",
-    value: "45",
-    icon: <SupportAgentOutlinedIcon />,
-    accent: COLORS.secondary,
-  },
-  {
-    title: "Pincode All Type of model merchant",
-    value: "89",
-    icon: <StorefrontOutlinedIcon />,
-    accent: COLORS.primaryDark,
-  },
-  {
-    title: "Pincode Total Self Rebirth Count",
-    value: "567",
-    icon: <AssignmentOutlinedIcon />,
-    accent: COLORS.success,
-  },
-];
-
-const pincodeCoordinatorOverviewMetrics = [
-  {
-    title: "Pincode Total Consumer",
-    value: "(Pincode1 count, Pincode2 count)",
-    icon: <PeopleOutlineIcon />,
-    accent: COLORS.primary,
-  },
-  {
-    title: "Pincode Captain Office",
-    value: "(Pincode1 count, Pincode2 count)",
-    icon: <BusinessCenterOutlinedIcon />,
-    accent: COLORS.success,
-  },
-  {
-    title: "Pincode Sarathi",
-    value: "(Pincode1 count, Pincode2 count)",
-    icon: <HubOutlinedIcon />,
-    accent: COLORS.secondary,
-  },
-  {
-    title: "Pincode All Type of model merchant",
-    value: "(Pincode1 count, Pincode2 count)",
-    icon: <AccountTreeOutlinedIcon />,
-    accent: COLORS.primaryDark,
-  },
-];
-
-const growthData = {
-  Daily: [
-    { name: "Mon", value: 420 },
-    { name: "Tue", value: 510 },
-    { name: "Wed", value: 470 },
-    { name: "Thu", value: 560 },
-    { name: "Fri", value: 620 },
-    { name: "Sat", value: 710 },
-    { name: "Sun", value: 760 },
-  ],
-  Weekly: [
-    { name: "W1", value: 3200 },
-    { name: "W2", value: 3600 },
-    { name: "W3", value: 3400 },
-    { name: "W4", value: 4100 },
-  ],
-  Monthly: [
-    { name: "Jan", value: 5.2 },
-    { name: "Feb", value: 6.1 },
-    { name: "Mar", value: 5.8 },
-    { name: "Apr", value: 6.3 },
-    { name: "May", value: 6.8 },
-  ],
-};
-
-function AchieverCard({ rank, name, value, color, photo }) {
   return (
     <motion.div whileHover={{ y: -4 }} transition={{ duration: 0.2 }}>
       <Box
@@ -146,7 +59,7 @@ function AchieverCard({ rank, name, value, color, photo }) {
           alignItems: "center",
           width: "100%",
           p: 2,
-          minWidth: 170,
+          minWidth: 190,
           borderRadius: 2,
           bgcolor: COLORS.surface,
           border: `1px solid ${COLORS.border}`,
@@ -154,28 +67,23 @@ function AchieverCard({ rank, name, value, color, photo }) {
           "&:hover": { boxShadow: "0 4px 12px rgba(0,0,0,0.1)" },
         }}
       >
-        <Avatar src={photo} alt={name} sx={{ width: 72, height: 72, mb: 1 }} />
-        <Box
-          sx={{
-            width: 42,
-            height: 42,
-            borderRadius: "50%",
-            display: "grid",
-            placeItems: "center",
-            bgcolor: color,
-            color: COLORS.surface,
-            mb: 1,
-            fontWeight: 800,
-            fontSize: "1rem",
-          }}
+        <Avatar
+          src={photoUrl || undefined}
+          alt={name}
+          sx={{ width: 72, height: 72, mb: 1, bgcolor: COLORS.primary }}
         >
-          {rank}
-        </Box>
-        <Typography variant="subtitle2" sx={{ fontWeight: 700, textAlign: "center", mb: 0.5 }}>
-          {name}
+          {initials}
+        </Avatar>
+
+        <Typography variant="subtitle2" sx={{ fontWeight: 800, textAlign: "center" }}>
+          {name || "Achiever"}
         </Typography>
-        <Typography variant="h6" sx={{ fontWeight: 800, color, textAlign: "center" }}>
-          {value}
+        <Typography variant="caption" sx={{ color: COLORS.textSecondary, textAlign: "center", mb: 1 }}>
+          {subtitle || ""}
+        </Typography>
+
+        <Typography variant="body2" sx={{ fontWeight: 700, color: COLORS.success, textAlign: "center" }}>
+          {achieved || ""}
         </Typography>
       </Box>
     </motion.div>
@@ -188,7 +96,7 @@ function OverviewMetricCard({ title, value, icon, accent }) {
       <Box
         sx={{
           height: "100%",
-          minHeight: 220,
+          minHeight: 180,
           p: 3,
           borderRadius: 4,
           bgcolor: COLORS.surface,
@@ -213,13 +121,13 @@ function OverviewMetricCard({ title, value, icon, accent }) {
           </Box>
         </Box>
 
-        <Typography variant="body1" sx={{ fontWeight: 600, color: COLORS.text, mb: 2 }}>
+        <Typography variant="body1" sx={{ fontWeight: 700, color: COLORS.text, mb: 1 }}>
           {title}
         </Typography>
 
         <Typography
           sx={{
-            fontWeight: 800,
+            fontWeight: 900,
             color: accent,
             fontSize: { xs: "1.35rem", sm: "1.55rem" },
             lineHeight: 1.2,
@@ -245,7 +153,7 @@ function OverviewSection({ title, metrics, horizontalSwipe = false }) {
       <CardContent sx={{ p: { xs: 3, md: 4 } }}>
         <Typography
           variant="h5"
-          sx={{ fontWeight: 800, color: COLORS.text, fontSize: { xs: "1.25rem", md: "1.5rem" } }}
+          sx={{ fontWeight: 900, color: COLORS.text, fontSize: { xs: "1.25rem", md: "1.5rem" } }}
         >
           {title}
         </Typography>
@@ -280,6 +188,77 @@ function OverviewSection({ title, metrics, horizontalSwipe = false }) {
   );
 }
 
+function PincodeWiseScroller({ title, icon, rows }) {
+  return (
+    <Card sx={{ borderRadius: 3, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", border: `1px solid ${COLORS.border}` }}>
+      <CardContent sx={{ p: { xs: 3, md: 4 } }}>
+        <Typography variant="h6" sx={{ fontWeight: 900, color: COLORS.text, mb: 2 }}>
+          {title}
+        </Typography>
+        <Box sx={{ overflowX: "auto", pb: 1 }}>
+          <Stack direction="row" spacing={2} sx={{ minWidth: "max-content" }}>
+            {(rows || []).map((r) => (
+              <Card key={r.pincode} sx={{ minWidth: 220, borderRadius: 3, border: `1px solid ${COLORS.border}`, boxShadow: "none" }}>
+                <CardContent sx={{ p: 2.5 }}>
+                  <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Box
+                      sx={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 2,
+                        bgcolor: COLORS.background,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: COLORS.primary,
+                      }}
+                    >
+                      {icon}
+                    </Box>
+                    <Box>
+                      <Typography variant="body2" sx={{ color: COLORS.textSecondary, fontWeight: 800 }}>
+                        Pincode {r.pincode}
+                      </Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 900, color: COLORS.text, lineHeight: 1.1 }}>
+                        {r.count}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </CardContent>
+              </Card>
+            ))}
+          </Stack>
+        </Box>
+      </CardContent>
+    </Card>
+  );
+}
+
+const growthData = {
+  Daily: [
+    { name: "Mon", value: 420 },
+    { name: "Tue", value: 510 },
+    { name: "Wed", value: 470 },
+    { name: "Thu", value: 560 },
+    { name: "Fri", value: 620 },
+    { name: "Sat", value: 710 },
+    { name: "Sun", value: 760 },
+  ],
+  Weekly: [
+    { name: "W1", value: 3200 },
+    { name: "W2", value: 3600 },
+    { name: "W3", value: 3400 },
+    { name: "W4", value: 4100 },
+  ],
+  Monthly: [
+    { name: "Jan", value: 5.2 },
+    { name: "Feb", value: 6.1 },
+    { name: "Mar", value: 5.8 },
+    { name: "Apr", value: 6.3 },
+    { name: "May", value: 6.8 },
+  ],
+};
+
 function GrowthBar({ data, maxValue }) {
   return (
     <Stack direction="row" spacing={1} alignItems="flex-end" justifyContent="space-around" sx={{ minHeight: 200, py: 2, overflowX: "auto" }}>
@@ -304,7 +283,7 @@ function GrowthBar({ data, maxValue }) {
               mb: 1,
             }}
           />
-          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, fontSize: "0.7rem" }}>
+          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, fontSize: "0.7rem" }}>
             {item.name}
           </Typography>
         </Box>
@@ -313,20 +292,125 @@ function GrowthBar({ data, maxValue }) {
   );
 }
 
-function FranchiseDashboard() {
-  const [selectedTab, setSelectedTab] = useState("Daily");
+export default function FranchiseDashboard() {
   const navigate = useNavigate();
+  const [selectedTab, setSelectedTab] = useState("Daily");
 
-  const selectedData = growthData[selectedTab];
-  const maxDataValue = useMemo(
-    () => Math.max(...selectedData.map((item) => item.value), 1),
-    [selectedData]
-  );
+  const storedUser = useMemo(() => {
+    try {
+      const raw = localStorage.getItem("user_agency") || sessionStorage.getItem("user_agency");
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  }, []);
+
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  const [banners, setBanners] = useState([]);
+  const [achievers, setAchievers] = useState([]);
+  const [metrics, setMetrics] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      setLoading(true);
+      setErr("");
+      try {
+        const [mRes, aRes, bRes] = await Promise.all([
+          API.get("/business/franchise/dashboard-metrics/"),
+          API.get("/business/franchise/achievers/"),
+          API.get("/business/franchise/wishing-banners/"),
+        ]);
+        if (!alive) return;
+        setMetrics(mRes?.data || null);
+        setAchievers(Array.isArray(aRes?.data?.results) ? aRes.data.results : []);
+        setBanners(Array.isArray(bRes?.data?.results) ? bRes.data.results : []);
+      } catch (e) {
+        if (!alive) return;
+        setErr(e?.response?.data?.detail || "Failed to load franchise dashboard data.");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const fmtMoney = (v) => {
+    try {
+      const n = Number(v || 0);
+      return `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+    } catch {
+      return `₹${v || 0}`;
+    }
+  };
+
+  const pincodeOverviewMetrics = useMemo(() => {
+    const counts = metrics?.overall?.counts || {};
+    return [
+      { title: "Pincode Total Consumer Count", value: String(counts.consumers ?? 0), icon: <GroupsOutlinedIcon />, accent: COLORS.primary },
+      { title: "Pincode Captain Office Count", value: String(counts.captain_office ?? 0), icon: <ApartmentOutlinedIcon />, accent: COLORS.success },
+      { title: "Pincode Sarathi Count", value: String(counts.sarathi ?? 0), icon: <WorkOutlineOutlinedIcon />, accent: COLORS.secondary },
+      { title: "Pincode Merchant Count", value: String(counts.merchants ?? 0), icon: <StoreOutlinedIcon />, accent: COLORS.primaryDark },
+      { title: "Pincode Total Self Rebirth ID", value: String(counts.self_rebirth_ids ?? 0), icon: <TrendingUpOutlinedIcon />, accent: COLORS.success },
+    ];
+  }, [metrics]);
+
+  const consumerStatsCards = useMemo(() => {
+    const cs = metrics?.consumer_stats || {};
+    return [
+      { title: "Consumer Active Overall", value: String(cs?.active?.overall ?? 0), icon: <TrendingUpOutlinedIcon />, accent: COLORS.success },
+      { title: "Consumer Active Month", value: String(cs?.active?.month ?? 0), icon: <TrendingUpOutlinedIcon />, accent: COLORS.success },
+      { title: "Consumer Inactive Overall", value: String(cs?.inactive?.overall ?? 0), icon: <TrendingUpOutlinedIcon />, accent: COLORS.secondary },
+      { title: "Consumer Inactive Month", value: String(cs?.inactive?.month ?? 0), icon: <TrendingUpOutlinedIcon />, accent: COLORS.secondary },
+      { title: "Consumer ID Self Rebirth Overall", value: String(cs?.self_rebirth_id?.overall ?? 0), icon: <TrendingUpOutlinedIcon />, accent: COLORS.primary },
+      { title: "Consumer ID Self Rebirth Month", value: String(cs?.self_rebirth_id?.month ?? 0), icon: <TrendingUpOutlinedIcon />, accent: COLORS.primary },
+      { title: "Consumer Total Earning Overall", value: fmtMoney(cs?.total_earning?.overall ?? 0), icon: <CurrencyRupeeRoundedIcon />, accent: COLORS.primaryDark },
+      { title: "Consumer Total Earning Month", value: fmtMoney(cs?.total_earning?.month ?? 0), icon: <CurrencyRupeeRoundedIcon />, accent: COLORS.primaryDark },
+    ];
+  }, [metrics]);
+
+  const selectedData = growthData[selectedTab] || [];
+  const maxDataValue = useMemo(() => Math.max(...selectedData.map((item) => item.value), 1), [selectedData]);
+
+  const perPin = metrics?.per_pincode || {};
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: COLORS.background, py: { xs: 2, md: 4 } }}>
       <Container maxWidth="xl">
         <Stack spacing={4}>
+          {err ? <Alert severity="error">{err}</Alert> : null}
+
+          {/* Wishing banner scroller */}
+          {loading ? (
+            <Skeleton variant="rounded" height={210} />
+          ) : banners?.length ? (
+            <Card sx={{ borderRadius: 3, overflow: "hidden", border: `1px solid ${COLORS.border}` }}>
+              <CardContent sx={{ p: 0 }}>
+                <Box sx={{ overflowX: "auto" }}>
+                  <Stack direction="row" spacing={0} sx={{ minWidth: "max-content" }}>
+                    {banners.map((b) => (
+                      <Box key={b.id} sx={{ width: { xs: 320, md: 520 }, height: { xs: 160, md: 220 }, flex: "0 0 auto" }}>
+                        {b?.image_url ? (
+                          <img
+                            src={b.image_url}
+                            alt={b.title || "Banner"}
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          />
+                        ) : (
+                          <Box sx={{ width: "100%", height: "100%", bgcolor: COLORS.background }} />
+                        )}
+                      </Box>
+                    ))}
+                  </Stack>
+                </Box>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {/* Header */}
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
             <Card
               sx={{
@@ -353,13 +437,12 @@ function FranchiseDashboard() {
                     >
                       <TrendingUpOutlinedIcon sx={{ fontSize: 28, color: "white" }} />
                     </Box>
-
                     <Box>
-                      <Typography variant="h4" sx={{ fontWeight: 800, fontSize: { xs: "1.5rem", md: "2rem" }, mb: 0.5 }}>
-                        Tri Growth Dashboard
+                      <Typography variant="h4" sx={{ fontWeight: 900, fontSize: { xs: "1.5rem", md: "2rem" }, mb: 0.5 }}>
+                        Franchise Dashboard
                       </Typography>
                       <Typography variant="subtitle1" sx={{ opacity: 0.9, fontSize: { xs: "0.9rem", md: "1rem" } }}>
-                        Your success analytics platform
+                        Pincode coordinator overview
                       </Typography>
                     </Box>
                   </Box>
@@ -368,14 +451,12 @@ function FranchiseDashboard() {
                     <IconButton sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "white" }}>
                       <NotificationsNoneRoundedIcon />
                     </IconButton>
-
                     <IconButton
                       onClick={() => navigate("/agency/franchise-wallet")}
                       sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "white" }}
                     >
                       <CurrencyRupeeRoundedIcon />
                     </IconButton>
-
                     <IconButton sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "white" }}>
                       <PublicRoundedIcon />
                     </IconButton>
@@ -383,20 +464,12 @@ function FranchiseDashboard() {
                 </Box>
 
                 <Box sx={{ mt: 3 }}>
-                  <Typography variant="h5" sx={{ fontWeight: 700, color: "white", mb: 0.5 }}>
-                    Prakash J
+                  <Typography variant="h5" sx={{ fontWeight: 800, color: "white", mb: 0.5 }}>
+                    {storedUser?.full_name || storedUser?.username || "Franchise Partner"}
                   </Typography>
-
                   <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.85)", mb: 1 }}>
-                    Franchise Partner
+                    {storedUser?.category ? String(storedUser.category).replaceAll("_", " ") : "Agency"}
                   </Typography>
-
-                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
-                    <ApartmentOutlinedIcon sx={{ color: "white", opacity: 0.9, fontSize: 18 }} />
-                    <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.9)", fontWeight: 600 }}>
-                      Franchise Type: Master Franchise
-                    </Typography>
-                  </Stack>
 
                   <Paper
                     sx={{
@@ -413,10 +486,10 @@ function FranchiseDashboard() {
                           <BadgeOutlinedIcon sx={{ color: "white", opacity: 0.9, fontSize: 20 }} />
                           <Box>
                             <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)", display: "block" }}>
-                              User ID
+                              Username
                             </Typography>
-                            <Typography variant="body2" sx={{ color: "white", fontWeight: 700 }}>
-                              TRFN 56157223
+                            <Typography variant="body2" sx={{ color: "white", fontWeight: 800 }}>
+                              {storedUser?.username || "—"}
                             </Typography>
                           </Box>
                         </Stack>
@@ -427,10 +500,10 @@ function FranchiseDashboard() {
                           <LocationOnOutlinedIcon sx={{ color: "white", opacity: 0.9, fontSize: 20 }} />
                           <Box>
                             <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)", display: "block" }}>
-                              Location
+                              Pincode
                             </Typography>
-                            <Typography variant="body2" sx={{ color: "white", fontWeight: 700 }}>
-                              Bangalore
+                            <Typography variant="body2" sx={{ color: "white", fontWeight: 800 }}>
+                              {storedUser?.pincode || "—"}
                             </Typography>
                           </Box>
                         </Stack>
@@ -441,10 +514,10 @@ function FranchiseDashboard() {
                           <TrendingUpOutlinedIcon sx={{ color: "white", opacity: 0.9, fontSize: 20 }} />
                           <Box>
                             <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)", display: "block" }}>
-                              Performance
+                              Assigned pincodes
                             </Typography>
-                            <Typography variant="body2" sx={{ color: "white", fontWeight: 800 }}>
-                              94%
+                            <Typography variant="body2" sx={{ color: "white", fontWeight: 900 }}>
+                              {Array.isArray(metrics?.overall?.pincodes) ? metrics.overall.pincodes.length : 0}
                             </Typography>
                           </Box>
                         </Stack>
@@ -456,33 +529,58 @@ function FranchiseDashboard() {
             </Card>
           </motion.div>
 
+          {/* Achievers */}
           <Card sx={{ borderRadius: 3, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", border: `1px solid ${COLORS.border}` }}>
             <CardContent sx={{ p: { xs: 3, md: 4 } }}>
-              <Typography variant="h5" sx={{ fontWeight: 800, color: COLORS.text, mb: 3 }}>
-                🏆 Top Achievers
+              <Typography variant="h5" sx={{ fontWeight: 900, color: COLORS.text, mb: 3 }}>
+                Top Achievers
               </Typography>
               <Box sx={{ overflowX: "auto", pb: 2 }}>
                 <Stack direction="row" spacing={2} sx={{ minWidth: "max-content" }}>
-                  {achievers.map((achiever) => (
-                    <div key={achiever.rank}>
-                      <AchieverCard {...achiever} />
-                    </div>
-                  ))}
+                  {loading ? (
+                    Array.from({ length: 5 }).map((_, idx) => (
+                      <Skeleton key={idx} variant="rounded" width={190} height={190} />
+                    ))
+                  ) : achievers.length ? (
+                    achievers.map((a) => (
+                      <div key={a.id}>
+                        <AchieverCard
+                          name={a.name}
+                          subtitle={a.pincode ? `Pincode ${a.pincode}` : ""}
+                          achieved={a.achieved}
+                          photoUrl={a.photo_url}
+                        />
+                      </div>
+                    ))
+                  ) : (
+                    <Typography variant="body2" sx={{ color: COLORS.textSecondary }}>
+                      No achievers configured for your pincodes.
+                    </Typography>
+                  )}
                 </Stack>
               </Box>
             </CardContent>
           </Card>
 
+          {/* Overview counts */}
           <Stack spacing={3}>
-            <OverviewSection title="Pincode Overview Count" metrics={pincodeOverviewMetrics} horizontalSwipe />
-            <OverviewSection title="Pincode - Co-ordinator Overview Count" metrics={pincodeCoordinatorOverviewMetrics} />
+            <OverviewSection title="Pincode Overview Counts" metrics={pincodeOverviewMetrics} horizontalSwipe />
+            <OverviewSection title="Consumer Stats (Overall + Month)" metrics={consumerStatsCards} />
           </Stack>
 
+          {/* Pincode-wise scrollers */}
+          <PincodeWiseScroller title="Pincode Total Consumer (pincode-wise)" icon={<GroupsOutlinedIcon />} rows={perPin?.consumers} />
+          <PincodeWiseScroller title="Pincode Captain Office (pincode-wise)" icon={<ApartmentOutlinedIcon />} rows={perPin?.captain_office} />
+          <PincodeWiseScroller title="Pincode Sarathi (pincode-wise)" icon={<WorkOutlineOutlinedIcon />} rows={perPin?.sarathi} />
+          <PincodeWiseScroller title="Pincode Merchant (pincode-wise)" icon={<StoreOutlinedIcon />} rows={perPin?.merchants} />
+          <PincodeWiseScroller title="Pincode Self Rebirth ID (pincode-wise)" icon={<TrendingUpOutlinedIcon />} rows={perPin?.self_rebirth_ids} />
+
+          {/* Growth analytics placeholder (existing UI) */}
           <Card sx={{ borderRadius: 3, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", border: `1px solid ${COLORS.border}` }}>
             <CardContent sx={{ p: { xs: 3, md: 4 } }}>
               <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3, flexWrap: "wrap", gap: 2 }}>
-                <Typography variant="h5" sx={{ fontWeight: 800, color: COLORS.text }}>
-                  📈 Growth Analytics
+                <Typography variant="h5" sx={{ fontWeight: 900, color: COLORS.text }}>
+                  Growth Analytics
                 </Typography>
 
                 <Stack direction="row" spacing={1}>
@@ -492,7 +590,7 @@ function FranchiseDashboard() {
                       label={tab}
                       onClick={() => setSelectedTab(tab)}
                       sx={{
-                        fontWeight: 600,
+                        fontWeight: 700,
                         bgcolor: selectedTab === tab ? COLORS.primary : COLORS.background,
                         color: selectedTab === tab ? COLORS.surface : COLORS.text,
                       }}
@@ -509,5 +607,3 @@ function FranchiseDashboard() {
     </Box>
   );
 }
-
-export default FranchiseDashboard;

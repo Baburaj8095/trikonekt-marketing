@@ -1763,6 +1763,7 @@ from django.core.exceptions import ValidationError
 class Package(models.Model):
     code = models.CharField(max_length=16, unique=True, db_index=True)
     name = models.CharField(max_length=150)
+
     description = models.TextField(blank=True)
     amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0)])
     is_active = models.BooleanField(default=True)
@@ -1778,6 +1779,67 @@ class Package(models.Model):
 
     def __str__(self):
         return f"{self.code} — {self.name} (₹{self.amount})"
+
+
+# ==============================
+# Franchise Dashboard (Admin-managed)
+# ==============================
+
+
+class FranchiseAchiever(models.Model):
+    """Admin-managed achievers mapped by pincode.
+
+    Used on Franchise (agency) dashboard.
+    """
+
+    pincode = models.CharField(max_length=10, db_index=True)
+    name = models.CharField(max_length=150)
+    achieved = models.CharField(max_length=200, blank=True, default="")
+    photo = models.ImageField(
+        upload_to="uploads/franchise/achievers/",
+        null=True,
+        blank=True,
+        storage=MEDIA_STORAGE,
+        max_length=500,
+    )
+    sort_order = models.IntegerField(default=0, db_index=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["sort_order", "-created_at", "id"]
+        indexes = [
+            models.Index(fields=["pincode", "is_active"]),
+        ]
+
+    def __str__(self):
+        return f"{self.pincode} - {self.name}"
+
+
+class WishingBanner(models.Model):
+    """Admin-managed wishing banner for franchise dashboard.
+
+    Requirement: show the latest active banner (single latest).
+    """
+
+    title = models.CharField(max_length=200, blank=True, default="")
+    image = models.ImageField(
+        upload_to="uploads/franchise/wishing/",
+        null=True,
+        blank=True,
+        storage=MEDIA_STORAGE,
+        max_length=500,
+    )
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return self.title or f"WishingBanner#{self.pk}"
 
 
 class AgencyPackageAssignment(models.Model):

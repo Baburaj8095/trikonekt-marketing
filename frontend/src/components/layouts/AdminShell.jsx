@@ -218,6 +218,7 @@ export default function AdminShell({ children }) {
     )
       return "promo";
     if (to.startsWith("/admin/notifications")) return "support";
+    if (to.startsWith("/admin/franchise/")) return "promo";
     return null;
   }
 
@@ -294,6 +295,15 @@ export default function AdminShell({ children }) {
           { to: "/admin/dashboard/models/business/promomonthlybox", label: "Season Boxes (Paid)", icon: "box" },
           { to: "/admin/promo-purchases", label: "Promo Purchases", icon: "ticket" },
           { to: "/admin/rank-upgrades", label: "Rank Upgrades", icon: "wallet" },
+        ],
+      },
+
+      {
+        key: "franchise",
+        label: "Franchise",
+        items: [
+          { to: "/admin/franchise/achievers", label: "Achievers", icon: "users" },
+          { to: "/admin/franchise/wishing-banners", label: "Wishing Banners", icon: "box" },
         ],
       },
       {

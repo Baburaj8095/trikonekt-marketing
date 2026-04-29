@@ -37,6 +37,8 @@ import AdminMerchants from "./pages/admin/AdminMerchants";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminKYC from "./pages/admin/AdminKYC";
 import AdminWithdrawals from "./pages/admin/AdminWithdrawals";
+import AdminFranchiseAchievers from "./pages/admin/AdminFranchiseAchievers";
+import AdminFranchiseWishingBanners from "./pages/admin/AdminFranchiseWishingBanners";
 import AdminMatrixFive from "./pages/admin/AdminMatrixFive";
 import AdminMatrixThree from "./pages/admin/AdminMatrixThree";
 import AdminAutopool from "./pages/admin/AdminAutopool";
@@ -1079,6 +1081,28 @@ function App() {
             </AdminProtectedRoute>
           }
         />
+
+          {/* Franchise: Admin-managed achievers + wishing banners */}
+          <Route
+            path="/admin/franchise/achievers"
+            element={
+              <AdminProtectedRoute>
+                <AdminShell>
+                  <AdminFranchiseAchievers />
+                </AdminShell>
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/franchise/wishing-banners"
+            element={
+              <AdminProtectedRoute>
+                <AdminShell>
+                  <AdminFranchiseWishingBanners />
+                </AdminShell>
+              </AdminProtectedRoute>
+            }
+          />
         <Route
           path="/admin/matrix"
           element={
