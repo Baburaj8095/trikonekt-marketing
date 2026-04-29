@@ -202,6 +202,35 @@ export default function BusinessDashboard() {
           </Card>
         </Grid>
 
+        {/* INVENTORY */}
+        <Grid item xs={12}>
+          <Card sx={{ borderRadius: 3 }}>
+            <CardContent>
+              <Typography fontWeight={800}>
+                Inventory
+              </Typography>
+
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                mt={1}
+              >
+                Manage products and billing across channels
+              </Typography>
+
+              <Button
+                variant="contained"
+                sx={{ mt: 2 }}
+                onClick={() =>
+                  navigate("/business/inventory")
+                }
+              >
+                Tri Inventory & Billing
+              </Button>
+            </CardContent>
+          </Card>
+        </Grid>
+
         {/* GO PUBLIC */}
         <Grid item xs={12}>
           <Card sx={{ borderRadius: 3 }}>

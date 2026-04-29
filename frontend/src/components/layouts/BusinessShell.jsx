@@ -40,6 +40,7 @@ export default function BusinessShell({ children }) {
     { to: "/business/dashboard", label: "Dashboard", icon: "dashboard" },
     { to: "/business/profile", label: "Profile", icon: "users" },
     { to: "/business/shops", label: "Shops", icon: "box" },
+    { to: "/business/inventory", label: "Inventory", icon: "inventory" },
     { to: "/business/support", label: "Support", icon: "ticket" },
   ];
 
@@ -47,6 +48,9 @@ export default function BusinessShell({ children }) {
     const [toPath] = to.split("?");
     if (toPath === "/business/shops") {
       return loc.pathname === "/business/shops" || loc.pathname.startsWith("/business/shops/");
+    }
+    if (toPath === "/business/inventory") {
+      return loc.pathname === "/business/inventory" || loc.pathname.startsWith("/business/inventory/");
     }
     return `${loc.pathname}${loc.search}` === to;
   };

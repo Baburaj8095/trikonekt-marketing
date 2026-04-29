@@ -42,7 +42,7 @@ from .views import (
     DirectMemberDetailView,
 )
 from .token_serializers import CustomTokenRefreshView
-from .views_tree import MyFiveMatrixTeamV1, FiveMatrixCountsView, MyMatrix5EntriesTree, MyMatrixRootsBreakdownView
+from .views_tree import MyFiveMatrixTeamV1, FiveMatrixCountsView, MyMatrix5EntriesTree
 
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
@@ -91,8 +91,6 @@ urlpatterns = [
     path('my/genealogy/tree5/', MyFiveMatrixTeamV1.as_view(), name='my_genealogy_tree5'),
     # Five-matrix genealogy counts (placed ACTIVE nodes only)
     path('genealogy/5m/counts/', FiveMatrixCountsView.as_view(), name='five_matrix_counts'),
-    # Per-root breakdown (count + earnings per root) for FIVE_150 and THREE_150
-    path('genealogy/roots/breakdown/', MyMatrixRootsBreakdownView.as_view(), name='my_matrix_roots_breakdown'),
     # Direct sponsor member detail
     path('direct/member-detail/', DirectMemberDetailView.as_view(), name='direct_member_detail'),
 ]

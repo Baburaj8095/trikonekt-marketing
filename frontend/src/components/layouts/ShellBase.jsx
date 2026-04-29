@@ -1,4 +1,7 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+
+export const ShellContext = createContext({ toggleSidebar: () => {}, isMobile: false });
+export function useShell() { return useContext(ShellContext); }
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import NotificationsBell from "../NotificationsBell";
 import { useCartStore } from "../../store/cartStore";
@@ -11,7 +14,7 @@ import { useCartStore } from "../../store/cartStore";
  *
  * Props:
  * - title: string (used in mobile header and sidebar title)
- * - menu: Array<{ to: string; label: string; icon?: string; badge?: number|string }>
+ * - menu: Array<{ to: string; label: string; icon?: string }>
  * - isActive?: (to: string, location: ReturnType<useLocation>) => boolean
  * - onLogout?: () => void (if provided, Logout button is shown in sidebar footer)
  * - footerText?: string
@@ -27,6 +30,7 @@ export default function ShellBase({
   rootPaths,
   isRoot,
   onBackFallbackPath,
+  hideTopBar = false,
   children,
 }) {
   const loc = useLocation();
@@ -211,11 +215,8 @@ export default function ShellBase({
   const cartItems = useCartStore((s) => s.items);
   const cartCount = Array.isArray(cartItems) ? cartItems.reduce((sum, i) => sum + (i.qty || 0), 0) : 0;
 
-  function NavLink({ to, label, icon, badge }) {
+  function NavLink({ to, label, icon }) {
     const active = activeCheck(to, loc);
-    const badgeVal = typeof badge === "number" ? badge : (badge ? Number(badge) : 0);
-    const showBadge = Number.isFinite(badgeVal) && badgeVal > 0;
-    const badgeText = badgeVal > 99 ? "99+" : String(badgeVal);
     return (
       <Link
         to={to}
@@ -236,31 +237,7 @@ export default function ShellBase({
         }}
       >
         {icon ? <Icon name={icon} active={active} /> : null}
-        <span style={{ fontWeight: active ? 700 : 600, fontSize: 14, flex: 1, minWidth: 0 }}>{label}</span>
-        {showBadge ? (
-          <span
-            aria-label="count"
-            style={{
-              marginLeft: 8,
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              minWidth: 18,
-              height: 18,
-              padding: "0 6px",
-              borderRadius: 999,
-              background: "#ef4444",
-              color: "#fff",
-              fontSize: 11,
-              fontWeight: 800,
-              lineHeight: "18px",
-              flexShrink: 0,
-            }}
-            title={badgeText}
-          >
-            {badgeText}
-          </span>
-        ) : null}
+        <span style={{ fontWeight: active ? 700 : 600, fontSize: 14 }}>{label}</span>
       </Link>
     );
   }
@@ -312,10 +289,13 @@ export default function ShellBase({
     }
   }
 
+  const shellCtx = useMemo(() => ({ toggleSidebar: () => setSidebarOpen(v => !v), isMobile }), [isMobile]);
+
   return (
-    <div className="role-shell-scope" style={{ minHeight: "100vh", background: "#f1f5f9" }}>
-      {/* Top bar: shown only on mobile */}
-      {isMobile ? (
+    <ShellContext.Provider value={shellCtx}>
+    <div className="role-shell-scope" style={{ background: "#f1f5f9" }}>
+      {/* Top bar: shown only on mobile and when not hidden by the page */}
+      {isMobile && !hideTopBar ? (
         <div
   style={{
     position: "sticky",
@@ -434,7 +414,7 @@ export default function ShellBase({
       ) : null}
 
       {/* Layout */}
-      <div style={{ display: "flex", alignItems: "stretch" }}>
+      <div style={{ display: "flex", alignItems: "flex-start" , minHeight: "100vh" }}>
         {/* Sidebar */}
         <aside
           style={{
@@ -563,7 +543,6 @@ export default function ShellBase({
                                 to={c.to}
                                 label={c.label}
                                 icon={c.icon}
-                                badge={c.badge}
                               />
                             ))}
                           </div>
@@ -580,7 +559,6 @@ export default function ShellBase({
                       to={it.to}
                       label={it.label}
                       icon={it.icon}
-                      badge={it.badge}
                     />
                   );
                 }
@@ -617,7 +595,7 @@ export default function ShellBase({
         </aside>
 
         {/* Main content */}
-        <main
+        {/* <main
           style={{
             flex: 1,
             minWidth: 0,
@@ -625,8 +603,20 @@ export default function ShellBase({
             marginLeft: isMobile ? 0 : (sidebarWidth + sidebarGap),
             width: "100%",
           }}
-        >
-          <div style={{ width: "100%", margin: "0 auto", maxWidth: 1400 }}>
+        > */}
+        <main
+           style={{
+           flex: 1,
+          minWidth: 0,
+          padding: 0,
+          minHeight: "150vh",
+          marginLeft: isMobile ? 0 : (sidebarWidth + sidebarGap),
+           width: isMobile ? "100%" : `calc(100% - ${sidebarWidth + sidebarGap}px)`,
+             overflowX: "hidden",
+              }}
+            >
+          {/* <div style={{ width: "100%", margin: "0 auto", maxWidth: 1400 }}> */}
+          <div style={{ width: "100%", margin: "0 auto", maxWidth: isMobile ? "100%" : 1400 }}>
             {!isMobile ? (
               <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, marginBottom: 8 }}>
                 {rightHeaderContent ? <div>{rightHeaderContent}</div> : null}
@@ -669,5 +659,6 @@ export default function ShellBase({
         </main>
       </div>
     </div>
+    </ShellContext.Provider>
   );
 }

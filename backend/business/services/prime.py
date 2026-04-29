@@ -110,7 +110,6 @@ def _credit_wallet(
     meta: Dict[str, Any] | None = None,
     source_type: str = "",
     source_id: str = "",
-    matrix_account_id: int | None = None,
 ) -> None:
     """
     Best-effort wallet credit. Payout decisioning must be handled by caller/policy.
@@ -124,7 +123,6 @@ def _credit_wallet(
         meta=meta or {},
         source_type=source_type or "",
         source_id=str(source_id or ""),
-        matrix_account_id=matrix_account_id,
     )
 
 
@@ -162,12 +160,12 @@ def _as_percents(lst, length: int):
     return out
 
 
-def _matrix_ancestor_accounts(acc: AutoPoolAccount, depth: int) -> list[AutoPoolAccount]:
+def _matrix_ancestors(acc, depth: int):
     """
-    Walk AutoPoolAccount parent chain to collect ancestor AutoPoolAccount nodes up to `depth`.
-    Dedupe by owner id to preserve existing payout semantics.
+    Walk AutoPoolAccount parent chain to collect ancestor owners up to `depth`.
+    Returns list of CustomUser recipients in order [L1..Ldepth] for matrix payouts.
     """
-    chain: list[AutoPoolAccount] = []
+    chain = []
     try:
         seen = set()
         node = getattr(acc, "parent_account", None)
@@ -175,7 +173,7 @@ def _matrix_ancestor_accounts(acc: AutoPoolAccount, depth: int) -> list[AutoPool
             owner = getattr(node, "owner", None)
             oid = getattr(owner, "id", None) if owner else None
             if owner and oid and oid not in seen:
-                chain.append(node)
+                chain.append(owner)
                 seen.add(oid)
             node = getattr(node, "parent_account", None)
     except Exception:
@@ -550,13 +548,8 @@ def distribute_prime_150_payouts(
                         fixed5 = [2, 1, 1, 0.5, 0.5, 0]
                     if fixed5:
                         for acc in created_five:
-                            upline_nodes = _matrix_ancestor_accounts(acc, depth=five_levels)
-                            if upline_nodes:
-                                iterable = [(idx, getattr(node, "owner", None), getattr(node, "id", None)) for idx, node in enumerate(upline_nodes)]
-                            else:
-                                iterable = [(idx, recipient, None) for idx, recipient in enumerate(_resolve_upline(consumer, depth=five_levels))]
-
-                            for idx, recipient, matrix_account_id in iterable:
+                            upline6 = _matrix_ancestors(acc, depth=five_levels) or _resolve_upline(consumer, depth=five_levels)
+                            for idx, recipient in enumerate(upline6):
                                 if idx >= len(fixed5):
                                     break
                                 amt = _q2(fixed5[idx] or 0)
@@ -581,18 +574,13 @@ def distribute_prime_150_payouts(
                                     "from_user_id": getattr(consumer, "id", None),
                                     "from_user": getattr(consumer, "username", None),
                                 }
-                                _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_FIVE", meta=meta, source_type=src_type, source_id=src_id, matrix_account_id=matrix_account_id)
+                                _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_FIVE", meta=meta, source_type=src_type, source_id=src_id)
                                 _update_matrix_progress(recipient, pool_type="FIVE_150", level=idx + 1, amount=amt)
                     else:
                         five_percents = _as_percents((row5_150.get("percents") or getattr(cfg2, "five_matrix_percents_json", []) or []), five_levels)
                         for acc in created_five:
-                            upline_nodes = _matrix_ancestor_accounts(acc, depth=five_levels)
-                            if upline_nodes:
-                                iterable = [(idx, getattr(node, "owner", None), getattr(node, "id", None)) for idx, node in enumerate(upline_nodes)]
-                            else:
-                                iterable = [(idx, recipient, None) for idx, recipient in enumerate(_resolve_upline(consumer, depth=five_levels))]
-
-                            for idx, recipient, matrix_account_id in iterable:
+                            upline6 = _matrix_ancestors(acc, depth=five_levels) or _resolve_upline(consumer, depth=five_levels)
+                            for idx, recipient in enumerate(upline6):
                                 if idx >= len(five_percents):
                                     break
                                 pct = five_percents[idx] or Decimal("0")
@@ -617,7 +605,7 @@ def distribute_prime_150_payouts(
                                     "from_user_id": getattr(consumer, "id", None),
                                     "from_user": getattr(consumer, "username", None),
                                 }
-                                _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_FIVE", meta=meta, source_type=src_type, source_id=src_id, matrix_account_id=matrix_account_id)
+                                _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_FIVE", meta=meta, source_type=src_type, source_id=src_id)
                                 _update_matrix_progress(recipient, pool_type="FIVE_150", level=idx + 1, amount=amt)
 
                 # Three-matrix payouts
@@ -633,13 +621,8 @@ def distribute_prime_150_payouts(
                         fixed3 = []
                     if fixed3:
                         for acc in created_three:
-                            upline_nodes = _matrix_ancestor_accounts(acc, depth=three_levels)
-                            if upline_nodes:
-                                iterable = [(idx, getattr(node, "owner", None), getattr(node, "id", None)) for idx, node in enumerate(upline_nodes)]
-                            else:
-                                iterable = [(idx, recipient, None) for idx, recipient in enumerate(_resolve_upline(consumer, depth=three_levels))]
-
-                            for idx, recipient, matrix_account_id in iterable:
+                            upline15 = _matrix_ancestors(acc, depth=three_levels) or _resolve_upline(consumer, depth=three_levels)
+                            for idx, recipient in enumerate(upline15):
                                 if idx >= len(fixed3):
                                     break
                                 amt = _q2(fixed3[idx] or 0)
@@ -663,18 +646,13 @@ def distribute_prime_150_payouts(
                                     "from_user_id": getattr(consumer, "id", None),
                                     "from_user": getattr(consumer, "username", None),
                                 }
-                                _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_THREE", meta=meta, source_type=src_type, source_id=src_id, matrix_account_id=matrix_account_id)
+                                _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_THREE", meta=meta, source_type=src_type, source_id=src_id)
                                 _update_matrix_progress(recipient, pool_type="THREE_150", level=idx + 1, amount=amt)
                     else:
                         three_percents = _as_percents((row3_150.get("percents") or getattr(cfg2, "three_matrix_percents_json", []) or []), three_levels)
                         for acc in created_three:
-                            upline_nodes = _matrix_ancestor_accounts(acc, depth=three_levels)
-                            if upline_nodes:
-                                iterable = [(idx, getattr(node, "owner", None), getattr(node, "id", None)) for idx, node in enumerate(upline_nodes)]
-                            else:
-                                iterable = [(idx, recipient, None) for idx, recipient in enumerate(_resolve_upline(consumer, depth=three_levels))]
-
-                            for idx, recipient, matrix_account_id in iterable:
+                            upline15 = _matrix_ancestors(acc, depth=three_levels) or _resolve_upline(consumer, depth=three_levels)
+                            for idx, recipient in enumerate(upline15):
                                 if idx >= len(three_percents):
                                     break
                                 pct = three_percents[idx] or Decimal("0")
@@ -699,7 +677,7 @@ def distribute_prime_150_payouts(
                                     "from_user_id": getattr(consumer, "id", None),
                                     "from_user": getattr(consumer, "username", None),
                                 }
-                                _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_THREE", meta=meta, source_type=src_type, source_id=src_id, matrix_account_id=matrix_account_id)
+                                _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_THREE", meta=meta, source_type=src_type, source_id=src_id)
                                 _update_matrix_progress(recipient, pool_type="THREE_150", level=idx + 1, amount=amt)
         except Exception:
             try:
@@ -1038,13 +1016,8 @@ def distribute_prime_750_payouts(
                             fixed5 = []
                     if fixed5:
                         for acc in created_five:
-                            upline_nodes = _matrix_ancestor_accounts(acc, depth=five_levels)
-                            if upline_nodes:
-                                iterable = [(idx, getattr(node, "owner", None), getattr(node, "id", None)) for idx, node in enumerate(upline_nodes)]
-                            else:
-                                iterable = [(idx, recipient, None) for idx, recipient in enumerate(_resolve_upline(consumer, depth=five_levels))]
-
-                            for idx, recipient, matrix_account_id in iterable:
+                            upline6 = _matrix_ancestors(acc, depth=five_levels) or _resolve_upline(consumer, depth=five_levels)
+                            for idx, recipient in enumerate(upline6):
                                 if idx >= len(fixed5):
                                     break
                                 amt = _q2(fixed5[idx] or 0)
@@ -1068,18 +1041,13 @@ def distribute_prime_750_payouts(
                                     "from_user_id": getattr(consumer, "id", None),
                                     "from_user": getattr(consumer, "username", None),
                                 }
-                                _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_FIVE", meta=meta, source_type=src_type, source_id=src_id, matrix_account_id=matrix_account_id)
+                                _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_FIVE", meta=meta, source_type=src_type, source_id=src_id)
                                 _update_matrix_progress(recipient, pool_type="FIVE_150", level=idx + 1, amount=amt)
                     else:
                         five_percents = _as_percents((row5_750.get("percents") or getattr(cfg2, "five_matrix_percents_json", []) or []), five_levels)
                         for acc in created_five:
-                            upline_nodes = _matrix_ancestor_accounts(acc, depth=five_levels)
-                            if upline_nodes:
-                                iterable = [(idx, getattr(node, "owner", None), getattr(node, "id", None)) for idx, node in enumerate(upline_nodes)]
-                            else:
-                                iterable = [(idx, recipient, None) for idx, recipient in enumerate(_resolve_upline(consumer, depth=five_levels))]
-
-                            for idx, recipient, matrix_account_id in iterable:
+                            upline6 = _matrix_ancestors(acc, depth=five_levels) or _resolve_upline(consumer, depth=five_levels)
+                            for idx, recipient in enumerate(upline6):
                                 if idx >= len(five_percents):
                                     break
                                 pct = five_percents[idx] or Decimal("0")
@@ -1104,7 +1072,7 @@ def distribute_prime_750_payouts(
                                     "from_user_id": getattr(consumer, "id", None),
                                     "from_user": getattr(consumer, "username", None),
                                 }
-                                _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_FIVE", meta=meta, source_type=src_type, source_id=src_id, matrix_account_id=matrix_account_id)
+                                _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_FIVE", meta=meta, source_type=src_type, source_id=src_id)
                                 _update_matrix_progress(recipient, pool_type="FIVE_150", level=idx + 1, amount=amt)
 
                 # Three-matrix
@@ -1121,13 +1089,8 @@ def distribute_prime_750_payouts(
                             fixed3 = []
                     if fixed3:
                         for acc in created_three:
-                            upline_nodes = _matrix_ancestor_accounts(acc, depth=three_levels)
-                            if upline_nodes:
-                                iterable = [(idx, getattr(node, "owner", None), getattr(node, "id", None)) for idx, node in enumerate(upline_nodes)]
-                            else:
-                                iterable = [(idx, recipient, None) for idx, recipient in enumerate(_resolve_upline(consumer, depth=three_levels))]
-
-                            for idx, recipient, matrix_account_id in iterable:
+                            upline15 = _matrix_ancestors(acc, depth=three_levels) or _resolve_upline(consumer, depth=three_levels)
+                            for idx, recipient in enumerate(upline15):
                                 if idx >= len(fixed3):
                                     break
                                 amt = _q2(fixed3[idx] or 0)
@@ -1151,18 +1114,13 @@ def distribute_prime_750_payouts(
                                     "from_user_id": getattr(consumer, "id", None),
                                     "from_user": getattr(consumer, "username", None),
                                 }
-                                _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_THREE", meta=meta, source_type=src_type, source_id=src_id, matrix_account_id=matrix_account_id)
+                                _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_THREE", meta=meta, source_type=src_type, source_id=src_id)
                                 _update_matrix_progress(recipient, pool_type="THREE_150", level=idx + 1, amount=amt)
                     else:
                         three_percents = _as_percents((row3_750.get("percents") or getattr(cfg2, "three_matrix_percents_json", []) or []), three_levels)
                         for acc in created_three:
-                            upline_nodes = _matrix_ancestor_accounts(acc, depth=three_levels)
-                            if upline_nodes:
-                                iterable = [(idx, getattr(node, "owner", None), getattr(node, "id", None)) for idx, node in enumerate(upline_nodes)]
-                            else:
-                                iterable = [(idx, recipient, None) for idx, recipient in enumerate(_resolve_upline(consumer, depth=three_levels))]
-
-                            for idx, recipient, matrix_account_id in iterable:
+                            upline15 = _matrix_ancestors(acc, depth=three_levels) or _resolve_upline(consumer, depth=three_levels)
+                            for idx, recipient in enumerate(upline15):
                                 if idx >= len(three_percents):
                                     break
                                 pct = three_percents[idx] or Decimal("0")
@@ -1187,7 +1145,7 @@ def distribute_prime_750_payouts(
                                     "from_user_id": getattr(consumer, "id", None),
                                     "from_user": getattr(consumer, "username", None),
                                 }
-                                _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_THREE", meta=meta, source_type=src_type, source_id=src_id, matrix_account_id=matrix_account_id)
+                                _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_THREE", meta=meta, source_type=src_type, source_id=src_id)
                                 _update_matrix_progress(recipient, pool_type="THREE_150", level=idx + 1, amount=amt)
         except Exception:
             try:

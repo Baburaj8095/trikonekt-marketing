@@ -258,19 +258,10 @@ def handle_monthly_759(task: BackgroundTask) -> None:
             continue
         is_first = bool(item.get("is_first"))
         try:
-            # IMPORTANT: Smart SSP matrix roots must be season-specific and only for the FIRST month
-            # of each season. The UI expects Smart SSP roots to be identifiable by season.
-            #
-            # Convention:
-            #   source_type = "MONTHLY_FIRST_SEASON-{season_number}"
-            #   source_id   = "{purchase_id}:{season_number}:{box_number}"
-            #
-            # For non-first boxes, we keep legacy "MONTHLY_759" source_type (payouts-only).
-            src_type = f"MONTHLY_FIRST_SEASON-{int(pkg_no)}" if (is_first and int(box_no) == 1) else "MONTHLY_759"
             distribute_monthly_759_payouts(
                 user,
                 is_first_month=is_first,
-                source={"type": src_type, "id": f"{purchase_id}:{pkg_no}:{box_no}"},
+                source={"type": "MONTHLY_759", "id": f"{purchase_id}:{pkg_no}:{box_no}"},
             )
         except Exception:
             continue

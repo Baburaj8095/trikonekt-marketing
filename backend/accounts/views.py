@@ -1384,7 +1384,7 @@ class TeamSummaryView(APIView):
                 s = (src or "").upper()
                 if any(x in s for x in ("PROMO_PURCHASE", "PRIME_750", "SUBSCRIPTION_750")):
                     return "SUBSCRIPTION_750"
-                if any(x in s for x in ("MONTHLY_759", "MONTHLY_1000", "SMART_SSP", "MONTHLY_FIRST_SEASON")):
+                if any(x in s for x in ("MONTHLY_759", "MONTHLY_1000", "SMART_SSP")):
                     return "SMART_SSP"
                 if any(x in s for x in ("ECOUPON", "COUPON_150", "SELF_250", "SELF_ACCOUNT", "SELF_REBIRTH", "PRIME_150", "PRIME150")):
                     return "SELF_REBIRTH"

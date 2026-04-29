@@ -70,7 +70,6 @@ def _credit_wallet(
     meta: Dict[str, Any] | None = None,
     source_type: str = "",
     source_id: str = "",
-    matrix_account_id: int | None = None,
 ):
     """
     Best-effort wallet credit. Business rules about whether to credit and how much
@@ -85,7 +84,6 @@ def _credit_wallet(
         meta=meta or {},
         source_type=source_type or "",
         source_id=str(source_id or ""),
-        matrix_account_id=matrix_account_id,
     )
 
 
@@ -117,12 +115,12 @@ def _as_percents(lst, length: int) -> List[Decimal]:
     return out
 
 
-def _matrix_ancestor_accounts(acc: AutoPoolAccount, depth: int) -> List[AutoPoolAccount]:
+def _matrix_ancestors(acc, depth: int) -> List[CustomUser]:
     """
-    Walk AutoPoolAccount parent chain to collect ancestor AutoPoolAccount nodes up to `depth`.
-    Dedupe by owner id to preserve existing payout semantics.
+    Walk AutoPoolAccount parent chain to collect ancestor owners up to `depth`.
+    Returns list of CustomUser recipients in order [L1..Ldepth] for matrix payouts.
     """
-    chain: List[AutoPoolAccount] = []
+    chain: List[CustomUser] = []
     try:
         seen = set()
         node = getattr(acc, "parent_account", None)
@@ -130,7 +128,7 @@ def _matrix_ancestor_accounts(acc: AutoPoolAccount, depth: int) -> List[AutoPool
             owner = getattr(node, "owner", None)
             oid = getattr(owner, "id", None) if owner else None
             if owner and oid and oid not in seen:
-                chain.append(node)
+                chain.append(owner)
                 seen.add(oid)
             node = getattr(node, "parent_account", None)
     except Exception:
@@ -236,18 +234,6 @@ def distribute_monthly_759_payouts(
     src_type = str(source.get("type") or "MONTHLY_759")
     src_id = str(source.get("id") or "")
 
-    # If the source_type encodes a season marker, treat it as a monthly "first season" trigger.
-    # This allows UI and downstream services to detect Smart SSP seats using a stable tag.
-    #
-    # Convention: MONTHLY_FIRST_SEASON-{season}
-    # Example:    MONTHLY_FIRST_SEASON-1
-    try:
-        st = src_type.strip().upper()
-        if st.startswith("MONTHLY_FIRST_SEASON-"):
-            is_first_month = True
-    except Exception:
-        pass
-
     # 1) Direct sponsor and optional self from policy
     direct_amt = _q2(box_cfg.direct_sponsor)
     if sponsor and direct_amt > 0:
@@ -315,12 +301,9 @@ def distribute_monthly_759_payouts(
                 logger.info("matrix skip: already distributed for purchase", extra={"product": "759", "user_id": getattr(consumer, "id", None), "source_id": src_id})
             except Exception:
                 pass
-        # Determine if matrix should open now.
-        # IMPORTANT: seat opening must NOT depend on commissions.monthly_759.base_amount.
-        # Even with base_amt==0 (payouts disabled/misconfigured), the user still expects
-        # the Smart SSP season root to appear in genealogy.
+        # Determine if matrix should open now (matrix-only behavior)
         should_open = False
-        if not already_for_purchase:
+        if not already_for_purchase and base_amt > 0:
             if cfg_mode == "NEVER":
                 should_open = False
             elif cfg_mode == "FIRST_MONTH_ONLY":
@@ -338,16 +321,6 @@ def distribute_monthly_759_payouts(
             acc5 = None
             acc3 = None
 
-            # Seat opening should NOT depend on commissions base_amount. Even if base_amount=0
-            # (payouts disabled/misconfigured), the user still expects the Smart SSP season root
-            # to appear in the genealogy dropdown.
-            try:
-                open_amt = _q2(CommissionConfig.get_solo().base_coupon_value)
-            except Exception:
-                open_amt = _q2("150")
-            if open_amt <= 0:
-                open_amt = _q2("150")
-
             if effective_enable5:
                 try:
                     exists5 = AutoPoolAccount.objects.filter(
@@ -359,7 +332,7 @@ def distribute_monthly_759_payouts(
                 if not exists5:
                     try:
                         acc5 = AutoPoolAccount.place_in_five_pool(
-                            consumer, "FIVE_150", open_amt, source_type=src_type, source_id=src_id
+                            consumer, "FIVE_150", base_amt, source_type=src_type, source_id=src_id
                         )
                         opened_any = True
                     except Exception:
@@ -376,7 +349,7 @@ def distribute_monthly_759_payouts(
                 if not exists3:
                     try:
                         acc3 = AutoPoolAccount.place_in_three_pool(
-                            consumer, "THREE_150", open_amt, source_type=src_type, source_id=src_id
+                            consumer, "THREE_150", base_amt, source_type=src_type, source_id=src_id
                         )
                         opened_any = True
                     except Exception:
@@ -390,282 +363,126 @@ def distribute_monthly_759_payouts(
             if effective_enable5:
                 cm5_759 = (cm5.get("759", {}) or cm5.get("rs759", {}) or cm5.get("prime759", {}) or cm5.get("prime_759", {}) or cm5.get("monthly_759", {}) or cm5.get("monthly759", {}) or {})
                 five_levels = int((cm5_759.get("levels") or cfg2.get_matrix_five_levels()))
-                upline6_accounts = _matrix_ancestor_accounts(acc5, depth=five_levels) if acc5 else []
-                upline6_users = _resolve_upline(consumer, depth=five_levels) if not acc5 else []
+                upline6 = _matrix_ancestors(acc5, depth=five_levels) if acc5 else _resolve_upline(consumer, depth=five_levels)
                 fixed5 = list(cm5_759.get("fixed_amounts") or getattr(cfg2, "five_matrix_amounts_json", []) or [])
                 if fixed5:
-                    if acc5:
-                        for idx, node in enumerate(upline6_accounts):
-                            if idx >= len(fixed5):
-                                break
-                            recipient = getattr(node, "owner", None)
-                            matrix_account_id = getattr(node, "id", None)
-                            amt = _q2(fixed5[idx] or 0)
-                            if amt <= 0:
+                    for idx, recipient in enumerate(upline6):
+                        if idx >= len(fixed5):
+                            break
+                        amt = _q2(fixed5[idx] or 0)
+                        if amt <= 0:
+                            continue
+                        try:
+                            from business.models import is_matrix_eligible as _elig
+                            if not _elig(recipient):
                                 continue
-                            try:
-                                from business.models import is_matrix_eligible as _elig
-                                if not _elig(recipient):
-                                    continue
-                            except Exception:
-                                continue
-                            if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
-                                continue
-                            meta = {
-                                "source": "FIVE_MATRIX_759_FIXED",
-                                "source_type": src_type,
-                                "source_id": src_id,
-                                "level_index": idx + 1,
-                                "fixed": True,
-                                "trigger": "MONTHLY_759",
-                                "from_user_id": getattr(consumer, "id", None),
-                                "from_user": getattr(consumer, "username", None),
-                            }
-                            _credit_wallet(
-                                recipient,
-                                amt,
-                                tx_type="AUTOPOOL_BONUS_FIVE",
-                                meta=meta,
-                                source_type=src_type,
-                                source_id=src_id,
-                                matrix_account_id=matrix_account_id,
-                            )
-                            _update_matrix_progress(recipient, pool_type="FIVE_150", level=idx + 1, amount=amt)
-                    else:
-                        for idx, recipient in enumerate(upline6_users):
-                            if idx >= len(fixed5):
-                                break
-                            amt = _q2(fixed5[idx] or 0)
-                            if amt <= 0:
-                                continue
-                            try:
-                                from business.models import is_matrix_eligible as _elig
-                                if not _elig(recipient):
-                                    continue
-                            except Exception:
-                                continue
-                            if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
-                                continue
-                            meta = {
-                                "source": "FIVE_MATRIX_759_FIXED",
-                                "source_type": src_type,
-                                "source_id": src_id,
-                                "level_index": idx + 1,
-                                "fixed": True,
-                                "trigger": "MONTHLY_759",
-                                "from_user_id": getattr(consumer, "id", None),
-                                "from_user": getattr(consumer, "username", None),
-                            }
-                            _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_FIVE", meta=meta, source_type=src_type, source_id=src_id)
-                            _update_matrix_progress(recipient, pool_type="FIVE_150", level=idx + 1, amount=amt)
+                        except Exception:
+                            continue
+                        if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
+                            continue
+                        meta = {
+                            "source": "FIVE_MATRIX_759_FIXED",
+                            "source_type": src_type,
+                            "source_id": src_id,
+                            "level_index": idx + 1,
+                            "fixed": True,
+                            "trigger": "MONTHLY_759",
+                            "from_user_id": getattr(consumer, "id", None),
+                            "from_user": getattr(consumer, "username", None),
+                        }
+                        _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_FIVE", meta=meta, source_type=src_type, source_id=src_id)
+                        _update_matrix_progress(recipient, pool_type="FIVE_150", level=idx + 1, amount=amt)
                 else:
                     five_percents = _as_percents((cm5_759.get("percents") or getattr(cfg2, "five_matrix_percents_json", []) or []), five_levels)
-                    if acc5:
-                        for idx, node in enumerate(upline6_accounts):
-                            if idx >= len(five_percents):
-                                break
-                            recipient = getattr(node, "owner", None)
-                            matrix_account_id = getattr(node, "id", None)
-                            pct = five_percents[idx] or Decimal("0")
-                            amt = _q2(base_amt * pct / Decimal("100"))
-                            if amt <= 0:
+                    for idx, recipient in enumerate(upline6):
+                        if idx >= len(five_percents):
+                            break
+                        pct = five_percents[idx] or Decimal("0")
+                        amt = _q2(base_amt * pct / Decimal("100"))
+                        if amt <= 0:
+                            continue
+                        try:
+                            from business.models import is_matrix_eligible as _elig
+                            if not _elig(recipient):
                                 continue
-                            try:
-                                from business.models import is_matrix_eligible as _elig
-                                if not _elig(recipient):
-                                    continue
-                            except Exception:
-                                continue
-                            if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
-                                continue
-                            meta = {
-                                "source": "FIVE_MATRIX_759",
-                                "source_type": src_type,
-                                "source_id": src_id,
-                                "level_index": idx + 1,
-                                "percent": str(pct),
-                                "trigger": "MONTHLY_759",
-                                "from_user_id": getattr(consumer, "id", None),
-                                "from_user": getattr(consumer, "username", None),
-                            }
-                            _credit_wallet(
-                                recipient,
-                                amt,
-                                tx_type="AUTOPOOL_BONUS_FIVE",
-                                meta=meta,
-                                source_type=src_type,
-                                source_id=src_id,
-                                matrix_account_id=matrix_account_id,
-                            )
-                            _update_matrix_progress(recipient, pool_type="FIVE_150", level=idx + 1, amount=amt)
-                    else:
-                        for idx, recipient in enumerate(upline6_users):
-                            if idx >= len(five_percents):
-                                break
-                            pct = five_percents[idx] or Decimal("0")
-                            amt = _q2(base_amt * pct / Decimal("100"))
-                            if amt <= 0:
-                                continue
-                            try:
-                                from business.models import is_matrix_eligible as _elig
-                                if not _elig(recipient):
-                                    continue
-                            except Exception:
-                                continue
-                            if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
-                                continue
-                            meta = {
-                                "source": "FIVE_MATRIX_759",
-                                "source_type": src_type,
-                                "source_id": src_id,
-                                "level_index": idx + 1,
-                                "percent": str(pct),
-                                "trigger": "MONTHLY_759",
-                                "from_user_id": getattr(consumer, "id", None),
-                                "from_user": getattr(consumer, "username", None),
-                            }
-                            _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_FIVE", meta=meta, source_type=src_type, source_id=src_id)
-                            _update_matrix_progress(recipient, pool_type="FIVE_150", level=idx + 1, amount=amt)
+                        except Exception:
+                            continue
+                        if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
+                            continue
+                        meta = {
+                            "source": "FIVE_MATRIX_759",
+                            "source_type": src_type,
+                            "source_id": src_id,
+                            "level_index": idx + 1,
+                            "percent": str(pct),
+                            "trigger": "MONTHLY_759",
+                            "from_user_id": getattr(consumer, "id", None),
+                            "from_user": getattr(consumer, "username", None),
+                        }
+                        _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_FIVE", meta=meta, source_type=src_type, source_id=src_id)
+                        _update_matrix_progress(recipient, pool_type="FIVE_150", level=idx + 1, amount=amt)
 
             if effective_enable3:
                 cm3_759 = (cm3.get("759", {}) or cm3.get("rs759", {}) or cm3.get("prime759", {}) or cm3.get("prime_759", {}) or cm3.get("monthly_759", {}) or cm3.get("monthly759", {}) or {})
                 three_levels = int((cm3_759.get("levels") or cfg2.get_matrix_three_levels()))
-                upline15_accounts = _matrix_ancestor_accounts(acc3, depth=three_levels) if acc3 else []
-                upline15_users = _resolve_upline(consumer, depth=three_levels) if not acc3 else []
+                upline15 = _matrix_ancestors(acc3, depth=three_levels) if acc3 else _resolve_upline(consumer, depth=three_levels)
                 fixed3 = list(cm3_759.get("fixed_amounts") or getattr(cfg2, "three_matrix_amounts_json", []) or [])
                 if fixed3:
-                    if acc3:
-                        for idx, node in enumerate(upline15_accounts):
-                            if idx >= len(fixed3):
-                                break
-                            recipient = getattr(node, "owner", None)
-                            matrix_account_id = getattr(node, "id", None)
-                            amt = _q2(fixed3[idx] or 0)
-                            if amt <= 0:
+                    for idx, recipient in enumerate(upline15):
+                        if idx >= len(fixed3):
+                            break
+                        amt = _q2(fixed3[idx] or 0)
+                        if amt <= 0:
+                            continue
+                        try:
+                            from business.models import is_matrix_eligible as _elig
+                            if not _elig(recipient):
                                 continue
-                            try:
-                                from business.models import is_matrix_eligible as _elig
-                                if not _elig(recipient):
-                                    continue
-                            except Exception:
-                                continue
-                            if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
-                                continue
-                            meta = {
-                                "source": "THREE_MATRIX_759_FIXED",
-                                "source_type": src_type,
-                                "source_id": src_id,
-                                "level_index": idx + 1,
-                                "fixed": True,
-                                "trigger": "MONTHLY_759",
-                                "from_user_id": getattr(consumer, "id", None),
-                                "from_user": getattr(consumer, "username", None),
-                            }
-                            _credit_wallet(
-                                recipient,
-                                amt,
-                                tx_type="AUTOPOOL_BONUS_THREE",
-                                meta=meta,
-                                source_type=src_type,
-                                source_id=src_id,
-                                matrix_account_id=matrix_account_id,
-                            )
-                            _update_matrix_progress(recipient, pool_type="THREE_150", level=idx + 1, amount=amt)
-                    else:
-                        for idx, recipient in enumerate(upline15_users):
-                            if idx >= len(fixed3):
-                                break
-                            amt = _q2(fixed3[idx] or 0)
-                            if amt <= 0:
-                                continue
-                            try:
-                                from business.models import is_matrix_eligible as _elig
-                                if not _elig(recipient):
-                                    continue
-                            except Exception:
-                                continue
-                            if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
-                                continue
-                            meta = {
-                                "source": "THREE_MATRIX_759_FIXED",
-                                "source_type": src_type,
-                                "source_id": src_id,
-                                "level_index": idx + 1,
-                                "fixed": True,
-                                "trigger": "MONTHLY_759",
-                                "from_user_id": getattr(consumer, "id", None),
-                                "from_user": getattr(consumer, "username", None),
-                            }
-                            _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_THREE", meta=meta, source_type=src_type, source_id=src_id)
-                            _update_matrix_progress(recipient, pool_type="THREE_150", level=idx + 1, amount=amt)
+                        except Exception:
+                            continue
+                        if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
+                            continue
+                        meta = {
+                            "source": "THREE_MATRIX_759_FIXED",
+                            "source_type": src_type,
+                            "source_id": src_id,
+                            "level_index": idx + 1,
+                            "fixed": True,
+                            "trigger": "MONTHLY_759",
+                            "from_user_id": getattr(consumer, "id", None),
+                            "from_user": getattr(consumer, "username", None),
+                        }
+                        _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_THREE", meta=meta, source_type=src_type, source_id=src_id)
+                        _update_matrix_progress(recipient, pool_type="THREE_150", level=idx + 1, amount=amt)
                 else:
                     three_percents = _as_percents((cm3_759.get("percents") or getattr(cfg2, "three_matrix_percents_json", []) or []), three_levels)
-                    if acc3:
-                        for idx, node in enumerate(upline15_accounts):
-                            if idx >= len(three_percents):
-                                break
-                            recipient = getattr(node, "owner", None)
-                            matrix_account_id = getattr(node, "id", None)
-                            pct = three_percents[idx] or Decimal("0")
-                            amt = _q2(base_amt * pct / Decimal("100"))
-                            if amt <= 0:
+                    for idx, recipient in enumerate(upline15):
+                        if idx >= len(three_percents):
+                            break
+                        pct = three_percents[idx] or Decimal("0")
+                        amt = _q2(base_amt * pct / Decimal("100"))
+                        if amt <= 0:
+                            continue
+                        try:
+                            from business.models import is_matrix_eligible as _elig
+                            if not _elig(recipient):
                                 continue
-                            try:
-                                from business.models import is_matrix_eligible as _elig
-                                if not _elig(recipient):
-                                    continue
-                            except Exception:
-                                continue
-                            if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
-                                continue
-                            meta = {
-                                "source": "THREE_MATRIX_759",
-                                "source_type": src_type,
-                                "source_id": src_id,
-                                "level_index": idx + 1,
-                                "percent": str(pct),
-                                "trigger": "MONTHLY_759",
-                                "from_user_id": getattr(consumer, "id", None),
-                                "from_user": getattr(consumer, "username", None),
-                            }
-                            _credit_wallet(
-                                recipient,
-                                amt,
-                                tx_type="AUTOPOOL_BONUS_THREE",
-                                meta=meta,
-                                source_type=src_type,
-                                source_id=src_id,
-                                matrix_account_id=matrix_account_id,
-                            )
-                            _update_matrix_progress(recipient, pool_type="THREE_150", level=idx + 1, amount=amt)
-                    else:
-                        for idx, recipient in enumerate(upline15_users):
-                            if idx >= len(three_percents):
-                                break
-                            pct = three_percents[idx] or Decimal("0")
-                            amt = _q2(base_amt * pct / Decimal("100"))
-                            if amt <= 0:
-                                continue
-                            try:
-                                from business.models import is_matrix_eligible as _elig
-                                if not _elig(recipient):
-                                    continue
-                            except Exception:
-                                continue
-                            if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
-                                continue
-                            meta = {
-                                "source": "THREE_MATRIX_759",
-                                "source_type": src_type,
-                                "source_id": src_id,
-                                "level_index": idx + 1,
-                                "percent": str(pct),
-                                "trigger": "MONTHLY_759",
-                                "from_user_id": getattr(consumer, "id", None),
-                                "from_user": getattr(consumer, "username", None),
-                            }
-                            _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_THREE", meta=meta, source_type=src_type, source_id=src_id)
-                            _update_matrix_progress(recipient, pool_type="THREE_150", level=idx + 1, amount=amt)
+                        except Exception:
+                            continue
+                        if _is_agency_or_employee(recipient) and not _allow_agency_in_matrix():
+                            continue
+                        meta = {
+                            "source": "THREE_MATRIX_759",
+                            "source_type": src_type,
+                            "source_id": src_id,
+                            "level_index": idx + 1,
+                            "percent": str(pct),
+                            "trigger": "MONTHLY_759",
+                            "from_user_id": getattr(consumer, "id", None),
+                            "from_user": getattr(consumer, "username", None),
+                        }
+                        _credit_wallet(recipient, amt, tx_type="AUTOPOOL_BONUS_THREE", meta=meta, source_type=src_type, source_id=src_id)
+                        _update_matrix_progress(recipient, pool_type="THREE_150", level=idx + 1, amount=amt)
 
         if opened_any:
             _matrix_mark_distributed(consumer, src_type, src_id, "759")

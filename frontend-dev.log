@@ -1,0 +1,442 @@
+
+> frontend@1.0.0 start
+> react-scripts start
+
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+(node:36996) [DEP0176] DeprecationWarning: fs.F_OK is deprecated, use fs.constants.F_OK instead
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Browserslist: browsers data (caniuse-lite) is 6 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+(node:36996) [DEP_WEBPACK_DEV_SERVER_ON_AFTER_SETUP_MIDDLEWARE] DeprecationWarning: 'onAfterSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
+(node:36996) [DEP_WEBPACK_DEV_SERVER_ON_BEFORE_SETUP_MIDDLEWARE] DeprecationWarning: 'onBeforeSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
+Starting the development server...
+
+Compiled successfully!
+
+You can now view frontend in the browser.
+
+  Local:            http://localhost:3000
+  On Your Network:  http://172.21.1.45:3000
+
+Note that the development build is not optimized.
+To create a production build, use npm run build.
+
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+(node:36996) [DEP0060] DeprecationWarning: The `util._extend` API is deprecated. Please use Object.assign() instead.
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Failed to compile.
+
+[eslint] 
+src\pages\franchise\FranchiseWalletPlaceholder.jsx
+Syntax error: Adjacent JSX elements must be wrapped in an enclosing tag. Did you want a JSX fragment <>...</>? (1006:12) (1006:12)
+[1m[31mERROR[39m[22m in [1m./src/pages/franchise/FranchiseWalletPlaceholder.jsx[39m[22m
+Module build failed (from ./node_modules/babel-loader/lib/index.js):
+SyntaxError: C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\src\pages\franchise\FranchiseWalletPlaceholder.jsx: Adjacent JSX elements must be wrapped in an enclosing tag. Did you want a JSX fragment <>...</>? (1006:12)
+
+[0m [90m 1004 |[39m                 ))}
+ [90m 1005 |[39m               [33m<[39m[33m/[39m[33mBox[39m[33m>[39m
+[31m[1m>[22m[39m[90m 1006 |[39m             [33m<[39m[33m/[39m[33mCardContent[39m[33m>[39m
+ [90m      |[39m             [31m[1m^[22m[39m
+ [90m 1007 |[39m           [33m<[39m[33m/[39m[33mCard[39m[33m>[39m
+ [90m 1008 |[39m         [33m<[39m[33m/[39m[33mBox[39m[33m>[39m
+ [90m 1009 |[39m       [33m<[39m[33m/[39m[33mBox[39m[33m>[39m[0m
+    at constructor (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:367:19)
+    at FlowParserMixin.raise (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:6630:19)
+    at FlowParserMixin.jsxParseElementAt (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:4775:18)
+    at FlowParserMixin.jsxParseElement (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:4782:17)
+    at FlowParserMixin.parseExprAtom (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:4792:19)
+    at FlowParserMixin.parseExprSubscripts (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:11085:23)
+    at FlowParserMixin.parseUpdate (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:11070:21)
+    at FlowParserMixin.parseMaybeUnary (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:11050:23)
+    at FlowParserMixin.parseMaybeUnaryOrPrivate (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:10903:61)
+    at FlowParserMixin.parseExprOps (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:10908:23)
+    at FlowParserMixin.parseMaybeConditional (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:10885:23)
+    at FlowParserMixin.parseMaybeAssign (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:10835:21)
+    at C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:3531:39
+    at FlowParserMixin.tryParse (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:6938:20)
+    at FlowParserMixin.parseMaybeAssign (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:3531:18)
+    at C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:10804:39
+    at FlowParserMixin.allowInAnd (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:12436:12)
+    at FlowParserMixin.parseMaybeAssignAllowIn (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:10804:17)
+    at FlowParserMixin.parseMaybeAssignAllowInOrVoidPattern (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:12503:17)
+    at FlowParserMixin.parseParenAndDistinguishExpression (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:11683:28)
+    at FlowParserMixin.parseParenAndDistinguishExpression (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:3624:18)
+    at FlowParserMixin.parseExprAtom (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:11335:23)
+    at FlowParserMixin.parseExprAtom (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:4797:20)
+    at FlowParserMixin.parseExprSubscripts (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:11085:23)
+    at FlowParserMixin.parseUpdate (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:11070:21)
+    at FlowParserMixin.parseMaybeUnary (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:11050:23)
+    at FlowParserMixin.parseMaybeUnaryOrPrivate (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:10903:61)
+    at FlowParserMixin.parseExprOps (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:10908:23)
+    at FlowParserMixin.parseMaybeConditional (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:10885:23)
+    at FlowParserMixin.parseMaybeAssign (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:10835:21)
+    at FlowParserMixin.parseMaybeAssign (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:3582:18)
+    at FlowParserMixin.parseFunctionBody (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:12103:24)
+    at C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:2923:63
+    at FlowParserMixin.forwardNoArrowParamsConversionAt (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:3099:16)
+    at FlowParserMixin.parseFunctionBody (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:2923:12)
+    at FlowParserMixin.parseArrowExpression (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:12085:10)
+    at FlowParserMixin.parseParenAndDistinguishExpression (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:11695:12)
+    at FlowParserMixin.parseParenAndDistinguishExpression (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:3624:18)
+    at FlowParserMixin.parseExprAtom (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:11335:23)
+    at FlowParserMixin.parseExprAtom (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:4797:20)
+    at FlowParserMixin.parseExprSubscripts (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:11085:23)
+    at FlowParserMixin.parseUpdate (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:11070:21)
+    at FlowParserMixin.parseMaybeUnary (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:11050:23)
+    at FlowParserMixin.parseMaybeUnaryOrPrivate (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:10903:61)
+    at FlowParserMixin.parseExprOps (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:10908:23)
+    at FlowParserMixin.parseMaybeConditional (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:10885:23)
+    at FlowParserMixin.parseMaybeAssign (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:10835:21)
+    at FlowParserMixin.parseMaybeAssign (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:3582:18)
+    at C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:10804:39
+    at FlowParserMixin.allowInAnd (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:12436:12)
+
+[1m[31mERROR[39m[22m in [1m[eslint] 
+src\pages\franchise\FranchiseWalletPlaceholder.jsx
+  Line 1006:12:  Parsing [1m[31merror[39m[22m[1m: Adjacent JSX elements [1m[33mmust[39m[22m[1m be wrapped in an enclosing tag. Did you want a JSX fragment <>...</>? (1006:12)
+
+[39m[22m
+
+webpack compiled with [1m[31m2 errors[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Compiled successfully!
+webpack compiled [1m[32msuccessfully[39m[22m
+Compiling...
+Failed to compile.
+
+[eslint] 
+src\App.js
+Syntax error: Missing semicolon. (1:2) (1:2)
+[1m[31mERROR[39m[22m in [1m[eslint] 
+src\App.js
+  Line 1:2:  Parsing [1m[31merror[39m[22m[1m: Missing semicolon. (1:2)
+
+[39m[22m
+
+webpack compiled with [1m[31m1 error[39m[22m
+Compiling...
+Failed to compile.
+
+[eslint] 
+src\App.js
+Syntax error: Missing semicolon. (1:2) (1:2)
+[1m[31mERROR[39m[22m in [1m./src/App.js[39m[22m
+Module build failed (from ./node_modules/babel-loader/lib/index.js):
+SyntaxError: C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\src\App.js: Missing semicolon. (1:2)
+
+[0m[31m[1m>[22m[39m[90m 1 |[39m [33mIt[39m looks like you forgot to include your [33mApp[39m[33m.[39mjs file [36min[39m the shared context[33m![39m [33mSince[39m [33mI[39m don[32m't have access to its contents, I can'[39mt modify it directly [36mfor[39m you[33m.[39m
+ [90m   |[39m   [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [33mHowever[39m[33m,[39m you can easily add the [36mpublic[39m route yourself[33m.[39m [33mHere[39m is exactly what you need to [36mdo[39m[33m:[39m
+ [90m 4 |[39m[0m
+    at constructor (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:367:19)
+    at FlowParserMixin.raise (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:6630:19)
+    at FlowParserMixin.semicolon (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:6926:10)
+    at FlowParserMixin.parseExpressionStatement (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:13294:10)
+    at FlowParserMixin.parseExpressionStatement (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:2971:18)
+    at FlowParserMixin.parseStatementContent (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:12908:19)
+    at FlowParserMixin.parseStatementLike (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:12776:17)
+    at FlowParserMixin.parseStatementLike (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:2949:24)
+    at FlowParserMixin.parseModuleItem (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:12753:17)
+    at FlowParserMixin.parseBlockOrModuleBlockBody (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:13325:36)
+    at FlowParserMixin.parseBlockBody (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:13318:10)
+    at FlowParserMixin.parseProgram (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:12634:10)
+    at FlowParserMixin.parseTopLevel (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:12624:25)
+    at FlowParserMixin.parseTopLevel (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:3718:28)
+    at FlowParserMixin.parse (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:14501:10)
+    at parse (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:14535:38)
+    at parser (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\core\lib\parser\index.js:41:34)
+    at parser.next (<anonymous>)
+    at normalizeFile (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\core\lib\transformation\normalize-file.js:64:37)
+    at normalizeFile.next (<anonymous>)
+    at run (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\core\lib\transformation\index.js:22:50)
+    at run.next (<anonymous>)
+    at transform (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\core\lib\transform.js:22:33)
+    at transform.next (<anonymous>)
+    at step (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\gensync\index.js:261:32)
+    at C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\gensync\index.js:273:13
+    at async.call.result.err.err (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\gensync\index.js:223:11)
+
+[1m[31mERROR[39m[22m in [1m[eslint] 
+src\App.js
+  Line 1:2:  Parsing [1m[31merror[39m[22m[1m: Missing semicolon. (1:2)
+
+[39m[22m
+
+webpack compiled with [1m[31m2 errors[39m[22m
+Compiling...
+Failed to compile.
+
+[eslint] 
+src\App.js
+Syntax error: Unexpected token (3:0) (3:undefined)
+[1m[31mERROR[39m[22m in [1m./src/App.js[39m[22m
+Module build failed (from ./node_modules/babel-loader/lib/index.js):
+SyntaxError: C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\src\App.js: Unexpected token (3:0)
+
+[0m [90m 1 |[39m
+ [90m 2 |[39m [36mimport[39m [33mFranchiseWalletPlaceholder[39m [36mfrom[39m [32m'./pages/franchise/FranchiseWalletPlaceholder'[39m[33m;[39m
+[31m[1m>[22m[39m[90m 3 |[39m [33m*[39m([33mNote[39m[33m:[39m [33mYou[39m may need to adjust the relative path [32m'./pages/franchise/FranchiseWalletPlaceholder'[39m depending on where your
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 4 |[39m
+ [90m 5 |[39m [36mimport[39m { [33mBrowserRouter[39m[33m,[39m [33mRoutes[39m[33m,[39m [33mRoute[39m[33m,[39m [33mNavigate[39m[33m,[39m useLocation } [36mfrom[39m [32m"react-router-dom"[39m[33m;[39m
+ [90m 6 |[39m [36mimport[39m [33mLogin[39m [36mfrom[39m [32m"./pages/Auth/Login"[39m[33m;[39m[0m
+    at constructor (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:367:19)
+    at FlowParserMixin.raise (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:6630:19)
+    at FlowParserMixin.unexpected (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:6650:16)
+    at FlowParserMixin.parseExprAtom (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:11451:16)
+    at FlowParserMixin.parseExprAtom (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:4797:20)
+    at FlowParserMixin.parseExprSubscripts (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:11085:23)
+    at FlowParserMixin.parseUpdate (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:11070:21)
+    at FlowParserMixin.parseMaybeUnary (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:11050:23)
+    at FlowParserMixin.parseMaybeUnaryOrPrivate (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:10903:61)
+    at FlowParserMixin.parseExprOps (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:10908:23)
+    at FlowParserMixin.parseMaybeConditional (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:10885:23)
+    at FlowParserMixin.parseMaybeAssign (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:10835:21)
+    at FlowParserMixin.parseMaybeAssign (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:3582:18)
+    at FlowParserMixin.parseExpressionBase (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:10788:23)
+    at C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:10784:39
+    at FlowParserMixin.allowInAnd (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:12431:16)
+    at FlowParserMixin.parseExpression (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:10784:17)
+    at FlowParserMixin.parseStatementContent (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:12904:23)
+    at FlowParserMixin.parseStatementLike (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:12776:17)
+    at FlowParserMixin.parseStatementLike (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:2949:24)
+    at FlowParserMixin.parseModuleItem (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:12753:17)
+    at FlowParserMixin.parseBlockOrModuleBlockBody (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:13325:36)
+    at FlowParserMixin.parseBlockBody (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:13318:10)
+    at FlowParserMixin.parseProgram (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:12634:10)
+    at FlowParserMixin.parseTopLevel (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:12624:25)
+    at FlowParserMixin.parseTopLevel (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:3718:28)
+    at FlowParserMixin.parse (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:14501:10)
+    at parse (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:14535:38)
+    at parser (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\core\lib\parser\index.js:41:34)
+    at parser.next (<anonymous>)
+    at normalizeFile (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\core\lib\transformation\normalize-file.js:64:37)
+    at normalizeFile.next (<anonymous>)
+    at run (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\core\lib\transformation\index.js:22:50)
+    at run.next (<anonymous>)
+    at transform (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\core\lib\transform.js:22:33)
+    at transform.next (<anonymous>)
+    at step (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\gensync\index.js:261:32)
+    at C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\gensync\index.js:273:13
+    at async.call.result.err.err (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\gensync\index.js:223:11)
+
+[1m[31mERROR[39m[22m in [1m[eslint] 
+src\App.js
+  Line 3:  Parsing [1m[31merror[39m[22m[1m: [1m[31mUnexpected[39m[22m[1m token (3:0)
+
+[39m[22m
+
+webpack compiled with [1m[31m2 errors[39m[22m
+Compiling...
+Failed to compile.
+
+[eslint] 
+src\App.js
+Syntax error: Identifier 'FranchiseWalletPlaceholder' has already been declared. (115:7) (115:7)
+[1m[31mERROR[39m[22m in [1m./src/App.js[39m[22m
+Module build failed (from ./node_modules/babel-loader/lib/index.js):
+SyntaxError: C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\src\App.js: Identifier 'FranchiseWalletPlaceholder' has already been declared. (115:7)
+
+[0m [90m 113 |[39m [36mimport[39m [33mFranchiseGrowthDashboard[39m [36mfrom[39m [32m"./pages/franchise/FranchiseGrowthDashboard"[39m[33m;[39m
+ [90m 114 |[39m [36mimport[39m [33mFranchiseGrowthDashboardDemo[39m [36mfrom[39m [32m"./pages/franchise/FranchiseGrowthDashboardDemo"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 115 |[39m [36mimport[39m [33mFranchiseWalletPlaceholder[39m [36mfrom[39m [32m"./pages/franchise/FranchiseWalletPlaceholder"[39m[33m;[39m
+ [90m     |[39m        [31m[1m^[22m[39m
+ [90m 116 |[39m [36mimport[39m [33mFranchiseShell[39m [36mfrom[39m [32m"./components/franchise/FranchiseShell"[39m[33m;[39m
+ [90m 117 |[39m [36mimport[39m [33mUserDashboard2Shell[39m [36mfrom[39m [32m"./pages/v2/UserDashboard2Shell"[39m[33m;[39m
+ [90m 118 |[39m [36mimport[39m [33mHomeV2[39m [36mfrom[39m [32m"./pages/v2/HomeV2"[39m[33m;[39m[0m
+    at constructor (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:367:19)
+    at FlowParserMixin.raise (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:6630:19)
+    at FlowScopeHandler.checkRedeclarationInScope (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:1647:19)
+    at FlowScopeHandler.declareName (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:1613:12)
+    at FlowScopeHandler.declareName (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:1714:11)
+    at FlowParserMixin.declareNameFromIdentifier (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:7594:16)
+    at FlowParserMixin.checkIdentifier (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:7590:12)
+    at FlowParserMixin.checkLVal (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:7529:12)
+    at FlowParserMixin.finishImportSpecifier (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:14275:10)
+    at FlowParserMixin.parseImportSpecifierLocal (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:3414:31)
+    at FlowParserMixin.maybeParseDefaultImportSpecifier (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:14379:12)
+    at FlowParserMixin.parseImportSpecifiersAndAfter (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:14248:29)
+    at FlowParserMixin.parseImport (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:14244:17)
+    at FlowParserMixin.parseStatementContent (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:12885:27)
+    at FlowParserMixin.parseStatementLike (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:12776:17)
+    at FlowParserMixin.parseStatementLike (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:2949:24)
+    at FlowParserMixin.parseModuleItem (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:12753:17)
+    at FlowParserMixin.parseBlockOrModuleBlockBody (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:13325:36)
+    at FlowParserMixin.parseBlockBody (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:13318:10)
+    at FlowParserMixin.parseProgram (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:12634:10)
+    at FlowParserMixin.parseTopLevel (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:12624:25)
+    at FlowParserMixin.parseTopLevel (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:3718:28)
+    at FlowParserMixin.parse (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:14501:10)
+    at parse (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:14535:38)
+    at parser (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\core\lib\parser\index.js:41:34)
+    at parser.next (<anonymous>)
+    at normalizeFile (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\core\lib\transformation\normalize-file.js:64:37)
+    at normalizeFile.next (<anonymous>)
+    at run (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\core\lib\transformation\index.js:22:50)
+    at run.next (<anonymous>)
+    at transform (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\core\lib\transform.js:22:33)
+    at transform.next (<anonymous>)
+    at step (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\gensync\index.js:261:32)
+    at C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\gensync\index.js:273:13
+    at async.call.result.err.err (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\gensync\index.js:223:11)
+
+[1m[31mERROR[39m[22m in [1m[eslint] 
+src\App.js
+  Line 115:7:  Parsing [1m[31merror[39m[22m[1m: Identifier 'FranchiseWalletPlaceholder' has already been declared. (115:7)
+
+[39m[22m
+
+webpack compiled with [1m[31m2 errors[39m[22m
+Compiling...
+Failed to compile.
+
+[eslint] 
+src\App.js
+Syntax error: Identifier 'FranchiseWalletPlaceholder' has already been declared. (113:7) (113:7)
+[1m[31mERROR[39m[22m in [1m./src/App.js[39m[22m
+Module build failed (from ./node_modules/babel-loader/lib/index.js):
+SyntaxError: C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\src\App.js: Identifier 'FranchiseWalletPlaceholder' has already been declared. (113:7)
+
+[0m [90m 111 |[39m [36mimport[39m [33mFranchiseGrowthDashboard[39m [36mfrom[39m [32m"./pages/franchise/FranchiseGrowthDashboard"[39m[33m;[39m
+ [90m 112 |[39m [36mimport[39m [33mFranchiseGrowthDashboardDemo[39m [36mfrom[39m [32m"./pages/franchise/FranchiseGrowthDashboardDemo"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 113 |[39m [36mimport[39m [33mFranchiseWalletPlaceholder[39m [36mfrom[39m [32m"./pages/franchise/FranchiseWalletPlaceholder"[39m[33m;[39m
+ [90m     |[39m        [31m[1m^[22m[39m
+ [90m 114 |[39m [36mimport[39m [33mFranchiseShell[39m [36mfrom[39m [32m"./components/franchise/FranchiseShell"[39m[33m;[39m
+ [90m 115 |[39m [36mimport[39m [33mUserDashboard2Shell[39m [36mfrom[39m [32m"./pages/v2/UserDashboard2Shell"[39m[33m;[39m
+ [90m 116 |[39m [36mimport[39m [33mHomeV2[39m [36mfrom[39m [32m"./pages/v2/HomeV2"[39m[33m;[39m[0m
+    at constructor (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:367:19)
+    at FlowParserMixin.raise (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:6630:19)
+    at FlowScopeHandler.checkRedeclarationInScope (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:1647:19)
+    at FlowScopeHandler.declareName (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:1613:12)
+    at FlowScopeHandler.declareName (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:1714:11)
+    at FlowParserMixin.declareNameFromIdentifier (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:7594:16)
+    at FlowParserMixin.checkIdentifier (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:7590:12)
+    at FlowParserMixin.checkLVal (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:7529:12)
+    at FlowParserMixin.finishImportSpecifier (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:14275:10)
+    at FlowParserMixin.parseImportSpecifierLocal (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:3414:31)
+    at FlowParserMixin.maybeParseDefaultImportSpecifier (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:14379:12)
+    at FlowParserMixin.parseImportSpecifiersAndAfter (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:14248:29)
+    at FlowParserMixin.parseImport (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:14244:17)
+    at FlowParserMixin.parseStatementContent (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:12885:27)
+    at FlowParserMixin.parseStatementLike (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:12776:17)
+    at FlowParserMixin.parseStatementLike (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:2949:24)
+    at FlowParserMixin.parseModuleItem (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:12753:17)
+    at FlowParserMixin.parseBlockOrModuleBlockBody (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:13325:36)
+    at FlowParserMixin.parseBlockBody (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:13318:10)
+    at FlowParserMixin.parseProgram (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:12634:10)
+    at FlowParserMixin.parseTopLevel (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:12624:25)
+    at FlowParserMixin.parseTopLevel (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:3718:28)
+    at FlowParserMixin.parse (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:14501:10)
+    at parse (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\parser\lib\index.js:14535:38)
+    at parser (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\core\lib\parser\index.js:41:34)
+    at parser.next (<anonymous>)
+    at normalizeFile (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\core\lib\transformation\normalize-file.js:64:37)
+    at normalizeFile.next (<anonymous>)
+    at run (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\core\lib\transformation\index.js:22:50)
+    at run.next (<anonymous>)
+    at transform (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\@babel\core\lib\transform.js:22:33)
+    at transform.next (<anonymous>)
+    at step (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\gensync\index.js:261:32)
+    at C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\gensync\index.js:273:13
+    at async.call.result.err.err (C:\App\15-04-2026 frsh\trikonekt-marketing-main\trikonekt-marketing-main\frontend\node_modules\gensync\index.js:223:11)
+
+[1m[31mERROR[39m[22m in [1m[eslint] 
+src\App.js
+  Line 113:7:  Parsing [1m[31merror[39m[22m[1m: Identifier 'FranchiseWalletPlaceholder' has already been declared. (113:7)
+
+[39m[22m
+
+webpack compiled with [1m[31m2 errors[39m[22m
+^C^C

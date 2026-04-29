@@ -1,68 +1,6 @@
 from rest_framework import serializers
-from .models import (
-    BusinessRegistration,
-    DailyReport,
-    TriApp,
-    TriAppProduct,
-    MerchantCategory,
-    MerchantSubCategory,
-    FranchiseAchiever,
-    WishingBanner,
-)
+from .models import BusinessRegistration, DailyReport, TriApp, TriAppProduct, MerchantCategory, MerchantSubCategory
 from locations.models import Country, State, City
-
-
-class FranchiseAchieverSerializer(serializers.ModelSerializer):
-    photo_url = serializers.SerializerMethodField()
-
-    class Meta:
-        model = FranchiseAchiever
-        fields = [
-            "id",
-            "pincode",
-            "name",
-            "achieved",
-            "sort_order",
-            "is_active",
-            "photo",
-            "photo_url",
-            "created_at",
-            "updated_at",
-        ]
-        read_only_fields = ["id", "created_at", "updated_at", "photo_url"]
-
-    def get_photo_url(self, obj):
-        try:
-            if not getattr(obj, "photo", None):
-                return None
-            return obj.photo.url
-        except Exception:
-            return None
-
-
-class WishingBannerSerializer(serializers.ModelSerializer):
-    image_url = serializers.SerializerMethodField()
-
-    class Meta:
-        model = WishingBanner
-        fields = [
-            "id",
-            "title",
-            "image",
-            "image_url",
-            "is_active",
-            "created_at",
-            "updated_at",
-        ]
-        read_only_fields = ["id", "created_at", "updated_at", "image_url"]
-
-    def get_image_url(self, obj):
-        try:
-            if not getattr(obj, "image", None):
-                return None
-            return obj.image.url
-        except Exception:
-            return None
 
 
 class BusinessRegistrationSerializer(serializers.ModelSerializer):

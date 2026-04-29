@@ -42,13 +42,11 @@ export default function LoginV2() {
   const location = useLocation();
   const { role: roleParam } = useParams();
 
-  // Allow both user (consumer) and team_user for dual login UI
   const ALLOWED_ROLES = ["user", "agency", "employee", "business"];
   const lockedRole = ALLOWED_ROLES.includes(String(roleParam || "").toLowerCase())
     ? String(roleParam).toLowerCase()
     : null;
 
-  // Default to consumer login tab
   const [role, setRole] = useState(lockedRole || "user");
 
   useEffect(() => {
@@ -107,7 +105,7 @@ export default function LoginV2() {
     }
   };
 
-  // Submit login with dual-role support
+  // Submit login (unchanged logic)
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg("");
@@ -115,9 +113,7 @@ export default function LoginV2() {
 
     try {
       let username = (formData.username || "").trim();
-      // Map team_user UI choice back to user role for backend
-      let submitRole = role === "team_user" ? "user" : role;
-      let loginContext = role === "team_user" ? "team" : "consumer";
+      let submitRole = role;
 
       // Role mismatch guard  auto-correct role based on registered category
       const resolved = await resolveRegisteredRole(username);
@@ -166,8 +162,6 @@ export default function LoginV2() {
       store.setItem(`token_${ns}`, access);
       if (refreshTok) store.setItem(`refresh_${ns}`, refreshTok);
       store.setItem(`role_${ns}`, roleEffective || tokenRole || "user");
-      // Store login context (consumer or team)
-      store.setItem(`login_context_${ns}`, loginContext);
 
       try {
         const authHeaders = { headers: { Authorization: `Bearer ${access}` } };
@@ -184,21 +178,13 @@ export default function LoginV2() {
       if (remember) localStorage.setItem("remember_username", username);
       else localStorage.removeItem("remember_username");
 
-      // Redirects based on role AND login context
+      // Redirects
       if (payload?.is_staff || payload?.is_superuser) {
         navigate("/admin/dashboard", { replace: true });
       } else {
         const eff = String(roleEffective || tokenRole || "user").toLowerCase();
-        if (eff === "user") {
-          // Route to either consumer dashboard or team dashboard based on login context
-          if (loginContext === "team") {
-            navigate("/team/genealogy", { replace: true });
-          } else {
-            navigate("/user/dashboard2", { replace: true });
-          }
-        } else {
-          navigate(`/${eff}/dashboard`, { replace: true });
-        }
+        if (eff === "user") navigate("/user/dashboard2", { replace: true });
+        else navigate(`/${eff}/dashboard`, { replace: true });
       }
     } catch (err) {
       console.error(err);
@@ -334,58 +320,11 @@ export default function LoginV2() {
           </Box>
 
           {/* Title */}
-          <Box sx={{ textAlign: "center", mb: 2.5 }}>
+          <Box sx={{ textAlign: "center", mb: 2 }}>
             <Typography sx={{ fontSize: 24, fontWeight: 700, color: "#111827" }}>Login</Typography>
             <Typography sx={{ fontSize: 14, color: "#6B7280", mt: 0.5 }}>
               Secure access to your account
             </Typography>
-          </Box>
-
-          {/* Role Tabs: Consumer vs Team Login */}
-          <Box
-            sx={{
-              display: "flex",
-              gap: 1,
-              mb: 2.5,
-              p: 1,
-              bgcolor: "#F3F4F6",
-              borderRadius: 1.5,
-            }}
-          >
-            <button
-              onClick={() => setRole("user")}
-              style={{
-                flex: 1,
-                padding: "10px 12px",
-                borderRadius: 10,
-                border: "none",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-                backgroundColor: role === "user" ? "#FF7B00" : "transparent",
-                color: role === "user" ? "#FFFFFF" : "#6B7280",
-                transition: "all 0.2s ease",
-              }}
-            >
-              Consumer Login
-            </button>
-            <button
-              onClick={() => setRole("team_user")}
-              style={{
-                flex: 1,
-                padding: "10px 12px",
-                borderRadius: 10,
-                border: "none",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-                backgroundColor: role === "team_user" ? "#FF7B00" : "transparent",
-                color: role === "team_user" ? "#FFFFFF" : "#6B7280",
-                transition: "all 0.2s ease",
-              }}
-            >
-              Team Login
-            </button>
           </Box>
 
           {/* Alerts (unchanged logic) */}

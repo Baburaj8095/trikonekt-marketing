@@ -64,14 +64,9 @@ import LOGO from "../../assets/TRIKONEKT.jpg";
 const Login = () => {
   // === LOGIC STATES (kept from original) ===
   const [mode, setMode] = useState("login"); // "login" | "register"
-  // NOTE: Login page should show only Team Login and Franchise Login.
-  // We still keep the old `role` state because the rest of the file (registration logic, field renderers,
-  // resolveRegisteredRole, etc.) references it, but we *force* it based on the selected loginMode.
   const [role, setRole] = useState("user"); // user | agency | employee | business
   const ALLOWED_ROLES = ["user", "agency", "employee", "business"];
   const { role: roleParam } = useParams();
-  // We do not expose role selection in the UI anymore (team/franchise only),
-  // so we only use the param to pick the *default* login mode once.
   const lockedRole = ALLOWED_ROLES.includes(String(roleParam || "").toLowerCase())
     ? String(roleParam).toLowerCase()
     : null;
@@ -89,25 +84,11 @@ const Login = () => {
     setMounted(true);
   }, []);
 
-  // We used to lock a role via route param, but the new requirement is:
-  // Login page should show only Team Login and Franchise Login.
-  // So we only use the param to pick the *default* login mode once.
-  const initLoginModeRef = useRef(false);
+  // If a role is locked via route param, force-select it
   useEffect(() => {
-    if (initLoginModeRef.current) return;
-    initLoginModeRef.current = true;
-    try {
-      if (lockedRole === "agency") {
-        setLoginMode("franchise");
-        setLoginContext("team");
-        setRole("agency");
-      } else {
-        // default to team login
-        setLoginMode("team");
-        setLoginContext("team");
-        setRole("user");
-      }
-    } catch (_) {}
+    if (lockedRole && role !== lockedRole) {
+      setRole(lockedRole);
+    }
   }, [lockedRole]);
 
   // If already authenticated:
@@ -228,10 +209,9 @@ const Login = () => {
     if (val) setRole(val);
   };
   const handleRegisterNav = () => {
-    // Registration page should show only Consumer registration
     const s = normalizeSponsor(sponsorId);
     const qs = s ? `?sponsor=${encodeURIComponent(s)}` : "";
-    navigate(`/auth/register-v2/user${qs}`);
+    navigate(`/auth/register-v2/${role}${qs}`);
   };
 
   const [formData, setFormData] = useState({
@@ -244,13 +224,6 @@ const Login = () => {
     business_category: "",
     address: "",
   });
-  // Login page should show only Team Login and Franchise Login.
-  // "team" uses the existing team-login handling already present in this file.
-  // "franchise" logs into agency namespace and redirects to /franchise/dashboard.
-  const [loginMode, setLoginMode] = useState("team"); // team | franchise
-  // Keep loginContext for backward compatibility with ConsumerShell menu restrictions.
-  // For this screen, we always set loginContext to "team".
-  const [loginContext, setLoginContext] = useState("team");
   const handleChange = (e) => {
     const { name, value } = e.target;
     if (name === "username" && role === "user") {
@@ -667,15 +640,6 @@ const Login = () => {
   };
 
   const isLogin = true;
-
-  // Force the legacy `role` state to match the selected login mode.
-  // - team login authenticates in the consumer namespace (role=user)
-  // - franchise login authenticates in the agency namespace (role=agency)
-  useEffect(() => {
-    try {
-      setRole(loginMode === "franchise" ? "agency" : "user");
-    } catch (_) {}
-  }, [loginMode]);
 
   // Load sponsor-constrained pincodes for Consumer/Employee registration
   useEffect(() => {
@@ -1255,22 +1219,21 @@ const Login = () => {
   };
 
   const loginField = useMemo(() => {
-    // Team login uses phone number; Franchise login uses username.
-    if (loginMode === "franchise") {
+    if (role === "user") {
       return {
-        label: "Username",
-        type: "text",
-        inputMode: "text",
-        placeholder: "Enter username",
+        label: "Phone Number",
+        type: "tel",
+        inputMode: "numeric",
+        placeholder: "Enter 10-digit phone number",
       };
     }
     return {
-      label: "Phone Number",
-      type: "tel",
-      inputMode: "numeric",
-      placeholder: "Enter 10-digit phone number",
+      label: "Username",
+      type: "text",
+      inputMode: "text",
+      placeholder: "Enter username",
     };
-  }, [loginMode]);
+  }, [role]);
 
   // Pretty-print role for contextual login error message
   const prettyRole = (r) =>
@@ -1303,9 +1266,7 @@ const Login = () => {
     try {
         // Accept username or phone; backend resolves and disambiguates if needed
         let username = (formData.username || "").trim();
-        // Team login is the existing login (consumer namespace, but uses stored loginContext=team)
-        // Franchise login must authenticate as agency and be restricted to geo franchise categories.
-        let submitRole = loginMode === "franchise" ? "agency" : role;
+        let submitRole = role;
 
         if (submitRole === "user") {
           const phone = (username || "").replace(/\D/g, "").slice(0, 10);
@@ -1317,14 +1278,11 @@ const Login = () => {
         }
 
         // Role mismatch guard  auto-correct role based on registered category
-        // (Skip auto-correct for franchise login because it must stay as agency)
-        if (loginMode !== "franchise") {
-          const resolved = await resolveRegisteredRole(username);
-          if (resolved && resolved !== submitRole) {
-            submitRole = resolved;
-            try { setRole(resolved); } catch (_) {}
-            setSuccessMsg(`Detected account type ${prettyRole(resolved)}. Proceeding with ${prettyRole(resolved)} login.`);
-          }
+        const resolved = await resolveRegisteredRole(username);
+        if (resolved && resolved !== submitRole) {
+          submitRole = resolved;
+          try { setRole(resolved); } catch (_) {}
+          setSuccessMsg(`Detected account type ${prettyRole(resolved)}. Proceeding with ${prettyRole(resolved)} login.`);
         }
 
         const res = await API.post("/accounts/login/", {
@@ -1341,21 +1299,15 @@ const Login = () => {
         const tokenRole = payload?.role;
         const tokenUsername = payload?.username;
         const tokenFullName = payload?.full_name;
-        const tokenCategory = String(payload?.category || "").toLowerCase();
 
         if (!tokenRole) throw new Error("Token missing role claim");
 
         // Determine effective app namespace from token role/category
-        // IMPORTANT: Some legacy agency accounts may have role="user" but category="agency_*".
-        // For routing/storage we must treat those as agency.
-        const catLower = String(payload?.category || "").toLowerCase();
         const roleEffective =
           payload?.role_effective ||
-          (catLower === "business" || catLower === "merchant" ? "business" : tokenRole);
+          (String(payload?.category || "").toLowerCase() === "business" ? "business" : tokenRole);
 
-        const isAdmin = Boolean(payload?.is_staff || payload?.is_superuser);
-        const isAgencyActor = String(tokenRole || "").toLowerCase() === "agency" || catLower.startsWith("agency_") || catLower === "company" || catLower === "company_manager";
-        const ns = isAdmin ? "admin" : (isAgencyActor ? "agency" : (roleEffective || tokenRole || "user"));
+        const ns = (payload?.is_staff || payload?.is_superuser) ? "admin" : (roleEffective || tokenRole || "user");
         const store = localStorage;
 
         // Clean legacy non-namespaced keys to avoid cross-role collisions
@@ -1370,11 +1322,6 @@ const Login = () => {
           sessionStorage.removeItem("user");
         } catch (_) {}
 
-        // Persist login context chosen by the user (consumer | team)
-        // Franchise/agency namespace still stores this key for compatibility, but remains "team" for this screen.
-        try {
-          store.setItem(`login_context_${ns}`, loginContext === "team" ? "team" : "consumer");
-        } catch (_) {}
         store.setItem(`token_${ns}`, access);
         if (refreshTok) store.setItem(`refresh_${ns}`, refreshTok);
         store.setItem(`role_${ns}`, roleEffective || tokenRole || "user");
@@ -1408,43 +1355,6 @@ const Login = () => {
         if (payload?.is_staff || payload?.is_superuser) {
           navigate("/admin/dashboard", { replace: true });
         } else {
-          // Franchise login: block sub-franchise category and force franchise dashboard route.
-          if (loginMode === "franchise") {
-            const allowedCats = new Set([
-              "agency_state_coordinator",
-              "agency_state",
-              "agency_district_coordinator",
-              "agency_district",
-              "agency_pincode_coordinator",
-              "agency_pincode",
-            ]);
-            if (!allowedCats.has(tokenCategory)) {
-              try {
-                localStorage.removeItem("token_agency");
-                localStorage.removeItem("refresh_agency");
-                localStorage.removeItem("role_agency");
-                localStorage.removeItem("user_agency");
-                sessionStorage.removeItem("token_agency");
-                sessionStorage.removeItem("refresh_agency");
-                sessionStorage.removeItem("role_agency");
-                sessionStorage.removeItem("user_agency");
-              } catch (_) {}
-              setErrorMsg("This account is not allowed for Franchise Login.");
-              return;
-            }
-            // Keep agency login behavior under /agency/*.
-            // We expose the new franchise UI screens inside the agency area.
-            navigate(`/agency/franchise-dashboard`, { replace: true });
-            return;
-          }
-
-          // Team login should land on Genealogy-5 screen.
-          // This is still under the consumer/user namespace.
-          if (loginMode === "team") {
-            navigate(`/user/genealogy-5`, { replace: true });
-            return;
-          }
-
           navigate(`/${roleEffective || tokenRole || "user"}/dashboard`, { replace: true });
         }
     } catch (err) {
@@ -2231,7 +2141,7 @@ const Login = () => {
             sx={{ textTransform: "none", fontWeight: 600, mr: 1 }}
             onClick={() => setDrawerOpen(true)}
           >
-            {loginMode === "franchise" ? "Franchise Login" : "Team Login"}
+            {prettyRole(role)}
           </Button>
           <IconButton color="inherit" onClick={() => setDrawerOpen(true)} aria-label="open menu">
             <MenuIcon />
@@ -2389,47 +2299,27 @@ const Login = () => {
             )}
 
             {isLogin && (
-              <Box sx={{ mb: 2 }}>
-                <ToggleButtonGroup
-                  value={loginMode}
-                  exclusive
-                  onChange={(_, v) => {
-                    if (!v) return;
-                    setLoginMode(v);
-                    // Persist the existing loginContext behaviour (team is already handled)
-                    setLoginContext("team");
-                    // Make role consistent with selected mode
-                    try { setRole(v === "franchise" ? "agency" : "user"); } catch (_) {}
-                  }}
-                  size="small"
-                  fullWidth
-                  sx={{ mb: 1 }}
-                >
-                  <ToggleButton value="team">Team Login</ToggleButton>
-                  <ToggleButton value="franchise">Franchise Login</ToggleButton>
-                </ToggleButtonGroup>
-                <TextField
-                  fullWidth
-                  name="username"
-                  value={formData.username}
-                  label={loginField.label}
-                  placeholder={loginField.placeholder}
-                  type={loginField.type}
-                  autoComplete="off"
-                  inputProps={{ inputMode: loginField.inputMode, ...(role === "user" ? { maxLength: 10, pattern: "[0-9]*" } : {}) }}
-                  onChange={handleChange}
-                  sx={{ mb: 2 }}
-                  required
-                  InputLabelProps={{ shrink: true }}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start" sx={{ mr: 0.5 }}>
-                        <AccountCircle fontSize="small" />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-              </Box>
+              <TextField
+                fullWidth
+                name="username"
+                value={formData.username}
+                label={loginField.label}
+                placeholder={loginField.placeholder}
+                type={loginField.type}
+                autoComplete="off"
+                inputProps={{ inputMode: loginField.inputMode, ...(role === "user" ? { maxLength: 10, pattern: "[0-9]*" } : {}) }}
+                onChange={handleChange}
+                sx={{ mb: 2 }}
+                required
+                InputLabelProps={{ shrink: true }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start" sx={{ mr: 0.5 }}>
+                      <AccountCircle fontSize="small" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
             )}
 
             <TextField
@@ -2581,30 +2471,21 @@ const Login = () => {
           </Box>
           <Divider />
           <List>
-            <ListItemButton
-              selected={loginMode === "team"}
-              onClick={() => {
-                setLoginMode("team");
-                setLoginContext("team");
-                setRole("user");
-                setDrawerOpen(false);
-              }}
-            >
+            <ListItemButton selected={role === "user"} onClick={() => { setRole("user"); setDrawerOpen(false); }}>
               <ListItemIcon><PersonIcon /></ListItemIcon>
-              <ListItemText primary="Team Login" />
+              <ListItemText primary="Consumer" />
             </ListItemButton>
-
-            <ListItemButton
-              selected={loginMode === "franchise"}
-              onClick={() => {
-                setLoginMode("franchise");
-                setLoginContext("team");
-                setRole("agency");
-                setDrawerOpen(false);
-              }}
-            >
+            <ListItemButton selected={role === "agency"} onClick={() => { setRole("agency"); setDrawerOpen(false); }}>
               <ListItemIcon><StoreIcon /></ListItemIcon>
-              <ListItemText primary="Franchise Login" />
+              <ListItemText primary="Agency" />
+            </ListItemButton>
+            <ListItemButton selected={role === "employee"} onClick={() => { setRole("employee"); setDrawerOpen(false); }}>
+              <ListItemIcon><WorkIcon /></ListItemIcon>
+              <ListItemText primary="Sarathi" />
+            </ListItemButton>
+            <ListItemButton selected={role === "business"} onClick={() => { setRole("business"); setDrawerOpen(false); }}>
+              <ListItemIcon><BusinessIcon /></ListItemIcon>
+              <ListItemText primary="Merchant" />
             </ListItemButton>
           </List>
         </Box>

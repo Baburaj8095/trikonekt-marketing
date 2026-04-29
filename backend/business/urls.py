@@ -42,15 +42,6 @@ from .views import (
     # Matrix tree + sentinel admin
     MatrixTreeView,
     AdminMatrixEnforceSentinelView,
-
-    # Franchise dashboard / admin-managed banners+achievers
-    FranchiseDashboardMetricsView,
-    FranchiseWishingBannersPublicView,
-    FranchiseAchieversPublicView,
-    AdminFranchiseAchieverListCreateView,
-    AdminFranchiseAchieverDetailView,
-    AdminWishingBannerListCreateView,
-    AdminWishingBannerDetailView,
 )
 
 urlpatterns = [
@@ -104,17 +95,4 @@ urlpatterns = [
     # Matrix Tree (entry-based) and Sentinel enforcement
     path('matrix/tree/', MatrixTreeView.as_view(), name='matrix_tree'),
     path('admin/matrix/enforce-sentinel/', AdminMatrixEnforceSentinelView.as_view(), name='admin_matrix_enforce_sentinel'),
-
-    # ==========================
-    # Franchise Dashboard helpers
-    # ==========================
-    path('franchise/dashboard-metrics/', FranchiseDashboardMetricsView.as_view(), name='franchise_dashboard_metrics'),
-    path('franchise/wishing-banners/', FranchiseWishingBannersPublicView.as_view(), name='franchise_wishing_banners'),
-    path('franchise/achievers/', FranchiseAchieversPublicView.as_view(), name='franchise_achievers'),
-
-    # Admin CRUD (used by Admin dashboard new screens)
-    path('admin/franchise/achievers/', AdminFranchiseAchieverListCreateView.as_view(), name='admin_franchise_achievers'),
-    path('admin/franchise/achievers/<int:pk>/', AdminFranchiseAchieverDetailView.as_view(), name='admin_franchise_achiever_detail'),
-    path('admin/franchise/wishing-banners/', AdminWishingBannerListCreateView.as_view(), name='admin_franchise_wishing_banners'),
-    path('admin/franchise/wishing-banners/<int:pk>/', AdminWishingBannerDetailView.as_view(), name='admin_franchise_wishing_banner_detail'),
 ]

@@ -141,99 +141,71 @@ def find_next_placement_slot(width: int, max_depth: int, pool_type: str, start_a
     else:
         root = _ensure_sentinel_root(pool_type)
 
-    # Build BFS frontier restricted to the sentinel tree.
-    # IMPORTANT PERF NOTE:
-    # The previous implementation used nested (pos × parents) loops with per-row transactions and EXISTS queries.
-    # During large backfills this explodes into millions of queries and can leave Postgres sessions
-    # "idle in transaction" for a long time.
-    #
-    # We now:
-    #   - avoid per-row `transaction.atomic()` entirely in the scan phase
-    #   - use a single GROUP BY to find the first parent at the current frontier that has < width children
-    #   - only fetch child positions for that one parent to compute the first missing position
-    #
-    # Concurrency safety remains acceptable because account creation is protected by unique constraints
-    # and GenericPlacement.place_account retries on IntegrityError.
-
+    # Build BFS frontier restricted to the sentinel tree:
+    # level 0 parents = [root], next level parents = children of previous level parents, and so on.
     current_parents: List[int] = [int(root.id)]
 
     # parent_level ranges from 0 (root) to max_depth-1 (so child at level <= max_depth)
     for parent_level in range(0, int(max_depth)):
         if not current_parents:
+            # Should not happen under normal growth; implies sentinel subtree missing this level
             break
 
-        # Fetch parents once (ordered), so we can keep deterministic left-to-right behavior.
-        parents = list(
-            AutoPoolAccount.objects.filter(id__in=current_parents)
-            .only("id", "level")
-            .order_by("id")
-        )
-        if not parents:
-            break
-        parent_ids = [int(p.id) for p in parents]
+        found_slot: Optional[Tuple[AutoPoolAccount, int, int]] = None
 
-        # Count children per parent (include ALL statuses: CLOSED still occupies a position structurally)
-        counts_by_parent: dict[int, int] = {}
-        for pid, ct in (
-            AutoPoolAccount.objects.filter(parent_account_id__in=parent_ids, pool_type=pool_type)
-            .values_list("parent_account_id")
-            .annotate(ct=Count("id"))
-            .values_list("parent_account_id", "ct")
-        ):
-            try:
-                counts_by_parent[int(pid)] = int(ct or 0)
-            except Exception:
-                continue
+        # Same-level round-robin: pos-major, then parent-id order
+        for pos_try in range(1, int(width) + 1):
+            for pid in current_parents:
+                with transaction.atomic():
+                    try:
+                        qs = AutoPoolAccount.objects.select_for_update(skip_locked=True)
+                    except TypeError:
+                        qs = AutoPoolAccount.objects.select_for_update()
+                    parent = qs.filter(id=int(pid)).first()
+                    if not parent:
+                        # locked by another tx; move on
+                        continue
 
-        # Find the first parent with < width children (BFS / left-to-right)
-        target_parent: Optional[AutoPoolAccount] = None
-        for p in parents:
-            ct = int(counts_by_parent.get(int(p.id), 0) or 0)
-            if ct < int(width):
-                target_parent = p
+                    child_level = int(getattr(parent, "level", 0) or 0) + 1
+                    if child_level > int(max_depth):
+                        raise MaxDepthError(f"Max depth reached for pool={pool_type}: next={child_level}, configured={max_depth}")
+
+                    # Consider any existing child regardless of status to honor unique (parent,pool_type,position)
+                    exists = AutoPoolAccount.objects.filter(
+                        parent_account=parent,
+                        pool_type=pool_type,
+                        position=int(pos_try),
+                    ).exists()
+                    if not exists:
+                        found_slot = (parent, int(pos_try), child_level)
+                        break
+            if found_slot:
                 break
 
-        if target_parent is not None:
-            child_level = int(getattr(target_parent, "level", 0) or 0) + 1
-            if child_level > int(max_depth):
-                raise MaxDepthError(
-                    f"Max depth reached for pool={pool_type}: next={child_level}, configured={max_depth}"
-                )
+        if found_slot:
+            return found_slot
 
-            # Fetch positions for this one parent only (fast) and pick first missing.
-            taken_positions = list(
-                AutoPoolAccount.objects.filter(
-                    parent_account_id=int(target_parent.id),
-                    pool_type=pool_type,
-                ).values_list("position", flat=True)
-            )
-            pos = _first_missing_position([int(x or 0) for x in taken_positions], int(width))
-            if pos is None:
-                # Shouldn't happen if ct < width, but be defensive under races.
-                raise NoCapacityError(
-                    f"Unable to find free slot under parent={int(target_parent.id)} for pool={pool_type}; retry"
-                )
-            return (target_parent, int(pos), int(child_level))
-
-        # WIDTH-BEFORE-DEPTH ENFORCEMENT:
-        # If total children at this frontier is < width * parents, we should not go deeper.
-        total_children = int(sum(int(v or 0) for v in counts_by_parent.values()))
-        expected_children = int(width) * len(parent_ids)
+        # WIDTH-BEFORE-DEPTH ENFORCEMENT (restricted to sentinel subtree at this level):
+        # Ensure all parents at this level have all width child slots filled before proceeding deeper.
+        # Count all children regardless of status; CLOSED rows still occupy positions structurally
+        total_children = AutoPoolAccount.objects.filter(
+            parent_account_id__in=current_parents, pool_type=pool_type
+        ).count()
+        expected_children = int(width) * len(current_parents)
         if total_children < expected_children:
+            # There are still free slots within this child level in the sentinel subtree (likely concurrent).
+            # Do not proceed deeper; caller should retry later.
             raise NoCapacityError(
                 f"Width-before-depth enforcement: level {parent_level+1} under sentinel not full for pool={pool_type}; retry after contention"
             )
 
         # Advance BFS frontier to next level strictly under these parents
-        current_parents = list(
-            AutoPoolAccount.objects.filter(
-                parent_account_id__in=parent_ids,
-                pool_type=pool_type,
-                status="ACTIVE",
-            )
+        next_parents = list(
+            AutoPoolAccount.objects.filter(parent_account_id__in=current_parents, pool_type=pool_type, status="ACTIVE")
             .order_by("id")
             .values_list("id", flat=True)
         )
+        current_parents = [int(x) for x in next_parents]
 
     raise NoCapacityError(f"No placement capacity for pool={pool_type} up to maxDepth={max_depth} (width={width}).")
 

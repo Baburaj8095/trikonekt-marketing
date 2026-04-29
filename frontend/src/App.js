@@ -37,8 +37,6 @@ import AdminMerchants from "./pages/admin/AdminMerchants";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminKYC from "./pages/admin/AdminKYC";
 import AdminWithdrawals from "./pages/admin/AdminWithdrawals";
-import AdminFranchiseAchievers from "./pages/admin/AdminFranchiseAchievers";
-import AdminFranchiseWishingBanners from "./pages/admin/AdminFranchiseWishingBanners";
 import AdminMatrixFive from "./pages/admin/AdminMatrixFive";
 import AdminMatrixThree from "./pages/admin/AdminMatrixThree";
 import AdminAutopool from "./pages/admin/AdminAutopool";
@@ -97,9 +95,13 @@ import AdminMerchantCategories from "./pages/admin/AdminMerchantCategories";
 import AdminMerchantSubcategories from "./pages/admin/AdminMerchantSubcategories";
 import BusinessShell from "./components/layouts/BusinessShell";
 import BusinessDashboard from "./pages/business/BusinessDashboard";
+import BudinessDashboard from "./pages/budinessdashboard/BusinessDashboard";
+import JoinPrimePage from "./pages/budinessdashboard/JoinPrimePage";
+import ScannerPage from "./pages/budinessdashboard/ScannerPage";
 import BusinessProfile from "./pages/business/BusinessProfile";
 import BusinessShops from "./pages/business/BusinessShops";
 import BusinessShopProducts from "./pages/business/BusinessShopProducts";
+import InventoryPage from "./pages/business/InventoryPage";
 import MerchantShops from "./pages/market/MerchantShops";
 import MerchantShopDetail from "./pages/market/MerchantShopDetail";
 import AgencyCoupons from "./pages/agency/AgencyCoupons";
@@ -107,6 +109,11 @@ import AgencyPrimePackage from "./pages/agency/AgencyPrimePackage";
 import AgencyPrimeApproval from "./pages/agency/AgencyPrimeApproval";
 import AgencyWallet from "./pages/agency/AgencyWallet";
 import UserDashboardV2 from "./pages/UserDashboardV2";
+import FranchiseDashboard from "./pages/franchise/FranchiseDashboard";
+import FranchiseGrowthDashboard from "./pages/franchise/FranchiseGrowthDashboard";
+import FranchiseGrowthDashboardDemo from "./pages/franchise/FranchiseGrowthDashboardDemo";
+import FranchiseWalletPlaceholder from "./pages/franchise/FranchiseWalletPlaceholder";
+import FranchiseShell from "./components/franchise/FranchiseShell";
 import UserDashboard2Shell from "./pages/v2/UserDashboard2Shell";
 import HomeV2 from "./pages/v2/HomeV2";
 import LoginV2 from "./pages/v2/Auth/LoginV2";
@@ -130,10 +137,33 @@ import RankUpgrade from "./pages/RankUpgrade";
 import AdminRankUpgrades from "./pages/admin/AdminRankUpgrades";
 import UploadToWallet from "./pages/UploadToWallet";
 import TeamWallet from "./screens/TeamWallet";
-import FranchiseDashboard from "./components/franchise/FranchiseDashboard";
-import FranchiseWalletPlaceholder from "./components/franchise/FranchiseWalletPlaceholder";
-import TransactionHistory from "./components/franchise/pages/TransactionHistory";
-import WithdrawalHistory from "./components/franchise/pages/WithdrawalHistory";
+import TransactionHistory from "./pages/franchise/pages/TransactionHistory";
+import WithdrawalHistory from "./pages/franchise/pages/WithdrawalHistory";
+import { Suspense, lazy } from "react";
+import { CircularProgress, Box, Typography } from "@mui/material";
+
+// Lazy load the mobile app for better performance
+const MobileApp = lazy(() => import("./components/MobileApp"));
+
+// Loading component for lazy loaded routes
+const RouteLoader = () => (
+  <Box
+    sx={{
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      minHeight: '100vh',
+      flexDirection: 'column',
+      gap: 2,
+      bgcolor: '#f1f5f9',
+    }}
+  >
+    <CircularProgress size={50} sx={{ color: '#0ea5e9' }} />
+    <Typography variant="h6" sx={{ color: '#0f172a' }}>
+      Loading TriKonekt...
+    </Typography>
+  </Box>
+);
 
 function LegacyAuthEntry() {
   const location = useLocation();
@@ -168,7 +198,16 @@ function App() {
         <Route path="/about" element={<AboutPage />} />
         <Route path="/prime" element={<PrimePage />} />
         <Route path="/business" element={<BusinessPage />} />
+        <Route path="/demo/budiness-dashboard" element={<BudinessDashboard />} />
+        <Route path="/demo/join-prime" element={<JoinPrimePage />} />
+        <Route path="/demo/scanner" element={<ScannerPage />} />
+        <Route path="/demo/budiness-dashboard/join-prime" element={<JoinPrimePage />} />
         <Route path="/c/:slug" element={<ConsumerShell><CategoryPage /></ConsumerShell>} />
+        <Route path="/demo/franchise-growth" element={
+          <Suspense fallback={<RouteLoader />}>
+            <MobileApp />
+          </Suspense>
+        } />
         <Route path="/auth/select" element={<RoleSelect />} />
         <Route path="/login" element={<LegacyAuthEntry />} />
         <Route path="/register" element={<EnhancedLogin />} />
@@ -204,6 +243,84 @@ function App() {
           }
         />
         <Route
+          path="/user/franchise-dashboard"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <FranchiseShell>
+                <FranchiseDashboard />
+              </FranchiseShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/demo/franchise-dashboard"
+          element={
+            <FranchiseShell>
+              <FranchiseDashboard />
+            </FranchiseShell>
+          }
+        />
+        <Route
+          path="/demo/franchise-wallet"
+          element={
+            <FranchiseShell>
+              <FranchiseWalletPlaceholder />
+            </FranchiseShell>
+          }
+        />
+        <Route
+          path="/user/franchise-growth"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <FranchiseGrowthDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/franchise-wallet"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <FranchiseShell>
+                <FranchiseWalletPlaceholder />
+              </FranchiseShell>
+            </ProtectedRoute>
+          }
+        />
+        {/* <Route
+  path="/user/franchise-wallet"
+  element={
+    <ProtectedRoute allowedRoles={["user"]}>
+      <FranchiseShell>
+        <FranchiseWalletPlaceholder />
+      </FranchiseShell>
+    </ProtectedRoute>
+  } */}
+  <Route
+  path="/user/franchise-wallet"
+  element={<FranchiseWalletPlaceholder />}
+/>
+        <Route
+  path="/user/transactions"
+  element={
+    <ProtectedRoute allowedRoles={["user"]}>
+      <FranchiseShell>
+        <TransactionHistory />
+      </FranchiseShell>
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/user/withdrawals"
+  element={
+    <ProtectedRoute allowedRoles={["user"]}>
+      <FranchiseShell>
+        <WithdrawalHistory />
+      </FranchiseShell>
+    </ProtectedRoute>
+  }
+/>
+        <Route
           path="/user/ecommerce"
           element={
             <ProtectedRoute allowedRoles={["user"]}>
@@ -214,74 +331,6 @@ function App() {
           }
         />
 
-        <Route
-          path="/franchise/ecommerce"
-          element={
-            <ProtectedRoute allowedRoles={["user"]}>
-              <ConsumerShell>
-                <EcommerceUser embedded />
-              </ConsumerShell>
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Franchise (Geo agency) Routes */}
-        <Route
-          path="/franchise/dashboard"
-          element={
-            <ProtectedRoute allowedRoles={["agency"]}>
-              <AgencyShell>
-                <FranchiseDashboard />
-              </AgencyShell>
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Agency - Franchise screens (new UI, kept inside the existing /agency area) */}
-        <Route
-          path="/agency/franchise-dashboard"
-          element={
-            <ProtectedRoute allowedRoles={["agency"]}>
-              <AgencyShell>
-                <FranchiseDashboard />
-              </AgencyShell>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/agency/franchise-wallet"
-          element={
-            <ProtectedRoute allowedRoles={["agency"]}>
-              <AgencyShell>
-                <FranchiseWalletPlaceholder />
-              </AgencyShell>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/agency/transactions"
-          element={
-            <ProtectedRoute allowedRoles={["agency"]}>
-              <AgencyShell>
-                <TransactionHistory />
-              </AgencyShell>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/agency/withdrawals"
-          element={
-            <ProtectedRoute allowedRoles={["agency"]}>
-              <AgencyShell>
-                <WithdrawalHistory />
-              </AgencyShell>
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Franchise main entry */}
-        <Route path="/franchise" element={<Navigate to="/franchise/dashboard" replace />} />
-
        
         <Route
           path="/user/dashboard2"
@@ -291,7 +340,7 @@ function App() {
             </ProtectedRoute>
           }
         />
-
+     
         <Route
           path="/user/lucky-draw"
           element={
@@ -1081,28 +1130,6 @@ function App() {
             </AdminProtectedRoute>
           }
         />
-
-          {/* Franchise: Admin-managed achievers + wishing banners */}
-          <Route
-            path="/admin/franchise/achievers"
-            element={
-              <AdminProtectedRoute>
-                <AdminShell>
-                  <AdminFranchiseAchievers />
-                </AdminShell>
-              </AdminProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/franchise/wishing-banners"
-            element={
-              <AdminProtectedRoute>
-                <AdminShell>
-                  <AdminFranchiseWishingBanners />
-                </AdminShell>
-              </AdminProtectedRoute>
-            }
-          />
         <Route
           path="/admin/matrix"
           element={
@@ -1553,6 +1580,16 @@ function App() {
             <ProtectedRoute allowedRoles={["business"]}>
               <BusinessShell>
                 <BusinessShopProducts />
+              </BusinessShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/business/inventory"
+          element={
+            <ProtectedRoute allowedRoles={["business"]}>
+              <BusinessShell>
+                <InventoryPage />
               </BusinessShell>
             </ProtectedRoute>
           }

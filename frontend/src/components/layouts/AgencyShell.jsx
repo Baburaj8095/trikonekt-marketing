@@ -82,8 +82,6 @@ export default function AgencyShell({ children }) {
   // Sidebar menu (parity with previous AgencyShell)
   const menu = [
     { to: "/agency/dashboard", label: "Dashboard", icon: "dashboard" },
-    { to: "/agency/franchise-dashboard", label: "Franchise Dashboard", icon: "chart" },
-    { to: "/agency/franchise-wallet", label: "Franchise Wallet", icon: "wallet" },
     { to: "/agency/profile", label: "Profile", icon: "users" },
 
     // Refer & Earn (as in sketch order)
@@ -92,8 +90,6 @@ export default function AgencyShell({ children }) {
     // Wallet and History
     { to: "/agency/wallet", label: "Earning Wallet", icon: "wallet" },
     { to: "/agency/history", label: "History", icon: "orders" },
-    { to: "/agency/transactions", label: "Transactions", icon: "orders" },
-    { to: "/agency/withdrawals", label: "Withdrawals", icon: "orders" },
 
     // Agency Prime Package
     { to: "/agency/prime-package", label: "Agency Prime Package", icon: "box" },
@@ -172,5 +168,4 @@ export default function AgencyShell({ children }) {
     </ShellBase>
   );
 }
-
 

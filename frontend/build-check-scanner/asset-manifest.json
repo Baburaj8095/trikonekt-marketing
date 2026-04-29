@@ -1,0 +1,37 @@
+{
+  "files": {
+    "main.css": "/static/css/main.0b9f716e.css",
+    "main.js": "/static/js/main.c347f023.js",
+    "static/js/224.0424bc59.chunk.js": "/static/js/224.0424bc59.chunk.js",
+    "home-screen.js": "/static/js/home-screen.a3c7e6ca.chunk.js",
+    "wallet-screen.js": "/static/js/wallet-screen.507ec77b.chunk.js",
+    "franchise-screen.js": "/static/js/franchise-screen.d58a5359.chunk.js",
+    "static/media/propeties.jpg": "/static/media/propeties.f40b8a1389627c7e2671.jpg",
+    "static/media/thailand.jpg": "/static/media/thailand.05dd3cef48c77b2133b9.jpg",
+    "static/media/homepage_banner.png": "/static/media/homepage_banner.5cfc3ad765a193c233be.png",
+    "static/media/lucky-draw-img.png": "/static/media/lucky-draw-img.0a6326e1befd1bb24f50.png",
+    "static/media/kerala.jpg": "/static/media/kerala.ab6a3579a783d8e6f40f.jpg",
+    "static/media/asst_2.png": "/static/media/asst_2.aa67d9e461f86f35cfb3.png",
+    "static/media/furniture.jpeg": "/static/media/furniture.eb5677c761e380a7638f.jpeg",
+    "static/media/spin1.png": "/static/media/spin1.963c3fb750c7fd95d0e2.png",
+    "static/media/ecommerce.jpg": "/static/media/ecommerce.742b157066efac94fdbd.jpg",
+    "static/media/TRIKONEKT.jpg": "/static/media/TRIKONEKT.4711f27973d23d88dd4d.jpg",
+    "static/media/holidays.jpg": "/static/media/holidays.a432324917f8b6893053.jpg",
+    "static/media/ev-img.jpg": "/static/media/ev-img.0e999d630bc6a19cf411.jpg",
+    "static/media/Wealth_Galaxy.jpg": "/static/media/Wealth_Galaxy.4fcdd571591bb17822e4.jpg",
+    "static/media/electronics-img.jpg": "/static/media/electronics-img.d73534929a042fb2e2ce.jpg",
+    "static/media/gifts.jpg": "/static/media/gifts.ba75607ecd3ee7e64b1a.jpg",
+    "static/media/play_store_screen.webp": "/static/media/play_store_screen.410beb181978f3c40e95.webp",
+    "index.html": "/index.html",
+    "main.0b9f716e.css.map": "/static/css/main.0b9f716e.css.map",
+    "main.c347f023.js.map": "/static/js/main.c347f023.js.map",
+    "224.0424bc59.chunk.js.map": "/static/js/224.0424bc59.chunk.js.map",
+    "home-screen.a3c7e6ca.chunk.js.map": "/static/js/home-screen.a3c7e6ca.chunk.js.map",
+    "wallet-screen.507ec77b.chunk.js.map": "/static/js/wallet-screen.507ec77b.chunk.js.map",
+    "franchise-screen.d58a5359.chunk.js.map": "/static/js/franchise-screen.d58a5359.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.0b9f716e.css",
+    "static/js/main.c347f023.js"
+  ]
+}

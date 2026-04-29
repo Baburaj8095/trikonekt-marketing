@@ -19,9 +19,6 @@ function parseJwt(token) {
 function currentNamespaceFromPath() {
   try {
     const p = typeof window !== "undefined" ? window.location.pathname : "";
-    // Franchise area is an alias of agency namespace (geo franchises)
-    // so it must read tokens from token_agency / refresh_agency.
-    if (p.startsWith("/franchise")) return "agency";
     if (p.startsWith("/agency")) return "agency";
     if (p.startsWith("/employee")) return "employee";
     if (p.startsWith("/business")) return "business";
@@ -179,5 +176,4 @@ export default function ProtectedRoute({ children, allowedRoles }) {
 
   return children;
 }
-
 

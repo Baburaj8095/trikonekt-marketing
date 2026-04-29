@@ -1295,6 +1295,9 @@ const RegisterV2 = () => {
   const Step0 = () => {
     const roles = [
       { key: "user", title: "Consumer", desc: "Shop, earn rewards, and enjoy benefits" },
+      { key: "agency", title: "Agency", desc: "Build a network and earn commission income" },
+      { key: "business", title: "Merchant", desc: "Promote, sell, and grow your business" },
+      { key: "employee", title: "Employee", desc: "Marketing, training, and job opportunities" },
     ];
     const Card = ({ k, title, desc }) => {
       const selected = role === k;

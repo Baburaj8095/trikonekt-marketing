@@ -308,10 +308,6 @@ export default function Genealogy5() {
   const [err, setErr] = useState("");
   const [levels, setLevels] = useState({ five: 10, three: 15 });
 
-  // ── New: Per-root breakdown (counts + earnings per ID by category) ──
-  const [rootsBreakdown, setRootsBreakdown] = useState(null);
-  const [rootsBreakdownErr, setRootsBreakdownErr] = useState("");
-
   // ── Navigation ──
   const [tab, setTab] = useState("directs");
   const [tabDir, setTabDir] = useState(1); // +1 = forward, -1 = backward
@@ -436,10 +432,8 @@ export default function Genealogy5() {
     let mounted = true;
     (async () => {
       try {
-        // NOTE: This endpoint includes "my_positions" (matrix roots) which can change
-        // immediately after a purchase. Keep cache TTL small to avoid missing newly opened IDs.
         const res = await API.get("/accounts/team/summary/", {
-          cacheTTL: 2000,
+          cacheTTL: 10000,
           retryAttempts: 2,
         });
         if (!mounted) return;
@@ -453,28 +447,6 @@ export default function Genealogy5() {
       } catch (_) {
         if (!mounted) return;
         setErr("Failed to load team data.");
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  // ── Roots breakdown (per ID earnings + categories) ──
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        setRootsBreakdownErr("");
-        const res = await API.get("/accounts/genealogy/roots/breakdown/", {
-          cacheTTL: 15000,
-          retryAttempts: 1,
-        });
-        if (!mounted) return;
-        setRootsBreakdown(res?.data || null);
-      } catch (_) {
-        if (!mounted) return;
-        setRootsBreakdownErr("Unable to load ID breakdown.");
       }
     })();
     return () => {
@@ -668,42 +640,10 @@ export default function Genealogy5() {
     }
   }, [data]);
 
-  // ── Enrich myPositions with per-root earnings + canonical category from rootsBreakdown ──
-  const enrichedMyPositions = useMemo(() => {
-    const rows = Array.isArray(myPositions) ? myPositions : [];
-    const five = Array.isArray(rootsBreakdown?.five?.roots)
-      ? rootsBreakdown.five.roots
-      : [];
-    const three = Array.isArray(rootsBreakdown?.three?.roots)
-      ? rootsBreakdown.three.roots
-      : [];
-
-    const idx = new Map();
-    for (const r of [...five, ...three]) {
-      try {
-        const key = `${String(r?.pool_type || "").toUpperCase()}::${String(r?.id || "")}`;
-        idx.set(key, r);
-      } catch (_) {}
-    }
-
-    return rows.map((p) => {
-      const key = `${String(p?.pool_type || "").toUpperCase()}::${String(p?.id || "")}`;
-      const extra = idx.get(key);
-      const earned = extra?.total_earned ?? undefined;
-      // Prefer API category (it is derived from stable rules), else inferred_category/source_type.
-      const category = extra?.category || p?.inferred_category || "";
-      return {
-        ...p,
-        total_earned: earned,
-        inferred_category: category,
-      };
-    });
-  }, [myPositions, rootsBreakdown]);
-
   // ── Derived: active 5-matrix roots list ──
   const fiveRootsList = useMemo(() => {
     try {
-      const rows = enrichedMyPositions.filter(
+      const rows = myPositions.filter(
         (p) =>
           String(p?.pool_type) === "FIVE_150" &&
           String(p?.status || "").toUpperCase() === "ACTIVE"
@@ -715,12 +655,12 @@ export default function Genealogy5() {
     } catch {
       return [];
     }
-  }, [enrichedMyPositions]);
+  }, [myPositions]);
 
   // ── Derived: active 3-matrix roots list ──
   const threeRootsList = useMemo(() => {
     try {
-      const rows = enrichedMyPositions.filter(
+      const rows = myPositions.filter(
         (p) =>
           String(p?.pool_type) === "THREE_150" &&
           String(p?.status || "").toUpperCase() === "ACTIVE"
@@ -732,7 +672,7 @@ export default function Genealogy5() {
     } catch {
       return [];
     }
-  }, [enrichedMyPositions]);
+  }, [myPositions]);
 
   // ── Auto-select first root ──
   useEffect(() => {

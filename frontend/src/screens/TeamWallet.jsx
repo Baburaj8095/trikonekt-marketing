@@ -413,7 +413,7 @@ export default function TeamWallet() {
         mx: "auto",
         px: "12px",
         py: "12px",
-        bgcolor: "#F7FAFC",
+        bgcolor: "#f8fafc",
         minHeight: "100vh",
       }}
     >
@@ -608,21 +608,71 @@ export default function TeamWallet() {
         </Box>
       </Box>
 
+      {/* ── Withdrawal history ── */}
+      <Box sx={{ mb: "14px" }}>
+        <SectionHeader title="Recent Withdrawals" />
+        {withdrawalsList.slice(0, 5).length ? (
+          <Stack spacing="6px">
+            {withdrawalsList.slice(0, 5).map((item, index) => (
+              <Box
+                key={`${item?.id || index}`}
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  bgcolor: "#fff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "8px",
+                  px: "12px",
+                  py: "8px",
+                }}
+              >
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
+                    ₹{fmtAmount(item?.amount)}
+                  </Typography>
+                  <Typography sx={{ fontSize: 10, color: "#94a3b8" }}>
+                    {item?.requested_at
+                      ? new Date(item.requested_at).toLocaleDateString()
+                      : "—"}
+                  </Typography>
+                </Box>
+                <Chip
+                  size="small"
+                  color={
+                    String(item?.status || "").toLowerCase() === "approved"
+                      ? "success"
+                      : String(item?.status || "").toLowerCase() === "rejected"
+                        ? "error"
+                        : "warning"
+                  }
+                  label={String(item?.status || "pending").toUpperCase()}
+                  sx={{ fontSize: 10, height: 22 }}
+                />
+              </Box>
+            ))}
+          </Stack>
+        ) : (
+          <Typography sx={{ fontSize: 12, color: "#94a3b8", textAlign: "center", py: "8px" }}>
+            No withdrawal history yet.
+          </Typography>
+        )}
+      </Box>
+
       {/* ── Bank info ── */}
       <Box sx={{ mb: "14px" }}>
         <SectionHeader title="Bank Linked" />
         {banksData?.banks?.length ? (
           <Stack spacing="6px">
             {banksData.banks.map((bank) => (
-              <Paper
+              <Box
                 key={bank.id}
-                elevation={0}
                 sx={{
-                  p: 1.15,
-                  borderRadius: 2,
-                  border: "1px solid",
-                  borderColor: "#EEF2F6",
                   bgcolor: "#fff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "8px",
+                  px: "12px",
+                  py: "8px",
                 }}
               >
                 <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
@@ -631,7 +681,7 @@ export default function TeamWallet() {
                 <Typography sx={{ fontSize: 11, color: "#64748b", mt: "2px" }}>
                   {bank.account_number_masked || bank.account_number_full || "—"} · {bank.ifsc || "—"}
                 </Typography>
-              </Paper>
+              </Box>
             ))}
           </Stack>
         ) : (
