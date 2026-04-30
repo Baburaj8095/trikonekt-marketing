@@ -1,4 +1,4 @@
-﻿import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Login from "./pages/Auth/Login";
 import LuckyDraw from "./pages/LuckyDraw";
 import UserDashboard from "./pages/UserDashboard";
@@ -140,6 +140,19 @@ import UploadToWallet from "./pages/UploadToWallet";
 import TeamWallet from "./screens/TeamWallet";
 import TransactionHistory from "./pages/franchise/pages/TransactionHistory";
 import WithdrawalHistory from "./pages/franchise/pages/WithdrawalHistory";
+import ConsumerEcommerceDashboard from "./pages/consumer-ecommerce/pages/App";
+import ConsumerEcommerceDelivery from "./pages/consumer-ecommerce/pages/DeliveryPage";
+import ConsumerNearbyStores from "./pages/consumer-ecommerce/pages/NearbyStoresPage";
+import ConsumerNearMe from "./pages/consumer-ecommerce/pages/NearMePage";
+import AdsPage from "./pages/consumer-ecommerce/pages/AdsPage";
+import SocietyPage from "./pages/consumer-ecommerce/pages/SocietyPage";
+import BusinessRegistrationPage from "./pages/consumer-ecommerce/pages/BusinessRegistrationPage";
+import ConsumerScannerPage from "./pages/consumer-ecommerce/pages/ConsumerScannerPage";
+import CartPage from "./pages/consumer-ecommerce/pages/CartPage";
+import TriPayPage from "./pages/consumer-ecommerce/pages/TriPayPage";
+import TriEatPage from "./pages/consumer-ecommerce/pages/TriEatPage";
+import TriTripPage from "./pages/consumer-ecommerce/pages/TriTripPage";
+import TriPickDropPage from "./pages/consumer-ecommerce/pages/TriPickDropPage";
 import { Suspense, lazy } from "react";
 import { CircularProgress, Box, Typography } from "@mui/material";
 
@@ -203,6 +216,22 @@ function App() {
         <Route path="/demo/join-prime" element={<JoinPrimePage />} />
         <Route path="/demo/scanner" element={<ScannerPage />} />
         <Route path="/demo/budiness-dashboard/join-prime" element={<JoinPrimePage />} />
+        <Route path="/consumer-ecommerce" element={<ConsumerEcommerceDashboard />} />
+        <Route path="/consumer-ecommerce/join-prime" element={<JoinPrimePage />} />
+        <Route path="/consumer-ecommerce/delivery" element={<ConsumerEcommerceDelivery />} />
+        <Route path="/consumer-ecommerce/nearby-stores" element={<ConsumerNearbyStores />} />
+        <Route path="/consumer-ecommerce/near-me" element={<ConsumerNearMe />} />
+        <Route path="/consumer-ecommerce/ads" element={<AdsPage />} />
+        <Route path="/consumer-ecommerce/society" element={<SocietyPage />} />
+        <Route path="/consumer-ecommerce/business" element={<BusinessRegistrationPage />} />
+        <Route path="/consumer-ecommerce/scanner" element={<ConsumerScannerPage />} />
+        <Route path="/consumer-ecommerce/cart" element={<CartPage />} />
+        <Route path="/consumer-ecommerce/tripay" element={<TriPayPage />} />
+        <Route path="/consumer-ecommerce/trieat" element={<TriEatPage />} />
+        <Route path="/consumer-ecommerce/tritrip" element={<TriTripPage />} />
+        <Route path="/consumer-ecommerce/tripickdrop" element={<TriPickDropPage />} />
+        <Route path="/consumer-ecommerce/tri-zone" element={<ConsumerEcommerceDashboard />} />
+        <Route path="/consumer-ecommerce/more" element={<ConsumerEcommerceDashboard />} />
         <Route path="/c/:slug" element={<ConsumerShell><CategoryPage /></ConsumerShell>} />
         <Route path="/demo/franchise-growth" element={
           <Suspense fallback={<RouteLoader />}>

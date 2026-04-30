@@ -40,16 +40,16 @@ import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import GiftCardCarousel from "../../components/business/GiftCardCarousel";
 
 const UI = {
-  bg: "#dbe8fb",
+  bg: "#f8fafc",
   surface: "#ffffff",
   card: "#ffffff",
   border: "#e5e7eb",
-  text: "#1f2937",
-  textMuted: "#6b7280",
-  primary: "#0F52BA",
-  secondary: "#2f6fd0",
+  text: "#0f172a",
+  textMuted: "#475569",
+  primary: "#2563eb",
+  secondary: "#1e40af",
   onPrimary: "#ffffff",
-  headerGradient: "linear-gradient(180deg, #0F52BA 0%, #2f6fd0 100%)",
+  headerGradient: "linear-gradient(180deg, #1e40af 0%, #2563eb 100%)",
 };
 
 const QUICK_LOCATIONS = [

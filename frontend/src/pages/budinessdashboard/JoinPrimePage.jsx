@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { alpha } from "@mui/material/styles";
 import {
   Avatar,
@@ -122,7 +122,11 @@ function InfoPill({ label }) {
 
 function JoinPrimePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [selectedRegistration, setSelectedRegistration] = useState("paid");
+  const backTarget = location.pathname.startsWith("/consumer-ecommerce")
+    ? "/consumer-ecommerce"
+    : "/demo/budiness-dashboard";
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: UI.bg }}>
@@ -139,7 +143,7 @@ function JoinPrimePage() {
         <Box sx={{ px: 2, py: 1.5 }}>
           <Stack direction="row" spacing={1.2} alignItems="center">
             <IconButton
-              onClick={() => navigate("/demo/budiness-dashboard")}
+              onClick={() => navigate(backTarget)}
               sx={{
                 color: UI.onPrimary,
                 bgcolor: alpha("#ffffff", 0.14),

@@ -34,11 +34,11 @@ import {
 
 // Theme colors
 const COLORS = {
-  primary: "#0ea5e9",
-  primaryDark: "#0284c7",
+  primary: "#2563eb",
+  primaryDark: "#1e40af",
   success: "#22c55e",
-  secondary: "#a855f7",
-  background: "#f1f5f9",
+  secondary: "#3b82f6",
+  background: "#f8fafc",
   surface: "#ffffff",
   text: "#0f172a",
   border: "#e5e7eb",
@@ -110,10 +110,10 @@ const FranchiseScreen = () => {
       {/* Header Card */}
       <Card
         sx={{
-          background: `linear-gradient(135deg, ${COLORS.secondary} 0%, ${COLORS.primary} 100%)`,
+          background: `linear-gradient(135deg, ${COLORS.primaryDark} 0%, ${COLORS.primary} 100%)`,
           borderRadius: 3,
           mb: 3,
-          boxShadow: "0 8px 32px rgba(168, 85, 247, 0.3)",
+          boxShadow: "0 8px 32px rgba(37, 99, 235, 0.3)",
           border: "none",
         }}
       >
