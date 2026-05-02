@@ -1856,7 +1856,14 @@ class TeamConsumerWishingBanner(models.Model):
     """Admin-managed wishing banner images for Team/Consumer dashboard."""
 
     title = models.CharField(max_length=180, blank=True, default="")
-    image = models.ImageField(upload_to="team_consumer/wishing_banners/", null=True, blank=True)
+    # Store in Cloudinary when enabled (align with uploads app + franchise wishing banner behavior)
+    image = models.ImageField(
+        upload_to="team_consumer/wishing_banners/",
+        null=True,
+        blank=True,
+        storage=MEDIA_STORAGE,
+        max_length=500,
+    )
     is_active = models.BooleanField(default=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -1877,7 +1884,14 @@ class TeamConsumerTopAchiever(models.Model):
     achieved = models.CharField(max_length=220, blank=True, default="")
     sort_order = models.IntegerField(default=0, db_index=True)
     is_active = models.BooleanField(default=True, db_index=True)
-    photo = models.ImageField(upload_to="team_consumer/top_achievers/", null=True, blank=True)
+    # Store in Cloudinary when enabled (align with franchise achievers)
+    photo = models.ImageField(
+        upload_to="team_consumer/top_achievers/",
+        null=True,
+        blank=True,
+        storage=MEDIA_STORAGE,
+        max_length=500,
+    )
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
 

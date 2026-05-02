@@ -26,6 +26,29 @@ const emptyForm = {
   image: null,
 };
 
+// MEDIA BASE to resolve relative URLs from API to absolute URLs (same pattern as UserDashboard)
+const MEDIA_BASE = String(API?.defaults?.baseURL || "").replace(/\/api\/?$/, "");
+
+// Resolve media URLs returned by API.
+//  - Prefer `image_url || image`
+//  - If relative, prefix with MEDIA_BASE
+//  - If absolute but points to localhost, rewrite to MEDIA_BASE
+function resolveApiMediaUrl(item) {
+  const raw = item?.image_url || item?.image || "";
+  if (!raw) return "";
+  const s = String(raw);
+  if (s.startsWith("data:")) return s;
+  if (/^https?:\/\//i.test(s)) {
+    if (/^https?:\/\/localhost(?::\d+)?\//i.test(s) && MEDIA_BASE) {
+      const path = s.replace(/^https?:\/\/localhost(?::\d+)?/i, "");
+      return `${MEDIA_BASE}${path}`;
+    }
+    return s;
+  }
+  if (!MEDIA_BASE) return s;
+  return `${MEDIA_BASE}${s.startsWith("/") ? "" : "/"}${s}`;
+}
+
 export default function AdminFranchiseWishingBanners() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -155,10 +178,10 @@ export default function AdminFranchiseWishingBanners() {
                     <Typography variant="caption" color="text.secondary">
                       Active: {r.is_active ? "Yes" : "No"}
                     </Typography>
-                    {r.image_url ? (
+                    {resolveApiMediaUrl(r) ? (
                       <Box
                         component="img"
-                        src={r.image_url}
+                        src={resolveApiMediaUrl(r)}
                         alt={r.title || "banner"}
                         sx={{ width: "100%", height: 160, objectFit: "cover", borderRadius: 1, border: "1px solid #e5e7eb" }}
                       />

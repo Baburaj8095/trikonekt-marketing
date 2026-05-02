@@ -20,6 +20,33 @@ import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import { useNavigate, useLocation } from "react-router-dom";
 import API from "../../api/api";
 
+// Resolve media URLs returned by API.
+// Match the working pattern used in UserDashboard:
+//  - Prefer `image_url || image`
+//  - If relative, prefix with MEDIA_BASE derived from API.defaults.baseURL
+//  - If absolute but points to localhost (dev artifact), rewrite to MEDIA_BASE (prod)
+function resolveApiMediaUrl(item, MEDIA_BASE) {
+  const raw = item?.image_url || item?.image || "";
+  if (!raw) return "";
+  const s = String(raw);
+
+  // data URL / absolute URL
+  if (s.startsWith("data:")) return s;
+  if (/^https?:\/\//i.test(s)) {
+    // If backend accidentally returns localhost URLs in production, rewrite them.
+    // Example: http://localhost:8000/media/... -> https://api.trikonekt.com/media/...
+    if (/^https?:\/\/localhost(?::\d+)?\//i.test(s) && MEDIA_BASE) {
+      const path = s.replace(/^https?:\/\/localhost(?::\d+)?/i, "");
+      return `${MEDIA_BASE}${path}`;
+    }
+    return s;
+  }
+
+  // relative URL from API: "/media/..."
+  if (!MEDIA_BASE) return s;
+  return `${MEDIA_BASE}${s.startsWith("/") ? "" : "/"}${s}`;
+}
+
 // Light, premium, unified look (aligned with Genealogy5 design tokens)
 const C = {
   appBg: "#f0f4ff",
@@ -39,6 +66,12 @@ function WishingBannerCarousel({ items = [], loading = false, error = "" }) {
   const banners = Array.isArray(items) ? items : [];
   const [idx, setIdx] = useState(0);
 
+  // MEDIA BASE to resolve relative URLs from API to absolute URLs
+  const MEDIA_BASE = useMemo(
+    () => String(API?.defaults?.baseURL || "").replace(/\/api\/?$/, ""),
+    []
+  );
+
   // auto-advance
   useEffect(() => {
     if (!banners.length) return;
@@ -55,6 +88,7 @@ function WishingBannerCarousel({ items = [], loading = false, error = "" }) {
   }, [banners.length, idx]);
 
   const active = banners[idx] || null;
+  const activeSrc = useMemo(() => resolveApiMediaUrl(active, MEDIA_BASE), [active, MEDIA_BASE]);
 
   return (
     <MotionPaper
@@ -89,15 +123,15 @@ function WishingBannerCarousel({ items = [], loading = false, error = "" }) {
         </Box>
       ) : null}
 
-      {active?.image_url ? (
+      {activeSrc ? (
         <Box
           key={active.id || idx}
           component="img"
-          src={active.image_url}
+          src={activeSrc}
           alt={active.title || "banner"}
           sx={{
             width: "100%",
-            height: 170,
+            height: 220,
             objectFit: "cover",
             display: "block",
             borderTop: `1px solid ${C.border}`,

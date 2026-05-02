@@ -248,18 +248,18 @@ export default function AdminShell({ children }) {
           },
         ],
       },
-      {
-        key: "catalog",
-        label: "Catalog",
-        items: [
-          { to: "/admin/ecommerce-categories", label: "Categories", icon: "box" },
-          { to: "/admin/products", label: "Products", icon: "box" },
-          { to: "/admin/seed-demo", label: "Seed Demo Data", icon: "upload" },
-        ],
-      },
+      // {
+      //   key: "catalog",
+      //   label: "Catalog",
+      //   items: [
+      //     { to: "/admin/ecommerce-categories", label: "Categories", icon: "box" },
+      //     { to: "/admin/products", label: "Products", icon: "box" },
+      //     { to: "/admin/seed-demo", label: "Seed Demo Data", icon: "upload" },
+      //   ],
+      // },
       {
         key: "ops",
-        label: "Operations",
+        label: "Package & Prime",
         items: [
           { to: "/admin/packages", label: "Packages", icon: "box" },
           { to: "/admin/payments", label: "Payments", icon: "wallet" },
@@ -268,7 +268,7 @@ export default function AdminShell({ children }) {
       },
       {
         key: "merchant_config",
-        label: "Merchant Config",
+        label: "Merchant Categories",
         items: [
           { to: "/admin/merchant-categories", label: "Merchant Categories", icon: "box" },
           { to: "/admin/merchant-subcategories", label: "Merchant Subcategories", icon: "box" },
@@ -276,7 +276,7 @@ export default function AdminShell({ children }) {
       },
       {
         key: "compliance",
-        label: "Compliance & Finance",
+        label: "Kyc & Withdrawals",
         items: [
           { to: "/admin/kyc", label: "KYC", icon: "shield" },
           { to: "/admin/withdrawals", label: "Withdrawals", icon: "wallet" },
@@ -288,7 +288,7 @@ export default function AdminShell({ children }) {
         label: "Promotions",
         items: [
           { to: "/admin/lucky-draw", label: "Lucky Draw", icon: "ticket" },
-          { to: "/admin/e-coupons", label: "E‑Coupons", icon: "ticket" },
+          // { to: "/admin/e-coupons", label: "E‑Coupons", icon: "ticket" },
           { to: "/admin/dashboard/models/business/promopackage", label: "Promo Packages", icon: "box" },
           { to: "/admin/promo-package-products", label: "Upload Promo Products (₹750)", icon: "upload" },
           { to: "/admin/dashboard/models/business/promopackageproduct", label: "Promo Products (₹750)", icon: "box" },
@@ -316,19 +316,19 @@ export default function AdminShell({ children }) {
           { to: "/admin/team-consumer/top-achievers", label: "Top Achievers", icon: "users" },
         ],
       },
-      {
-        key: "tri",
-        label: "TRI Apps",
-        items: [
-          { to: "/admin/tri/tri-holidays", label: "Manage TRI Holidays", icon: "box" },
-          { to: "/admin/tri/tri-ev", label: "Manage TRI EV Vehicles", icon: "box" },
-          { to: "/admin/tri/tri-furniture", label: "Manage TRI Furniture", icon: "box" },
-          { to: "/admin/tri/tri-electronics", label: "Manage TRI Electronics", icon: "box" },
-          { to: "/admin/tri/tri-properties", label: "Manage TRI Properties", icon: "box" },
-          { to: "/admin/tri/tri-saving", label: "Manage TRI Saving", icon: "box" },
-          { to: "/admin/tri/tri-local-store", label: "Manage Local Store", icon: "box" },
-        ],
-      },
+      // {
+      //   key: "tri",
+      //   label: "TRI Apps",
+      //   items: [
+      //     { to: "/admin/tri/tri-holidays", label: "Manage TRI Holidays", icon: "box" },
+      //     { to: "/admin/tri/tri-ev", label: "Manage TRI EV Vehicles", icon: "box" },
+      //     { to: "/admin/tri/tri-furniture", label: "Manage TRI Furniture", icon: "box" },
+      //     { to: "/admin/tri/tri-electronics", label: "Manage TRI Electronics", icon: "box" },
+      //     { to: "/admin/tri/tri-properties", label: "Manage TRI Properties", icon: "box" },
+      //     { to: "/admin/tri/tri-saving", label: "Manage TRI Saving", icon: "box" },
+      //     { to: "/admin/tri/tri-local-store", label: "Manage Local Store", icon: "box" },
+      //   ],
+      // },
       {
         key: "reports",
         label: "Reports & Business",
@@ -351,12 +351,12 @@ export default function AdminShell({ children }) {
         label: "Engagement",
         items: [{ to: "/admin/notifications", label: "Notifications", icon: "ticket" }],
       },
-      {
-        key: "dev",
-        label: "Developer Tools",
-        requiresSuperuser: true,
-        items: [{ to: "/admin/dashboard/models", label: "Developer Service", icon: "box" }],
-      },
+      // {
+      //   key: "dev",
+      //   label: "Developer Tools",
+      //   requiresSuperuser: true,
+      //   items: [{ to: "/admin/dashboard/models", label: "Developer Service", icon: "box" }],
+      // },
     ],
     []
   );
@@ -447,7 +447,26 @@ export default function AdminShell({ children }) {
     const toStr = String(to || "");
     const toPath = toStr.split("?")[0];
     if (toPath === "/admin/dashboard/models") return String(location.pathname || "").startsWith("/admin/dashboard/models");
-    return location.pathname === toPath || location.pathname.startsWith(toPath + "/") || `${location.pathname}${location.search}` === toStr;
+
+    // If the menu item includes query params, treat it as a *filter selector*.
+    // In that case, mark active when:
+    //  - pathname matches, AND
+    //  - all query params in `to` match the current URL (allowing extra params like page=2)
+    if (toStr.includes("?")) {
+      if (location.pathname !== toPath) return false;
+      const toQuery = toStr.split("?")[1] || "";
+      const toParams = new URLSearchParams(toQuery);
+      const locParams = new URLSearchParams(location.search || "");
+      for (const [k, v] of toParams.entries()) {
+        if (locParams.get(k) !== v) return false;
+      }
+      return true;
+    }
+
+    // Special-case: keep "All Users" un-highlighted when any quick-filter query is present.
+    if (toPath === "/admin/users" && (location.search || "")) return false;
+
+    return location.pathname === toPath || location.pathname.startsWith(toPath + "/");
   };
 
   const rightPill = useMemo(() => {
