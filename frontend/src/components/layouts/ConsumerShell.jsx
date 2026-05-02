@@ -46,6 +46,7 @@ export default function ConsumerShell({ children }) {
     if (isTeamLogin) {
       return [
         { to: "/user/team-dashboard", label: "Dashboard", icon: "dashboard" },
+        { to: "/user/refer-earn", label: "Refer & Earn", icon: "upload" },
         { to: "/user/profile", label: "Profile", icon: "users" },
         { to: "/user/promo-packages", label: "Join Prime", icon: "star" },
         { to: "/user/dashboard/upgrade", label: "Rank Upgrade", icon: "wallet" },

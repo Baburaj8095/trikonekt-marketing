@@ -238,7 +238,10 @@ function MobileBottomNav({ value, onChange }) {
         width: "100%",
         maxWidth: 520,
         borderTop: `1px solid ${C.border}`,
-        zIndex: 2000,
+        // Keep bottom nav above the page content, but BELOW the mobile sidebar drawer
+        // (ShellBase sidebar zIndex = 1050). Otherwise it can cover the sidebar footer
+        // (Logout button) during Team Login.
+        zIndex: 1030,
         borderRadius: "18px 18px 0 0",
         overflow: "hidden",
       }}
@@ -410,7 +413,7 @@ export default function TeamDashboard() {
         </Stack>
 
         {/* Hero banner */}
-        <MotionPaper
+        {/* <MotionPaper
           elevation={0}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -484,13 +487,20 @@ export default function TeamDashboard() {
             </Button>
             <Button
               variant="text"
+              onClick={() => navigate("/user/refer-earn")}
+              sx={{ textTransform: "none", fontWeight: 900, borderRadius: 99, color: C.text }}
+            >
+              Refer & Earn
+            </Button>
+            <Button
+              variant="text"
               onClick={() => navigate("/user/history")}
               sx={{ textTransform: "none", fontWeight: 900, borderRadius: 99, color: C.text }}
             >
               History
             </Button>
           </Stack>
-        </MotionPaper>
+        </MotionPaper> */}
 
         {/* Wishing banner carousel (replaces wallet statistics) */}
         <WishingBannerCarousel items={banners} loading={bannersLoading} error={bannersErr} />

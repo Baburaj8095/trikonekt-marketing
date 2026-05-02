@@ -6,6 +6,7 @@
 .env.*
 backend/.env
 backend/.env.*
+backend/keys/
 frontend/.env
 frontend/.env.*
 

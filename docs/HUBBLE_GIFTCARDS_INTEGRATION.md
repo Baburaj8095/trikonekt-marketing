@@ -25,7 +25,17 @@ Returns:
 
 ### 2) Webhook receiver (public)
 
+This project supports both:
+
+1) **A single generic webhook URL** (works if Hubble allows one callback URL):
+
 `POST /api/business/hubble/webhook/`
+
+2) **Separate callback URLs per event type** (as per Hubble docs), all routed to the same receiver:
+
+- `POST /api/business/hubble/webhook/brand-updated/`
+- `POST /api/business/hubble/webhook/partner-discount/`
+- `POST /api/business/hubble/webhook/transaction-status/`
 
 Requirements:
 - Must include `X-Verify` header.
@@ -47,7 +57,14 @@ Configure these in `backend/.env` (local) or Render env (prod):
 HUBBLE_SDK_BASE_URL=https://sdk.dev.myhubble.money
 HUBBLE_CLIENT_ID=your_client_id
 
-# Optional (only if Hubble requires it in iframe URL)
+# Some Hubble setups require this in the iframe URL as `clientSecret`.
+# WARNING: if passed via URL query params, it will be visible in the browser.
+HUBBLE_CLIENT_SECRET=your_client_secret
+
+# Optional: theme query param for the iframe URL (e.g. light/dark)
+HUBBLE_SDK_THEME=light
+
+# Backward-compat (older variable name used in earlier draft)
 HUBBLE_APP_SECRET=
 
 # JWT signing key for RS256 (pick one)
@@ -110,8 +127,10 @@ npm start
    - Share your RSA public key if Hubble requires it.
 
 2. **Webhook URL**
-   - Set webhook URL to:
-     - `https://<your-api-domain>/api/business/hubble/webhook/`
+   - Configure callback URLs (recommended to match Hubble dashboard fields):
+     - Brand Updates: `https://<your-api-domain>/api/business/hubble/webhook/brand-updated/`
+     - Partner Discount Updates: `https://<your-api-domain>/api/business/hubble/webhook/partner-discount/`
+     - Transaction Status Updates: `https://<your-api-domain>/api/business/hubble/webhook/transaction-status/`
    - Configure webhook secret and ensure it matches `HUBBLE_WEBHOOK_SECRET`.
 
 3. **Optional IP whitelisting**

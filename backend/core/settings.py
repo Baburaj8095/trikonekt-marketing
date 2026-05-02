@@ -72,19 +72,20 @@ TEMPLATES = [{
 
 WSGI_APPLICATION = 'core.wsgi.application'
 
-# DATABASES = {
-#     'default': dj_database_url.config(
-#         default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-#         conn_max_age=600,
-#         ssl_require=False
-#     )
-# }
+# Database
+# --------
+# SECURITY: never hardcode credentials in source control.
+# Require DATABASE_URL in the environment for any non-local deployment.
+DEFAULT_DB_URL = os.environ.get("DATABASE_URL", "").strip()
+if not DEFAULT_DB_URL:
+    # Safe local fallback only.
+    DEFAULT_DB_URL = f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
 
 DATABASES = {
     'default': dj_database_url.config(
-        default="postgresql://trikonekt:Lmt91m5Lnp1dwEoKBPzOuFFjXF0fk4Xi@dpg-d4734kn5r7bs73ajic80-a.singapore-postgres.render.com/trikonekt_rn21",
+        default=DEFAULT_DB_URL,
         conn_max_age=int(os.environ.get('DB_CONN_MAX_AGE', '0')),
-        ssl_require=True
+        ssl_require=bool(os.environ.get("DB_SSL_REQUIRE", "True").lower() in ("1", "true", "yes")),
     )
 }
 # Force Starter-plan safety: always disable persistent DB connections
@@ -151,14 +152,31 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'anon': os.environ.get('DRF_THROTTLE_ANON', '60/min'),
         'user': os.environ.get('DRF_THROTTLE_USER', '300/min'),
+        # Dedicated webhook throttle (default high enough to avoid breaking real traffic).
+        'hubble_webhook': os.environ.get('DRF_THROTTLE_HUBBLE_WEBHOOK', '600/min'),
     },
 }
 
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, str(default)))
+    except Exception:
+        return default
+
+
+# JWT configuration
+# -----------------
+# Backward compatible change:
+# - Reducing lifetimes affects only newly-minted tokens.
+# - Existing long-lived tokens (if any) will continue to validate until their embedded exp.
+ACCESS_TOKEN_MINUTES = _env_int("JWT_ACCESS_TOKEN_MINUTES", 15)
+REFRESH_TOKEN_DAYS = _env_int("JWT_REFRESH_TOKEN_DAYS", 30)
+
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=3650),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=3650),
-    'ROTATE_REFRESH_TOKENS': False,
-    'BLACKLIST_AFTER_ROTATION': False,
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=max(1, ACCESS_TOKEN_MINUTES)),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=max(1, REFRESH_TOKEN_DAYS)),
+    'ROTATE_REFRESH_TOKENS': os.environ.get("JWT_ROTATE_REFRESH_TOKENS", "True").lower() in ("1", "true", "yes"),
+    'BLACKLIST_AFTER_ROTATION': os.environ.get("JWT_BLACKLIST_AFTER_ROTATION", "True").lower() in ("1", "true", "yes"),
     'UPDATE_LAST_LOGIN': False,
     'AUTH_HEADER_TYPES': ('Bearer',),
     'LEEWAY': 60,  # absorb up to 60s clock drift to avoid false token_not_valid
@@ -244,13 +262,23 @@ SKIP_HEAVY_ON_APPROVE = os.environ.get('SKIP_HEAVY_ON_APPROVE', 'True' if DEBUG 
 # ==========================
 # Hubble (Gift Cards) SDK
 # ==========================
-# Web SDK base URL. Use dev in non-production.
-HUBBLE_SDK_BASE_URL = os.environ.get('HUBBLE_SDK_BASE_URL', 'https://sdk.dev.myhubble.money')
+# Web SDK base URL.
+# Hubble experience center is typically served at:
+#   https://sdk.myhubble.money/experience-center
+# We keep this as the default and let env override for staging/dev.
+HUBBLE_SDK_BASE_URL = os.environ.get('HUBBLE_SDK_BASE_URL', 'https://sdk.myhubble.money/experience-center')
 # Partner client id (used as JWT 'iss' for JWT SSO)
 HUBBLE_CLIENT_ID = os.environ.get('HUBBLE_CLIENT_ID', '')
 
-# NOTE: Hubble Web docs mention appSecret query param; do NOT expose it to frontend.
-# Some partners still use it; keep supported as optional config.
+# NOTE: Hubble partner setup may require passing a clientSecret/clientAppSecret in the iframe URL.
+# This value will be exposed to the browser as a query param.
+# Prefer using server-side token-only flows if Hubble supports it.
+HUBBLE_CLIENT_SECRET = os.environ.get('HUBBLE_CLIENT_SECRET', '')
+
+# Optional theme for SDK iframe URL (e.g., "light" or "dark").
+HUBBLE_SDK_THEME = os.environ.get('HUBBLE_SDK_THEME', '')
+
+# Backward-compat (older env var name used in earlier integration draft)
 HUBBLE_APP_SECRET = os.environ.get('HUBBLE_APP_SECRET', '')
 
 # RSA private key (PEM) used to sign JWT (RS256) for SSO.
@@ -260,3 +288,11 @@ HUBBLE_JWT_PRIVATE_KEY_PATH = os.environ.get('HUBBLE_JWT_PRIVATE_KEY_PATH', '')
 
 # Webhook verification secret (HMAC-SHA256 base64 signature in X-Verify)
 HUBBLE_WEBHOOK_SECRET = os.environ.get('HUBBLE_WEBHOOK_SECRET', '')
+
+# Optional IP allowlist for webhook ingress.
+# Leave empty to disable IP checks (backward compatible).
+HUBBLE_WEBHOOK_IP_ALLOWLIST = os.environ.get('HUBBLE_WEBHOOK_IP_ALLOWLIST', '')
+
+# SECURITY: default is to NOT expose HUBBLE_CLIENT_SECRET to browsers via iframe URL.
+# Enable only if Hubble requires it for your partner setup.
+HUBBLE_SEND_CLIENT_SECRET_TO_BROWSER = os.environ.get('HUBBLE_SEND_CLIENT_SECRET_TO_BROWSER', '')

@@ -51,6 +51,7 @@ from .serializers import (
 # ==========================
 from core.hubble import generate_hubble_sso_jwt, build_hubble_web_sdk_url, verify_hubble_webhook
 from .hubble_models import HubbleWebhookEvent
+from .throttles import HubbleWebhookAnonThrottle
 
 
 def _digits_only(v: str) -> str:
@@ -88,15 +89,86 @@ class HubbleIframeUrlView(APIView):
 
     def get(self, request):
         u = request.user
-        token = generate_hubble_sso_jwt(
-            subject=str(getattr(u, "id", "")),
-            name=str(getattr(u, "full_name", "") or getattr(u, "username", "") or ""),
-            email=str(getattr(u, "email", "") or ""),
-            phone_number=_digits_only(getattr(u, "phone", "") or ""),
-            cohorts=[str(getattr(u, "category", "") or "consumer")],
-        )
-        iframe_url = build_hubble_web_sdk_url(token=token)
-        return Response({"iframeUrl": iframe_url, "token": token, "expiresIn": 60})
+        try:
+            token = generate_hubble_sso_jwt(
+                subject=str(getattr(u, "id", "")),
+                name=str(getattr(u, "full_name", "") or getattr(u, "username", "") or ""),
+                email=str(getattr(u, "email", "") or ""),
+                phone_number=_digits_only(getattr(u, "phone", "") or ""),
+                cohorts=[str(getattr(u, "category", "") or "consumer")],
+            )
+            iframe_url = build_hubble_web_sdk_url(token=token)
+        except Exception as e:
+            # Return actionable config error instead of generic 500
+            return Response(
+                {
+                    "detail": "Hubble is not configured on server.",
+                    "error": f"{type(e).__name__}: {e}",
+                    "required_env": [
+                        "HUBBLE_SDK_BASE_URL",
+                        "HUBBLE_CLIENT_ID",
+                        "HUBBLE_JWT_PRIVATE_KEY_PEM (or HUBBLE_JWT_PRIVATE_KEY_PATH)",
+                    ],
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        # SECURITY: Do not return the raw SSO token in production responses.
+        # Backward-compatible behavior:
+        # - Existing clients that ignore `token` keep working.
+        # - If some internal debug tooling depends on it, allow it only when DEBUG and debug=1.
+        include_token = False
+        try:
+            include_token = bool(settings.DEBUG) and str(request.query_params.get("debug") or "").lower() in ("1", "true", "yes")
+        except Exception:
+            include_token = False
+
+        data = {"iframeUrl": iframe_url, "expiresIn": 60}
+        if include_token:
+            data["token"] = token
+        return Response(data)
+
+
+class HubbleTransactionsMeView(APIView):
+    """List the authenticated user's Hubble transactions.
+
+    GET /api/business/hubble/transactions/me/
+    Query params:
+      - status: filter by status
+      - limit: default 50 (max 200)
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from .hubble_models import HubbleTransaction
+
+        status_filter = str(request.query_params.get("status") or "").strip().upper()
+        try:
+            limit = int(request.query_params.get("limit") or 50)
+        except Exception:
+            limit = 50
+        limit = max(1, min(200, limit))
+
+        qs = HubbleTransaction.objects.filter(user=request.user).order_by("-updated_at", "-id")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+
+        out = []
+        for t in qs[:limit]:
+            out.append(
+                {
+                    "transactionReferenceId": t.transaction_reference_id,
+                    "status": t.status,
+                    "amount": str(t.amount) if t.amount is not None else None,
+                    "discountAmount": str(t.discount_amount) if t.discount_amount is not None else None,
+                    "currency": t.currency,
+                    "updatedAt": t.updated_at.isoformat() if t.updated_at else None,
+                    "createdAt": t.created_at.isoformat() if t.created_at else None,
+                }
+            )
+
+        return Response({"results": out})
 
 
 class HubbleWebhookReceiverView(APIView):
@@ -109,8 +181,40 @@ class HubbleWebhookReceiverView(APIView):
     """
 
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [HubbleWebhookAnonThrottle]
+
+    def _get_client_ip(self, request) -> str:
+        """Best-effort client IP extraction.
+
+        NOTE: If you're behind a proxy/load balancer, ensure Django is configured to trust
+        X-Forwarded-For correctly. For Render, you typically want to rely on X-Forwarded-For.
+        """
+        try:
+            xff = request.META.get("HTTP_X_FORWARDED_FOR")
+            if xff:
+                # first IP is original client
+                return str(xff.split(",")[0]).strip()
+        except Exception:
+            pass
+        try:
+            return str(request.META.get("REMOTE_ADDR") or "").strip()
+        except Exception:
+            return ""
+
+    def _is_ip_allowed(self, ip: str) -> bool:
+        allowlist_raw = str(getattr(settings, "HUBBLE_WEBHOOK_IP_ALLOWLIST", "") or "").strip()
+        if not allowlist_raw:
+            return True  # disabled (backward compatible)
+        allowed = {a.strip() for a in allowlist_raw.split(",") if a.strip()}
+        return ip in allowed
 
     def post(self, request):
+        # Optional ingress control: allowlist webhook source IPs.
+        # Disabled by default; enable by setting HUBBLE_WEBHOOK_IP_ALLOWLIST.
+        ip = self._get_client_ip(request)
+        if not self._is_ip_allowed(ip):
+            return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
+
         raw_body: bytes = request.body or b""
         x_verify = request.headers.get("X-Verify") or request.META.get("HTTP_X_VERIFY") or ""
 

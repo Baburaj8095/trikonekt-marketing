@@ -89,13 +89,31 @@ def generate_hubble_sso_jwt(*, subject: str, name: str = "", email: str = "", ph
 def build_hubble_web_sdk_url(*, token: str) -> str:
     """Return the URL used in iframe src.
 
-    NOTE: Hubble web docs show `appSecret` query param too.
-    However, appSecret is sensitive and should not be exposed to the browser.
-    We'll include it only if configured (some partner setups may require it).
+    Partner setups differ:
+    - Some require only: clientId + token
+    - Some require: clientId + clientSecret + token (+ theme)
+
+    SECURITY NOTE:
+    If you pass a clientSecret via query params, it will be visible in the browser.
+    Prefer server-side-only flows if Hubble supports them.
     """
     base = (getattr(settings, "HUBBLE_SDK_BASE_URL", "") or "").rstrip("/")
     client_id = (getattr(settings, "HUBBLE_CLIENT_ID", "") or "").strip()
+    client_secret = (getattr(settings, "HUBBLE_CLIENT_SECRET", "") or "").strip()
+    theme = (getattr(settings, "HUBBLE_SDK_THEME", "") or "").strip()
+
+    # Backward-compat: older env var name
     app_secret = (getattr(settings, "HUBBLE_APP_SECRET", "") or "").strip()
+    if not client_secret and app_secret:
+        client_secret = app_secret
+
+    # SECURITY: do not send partner secrets to the browser unless explicitly allowed.
+    # Default is OFF for safety; enable only if Hubble explicitly requires it.
+    send_secret = str(getattr(settings, "HUBBLE_SEND_CLIENT_SECRET_TO_BROWSER", "") or "").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
     if not base:
         raise ValueError("HUBBLE_SDK_BASE_URL is not configured")
     if not client_id:
@@ -107,8 +125,11 @@ def build_hubble_web_sdk_url(*, token: str) -> str:
     from urllib.parse import urlencode
 
     params = {"clientId": client_id, "token": token}
-    if app_secret:
-        params["appSecret"] = app_secret
+    if client_secret and send_secret:
+        # Hubble docs sometimes call this 'clientSecret'
+        params["clientSecret"] = client_secret
+    if theme:
+        params["theme"] = theme
     return f"{base}/?{urlencode(params)}"
 
 

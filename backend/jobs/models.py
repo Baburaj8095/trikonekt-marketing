@@ -1527,7 +1527,8 @@ def handle_hubble_webhook_process(task: BackgroundTask) -> None:
 
     from django.utils import timezone
 
-    from business.hubble_models import HubbleWebhookEvent
+    from business.hubble_models import HubbleWebhookEvent, HubbleTransaction
+    from business.views import _resolve_user_from_hubble_subject
 
     evt = HubbleWebhookEvent.objects.filter(pk=int(event_id)).first()
     if not evt:
@@ -1554,9 +1555,96 @@ def handle_hubble_webhook_process(task: BackgroundTask) -> None:
         p = evt.payload or {}
         status_val = str(p.get("orderStatus") or evt.status or "").upper()
         tx_ref = str(p.get("transactionReferenceId") or evt.transaction_reference_id or "")
+        hubble_user_id = str(p.get("userId") or p.get("user_id") or "").strip()
 
-        # TODO: Implement actual internal ledger mapping if desired.
-        # For now, we only store + acknowledge.
+        # Project into canonical transaction table (idempotent upsert)
+        if tx_ref:
+            try:
+                # Resolve internal user if possible
+                user_obj = _resolve_user_from_hubble_subject(hubble_user_id) if hubble_user_id else None
+            except Exception:
+                user_obj = None
+
+            # best-effort numeric conversions
+            from decimal import Decimal as D
+            amt = None
+            disc = None
+            try:
+                if p.get("amount") is not None:
+                    amt = D(str(p.get("amount")))
+            except Exception:
+                amt = None
+            try:
+                if p.get("discountAmount") is not None:
+                    disc = D(str(p.get("discountAmount")))
+            except Exception:
+                disc = None
+            currency = str(p.get("currency") or "").strip()[:8]
+
+            obj, _created = HubbleTransaction.objects.get_or_create(
+                transaction_reference_id=tx_ref,
+                defaults={
+                    "hubble_user_id": hubble_user_id,
+                    "user": user_obj,
+                    "status": HubbleTransaction.normalize_status(status_val),
+                    "amount": amt,
+                    "discount_amount": disc,
+                    "currency": currency,
+                    "last_event": evt,
+                    "last_webhook_received_at": evt.received_at,
+                },
+            )
+            # Update existing with conservative transition
+            if not _created:
+                changed = False
+                try:
+                    if hubble_user_id and (obj.hubble_user_id != hubble_user_id):
+                        obj.hubble_user_id = hubble_user_id
+                        changed = True
+                except Exception:
+                    pass
+                try:
+                    if user_obj and (obj.user_id != getattr(user_obj, "id", None)):
+                        obj.user = user_obj
+                        changed = True
+                except Exception:
+                    pass
+                try:
+                    before = obj.status
+                    obj.apply_status_transition(status_val)
+                    if obj.status != before:
+                        changed = True
+                except Exception:
+                    pass
+                try:
+                    if amt is not None and obj.amount != amt:
+                        obj.amount = amt
+                        changed = True
+                except Exception:
+                    pass
+                try:
+                    if disc is not None and obj.discount_amount != disc:
+                        obj.discount_amount = disc
+                        changed = True
+                except Exception:
+                    pass
+                try:
+                    if currency and obj.currency != currency:
+                        obj.currency = currency
+                        changed = True
+                except Exception:
+                    pass
+
+                obj.last_event = evt
+                obj.last_webhook_received_at = evt.received_at
+                changed = True
+
+                if changed:
+                    try:
+                        obj.save()
+                    except Exception:
+                        # Do not fail event processing on transaction update errors
+                        pass
 
         evt.process_status = HubbleWebhookEvent.STATUS_DONE
         evt.processed_at = timezone.now()
