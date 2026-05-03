@@ -160,8 +160,8 @@ function LegacyAuthEntry() {
 
 function DomainRedirects() {
   // Client-side redirects to enforce:
-  // - admin.growth.vin/  -> /admin
-  // - (www.)growth.vin/admin -> https://admin.growth.vin/admin
+  // - admin.growth.vin/  -> /admin/login
+  // - (www.)growth.vin/admin/* -> https://admin.growth.vin/admin/*
   // (Vercel static-build vercel.json routes do not support host-based redirects.)
   const location = useLocation();
 
@@ -169,9 +169,10 @@ function DomainRedirects() {
     const host = String(window.location.hostname || "").toLowerCase();
     const path = String(location.pathname || "");
 
-    // 1) Admin subdomain root -> /admin
+    // 1) Admin subdomain root -> /admin/login
+    // This matches your requirement: https://admin.growth.vin/ should land on admin login.
     if (host === "admin.growth.vin" && (path === "/" || path === "")) {
-      return <Navigate to="/admin" replace />;
+      return <Navigate to="/admin/login" replace />;
     }
 
     // 2) If user tries to access admin on main domain, force admin subdomain
@@ -179,6 +180,9 @@ function DomainRedirects() {
     if ((host === "growth.vin" || host === "www.growth.vin") && (path === "/admin" || path.startsWith("/admin/"))) {
       const qs = window.location.search || "";
       const hash = window.location.hash || "";
+      // Example:
+      //  - https://www.growth.vin/admin/login -> https://admin.growth.vin/admin/login
+      //  - https://www.growth.vin/admin/users -> https://admin.growth.vin/admin/users
       window.location.replace(`https://admin.growth.vin${path}${qs}${hash}`);
       return null;
     }
