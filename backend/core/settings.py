@@ -183,8 +183,26 @@ SIMPLE_JWT = {
 }
 
 # CORS configuration
-CORS_ALLOWED_ORIGINS = _csv_env('CORS_ALLOWED_ORIGINS', 'https://trikonekt.com,https://www.trikonekt.com')
-CORS_ALLOWED_ORIGIN_REGEXES = _csv_env('CORS_ALLOWED_ORIGIN_REGEXES', '^https://.*\\.vercel\\.app$,^https://.*\\.trikonekt\\.com$')
+# Default list includes both old (trikonekt.com) and new (growth.vin) domains to support migration.
+# You can override completely via the CORS_ALLOWED_ORIGINS environment variable on Render.
+CORS_ALLOWED_ORIGINS = _csv_env(
+    'CORS_ALLOWED_ORIGINS',
+    ','.join([
+        # New domains
+        'https://growth.vin',
+        'https://www.growth.vin',
+        'https://admin.growth.vin',
+        # Existing/old domains
+        'https://trikonekt.com',
+        'https://www.trikonekt.com',
+    ])
+)
+
+# Keep regex allowlist for preview deployments / known subdomains
+CORS_ALLOWED_ORIGIN_REGEXES = _csv_env(
+    'CORS_ALLOWED_ORIGIN_REGEXES',
+    '^https://.*\\.vercel\\.app$,^https://.*\\.trikonekt\\.com$,^https://.*\\.growth\\.vin$'
+)
 CORS_ALLOW_ALL_ORIGINS = False if (CORS_ALLOWED_ORIGINS or CORS_ALLOWED_ORIGIN_REGEXES) else True
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = list(default_headers) + ["authorization"]
@@ -220,10 +238,27 @@ if os.environ.get('CLOUDINARY_URL'):
         # cloudinary pkg missing; uploads will fall back to local via shim
         pass
 
-# CSRF trusted origins for local frontend dev
+# CSRF trusted origins for local frontend dev and deployed frontends
 # This allows POST/PUT/PATCH/DELETE from the React dev server at port 3000
 # without failing the CSRF Origin check.
-CSRF_TRUSTED_ORIGINS = _csv_env('CSRF_TRUSTED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,https://trikonekt.com,https://www.trikonekt.com,https://api.trikonekt.com,https://trikonekt.vercel.app')
+CSRF_TRUSTED_ORIGINS = _csv_env(
+    'CSRF_TRUSTED_ORIGINS',
+    ','.join([
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        # New domains
+        'https://growth.vin',
+        'https://www.growth.vin',
+        'https://admin.growth.vin',
+        'https://api.growth.vin',
+        # Existing/old domains
+        'https://trikonekt.com',
+        'https://www.trikonekt.com',
+        'https://api.trikonekt.com',
+        # Vercel preview/production hostnames (update if you have a new one for growth.vin)
+        'https://trikonekt.vercel.app',
+    ])
+)
 
 # Email configuration (env-driven with safe defaults)
 MAIL_ENABLED = os.environ.get('MAIL_ENABLED', '').lower() in ('1', 'true', 'yes')
