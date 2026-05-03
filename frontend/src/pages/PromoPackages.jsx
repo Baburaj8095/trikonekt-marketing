@@ -451,7 +451,7 @@ function Prime150Section({ reg150Pkg, prime150Active, onBuy }) {
  * - Plan selector under Season 1: Registration ₹150 | Season Prime ₹1000
  * - Box grid (4x3) visible only for Season Prime
  */
-function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, seasonsHints = [], seasonActive }) {
+function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, seasonsHints = [], seasonActive, rename = null }) {
   const meta = seasonPkg?.monthly_meta || {};
   const totalBoxes = Math.max(1, Number(meta?.total_boxes || 12));
   const defaultSeason = Number(meta?.current_package_number || 1);
@@ -561,7 +561,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
   return (
     <Box sx={{ p: 2 }}>
       <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5 }}>
-        Season {seasonActive ? <Chip size="small" color="success" sx={{ ml: 1 }} label="Active" /> : null}
+        {(rename?.seasonLabel || "Season")} {seasonActive ? <Chip size="small" color="success" sx={{ ml: 1 }} label="Active" /> : null}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
         Choose a season and plan to get started.
@@ -569,7 +569,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
 
       {/* ① Season selector */}
       <Typography variant="subtitle2" sx={{ mt: 1 }}>
-        Choose Season 
+        Choose {(rename?.seasonLabel || "Season")} 
       </Typography>
       <Box sx={{ display: "grid", gap: 1 }}>
         {seasonsToShow.map((n) => {
@@ -594,7 +594,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
               }}
             >
               <Radio size="small" checked={selectedSeason === n} disabled={!enabled} />
-              <Typography sx={{ flex: 1 }}>Season {n}</Typography>
+              <Typography sx={{ flex: 1 }}>{(rename?.seasonLabel || "Season")} {n}</Typography>
               {active ? (
                 <Chip size="small" label="Available" color="success" />
               ) : locked ? (
@@ -623,7 +623,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
             <FormControlLabel
               value="SEASON1000"
               control={<Radio size="small" />}
-              label="Season Prime ₹1000"
+              label={(rename?.seasonPlanLabel || "Season Prime ₹1000")}
             />
           </RadioGroup>
         </Box>
@@ -706,7 +706,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
             });
         }}
       >
-        BUY SEASON
+        {(rename?.seasonBuyCta || "BUY SEASON")}
       </Button>
     </Box>
   );
@@ -926,14 +926,52 @@ function TourSection({ triHolidays }) {
 /* ======================================================================== */
 /* MAIN */
 /* ======================================================================== */
-export default function PromoPackages({ title = "Consumer Packages" } = {}) {
+export default function PromoPackages({
+  title = "Consumer Packages",
+  // New: allow route wrappers to render a single section
+  // prime750 | season | rank | prime150 | tour
+  initialTabKey = null,
+  // New: allow wrappers to restrict purchase history list
+  // all | prime750 | monthly | tour
+  historyScope = "all",
+  // Optional UI renames (used for SPP)
+  rename = null,
+} = {}) {
   const [packages, setPackages] = useState([]);
   const [history, setHistory] = useState([]);
   const [triHolidays, setTriHolidays] = useState(null);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [paymentData, setPaymentData] = useState(null);
   const [seasonsHints, setSeasonsHints] = useState([]);
-  const [tab, setTab] = useState(0);
+  const keyToTab = useMemo(() => {
+    const m = { prime750: 0, season: 1, rank: 2, prime150: 3, tour: 4 };
+    return m;
+  }, []);
+
+  const [tab, setTab] = useState(() => {
+    try {
+      const k = String(initialTabKey || "").trim().toLowerCase();
+      if (k && keyToTab[k] != null) return keyToTab[k];
+    } catch (_) {}
+    return 0;
+  });
+
+  // If wrapper changes initialTabKey after mount, keep in sync (non-breaking)
+  useEffect(() => {
+    try {
+      const k = String(initialTabKey || "").trim().toLowerCase();
+      if (k && keyToTab[k] != null) setTab(keyToTab[k]);
+    } catch (_) {}
+  }, [initialTabKey, keyToTab]);
+
+  const ren = useMemo(() => {
+    const r = rename && typeof rename === "object" ? rename : {};
+    return {
+      seasonLabel: r.seasonLabel || "Season",
+      seasonBuyCta: r.seasonBuyCta || "BUY SEASON",
+      seasonPlanLabel: r.seasonPlanLabel || "Season Prime ₹1000",
+    };
+  }, [rename]);
   const [paymentSuccessOpen, setPaymentSuccessOpen] = useState(false);
 
   useEffect(() => {
@@ -1024,18 +1062,49 @@ export default function PromoPackages({ title = "Consumer Packages" } = {}) {
     setPaymentOpen(true);
   };
 
+  const scopedHistory = useMemo(() => {
+    const scope = String(historyScope || "all").toLowerCase();
+    const rows = Array.isArray(history) ? history : [];
+    if (scope === "all") return rows;
+
+    if (scope === "prime750") {
+      const primeId = primePkg?.id;
+      return rows.filter((h) => {
+        const pid = h?.package?.id || h?.package_id;
+        return primeId ? String(pid) === String(primeId) : approx(h?.package?.price, 750);
+      });
+    }
+
+    if (scope === "monthly") {
+      const seasonId = seasonPkg?.id;
+      return rows.filter((h) => {
+        const pid = h?.package?.id || h?.package_id;
+        const ptype = String(h?.package?.type || "").toUpperCase();
+        if (ptype === "MONTHLY") return true;
+        return seasonId ? String(pid) === String(seasonId) : false;
+      });
+    }
+
+    if (scope === "tour") {
+      // Tri Tour is backed by the Tri app slug in purchase metadata
+      return rows.filter((h) => String(h?.tri_app_slug || "").toLowerCase() === "tri-holidays");
+    }
+
+    return rows;
+  }, [history, historyScope, primePkg?.id, seasonPkg?.id]);
+
   const PurchaseHistory = () => (
     <Box sx={{ p: 2 }}>
       <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>
         Purchase History
       </Typography>
-      {history.length === 0 ? (
+      {scopedHistory.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
           No purchases yet.
         </Typography>
       ) : (
         <Box>
-          {history.map((h) => {
+          {scopedHistory.map((h) => {
             const status = String(h?.status || "").toUpperCase();
             const badgeColor =
               status === "APPROVED" ? "success.main" : status === "PENDING" ? "warning.main" : "text.secondary";
@@ -1097,55 +1166,57 @@ export default function PromoPackages({ title = "Consumer Packages" } = {}) {
         {title}
       </Typography>
 
-      <Box
-        sx={{
-          position: "sticky",
-          top: 0,
-          zIndex: 20,
-          bgcolor: "background.paper",
-          borderBottom: "1px solid",
-          borderColor: "divider",
-        }}
-      >
-        <Tabs
-          value={tab}
-          onChange={(_, v) => setTab(v)}
-          variant="scrollable"
-          scrollButtons={false}
-          allowScrollButtonsMobile
-          TabIndicatorProps={{
-            sx: { height: 3, borderRadius: 3 },
-          }}
+      {initialTabKey ? null : (
+        <Box
           sx={{
-            px: 1,
-
-            "& .MuiTabs-flexContainer": {
-              gap: 1,
-            },
-
-            "& .MuiTab-root": {
-              textTransform: "none",
-              fontWeight: 700,
-              fontSize: 14,
-              minHeight: 48,
-              px: 2.2,
-              borderRadius: 2,
-              color: "text.secondary",
-            },
-
-            "& .Mui-selected": {
-              color: "primary.main",
-              bgcolor: "primary.50",
-            },
+            position: "sticky",
+            top: 0,
+            zIndex: 20,
+            bgcolor: "background.paper",
+            borderBottom: "1px solid",
+            borderColor: "divider",
           }}
         >
-          <Tab label="Prime 750" />
-          <Tab label="Season" />
-          <Tab label="Rank Upgrade" />
-          <Tab label="Prime 150" />
-          <Tab label="Tour" />
-        </Tabs>
-      </Box>
+          <Tabs
+            value={tab}
+            onChange={(_, v) => setTab(v)}
+            variant="scrollable"
+            scrollButtons={false}
+            allowScrollButtonsMobile
+            TabIndicatorProps={{
+              sx: { height: 3, borderRadius: 3 },
+            }}
+            sx={{
+              px: 1,
+
+              "& .MuiTabs-flexContainer": {
+                gap: 1,
+              },
+
+              "& .MuiTab-root": {
+                textTransform: "none",
+                fontWeight: 700,
+                fontSize: 14,
+                minHeight: 48,
+                px: 2.2,
+                borderRadius: 2,
+                color: "text.secondary",
+              },
+
+              "& .Mui-selected": {
+                color: "primary.main",
+                bgcolor: "primary.50",
+              },
+            }}
+          >
+            <Tab label="Prime 750" />
+            <Tab label={ren.seasonLabel} />
+            <Tab label="Rank Upgrade" />
+            <Tab label="Prime 150" />
+            <Tab label="Tour" />
+          </Tabs>
+        </Box>
+      )}
 
       
       <Paper elevation={0} sx={{ borderRadius: 2 }}>
@@ -1175,6 +1246,7 @@ export default function PromoPackages({ title = "Consumer Packages" } = {}) {
                 onBuy={onBuy}
                 seasonsHints={seasonsHints}
                 seasonActive={seasonActive}
+                rename={ren}
               />
             ) : (
               <Alert severity="warning">Season package not available.</Alert>

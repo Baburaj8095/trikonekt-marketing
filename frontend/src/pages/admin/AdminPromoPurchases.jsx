@@ -123,6 +123,15 @@ export default function AdminPromoPurchases() {
       return "";
     }
   });
+
+  const [triAppSlug, setTriAppSlug] = useState(() => {
+    try {
+      const params = new URLSearchParams(location.search || "");
+      return (params.get("tri_app_slug") || "").trim();
+    } catch {
+      return "";
+    }
+  });
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [rows, setRows] = useState([]);
@@ -169,6 +178,7 @@ export default function AdminPromoPurchases() {
       const params = {};
       if (status) params.status = status;
       if (kind) params.kind = kind;
+      if (triAppSlug) params.tri_app_slug = triAppSlug;
       if (userId) params.user_id = userId;
       if (dateFrom) params.date_from = dateFrom;
       if (dateTo) params.date_to = dateTo;
@@ -185,7 +195,7 @@ export default function AdminPromoPurchases() {
 
   useEffect(() => {
     fetchRows();
-  }, [status, kind, userId, dateFrom, dateTo]);
+  }, [status, kind, triAppSlug, userId, dateFrom, dateTo]);
 
   async function handleApprove(r) {
     if (!window.confirm(`Approve purchase #${r.id}?`)) return;
@@ -557,6 +567,13 @@ export default function AdminPromoPurchases() {
           Approve or reject consumer promo purchases. This view is kept intentionally simple.
         </div>
       </div>
+
+      {/* Optional context line when tri app filter is active (Tri Tour) */}
+      {triAppSlug ? (
+        <div style={{ marginBottom: 10, color: "#475569", fontSize: 13 }}>
+          Filtered by TRI App: <b>{triAppSlug}</b>
+        </div>
+      ) : null}
 
       <div
         style={{

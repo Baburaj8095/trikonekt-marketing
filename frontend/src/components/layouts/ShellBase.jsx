@@ -473,11 +473,15 @@ export default function ShellBase({
                     const label = it.label || it.section;
                     const to = it.to;
                     const secIcon = it.icon;
-                    // Collect children until next section (optional grouping)
-                    const groupChildren = it?.groupChildren !== false;
-                    const children = [];
+                    // Children handling:
+                    // 1) Preferred: explicit items array on the section object (does NOT consume following menu items)
+                    // 2) Backward-compatible: group following items until next section
+                    const explicitChildren = Array.isArray(it?.items) ? it.items : null;
+                    const groupChildren = explicitChildren ? false : (it?.groupChildren !== false);
+                    const children = explicitChildren ? explicitChildren : [];
+
                     let j = i + 1;
-                    if (groupChildren) {
+                    if (!explicitChildren && groupChildren) {
                       for (; j < menu.length; j++) {
                         const nxt = menu[j];
                         if (nxt?.type === "section" || nxt?.section) break;

@@ -268,6 +268,12 @@ For **Vercel static-build** projects (like this repo), `vercel.json` does **not*
 So in this repo, implement it in the frontend app (React) using `window.location.hostname`.
 See: `frontend/src/App.js` → `DomainRedirects()`.
 
+Current behavior implemented:
+
+- `https://admin.growth.vin/` → `https://admin.growth.vin/admin/login`
+- `https://growth.vin/admin/login` or `https://www.growth.vin/admin/login` → `https://admin.growth.vin/admin/login`
+- Any `https://(www.)growth.vin/admin/*` → `https://admin.growth.vin/admin/*`
+
 ---
 
 ## 6) SSL/TLS certificates

@@ -6,7 +6,7 @@ import os
 
 from core.crypto import encrypt_string
 
-from .models import CustomUser, AgencyRegionAssignment, WalletTransaction, Wallet, UserKYC, WithdrawalRequest, SupportTicket, SupportTicketMessage, UserNominee
+from .models import CustomUser, AgencyRegionAssignment, WalletTransaction, Wallet, UserKYC, WithdrawalRequest, SupportTicket, SupportTicketMessage, UserNominee, WalletUploadRequest
 from locations.models import Country, State, City
 
 
@@ -1548,6 +1548,8 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
             "decided_at",
             "payout_ref",
         ]
+
+        # Existing withdrawal serializer behavior (read-only + server-side validations)
         read_only_fields = ["status", "requested_at", "decided_at", "payout_ref"]
 
     def validate(self, attrs):
@@ -1572,8 +1574,7 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
         Create a withdrawal request with the following business rules:
         - KYC must be verified
         - Requested amount must not exceed the user's available main wallet balance
-        - Only one request allowed within each Sunday 6:00 PM–11:59 PM (IST) window
-        - Requests can only be made on Sunday between 18:00 and 23:59 IST
+        - Window rules enforced by CommissionConfig.get_withdrawals_window()
         """
         from decimal import Decimal
         from datetime import datetime, time, timedelta, timezone as dt_timezone
@@ -1609,7 +1610,6 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"detail": "KYC verification required to request withdrawal.", "code": "KYC_REQUIRED"})
 
         # Wallet balance must be sufficient for the requested amount
-        # Note: use main_balance (main income) as the eligibility metric (align with /wallet/me/history top.main_income_balance)
         w = Wallet.get_or_create_for_user(user)
         try:
             mb = Decimal(w.main_balance or 0)
@@ -1650,7 +1650,6 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
                 "code": "WITHDRAWALS_DISABLED",
             })
 
-        # Enforce same-day weekday
         if now_local.weekday() != withdrawal_day:
             days_ahead = (withdrawal_day - now_local.weekday() + 7) % 7
             days_ahead = days_ahead or 7
@@ -1664,13 +1663,10 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
 
         window_start_local = datetime.combine(now_local.date(), start_t, IST)
         window_end_local = datetime.combine(now_local.date(), end_t, IST)
-
-        # Support windows that cross midnight (e.g., 18:00 -> 02:00 next day)
         if window_end_local <= window_start_local:
             window_end_local = window_end_local + timedelta(days=1)
 
         if not (window_start_local <= now_local <= window_end_local):
-            # If we're before start, next window is today at start; else next week's configured day
             if now_local < window_start_local:
                 next_window_start_local = window_start_local
             else:
@@ -1681,12 +1677,6 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
                 "next_window_at": next_window_start_local.astimezone(dt_timezone.utc).isoformat(),
                 "next_window_at_ist": next_window_start_local.isoformat(),
             })
-
-        window_start_utc = window_start_local.astimezone(dt_timezone.utc)
-        window_end_utc = window_end_local.astimezone(dt_timezone.utc)
-
-        # Removed: Restriction to only one withdrawal request per Wednesday.
-        # The user can now request multiple withdrawals within the Wednesday window.
 
         # If bank method and missing fields, hydrate from KYC
         if method == "bank" and (not bank_acc or not ifsc):
@@ -1712,3 +1702,82 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
             note=(validated_data.get("note") or ""),
         )
         return wr
+
+
+# ==========================
+# Upload to Wallet (request + admin approval)
+# ==========================
+
+
+class WalletUploadRequestSerializer(serializers.ModelSerializer):
+    username = serializers.SerializerMethodField(read_only=True)
+    full_name = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = WalletUploadRequest
+        fields = [
+            "id",
+            "user",
+            "username",
+            "full_name",
+            "amount",
+            "utr",
+            "proof",
+            "remarks",
+            "status",
+            "requested_at",
+            "decided_at",
+            "decided_by",
+            "reject_reason",
+            "wallet_transaction",
+        ]
+        read_only_fields = [
+            "id",
+            "status",
+            "requested_at",
+            "decided_at",
+            "decided_by",
+            "wallet_transaction",
+        ]
+
+    def get_username(self, obj):
+        try:
+            return getattr(getattr(obj, "user", None), "username", None)
+        except Exception:
+            return None
+
+    def get_full_name(self, obj):
+        try:
+            u = getattr(obj, "user", None)
+            return getattr(u, "full_name", None) or getattr(u, "username", None)
+        except Exception:
+            return None
+
+
+class WalletUploadRequestCreateSerializer(serializers.ModelSerializer):
+    """User submission serializer.
+
+    Admin-only fields must not be writable by end users.
+    """
+
+    class Meta:
+        model = WalletUploadRequest
+        fields = ["amount", "utr", "proof", "remarks"]
+
+    def validate_amount(self, v):
+        from decimal import Decimal
+        try:
+            amt = Decimal(str(v))
+        except Exception:
+            raise serializers.ValidationError("Invalid amount")
+        if amt <= 0:
+            raise serializers.ValidationError("Amount must be greater than 0")
+        return v
+
+    def validate_utr(self, v):
+        s = str(v or "").strip()
+        if not s:
+            raise serializers.ValidationError("UTR is required")
+        if len(s) < 6:
+            raise serializers.ValidationError("UTR seems too short")
+        return s

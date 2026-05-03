@@ -1028,6 +1028,9 @@ class PromoPurchaseSerializer(serializers.ModelSerializer):
             "selected_product_name",
             "delivery_by",
             "shipping_address",
+            # TRI apps (optional metadata; used for admin filtering)
+            "tri_app_slug",
+            "tri_product_id",
             "selected_promo_product_id",
             "selected_product_id",
             # MONTHLY box flow
@@ -1273,6 +1276,24 @@ class PromoPurchaseSerializer(serializers.ModelSerializer):
                     pass
 
         return attrs
+
+    def to_internal_value(self, data):
+        """Backward-compatible aliases for TRI purchase fields.
+
+        Frontend sends:
+          - tri_app_slug
+          - product_id
+          - tri (boolean-ish)
+
+        Model stores:
+          - tri_app_slug
+          - tri_product_id
+        """
+        d = (data or {}).copy()
+        # Map product_id -> tri_product_id
+        if d.get("product_id") is not None and d.get("tri_product_id") is None:
+            d["tri_product_id"] = d.get("product_id")
+        return super().to_internal_value(d)
 
     def create(self, validated_data):
         request = self.context.get("request")

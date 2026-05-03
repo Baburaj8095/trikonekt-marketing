@@ -55,6 +55,11 @@ import AdminPackages from "./pages/admin/AdminPackages";
 import AdminBusiness from "./pages/admin/AdminBusiness";
 import AdminReports from "./pages/admin/AdminReports";
 import AdminPromoPurchases from "./pages/admin/AdminPromoPurchases";
+import AdminPackagePromoPurchases from "./pages/admin/AdminPackagePromoPurchases";
+import AdminJoinSubscriptionPurchases from "./pages/admin/AdminJoinSubscriptionPurchases";
+import AdminSPPPurchases from "./pages/admin/AdminSPPPurchases";
+import AdminTriTourPurchases from "./pages/admin/AdminTriTourPurchases";
+import AdminWalletUploadApprovals from "./pages/admin/AdminWalletUploadApprovals";
 import AdminPromoPackageProducts from "./pages/admin/AdminPromoPackageProducts";
 import AdminDashboardCards from "./pages/admin/AdminDashboardCards";
 import AdminHomeCards from "./pages/admin/AdminHomeCards";
@@ -79,6 +84,9 @@ import AdminNotifications from "./pages/admin/AdminNotifications";
 import ImpersonateLanding from "./pages/Auth/ImpersonateLanding";
 import ECouponStore from "./pages/ECouponStore";
 import PromoPackages from "./pages/PromoPackages";
+import JoinSubscription from "./pages/packages/JoinSubscription";
+import SPP from "./pages/packages/SPP";
+import DigitalEducationPrime from "./pages/packages/DigitalEducationPrime";
 import PromoProducts from "./pages/PromoProducts";
 import TrikonektProducts from "./pages/TrikonektProducts";
 import AgencyMarketplace from "./pages/agency/AgencyMarketplace";
@@ -239,6 +247,38 @@ function App() {
             <ProtectedRoute allowedRoles={["user"]}>
               <ConsumerShell>
                 <UserDashboard embedded />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Packages (bifurcated) */}
+        <Route
+          path="/user/packages/join-subscription"
+          element={
+            <ProtectedRoute>
+              <ConsumerShell>
+                <JoinSubscription />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/packages/spp"
+          element={
+            <ProtectedRoute>
+              <ConsumerShell>
+                <SPP />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/packages/digital-education-prime"
+          element={
+            <ProtectedRoute>
+              <ConsumerShell>
+                <DigitalEducationPrime />
               </ConsumerShell>
             </ProtectedRoute>
           }
@@ -1263,6 +1303,49 @@ function App() {
             <AdminProtectedRoute>
               <AdminShell>
                 <AdminPromoPurchases />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/wallet-upload-approvals"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminWalletUploadApprovals />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+
+        {/* Package-specific Admin screens (single screen per package) */}
+        <Route
+          path="/admin/packages/join-subscription"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminJoinSubscriptionPurchases />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/packages/spp"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminSPPPurchases />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/packages/tri-tour"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminTriTourPurchases />
               </AdminShell>
             </AdminProtectedRoute>
           }

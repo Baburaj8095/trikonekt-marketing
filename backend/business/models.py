@@ -2191,6 +2191,11 @@ class PromoPurchase(models.Model):
     shipping_address = models.TextField(blank=True)
     delivery_by = models.DateField(null=True, blank=True)
 
+    # TRI apps (Tri Tour / tri-holidays)
+    # Stored for admin filtering/reporting. Optional for non-TRI purchases.
+    tri_app_slug = models.SlugField(max_length=60, blank=True, default="", db_index=True)
+    tri_product_id = models.PositiveIntegerField(null=True, blank=True, db_index=True)
+
     # MONTHLY boxes flow (price per box)
     package_number = models.PositiveIntegerField(null=True, blank=True, db_index=True)
     boxes_json = models.JSONField(default=list, blank=True, help_text="Selected box numbers for MONTHLY (1..12)")
@@ -2215,6 +2220,7 @@ class PromoPurchase(models.Model):
             models.Index(fields=["user", "status", "requested_at"]),
             models.Index(fields=["user", "package"]),
             models.Index(fields=["user", "package", "year", "month"]),
+            models.Index(fields=["tri_app_slug", "status", "requested_at"]),
         ]
 
     def __str__(self):

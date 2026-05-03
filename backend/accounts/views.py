@@ -1,8 +1,29 @@
 from rest_framework import generics
 from rest_framework.pagination import PageNumberPagination, CursorPagination
-from .models import CustomUser, AgencyRegionAssignment, Wallet, WalletTransaction, SupportTicket, SupportTicketMessage, UserNominee
-from .serializers import RegisterSerializer, PublicUserSerializer, UserKYCSerializer, WithdrawalRequestSerializer, ProfileMeSerializer, SupportTicketSerializer, SupportTicketMessageSerializer, UserNomineeSerializer
+from .models import (
+    CustomUser,
+    AgencyRegionAssignment,
+    Wallet,
+    WalletTransaction,
+    SupportTicket,
+    SupportTicketMessage,
+    UserNominee,
+    WalletUploadRequest,
+)
+from .serializers import (
+    RegisterSerializer,
+    PublicUserSerializer,
+    UserKYCSerializer,
+    WithdrawalRequestSerializer,
+    ProfileMeSerializer,
+    SupportTicketSerializer,
+    SupportTicketMessageSerializer,
+    UserNomineeSerializer,
+    WalletUploadRequestSerializer,
+    WalletUploadRequestCreateSerializer,
+)
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from adminapi.permissions import IsAdminOrStaff, HasAdminModuleAccess
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .token_serializers import CustomTokenObtainPairSerializer
 from rest_framework.views import APIView
@@ -29,6 +50,138 @@ try:
     from xhtml2pdf import pisa
 except Exception:
     pisa = None  # type: ignore
+
+
+# ==================================
+# Wallet Upload Requests (User + Admin)
+# ==================================
+
+
+class WalletUploadRequestCreateView(APIView):
+    """User submits a wallet upload request for admin approval.
+
+    POST /api/accounts/wallet/upload-requests/
+    body: multipart/form-data { amount, utr, proof(file), remarks? }
+
+    Credits are NOT applied immediately.
+    """
+
+    permission_classes = [IsAuthenticated]
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser]
+
+    def post(self, request):
+        ser = WalletUploadRequestCreateSerializer(data=request.data, context={"request": request})
+        ser.is_valid(raise_exception=True)
+        obj = WalletUploadRequest.objects.create(
+            user=request.user,
+            amount=ser.validated_data.get("amount"),
+            utr=ser.validated_data.get("utr"),
+            proof=ser.validated_data.get("proof"),
+            remarks=ser.validated_data.get("remarks", ""),
+            status="PENDING",
+        )
+        return Response(
+            WalletUploadRequestSerializer(obj, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class AdminWalletUploadRequestListView(APIView):
+    """Admin list of wallet upload requests.
+
+    GET /api/accounts/admin/wallet/upload-requests/?status=PENDING
+    """
+
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
+
+    def get(self, request):
+        qs = WalletUploadRequest.objects.select_related("user", "decided_by").order_by("-requested_at", "-id")
+        st = (request.query_params.get("status") or "").strip().upper()
+        if st in ("PENDING", "APPROVED", "REJECTED"):
+            qs = qs.filter(status=st)
+        data = WalletUploadRequestSerializer(qs[:500], many=True, context={"request": request}).data
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class AdminWalletUploadRequestApproveView(APIView):
+    """Approve a request and credit INTERNAL wallet pocket.
+
+    POST /api/accounts/admin/wallet/upload-requests/<id>/approve/
+    """
+
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
+
+    def post(self, request, pk: int):
+        from decimal import Decimal
+        from django.utils import timezone as _tz
+        from django.db import transaction as _tx
+
+        with _tx.atomic():
+            obj = WalletUploadRequest.objects.select_for_update().select_related("user").filter(pk=pk).first()
+            if not obj:
+                return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+            if obj.status == "APPROVED":
+                return Response(WalletUploadRequestSerializer(obj, context={"request": request}).data)
+            if obj.status != "PENDING":
+                return Response({"detail": "Only PENDING requests can be approved."}, status=status.HTTP_400_BAD_REQUEST)
+
+            w = Wallet.get_or_create_for_user(obj.user)
+            w = Wallet.objects.select_for_update().get(pk=w.pk)
+
+            amt = Decimal(str(obj.amount or 0))
+            if amt <= 0:
+                return Response({"detail": "Invalid amount."}, status=status.HTTP_400_BAD_REQUEST)
+
+            w.balance = (w.balance or Decimal("0")) + amt
+            w.save(update_fields=["balance", "updated_at"])
+
+            tx = WalletTransaction.objects.create(
+                user=obj.user,
+                amount=amt,
+                balance_after=w.balance,
+                type="INTERNAL_WALLET_CREDIT",
+                source_type="WALLET_UPLOAD",
+                source_id=str(obj.id),
+                meta={"wallet_upload_request_id": obj.id, "utr": obj.utr},
+            )
+
+            obj.status = "APPROVED"
+            obj.decided_by = request.user
+            obj.decided_at = _tz.now()
+            obj.wallet_transaction = tx
+            obj.reject_reason = ""
+            obj.save(update_fields=["status", "decided_by", "decided_at", "wallet_transaction", "reject_reason"])
+
+        return Response(WalletUploadRequestSerializer(obj, context={"request": request}).data, status=status.HTTP_200_OK)
+
+
+class AdminWalletUploadRequestRejectView(APIView):
+    """Reject a wallet upload request.
+
+    POST /api/accounts/admin/wallet/upload-requests/<id>/reject/ { reason?: string }
+    """
+
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
+
+    def post(self, request, pk: int):
+        from django.utils import timezone as _tz
+        from django.db import transaction as _tx
+
+        reason = str((request.data or {}).get("reason") or "").strip()
+        with _tx.atomic():
+            obj = WalletUploadRequest.objects.select_for_update().filter(pk=pk).first()
+            if not obj:
+                return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+            if obj.status == "REJECTED":
+                return Response(WalletUploadRequestSerializer(obj, context={"request": request}).data)
+            if obj.status != "PENDING":
+                return Response({"detail": "Only PENDING requests can be rejected."}, status=status.HTTP_400_BAD_REQUEST)
+            obj.status = "REJECTED"
+            obj.decided_by = request.user
+            obj.decided_at = _tz.now()
+            obj.reject_reason = reason
+            obj.save(update_fields=["status", "decided_by", "decided_at", "reject_reason"])
+        return Response(WalletUploadRequestSerializer(obj, context={"request": request}).data, status=status.HTTP_200_OK)
 
 
 class RegisterView(generics.CreateAPIView):
@@ -875,6 +1028,7 @@ def regions_by_sponsor(request):
 
 # Simple hierarchy endpoint for audits and dashboards
 from rest_framework.permissions import IsAuthenticated
+from adminapi.permissions import IsAdminOrStaff, HasAdminModuleAccess
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -1867,11 +2021,35 @@ class WalletMe(APIView):
             internal_wallet_balance = _wallet_sum(["INTERNAL_WALLET_CREDIT"], ["INTERNAL_WALLET_DEBIT"])
             wallet_transfer_total = _wallet_sum(["WALLET_TO_WALLET_IN"], ["WALLET_TO_WALLET_OUT"])
             withdrawal_wallet_balance = str((D(str(getattr(w, "withdrawable_balance", 0) or 0))).quantize(D("0.01")))
+            package_upload_balance = _wallet_sum(
+                [
+                    "WALLET_UPLOAD_CREDIT",
+                    "PACKAGE_UPLOAD_CREDIT",
+                    "PACKAGE_BUY_UPLOAD_CREDIT",
+                    "UPLOAD_TO_WALLET_CREDIT",
+                ],
+                [
+                    "PACKAGE_UPLOAD_DEBIT",
+                    "PACKAGE_BUY_UPLOAD_DEBIT",
+                    "UPLOAD_TO_WALLET_DEBIT",
+                ],
+            )
+            try:
+                upload_sources = ["WALLET_UPLOAD", "UPLOAD_TO_WALLET", "PACKAGE_UPLOAD", "PACKAGE_BUY_UPLOAD"]
+                source_credit = tx_all.filter(source_type__in=upload_sources, amount__gt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")
+                source_debit = tx_all.filter(source_type__in=upload_sources, amount__lt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")
+                typed_total = D(str(package_upload_balance or "0"))
+                source_total = D(str(source_credit)) + D(str(source_debit))
+                if source_total > typed_total:
+                    package_upload_balance = str(source_total.quantize(D("0.01")))
+            except Exception:
+                pass
         except Exception:
             shopping_wallet_balance = "0.00"
             internal_wallet_balance = "0.00"
             wallet_transfer_total = "0.00"
             withdrawal_wallet_balance = str(getattr(w, "withdrawable_balance", 0) or 0)
+            package_upload_balance = "0.00"
 
         return Response({
             "balance": str(w.balance),                       # total (legacy)
@@ -1941,6 +2119,7 @@ class WalletMe(APIView):
                 "internal": str(internal_wallet_balance),
                 "walletToWallet": str(wallet_transfer_total),
                 "withdrawal": str(withdrawal_wallet_balance),
+                "packageUpload": str(package_upload_balance),
             },
             "smart_purchase": {
                 "seasonPurchasedCount": int(monthly_active_count),

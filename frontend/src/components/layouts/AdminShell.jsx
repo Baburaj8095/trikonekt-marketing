@@ -208,6 +208,7 @@ export default function AdminShell({ children }) {
       to.startsWith("/admin/packages") ||
       to.startsWith("/admin/products") ||
       to.startsWith("/admin/payments") ||
+      to.startsWith("/admin/wallet-upload-approvals") ||
       to.startsWith("/admin/agency-prime-requests") ||
       to.startsWith("/admin/lucky-draw") ||
       to.startsWith("/admin/promo-purchases") ||
@@ -259,11 +260,11 @@ export default function AdminShell({ children }) {
       // },
       {
         key: "ops",
-        label: "Package & Prime",
+        label: "Payment Config",
         items: [
-          { to: "/admin/packages", label: "Packages", icon: "box" },
+          // { to: "/admin/packages", label: "Packages", icon: "box" },
           { to: "/admin/payments", label: "Payments", icon: "wallet" },
-          { to: "/admin/agency-prime-requests", label: "Agency Prime Requests", icon: "wallet" },
+          // { to: "/admin/agency-prime-requests", label: "Agency Prime Requests", icon: "wallet" },
         ],
       },
       {
@@ -285,16 +286,24 @@ export default function AdminShell({ children }) {
       },
       {
         key: "promotions",
-        label: "Promotions",
+        label: "Package Approval",
         items: [
           { to: "/admin/lucky-draw", label: "Lucky Draw", icon: "ticket" },
           // { to: "/admin/e-coupons", label: "E‑Coupons", icon: "ticket" },
-          { to: "/admin/dashboard/models/business/promopackage", label: "Promo Packages", icon: "box" },
-          { to: "/admin/promo-package-products", label: "Upload Promo Products (₹750)", icon: "upload" },
-          { to: "/admin/dashboard/models/business/promopackageproduct", label: "Promo Products (₹750)", icon: "box" },
-          { to: "/admin/dashboard/models/business/promomonthlypackage", label: "Season Numbers", icon: "box" },
-          { to: "/admin/dashboard/models/business/promomonthlybox", label: "Season Boxes (Paid)", icon: "box" },
-          { to: "/admin/promo-purchases", label: "Promo Purchases", icon: "ticket" },
+          // { to: "/admin/dashboard/models/business/promopackage", label: "Promo Packages", icon: "box" },
+          // { to: "/admin/promo-package-products", label: "Upload Promo Products (₹750)", icon: "upload" },
+          // { to: "/admin/dashboard/models/business/promopackageproduct", label: "Promo Products (₹750)", icon: "box" },
+          // { to: "/admin/dashboard/models/business/promomonthlypackage", label: "Season Numbers", icon: "box" },
+          // { to: "/admin/dashboard/models/business/promomonthlybox", label: "Season Boxes (Paid)", icon: "box" },
+          // { to: "/admin/promo-purchases", label: "Promo Purchases", icon: "ticket" },
+
+          // Package-specific approval screens (requested)
+          { to: "/admin/packages/join-subscription", label: "Approvals: Join Subscription", icon: "ticket" },
+          { to: "/admin/packages/spp", label: "Approvals: SPP", icon: "ticket" },
+          { to: "/admin/packages/tri-tour", label: "Approvals: Tri Tour", icon: "ticket" },
+
+          { to: "/admin/wallet-upload-approvals", label: "Wallet Upload Approvals", icon: "wallet" },
+
           { to: "/admin/rank-upgrades", label: "Rank Upgrades", icon: "wallet" },
         ],
       },

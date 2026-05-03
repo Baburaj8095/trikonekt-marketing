@@ -997,6 +997,11 @@ class AdminPromoPurchaseListView(APIView):
                 qs = qs.filter(package__type="MONTHLY")
             # else: ignore unknown kind
 
+        # TRI apps filter (Tri Tour)
+        tri_app_slug = (request.query_params.get("tri_app_slug") or "").strip()
+        if tri_app_slug:
+            qs = qs.filter(tri_app_slug=tri_app_slug)
+
         # date range on requested_at
         d_from = (request.query_params.get("date_from") or "").strip()
         d_to = (request.query_params.get("date_to") or "").strip()

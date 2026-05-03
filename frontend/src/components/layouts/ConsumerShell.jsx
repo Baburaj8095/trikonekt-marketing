@@ -48,15 +48,32 @@ export default function ConsumerShell({ children }) {
         { to: "/user/team-dashboard", label: "Dashboard", icon: "dashboard" },
         { to: "/user/refer-earn", label: "Refer & Earn", icon: "upload" },
         { to: "/user/profile", label: "Profile", icon: "users" },
-        { to: "/user/promo-packages", label: "Join Prime", icon: "star" },
-        { to: "/user/dashboard/upgrade", label: "Rank Upgrade", icon: "wallet" },
-        { to: "/user/genealogy-5", label: "Genealogy Tree", icon: "tree" },
+
+        // Packages accordion (team login)
+        {
+          type: "section",
+          label: "Packages",
+          icon: "box",
+          collapsible: true,
+          groupChildren: false,
+          items: [
+            { to: "/user/packages/join-subscription", label: "Join Subscription", icon: "star" },
+            { to: "/user/packages/spp", label: "Smart Product Purchase (SPP)", icon: "box" },
+            { to: "/user/packages/digital-education-prime", label: "Digital Education Prime Purchase", icon: "wallet" },
+            { to: "/user/tri/tri-holidays", label: "Tri Tour", icon: "ticket" },
+          ],
+        },
+
+        // Keep legacy entries for backward compatibility / direct access
+        // { to: "/user/promo-packages", label: "Join Prime (Legacy)", icon: "star" },
+        // { to: "/user/dashboard/upgrade", label: "Rank Upgrade (Legacy)", icon: "wallet" },
+        // { to: "/user/genealogy-5", label: "Genealogy Tree", icon: "tree" },
         { to: "/user/kyc", label: "KYC", icon: "shield" },
-        { to: "/user/team-wallet", label: "Team Wallet", icon: "wallet" },
-        { to: "/user/upload-wallet", label: "Upload to Wallet", icon: "upload" },
+        // { to: "/user/team-wallet", label: "Team Wallet", icon: "wallet" },
+        { to: "/user/upload-wallet", label: "Add Money", icon: "upload" },
         // Withdrawal screen is implemented as /user/wallet (Wallet component)
         { to: "/user/wallet", label: "Withdrawal", icon: "wallet" },
-        { to: "/user/history", label: "History", icon: "orders" },
+        // { to: "/user/history", label: "History", icon: "orders" },
         { to: "/user/support", label: "Support", icon: "ticket" },
       ];
     }
@@ -75,8 +92,24 @@ export default function ConsumerShell({ children }) {
       //{ to: "/user/my-team", label: "My Team", icon: "tree" },
       { to: "/user/genealogy-5", label: "Genealogy Tree", icon: "tree" },
 
-      { to: "/user/promo-packages", label: "Join Prime", icon: "star" },
-      { to: "/user/dashboard/upgrade", label: "Rank Upgrade", icon: "wallet" },
+      // Packages accordion (consumer login)
+      {
+        type: "section",
+        label: "Packages",
+        icon: "box",
+        collapsible: true,
+        groupChildren: false,
+        items: [
+          { to: "/user/packages/join-subscription", label: "Join Subscription", icon: "star" },
+          { to: "/user/packages/spp", label: "Smart Product Purchase (SPP)", icon: "box" },
+          { to: "/user/packages/digital-education-prime", label: "Digital Education Prime Purchase", icon: "wallet" },
+          { to: "/user/tri/tri-holidays", label: "Tri Tour", icon: "ticket" },
+        ],
+      },
+
+      // Keep legacy entries for backward compatibility / direct access
+      { to: "/user/promo-packages", label: "Join Prime (Legacy)", icon: "star" },
+      { to: "/user/dashboard/upgrade", label: "Rank Upgrade (Legacy)", icon: "wallet" },
       { to: "/user/redeem-coupon", label: "My E coupons", icon: "ticket" },
       { to: "/user/my-orders", label: "My Orders", icon: "orders" },
       { to: "/trikonekt-products", label: "Trikonekt Products", icon: "box" },

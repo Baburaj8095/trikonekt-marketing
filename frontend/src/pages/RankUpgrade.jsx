@@ -315,6 +315,18 @@ function RankPaymentSheet({ open, onClose, data, onSuccess }) {
 }
 
 export default function RankUpgrade() {
+  // Optional UI-only label override (used by Digital Education Prime package wrapper)
+  const labelOverride = (() => {
+    try {
+      return window.__tk_rank_upgrade_label_override || null;
+    } catch {
+      return null;
+    }
+  })();
+
+  const screenTitle = labelOverride?.title || "Rank Upgrade";
+  const rankWord = labelOverride?.rankWord || "Rank";
+
   const [ranks, setRanks] = useState([]);
   const [elig, setElig] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -449,10 +461,21 @@ export default function RankUpgrade() {
 
   const canUpgrade = !!elig?.eligible && !!elig?.next_rank && Number(amount) > 0;
 
+  if (loading) {
+    return (
+      <Box sx={{ p: 2 }}>
+        <Typography fontSize={18} fontWeight={900} sx={{ mb: 1 }}>
+          {screenTitle}
+        </Typography>
+        <LinearProgress />
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ p: 2 }}>
       <Typography fontSize={18} fontWeight={900} sx={{ mb: 1 }}>
-        Rank Upgrade
+        {screenTitle}
       </Typography>
 
       
@@ -493,7 +516,7 @@ export default function RankUpgrade() {
       {/* Rank Table (choose and buy) */}
       <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2 }}>
         <Typography fontWeight={800} sx={{ mb: 1 }}>
-          Rank Upgrade Table
+          {rankWord} Upgrade Table
         </Typography>
         {/* Desktop/Tablet table */}
         <Box sx={{ display: { xs: "none", sm: "block" } }}>

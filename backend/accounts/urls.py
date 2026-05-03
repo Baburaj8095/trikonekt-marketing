@@ -40,6 +40,10 @@ from .views import (
     WalletTransferConfirm,
     # Direct sponsor member detail
     DirectMemberDetailView,
+    WalletUploadRequestCreateView,
+    AdminWalletUploadRequestListView,
+    AdminWalletUploadRequestApproveView,
+    AdminWalletUploadRequestRejectView,
 )
 from .token_serializers import CustomTokenRefreshView
 from .views_tree import MyFiveMatrixTeamV1, FiveMatrixCountsView, MyMatrix5EntriesTree, MyMatrixRootsBreakdownView
@@ -95,4 +99,10 @@ urlpatterns = [
     path('genealogy/roots/breakdown/', MyMatrixRootsBreakdownView.as_view(), name='my_matrix_roots_breakdown'),
     # Direct sponsor member detail
     path('direct/member-detail/', DirectMemberDetailView.as_view(), name='direct_member_detail'),
+
+    # Wallet upload requests (user submit + admin approvals)
+    path('wallet/upload-requests/', WalletUploadRequestCreateView.as_view(), name='wallet_upload_request_create'),
+    path('admin/wallet/upload-requests/', AdminWalletUploadRequestListView.as_view(), name='admin_wallet_upload_requests'),
+    path('admin/wallet/upload-requests/<int:pk>/approve/', AdminWalletUploadRequestApproveView.as_view(), name='admin_wallet_upload_request_approve'),
+    path('admin/wallet/upload-requests/<int:pk>/reject/', AdminWalletUploadRequestRejectView.as_view(), name='admin_wallet_upload_request_reject'),
 ]

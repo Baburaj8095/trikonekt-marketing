@@ -845,16 +845,58 @@ class WalletTransaction(models.Model):
     meta = models.JSONField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+
+# ======================
+# Upload to Wallet (admin approval)
+# ======================
+
+
+class WalletUploadRequest(models.Model):
+    """User-submitted wallet upload request (amount + UTR + proof).
+
+    On admin approval, the amount is credited into the user's INTERNAL pocket
+    (Self Package Pocket) via WalletTransaction with type INTERNAL_WALLET_CREDIT.
+    """
+
+    STATUS_CHOICES = [
+        ("PENDING", "Pending"),
+        ("APPROVED", "Approved"),
+        ("REJECTED", "Rejected"),
+        ("CANCELLED", "Cancelled"),
+    ]
+
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="wallet_upload_requests", db_index=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    utr = models.CharField(max_length=64, db_index=True)
+    proof = models.FileField(upload_to="wallet_uploads/", null=True, blank=True)
+    remarks = models.TextField(blank=True, default="")
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="PENDING", db_index=True)
+
+    requested_at = models.DateTimeField(auto_now_add=True)
+    decided_at = models.DateTimeField(null=True, blank=True)
+    decided_by = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.SET_NULL, related_name="wallet_upload_decisions")
+
+    reject_reason = models.TextField(blank=True, default="")
+
+    # Idempotency guard: store the created WalletTransaction id when approved
+    wallet_transaction = models.ForeignKey(
+        "WalletTransaction",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="wallet_upload_requests",
+    )
+
     class Meta:
-        ordering = ['-created_at']
+        ordering = ["-requested_at", "-id"]
         indexes = [
-            models.Index(fields=['user', 'type']),
-            models.Index(fields=['user', 'matrix_account']),
-            models.Index(fields=['created_at']),
+            models.Index(fields=["status", "requested_at"], name="wul_status_req_idx"),
+            models.Index(fields=["user", "status"], name="wul_user_status_idx"),
         ]
 
     def __str__(self) -> str:
-        return f"{self.user.username} {self.type} {self.amount} -> {self.balance_after}"
+        return f"WalletUploadRequest<{self.user_id}> ₹{self.amount} {self.status}"
+
 
 
 # ======================

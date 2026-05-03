@@ -943,6 +943,10 @@ export async function createPromoPurchase({
   selected_product_id = null,
   selected_promo_product_id = null,
   shipping_address = "",
+  // TRI apps: optional metadata for tri-holidays purchases (non-breaking)
+  tri = null,
+  tri_app_slug = "",
+  product_id = null,
   // For PRIME 150 user choice
   prime150_choice = "EBOOK",
   // For PRIME 750 user choice
@@ -985,6 +989,12 @@ export async function createPromoPurchase({
   if (prime750_choice != null && String(prime750_choice).trim() !== "") {
     fd.append("prime750_choice", String(prime750_choice).toUpperCase());
   }
+
+  // Tri app metadata (stored server-side for filtering in admin)
+  if (tri != null) fd.append("tri", String(tri ? "1" : "0"));
+  if (tri_app_slug) fd.append("tri_app_slug", String(tri_app_slug));
+  if (product_id != null) fd.append("product_id", String(product_id));
+
   const res = await API.post("/business/promo/purchases/", fd, {
     headers: { "Content-Type": "multipart/form-data" },
     timeout: 30000,
@@ -1012,6 +1022,38 @@ export async function adminRejectPromoPurchase(id, reason = "") {
     { timeout: 300000 }
   );
   return res?.data || res;
+}
+
+// =============================
+// Admin: Wallet Upload Approvals
+// =============================
+
+export async function adminListWalletUploadRequests(params = {}) {
+  const res = await API.get("/accounts/admin/wallet/upload-requests/", { params });
+  return res.data;
+}
+
+export async function adminApproveWalletUploadRequest(id) {
+  const res = await API.post(`/accounts/admin/wallet/upload-requests/${id}/approve/`);
+  return res.data;
+}
+
+export async function adminRejectWalletUploadRequest(id, reason = "") {
+  const res = await API.post(`/accounts/admin/wallet/upload-requests/${id}/reject/`, { reason });
+  return res.data;
+}
+
+// User submit (optional for future UI)
+export async function createWalletUploadRequest({ amount, utr, proof, remarks = "" }) {
+  const form = new FormData();
+  form.append("amount", amount);
+  form.append("utr", utr);
+  if (proof) form.append("proof", proof);
+  if (remarks) form.append("remarks", remarks);
+  const res = await API.post("/accounts/wallet/upload-requests/", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data;
 }
 
 /**
