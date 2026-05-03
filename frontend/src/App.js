@@ -158,10 +158,42 @@ function LegacyAuthEntry() {
   return <Login />;
 }
 
+function DomainRedirects() {
+  // Client-side redirects to enforce:
+  // - admin.growth.vin/  -> /admin
+  // - (www.)growth.vin/admin -> https://admin.growth.vin/admin
+  // (Vercel static-build vercel.json routes do not support host-based redirects.)
+  const location = useLocation();
+
+  try {
+    const host = String(window.location.hostname || "").toLowerCase();
+    const path = String(location.pathname || "");
+
+    // 1) Admin subdomain root -> /admin
+    if (host === "admin.growth.vin" && (path === "/" || path === "")) {
+      return <Navigate to="/admin" replace />;
+    }
+
+    // 2) If user tries to access admin on main domain, force admin subdomain
+    // We redirect only /admin and /admin/*
+    if ((host === "growth.vin" || host === "www.growth.vin") && (path === "/admin" || path.startsWith("/admin/"))) {
+      const qs = window.location.search || "";
+      const hash = window.location.hash || "";
+      window.location.replace(`https://admin.growth.vin${path}${qs}${hash}`);
+      return null;
+    }
+  } catch (_) {
+    // fail open
+  }
+
+  return null;
+}
+
 function App() {
   return (
     <BrowserRouter>
       <LoadingOverlay />
+      <DomainRedirects />
       <Routes>
         {/* Public Routes */}
 

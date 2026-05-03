@@ -263,7 +263,10 @@ If someone opens:
 
 - `https://admin.growth.vin/admin`
 
-This can be done in `frontend/vercel.json` using **host-based redirects**.
+For **Vercel static-build** projects (like this repo), `vercel.json` does **not** support host-based redirects.
+
+So in this repo, implement it in the frontend app (React) using `window.location.hostname`.
+See: `frontend/src/App.js` → `DomainRedirects()`.
 
 ---
 
