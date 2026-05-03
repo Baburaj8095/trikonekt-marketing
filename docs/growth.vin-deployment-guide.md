@@ -28,6 +28,13 @@ Existing production reference (current):
 
 > **Important**: `admin.growth.vin/admin` is a **frontend route**. The **API** should be on `api.growth.vin`.
 
+### API URL pattern reminder (common mistake)
+
+This backend serves API routes under the `/api/` prefix. Example:
+
+- ✅ Login: `https://api.growth.vin/api/accounts/login/`
+- ❌ Wrong: `https://api.growth.vin/accounts/login/`
+
 ---
 
 ## 1) Prerequisites
@@ -158,6 +165,20 @@ Set (example):
 
 > Use whatever env naming your frontend actually reads (e.g. `REACT_APP_...` or `VITE_...`).
 
+### 4.2.1 Important (this repo): Vercel route proxy to API domain
+
+This repo uses `frontend/vercel.json` to proxy frontend requests like:
+
+- `/api/*` → backend API
+- `/media/*` → backend media
+- `/uploads/*` → backend uploads
+
+So for the new domain, ensure these targets point to:
+
+- `https://api.growth.vin`
+
+(Previously this was pointing to `https://api.trikonekt.com`.)
+
 ### 4.3 Add Custom Domains in Vercel
 
 In Vercel Project → **Settings** → **Domains**:
@@ -210,6 +231,18 @@ This repo already contains `frontend/vercel.json`. Confirm it includes a rewrite
 
 If you use Next.js, you do not need this rewrite.
 
+### 5.4 How admin.growth.vin/admin works (same Vercel project)
+
+Because `admin.growth.vin` points to the **same Vercel project**, the app build is identical. The only difference is the **hostname**.
+
+What you must ensure:
+
+1. In Vercel → Project → Domains, add `admin.growth.vin`
+2. In GoDaddy DNS, add the `admin` record that Vercel instructs (usually CNAME)
+3. Keep SPA rewrite (`/(.*) → /index.html`) so refreshing `/admin` does not 404
+
+Then your React Router route `/admin` will load normally on `admin.growth.vin/admin`.
+
 ### 5.3 Optional: redirect admin root to /admin
 
 In Vercel, you can add a redirect so `admin.growth.vin/` goes to `/admin`.
@@ -219,6 +252,18 @@ Options:
 - Add a redirect in `vercel.json`, OR
 - Add it in Vercel Project settings (Redirects), OR
 - In your frontend router, handle `/` differently depending on hostname.
+
+### 5.5 Optional: force all `/admin` traffic to the admin subdomain
+
+If someone opens:
+
+- `https://growth.vin/admin` or `https://www.growth.vin/admin`
+
+…you may want to redirect them to:
+
+- `https://admin.growth.vin/admin`
+
+This can be done in `frontend/vercel.json` using **host-based redirects**.
 
 ---
 
@@ -249,14 +294,16 @@ Do not try to manually upload certificates in GoDaddy for these platforms.
 From a terminal:
 
 ```bash
-curl -i https://api.growth.vin/
+curl -i https://api.growth.vin/healthz
 ```
 
-If your API health endpoint is something like `/health/`:
+Also test a known public endpoint:
 
 ```bash
-curl -i https://api.growth.vin/health/
+curl -i https://api.growth.vin/api/company/
 ```
+
+> Note: `https://api.growth.vin/` may return **404 Not Found** and that can be normal, because this backend defines routes like `/healthz` and `/api/...`.
 
 ### 7.4 CORS verification
 
@@ -293,6 +340,28 @@ Fix: ensure Render custom domain is added and DNS CNAME is correct; verify `ALLO
 - Set `DEBUG=False`.
 - Ensure `SECRET_KEY` is rotated and stored only in Render env vars.
 - Set correct cookie security flags if using session auth.
+
+---
+
+## 9.1 Database migration (Do you need to move data?)
+
+**If you are only migrating domains (trikonekt.com → growth.vin):**
+
+- Recommended: **reuse the same Render backend service + same Render Postgres database**.
+- In this case there is **no database migration** required.
+- You only add new custom domains and update `ALLOWED_HOSTS` / CORS.
+
+**Only migrate the database if you are creating a brand-new database** for `growth.vin`.
+If you do, the high-level steps are:
+
+1. Export from old DB (backup / dump)
+2. Restore into new DB
+3. Point backend `DATABASE_URL` to new DB
+4. Run Django migrations
+
+If you want, I can add exact `pg_dump` / `psql` commands once you confirm:
+- old DB provider + access method, and
+- new DB provider (Render Postgres is easiest).
 
 ---
 

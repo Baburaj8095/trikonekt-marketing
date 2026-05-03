@@ -8,15 +8,18 @@
     }
   ],
   "routes": [
+    { "src": "^/$", "host": "admin\\.growth\\.vin$", "status": 308, "headers": { "Location": "/admin" } },
+    { "src": "^/admin/?$", "host": "(www\\.)?growth\\.vin$", "status": 308, "headers": { "Location": "https://admin.growth.vin/admin" } },
+
     { "src": "/static/(.*)", "dest": "/static/$1" },
     { "src": "/favicon.ico", "dest": "/favicon.ico" },
     { "src": "/asset-manifest.json", "dest": "/asset-manifest.json" },
     { "src": "/manifest.json", "dest": "/manifest.json" },
     { "src": "/logo(.*)\\.png", "dest": "/logo$1.png" },
 
-    { "src": "/api/(.*)", "dest": "https://api.trikonekt.com/api/$1" },
-    { "src": "/media/(.*)", "dest": "https://api.trikonekt.com/media/$1" },
-    { "src": "/uploads/(.*)", "dest": "https://api.trikonekt.com/uploads/$1" },
+    { "src": "/api/(.*)", "dest": "https://api.growth.vin/api/$1" },
+    { "src": "/media/(.*)", "dest": "https://api.growth.vin/media/$1" },
+    { "src": "/uploads/(.*)", "dest": "https://api.growth.vin/uploads/$1" },
 
     { "src": "/(.*)", "dest": "/index.html" }
   ]
