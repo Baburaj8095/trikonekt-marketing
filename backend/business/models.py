@@ -2184,6 +2184,37 @@ class PromoPurchase(models.Model):
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0.00)], default=0)
     payment_proof = models.FileField(upload_to="uploads/promo_proofs/", null=True, blank=True, storage=RAW_STORAGE)
 
+    # Payment mode (manual proof vs internal self-package wallet)
+    PAYMENT_MODE_MANUAL = "MANUAL"
+    PAYMENT_MODE_WALLET = "WALLET"
+    PAYMENT_MODE_CHOICES = (
+        (PAYMENT_MODE_MANUAL, "MANUAL"),
+        (PAYMENT_MODE_WALLET, "WALLET"),
+    )
+    payment_mode = models.CharField(
+        max_length=16,
+        choices=PAYMENT_MODE_CHOICES,
+        default=PAYMENT_MODE_MANUAL,
+        db_index=True,
+        help_text="MANUAL=UPI proof upload, WALLET=self package (internal) wallet",
+    )
+
+    # For wallet-paid purchases, track debit/refund tx for idempotency/audit
+    wallet_debit_tx = models.ForeignKey(
+        "accounts.WalletTransaction",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="promo_wallet_debits",
+    )
+    wallet_refund_tx = models.ForeignKey(
+        "accounts.WalletTransaction",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="promo_wallet_refunds",
+    )
+
     # PRIME750 specific: selected product and shipping/delivery metadata
     # Deprecated: selected_product kept for backward compatibility (was market.Product)
     selected_product = models.ForeignKey("market.Product", null=True, blank=True, on_delete=models.SET_NULL, related_name="selected_in_promo_purchases")
@@ -2221,6 +2252,7 @@ class PromoPurchase(models.Model):
             models.Index(fields=["user", "package"]),
             models.Index(fields=["user", "package", "year", "month"]),
             models.Index(fields=["tri_app_slug", "status", "requested_at"]),
+            models.Index(fields=["payment_mode", "status", "requested_at"]),
         ]
 
     def __str__(self):

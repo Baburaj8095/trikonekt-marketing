@@ -13,6 +13,9 @@ import {
   InputAdornment,
   Snackbar,
   Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   Tabs,
   Tab,
   Checkbox,
@@ -35,6 +38,8 @@ import {
   createPromoPurchase,
   listCouponSeasons,
   getEcouponStoreBootstrap,
+  createPromoPurchaseFromWallet,
+  getWalletMe,
 } from "../api/api";
 import { useNavigate } from "react-router-dom";
 import RankUpgrade from "./RankUpgrade";
@@ -291,6 +296,43 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
         </Alert>
       </Snackbar>
     </>
+  );
+}
+
+/* ======================================================================== */
+/* Payment Method Chooser (Wallet vs Manual) */
+/* ======================================================================== */
+function PaymentMethodDialog({ open, onClose, intent, walletMe, onPickManual, onPickWallet }) {
+  if (!open) return null;
+  const amount = Number(intent?.amount || intent?.pkg?.price || 0);
+  const internalBal = Number(walletMe?.transfer_wallets?.internal || walletMe?.internal_wallet_balance || 0);
+  const canWallet = internalBal >= amount && amount > 0;
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>Select Payment Method</DialogTitle>
+      <DialogContent dividers>
+        <Typography variant="body2" color="text.secondary">
+          Amount: <b>₹{amount}</b>
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
+          Self Package Wallet Balance: <b>₹{internalBal.toFixed(2)}</b>
+        </Typography>
+        {!canWallet ? (
+          <Alert severity="info" sx={{ mt: 1.5 }}>
+            Wallet payment is available only when your Self Package Wallet balance is enough.
+          </Alert>
+        ) : null}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button variant="outlined" onClick={onPickManual}>
+          Manual Payment
+        </Button>
+        <Button variant="contained" disabled={!canWallet} onClick={onPickWallet}>
+          Pay from Wallet
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 
@@ -942,6 +984,11 @@ export default function PromoPackages({
   const [triHolidays, setTriHolidays] = useState(null);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [paymentData, setPaymentData] = useState(null);
+  const [methodOpen, setMethodOpen] = useState(false);
+  const [purchaseIntent, setPurchaseIntent] = useState(null);
+  const [walletMe, setWalletMe] = useState(null);
+  const [walletBusy, setWalletBusy] = useState(false);
+  const [walletErr, setWalletErr] = useState("");
   const [seasonsHints, setSeasonsHints] = useState([]);
   const keyToTab = useMemo(() => {
     const m = { prime750: 0, season: 1, rank: 2, prime150: 3, tour: 4 };
@@ -1056,10 +1103,17 @@ export default function PromoPackages({
     return !!id && activePackageIds.has(id);
   }, [activePackageIds, seasonPkg?.id]);
 
-  const onBuy = (data) => {
-    // Open shared payment sheet
-    setPaymentData(data);
-    setPaymentOpen(true);
+  const onBuy = async (data) => {
+    // New flow: ask user to choose Wallet vs Manual.
+    setPurchaseIntent(data);
+    setWalletErr("");
+    try {
+      const w = await getWalletMe();
+      setWalletMe(w || null);
+    } catch {
+      setWalletMe(null);
+    }
+    setMethodOpen(true);
   };
 
   const scopedHistory = useMemo(() => {
@@ -1281,6 +1335,51 @@ export default function PromoPackages({
           setPaymentSuccessOpen(true);
         }}
       />
+
+      {/* Payment method chooser */}
+      <PaymentMethodDialog
+        open={methodOpen}
+        onClose={() => !walletBusy && setMethodOpen(false)}
+        intent={purchaseIntent}
+        walletMe={walletMe}
+        onPickManual={() => {
+          setMethodOpen(false);
+          setPaymentData(purchaseIntent);
+          setPaymentOpen(true);
+        }}
+        onPickWallet={async () => {
+          if (!purchaseIntent?.pkg?.id) return;
+          setWalletBusy(true);
+          setWalletErr("");
+          try {
+            await createPromoPurchaseFromWallet({
+              package_id: purchaseIntent.pkg.id,
+              ...(purchaseIntent.purchasePayload || {}),
+            });
+            setMethodOpen(false);
+            setHistory(await listMyPromoPurchases());
+            setPaymentSuccessOpen(true);
+          } catch (e) {
+            const msg = e?.response?.data?.detail || e?.message || "Wallet payment failed";
+            setWalletErr(msg);
+          } finally {
+            setWalletBusy(false);
+          }
+        }}
+      />
+
+      {walletErr ? (
+        <Snackbar
+          open={!!walletErr}
+          autoHideDuration={4000}
+          onClose={() => setWalletErr("")}
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        >
+          <Alert onClose={() => setWalletErr("")} severity="error" sx={{ width: "100%" }}>
+            {walletErr}
+          </Alert>
+        </Snackbar>
+      ) : null}
       <Dialog open={paymentSuccessOpen} onClose={() => setPaymentSuccessOpen(false)}>
         <Box sx={{ p: 3, textAlign: "center", minWidth: 280 }}>
           <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>

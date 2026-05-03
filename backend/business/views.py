@@ -958,6 +958,118 @@ class PromoPurchaseMeListCreateView(APIView):
         return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+class PromoPurchasePayFromWalletView(APIView):
+    """Wallet-paid promo purchase.
+
+    POST /api/business/promo/purchases/pay-from-wallet/
+    JSON body:
+      {
+        package_id: <int>,
+        quantity?: <int>,
+        prime150_choice?: "EBOOK"|"REDEEM",
+        prime750_choice?: "PRODUCT"|"REDEEM",
+        selected_promo_product_id?: <int>,
+        shipping_address?: <string>,
+        package_number?: <int>,
+        boxes?: [int, ...],
+        tri_app_slug?: <string>,
+        product_id?: <int>
+      }
+
+    Server will:
+      - Validate payload using PromoPurchaseSerializer rules
+      - Compute authoritative amount_paid
+      - Debit INTERNAL wallet immediately
+      - Create PromoPurchase PENDING with payment_mode=WALLET and link wallet tx
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        from decimal import Decimal as D
+        from accounts.models import Wallet, WalletTransaction
+
+        # Validate payload with the existing serializer (but without requiring payment_proof)
+        ser = PromoPurchaseSerializer(data=request.data, context={"request": request})
+        if not ser.is_valid():
+            return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        # Compute would-be total from validated data (serializer create() does this too, but we need it pre-debit)
+        try:
+            pkg = ser.validated_data.get("package")
+        except Exception:
+            pkg = None
+        if not pkg:
+            return Response({"detail": "Invalid package_id."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            qty = int(ser.validated_data.get("quantity") or 1)
+        except Exception:
+            qty = 1
+        qty = max(1, qty)
+
+        try:
+            # MONTHLY UI price is 1000 per box (see serializer)
+            if str(getattr(pkg, "type", "")) == "MONTHLY":
+                unit = D("1000.00")
+            else:
+                unit = D(str(getattr(pkg, "price", "0") or "0"))
+        except Exception:
+            unit = D("0")
+        total = (unit * D(str(qty))).quantize(D("0.01"))
+        if total <= 0:
+            return Response({"detail": "Invalid payable amount."}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            # Debit internal wallet
+            w = Wallet.get_or_create_for_user(request.user)
+            try:
+                w.debit(
+                    total,
+                    tx_type="INTERNAL_WALLET_DEBIT",
+                    meta={"reason": "PROMO_PURCHASE", "package_id": getattr(pkg, "id", None)},
+                    source_type="PROMO_PURCHASE",
+                    source_id="",  # filled after promo purchase is created
+                )
+            except Exception:
+                return Response({"detail": "Insufficient wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Create the purchase record
+            try:
+                data = dict(ser.validated_data)
+            except Exception:
+                data = ser.validated_data
+            # Ensure clean fields (serializer uses write-only helpers)
+            data.pop("boxes", None)
+            pp = PromoPurchase.objects.create(
+                user=request.user,
+                amount_paid=total,
+                payment_mode="WALLET",
+                **data,
+            )
+
+            # Link the debit tx we just created (find by source_type + user + amount)
+            tx = WalletTransaction.objects.filter(
+                user=request.user,
+                type="INTERNAL_WALLET_DEBIT",
+                source_type="PROMO_PURCHASE",
+                amount=D(str(total)) * D("-1"),
+            ).order_by("-id").first()
+            if tx:
+                # Fill source_id and backlink
+                try:
+                    tx.source_id = str(pp.id)
+                    tx.meta = dict(tx.meta or {})
+                    tx.meta.update({"purchase_id": pp.id})
+                    tx.save(update_fields=["source_id", "meta"])
+                except Exception:
+                    pass
+                pp.wallet_debit_tx = tx
+                pp.save(update_fields=["wallet_debit_tx"])
+
+        return Response(PromoPurchaseSerializer(pp, context={"request": request}).data, status=status.HTTP_201_CREATED)
+
+
 class AdminPromoPurchaseListView(APIView):
     """
     GET /api/business/admin/promo/purchases/
@@ -1668,6 +1780,34 @@ class AdminPromoPurchaseRejectView(APIView):
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
         if obj.status != "PENDING":
             return Response({"detail": "Only PENDING purchases can be rejected."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # If paid from internal wallet, refund immediately on rejection (best-effort, idempotent).
+        try:
+            if getattr(obj, "payment_mode", "MANUAL") == "WALLET" and not getattr(obj, "wallet_refund_tx_id", None):
+                from accounts.models import Wallet, WalletTransaction
+                from decimal import Decimal as D
+                w = Wallet.get_or_create_for_user(obj.user)
+                amt = D(str(getattr(obj, "amount_paid", "0") or "0"))
+                if amt > 0:
+                    # Credit internal wallet back. Keep source_type/source_id for audit.
+                    w.credit(
+                        amt,
+                        tx_type="INTERNAL_WALLET_CREDIT",
+                        meta={"reason": "PROMO_PURCHASE_REJECT_REFUND", "purchase_id": obj.id},
+                        source_type="PROMO_PURCHASE_REFUND",
+                        source_id=str(obj.id),
+                    )
+                    tx = WalletTransaction.objects.filter(
+                        user=obj.user,
+                        type="INTERNAL_WALLET_CREDIT",
+                        source_type="PROMO_PURCHASE_REFUND",
+                        source_id=str(obj.id),
+                    ).order_by("-id").first()
+                    if tx:
+                        obj.wallet_refund_tx = tx
+                        obj.save(update_fields=["wallet_refund_tx"])
+        except Exception:
+            pass
 
         reason = str((request.data or {}).get("reason") or "").strip()
         obj.status = "REJECTED"

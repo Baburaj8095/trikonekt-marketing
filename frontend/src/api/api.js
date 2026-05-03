@@ -1002,6 +1002,18 @@ export async function createPromoPurchase({
   return res?.data || res;
 }
 
+// Wallet-paid promo purchase (no manual proof). Server debits INTERNAL wallet.
+export async function createPromoPurchaseFromWallet(payload = {}) {
+  const res = await API.post("/business/promo/purchases/pay-from-wallet/", payload);
+  return res?.data || res;
+}
+
+// Wallet summary (includes internal/self-package wallet balance)
+export async function getWalletMe() {
+  const res = await API.get("/accounts/wallet/me/", { dedupe: "cancelPrevious", cacheTTL: 10_000 });
+  return res?.data || res;
+}
+
 // Admin promo purchases
 export async function adminListPromoPurchases(params = {}) {
   const res = await API.get("/business/admin/promo/purchases/", { params });

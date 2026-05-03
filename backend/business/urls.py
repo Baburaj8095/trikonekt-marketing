@@ -20,6 +20,7 @@ from .views import (
     # Promo packages
     PromoPackageListView,
     PromoPurchaseMeListCreateView,
+    PromoPurchasePayFromWalletView,
     AdminPromoPurchaseListView,
     AdminPromoPurchaseApproveView,
     AdminPromoPurchaseRejectView,
@@ -97,6 +98,7 @@ urlpatterns = [
     # Promo Packages (Consumer + Admin)
     path('promo/packages/', PromoPackageListView.as_view(), name='promo_packages_list'),
     path('promo/purchases/', PromoPurchaseMeListCreateView.as_view(), name='promo_purchases_me'),
+    path('promo/purchases/pay-from-wallet/', PromoPurchasePayFromWalletView.as_view(), name='promo_purchases_pay_from_wallet'),
     path('admin/promo/purchases/', AdminPromoPurchaseListView.as_view(), name='admin_promo_purchases_list'),
     path('admin/promo/purchases/<int:pk>/approve/', AdminPromoPurchaseApproveView.as_view(), name='admin_promo_purchase_approve'),
     path('admin/promo/purchases/<int:pk>/reject/', AdminPromoPurchaseRejectView.as_view(), name='admin_promo_purchase_reject'),
