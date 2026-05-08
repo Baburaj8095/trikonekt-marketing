@@ -295,15 +295,19 @@ def distribute_monthly_759_payouts(
         from business.models import distribute_auto_pool_commissions  # local import to avoid cycles
         base_amt = _q2(runtime["base_amount"])
         if base_amt <= 0:
-            raise ConfigurationError("commissions.monthly_759.base_amount must be > 0 for agency distribution")
-        distribute_auto_pool_commissions(
-            consumer,
-            base_amount=base_amt,
-            fixed_key="759",
-            source_type=src_type,
-            source_id=src_id,
-            extra_meta={"trigger": "MONTHLY_759", "is_first_month": bool(is_first_month)},
-        )
+            logger.warning(
+                "monthly_759 agency distribution skipped: base_amount must be > 0",
+                extra={"user_id": getattr(consumer, "id", None), "source_type": src_type, "source_id": src_id},
+            )
+        else:
+            distribute_auto_pool_commissions(
+                consumer,
+                base_amount=base_amt,
+                fixed_key="759",
+                source_type=src_type,
+                source_id=src_id,
+                extra_meta={"trigger": "MONTHLY_759", "is_first_month": bool(is_first_month)},
+            )
 
     # 3b) Matrix account creation/payouts with monthly open mode
     try:
@@ -681,13 +685,17 @@ def distribute_monthly_759_payouts(
         from accounts.models import RewardPointsAccount
         base_amt_points = _q2(runtime["base_amount"])
         if base_amt_points <= 0:
-            raise ConfigurationError("commissions.monthly_759.base_amount must be > 0 for reward points")
-        RewardPointsAccount.credit_points(
-            consumer,
-            base_amt_points,
-            reason="MONTHLY_759",
-            meta={"source_type": src_type, "source_id": src_id, "is_first_month": bool(is_first_month)},
-        )
+            logger.warning(
+                "monthly_759 reward points skipped: base_amount must be > 0",
+                extra={"user_id": getattr(consumer, "id", None), "source_type": src_type, "source_id": src_id},
+            )
+        else:
+            RewardPointsAccount.credit_points(
+                consumer,
+                base_amt_points,
+                reason="MONTHLY_759",
+                meta={"source_type": src_type, "source_id": src_id, "is_first_month": bool(is_first_month)},
+            )
     except ConfigurationError:
         # propagate configuration errors (stop payout)
         raise
