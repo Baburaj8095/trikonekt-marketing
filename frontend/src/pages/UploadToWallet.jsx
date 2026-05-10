@@ -16,7 +16,7 @@ import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
 import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceWalletRounded";
 import normalizeMediaUrl from "../utils/media";
-import API, { getEcouponStoreBootstrap } from "../api/api";
+import API, { createWalletUploadRequest, getEcouponStoreBootstrap } from "../api/api";
 import { useNavigate } from "react-router-dom";
 
 function readStoredUser() {
@@ -47,6 +47,7 @@ export default function UploadToWallet() {
     utr: "",
     bill: null,
   });
+  const [fileInputKey, setFileInputKey] = useState(0);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -118,6 +119,12 @@ export default function UploadToWallet() {
       return;
     }
 
+    const amount = Number(form.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setScreenError("Please enter a valid amount greater than 0.");
+      return;
+    }
+
     if (!String(form.utr || "").trim()) {
       setScreenError("Please enter the UTR number.");
       return;
@@ -130,13 +137,29 @@ export default function UploadToWallet() {
 
     setSubmitting(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 700));
+      await createWalletUploadRequest({
+        amount: String(amount),
+        utr: String(form.utr || "").trim(),
+        proof: form.bill,
+      });
       setSuccessMsg(
-        "Upload to Wallet screen is ready. Backend submission API is not yet available, so this submission is kept as UI-only for now."
+        "Wallet upload request submitted. It will be added to your Self Package Wallet after admin approval."
       );
       setForm({ amount: "", utr: "", bill: null });
-    } catch {
-      setScreenError("Failed to submit upload request.");
+      setFileInputKey((prev) => prev + 1);
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      const amountErr = err?.response?.data?.amount?.[0];
+      const utrErr = err?.response?.data?.utr?.[0];
+      const proofErr = err?.response?.data?.proof?.[0];
+      setScreenError(
+        detail ||
+          amountErr ||
+          utrErr ||
+          proofErr ||
+          err?.message ||
+          "Failed to submit upload request."
+      );
     } finally {
       setSubmitting(false);
     }
@@ -360,6 +383,7 @@ export default function UploadToWallet() {
                       >
                         Choose File
                         <input
+                          key={fileInputKey}
                           type="file"
                           hidden
                           accept="image/*,.pdf"

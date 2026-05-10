@@ -494,7 +494,25 @@ class Wallet(models.Model):
         # Lock this wallet row
         w = Wallet.objects.select_for_update().get(pk=self.pk)
 
-        if tx_type == "WITHDRAWAL_DEBIT":
+        if tx_type == "INTERNAL_WALLET_DEBIT":
+            internal_credit = WalletTransaction.objects.filter(
+                user=self.user,
+                type="INTERNAL_WALLET_CREDIT",
+                amount__gt=0,
+            ).aggregate(total=models.Sum("amount"))["total"] or D("0")
+            internal_debit = WalletTransaction.objects.filter(
+                user=self.user,
+                type="INTERNAL_WALLET_DEBIT",
+                amount__lt=0,
+            ).aggregate(total=models.Sum("amount"))["total"] or D("0")
+            internal_available = D(str(internal_credit)) + D(str(internal_debit))
+            if internal_available < amt:
+                raise ValueError("Insufficient internal wallet balance.")
+            w.balance = (w.balance or D("0")) - amt
+            if w.balance < 0:
+                raise ValueError("Insufficient wallet balance.")
+            w.save(update_fields=["balance", "updated_at"])
+        elif tx_type == "WITHDRAWAL_DEBIT":
             # Debit specifically from Main Wallet as per new policy
             new_main = (w.main_balance or D("0")) - amt
             if new_main < 0:
