@@ -1,4 +1,5 @@
 import React from "react";
+import { useLocation } from "react-router-dom";
 import RankUpgrade from "../RankUpgrade";
 
 /**
@@ -7,6 +8,13 @@ import RankUpgrade from "../RankUpgrade";
  * - Uses a global window flag consumed by RankUpgrade to change labels only.
  */
 export default function DigitalEducationPrime() {
+  const location = useLocation();
+  const defaultToRankId = React.useMemo(() => {
+    const params = new URLSearchParams(location.search || "");
+    const raw = params.get("rank_id");
+    return raw ? Number(raw) : null;
+  }, [location.search]);
+
   React.useEffect(() => {
     try {
       window.__tk_rank_upgrade_label_override = {
@@ -21,5 +29,5 @@ export default function DigitalEducationPrime() {
     };
   }, []);
 
-  return <RankUpgrade />;
+  return <RankUpgrade defaultToRankId={defaultToRankId} />;
 }

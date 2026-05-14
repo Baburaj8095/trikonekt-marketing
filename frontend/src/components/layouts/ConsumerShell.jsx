@@ -46,13 +46,11 @@ export default function ConsumerShell({ children }) {
     if (isTeamLogin) {
       return [
         { to: "/user/team-dashboard", label: "Dashboard", icon: "dashboard" },
-        { to: "/user/refer-earn", label: "Refer & Earn", icon: "upload" },
-        { to: "/user/profile", label: "Profile", icon: "users" },
+        { to: "/user/upload-wallet", label: "Add Money", icon: "upload" },
 
-        // Packages accordion (team login)
         {
           type: "section",
-          label: "Packages",
+          label: "Buy Packages",
           icon: "box",
           collapsible: true,
           groupChildren: false,
@@ -64,17 +62,21 @@ export default function ConsumerShell({ children }) {
           ],
         },
 
-        // Keep legacy entries for backward compatibility / direct access
-        // { to: "/user/promo-packages", label: "Join Prime (Legacy)", icon: "star" },
-        // { to: "/user/dashboard/upgrade", label: "Rank Upgrade (Legacy)", icon: "wallet" },
-        // { to: "/user/genealogy-5", label: "Genealogy Tree", icon: "tree" },
-        { to: "/user/kyc", label: "KYC", icon: "shield" },
-        // { to: "/user/team-wallet", label: "Team Wallet", icon: "wallet" },
-        { to: "/user/upload-wallet", label: "Add Money", icon: "upload" },
-        // Withdrawal screen is implemented as /user/wallet (Wallet component)
-        { to: "/user/wallet", label: "Withdrawal", icon: "wallet" },
-        // { to: "/user/history", label: "History", icon: "orders" },
+        { to: "/user/gift-cards", label: "Gift Card Summary", icon: "ticket" },
+        { to: "/user/promo-packages", label: "Package Summary", icon: "orders" },
+        { to: "/user/packages/digital-education-prime", label: "Educational Video Summary", icon: "file" },
+        { to: "/user/team-dashboard?action=id-card", label: "Generate ID Card", icon: "users" },
         { to: "/user/support", label: "Support", icon: "ticket" },
+        { to: "/user/trikonekt-pdf", label: "Trikonekt PDF", icon: "file" },
+        { to: "/user/certificate-download", label: "Certificate Download", icon: "file" },
+        { to: "/user/team-wallet", label: "Team Wallet", icon: "wallet" },
+        { to: "/user/wallet", label: "Withdrawal", icon: "wallet" },
+        { to: "/user/redeem-coupon", label: "Coupon Pocket", icon: "ticket" },
+        { to: "/user/e-coupon-store", label: "Package Purchase Coupon", icon: "ticket" },
+        { to: "/trikonekt-products", label: "E-Commerce", icon: "box" },
+        { to: "/user/tri/tri-holidays", label: "TRI Tour", icon: "ticket" },
+        { to: "/user/refer-earn", label: "Refer & Earn", icon: "upload" },
+        { to: "/user/kyc", label: "KYC", icon: "shield" },
       ];
     }
 
@@ -108,7 +110,7 @@ export default function ConsumerShell({ children }) {
       },
 
       // Keep legacy entries for backward compatibility / direct access
-      { to: "/user/promo-packages", label: "Join Prime (Legacy)", icon: "star" },
+      { to: "/user/promo-packages", label: "Package Summary", icon: "orders" },
       { to: "/user/dashboard/upgrade", label: "Rank Upgrade (Legacy)", icon: "wallet" },
       { to: "/user/redeem-coupon", label: "My E coupons", icon: "ticket" },
       { to: "/user/my-orders", label: "My Orders", icon: "orders" },

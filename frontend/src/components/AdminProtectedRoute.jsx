@@ -1,6 +1,7 @@
 ﻿import React, { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import API, { ensureFreshAccess } from "../api/api";
+import { ROUTE_PERMISSIONS, hasPermission } from "../admin/permissions";
 
 function parseJwt(token) {
   try {
@@ -66,11 +67,20 @@ function clearTokens() {
   } catch {}
 }
 
+function permissionForPath(pathname) {
+  const path = String(pathname || "");
+  const matches = ROUTE_PERMISSIONS
+    .filter((r) => path === r.path || path.startsWith(`${r.path}/`))
+    .sort((a, b) => String(b.path).length - String(a.path).length);
+  return matches[0]?.permission || null;
+}
+
 export default function AdminProtectedRoute({ children }) {
   const location = useLocation();
   const [pending, setPending] = useState(true);
   const [granted, setGranted] = useState(false);
   const [payload, setPayload] = useState(null);
+  const [forbidden, setForbidden] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -120,6 +130,25 @@ export default function AdminProtectedRoute({ children }) {
         }
 
         if (!cancelled) {
+          const requiredPermission = permissionForPath(location.pathname);
+          if (requiredPermission && !isSuperuser) {
+            try {
+              const me = await API.get("admin/me/", { timeout: 8000, retryAttempts: 0, dedupe: "none", cacheTTL: 60000 });
+              const perms = Array.isArray(me?.data?.permissions) ? me.data.permissions : [];
+              if (!hasPermission(perms, requiredPermission)) {
+                setForbidden(true);
+                setGranted(false);
+                setPayload(claim);
+                return;
+              }
+            } catch (_) {
+              setForbidden(true);
+              setGranted(false);
+              setPayload(claim);
+              return;
+            }
+          }
+          setForbidden(false);
           setGranted(true);
           setPayload(claim);
         }
@@ -136,6 +165,9 @@ export default function AdminProtectedRoute({ children }) {
   }
 
   if (!granted) {
+    if (forbidden) {
+      return <Navigate to="/admin/dashboard" replace state={{ deniedFrom: location.pathname }} />;
+    }
     // If user is authenticated but not admin, route to their dashboard
     const role = payload?.role;
     if (role && !(payload?.is_staff || payload?.is_superuser)) {

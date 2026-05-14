@@ -10,6 +10,8 @@ from .models import (
     WishingBanner,
     TeamConsumerWishingBanner,
     TeamConsumerTopAchiever,
+    TeamConsumerEducationalVideo,
+    TeamConsumerDocument,
 )
 from locations.models import Country, State, City
 
@@ -112,6 +114,128 @@ class TeamConsumerTopAchieverSerializer(serializers.ModelSerializer):
     def get_photo_url(self, obj):
         try:
             f = getattr(obj, "photo", None)
+            return f.url if f else None
+        except Exception:
+            return None
+
+
+class TeamConsumerEducationalVideoSerializer(serializers.ModelSerializer):
+    video_url = serializers.SerializerMethodField()
+    thumbnail_url = serializers.SerializerMethodField()
+    required_rank_name = serializers.CharField(source="required_rank.rank_name", read_only=True)
+    required_rank_level = serializers.IntegerField(source="required_rank.level_number", read_only=True)
+    required_rank_amount = serializers.DecimalField(source="required_rank.upgrade_amount", max_digits=12, decimal_places=2, read_only=True)
+    can_access = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TeamConsumerEducationalVideo
+        fields = [
+            "id",
+            "title",
+            "description",
+            "required_rank",
+            "required_rank_name",
+            "required_rank_level",
+            "required_rank_amount",
+            "can_access",
+            "sort_order",
+            "is_active",
+            "video",
+            "video_url",
+            "thumbnail",
+            "thumbnail_url",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "created_at",
+            "updated_at",
+            "video_url",
+            "thumbnail_url",
+            "required_rank_name",
+            "required_rank_level",
+            "required_rank_amount",
+            "can_access",
+        ]
+
+    def _is_admin_request(self):
+        try:
+            request = self.context.get("request") if hasattr(self, "context") else None
+            user = getattr(request, "user", None)
+            return bool(user and user.is_authenticated and (user.is_staff or user.is_superuser))
+        except Exception:
+            return False
+
+    def _user_can_access(self, obj):
+        if self._is_admin_request():
+            return True
+        rank = getattr(obj, "required_rank", None)
+        if not rank:
+            return False
+        try:
+            request = self.context.get("request") if hasattr(self, "context") else None
+            user = getattr(request, "user", None)
+            if not user or not user.is_authenticated:
+                return False
+            from mlm_ranks.models import RankUpgrade
+
+            required_level = int(getattr(rank, "level_number", 0) or 0)
+            return RankUpgrade.objects.filter(
+                user=user,
+                payment_status=RankUpgrade.STATUS_SUCCESS,
+                to_rank__level_number__gte=required_level,
+            ).exists()
+        except Exception:
+            return False
+
+    def get_can_access(self, obj):
+        return self._user_can_access(obj)
+
+    def get_video_url(self, obj):
+        if not self._user_can_access(obj):
+            return None
+        try:
+            f = getattr(obj, "video", None)
+            return f.url if f else None
+        except Exception:
+            return None
+
+    def get_thumbnail_url(self, obj):
+        try:
+            f = getattr(obj, "thumbnail", None)
+            return f.url if f else None
+        except Exception:
+            return None
+
+
+class TeamConsumerDocumentSerializer(serializers.ModelSerializer):
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TeamConsumerDocument
+        fields = [
+            "id",
+            "kind",
+            "title",
+            "file",
+            "file_url",
+            "sort_order",
+            "is_active",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at", "file_url"]
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if self.instance is None and not attrs.get("file"):
+            raise serializers.ValidationError({"file": "PDF file is required."})
+        return attrs
+
+    def get_file_url(self, obj):
+        try:
+            f = getattr(obj, "file", None)
             return f.url if f else None
         except Exception:
             return None

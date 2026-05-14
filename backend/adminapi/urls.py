@@ -57,9 +57,21 @@ from .views_rbac import (
     RolePermissionsBulkAssignView,
     RolePermissionsForRoleView,
     AdminPermissionSeedDefaultsView,
+    AdminTokenObtainPairView,
+    AdminLoginOTPRequestView,
+    AdminLoginOTPVerifyView,
+    AdminPasswordResetOTPRequestView,
+    AdminPasswordResetOTPVerifyView,
+    AdminPasswordResetOTPConfirmView,
 )
 
 urlpatterns = [
+    path("login/", AdminTokenObtainPairView.as_view()),
+    path("login/request-otp/", AdminLoginOTPRequestView.as_view()),
+    path("login/verify-otp/", AdminLoginOTPVerifyView.as_view()),
+    path("password/request-otp/", AdminPasswordResetOTPRequestView.as_view()),
+    path("password/verify-otp/", AdminPasswordResetOTPVerifyView.as_view()),
+    path("password/reset/", AdminPasswordResetOTPConfirmView.as_view()),
     path("metrics/", AdminMetricsView.as_view()),
     path("ping/", AdminPingView.as_view()),
     path("users/tree/root/", AdminUserTreeRoot.as_view()),

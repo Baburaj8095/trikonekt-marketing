@@ -1904,6 +1904,80 @@ class TeamConsumerTopAchiever(models.Model):
         return self.name or f"TeamConsumerTopAchiever#{self.pk}"
 
 
+class TeamConsumerEducationalVideo(models.Model):
+    """Admin-managed educational videos displayed on the Team/Consumer dashboard."""
+
+    title = models.CharField(max_length=180, blank=True, default="")
+    description = models.TextField(blank=True, default="")
+    required_rank = models.ForeignKey(
+        "mlm_ranks.Rank",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="educational_videos",
+        help_text="Digital Education Prime rank required to unlock this video.",
+    )
+    sort_order = models.IntegerField(default=0, db_index=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    video = models.FileField(
+        upload_to="team_consumer/educational_videos/",
+        null=True,
+        blank=True,
+        storage=RAW_STORAGE,
+        max_length=500,
+    )
+    thumbnail = models.ImageField(
+        upload_to="team_consumer/educational_video_thumbnails/",
+        null=True,
+        blank=True,
+        storage=MEDIA_STORAGE,
+        max_length=500,
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["sort_order", "-created_at", "id"]
+        verbose_name = "Team/Consumer Educational Video"
+        verbose_name_plural = "Team/Consumer Educational Videos"
+
+    def __str__(self):
+        return self.title or f"TeamConsumerEducationalVideo#{self.pk}"
+
+
+class TeamConsumerDocument(models.Model):
+    """Admin-managed PDF documents for Team/Consumer dashboard actions."""
+
+    KIND_PDF = "PDF"
+    KIND_CERTIFICATE = "CERTIFICATE"
+    KIND_CHOICES = (
+        (KIND_PDF, "Trikonekt PDF"),
+        (KIND_CERTIFICATE, "Certificate"),
+    )
+
+    kind = models.CharField(max_length=24, choices=KIND_CHOICES, db_index=True)
+    title = models.CharField(max_length=180, blank=True, default="")
+    file = models.FileField(
+        upload_to="team_consumer/documents/",
+        null=True,
+        blank=True,
+        storage=RAW_STORAGE,
+        max_length=500,
+    )
+    sort_order = models.IntegerField(default=0, db_index=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["kind", "sort_order", "-created_at", "id"]
+        verbose_name = "Team/Consumer Document"
+        verbose_name_plural = "Team/Consumer Documents"
+
+    def __str__(self):
+        return self.title or f"{self.kind}#{self.pk}"
+
+
 class AgencyPackageAssignment(models.Model):
     """
     Assign a Package to an Agency (CustomUser with role/category agency_*).

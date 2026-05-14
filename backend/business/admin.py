@@ -7,8 +7,24 @@ from django import forms
 from decimal import Decimal
 import json
 
-from .models import BusinessRegistration, MerchantCategory, MerchantSubCategory, CommissionConfig, RootConsumerConfig, AutoPoolAccount, RewardProgress, RewardRedemption, UserMatrixProgress, ReferralJoinPayout, FranchisePayout, DailyReport, WithholdingReserve, Package, AgencyPackageAssignment, AgencyPackagePayment, PromoPackage, PromoProduct, PromoPurchase, PromoPackageProduct, PromoMonthlyPackage, PromoMonthlyBox, PromoEBook, PromoPackageEBook, EBookAccess, TriApp, TriAppProduct
+from .models import BusinessRegistration, MerchantCategory, MerchantSubCategory, CommissionConfig, RootConsumerConfig, AutoPoolAccount, RewardProgress, RewardRedemption, UserMatrixProgress, ReferralJoinPayout, FranchisePayout, DailyReport, WithholdingReserve, Package, AgencyPackageAssignment, AgencyPackagePayment, PromoPackage, PromoProduct, PromoPurchase, PromoPackageProduct, PromoMonthlyPackage, PromoMonthlyBox, PromoEBook, PromoPackageEBook, EBookAccess, TriApp, TriAppProduct, TeamConsumerEducationalVideo, TeamConsumerDocument
 from accounts.models import CustomUser
+
+
+@admin.register(TeamConsumerEducationalVideo)
+class TeamConsumerEducationalVideoAdmin(admin.ModelAdmin):
+    list_display = ("title", "required_rank", "sort_order", "is_active", "created_at")
+    list_filter = ("required_rank", "is_active", "created_at")
+    search_fields = ("title", "description")
+    ordering = ("sort_order", "-created_at")
+
+
+@admin.register(TeamConsumerDocument)
+class TeamConsumerDocumentAdmin(admin.ModelAdmin):
+    list_display = ("title", "kind", "sort_order", "is_active", "created_at")
+    list_filter = ("kind", "is_active", "created_at")
+    search_fields = ("title",)
+    ordering = ("kind", "sort_order", "-created_at")
 
 
 @admin.register(BusinessRegistration)

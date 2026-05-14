@@ -48,14 +48,13 @@ export default function UserPermissionMap() {
   const loadUsers = React.useCallback(async (q) => {
     try {
       const res = await API.get("admin/users/", {
-        params: { page: 1, page_size: 200, search: q || undefined },
-        timeout: 12000,
+        params: { page: 1, page_size: 50, admin_only: 1, search: q || undefined },
+        timeout: 8000,
         retryAttempts: 1,
         dedupe: "cancelPrevious",
       });
       const results = Array.isArray(res?.data?.results) ? res.data.results : Array.isArray(res?.data) ? res.data : [];
-      const staff = results.filter((r) => r && (r.is_staff || r.admin_role)); // heuristic
-      setAdminUsers((staff.length ? staff : results).filter((r) => r && r.username));
+      setAdminUsers(results.filter((r) => r && r.username));
     } catch {
       setAdminUsers([]);
     }

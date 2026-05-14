@@ -32,6 +32,8 @@ from .models import (
     WishingBanner,
     TeamConsumerWishingBanner,
     TeamConsumerTopAchiever,
+    TeamConsumerEducationalVideo,
+    TeamConsumerDocument,
 )
 from .serializers import (
     BusinessRegistrationSerializer,
@@ -43,6 +45,8 @@ from .serializers import (
     WishingBannerSerializer,
     TeamConsumerWishingBannerSerializer,
     TeamConsumerTopAchieverSerializer,
+    TeamConsumerEducationalVideoSerializer,
+    TeamConsumerDocumentSerializer,
 )
 
 
@@ -533,6 +537,39 @@ class TeamConsumerTopAchieversPublicView(APIView):
         return Response({"results": ser.data}, status=status.HTTP_200_OK)
 
 
+class TeamConsumerEducationalVideosPublicView(APIView):
+    """Consumer-facing endpoint to fetch active educational videos."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        qs = TeamConsumerEducationalVideo.objects.filter(is_active=True).select_related("required_rank").order_by("sort_order", "-created_at", "id")
+        ser = TeamConsumerEducationalVideoSerializer(qs, many=True, context={"request": request})
+        return Response({"results": ser.data}, status=status.HTTP_200_OK)
+
+
+class TeamConsumerDocumentLatestPublicView(APIView):
+    """Consumer-facing endpoint to fetch the latest active Team PDF / certificate PDF."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, kind):
+        k = str(kind or "").strip().upper()
+        allowed = {TeamConsumerDocument.KIND_PDF, TeamConsumerDocument.KIND_CERTIFICATE}
+        if k not in allowed:
+            return Response({"detail": "Invalid document kind."}, status=status.HTTP_400_BAD_REQUEST)
+        obj = (
+            TeamConsumerDocument.objects.filter(kind=k, is_active=True)
+            .exclude(file="")
+            .order_by("sort_order", "-created_at", "id")
+            .first()
+        )
+        if not obj:
+            return Response({"detail": "No document uploaded."}, status=status.HTTP_404_NOT_FOUND)
+        ser = TeamConsumerDocumentSerializer(obj, context={"request": request})
+        return Response(ser.data, status=status.HTTP_200_OK)
+
+
 class AdminTeamConsumerWishingBannerListCreateView(generics.ListCreateAPIView):
     # Admin UI route: /admin/team-consumer/* is gated under the "promo" module in frontend.
     permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("promo")]
@@ -559,6 +596,36 @@ class AdminTeamConsumerTopAchieverDetailView(generics.RetrieveUpdateDestroyAPIVi
     permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("promo")]
     serializer_class = TeamConsumerTopAchieverSerializer
     queryset = TeamConsumerTopAchiever.objects.all()
+
+
+class AdminTeamConsumerEducationalVideoListCreateView(generics.ListCreateAPIView):
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("promo")]
+    serializer_class = TeamConsumerEducationalVideoSerializer
+    queryset = TeamConsumerEducationalVideo.objects.select_related("required_rank").all().order_by("sort_order", "-created_at", "id")
+
+
+class AdminTeamConsumerEducationalVideoDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("promo")]
+    serializer_class = TeamConsumerEducationalVideoSerializer
+    queryset = TeamConsumerEducationalVideo.objects.select_related("required_rank").all()
+
+
+class AdminTeamConsumerDocumentListCreateView(generics.ListCreateAPIView):
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("promo")]
+    serializer_class = TeamConsumerDocumentSerializer
+
+    def get_queryset(self):
+        qs = TeamConsumerDocument.objects.all().order_by("kind", "sort_order", "-created_at", "id")
+        kind = str(self.request.query_params.get("kind") or "").strip().upper()
+        if kind:
+            qs = qs.filter(kind=kind)
+        return qs
+
+
+class AdminTeamConsumerDocumentDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("promo")]
+    serializer_class = TeamConsumerDocumentSerializer
+    queryset = TeamConsumerDocument.objects.all()
 
 logger = logging.getLogger(__name__)
 

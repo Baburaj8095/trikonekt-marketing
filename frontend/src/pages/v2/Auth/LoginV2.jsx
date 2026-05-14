@@ -31,7 +31,7 @@ import {
   ArrowBackIosNew,
 } from "@mui/icons-material";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
-import API from "../../../api/api";
+import API, { setAuthBlocked } from "../../../api/api";
 import LOGO from "../../../assets/TRIKONEKT.jpg";
 // Removed NavbarV2 and FooterV2 (no website nav on this screen)
 import V2Button from "../components/V2Button";
@@ -150,6 +150,7 @@ export default function LoginV2() {
 
       const ns = (payload?.is_staff || payload?.is_superuser) ? "admin" : (roleEffective || tokenRole || "user");
       const store = localStorage;
+      try { setAuthBlocked(false, ns); } catch (_) {}
 
       // Clean old non-namespaced keys
       try {

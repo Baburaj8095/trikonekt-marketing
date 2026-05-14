@@ -314,7 +314,7 @@ function RankPaymentSheet({ open, onClose, data, onSuccess }) {
   );
 }
 
-export default function RankUpgrade() {
+export default function RankUpgrade({ defaultToRankId = null } = {}) {
   // Optional UI-only label override (used by Digital Education Prime package wrapper)
   const labelOverride = (() => {
     try {
@@ -450,6 +450,14 @@ export default function RankUpgrade() {
     const match = (ranks || []).find((r) => String(r.rank_name) === String(elig.next_rank));
     return match || null;
   }, [ranks, elig?.next_rank]);
+
+  useEffect(() => {
+    if (!defaultToRankId || !Array.isArray(ranks) || !ranks.length) return;
+    const target = ranks.find((r) => String(r.id) === String(defaultToRankId));
+    if (!target) return;
+    setSelectedToRankId(target.id);
+    setSelectedToRankName(target.rank_name || "");
+  }, [defaultToRankId, ranks]);
 
   // Effective achieved level for UI gating:
   // If base purchase is not approved yet, keep user at level 0 so L1 stays buyable.

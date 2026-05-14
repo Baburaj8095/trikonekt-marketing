@@ -61,10 +61,16 @@ from .views import (
     # Team/Consumer dashboard banners + achievers
     TeamConsumerWishingBannersPublicView,
     TeamConsumerTopAchieversPublicView,
+    TeamConsumerEducationalVideosPublicView,
+    TeamConsumerDocumentLatestPublicView,
     AdminTeamConsumerWishingBannerListCreateView,
     AdminTeamConsumerWishingBannerDetailView,
     AdminTeamConsumerTopAchieverListCreateView,
     AdminTeamConsumerTopAchieverDetailView,
+    AdminTeamConsumerEducationalVideoListCreateView,
+    AdminTeamConsumerEducationalVideoDetailView,
+    AdminTeamConsumerDocumentListCreateView,
+    AdminTeamConsumerDocumentDetailView,
 )
 
 urlpatterns = [
@@ -138,12 +144,18 @@ urlpatterns = [
     # ==========================
     path('team-consumer/wishing-banners/', TeamConsumerWishingBannersPublicView.as_view(), name='team_consumer_wishing_banners'),
     path('team-consumer/top-achievers/', TeamConsumerTopAchieversPublicView.as_view(), name='team_consumer_top_achievers'),
+    path('team-consumer/educational-videos/', TeamConsumerEducationalVideosPublicView.as_view(), name='team_consumer_educational_videos'),
+    path('team-consumer/documents/<str:kind>/latest/', TeamConsumerDocumentLatestPublicView.as_view(), name='team_consumer_document_latest'),
 
     # Admin CRUD (Team/Consumer)
     path('admin/team-consumer/wishing-banners/', AdminTeamConsumerWishingBannerListCreateView.as_view(), name='admin_team_consumer_wishing_banners'),
     path('admin/team-consumer/wishing-banners/<int:pk>/', AdminTeamConsumerWishingBannerDetailView.as_view(), name='admin_team_consumer_wishing_banner_detail'),
     path('admin/team-consumer/top-achievers/', AdminTeamConsumerTopAchieverListCreateView.as_view(), name='admin_team_consumer_top_achievers'),
     path('admin/team-consumer/top-achievers/<int:pk>/', AdminTeamConsumerTopAchieverDetailView.as_view(), name='admin_team_consumer_top_achiever_detail'),
+    path('admin/team-consumer/educational-videos/', AdminTeamConsumerEducationalVideoListCreateView.as_view(), name='admin_team_consumer_educational_videos'),
+    path('admin/team-consumer/educational-videos/<int:pk>/', AdminTeamConsumerEducationalVideoDetailView.as_view(), name='admin_team_consumer_educational_video_detail'),
+    path('admin/team-consumer/documents/', AdminTeamConsumerDocumentListCreateView.as_view(), name='admin_team_consumer_documents'),
+    path('admin/team-consumer/documents/<int:pk>/', AdminTeamConsumerDocumentDetailView.as_view(), name='admin_team_consumer_document_detail'),
 
     # ==========================
     # Hubble (Gift Cards)

@@ -312,6 +312,20 @@ class UpgradePaymentRequestView(APIView):
         return Response(RankUpgradePaymentSerializer(rup).data, status=status.HTTP_201_CREATED)
 
 
+class MyRankUpgradesView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        qs = (
+            RankUpgrade.objects
+            .filter(user=request.user)
+            .select_related("from_rank", "to_rank", "user")
+            .prefetch_related("payments")
+            .order_by("-created_at", "-id")
+        )
+        return Response(RankUpgradeSerializer(qs, many=True).data, status=status.HTTP_200_OK)
+
+
 # ----------------------- Admin APIs -----------------------
 
 class RankMatrixTreeView(APIView):

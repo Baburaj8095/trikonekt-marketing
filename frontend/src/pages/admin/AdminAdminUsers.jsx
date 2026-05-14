@@ -30,7 +30,7 @@ function Modal({ open, title, onClose, children }) {
       onClick={onClose}
     >
       <div
-        style={{ width: "100%", maxWidth: 520, background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0" }}
+        style={{ width: "100%", maxWidth: 760, background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ padding: 12, borderBottom: "1px solid #e2e8f0", background: "#f8fafc", borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
@@ -57,9 +57,17 @@ export default function AdminAdminUsers() {
   const [search, setSearch] = React.useState("");
   const [rows, setRows] = React.useState([]);
   const [roles, setRoles] = React.useState([]);
+  const [permissions, setPermissions] = React.useState([]);
 
   const [createOpen, setCreateOpen] = React.useState(false);
-  const [createForm, setCreateForm] = React.useState({ username: "", email: "", password: "", role_id: "" });
+  const [createForm, setCreateForm] = React.useState({
+    username: "",
+    email: "",
+    password: "",
+    access_type: "custom",
+    role_id: "",
+    permission_ids: [],
+  });
   const [createErr, setCreateErr] = React.useState("");
 
   const [editOpen, setEditOpen] = React.useState(false);
@@ -80,23 +88,28 @@ export default function AdminAdminUsers() {
     }
   }, []);
 
+  const loadPermissions = React.useCallback(async () => {
+    try {
+      const res = await API.get("admin/permissions/", { timeout: 8000, retryAttempts: 0 });
+      setPermissions(Array.isArray(res?.data) ? res.data : []);
+    } catch {
+      setPermissions([]);
+    }
+  }, []);
+
   // Load admin users (staff only) using admin list API with large page_size
   const loadData = React.useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      // query via admin users endpoint; filter on FE to staff users
       const res = await API.get("admin/users/", {
-        params: { page: 1, page_size: 200, search: search || undefined },
-        timeout: 12000,
+        params: { page: 1, page_size: 50, admin_only: 1, search: search || undefined },
+        timeout: 8000,
         retryAttempts: 1,
         dedupe: "cancelPrevious",
       });
       const results = Array.isArray(res?.data?.results) ? res.data.results : Array.isArray(res?.data) ? res.data : [];
-      const staff = results.filter((r) => !!r.is_active && r.role && (r.role === "agency" || r.role === "employee" || r.role === "user") ? r.is_staff : r.is_staff); // fallback if serializer includes is_staff
-      // If serializer doesn't include is_staff, consult /admin/dynamic endpoint for each? Avoid N+1; instead, show all and rely on actions being admin-only.
-      const finalRows = (staff.length ? staff : results).filter((r) => r && r.username);
-      setRows(finalRows);
+      setRows(results.filter((r) => r && r.username));
     } catch (e) {
       const msg = e?.response?.data?.detail || e?.message || "Failed to load admin users";
       setError(String(msg));
@@ -108,7 +121,30 @@ export default function AdminAdminUsers() {
 
   React.useEffect(() => {
     loadRoles();
-  }, [loadRoles]);
+    loadPermissions();
+  }, [loadRoles, loadPermissions]);
+
+  const permissionsByModule = React.useMemo(() => {
+    const grouped = {};
+    permissions.forEach((p) => {
+      const moduleName = p.module || String(p.code || "").split(".")[0] || "Other";
+      (grouped[moduleName] = grouped[moduleName] || []).push(p);
+    });
+    return Object.keys(grouped)
+      .sort()
+      .map((name) => ({ name, items: grouped[name].sort((a, b) => String(a.code).localeCompare(String(b.code))) }));
+  }, [permissions]);
+
+  function toggleCreatePermission(permissionId) {
+    const pid = Number(permissionId);
+    setCreateForm((f) => {
+      const current = Array.isArray(f.permission_ids) ? f.permission_ids : [];
+      return {
+        ...f,
+        permission_ids: current.includes(pid) ? current.filter((x) => x !== pid) : [...current, pid],
+      };
+    });
+  }
 
   React.useEffect(() => {
     const t = setTimeout(loadData, 300);
@@ -214,21 +250,46 @@ export default function AdminAdminUsers() {
         setCreateErr("Password must be at least 8 characters.");
         return;
       }
-      if (!createForm.role_id) {
-        setCreateErr("Role is required.");
-        return;
+      let roleId = createForm.role_id ? Number(createForm.role_id) : null;
+      if (createForm.access_type === "super") {
+        const superRole = roles.find((r) => r.is_super);
+        if (!superRole) {
+          setCreateErr("Super Admin role is missing. Seed default permissions first.");
+          return;
+        }
+        roleId = Number(superRole.id);
+      } else {
+        const selectedPermissionIds = Array.isArray(createForm.permission_ids) ? createForm.permission_ids : [];
+        if (!roleId && selectedPermissionIds.length === 0) {
+          setCreateErr("Select at least one screen/action permission for a custom admin.");
+          return;
+        }
+        if (!roleId) {
+          const roleName = `${username} Admin`;
+          const roleRes = await API.post("admin/roles/", {
+            name: roleName,
+            description: `Custom admin access for ${username}`,
+            is_super: false,
+          });
+          roleId = Number(roleRes?.data?.id);
+          if (!roleId) throw new Error("Could not create custom role.");
+        }
+        if (selectedPermissionIds.length > 0) {
+          await API.put(`admin/roles/${roleId}/permissions/`, selectedPermissionIds);
+        }
       }
       const payload = {
         username,
         email: String(createForm.email || "").trim() || undefined,
         password,
         is_active: true,
-        role_id: createForm.role_id ? Number(createForm.role_id) : undefined,
+        role_id: roleId,
       };
       await API.post("admin/users/", payload);
       setCreateOpen(false);
-      setCreateForm({ username: "", email: "", password: "", role_id: "" });
+      setCreateForm({ username: "", email: "", password: "", access_type: "custom", role_id: "", permission_ids: [] });
       setNotice("Admin user created.");
+      loadRoles();
       loadData();
     } catch (e) {
       const msg = e?.response?.data?.detail || e?.message || "Create failed";
@@ -434,20 +495,82 @@ display: "grid",
               placeholder="Min 8 characters"
             />
           </Field>
-          <Field label="Role">
-            <select
-              value={createForm.role_id}
-              onChange={(e) => setCreateForm((f) => ({ ...f, role_id: e.target.value }))}
-              style={{ padding: "8px 10px", border: "1px solid #e2e8f0", borderRadius: 8, width: "100%", background: "#fff" }}
-            >
-              <option value=""> None </option>
-              {roles.map((x) => (
-                <option key={x.id} value={x.id}>
-                  {x.name}{x.is_super ? " (SUPER)" : ""}
-                </option>
-              ))}
-            </select>
+          <Field label="Access">
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 700 }}>
+                <input
+                  type="radio"
+                  checked={createForm.access_type === "custom"}
+                  onChange={() => setCreateForm((f) => ({ ...f, access_type: "custom", role_id: "" }))}
+                />
+                Custom Admin
+              </label>
+              <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 700 }}>
+                <input
+                  type="radio"
+                  checked={createForm.access_type === "super"}
+                  onChange={() => setCreateForm((f) => ({ ...f, access_type: "super", role_id: "", permission_ids: [] }))}
+                />
+                Super Admin
+              </label>
+            </div>
           </Field>
+
+          {createForm.access_type === "custom" ? (
+            <>
+              <Field label="Use Role">
+                <select
+                  value={createForm.role_id}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, role_id: e.target.value, permission_ids: [] }))}
+                  style={{ padding: "8px 10px", border: "1px solid #e2e8f0", borderRadius: 8, width: "100%", background: "#fff" }}
+                >
+                  <option value=""> Create new role from selected permissions </option>
+                  {roles.filter((x) => !x.is_super).map((x) => (
+                    <option key={x.id} value={x.id}>
+                      {x.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              {!createForm.role_id ? (
+                <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, padding: 10, maxHeight: 260, overflow: "auto" }}>
+                  <div style={{ fontWeight: 900, marginBottom: 8, color: "#0f172a" }}>Select Screens & Actions</div>
+                  {permissionsByModule.length === 0 ? (
+                    <div style={{ color: "#64748b" }}>No permissions found. Use Permissions > Seed Defaults first.</div>
+                  ) : (
+                    permissionsByModule.map((group) => (
+                      <div key={group.name} style={{ marginBottom: 12 }}>
+                        <div style={{ fontSize: 12, fontWeight: 900, color: "#334155", marginBottom: 6 }}>{group.name}</div>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 6 }}>
+                          {group.items.map((p) => (
+                            <label key={p.id} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+                              <input
+                                type="checkbox"
+                                checked={(createForm.permission_ids || []).includes(Number(p.id))}
+                                onChange={() => toggleCreatePermission(p.id)}
+                              />
+                              <span>
+                                <strong>{p.code}</strong>
+                                {p.name || p.label ? <span style={{ color: "#64748b" }}> - {p.name || p.label}</span> : null}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              ) : (
+                <div style={{ padding: "8px 10px", border: "1px solid #bfdbfe", background: "#eff6ff", color: "#1e3a8a", borderRadius: 8, fontSize: 13 }}>
+                  This user will receive the selected existing role. Edit role permissions from Roles or Role Permission Mapping.
+                </div>
+              )}
+            </>
+          ) : (
+            <div style={{ padding: "8px 10px", border: "1px solid #fde68a", background: "#fffbeb", color: "#92400e", borderRadius: 8, fontSize: 13 }}>
+              Super Admin gets full access to every admin screen and action.
+            </div>
+          )}
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
             <button
               type="button"

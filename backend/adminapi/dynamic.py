@@ -4,8 +4,37 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
-from .permissions import IsAdminOrStaff
+from .permissions import IsAdminOrStaff, IsSuperAdmin
 from django.core.cache import cache
+
+
+SENSITIVE_MODEL_DENYLIST = {
+    ("auth", "permission"),
+    ("auth", "group"),
+    ("contenttypes", "contenttype"),
+    ("admin", "logentry"),
+    ("sessions", "session"),
+    ("token_blacklist", "outstandingtoken"),
+    ("token_blacklist", "blacklistedtoken"),
+    ("accounts", "passwordresetotp"),
+    ("accounts", "auditlog"),
+}
+
+SENSITIVE_FIELD_DENYLIST = {
+    "password",
+    "last_password_encrypted",
+    "otp_hash",
+    "secret",
+    "token",
+    "key",
+}
+
+
+def is_dynamic_model_allowed(model):
+    key = (model._meta.app_label.lower(), model._meta.model_name.lower())
+    if key in SENSITIVE_MODEL_DENYLIST:
+        return False
+    return True
 
 
 def build_serializer(model):
@@ -46,6 +75,12 @@ def build_serializer(model):
             model = model
             # Keep all model fields; declared SerializerMethodFields are included automatically
             fields = "__all__"
+        def to_representation(self, instance):
+            data = super().to_representation(instance)
+            for field in list(data.keys()):
+                if str(field).lower() in SENSITIVE_FIELD_DENYLIST:
+                    data.pop(field, None)
+            return data
 
     return DynamicSerializer
 
@@ -100,7 +135,7 @@ def build_viewset(model, modeladmin):
     class DynamicViewSet(viewsets.ModelViewSet):
         queryset = model.objects.all().order_by("-pk")
         serializer_class = Serializer
-        permission_classes = [StaffOrModelPerms]
+        permission_classes = [IsAdminOrStaff, IsSuperAdmin]
         filter_backends = [filters.SearchFilter, filters.OrderingFilter, DjangoFilterBackend]
 
         # Mirror ModelAdmin configuration for search/ordering/filters where possible
@@ -160,6 +195,8 @@ def build_viewset(model, modeladmin):
 # Build a router under /api/admin/dynamic/<app>/<model>/
 router = routers.DefaultRouter()
 for model, modeladmin in admin.site._registry.items():
+    if not is_dynamic_model_allowed(model):
+        continue
     prefix = f"dynamic/{model._meta.app_label}/{model._meta.model_name}"
     router.register(prefix, build_viewset(model, modeladmin), basename=f"{model._meta.app_label}-{model._meta.model_name}")
 
@@ -176,6 +213,8 @@ def field_meta_from_serializer(serializer_class):
     s = serializer_class()
     meta = []
     for name, field in s.fields.items():
+        if str(name).lower() in SENSITIVE_FIELD_DENYLIST:
+            continue
         f = {
             "name": name,
             "type": field.__class__.__name__,
@@ -222,6 +261,8 @@ def field_meta_from_serializer(serializer_class):
 def _build_admin_meta_static():
     payload = []
     for model, modeladmin in admin.site._registry.items():
+        if not is_dynamic_model_allowed(model):
+            continue
         ser = build_serializer(model)
 
         # Gather action names safely from explicit actions (callables or strings)

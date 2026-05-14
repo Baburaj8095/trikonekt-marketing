@@ -44,6 +44,12 @@ from .views import (
     AdminWalletUploadRequestListView,
     AdminWalletUploadRequestApproveView,
     AdminWalletUploadRequestRejectView,
+    ConsumerPasswordResetOTPRequestView,
+    ConsumerPasswordResetOTPVerifyView,
+    ConsumerPasswordResetOTPConfirmView,
+    FranchisePasswordResetOTPRequestView,
+    FranchisePasswordResetOTPVerifyView,
+    FranchisePasswordResetOTPConfirmView,
 )
 from .token_serializers import CustomTokenRefreshView
 from .views_tree import MyFiveMatrixTeamV1, FiveMatrixCountsView, MyMatrix5EntriesTree, MyMatrixRootsBreakdownView
@@ -52,6 +58,12 @@ urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
     path('login/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('password/reset/', ResetPasswordView.as_view(), name='password_reset'),
+    path('consumer/password/request-otp/', ConsumerPasswordResetOTPRequestView.as_view(), name='consumer_password_request_otp'),
+    path('consumer/password/verify-otp/', ConsumerPasswordResetOTPVerifyView.as_view(), name='consumer_password_verify_otp'),
+    path('consumer/password/reset/', ConsumerPasswordResetOTPConfirmView.as_view(), name='consumer_password_reset_otp'),
+    path('franchise/password/request-otp/', FranchisePasswordResetOTPRequestView.as_view(), name='franchise_password_request_otp'),
+    path('franchise/password/verify-otp/', FranchisePasswordResetOTPVerifyView.as_view(), name='franchise_password_verify_otp'),
+    path('franchise/password/reset/', FranchisePasswordResetOTPConfirmView.as_view(), name='franchise_password_reset_otp'),
     path('users/', UsersListView.as_view(), name='users_list'),
     path('me/', MeView.as_view(), name='me'),
     path('profile/', ProfileMeView.as_view(), name='profile_me'),

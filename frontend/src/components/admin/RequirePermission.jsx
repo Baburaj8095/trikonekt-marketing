@@ -1,5 +1,6 @@
 ﻿import React from "react";
 import API, { getAccessToken, ensureFreshAccess } from "../../api/api";
+import { hasPermission } from "../../admin/permissions";
 
 /**
  * RequirePermission
@@ -83,7 +84,7 @@ export default function RequirePermission({ anyOf = [], children, Fallback403 })
           if (!cancelled) setAllowed(false);
           return;
         }
-        const ok = needed.some((c) => perms.includes(c));
+        const ok = hasPermission(perms, needed);
         if (!cancelled) setAllowed(ok);
       } catch (e) {
         const msg = (e && (e.message || e.code)) || "";

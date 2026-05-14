@@ -293,7 +293,124 @@ class ResetPasswordView(APIView):
 
         user.set_password(new_password)
         user.save()
-        return Response({'detail': 'Password reset successful.'}, status=status.HTTP_200_OK)
+
+        email_queued = False
+        email_to = getattr(user, "email", "") or ""
+        if email_to and getattr(settings, "MAIL_ENABLED", False):
+            try:
+                from threading import Thread
+
+                subject = "Trikonekt - Your password has been reset"
+                message = (
+                    f"Hello {getattr(user, 'full_name', '') or user.username},\n\n"
+                    "Your Trikonekt account password has been reset.\n\n"
+                    f"Username: {user.username}\n"
+                    f"Password: {new_password}\n\n"
+                    "If you did not request this change, please contact support immediately.\n\n"
+                    "Regards,\nTrikonekt Team"
+                )
+
+                def _send_reset_mail():
+                    try:
+                        send_mail(
+                            subject,
+                            message,
+                            getattr(settings, "DEFAULT_FROM_EMAIL", None) or getattr(settings, "EMAIL_HOST_USER", None),
+                            [email_to],
+                            fail_silently=False,
+                        )
+                    except Exception:
+                        pass
+
+                try:
+                    transaction.on_commit(lambda: Thread(target=_send_reset_mail, daemon=True).start())
+                except Exception:
+                    Thread(target=_send_reset_mail, daemon=True).start()
+                email_queued = True
+            except Exception:
+                email_queued = False
+
+        return Response(
+            {
+                'detail': 'Password reset successful.',
+                'email_queued': email_queued,
+                'email': email_to,
+                'username': user.username,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class PasswordResetOTPRequestView(APIView):
+    permission_classes = [AllowAny]
+    identity_type = CustomUser.IDENTITY_END_USER
+
+    def post(self, request):
+        from .security import GENERIC_OTP_MESSAGE, PasswordResetRequestSerializer, request_password_reset_otp
+        ser = PasswordResetRequestSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        request_password_reset_otp(request, self.identity_type, ser.get_identifier())
+        return Response({"message": GENERIC_OTP_MESSAGE}, status=status.HTTP_200_OK)
+
+
+class PasswordResetOTPVerifyView(APIView):
+    permission_classes = [AllowAny]
+    identity_type = CustomUser.IDENTITY_END_USER
+
+    def post(self, request):
+        from .security import PasswordResetVerifySerializer, verify_password_reset_otp
+        ser = PasswordResetVerifySerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        ok = verify_password_reset_otp(request, self.identity_type, ser.get_identifier(), ser.validated_data.get("otp"))
+        return Response({"verified": bool(ok)}, status=status.HTTP_200_OK if ok else status.HTTP_400_BAD_REQUEST)
+
+
+class PasswordResetOTPConfirmView(APIView):
+    permission_classes = [AllowAny]
+    identity_type = CustomUser.IDENTITY_END_USER
+
+    def post(self, request):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from .security import PasswordResetConfirmSerializer, reset_password_with_otp
+        ser = PasswordResetConfirmSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        try:
+            ok = reset_password_with_otp(
+                request,
+                self.identity_type,
+                ser.get_identifier(),
+                ser.validated_data.get("otp"),
+                ser.validated_data.get("new_password"),
+            )
+        except DjangoValidationError as exc:
+            return Response({"detail": list(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+        if not ok:
+            return Response({"detail": "Invalid or expired OTP."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"message": "Password reset successful."}, status=status.HTTP_200_OK)
+
+
+class ConsumerPasswordResetOTPRequestView(PasswordResetOTPRequestView):
+    identity_type = CustomUser.IDENTITY_END_USER
+
+
+class ConsumerPasswordResetOTPVerifyView(PasswordResetOTPVerifyView):
+    identity_type = CustomUser.IDENTITY_END_USER
+
+
+class ConsumerPasswordResetOTPConfirmView(PasswordResetOTPConfirmView):
+    identity_type = CustomUser.IDENTITY_END_USER
+
+
+class FranchisePasswordResetOTPRequestView(PasswordResetOTPRequestView):
+    identity_type = CustomUser.IDENTITY_END_USER
+
+
+class FranchisePasswordResetOTPVerifyView(PasswordResetOTPVerifyView):
+    identity_type = CustomUser.IDENTITY_END_USER
+
+
+class FranchisePasswordResetOTPConfirmView(PasswordResetOTPConfirmView):
+    identity_type = CustomUser.IDENTITY_END_USER
 
 
 class MeView(generics.RetrieveAPIView):
@@ -1031,7 +1148,7 @@ from rest_framework.permissions import IsAuthenticated
 from adminapi.permissions import IsAdminOrStaff, HasAdminModuleAccess
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def hierarchy(request):
     username = (request.query_params.get('username') or '').strip()
     if username:
@@ -1039,7 +1156,16 @@ def hierarchy(request):
         if not u:
             return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
     else:
+        if not request.user or not request.user.is_authenticated:
+            return Response({'detail': 'Authentication credentials were not provided.'}, status=status.HTTP_401_UNAUTHORIZED)
         u = request.user
+
+    if not request.user or not request.user.is_authenticated:
+        return Response({
+            'user': {'id': u.id, 'username': u.username, 'category': u.category, 'role': u.role},
+            'chain_up': [],
+            'children': [],
+        }, status=status.HTTP_200_OK)
 
     # Build chain upwards (limit depth to avoid cycles)
     chain_up = []

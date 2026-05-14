@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import API, { ensureFreshAccess, getAccessToken } from "../../api/api";
 import { getAdminMeta } from "../../admin-panel/api/adminMeta";
 import ShellBase from "./ShellBase";
+import { hasPermission } from "../../admin/permissions";
 
 /**
  * AdminShell (ShellBase-powered)
@@ -194,7 +195,14 @@ export default function AdminShell({ children }) {
   // Module gating: map routes to admin module keys returned by /api/admin/ping
   function routeToModule(to) {
     if (!to) return null;
-    if (to.startsWith("/admin/access-manager")) return "users";
+    if (
+      to.startsWith("/admin/access-manager") ||
+      to.startsWith("/admin/sub-admins") ||
+      to.startsWith("/admin/roles") ||
+      to.startsWith("/admin/permissions") ||
+      to.startsWith("/admin/user-permissions")
+    )
+      return "users";
     if (to.startsWith("/admin/users") || to.startsWith("/admin/user-tree") || to.startsWith("/admin/dashboard/models/auth/")) return "users";
     if (to.startsWith("/admin/e-coupons")) return "ecoupons";
     if (to.startsWith("/admin/kyc")) return "kyc";
@@ -238,14 +246,14 @@ export default function AdminShell({ children }) {
         key: "administration",
         label: "Administration",
         items: [
-          { to: "/admin_user", label: "Admin Users", icon: "users", rbacAnyOf: ["manage_users", "show_users"] },
-          { to: "/role", label: "Roles", icon: "shield", rbacAnyOf: ["manage_roles", "show_roles"] },
-          { to: "/permission", label: "Permissions", icon: "shield", rbacAnyOf: ["manage_permissions", "show_permissions"] },
+          { to: "/admin/sub-admins", label: "Sub Admins", icon: "users", rbacAnyOf: ["users.read", "users.write"] },
+          { to: "/admin/roles", label: "Roles", icon: "shield", rbacAnyOf: ["roles.read", "roles.manage"] },
+          { to: "/admin/permissions", label: "Permissions", icon: "shield", rbacAnyOf: ["permissions.read", "permissions.manage"] },
           {
-            to: "/user_permission",
-            label: "User Permission Mapping",
+            to: "/admin/user-permissions",
+            label: "Role Permission Mapping",
             icon: "shield",
-            rbacAnyOf: ["manage_roles", "manage_permissions", "show_roles", "show_permissions"],
+            rbacAnyOf: ["roles.manage", "permissions.manage", "roles.read", "permissions.read"],
           },
         ],
       },
@@ -323,6 +331,9 @@ export default function AdminShell({ children }) {
         items: [
           { to: "/admin/team-consumer/wishing-banners", label: "Wishing Banners", icon: "box" },
           { to: "/admin/team-consumer/top-achievers", label: "Top Achievers", icon: "users" },
+          { to: "/admin/team-consumer/educational-videos", label: "Educational Videos", icon: "file" },
+          { to: "/admin/team-consumer/pdf-uploads", label: "Trikonekt PDF Uploads", icon: "file" },
+          { to: "/admin/team-consumer/certificate-uploads", label: "Certificate Uploads", icon: "file" },
         ],
       },
       // {
@@ -383,7 +394,7 @@ export default function AdminShell({ children }) {
       const any = it?.rbacAnyOf;
       if (!any || !Array.isArray(any) || any.length === 0) return true;
       if (!Array.isArray(rbacPerms)) return false;
-      return any.some((c) => rbacPerms.includes(c));
+      return hasPermission(rbacPerms, any);
     };
 
     const filterItem = (it) => {

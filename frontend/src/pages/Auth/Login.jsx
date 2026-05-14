@@ -58,7 +58,7 @@ import {
 } from "@mui/icons-material";
 
 import { useNavigate, useLocation, useParams } from "react-router-dom";
-import API from "../../api/api";
+import API, { setAuthBlocked } from "../../api/api";
 import LOGO from "../../assets/TRIKONEKT.jpg";
 
 const Login = () => {
@@ -345,6 +345,8 @@ const Login = () => {
   const [fpUsername, setFpUsername] = useState("");
   const [fpNewPassword, setFpNewPassword] = useState("");
   const [fpLoading, setFpLoading] = useState(false);
+  const [fpResultOpen, setFpResultOpen] = useState(false);
+  const [fpResult, setFpResult] = useState({ ok: false, title: "", message: "", username: "", password: "" });
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   // Success popup for registration
@@ -642,7 +644,14 @@ const Login = () => {
     const username = fpUsername || formData.username;
     const newPassword = fpNewPassword;
     if (!username || !newPassword) {
-      alert("Please provide username and new password.");
+      setFpResult({
+        ok: false,
+        title: "Password Reset Failed",
+        message: "Please provide username and new password.",
+        username: "",
+        password: "",
+      });
+      setFpResultOpen(true);
       return;
     }
     try {
@@ -651,7 +660,18 @@ const Login = () => {
         username,
         new_password: newPassword,
       });
-      alert(res?.data?.detail || "Password reset successful.");
+      const emailQueued = !!res?.data?.email_queued;
+      const email = res?.data?.email || "";
+      setFpResult({
+        ok: true,
+        title: "Password Reset Successful",
+        message: emailQueued
+          ? `The new password has been sent to the registered email${email ? `: ${email}` : "."}`
+          : "Password reset successful. No registered email was available or mail is disabled.",
+        username: res?.data?.username || username,
+        password: newPassword,
+      });
+      setFpResultOpen(true);
       setForgotOpen(false);
       setFpUsername("");
       setFpNewPassword("");
@@ -660,7 +680,14 @@ const Login = () => {
       const msg =
         err?.response?.data?.detail ||
         (err?.response?.data ? JSON.stringify(err.response.data) : "Password reset failed!");
-      alert(msg);
+      setFpResult({
+        ok: false,
+        title: "Password Reset Failed",
+        message: Array.isArray(msg) ? msg.join(" ") : String(msg),
+        username,
+        password: "",
+      });
+      setFpResultOpen(true);
     } finally {
       setFpLoading(false);
     }
@@ -1357,6 +1384,7 @@ const Login = () => {
         const isAgencyActor = String(tokenRole || "").toLowerCase() === "agency" || catLower.startsWith("agency_") || catLower === "company" || catLower === "company_manager";
         const ns = isAdmin ? "admin" : (isAgencyActor ? "agency" : (roleEffective || tokenRole || "user"));
         const store = localStorage;
+        try { setAuthBlocked(false, ns); } catch (_) {}
 
         // Clean legacy non-namespaced keys to avoid cross-role collisions
         try {
@@ -2559,6 +2587,9 @@ const Login = () => {
           <Dialog open={forgotOpen} onClose={() => setForgotOpen(false)} fullWidth maxWidth="xs">
             <DialogTitle>Reset Password</DialogTitle>
             <DialogContent>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                Reset password for {loginMode === "franchise" ? "Franchise" : "Team"} login. The new password will be sent to the registered email.
+              </Typography>
               <TextField margin="dense" label="Username" fullWidth value={fpUsername} onChange={(e) => setFpUsername(e.target.value)} />
               <TextField margin="dense" label="New Password" type="password" fullWidth value={fpNewPassword} onChange={(e) => setFpNewPassword(e.target.value)} />
             </DialogContent>
@@ -2567,6 +2598,31 @@ const Login = () => {
               <Button variant="contained" onClick={handlePasswordReset} disabled={fpLoading}>
                 {fpLoading ? "Resetting..." : "Reset Password"}
               </Button>
+            </DialogActions>
+          </Dialog>
+
+          <Dialog open={fpResultOpen} onClose={() => setFpResultOpen(false)} fullWidth maxWidth="xs">
+            <DialogTitle>{fpResult.title}</DialogTitle>
+            <DialogContent>
+              <Typography
+                variant="body1"
+                sx={{
+                  whiteSpace: "pre-line",
+                  color: fpResult.ok ? "success.main" : "error.main",
+                  fontWeight: 700,
+                  mb: fpResult.ok ? 1.5 : 0,
+                }}
+              >
+                {fpResult.message}
+              </Typography>
+              {fpResult.ok ? (
+                <Typography variant="body1" sx={{ whiteSpace: "pre-line" }}>
+                  {`Username: ${fpResult.username}\nPassword: ${fpResult.password}`}
+                </Typography>
+              ) : null}
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setFpResultOpen(false)}>Close</Button>
             </DialogActions>
           </Dialog>
         </Paper>

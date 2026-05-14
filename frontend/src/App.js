@@ -26,6 +26,7 @@ import History from "./pages/History";
 import LoadingOverlay from "./components/LoadingOverlay";
 import MyTeam from "./pages/team/MyTeam";
 import Genealogy5 from "./pages/team/Genealogy5";
+import TeamDocumentDownload from "./pages/team/TeamDocumentDownload";
 import EmployeeDailyReport from "./pages/reports/EmployeeDailyReport";
 import AgencyDailyReport from "./pages/reports/AgencyDailyReport";
 import AdminProtectedRoute from "./components/AdminProtectedRoute";
@@ -41,6 +42,9 @@ import AdminFranchiseAchievers from "./pages/admin/AdminFranchiseAchievers";
 import AdminFranchiseWishingBanners from "./pages/admin/AdminFranchiseWishingBanners";
 import AdminTeamConsumerWishingBanners from "./pages/admin/AdminTeamConsumerWishingBanners";
 import AdminTeamConsumerTopAchievers from "./pages/admin/AdminTeamConsumerTopAchievers";
+import AdminTeamConsumerEducationalVideos from "./pages/admin/AdminTeamConsumerEducationalVideos";
+import AdminTeamConsumerPdfUploads from "./pages/admin/AdminTeamConsumerPdfUploads";
+import AdminTeamConsumerCertificateUploads from "./pages/admin/AdminTeamConsumerCertificateUploads";
 import AdminMatrixFive from "./pages/admin/AdminMatrixFive";
 import AdminMatrixThree from "./pages/admin/AdminMatrixThree";
 import AdminAutopool from "./pages/admin/AdminAutopool";
@@ -84,6 +88,7 @@ import AdminNotifications from "./pages/admin/AdminNotifications";
 import ImpersonateLanding from "./pages/Auth/ImpersonateLanding";
 import ECouponStore from "./pages/ECouponStore";
 import PromoPackages from "./pages/PromoPackages";
+import PackageSummary from "./pages/PackageSummary";
 import JoinSubscription from "./pages/packages/JoinSubscription";
 import SPP from "./pages/packages/SPP";
 import DigitalEducationPrime from "./pages/packages/DigitalEducationPrime";
@@ -102,6 +107,7 @@ import AdminTriAppManage from "./pages/admin/AdminTriAppManage";
 import AdminAccessManager from "./pages/admin/AdminAccessManager";
 import AdminAdminUsers from "./pages/admin/AdminAdminUsers";
 import RolesPage from "./pages/admin/RolesPage";
+import PermissionsPage from "./pages/admin/PermissionsPage";
 import UserPermissionMap from "./pages/admin/UserPermissionMap";
 import AdminMerchantCategories from "./pages/admin/AdminMerchantCategories";
 import AdminMerchantSubcategories from "./pages/admin/AdminMerchantSubcategories";
@@ -517,6 +523,26 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/user/trikonekt-pdf"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <TeamDocumentDownload kind="PDF" />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/certificate-download"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <TeamDocumentDownload kind="CERTIFICATE" />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
         <Route path="/user/genealogy" element={<Navigate to="/user/genealogy-5" replace />} />
         <Route
           path="/user/wealth-galaxy"
@@ -563,7 +589,7 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["user"]}>
               <ConsumerShell>
-                <PromoPackages />
+                <PackageSummary />
               </ConsumerShell>
             </ProtectedRoute>
           }
@@ -1228,6 +1254,36 @@ function App() {
           }
         />
         <Route
+          path="/admin/team-consumer/educational-videos"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminTeamConsumerEducationalVideos />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/team-consumer/pdf-uploads"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminTeamConsumerPdfUploads />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/team-consumer/certificate-uploads"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminTeamConsumerCertificateUploads />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/matrix"
           element={
             <AdminProtectedRoute>
@@ -1581,7 +1637,48 @@ function App() {
             </AdminProtectedRoute>
           }
         />
-        {/* RBAC Administration routes (as per required UI flow) */}
+        {/* RBAC Administration routes */}
+        <Route
+          path="/admin/sub-admins"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminAdminUsers />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/roles"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <RolesPage />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/permissions"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <PermissionsPage />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/user-permissions"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <UserPermissionMap />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        {/* Legacy RBAC URLs kept as aliases */}
         <Route
           path="/admin_user"
           element={
@@ -1607,7 +1704,7 @@ function App() {
           element={
             <AdminProtectedRoute>
               <AdminShell>
-                <RolesPage />
+                <PermissionsPage />
               </AdminShell>
             </AdminProtectedRoute>
           }

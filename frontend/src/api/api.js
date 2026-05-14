@@ -477,9 +477,19 @@ API.interceptors.request.use(async (config) => {
 
   // Do not attach Authorization header for public endpoints to avoid 401 on AllowAny views
   // when a stale/invalid token is present.
-  const pathForAuth = String(config.url || "").replace(/^\//, "");
+  const pathForAuth = String(config.url || "")
+    .replace(/^\//, "")
+    .replace(/^api\//, "");
   const isPublicEndpoint =
     pathForAuth.startsWith("location/") ||
+    pathForAuth.startsWith("accounts/login/") ||
+    pathForAuth.startsWith("accounts/token/refresh/") ||
+    pathForAuth.startsWith("accounts/password/reset/") ||
+    pathForAuth.startsWith("accounts/consumer/password/") ||
+    pathForAuth.startsWith("accounts/franchise/password/") ||
+    pathForAuth.startsWith("admin/login/") ||
+    pathForAuth.startsWith("admin/password/") ||
+    pathForAuth.startsWith("accounts/hierarchy/") ||
     pathForAuth.startsWith("accounts/regions/by-sponsor/");
 
   if (token && !isPublicEndpoint) {
@@ -1509,6 +1519,11 @@ export async function createRankUpgradePayment({ upgrade_id, utr = "", remarks =
     headers: { "Content-Type": "multipart/form-data" },
     timeout: 30000,
   });
+  return res?.data || res;
+}
+
+export async function listMyRankUpgrades(params = {}) {
+  const res = await API.get("/user/rank-upgrades/", { params, dedupe: "cancelPrevious", cacheTTL: 5000 });
   return res?.data || res;
 }
 

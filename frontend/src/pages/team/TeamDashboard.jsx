@@ -1,10 +1,14 @@
-
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Avatar,
   Box,
   Button,
+  Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   IconButton,
   Paper,
   Stack,
@@ -17,72 +21,81 @@ import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
 import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceWalletRounded";
 import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
+import PlayCircleRoundedIcon from "@mui/icons-material/PlayCircleRounded";
+import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
+import FlightTakeoffRoundedIcon from "@mui/icons-material/FlightTakeoffRounded";
+import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
+import ArrowForwardIosRoundedIcon from "@mui/icons-material/ArrowForwardIosRounded";
+import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
 import { useNavigate, useLocation } from "react-router-dom";
 import API from "../../api/api";
+import imgEcommerce from "../../assets/ecommerce.jpg";
+import imgGifts from "../../assets/gifts.jpg";
+import imgHolidays from "../../assets/holidays.jpg";
+import imgKerala from "../../assets/kerala.jpg";
+import imgThailand from "../../assets/thailand.jpg";
 
-// Resolve media URLs returned by API.
-// Match the working pattern used in UserDashboard:
-//  - Prefer `image_url || image`
-//  - If relative, prefix with MEDIA_BASE derived from API.defaults.baseURL
-//  - If absolute but points to localhost (dev artifact), rewrite to MEDIA_BASE (prod)
 function resolveApiMediaUrl(item, MEDIA_BASE) {
   const raw = item?.image_url || item?.image || "";
   if (!raw) return "";
   const s = String(raw);
-
-  // data URL / absolute URL
   if (s.startsWith("data:")) return s;
   if (/^https?:\/\//i.test(s)) {
-    // If backend accidentally returns localhost URLs in production, rewrite them.
-    // Example: http://localhost:8000/media/... -> https://api.trikonekt.com/media/...
     if (/^https?:\/\/localhost(?::\d+)?\//i.test(s) && MEDIA_BASE) {
       const path = s.replace(/^https?:\/\/localhost(?::\d+)?/i, "");
       return `${MEDIA_BASE}${path}`;
     }
     return s;
   }
-
-  // relative URL from API: "/media/..."
   if (!MEDIA_BASE) return s;
   return `${MEDIA_BASE}${s.startsWith("/") ? "" : "/"}${s}`;
 }
 
-// Light, premium, unified look (aligned with Genealogy5 design tokens)
 const C = {
-  appBg: "#f0f4ff",
+  appBg: "#f4f7fb",
   surface: "#ffffff",
-  primary: "#4f46e5",
-  primarySoft: "rgba(79,70,229,0.12)",
+  primary: "#2563eb",
+  primaryDark: "#1e40af",
+  accent: "#10b981",
+  warm: "#f97316",
   text: "#111827",
-  textSec: "#6b7280",
-  border: "#e5e7eb",
-  shadow: "0 10px 30px rgba(15, 23, 42, 0.08)",
-  radius: 3,
+  textSec: "#64748b",
+  border: "#e2e8f0",
+  shadow: "0 14px 34px rgba(15, 23, 42, 0.08)",
 };
 
 const MotionPaper = motion.create(Paper);
 
+function SectionTitle({ title, action, onAction }) {
+  return (
+    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.25 }}>
+      <Typography sx={{ fontSize: 16, fontWeight: 1000, color: C.text }}>{title}</Typography>
+      {action ? (
+        <Button
+          size="small"
+          endIcon={<ArrowForwardIosRoundedIcon sx={{ fontSize: 13 }} />}
+          onClick={onAction}
+          sx={{ textTransform: "none", fontWeight: 900, color: C.primary }}
+        >
+          {action}
+        </Button>
+      ) : null}
+    </Stack>
+  );
+}
+
 function WishingBannerCarousel({ items = [], loading = false, error = "" }) {
   const banners = Array.isArray(items) ? items : [];
   const [idx, setIdx] = useState(0);
+  const MEDIA_BASE = useMemo(() => String(API?.defaults?.baseURL || "").replace(/\/api\/?$/, ""), []);
 
-  // MEDIA BASE to resolve relative URLs from API to absolute URLs
-  const MEDIA_BASE = useMemo(
-    () => String(API?.defaults?.baseURL || "").replace(/\/api\/?$/, ""),
-    []
-  );
-
-  // auto-advance
   useEffect(() => {
-    if (!banners.length) return;
-    const t = window.setInterval(() => {
-      setIdx((i) => (i + 1) % banners.length);
-    }, 3500);
+    if (!banners.length) return undefined;
+    const t = window.setInterval(() => setIdx((i) => (i + 1) % banners.length), 3500);
     return () => window.clearInterval(t);
   }, [banners.length]);
 
   useEffect(() => {
-    // reset index when list changes
     if (!banners.length) setIdx(0);
     else if (idx >= banners.length) setIdx(0);
   }, [banners.length, idx]);
@@ -97,30 +110,23 @@ function WishingBannerCarousel({ items = [], loading = false, error = "" }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
       sx={{
-        mt: 2.25,
-        borderRadius: 4,
+        borderRadius: 2,
         border: `1px solid ${C.border}`,
         background: C.surface,
-        boxShadow: "0 8px 18px rgba(2, 6, 23, 0.05)",
+        boxShadow: C.shadow,
         overflow: "hidden",
       }}
     >
       <Box sx={{ px: 2, pt: 1.5, pb: 1 }}>
-        <Typography sx={{ fontSize: 15, fontWeight: 1000, color: C.text }}>
-          Wishing Banner
-        </Typography>
+        <SectionTitle title="Daily Wishing Banner" />
       </Box>
 
       {error ? (
-        <Box sx={{ px: 2, pb: 1.5 }}>
-          <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#dc2626" }}>{error}</Typography>
-        </Box>
+        <Typography sx={{ px: 2, pb: 2, fontSize: 13, fontWeight: 800, color: "#dc2626" }}>{error}</Typography>
       ) : null}
 
       {loading ? (
-        <Box sx={{ px: 2, pb: 2 }}>
-          <Typography sx={{ fontSize: 12, color: C.textSec, fontWeight: 700 }}>Loading banners…</Typography>
-        </Box>
+        <Typography sx={{ px: 2, pb: 2, fontSize: 12, color: C.textSec, fontWeight: 700 }}>Loading banners...</Typography>
       ) : null}
 
       {activeSrc ? (
@@ -128,25 +134,27 @@ function WishingBannerCarousel({ items = [], loading = false, error = "" }) {
           key={active.id || idx}
           component="img"
           src={activeSrc}
-          alt={active.title || "banner"}
-          sx={{
-            width: "100%",
-            height: 220,
-            objectFit: "cover",
-            display: "block",
-            borderTop: `1px solid ${C.border}`,
-          }}
+          alt={active.title || "Wishing banner"}
+          sx={{ width: "100%", height: { xs: 190, md: 280 }, objectFit: "cover", display: "block" }}
         />
-      ) : (
-        !loading && !error ? (
-          <Box sx={{ px: 2, pb: 2 }}>
-            <Typography sx={{ fontSize: 12, color: C.textSec, fontWeight: 700 }}>No banners available.</Typography>
-          </Box>
-        ) : null
-      )}
+      ) : !loading && !error ? (
+        <Box
+          sx={{
+            minHeight: { xs: 180, md: 260 },
+            display: "grid",
+            placeItems: "center",
+            px: 2,
+            background: "linear-gradient(135deg, #dbeafe 0%, #ffffff 55%, #dcfce7 100%)",
+          }}
+        >
+          <Typography sx={{ fontSize: { xs: 22, md: 30 }, fontWeight: 1000, color: C.primaryDark, textAlign: "center" }}>
+            Welcome to Team Consumer
+          </Typography>
+        </Box>
+      ) : null}
 
       {banners.length > 1 ? (
-        <Stack direction="row" spacing={0.75} justifyContent="center" sx={{ py: 1.25, bgcolor: "rgba(255,255,255,0.7)" }}>
+        <Stack direction="row" spacing={0.75} justifyContent="center" sx={{ py: 1.25 }}>
           {banners.map((_, i) => (
             <Box
               key={i}
@@ -154,12 +162,12 @@ function WishingBannerCarousel({ items = [], loading = false, error = "" }) {
               role="button"
               tabIndex={0}
               sx={{
-                width: i === idx ? 18 : 7,
+                width: i === idx ? 20 : 7,
                 height: 7,
                 borderRadius: 99,
-                bgcolor: i === idx ? C.primary : "rgba(148,163,184,0.9)",
-                transition: "all 160ms ease",
+                bgcolor: i === idx ? C.primary : "#cbd5e1",
                 cursor: "pointer",
+                transition: "all 160ms ease",
               }}
             />
           ))}
@@ -172,30 +180,22 @@ function WishingBannerCarousel({ items = [], loading = false, error = "" }) {
 function TopAchieversRow({ items = [], loading = false, error = "" }) {
   const rows = Array.isArray(items) ? items : [];
   return (
-    <Box sx={{ mt: 2.5 }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.25 }}>
-        <Typography sx={{ fontSize: 15, fontWeight: 1000, color: C.text }}>
-          Top Achievers
-        </Typography>
-      </Stack>
+    <Box>
+      <SectionTitle title="Top Achievers" />
 
       {error ? (
-        <Paper elevation={0} sx={{ p: 1.25, borderRadius: 3, border: `1px solid ${C.border}` }}>
+        <Paper elevation={0} sx={{ p: 1.25, borderRadius: 2, border: `1px solid ${C.border}` }}>
           <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#dc2626" }}>{error}</Typography>
         </Paper>
       ) : null}
 
       {loading ? (
-        <Typography sx={{ fontSize: 12, color: C.textSec, fontWeight: 700, mb: 1 }}>Loading achievers…</Typography>
+        <Typography sx={{ fontSize: 12, color: C.textSec, fontWeight: 700, mb: 1 }}>Loading achievers...</Typography>
       ) : null}
 
-      <Stack
-        direction="row"
-        spacing={1.25}
-        sx={{ overflowX: "auto", pb: 0.5, "&::-webkit-scrollbar": { display: "none" } }}
-      >
-        {(rows || []).map((a) => {
-          const name = a?.name || "—";
+      <Stack direction="row" spacing={1.25} sx={{ overflowX: "auto", pb: 0.5, "&::-webkit-scrollbar": { display: "none" } }}>
+        {rows.map((a) => {
+          const name = a?.name || "Team Member";
           const initials = String(name).trim().slice(0, 2).toUpperCase();
           return (
             <Paper
@@ -203,20 +203,16 @@ function TopAchieversRow({ items = [], loading = false, error = "" }) {
               elevation={0}
               sx={{
                 flexShrink: 0,
-                width: 180,
+                width: { xs: 170, sm: 210 },
                 border: `1px solid ${C.border}`,
-                borderRadius: 3,
+                borderRadius: 2,
                 p: 1.25,
                 background: C.surface,
                 boxShadow: "0 8px 18px rgba(2, 6, 23, 0.05)",
               }}
             >
               <Stack direction="row" spacing={1} alignItems="center">
-                <Avatar
-                  src={a?.photo_url || undefined}
-                  sx={{ width: 46, height: 46, bgcolor: C.primary, fontWeight: 900 }}
-                  imgProps={{ referrerPolicy: "no-referrer" }}
-                >
+                <Avatar src={a?.photo_url || undefined} sx={{ width: 46, height: 46, bgcolor: C.primary, fontWeight: 900 }}>
                   {initials}
                 </Avatar>
                 <Box sx={{ minWidth: 0, flex: 1 }}>
@@ -224,7 +220,7 @@ function TopAchieversRow({ items = [], loading = false, error = "" }) {
                     {name}
                   </Typography>
                   <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: C.textSec }} noWrap>
-                    {a?.achieved || "—"}
+                    {a?.achieved || "Achiever"}
                   </Typography>
                 </Box>
               </Stack>
@@ -233,22 +229,245 @@ function TopAchieversRow({ items = [], loading = false, error = "" }) {
         })}
 
         {!loading && !error && !rows.length ? (
-          <Paper
-            elevation={0}
-            sx={{
-              flexShrink: 0,
-              width: 220,
-              border: `1px dashed ${C.border}`,
-              borderRadius: 3,
-              p: 1.25,
-              background: "rgba(255,255,255,0.7)",
-            }}
-          >
+          <Paper elevation={0} sx={{ flexShrink: 0, width: 220, border: `1px dashed ${C.border}`, borderRadius: 2, p: 1.25 }}>
             <Typography sx={{ fontSize: 12, color: C.textSec, fontWeight: 800 }}>No achievers added yet.</Typography>
           </Paper>
         ) : null}
       </Stack>
     </Box>
+  );
+}
+
+function HorizontalScroller({ children }) {
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        gap: 1.25,
+        overflowX: "auto",
+        pb: 0.5,
+        scrollSnapType: "x mandatory",
+        WebkitOverflowScrolling: "touch",
+        "&::-webkit-scrollbar": { display: "none" },
+      }}
+    >
+      {children}
+    </Box>
+  );
+}
+
+function VideoScroller({ videos = [], loading = false, onOpenFallback, onBuyPrime }) {
+  const MEDIA_BASE = useMemo(() => String(API?.defaults?.baseURL || "").replace(/\/api\/?$/, ""), []);
+  const resolveRaw = (raw) => resolveApiMediaUrl({ image_url: raw }, MEDIA_BASE);
+
+  const rows = Array.isArray(videos) ? videos : [];
+
+  const downloadFile = (url, title) => {
+    if (!url) return;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${String(title || "educational-video").replace(/[^\w.-]+/g, "-")}.mp4`;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
+  return (
+    <Box>
+      <SectionTitle title="Digital Education Videos" action="Open" onAction={onOpenFallback} />
+      {loading ? (
+        <Typography sx={{ fontSize: 12, color: C.textSec, fontWeight: 700, mb: 1 }}>Loading videos...</Typography>
+      ) : null}
+      <HorizontalScroller>
+        {rows.map((v) => {
+          const videoUrl = resolveRaw(v.video_url || v.video);
+          const thumb = resolveRaw(v.thumbnail_url || v.thumbnail);
+          const isPurchased = !!v.is_purchased || !!v.can_access;
+          const canWatch = isPurchased && !!videoUrl;
+          const rankLabel = v.required_rank_name || (v.required_rank_level ? `Prime L${v.required_rank_level}` : "Digital Education Prime");
+          const actionLabel = isPurchased ? (videoUrl ? "View" : "Purchased") : "Buy";
+          return (
+            <Paper
+              key={v.id}
+              elevation={0}
+              onClick={() => {
+                if (canWatch) window.open(videoUrl, "_blank", "noopener,noreferrer");
+                else if (!isPurchased) onBuyPrime?.(v);
+              }}
+              sx={{
+                flex: "0 0 180px",
+                scrollSnapAlign: "start",
+                p: 1,
+                borderRadius: 2,
+                border: `1px solid ${C.border}`,
+                cursor: "pointer",
+                bgcolor: C.surface,
+              }}
+            >
+              <Box
+                sx={{
+                  height: 86,
+                  borderRadius: 1.5,
+                  overflow: "hidden",
+                  display: "grid",
+                  placeItems: "center",
+                  bgcolor: "rgba(37,99,235,0.1)",
+                  color: C.primary,
+                }}
+              >
+                {thumb ? (
+                  <Box component="img" src={thumb} alt={v.title || "Video"} sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  <PlayCircleRoundedIcon sx={{ fontSize: 38 }} />
+                )}
+              </Box>
+              <Typography sx={{ mt: 0.9, fontSize: 13, fontWeight: 1000 }} noWrap>
+                {v.title || "Educational Video"}
+              </Typography>
+              <Typography sx={{ mt: 0.2, fontSize: 11.5, color: C.textSec, fontWeight: 700 }} noWrap>
+                {canWatch ? "Ready to watch" : isPurchased ? "Video upload pending" : rankLabel}
+              </Typography>
+              <Stack direction="row" spacing={0.75} sx={{ mt: 1 }}>
+                {canWatch ? (
+                  <>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.open(videoUrl, "_blank", "noopener,noreferrer");
+                      }}
+                      sx={{ minWidth: 0, flex: 1, fontSize: 11, fontWeight: 900, textTransform: "none" }}
+                    >
+                      View
+                    </Button>
+                    <IconButton
+                      size="small"
+                      aria-label="download video"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        downloadFile(videoUrl, v.title);
+                      }}
+                      sx={{ border: `1px solid ${C.border}`, borderRadius: 1 }}
+                    >
+                      <FileDownloadRoundedIcon fontSize="small" />
+                    </IconButton>
+                  </>
+                ) : (
+                  <Button
+                    size="small"
+                    variant="contained"
+                    fullWidth
+                    disabled={isPurchased}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isPurchased) onBuyPrime?.(v);
+                    }}
+                    sx={{ fontSize: 11, fontWeight: 900, textTransform: "none" }}
+                  >
+                    {actionLabel}
+                  </Button>
+                )}
+              </Stack>
+            </Paper>
+          );
+        })}
+      </HorizontalScroller>
+    </Box>
+  );
+}
+
+function TourScroller({ onTour, onShop, onCoupons }) {
+  const items = [
+    { name: "Goa", image: imgHolidays, onClick: onTour },
+    { name: "Kerala", image: imgKerala, onClick: onTour },
+    { name: "Thailand", image: imgThailand, onClick: onTour },
+    { name: "Malaysia", image: imgHolidays, onClick: onTour },
+    { name: "E-Commerce", image: imgEcommerce, onClick: onShop },
+    { name: "Coupons", image: imgGifts, onClick: onCoupons },
+  ];
+
+  return (
+    <Box>
+      <SectionTitle title="E-Commerce and TRI Tour" />
+      <HorizontalScroller>
+        {items.map((d) => (
+          <Paper
+            key={d.name}
+            elevation={0}
+            onClick={d.onClick}
+            sx={{
+              flex: "0 0 132px",
+              scrollSnapAlign: "start",
+              borderRadius: 2,
+              overflow: "hidden",
+              border: `1px solid ${C.border}`,
+              bgcolor: C.surface,
+              cursor: "pointer",
+            }}
+          >
+            <Box component="img" src={d.image} alt={d.name} sx={{ width: "100%", height: 94, objectFit: "cover", display: "block" }} />
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 1, py: 1 }}>
+              <Typography sx={{ fontSize: 13, fontWeight: 1000 }} noWrap>
+                {d.name}
+              </Typography>
+              {d.name === "E-Commerce" ? <StorefrontRoundedIcon sx={{ fontSize: 17, color: C.primary }} /> : <FlightTakeoffRoundedIcon sx={{ fontSize: 17, color: C.primary }} />}
+            </Stack>
+          </Paper>
+        ))}
+      </HorizontalScroller>
+    </Box>
+  );
+}
+
+function IdCardDialog({ open, onClose, user, initials }) {
+  const MEDIA_BASE = String(API?.defaults?.baseURL || "").replace(/\/api\/?$/, "");
+  const avatar = resolveApiMediaUrl({ image_url: user?.avatar_url || user?.avatar || "" }, MEDIA_BASE);
+  const role = user?.role || user?.category || "Team Consumer";
+  const userId = user?.prefixed_id || user?.unique_id || user?.username || user?.id || "-";
+
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle sx={{ fontWeight: 900 }}>Team ID Card</DialogTitle>
+      <DialogContent>
+        <Paper
+          elevation={0}
+          sx={{
+            width: "100%",
+            maxWidth: 320,
+            mx: "auto",
+            borderRadius: 2,
+            overflow: "hidden",
+            border: `1px solid ${C.border}`,
+            bgcolor: "#fff",
+          }}
+        >
+          <Box sx={{ p: 1.25, bgcolor: C.primary, color: "#fff", textAlign: "center" }}>
+            <Typography sx={{ fontSize: 16, fontWeight: 1000 }}>TRIKONEKT</Typography>
+            <Typography sx={{ fontSize: 11, fontWeight: 800, opacity: 0.9 }}>TEAM CONSUMER ID CARD</Typography>
+          </Box>
+          <Box sx={{ p: 2, textAlign: "center" }}>
+            <Avatar src={avatar || undefined} sx={{ width: 86, height: 86, mx: "auto", bgcolor: C.primaryDark, fontSize: 26, fontWeight: 1000 }}>
+              {initials}
+            </Avatar>
+            <Typography sx={{ mt: 1.25, fontSize: 18, fontWeight: 1000 }}>{user?.full_name || user?.name || "Team User"}</Typography>
+            <Typography sx={{ fontSize: 12, color: C.textSec, fontWeight: 800 }}>{role}</Typography>
+            <Box sx={{ mt: 1.5, textAlign: "left", borderTop: `1px solid ${C.border}`, pt: 1.25 }}>
+              <Typography sx={{ fontSize: 12, fontWeight: 800, color: C.textSec }}>User ID</Typography>
+              <Typography sx={{ fontSize: 14, fontWeight: 1000 }}>{userId}</Typography>
+              <Typography sx={{ fontSize: 12, fontWeight: 800, color: C.textSec, mt: 1 }}>Phone Number</Typography>
+              <Typography sx={{ fontSize: 14, fontWeight: 1000 }}>{user?.phone || "-"}</Typography>
+            </Box>
+          </Box>
+        </Paper>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Close</Button>
+        <Button variant="contained" onClick={() => window.print()}>Print</Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 
@@ -272,9 +491,6 @@ function MobileBottomNav({ value, onChange }) {
         width: "100%",
         maxWidth: 520,
         borderTop: `1px solid ${C.border}`,
-        // Keep bottom nav above the page content, but BELOW the mobile sidebar drawer
-        // (ShellBase sidebar zIndex = 1050). Otherwise it can cover the sidebar footer
-        // (Logout button) during Team Login.
         zIndex: 1030,
         borderRadius: "18px 18px 0 0",
         overflow: "hidden",
@@ -289,33 +505,12 @@ function MobileBottomNav({ value, onChange }) {
               onClick={() => onChange(it.value)}
               role="button"
               tabIndex={0}
-              sx={{
-                width: "20%",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 0.25,
-                color: active ? C.primary : "#94a3b8",
-                cursor: "pointer",
-                WebkitTapHighlightColor: "transparent",
-              }}
+              sx={{ width: "20%", display: "flex", flexDirection: "column", alignItems: "center", gap: 0.25, color: active ? C.primary : "#94a3b8", cursor: "pointer" }}
             >
-              <Box
-                sx={{
-                  width: 42,
-                  height: 30,
-                  borderRadius: 99,
-                  display: "grid",
-                  placeItems: "center",
-                  bgcolor: active ? C.primarySoft : "transparent",
-                  transition: "background 0.18s ease",
-                }}
-              >
+              <Box sx={{ width: 42, height: 30, borderRadius: 99, display: "grid", placeItems: "center", bgcolor: active ? "rgba(37,99,235,0.12)" : "transparent" }}>
                 {React.cloneElement(it.icon, { fontSize: "small" })}
               </Box>
-              <Typography sx={{ fontSize: 11, fontWeight: active ? 900 : 700, lineHeight: 1 }}>
-                {it.label}
-              </Typography>
+              <Typography sx={{ fontSize: 11, fontWeight: active ? 900 : 700, lineHeight: 1 }}>{it.label}</Typography>
             </Box>
           );
         })}
@@ -338,24 +533,67 @@ export default function TeamDashboard() {
     }
   }, []);
 
-  const username = storedUser?.username || "";
-  const fullName = storedUser?.full_name || "Team User";
+  const username = storedUser?.username || storedUser?.id || "";
+  const fullName = storedUser?.full_name || storedUser?.name || "Team User";
+  const status = storedUser?.status || storedUser?.profile_status || "Agent";
+  const [profileUser, setProfileUser] = useState(storedUser);
+  const [idCardOpen, setIdCardOpen] = useState(false);
+  const [docErr, setDocErr] = useState("");
   const initials = useMemo(() => {
-    const n = String(fullName || username || "T").trim();
+    const n = String(profileUser?.full_name || fullName || username || "T").trim();
     const parts = n.split(" ").filter(Boolean);
-    const a = parts[0]?.[0] || "T";
-    const b = parts.length > 1 ? parts[parts.length - 1]?.[0] : "";
-    return (a + b).toUpperCase();
-  }, [fullName, username]);
+    return `${parts[0]?.[0] || "T"}${parts.length > 1 ? parts[parts.length - 1]?.[0] : ""}`.toUpperCase();
+  }, [profileUser?.full_name, fullName, username]);
 
-  // Team/Consumer dashboard content (admin-managed)
   const [banners, setBanners] = useState([]);
   const [bannersLoading, setBannersLoading] = useState(false);
   const [bannersErr, setBannersErr] = useState("");
-
   const [achievers, setAchievers] = useState([]);
   const [achieversLoading, setAchieversLoading] = useState(false);
   const [achieversErr, setAchieversErr] = useState("");
+  const [videos, setVideos] = useState([]);
+  const [videosLoading, setVideosLoading] = useState(false);
+  const [primeRanks, setPrimeRanks] = useState([]);
+  const [achievedPrimeLevel, setAchievedPrimeLevel] = useState(0);
+
+  const educationVideoSlots = useMemo(() => {
+    const ranks =
+      Array.isArray(primeRanks) && primeRanks.length
+        ? primeRanks.slice(0, 10)
+        : Array.from({ length: 10 }).map((_, idx) => ({
+            id: null,
+            level_number: idx + 1,
+            rank_name: `Prime ${idx + 1}`,
+            upgrade_amount: "",
+          }));
+
+    const byLevel = new Map();
+    const unmapped = [];
+    (Array.isArray(videos) ? videos : []).forEach((video) => {
+      const level = Number(video?.required_rank_level || 0);
+      if (level) byLevel.set(level, video);
+      else unmapped.push(video);
+    });
+
+    return ranks.map((rank, idx) => {
+      const level = Number(rank?.level_number || idx + 1);
+      const mapped = byLevel.get(level) || unmapped[idx] || {};
+      const isPurchased = Number(achievedPrimeLevel || 0) >= level || !!mapped.can_access;
+      const rankId = mapped.required_rank || rank?.id || null;
+      return {
+        ...mapped,
+        id: mapped.id || `prime-slot-${level}`,
+        title: mapped.title || `Video ${level}`,
+        description: mapped.description || "Digital education",
+        required_rank: rankId,
+        required_rank_name: mapped.required_rank_name || rank?.rank_name || `Prime ${level}`,
+        required_rank_level: level,
+        required_rank_amount: mapped.required_rank_amount || rank?.upgrade_amount || "",
+        can_access: !!mapped.can_access || isPurchased,
+        is_purchased: isPurchased,
+      };
+    });
+  }, [achievedPrimeLevel, primeRanks, videos]);
 
   useEffect(() => {
     let alive = true;
@@ -365,13 +603,12 @@ export default function TeamDashboard() {
       setBannersErr("");
       try {
         const res = await API.get("/business/team-consumer/wishing-banners/", { cacheTTL: 2500, retryAttempts: 1 });
-        if (!alive) return;
-        const items = Array.isArray(res?.data?.results) ? res.data.results : [];
-        setBanners(items);
-      } catch (_) {
-        if (!alive) return;
-        setBannersErr("Unable to load wishing banners.");
-        setBanners([]);
+        if (alive) setBanners(Array.isArray(res?.data?.results) ? res.data.results : []);
+      } catch {
+        if (alive) {
+          setBannersErr("Unable to load wishing banners.");
+          setBanners([]);
+        }
       } finally {
         if (alive) setBannersLoading(false);
       }
@@ -382,27 +619,71 @@ export default function TeamDashboard() {
       setAchieversErr("");
       try {
         const res = await API.get("/business/team-consumer/top-achievers/", { cacheTTL: 2500, retryAttempts: 1 });
-        if (!alive) return;
-        const items = Array.isArray(res?.data?.results) ? res.data.results : [];
-        setAchievers(items);
-      } catch (_) {
-        if (!alive) return;
-        setAchieversErr("Unable to load top achievers.");
-        setAchievers([]);
+        if (alive) setAchievers(Array.isArray(res?.data?.results) ? res.data.results : []);
+      } catch {
+        if (alive) {
+          setAchieversErr("Unable to load top achievers.");
+          setAchievers([]);
+        }
       } finally {
         if (alive) setAchieversLoading(false);
       }
     };
 
+    const fetchVideos = async () => {
+      setVideosLoading(true);
+      try {
+        const [videoRes, rankRes, eligRes] = await Promise.allSettled([
+          API.get("/business/team-consumer/educational-videos/", { cacheTTL: 2500, retryAttempts: 1 }),
+          API.get("/ranks/", { cacheTTL: 10000, retryAttempts: 1 }),
+          API.get("/user/upgrade-eligibility/", { cacheTTL: 2500, retryAttempts: 1, timeout: 60000 }),
+        ]);
+        if (!alive) return;
+        if (videoRes.status === "fulfilled") {
+          setVideos(Array.isArray(videoRes.value?.data?.results) ? videoRes.value.data.results : []);
+        } else {
+          setVideos([]);
+        }
+        if (rankRes.status === "fulfilled") {
+          const ranks = Array.isArray(rankRes.value?.data) ? rankRes.value.data : [];
+          setPrimeRanks(ranks.slice(0, 10));
+        } else {
+          setPrimeRanks([]);
+        }
+        if (eligRes.status === "fulfilled") {
+          setAchievedPrimeLevel(Number(eligRes.value?.data?.achieved_level || 0));
+        } else {
+          setAchievedPrimeLevel(0);
+        }
+      } catch {
+        if (alive) {
+          setVideos([]);
+          setPrimeRanks([]);
+          setAchievedPrimeLevel(0);
+        }
+      } finally {
+        if (alive) setVideosLoading(false);
+      }
+    };
+
+    const fetchProfile = async () => {
+      try {
+        const res = await API.get("/accounts/profile/", { cacheTTL: 2500, retryAttempts: 1 });
+        if (alive && res?.data) setProfileUser({ ...storedUser, ...res.data });
+      } catch {
+        if (alive) setProfileUser(storedUser);
+      }
+    };
+
     fetchBanners();
     fetchAchievers();
-
+    fetchVideos();
+    fetchProfile();
     return () => {
       alive = false;
     };
-  }, []);
+  }, [storedUser]);
 
-  // Bottom nav selection based on path
   const navIndex = useMemo(() => {
     const p = location.pathname || "";
     if (p.includes("/genealogy")) return 1;
@@ -415,135 +696,117 @@ export default function TeamDashboard() {
   const handleNav = (idx) => {
     if (idx === 0) navigate("/user/team-dashboard");
     if (idx === 1) navigate("/user/genealogy-5");
-    if (idx === 2) navigate("/user/team-wallet");
+    if (idx === 2) navigate("/user/wallet");
     if (idx === 3) navigate("/user/history");
     if (idx === 4) navigate("/user/profile");
   };
 
-  return (
-    <Box sx={{ minHeight: "100dvh", bgcolor: C.appBg }}>
-      <Box sx={{ maxWidth: 520, mx: "auto", px: 2, pt: 2, pb: isMobile ? 10 : 4 }}>
-        {/* Header */}
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-          <Stack direction="row" alignItems="center" spacing={1.25}>
-            <Avatar sx={{ width: 44, height: 44, bgcolor: C.primary, fontWeight: 900 }}>
-              {initials}
-            </Avatar>
-            <Box>
-              <Typography sx={{ fontSize: 12, fontWeight: 800, color: C.textSec, lineHeight: 1 }}>
-                Welcome
-              </Typography>
-              <Typography sx={{ fontSize: 18, fontWeight: 900, color: C.text, letterSpacing: "-0.4px" }}>
-                {fullName}
-              </Typography>
-              <Typography sx={{ fontSize: 12, fontWeight: 800, color: C.primary }}>
-                ID: {username || "—"}
-              </Typography>
-            </Box>
-          </Stack>
-          <IconButton aria-label="notifications" sx={{ bgcolor: C.surface, border: `1px solid ${C.border}` }}>
-            <NotificationsNoneRoundedIcon />
-          </IconButton>
-        </Stack>
+  const resolveDocumentUrl = useCallback((raw) => {
+    if (!raw) return "";
+    const s = String(raw);
+    if (/^https?:\/\//i.test(s) || s.startsWith("data:")) return s;
+    const mediaBase = String(API?.defaults?.baseURL || "").replace(/\/api\/?$/, "");
+    return mediaBase ? `${mediaBase}${s.startsWith("/") ? "" : "/"}${s}` : s;
+  }, []);
 
-        {/* Hero banner */}
-        {/* <MotionPaper
+  const openLatestDocument = useCallback(async (kind) => {
+    setDocErr("");
+    try {
+      const res = await API.get(`/business/team-consumer/documents/${kind}/latest/`, { retryAttempts: 1 });
+      const url = resolveDocumentUrl(res?.data?.file_url || res?.data?.file);
+      if (!url) {
+        setDocErr("Document uploaded record has no file.");
+        return;
+      }
+      window.open(url, "_blank", "noopener,noreferrer");
+      navigate("/user/team-dashboard", { replace: true });
+    } catch (e) {
+      setDocErr(e?.response?.data?.detail || "Document is not uploaded yet.");
+      navigate("/user/team-dashboard", { replace: true });
+    }
+  }, [navigate, resolveDocumentUrl]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search || "");
+    const action = String(params.get("action") || "").toLowerCase();
+    if (!action) return;
+    if (action === "id-card") setIdCardOpen(true);
+    if (action === "pdf") openLatestDocument("PDF");
+    if (action === "certificate") openLatestDocument("CERTIFICATE");
+  }, [location.search, openLatestDocument]);
+
+  return (
+    <Box sx={{ minHeight: "100dvh", bgcolor: C.appBg, pb: isMobile ? 10 : 3 }}>
+      <Box sx={{ width: "100%", maxWidth: 1180, mx: "auto", px: { xs: 0, sm: 1, md: 2 }, py: { xs: 0.5, md: 1.5 } }}>
+        <Paper
           elevation={0}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.22 }}
           sx={{
-            p: 2,
-            borderRadius: 4,
-            color: "#0f172a",
+            mb: 2,
+            p: { xs: 1.5, md: 2 },
+            borderRadius: 2,
             border: `1px solid ${C.border}`,
-            background: "linear-gradient(135deg, rgba(79,70,229,0.16) 0%, rgba(59,130,246,0.10) 48%, rgba(255,255,255,1) 100%)",
-            boxShadow: C.shadow,
-            overflow: "hidden",
-            position: "relative",
+            background: C.surface,
+            boxShadow: "0 8px 20px rgba(15, 23, 42, 0.05)",
           }}
         >
-          <Box
-            sx={{
-              position: "absolute",
-              right: -30,
-              top: -30,
-              width: 140,
-              height: 140,
-              borderRadius: 999,
-              background: "radial-gradient(circle at 30% 30%, rgba(79,70,229,0.22), transparent 70%)",
+          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1.5}>
+            <Stack direction="row" alignItems="center" spacing={1.25} sx={{ minWidth: 0 }}>
+              <Avatar sx={{ width: 52, height: 52, bgcolor: C.primary, fontWeight: 1000 }}>{initials}</Avatar>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography sx={{ fontSize: 12, fontWeight: 900, color: C.textSec, lineHeight: 1 }}>Team Consumer</Typography>
+                <Typography sx={{ fontSize: { xs: 18, md: 22 }, fontWeight: 1000, color: C.text }} noWrap>
+                  {profileUser?.full_name || fullName}
+                </Typography>
+                <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.5, flexWrap: "wrap" }}>
+                  <Chip size="small" label={`ID: ${profileUser?.prefixed_id || profileUser?.unique_id || username || "-"}`} sx={{ fontWeight: 900, bgcolor: "rgba(37,99,235,0.1)", color: C.primary }} />
+                  <Chip size="small" label={`Status: ${status}`} sx={{ fontWeight: 900, bgcolor: "rgba(16,185,129,0.12)", color: "#047857" }} />
+                </Stack>
+              </Box>
+            </Stack>
+            <IconButton aria-label="notifications" sx={{ bgcolor: "#f8fafc", border: `1px solid ${C.border}` }}>
+              <NotificationsNoneRoundedIcon />
+            </IconButton>
+          </Stack>
+        </Paper>
+
+        {docErr ? (
+          <Paper elevation={0} sx={{ mb: 2, p: 1.25, borderRadius: 2, border: "1px solid #fecaca", bgcolor: "#fef2f2" }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#b91c1c" }}>{docErr}</Typography>
+          </Paper>
+        ) : null}
+
+        <Stack spacing={2}>
+          <WishingBannerCarousel items={banners} loading={bannersLoading} error={bannersErr} />
+          <TopAchieversRow items={achievers} loading={achieversLoading} error={achieversErr} />
+          <VideoScroller
+            videos={educationVideoSlots}
+            loading={videosLoading}
+            onOpenFallback={() => navigate("/user/packages/digital-education-prime")}
+            onBuyPrime={(video) => {
+              if (video?.is_purchased || video?.can_access) return;
+              const params = new URLSearchParams();
+              if (video?.required_rank) params.set("rank_id", String(video.required_rank));
+              if (video?.id) params.set("video_id", String(video.id));
+              navigate(`/user/packages/digital-education-prime${params.toString() ? `?${params.toString()}` : ""}`);
             }}
           />
-          <Typography sx={{ fontSize: 18, fontWeight: 1000, color: C.text, letterSpacing: "-0.4px" }}>
-            Grow your business with Trikonekt
-          </Typography>
-          <Typography sx={{ fontSize: 13, color: C.textSec, fontWeight: 700, mt: 0.75, maxWidth: 420 }}>
-            Track earnings, manage wallet actions, and explore your team — all in one place.
-          </Typography>
-          <Stack direction="row" spacing={1} sx={{ mt: 1.5, flexWrap: "wrap" }}>
-            <Button
-              variant="contained"
-              onClick={() => navigate("/user/upload-wallet")}
-              sx={{
-                textTransform: "none",
-                fontWeight: 900,
-                borderRadius: 99,
-                px: 2,
-                background: C.primary,
-                boxShadow: "0 10px 18px rgba(79,70,229,0.22)",
-                "&:hover": { background: "#4338ca" },
-              }}
-            >
-              Upload Wallet
-            </Button>
-            <Button
-              variant="outlined"
-              onClick={() => navigate("/user/wallet")}
-              sx={{
-                textTransform: "none",
-                fontWeight: 900,
-                borderRadius: 99,
-                px: 2,
-                borderColor: "rgba(79,70,229,0.35)",
-                color: C.primary,
-                bgcolor: "rgba(255,255,255,0.65)",
-                "&:hover": { borderColor: C.primary, bgcolor: "rgba(79,70,229,0.06)" },
-              }}
-            >
-              Withdraw
-            </Button>
-            <Button
-              variant="text"
-              onClick={() => navigate("/user/genealogy-5")}
-              sx={{ textTransform: "none", fontWeight: 900, borderRadius: 99, color: C.text }}
-            >
-              Team View
-            </Button>
-            <Button
-              variant="text"
-              onClick={() => navigate("/user/refer-earn")}
-              sx={{ textTransform: "none", fontWeight: 900, borderRadius: 99, color: C.text }}
-            >
-              Refer & Earn
-            </Button>
-            <Button
-              variant="text"
-              onClick={() => navigate("/user/history")}
-              sx={{ textTransform: "none", fontWeight: 900, borderRadius: 99, color: C.text }}
-            >
-              History
-            </Button>
-          </Stack>
-        </MotionPaper> */}
-
-        {/* Wishing banner carousel (replaces wallet statistics) */}
-        <WishingBannerCarousel items={banners} loading={bannersLoading} error={bannersErr} />
-
-        {/* Top achievers (admin managed) */}
-        <TopAchieversRow items={achievers} loading={achieversLoading} error={achieversErr} />
+          <TourScroller
+            onTour={() => navigate("/user/tri/tri-holidays")}
+            onShop={() => navigate("/trikonekt-products")}
+            onCoupons={() => navigate("/user/redeem-coupon")}
+          />
+        </Stack>
       </Box>
 
-      {/* Mobile-only bottom navigation */}
+      <IdCardDialog
+        open={idCardOpen}
+        onClose={() => {
+          setIdCardOpen(false);
+          navigate("/user/team-dashboard", { replace: true });
+        }}
+        user={profileUser}
+        initials={initials}
+      />
       {isMobile ? <MobileBottomNav value={navIndex} onChange={handleNav} /> : null}
     </Box>
   );

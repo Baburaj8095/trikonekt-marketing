@@ -28,12 +28,20 @@ class CustomUser(AbstractUser):
         ('agency_sub_franchise', 'Agency Sub-Franchise'),
         ('company_manager', 'Company Manager'),
     ]
+    IDENTITY_END_USER = 'END_USER'
+    IDENTITY_ADMIN = 'ADMIN'
+    IDENTITY_TYPE_CHOICES = [
+        (IDENTITY_END_USER, 'End User'),
+        (IDENTITY_ADMIN, 'Admin'),
+    ]
 
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='user', db_index=True)
+    identity_type = models.CharField(max_length=20, choices=IDENTITY_TYPE_CHOICES, default=IDENTITY_END_USER, db_index=True)
     # Specific registration category for username/ownership logic
     category = models.CharField(max_length=40, choices=CATEGORY_CHOICES, default='consumer', db_index=True)
     # Admin RBAC Role (single role per admin user; null for non-admins)
     admin_role = models.ForeignKey('adminapi.Role', null=True, blank=True, on_delete=models.SET_NULL, related_name='users')
+    admin_roles = models.ManyToManyField('adminapi.Role', through='adminapi.UserRole', related_name='assigned_users', blank=True)
 
     # 6-digit unique registration id
     unique_id = models.CharField(max_length=6, unique=True, blank=True, null=True, editable=False)
@@ -88,6 +96,7 @@ class CustomUser(AbstractUser):
             models.Index(fields=['account_active', 'date_joined']),
             models.Index(fields=['first_purchase_activated_at']),
             models.Index(fields=['role', 'category']),
+            models.Index(fields=['identity_type', 'is_staff']),
         ]
 
     def __str__(self):
@@ -137,6 +146,11 @@ class CustomUser(AbstractUser):
                 return candidate
 
     def save(self, *args, **kwargs):
+        if self.is_staff or self.is_superuser:
+            self.identity_type = CustomUser.IDENTITY_ADMIN
+        elif not self.identity_type:
+            self.identity_type = CustomUser.IDENTITY_END_USER
+
         # Ensure 6-digit registration id
         if not self.unique_id:
             self.unique_id = self.generate_unique_id()
@@ -1383,6 +1397,63 @@ class SupportTicketMessage(models.Model):
 
     def __str__(self) -> str:
         return f"Msg<{self.ticket_id} by {getattr(self.author, 'username', '')}>"
+
+
+class PasswordResetOTP(models.Model):
+    IDENTITY_TYPE_CHOICES = CustomUser.IDENTITY_TYPE_CHOICES
+    PURPOSE_PASSWORD_RESET = "PASSWORD_RESET"
+    PURPOSE_ADMIN_LOGIN = "ADMIN_LOGIN"
+    PURPOSE_CHOICES = [
+        (PURPOSE_PASSWORD_RESET, "Password Reset"),
+        (PURPOSE_ADMIN_LOGIN, "Admin Login"),
+    ]
+
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="password_reset_otps")
+    identity_type = models.CharField(max_length=20, choices=IDENTITY_TYPE_CHOICES, db_index=True)
+    purpose = models.CharField(max_length=32, choices=PURPOSE_CHOICES, default=PURPOSE_PASSWORD_RESET, db_index=True)
+    otp_hash = models.CharField(max_length=128)
+    expires_at = models.DateTimeField(db_index=True)
+    attempt_count = models.PositiveSmallIntegerField(default=0)
+    max_attempts = models.PositiveSmallIntegerField(default=5)
+    is_used = models.BooleanField(default=False, db_index=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "password_reset_otps"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "identity_type", "is_used"]),
+            models.Index(fields=["user", "identity_type", "purpose", "is_used"]),
+            models.Index(fields=["expires_at", "is_used"]),
+            models.Index(fields=["ip_address", "created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"PasswordResetOTP<{self.user_id}:{self.identity_type}:{'used' if self.is_used else 'active'}>"
+
+
+class AuditLog(models.Model):
+    actor_user = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.SET_NULL, related_name="audit_events")
+    action = models.CharField(max_length=80, db_index=True)
+    resource_type = models.CharField(max_length=100, blank=True, db_index=True)
+    resource_id = models.CharField(max_length=100, blank=True, db_index=True)
+    before_json = models.JSONField(null=True, blank=True)
+    after_json = models.JSONField(null=True, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = "audit_logs"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["actor_user", "action"]),
+            models.Index(fields=["resource_type", "resource_id"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"AuditLog<{self.action}:{self.resource_type}:{self.resource_id}>"
 
 
 # ==============================

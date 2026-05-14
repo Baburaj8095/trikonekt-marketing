@@ -7,6 +7,8 @@ from rest_framework_simplejwt.settings import api_settings
 from rest_framework_simplejwt.views import TokenRefreshView
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    require_admin_identity = False
+
     def validate(self, attrs):
         # Flexible identifier resolution:
         # - Accept exact username as-is
@@ -19,6 +21,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         if not raw_username:
             raise serializers.ValidationError({"detail": "Username is required."})
+
+        attrs["password"] = password
 
         def only_digits(s: str) -> str:
             return "".join(c for c in (s or "") if c.isdigit())
@@ -87,7 +91,23 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         else:
             attrs["username"] = raw_username
 
+        User = get_user_model()
+        user_for_message = User.objects.filter(username__iexact=attrs.get("username")).first()
+        if user_for_message:
+            if not getattr(user_for_message, "is_active", False):
+                raise serializers.ValidationError({"detail": "Account is inactive."})
+            if not user_for_message.check_password(password):
+                raise serializers.ValidationError({"detail": "Wrong password."})
+
         data = super().validate(attrs)
+
+        identity_type = str(getattr(self.user, "identity_type", "") or "").upper()
+        is_admin = identity_type == "ADMIN" or bool(getattr(self.user, "is_staff", False) or getattr(self.user, "is_superuser", False))
+        if self.require_admin_identity:
+            if not is_admin:
+                raise serializers.ValidationError({"detail": "Not authorized for admin login."})
+        elif is_admin:
+            raise serializers.ValidationError({"detail": "Admin accounts must use the admin login."})
 
         # Optional: if the client provides a role, ensure it matches the user's role.
         # Skip strict role check when the user explicitly typed an exact username (to allow TRBS########## even if UI role defaulted to "user").
@@ -129,6 +149,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         # Admin flags for guarding Admin UI routes
         token['is_staff'] = bool(getattr(user, 'is_staff', False))
         token['is_superuser'] = bool(getattr(user, 'is_superuser', False))
+        token['identity_type'] = getattr(user, 'identity_type', '') or ('ADMIN' if getattr(user, 'is_staff', False) else 'END_USER')
         return token
 
 
@@ -165,6 +186,7 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
                     access["role_effective"] = "business" if cat in ("business", "merchant") else user.role
                     access["is_staff"] = bool(getattr(user, "is_staff", False))
                     access["is_superuser"] = bool(getattr(user, "is_superuser", False))
+                    access["identity_type"] = getattr(user, "identity_type", "") or ("ADMIN" if getattr(user, "is_staff", False) else "END_USER")
                     data["access"] = str(access)
         except Exception:
             # If anything fails, return the default data without extra claims
@@ -174,3 +196,7 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
 
 class CustomTokenRefreshView(TokenRefreshView):
     serializer_class = CustomTokenRefreshSerializer
+
+
+class AdminTokenObtainPairSerializer(CustomTokenObtainPairSerializer):
+    require_admin_identity = True
