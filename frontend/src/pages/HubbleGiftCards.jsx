@@ -80,15 +80,9 @@ export default function HubbleGiftCards() {
         <iframe
           title="Hubble Gift Cards"
           src={iframeUrl}
-          // SECURITY: prevent leaking token-bearing query params via referrer headers.
           referrerPolicy="no-referrer"
-          // SECURITY: sandbox the iframe. Hubble requires its own JS to run.
-          // IMPORTANT: Hubble's own CSP may block embedding if the iframe has an opaque origin.
-          // `allow-same-origin` is required so the embedded page is treated as https origin,
-          // not as "null" (opaque) origin.
           sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
           style={{ width: "100%", height: "80vh", border: "0px" }}
-          // Keep allow list minimal. Remove clipboard permissions unless truly required.
           allow="payment"
         />
       ) : null}

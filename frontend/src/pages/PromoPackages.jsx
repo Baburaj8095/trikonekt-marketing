@@ -306,7 +306,9 @@ function PaymentMethodDialog({ open, onClose, intent, walletMe, onPickManual, on
   if (!open) return null;
   const amount = Number(intent?.amount || intent?.pkg?.price || 0);
   const internalBal = Number(walletMe?.transfer_wallets?.internal || walletMe?.internal_wallet_balance || 0);
+  const packageCouponBal = Number(walletMe?.transfer_wallets?.packagePurchaseCoupon || 0);
   const canWallet = internalBal >= amount && amount > 0;
+  const canPackageCoupon = packageCouponBal >= amount && amount > 0;
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
       <DialogTitle>Select Payment Method</DialogTitle>
@@ -317,9 +319,12 @@ function PaymentMethodDialog({ open, onClose, intent, walletMe, onPickManual, on
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
           Self Package Wallet Balance: <b>₹{internalBal.toFixed(2)}</b>
         </Typography>
-        {!canWallet ? (
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
+          Package Purchase Coupon Wallet Balance: <b>₹{packageCouponBal.toFixed(2)}</b>
+        </Typography>
+        {!canWallet && !canPackageCoupon ? (
           <Alert severity="info" sx={{ mt: 1.5 }}>
-            Wallet payment is available only when your Self Package Wallet balance is enough.
+            Wallet payment is available only when one package wallet balance is enough.
           </Alert>
         ) : null}
       </DialogContent>
@@ -328,8 +333,11 @@ function PaymentMethodDialog({ open, onClose, intent, walletMe, onPickManual, on
         <Button variant="outlined" onClick={onPickManual}>
           Manual Payment
         </Button>
-        <Button variant="contained" disabled={!canWallet} onClick={onPickWallet}>
-          Pay from Wallet
+        <Button variant="contained" disabled={!canWallet} onClick={() => onPickWallet("internal")}>
+          Pay from Self Package
+        </Button>
+        <Button variant="contained" disabled={!canPackageCoupon} onClick={() => onPickWallet("package_coupon")}>
+          Pay from Coupon Wallet
         </Button>
       </DialogActions>
     </Dialog>
@@ -1347,13 +1355,14 @@ export default function PromoPackages({
           setPaymentData(purchaseIntent);
           setPaymentOpen(true);
         }}
-        onPickWallet={async () => {
+        onPickWallet={async (walletSource = "internal") => {
           if (!purchaseIntent?.pkg?.id) return;
           setWalletBusy(true);
           setWalletErr("");
           try {
             await createPromoPurchaseFromWallet({
               package_id: purchaseIntent.pkg.id,
+              wallet_source: walletSource,
               ...(purchaseIntent.purchasePayload || {}),
             });
             setMethodOpen(false);

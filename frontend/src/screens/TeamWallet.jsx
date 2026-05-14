@@ -38,6 +38,11 @@ function fmtAmount(value) {
 
 const TRANSFER_OPTIONS = [
   {
+    value: "coupon",
+    label: "Coupon Pocket",
+    helper: "Use this pocket to create Trizone, online, near store, and package purchase vouchers.",
+  },
+  {
     value: "shopping",
     label: "Gift Card Pocket",
     helper: "Use for shopping in consumer dashboard and product purchases.",
@@ -65,16 +70,23 @@ const WALLET_DEFINITIONS = [
   { slNo: 3, name: "Shopping Reward Wallet", section: "core" },
   { slNo: 4, name: "Redeem Points Wallet", section: "core" },
   { slNo: 5, name: "Main Wallet", section: "core", highlight: true },
-  { slNo: 6, name: "Package Buy / Upload Wallet", section: "operational" },
+  { slNo: 6, name: "Coupon Pocket Wallet", section: "operational" },
   { slNo: 7, name: "Shopping Wallet", section: "operational" },
   { slNo: 8, name: "Buy Package (Internal)", section: "operational" },
   { slNo: 9, name: "Wallet to Wallet Transfer", section: "operational" },
   { slNo: 10, name: "Withdrawal Wallet", section: "operational" },
-  { slNo: 11, name: "Franchise Referral Wallet", section: "rewards" },
-  { slNo: 12, name: "Smart Purchase Spin & Win", section: "rewards" },
+  { slNo: 11, name: "Package Purchase Coupon Wallet", section: "rewards" },
+  { slNo: 12, name: "Direct Benefit Wallet", section: "rewards" },
   { slNo: 13, name: "Prime Subscription Spin & Win", section: "rewards" },
-  { slNo: 14, name: "BOP Meeting Spin & Win", section: "rewards" },
+  { slNo: 14, name: "Level Benefit Wallet", section: "rewards" },
   { slNo: 15, name: "Reward Gift", section: "rewards" },
+];
+
+const VOUCHER_TYPES = [
+  { value: "TRIZONE", label: "Trizone Voucher", validity: "30 days" },
+  { value: "ONLINE", label: "Online Coupon", validity: "30 days" },
+  { value: "NEAR_STORE", label: "Near Store Coupon", validity: "30 days" },
+  { value: "PACKAGE_PURCHASE", label: "Package Purchase Coupon", validity: "7 days" },
 ];
 
 const walletPanelSx = {
@@ -311,9 +323,17 @@ export default function TeamWallet() {
   const [success, setSuccess] = useState("");
   const [walletData, setWalletData] = useState({});
   const [historyData, setHistoryData] = useState({});
+  const [voucherData, setVoucherData] = useState({ results: [] });
   const [kycData, setKycData] = useState({});
   const [withdrawals, setWithdrawals] = useState([]);
   const [transferOpen, setTransferOpen] = useState(false);
+  const [voucherOpen, setVoucherOpen] = useState(false);
+  const [voucherForm, setVoucherForm] = useState({
+    voucher_type: "TRIZONE",
+    amount: "",
+    assigned_to: "",
+    note: "",
+  });
   const [otpRequested, setOtpRequested] = useState(false);
   const [lookupResult, setLookupResult] = useState(null);
   const [transferForm, setTransferForm] = useState({
@@ -327,13 +347,15 @@ export default function TeamWallet() {
     try {
       setLoading(true);
       setError("");
-      const [walletRes, kycRes, historyRes, withdrawalsRes] = await Promise.all([
+      const [walletRes, kycRes, historyRes, withdrawalsRes, vouchersRes] = await Promise.all([
         API.get("/accounts/wallet/me/"),
         API.get("/accounts/kyc/me/"),
         API.get("/accounts/wallet/me/history/"),
         API.get("/accounts/withdrawals/me/"),
+        API.get("/accounts/wallet/vouchers/"),
       ]);
       setWalletData(walletRes?.data || {});
+      setVoucherData(vouchersRes?.data || { results: [] });
       setKycData(kycRes?.data || {});
       setHistoryData(historyRes?.data || {});
       setWithdrawals(
@@ -429,13 +451,15 @@ export default function TeamWallet() {
           break;
         case 6:
           amount = Number(
-            transferWallets?.packageUpload ||
-              walletData?.package_upload_balance ||
-              walletData?.upload_wallet_balance ||
+            transferWallets?.coupon ||
+              voucherData?.coupon_wallet_balance ||
               0
           );
           icon = <LocalShippingIcon />;
-          label = "Uploaded package amount";
+          label = "Create 30-day/7-day vouchers";
+          actions = [
+            { label: "Voucher", onClick: () => setVoucherOpen(true) },
+          ];
           break;
         case 7:
           amount = Number(transferWallets?.shopping || 0);
@@ -465,14 +489,14 @@ export default function TeamWallet() {
           ];
           break;
         case 11:
-          amount = Number(income?.franchise || 0);
+          amount = Number(transferWallets?.packagePurchaseCoupon || voucherData?.package_coupon_wallet_balance || 0);
           icon = <PeopleIcon />;
-          label = "Franchise referrals";
+          label = "Redeemed package vouchers";
           break;
         case 12:
-          amount = Number(smartPurchase?.seasonPurchasedCount || 0);
+          amount = Number(income?.directReferral || 0);
           icon = <CasinoIcon />;
-          label = `Pending ${smartPurchase?.seasonPendingCount || 0}`;
+          label = "Direct bonus/reward";
           break;
         case 13:
           amount = Number(prime?.activeCount || 0);
@@ -480,9 +504,9 @@ export default function TeamWallet() {
           label = `Active ${prime?.activeCount || 0}`;
           break;
         case 14:
-          amount = walletData?.today?.spinEligible ? 1 : 0;
+          amount = Number(income?.matrixLevel || income?.levelBonus || 0);
           icon = <WorkIcon />;
-          label = walletData?.today?.spinEligible ? "Spin available" : "No spin today";
+          label = "Level income";
           break;
         case 15:
           amount = Number(walletData?.totals?.allEarnings || 0);
@@ -495,7 +519,7 @@ export default function TeamWallet() {
 
       return { ...def, amount, icon, label, actions };
     });
-  }, [coupons, income, kycVerified, limits, prime, smartPurchase, top, totalEarningBonus, transferWallets, walletData]);
+  }, [coupons, income, kycVerified, limits, prime, smartPurchase, top, totalEarningBonus, transferWallets, voucherData, walletData]);
 
   const sections = useMemo(() => ({
     core: wallets.filter((w) => w.section === "core"),
@@ -512,27 +536,27 @@ export default function TeamWallet() {
     () => [
       {
         no: 1,
+        transferType: "coupon",
+        title: "Coupon Pocket",
+        wallet: walletByNo[6],
+      },
+      {
+        no: 2,
         transferType: "shopping",
         title: "Gift Card Pocket",
         wallet: walletByNo[7],
       },
       {
-        no: 2,
+        no: 3,
         transferType: "internal",
         title: "Self Package Pocket",
-        wallet: walletByNo[6],
-      },
-      {
-        no: 3,
-        transferType: "withdrawal",
-        title: "Withdrawal To Pocket",
-        wallet: walletByNo[10],
+        wallet: walletByNo[8],
       },
       {
         no: 4,
-        transferType: "internal",
-        title: "Add Money (Buy Package)",
-        wallet: walletByNo[8],
+        transferType: "withdrawal",
+        title: "Withdrawal To Pocket",
+        wallet: walletByNo[10],
       },
     ],
     [walletByNo]
@@ -551,9 +575,9 @@ export default function TeamWallet() {
     () => [
       {
         title: "Package Purchase GiftCard (Buy Package)",
-        amount: walletByNo[8]?.amount || walletByNo[6]?.amount,
-        icon: walletByNo[8]?.icon || walletByNo[6]?.icon,
-        caption: "Purchase gift card entry",
+        amount: walletByNo[11]?.amount,
+        icon: walletByNo[11]?.icon,
+        caption: "Redeemed package coupon amount",
         tone: 3,
       },
       {
@@ -588,6 +612,20 @@ export default function TeamWallet() {
         tone: 2,
       },
       {
+        title: "Direct Benefit",
+        amount: Number(income?.directReferral || 0),
+        icon: <PaymentsIcon />,
+        caption: "Direct bonus/reward",
+        tone: 1,
+      },
+      {
+        title: "Level Benefit",
+        amount: Number(income?.matrixLevel || income?.levelBonus || 0),
+        icon: <AccountBalanceWalletIcon />,
+        caption: "Level income",
+        tone: 2,
+      },
+      {
         title: "Zonal Reward",
         amount: Number(income?.zonal || walletData?.zonal_reward || 0),
         icon: <EmojiEventsIcon />,
@@ -609,6 +647,14 @@ export default function TeamWallet() {
     () => TRANSFER_OPTIONS.find((item) => item.value === transferForm.transfer_type)?.helper || "",
     [transferForm.transfer_type]
   );
+
+  const transferChargeText = useMemo(() => {
+    const pct = transferForm.transfer_type === "withdrawal" ? 10 : ["coupon", "internal"].includes(transferForm.transfer_type) ? 7 : 0;
+    const amount = Number(transferForm.amount || 0);
+    if (!pct || !amount) return "";
+    const charge = amount * pct / 100;
+    return `${pct}% admin service charge: Rs. ${fmtAmount(charge)}. Net credit: Rs. ${fmtAmount(amount - charge)}.`;
+  }, [transferForm.amount, transferForm.transfer_type]);
 
   const handleTransferChange = (field, value) => {
     setTransferForm((prev) => ({ ...prev, [field]: value }));
@@ -673,6 +719,34 @@ export default function TeamWallet() {
       await loadData();
     } catch (err) {
       setError(err?.response?.data?.detail || "Transfer confirmation failed.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleVoucherChange = (field, value) => {
+    setVoucherForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleCreateVoucher = async () => {
+    try {
+      setActionLoading(true);
+      setError("");
+      setSuccess("");
+      const payload = {
+        voucher_type: voucherForm.voucher_type,
+        amount: voucherForm.amount,
+        note: voucherForm.note,
+      };
+      if (voucherForm.voucher_type === "PACKAGE_PURCHASE") {
+        payload.assigned_to = voucherForm.assigned_to;
+      }
+      const res = await API.post("/accounts/wallet/vouchers/", payload);
+      setSuccess(`Voucher created: ${res?.data?.code || ""}`);
+      setVoucherForm((prev) => ({ ...prev, amount: "", assigned_to: "", note: "" }));
+      await loadData();
+    } catch (err) {
+      setError(err?.response?.data?.detail || "Failed to create voucher.");
     } finally {
       setActionLoading(false);
     }
@@ -760,7 +834,7 @@ export default function TeamWallet() {
             caption="Choose a pocket after click"
             highlight
             tone={5}
-            onClick={() => openTransferType("shopping")}
+            onClick={() => openTransferType("coupon")}
           />
         </Box>
 
@@ -835,8 +909,115 @@ export default function TeamWallet() {
         </Box>
       </Box>
 
-
       {/* ── Transfer Dialog ── */}
+      <Dialog
+        open={voucherOpen}
+        onClose={() => !actionLoading && setVoucherOpen(false)}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{ sx: { borderRadius: "16px", mx: "12px" } }}
+      >
+        <DialogTitle sx={{ fontSize: 15, fontWeight: 800, pb: 1 }}>
+          Coupon Pocket Vouchers
+        </DialogTitle>
+        <DialogContent sx={{ pt: "4px !important" }}>
+          <Stack spacing="12px">
+            <Alert severity="info" sx={{ fontSize: 12, py: "2px" }}>
+              Coupon Pocket Balance: Rs. {fmtAmount(transferWallets?.coupon || voucherData?.coupon_wallet_balance || 0)}
+            </Alert>
+            <TextField
+              select
+              label="Voucher Type"
+              value={voucherForm.voucher_type}
+              onChange={(e) => handleVoucherChange("voucher_type", e.target.value)}
+              fullWidth
+              size="small"
+            >
+              {VOUCHER_TYPES.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label} ({option.validity})
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              label="Amount"
+              type="number"
+              value={voucherForm.amount}
+              onChange={(e) => handleVoucherChange("amount", e.target.value)}
+              fullWidth
+              size="small"
+            />
+            {voucherForm.voucher_type === "PACKAGE_PURCHASE" && (
+              <TextField
+                label="Receiver Consumer ID"
+                value={voucherForm.assigned_to}
+                onChange={(e) => handleVoucherChange("assigned_to", e.target.value)}
+                fullWidth
+                size="small"
+              />
+            )}
+            <TextField
+              label="Note"
+              value={voucherForm.note}
+              onChange={(e) => handleVoucherChange("note", e.target.value)}
+              fullWidth
+              size="small"
+              multiline
+              minRows={2}
+            />
+            <Button
+              variant="contained"
+              onClick={handleCreateVoucher}
+              disabled={actionLoading}
+              sx={{ textTransform: "none", fontWeight: 800 }}
+            >
+              {actionLoading ? "Creating..." : "Create Voucher"}
+            </Button>
+
+            <Box>
+              <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#64748b", mb: 0.8 }}>
+                Recent Vouchers
+              </Typography>
+              <Stack spacing="8px" sx={{ maxHeight: 210, overflow: "auto" }}>
+                {(voucherData?.results || []).slice(0, 8).map((item) => (
+                  <Box
+                    key={item.id}
+                    sx={{
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "8px",
+                      p: "8px",
+                      bgcolor: "#fff",
+                    }}
+                  >
+                    <Stack direction="row" justifyContent="space-between" spacing="8px">
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>
+                          {item.code} - Rs. {fmtAmount(item.amount)}
+                        </Typography>
+                        <Typography sx={{ fontSize: 11, color: "#64748b" }}>
+                          {item.voucher_type_label || item.voucher_type} - Valid till {item.expires_at ? new Date(item.expires_at).toLocaleDateString() : "-"}
+                        </Typography>
+                      </Box>
+                      <Chip size="small" label={item.status} sx={{ height: 20, fontSize: 10, fontWeight: 800 }} />
+                    </Stack>
+                  </Box>
+                ))}
+                {!(voucherData?.results || []).length && (
+                  <Typography sx={{ fontSize: 12, color: "#94a3b8" }}>
+                    No vouchers yet.
+                  </Typography>
+                )}
+              </Stack>
+            </Box>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: "16px", pb: "16px" }}>
+          <Button onClick={() => setVoucherOpen(false)} disabled={actionLoading} size="small">
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Dialog
         open={transferOpen}
         onClose={() => !actionLoading && setTransferOpen(false)}
@@ -864,7 +1045,7 @@ export default function TeamWallet() {
               ))}
             </TextField>
             <Alert severity="info" sx={{ fontSize: 12, py: "2px" }}>
-              {transferPreviewText}
+              {transferPreviewText} {transferChargeText}
             </Alert>
             <TextField
               label="Amount"

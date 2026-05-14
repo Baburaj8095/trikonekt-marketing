@@ -1046,7 +1046,7 @@ class PromoPurchasePayFromWalletView(APIView):
     Server will:
       - Validate payload using PromoPurchaseSerializer rules
       - Compute authoritative amount_paid
-      - Debit INTERNAL wallet immediately
+      - Debit INTERNAL wallet or PACKAGE_COUPON wallet immediately
       - Create PromoPurchase PENDING with payment_mode=WALLET and link wallet tx
     """
 
@@ -1087,19 +1087,51 @@ class PromoPurchasePayFromWalletView(APIView):
         if total <= 0:
             return Response({"detail": "Invalid payable amount."}, status=status.HTTP_400_BAD_REQUEST)
 
+        wallet_source = str(request.data.get("wallet_source") or request.data.get("walletSource") or "internal").strip().lower()
+        if wallet_source not in {"internal", "package_coupon"}:
+            return Response({"detail": "Invalid wallet_source."}, status=status.HTTP_400_BAD_REQUEST)
+
         with transaction.atomic():
-            # Debit internal wallet
             w = Wallet.get_or_create_for_user(request.user)
-            try:
-                w.debit(
-                    total,
-                    tx_type="INTERNAL_WALLET_DEBIT",
-                    meta={"reason": "PROMO_PURCHASE", "package_id": getattr(pkg, "id", None)},
+            if wallet_source == "package_coupon":
+                credit = WalletTransaction.objects.filter(
+                    user=request.user,
+                    type__in=["PACKAGE_COUPON_WALLET_CREDIT", "VOUCHER_REDEEM_CREDIT"],
+                    amount__gt=0,
+                ).aggregate(total=Sum("amount"))["total"] or D("0.00")
+                debit = WalletTransaction.objects.filter(
+                    user=request.user,
+                    type="PACKAGE_COUPON_WALLET_DEBIT",
+                    amount__lt=0,
+                ).aggregate(total=Sum("amount"))["total"] or D("0.00")
+                available = D(str(credit)) + D(str(debit))
+                if available < total:
+                    return Response({"detail": "Insufficient Package Purchase Coupon Wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
+                w = Wallet.objects.select_for_update().get(pk=w.pk)
+                w.balance = (w.balance or D("0")) - total
+                if w.balance < D("0"):
+                    return Response({"detail": "Insufficient wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
+                w.save(update_fields=["balance", "updated_at"])
+                WalletTransaction.objects.create(
+                    user=request.user,
+                    amount=total * D("-1"),
+                    balance_after=w.balance,
+                    type="PACKAGE_COUPON_WALLET_DEBIT",
+                    meta={"reason": "PROMO_PURCHASE", "package_id": getattr(pkg, "id", None), "wallet_source": "package_coupon"},
                     source_type="PROMO_PURCHASE",
-                    source_id="",  # filled after promo purchase is created
+                    source_id="",
                 )
-            except Exception:
-                return Response({"detail": "Insufficient wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                try:
+                    w.debit(
+                        total,
+                        tx_type="INTERNAL_WALLET_DEBIT",
+                        meta={"reason": "PROMO_PURCHASE", "package_id": getattr(pkg, "id", None), "wallet_source": "internal"},
+                        source_type="PROMO_PURCHASE",
+                        source_id="",  # filled after promo purchase is created
+                    )
+                except Exception:
+                    return Response({"detail": "Insufficient wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
 
             # Create the purchase record
             try:
@@ -1116,9 +1148,10 @@ class PromoPurchasePayFromWalletView(APIView):
             )
 
             # Link the debit tx we just created (find by source_type + user + amount)
+            debit_type = "PACKAGE_COUPON_WALLET_DEBIT" if wallet_source == "package_coupon" else "INTERNAL_WALLET_DEBIT"
             tx = WalletTransaction.objects.filter(
                 user=request.user,
-                type="INTERNAL_WALLET_DEBIT",
+                type=debit_type,
                 source_type="PROMO_PURCHASE",
                 amount=D(str(total)) * D("-1"),
             ).order_by("-id").first()

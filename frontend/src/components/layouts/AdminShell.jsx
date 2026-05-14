@@ -207,6 +207,7 @@ export default function AdminShell({ children }) {
     if (to.startsWith("/admin/e-coupons")) return "ecoupons";
     if (to.startsWith("/admin/kyc")) return "kyc";
     if (to.startsWith("/admin/withdrawals")) return "withdrawals";
+    if (to.startsWith("/admin/wallets") || to.startsWith("/admin/wallet-vouchers") || to.startsWith("/admin/wallet-reconcile")) return "reports_finance";
     if (to.startsWith("/admin/support")) return "support";
     if (to.startsWith("/admin/autopool")) return "autopool";
     if (to.startsWith("/admin/commissions")) return "commissions";
@@ -290,6 +291,15 @@ export default function AdminShell({ children }) {
           { to: "/admin/kyc", label: "KYC", icon: "shield" },
           { to: "/admin/withdrawals", label: "Withdrawals", icon: "wallet" },
           { to: "/admin/support", label: "Support", icon: "ticket" },
+        ],
+      },
+      {
+        key: "wallets",
+        label: "Wallet Control",
+        items: [
+          { to: "/admin/wallets", label: "Wallet Overview", icon: "wallet" },
+          { to: "/admin/wallet-vouchers", label: "Voucher Maintenance", icon: "ticket" },
+          { to: "/admin/wallet-reconcile", label: "Wallet Reconcile", icon: "chart" },
         ],
       },
       {

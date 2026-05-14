@@ -847,6 +847,14 @@ class WalletTransaction(models.Model):
         ('SHOPPING_WALLET_CREDIT', 'Shopping Wallet Credit'),
         ('SHOPPING_WALLET_DEBIT', 'Shopping Wallet Debit'),
         ('SHOPPING_WALLET_TRANSFER_OUT', 'Shopping Wallet Transfer Out'),
+        ('COUPON_WALLET_CREDIT', 'Coupon Wallet Credit'),
+        ('COUPON_WALLET_DEBIT', 'Coupon Wallet Debit'),
+        ('COUPON_WALLET_TRANSFER_OUT', 'Coupon Wallet Transfer Out'),
+        ('COUPON_WALLET_REFUND', 'Coupon Wallet Refund'),
+        ('PACKAGE_COUPON_WALLET_CREDIT', 'Package Coupon Wallet Credit'),
+        ('PACKAGE_COUPON_WALLET_DEBIT', 'Package Coupon Wallet Debit'),
+        ('VOUCHER_CREATE_DEBIT', 'Voucher Create Debit'),
+        ('VOUCHER_REDEEM_CREDIT', 'Voucher Redeem Credit'),
         ('INTERNAL_WALLET_CREDIT', 'Internal Wallet Credit'),
         ('INTERNAL_WALLET_DEBIT', 'Internal Wallet Debit'),
         ('INTERNAL_WALLET_TRANSFER_OUT', 'Internal Wallet Transfer Out'),
@@ -929,6 +937,92 @@ class WalletUploadRequest(models.Model):
     def __str__(self) -> str:
         return f"WalletUploadRequest<{self.user_id}> ₹{self.amount} {self.status}"
 
+
+
+class ConsumerVoucher(models.Model):
+    """Consumer-created voucher funded from the Coupon Pocket wallet."""
+
+    TYPE_TRIZONE = "TRIZONE"
+    TYPE_ONLINE = "ONLINE"
+    TYPE_NEAR_STORE = "NEAR_STORE"
+    TYPE_PACKAGE_PURCHASE = "PACKAGE_PURCHASE"
+
+    TYPE_CHOICES = [
+        (TYPE_TRIZONE, "Trizone Voucher"),
+        (TYPE_ONLINE, "Online Coupon"),
+        (TYPE_NEAR_STORE, "Near Store Coupon"),
+        (TYPE_PACKAGE_PURCHASE, "Package Purchase Coupon"),
+    ]
+
+    STATUS_ACTIVE = "ACTIVE"
+    STATUS_REDEEMED = "REDEEMED"
+    STATUS_EXPIRED = "EXPIRED"
+    STATUS_CANCELLED = "CANCELLED"
+
+    STATUS_CHOICES = [
+        (STATUS_ACTIVE, "Active"),
+        (STATUS_REDEEMED, "Redeemed"),
+        (STATUS_EXPIRED, "Expired"),
+        (STATUS_CANCELLED, "Cancelled"),
+    ]
+
+    creator = models.ForeignKey(CustomUser, on_delete=models.PROTECT, related_name="created_consumer_vouchers", db_index=True)
+    assigned_to = models.ForeignKey(
+        CustomUser,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="assigned_consumer_vouchers",
+        help_text="Optional intended redeemer, mainly for package purchase coupons.",
+    )
+    redeemed_by = models.ForeignKey(
+        CustomUser,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="redeemed_consumer_vouchers",
+    )
+    voucher_type = models.CharField(max_length=32, choices=TYPE_CHOICES, db_index=True)
+    code = models.CharField(max_length=32, unique=True, db_index=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_ACTIVE, db_index=True)
+    note = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(db_index=True)
+    redeemed_at = models.DateTimeField(null=True, blank=True)
+    expired_at = models.DateTimeField(null=True, blank=True)
+    debit_transaction = models.ForeignKey(
+        "WalletTransaction",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="voucher_debits",
+    )
+    redeem_transaction = models.ForeignKey(
+        "WalletTransaction",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="voucher_redeems",
+    )
+    refund_transaction = models.ForeignKey(
+        "WalletTransaction",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="voucher_refunds",
+    )
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["creator", "status"], name="cv_creator_status_idx"),
+            models.Index(fields=["assigned_to", "status"], name="cv_assignee_status_idx"),
+            models.Index(fields=["voucher_type", "status"], name="cv_type_status_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"ConsumerVoucher<{self.code}> {self.voucher_type} {self.status}"
 
 
 # ======================

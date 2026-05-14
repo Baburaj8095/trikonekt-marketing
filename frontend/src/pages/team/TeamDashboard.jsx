@@ -793,7 +793,7 @@ export default function TeamDashboard() {
           <TourScroller
             onTour={() => navigate("/user/tri/tri-holidays")}
             onShop={() => navigate("/trikonekt-products")}
-            onCoupons={() => navigate("/user/redeem-coupon")}
+            onCoupons={() => navigate("/user/coupon-pocket")}
           />
         </Stack>
       </Box>

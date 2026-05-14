@@ -2,6 +2,7 @@ from datetime import date
 from decimal import Decimal
 
 from django.db.models import Count, Q, Sum, Prefetch
+from django.db import transaction
 from django.utils import timezone
 from django.core.cache import cache
 from rest_framework.views import APIView
@@ -11,7 +12,7 @@ from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.http import HttpResponse
 
-from accounts.models import CustomUser, Wallet, WalletTransaction, UserKYC, WithdrawalRequest, SupportTicket, SupportTicketMessage, AgencyRegionAssignment
+from accounts.models import CustomUser, Wallet, WalletTransaction, ConsumerVoucher, UserKYC, WithdrawalRequest, SupportTicket, SupportTicketMessage, AgencyRegionAssignment
 from coupons.models import Coupon, CouponCode, CouponSubmission, CouponBatch
 from uploads.models import FileUpload, DashboardCard, HomeCard, LuckyDrawSubmission
 from market.models import Product, PurchaseRequest, Banner, BannerItem, BannerPurchaseRequest
@@ -1002,6 +1003,339 @@ class AdminUserWalletAdjustView(APIView):
             },
             status=200,
         )
+
+
+def _wallet_bucket_sums(user):
+    tx = WalletTransaction.objects.filter(user=user)
+
+    def sum_types(credit_types, debit_types=None):
+        credit = tx.filter(type__in=list(credit_types or []), amount__gt=0).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        debit = tx.filter(type__in=list(debit_types or []), amount__lt=0).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        return (Decimal(str(credit)) + Decimal(str(debit))).quantize(Decimal("0.01"))
+
+    direct = tx.filter(type__in=["DIRECT_REF_BONUS"], amount__gt=0).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    level = tx.filter(type__in=["LEVEL_BONUS", "AUTOPOOL_BONUS_THREE", "AUTOPOOL_BONUS_FIVE"], amount__gt=0).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    service_charge = tx.filter(source_type="ADMIN_SERVICE_CHARGE", amount__lt=0).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+
+    return {
+        "coupon": sum_types(["COUPON_WALLET_CREDIT", "COUPON_WALLET_REFUND"], ["COUPON_WALLET_DEBIT", "VOUCHER_CREATE_DEBIT"]),
+        "shopping": sum_types(["SHOPPING_WALLET_CREDIT"], ["SHOPPING_WALLET_DEBIT"]),
+        "self_package": sum_types(["INTERNAL_WALLET_CREDIT"], ["INTERNAL_WALLET_DEBIT"]),
+        "package_purchase_coupon": sum_types(["PACKAGE_COUPON_WALLET_CREDIT", "VOUCHER_REDEEM_CREDIT"], ["PACKAGE_COUPON_WALLET_DEBIT"]),
+        "wallet_to_wallet": sum_types(["WALLET_TO_WALLET_IN"], ["WALLET_TO_WALLET_OUT"]),
+        "direct_benefit": Decimal(str(direct)).quantize(Decimal("0.01")),
+        "level_benefit": Decimal(str(level)).quantize(Decimal("0.01")),
+        "admin_service_charges": abs(Decimal(str(service_charge))).quantize(Decimal("0.01")),
+    }
+
+
+def _wallet_summary_payload(user):
+    w = Wallet.get_or_create_for_user(user)
+    buckets = _wallet_bucket_sums(user)
+    return {
+        "user_id": user.id,
+        "username": user.username,
+        "prefixed_id": getattr(user, "prefixed_id", "") or "",
+        "full_name": getattr(user, "full_name", "") or "",
+        "phone": getattr(user, "phone", "") or "",
+        "category": getattr(user, "category", "") or "",
+        "balance": str(w.balance or 0),
+        "main_balance": str(w.main_balance or 0),
+        "withdrawable_balance": str(w.withdrawable_balance or 0),
+        "self_account_balance": str(getattr(w, "self_account_balance", 0) or 0),
+        "pockets": {k: str(v) for k, v in buckets.items()},
+        "updated_at": getattr(w, "updated_at", None),
+    }
+
+
+def _tx_payload(tx):
+    return {
+        "id": tx.id,
+        "user_id": tx.user_id,
+        "username": getattr(tx.user, "username", "") if getattr(tx, "user", None) else "",
+        "amount": str(tx.amount),
+        "balance_after": str(tx.balance_after),
+        "type": tx.type,
+        "source_type": tx.source_type or "",
+        "source_id": tx.source_id or "",
+        "meta": tx.meta or {},
+        "created_at": tx.created_at,
+    }
+
+
+def _voucher_payload(v):
+    return {
+        "id": v.id,
+        "code": v.code,
+        "voucher_type": v.voucher_type,
+        "amount": str(v.amount),
+        "status": v.status,
+        "creator_id": v.creator_id,
+        "creator_username": getattr(v.creator, "username", "") if getattr(v, "creator", None) else "",
+        "assigned_to_id": v.assigned_to_id,
+        "assigned_to_username": getattr(v.assigned_to, "username", "") if getattr(v, "assigned_to", None) else "",
+        "redeemed_by_id": v.redeemed_by_id,
+        "redeemed_by_username": getattr(v.redeemed_by, "username", "") if getattr(v, "redeemed_by", None) else "",
+        "created_at": v.created_at,
+        "expires_at": v.expires_at,
+        "redeemed_at": v.redeemed_at,
+        "expired_at": v.expired_at,
+        "note": v.note,
+    }
+
+
+class AdminWalletListView(APIView):
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
+
+    def get(self, request):
+        q = str(request.query_params.get("q") or "").strip()
+        category = str(request.query_params.get("category") or "").strip()
+        try:
+            page = max(1, int(request.query_params.get("page") or 1))
+            page_size = min(100, max(1, int(request.query_params.get("page_size") or 25)))
+        except Exception:
+            page, page_size = 1, 25
+
+        users = CustomUser.objects.select_related("wallet").order_by("-id")
+        if q:
+            users = users.filter(
+                Q(username__icontains=q) |
+                Q(prefixed_id__icontains=q) |
+                Q(full_name__icontains=q) |
+                Q(phone__icontains=q) |
+                Q(email__icontains=q)
+            )
+        if category:
+            users = users.filter(category=category)
+        total = users.count()
+        start = (page - 1) * page_size
+        rows = [_wallet_summary_payload(u) for u in users[start:start + page_size]]
+        return Response({"count": total, "page": page, "page_size": page_size, "results": rows})
+
+
+class AdminWalletDetailView(APIView):
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
+
+    def get(self, request, user_id: int):
+        user = CustomUser.objects.filter(pk=user_id).first()
+        if not user:
+            return Response({"detail": "User not found."}, status=404)
+        return Response(_wallet_summary_payload(user))
+
+
+class AdminWalletLedgerView(APIView):
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
+
+    def get(self, request, user_id: int | None = None):
+        qs = WalletTransaction.objects.select_related("user").order_by("-created_at", "-id")
+        if user_id is not None:
+            qs = qs.filter(user_id=user_id)
+        q = str(request.query_params.get("q") or "").strip()
+        tx_type = str(request.query_params.get("type") or "").strip()
+        source_type = str(request.query_params.get("source_type") or "").strip()
+        if q:
+            qs = qs.filter(Q(user__username__icontains=q) | Q(user__prefixed_id__icontains=q) | Q(source_id__icontains=q))
+        if tx_type:
+            qs = qs.filter(type=tx_type)
+        if source_type:
+            qs = qs.filter(source_type=source_type)
+        date_from = request.query_params.get("date_from")
+        date_to = request.query_params.get("date_to")
+        if date_from:
+            qs = qs.filter(created_at__date__gte=date_from)
+        if date_to:
+            qs = qs.filter(created_at__date__lte=date_to)
+        try:
+            page = max(1, int(request.query_params.get("page") or 1))
+            page_size = min(200, max(1, int(request.query_params.get("page_size") or 50)))
+        except Exception:
+            page, page_size = 1, 50
+        total = qs.count()
+        start = (page - 1) * page_size
+        return Response({"count": total, "page": page, "page_size": page_size, "results": [_tx_payload(x) for x in qs[start:start + page_size]]})
+
+
+class AdminWalletAdjustPocketView(APIView):
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
+
+    def post(self, request, user_id: int):
+        user = CustomUser.objects.filter(pk=user_id).first()
+        if not user:
+            return Response({"detail": "User not found."}, status=404)
+        action = str(request.data.get("action") or "").strip().lower()
+        pocket = str(request.data.get("pocket") or "main").strip().lower()
+        note = str(request.data.get("note") or "").strip()
+        try:
+            amount = Decimal(str(request.data.get("amount") or "0")).quantize(Decimal("0.01"))
+        except Exception:
+            return Response({"detail": "Invalid amount."}, status=400)
+        if action not in {"credit", "debit"} or amount <= 0:
+            return Response({"detail": "Use action credit/debit and amount > 0."}, status=400)
+
+        credit_types = {
+            "main": "ADJUSTMENT_CREDIT",
+            "coupon": "COUPON_WALLET_CREDIT",
+            "shopping": "SHOPPING_WALLET_CREDIT",
+            "self_package": "INTERNAL_WALLET_CREDIT",
+            "withdrawal": "WITHDRAWAL_WALLET_CREDIT",
+            "package_purchase_coupon": "PACKAGE_COUPON_WALLET_CREDIT",
+        }
+        debit_types = {
+            "main": "ADJUSTMENT_DEBIT",
+            "coupon": "COUPON_WALLET_DEBIT",
+            "shopping": "SHOPPING_WALLET_DEBIT",
+            "self_package": "INTERNAL_WALLET_DEBIT",
+            "withdrawal": "WITHDRAWAL_DEBIT",
+            "package_purchase_coupon": "PACKAGE_COUPON_WALLET_DEBIT",
+        }
+        if pocket not in credit_types:
+            return Response({"detail": "Invalid pocket."}, status=400)
+
+        signed = amount if action == "credit" else amount * Decimal("-1")
+        tx_type = credit_types[pocket] if action == "credit" else debit_types[pocket]
+        with transaction.atomic():
+            w = Wallet.get_or_create_for_user(user)
+            w = Wallet.objects.select_for_update().get(pk=w.pk)
+            if pocket == "main":
+                if action == "credit":
+                    w.main_balance = (w.main_balance or Decimal("0")) + amount
+                    w.balance = (w.balance or Decimal("0")) + amount
+                else:
+                    if (w.main_balance or Decimal("0")) < amount:
+                        return Response({"detail": "Insufficient main wallet balance."}, status=400)
+                    w.main_balance = (w.main_balance or Decimal("0")) - amount
+                    w.balance = max(Decimal("0"), (w.balance or Decimal("0")) - amount)
+            elif pocket == "withdrawal":
+                if action == "debit" and (w.withdrawable_balance or Decimal("0")) < amount:
+                    return Response({"detail": "Insufficient withdrawal pocket balance."}, status=400)
+                w.withdrawable_balance = (w.withdrawable_balance or Decimal("0")) + signed
+                w.balance = (w.balance or Decimal("0")) + signed
+            else:
+                if action == "debit" and _wallet_bucket_sums(user).get(pocket, Decimal("0")) < amount:
+                    return Response({"detail": f"Insufficient {pocket} balance."}, status=400)
+                w.balance = (w.balance or Decimal("0")) + signed
+            if w.balance < 0:
+                return Response({"detail": "Insufficient wallet balance."}, status=400)
+            w.save(update_fields=["balance", "main_balance", "withdrawable_balance", "updated_at"])
+            WalletTransaction.objects.create(
+                user=user,
+                amount=signed,
+                balance_after=w.balance,
+                type=tx_type,
+                source_type="ADMIN_MANUAL",
+                source_id=str(getattr(request.user, "id", "")),
+                meta={"pocket": pocket, "note": note, "by_admin": getattr(request.user, "username", "")},
+            )
+        return Response(_wallet_summary_payload(user))
+
+
+class AdminWalletVoucherListView(APIView):
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
+
+    def get(self, request):
+        now = timezone.now()
+        due = ConsumerVoucher.objects.filter(status=ConsumerVoucher.STATUS_ACTIVE, expires_at__lte=now)
+        for voucher in due[:500]:
+            self._expire_and_refund(voucher)
+
+        qs = ConsumerVoucher.objects.select_related("creator", "assigned_to", "redeemed_by").order_by("-created_at", "-id")
+        q = str(request.query_params.get("q") or "").strip()
+        status_filter = str(request.query_params.get("status") or "").strip().upper()
+        voucher_type = str(request.query_params.get("voucher_type") or "").strip().upper()
+        if q:
+            qs = qs.filter(Q(code__icontains=q) | Q(creator__username__icontains=q) | Q(assigned_to__username__icontains=q) | Q(redeemed_by__username__icontains=q))
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        if voucher_type:
+            qs = qs.filter(voucher_type=voucher_type)
+        try:
+            page = max(1, int(request.query_params.get("page") or 1))
+            page_size = min(100, max(1, int(request.query_params.get("page_size") or 50)))
+        except Exception:
+            page, page_size = 1, 50
+        total = qs.count()
+        start = (page - 1) * page_size
+        return Response({"count": total, "page": page, "page_size": page_size, "results": [_voucher_payload(v) for v in qs[start:start + page_size]]})
+
+    @staticmethod
+    def _expire_and_refund(voucher):
+        if voucher.status != ConsumerVoucher.STATUS_ACTIVE or voucher.refund_transaction_id:
+            return
+        with transaction.atomic():
+            voucher = ConsumerVoucher.objects.select_for_update().get(pk=voucher.pk)
+            if voucher.status != ConsumerVoucher.STATUS_ACTIVE or voucher.refund_transaction_id:
+                return
+            w = Wallet.get_or_create_for_user(voucher.creator)
+            w = Wallet.objects.select_for_update().get(pk=w.pk)
+            w.balance = (w.balance or Decimal("0")) + voucher.amount
+            w.save(update_fields=["balance", "updated_at"])
+            tx = WalletTransaction.objects.create(
+                user=voucher.creator,
+                amount=voucher.amount,
+                balance_after=w.balance,
+                type="COUPON_WALLET_REFUND",
+                source_type="VOUCHER_EXPIRED",
+                source_id=str(voucher.id),
+                meta={"voucher_code": voucher.code, "voucher_type": voucher.voucher_type, "by_admin_job": True},
+            )
+            voucher.status = ConsumerVoucher.STATUS_EXPIRED
+            voucher.expired_at = timezone.now()
+            voucher.refund_transaction = tx
+            voucher.save(update_fields=["status", "expired_at", "refund_transaction"])
+
+
+class AdminWalletVoucherCancelRefundView(APIView):
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
+
+    def post(self, request, pk: int):
+        voucher = ConsumerVoucher.objects.filter(pk=pk).select_related("creator").first()
+        if not voucher:
+            return Response({"detail": "Voucher not found."}, status=404)
+        if voucher.status != ConsumerVoucher.STATUS_ACTIVE:
+            return Response({"detail": "Only active vouchers can be cancelled/refunded."}, status=400)
+        with transaction.atomic():
+            voucher = ConsumerVoucher.objects.select_for_update().get(pk=pk)
+            w = Wallet.get_or_create_for_user(voucher.creator)
+            w = Wallet.objects.select_for_update().get(pk=w.pk)
+            w.balance = (w.balance or Decimal("0")) + voucher.amount
+            w.save(update_fields=["balance", "updated_at"])
+            tx = WalletTransaction.objects.create(
+                user=voucher.creator,
+                amount=voucher.amount,
+                balance_after=w.balance,
+                type="COUPON_WALLET_REFUND",
+                source_type="VOUCHER_CANCEL_REFUND",
+                source_id=str(voucher.id),
+                meta={"voucher_code": voucher.code, "by_admin": getattr(request.user, "username", ""), "reason": str(request.data.get("reason") or "")},
+            )
+            voucher.status = ConsumerVoucher.STATUS_CANCELLED
+            voucher.refund_transaction = tx
+            voucher.save(update_fields=["status", "refund_transaction"])
+        return Response(_voucher_payload(voucher))
+
+
+class AdminWalletReconcileView(APIView):
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
+
+    def get(self, request):
+        q = str(request.query_params.get("q") or "").strip()
+        users = CustomUser.objects.select_related("wallet").order_by("-id")
+        if q:
+            users = users.filter(Q(username__icontains=q) | Q(prefixed_id__icontains=q) | Q(full_name__icontains=q) | Q(phone__icontains=q))
+        limit = min(500, max(1, int(request.query_params.get("limit") or 100)))
+        rows = []
+        for user in users[:limit]:
+            w = Wallet.get_or_create_for_user(user)
+            ledger_total = WalletTransaction.objects.filter(user=user).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+            diff = (Decimal(str(w.balance or 0)) - Decimal(str(ledger_total))).quantize(Decimal("0.01"))
+            rows.append({
+                **_wallet_summary_payload(user),
+                "ledger_total": str(Decimal(str(ledger_total)).quantize(Decimal("0.01"))),
+                "balance_vs_ledger_diff": str(diff),
+                "status": "OK" if diff == Decimal("0.00") else "MISMATCH",
+            })
+        mismatches = sum(1 for r in rows if r["status"] != "OK")
+        return Response({"count": len(rows), "mismatches": mismatches, "results": rows})
 
 
 class AdminECouponBulkCreateView(APIView):

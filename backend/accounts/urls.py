@@ -38,6 +38,8 @@ from .views import (
     WalletTransferConsumerLookup,
     WalletTransferOtpRequest,
     WalletTransferConfirm,
+    ConsumerVoucherListCreate,
+    ConsumerVoucherRedeem,
     # Direct sponsor member detail
     DirectMemberDetailView,
     WalletUploadRequestCreateView,
@@ -87,6 +89,8 @@ urlpatterns = [
     path('wallet/transfer/lookup-consumer/', WalletTransferConsumerLookup.as_view(), name='wallet_transfer_lookup_consumer'),
     path('wallet/transfer/request-otp/', WalletTransferOtpRequest.as_view(), name='wallet_transfer_request_otp'),
     path('wallet/transfer/confirm/', WalletTransferConfirm.as_view(), name='wallet_transfer_confirm'),
+    path('wallet/vouchers/', ConsumerVoucherListCreate.as_view(), name='consumer_vouchers'),
+    path('wallet/vouchers/redeem/', ConsumerVoucherRedeem.as_view(), name='consumer_voucher_redeem'),
     path('wallet/purchase/ecoupon/', wallet_purchase_ecoupon, name='wallet_purchase_ecoupon'),
     path('wallet/purchase/product/', wallet_purchase_product, name='wallet_purchase_product'),
     # KYC + Withdrawals

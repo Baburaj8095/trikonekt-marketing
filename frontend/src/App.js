@@ -27,6 +27,7 @@ import LoadingOverlay from "./components/LoadingOverlay";
 import MyTeam from "./pages/team/MyTeam";
 import Genealogy5 from "./pages/team/Genealogy5";
 import TeamDocumentDownload from "./pages/team/TeamDocumentDownload";
+import TeamWalletHistory from "./pages/team/TeamWalletHistory";
 import EmployeeDailyReport from "./pages/reports/EmployeeDailyReport";
 import AgencyDailyReport from "./pages/reports/AgencyDailyReport";
 import AdminProtectedRoute from "./components/AdminProtectedRoute";
@@ -64,6 +65,10 @@ import AdminJoinSubscriptionPurchases from "./pages/admin/AdminJoinSubscriptionP
 import AdminSPPPurchases from "./pages/admin/AdminSPPPurchases";
 import AdminTriTourPurchases from "./pages/admin/AdminTriTourPurchases";
 import AdminWalletUploadApprovals from "./pages/admin/AdminWalletUploadApprovals";
+import AdminWallets from "./pages/admin/AdminWallets";
+import AdminWalletDetail from "./pages/admin/AdminWalletDetail";
+import AdminWalletVouchers from "./pages/admin/AdminWalletVouchers";
+import AdminWalletReconcile from "./pages/admin/AdminWalletReconcile";
 import AdminPromoPackageProducts from "./pages/admin/AdminPromoPackageProducts";
 import AdminDashboardCards from "./pages/admin/AdminDashboardCards";
 import AdminHomeCards from "./pages/admin/AdminHomeCards";
@@ -87,6 +92,8 @@ import AdminSupport from "./pages/admin/AdminSupport";
 import AdminNotifications from "./pages/admin/AdminNotifications";
 import ImpersonateLanding from "./pages/Auth/ImpersonateLanding";
 import ECouponStore from "./pages/ECouponStore";
+import CouponPocket from "./pages/CouponPocket";
+import PackageCouponPocket from "./pages/PackageCouponPocket";
 import PromoPackages from "./pages/PromoPackages";
 import PackageSummary from "./pages/PackageSummary";
 import JoinSubscription from "./pages/packages/JoinSubscription";
@@ -152,6 +159,7 @@ import FranchiseWalletPlaceholder from "./components/franchise/FranchiseWalletPl
 import TransactionHistory from "./components/franchise/pages/TransactionHistory";
 import WithdrawalHistory from "./components/franchise/pages/WithdrawalHistory";
 import HubbleGiftCards from "./pages/HubbleGiftCards";
+import GiftCardSummary from "./pages/GiftCardSummary";
 
 function LegacyAuthEntry() {
   const location = useLocation();
@@ -398,6 +406,16 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/user/coupon-pocket"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <CouponPocket />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/user/gift-cards"
@@ -405,6 +423,16 @@ function App() {
             <ProtectedRoute allowedRoles={["user"]}>
               <ConsumerShell>
                 <HubbleGiftCards />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/gift-card-summary"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <GiftCardSummary />
               </ConsumerShell>
             </ProtectedRoute>
           }
@@ -435,6 +463,16 @@ function App() {
             <ProtectedRoute allowedRoles={["user"]}>
               <ConsumerShell>
                 <TeamWallet />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/team-history"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <TeamWalletHistory />
               </ConsumerShell>
             </ProtectedRoute>
           }
@@ -580,6 +618,16 @@ function App() {
             <ProtectedRoute allowedRoles={["user"]}>
               <ConsumerShell>
                 <ECouponStore />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/package-coupon-pocket"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <PackageCouponPocket />
               </ConsumerShell>
             </ProtectedRoute>
           }
@@ -1370,6 +1418,46 @@ function App() {
             <AdminProtectedRoute>
               <AdminShell>
                 <AdminWalletUploadApprovals />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/wallets"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminWallets />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/wallets/:userId"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminWalletDetail />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/wallet-vouchers"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminWalletVouchers />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/wallet-reconcile"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminWalletReconcile />
               </AdminShell>
             </AdminProtectedRoute>
           }

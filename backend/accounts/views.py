@@ -5,6 +5,7 @@ from .models import (
     AgencyRegionAssignment,
     Wallet,
     WalletTransaction,
+    ConsumerVoucher,
     SupportTicket,
     SupportTicketMessage,
     UserNominee,
@@ -44,6 +45,7 @@ from django.core.cache import cache
 from django.core.mail import send_mail
 from django.contrib.staticfiles import finders
 from io import BytesIO
+from datetime import timedelta
 import random
 import os
 try:
@@ -2144,7 +2146,12 @@ class WalletMe(APIView):
                 return str((D(str(credit)) + D(str(debit))).quantize(D("0.01")))
 
             shopping_wallet_balance = _wallet_sum(["SHOPPING_WALLET_CREDIT"], ["SHOPPING_WALLET_DEBIT"])
+            coupon_wallet_balance = _wallet_sum(
+                ["COUPON_WALLET_CREDIT", "COUPON_WALLET_REFUND"],
+                ["COUPON_WALLET_DEBIT", "VOUCHER_CREATE_DEBIT"],
+            )
             internal_wallet_balance = _wallet_sum(["INTERNAL_WALLET_CREDIT"], ["INTERNAL_WALLET_DEBIT"])
+            package_coupon_wallet_balance = _wallet_sum(["PACKAGE_COUPON_WALLET_CREDIT", "VOUCHER_REDEEM_CREDIT"], ["PACKAGE_COUPON_WALLET_DEBIT"])
             wallet_transfer_total = _wallet_sum(["WALLET_TO_WALLET_IN"], ["WALLET_TO_WALLET_OUT"])
             withdrawal_wallet_balance = str((D(str(getattr(w, "withdrawable_balance", 0) or 0))).quantize(D("0.01")))
             package_upload_balance = _wallet_sum(
@@ -2172,7 +2179,9 @@ class WalletMe(APIView):
                 pass
         except Exception:
             shopping_wallet_balance = "0.00"
+            coupon_wallet_balance = "0.00"
             internal_wallet_balance = "0.00"
+            package_coupon_wallet_balance = "0.00"
             wallet_transfer_total = "0.00"
             withdrawal_wallet_balance = str(getattr(w, "withdrawable_balance", 0) or 0)
             package_upload_balance = "0.00"
@@ -2242,7 +2251,9 @@ class WalletMe(APIView):
             },
             "transfer_wallets": {
                 "shopping": str(shopping_wallet_balance),
+                "coupon": str(coupon_wallet_balance),
                 "internal": str(internal_wallet_balance),
+                "packagePurchaseCoupon": str(package_coupon_wallet_balance),
                 "walletToWallet": str(wallet_transfer_total),
                 "withdrawal": str(withdrawal_wallet_balance),
                 "packageUpload": str(package_upload_balance),
@@ -2299,18 +2310,53 @@ def _move_main_to_derived_wallet(user, amount, target_type, extra_meta=None):
     if amount <= D("0"):
         raise serializers.ValidationError({"amount": "Amount must be greater than 0."})
 
+    charge_percent_map = {
+        "coupon": D("7.00"),
+        "internal": D("7.00"),
+        "withdrawal": D("10.00"),
+    }
+    charge_percent = charge_percent_map.get(target_type, D("0.00"))
+    charge_amount = ((amount * charge_percent) / D("100")).quantize(D("0.01"))
+    net_amount = (amount - charge_amount).quantize(D("0.01"))
+    if net_amount <= D("0"):
+        raise serializers.ValidationError({"detail": "Transfer amount is too small after admin service charge."})
+
+    def _get_admin_wallet_user():
+        try:
+            from business.models import CommissionConfig, RootConsumerConfig
+            cfg = CommissionConfig.get_solo()
+            root_user = RootConsumerConfig.get_solo().get_root_user()
+            return root_user or getattr(cfg, "tax_company_user", None)
+        except Exception:
+            pass
+        try:
+            return CustomUser.objects.filter(category="company").first() or CustomUser.objects.filter(is_superuser=True).first()
+        except Exception:
+            return None
+
     wallet = Wallet.get_or_create_for_user(user)
     with transaction.atomic():
         wallet = Wallet.objects.select_for_update().get(pk=wallet.pk)
         if D(str(getattr(wallet, "main_balance", 0) or 0)) < amount:
             raise serializers.ValidationError({"detail": "Insufficient main wallet balance."})
 
-        meta = {"target_wallet": target_type, **(extra_meta or {})}
+        meta = {
+            "target_wallet": target_type,
+            "gross_amount": str(amount),
+            "net_amount": str(net_amount),
+            "admin_service_charge_percent": str(charge_percent),
+            "admin_service_charge_amount": str(charge_amount),
+            **(extra_meta or {}),
+        }
 
         if target_type == "withdrawal":
             wallet.main_balance = (wallet.main_balance or D("0")) - amount
-            wallet.withdrawable_balance = (wallet.withdrawable_balance or D("0")) + amount
-            wallet.save(update_fields=["main_balance", "withdrawable_balance", "updated_at"])
+            wallet.withdrawable_balance = (wallet.withdrawable_balance or D("0")) + net_amount
+            if charge_amount > D("0"):
+                wallet.balance = (wallet.balance or D("0")) - charge_amount
+                if wallet.balance < D("0"):
+                    wallet.balance = D("0")
+            wallet.save(update_fields=["balance", "main_balance", "withdrawable_balance", "updated_at"])
             WalletTransaction.objects.create(
                 user=user,
                 amount=amount * D("-1"),
@@ -2322,28 +2368,54 @@ def _move_main_to_derived_wallet(user, amount, target_type, extra_meta=None):
             )
             WalletTransaction.objects.create(
                 user=user,
-                amount=amount,
+                amount=net_amount,
                 balance_after=wallet.balance,
                 type="WITHDRAWAL_WALLET_CREDIT",
                 source_type="MAIN_TO_WITHDRAWAL",
                 source_id="",
                 meta=meta,
             )
-            return {"status": "ok", "wallet": "withdrawal", "amount": str(amount)}
+            if charge_amount > D("0"):
+                WalletTransaction.objects.create(
+                    user=user,
+                    amount=charge_amount * D("-1"),
+                    balance_after=wallet.balance,
+                    type="ADJUSTMENT_DEBIT",
+                    source_type="ADMIN_SERVICE_CHARGE",
+                    source_id="MAIN_TO_WITHDRAWAL",
+                    meta=meta,
+                )
+                admin_user = _get_admin_wallet_user()
+                if admin_user:
+                    admin_wallet = Wallet.get_or_create_for_user(admin_user)
+                    admin_wallet.credit(
+                        charge_amount,
+                        tx_type="TAX_POOL_CREDIT",
+                        meta={**meta, "from_user_id": user.id, "from_user": user.username, "no_withhold": True},
+                        source_type="ADMIN_SERVICE_CHARGE",
+                        source_id=str(user.id),
+                    )
+            return {"status": "ok", "wallet": "withdrawal", "amount": str(amount), "net_amount": str(net_amount), "admin_service_charge": str(charge_amount)}
 
         credit_type_map = {
             "shopping": "SHOPPING_WALLET_CREDIT",
+            "coupon": "COUPON_WALLET_CREDIT",
             "internal": "INTERNAL_WALLET_CREDIT",
         }
         debit_type_map = {
             "shopping": "SHOPPING_WALLET_TRANSFER_OUT",
+            "coupon": "COUPON_WALLET_TRANSFER_OUT",
             "internal": "INTERNAL_WALLET_TRANSFER_OUT",
         }
         if target_type not in credit_type_map:
             raise serializers.ValidationError({"detail": "Unsupported wallet transfer type."})
 
         wallet.main_balance = (wallet.main_balance or D("0")) - amount
-        wallet.save(update_fields=["main_balance", "updated_at"])
+        if charge_amount > D("0"):
+            wallet.balance = (wallet.balance or D("0")) - charge_amount
+            if wallet.balance < D("0"):
+                wallet.balance = D("0")
+        wallet.save(update_fields=["balance", "main_balance", "updated_at"])
         WalletTransaction.objects.create(
             user=user,
             amount=amount * D("-1"),
@@ -2355,14 +2427,34 @@ def _move_main_to_derived_wallet(user, amount, target_type, extra_meta=None):
         )
         WalletTransaction.objects.create(
             user=user,
-            amount=amount,
+            amount=net_amount,
             balance_after=wallet.balance,
             type=credit_type_map[target_type],
             source_type=f"MAIN_TO_{target_type.upper()}",
             source_id="",
             meta=meta,
         )
-    return {"status": "ok", "wallet": target_type, "amount": str(amount)}
+        if charge_amount > D("0"):
+            WalletTransaction.objects.create(
+                user=user,
+                amount=charge_amount * D("-1"),
+                balance_after=wallet.balance,
+                type="ADJUSTMENT_DEBIT",
+                source_type="ADMIN_SERVICE_CHARGE",
+                source_id=f"MAIN_TO_{target_type.upper()}",
+                meta=meta,
+            )
+            admin_user = _get_admin_wallet_user()
+            if admin_user:
+                admin_wallet = Wallet.get_or_create_for_user(admin_user)
+                admin_wallet.credit(
+                    charge_amount,
+                    tx_type="TAX_POOL_CREDIT",
+                    meta={**meta, "from_user_id": user.id, "from_user": user.username, "no_withhold": True},
+                    source_type="ADMIN_SERVICE_CHARGE",
+                    source_id=str(user.id),
+                )
+    return {"status": "ok", "wallet": target_type, "amount": str(amount), "net_amount": str(net_amount), "admin_service_charge": str(charge_amount)}
 
 
 class WalletTransferConsumerLookup(APIView):
@@ -2390,7 +2482,7 @@ class WalletTransferOtpRequest(APIView):
         amount = request.data.get("amount")
         target_consumer_id = request.data.get("target_consumer_id") or request.data.get("consumer_id")
 
-        allowed = {"shopping", "internal", "wallet_to_wallet", "withdrawal"}
+        allowed = {"shopping", "coupon", "internal", "wallet_to_wallet", "withdrawal"}
         if transfer_type not in allowed:
             return Response({"detail": "Invalid transfer_type."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -2443,7 +2535,7 @@ class WalletTransferConfirm(APIView):
         amount = D(str(payload.get("amount") or "0"))
         target_consumer_id = payload.get("target_consumer_id")
 
-        if transfer_type in {"shopping", "internal", "withdrawal"}:
+        if transfer_type in {"shopping", "coupon", "internal", "withdrawal"}:
             result = _move_main_to_derived_wallet(request.user, amount, transfer_type)
             cache.delete(key)
             return Response(result, status=status.HTTP_200_OK)
@@ -2492,6 +2584,237 @@ class WalletTransferConfirm(APIView):
             })
 
         return Response({"detail": "Invalid transfer_type."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+def _coupon_wallet_balance(user):
+    from decimal import Decimal as D
+
+    tx = WalletTransaction.objects.filter(user=user)
+    credit = tx.filter(type__in=["COUPON_WALLET_CREDIT", "COUPON_WALLET_REFUND"], amount__gt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")
+    debit = tx.filter(type__in=["COUPON_WALLET_DEBIT", "VOUCHER_CREATE_DEBIT"], amount__lt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")
+    return (D(str(credit)) + D(str(debit))).quantize(D("0.01"))
+
+
+def _package_coupon_wallet_balance(user):
+    from decimal import Decimal as D
+
+    tx = WalletTransaction.objects.filter(user=user)
+    credit = tx.filter(type__in=["PACKAGE_COUPON_WALLET_CREDIT", "VOUCHER_REDEEM_CREDIT"], amount__gt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")
+    debit = tx.filter(type="PACKAGE_COUPON_WALLET_DEBIT", amount__lt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")
+    return (D(str(credit)) + D(str(debit))).quantize(D("0.01"))
+
+
+def _voucher_validity_days(voucher_type):
+    if voucher_type == ConsumerVoucher.TYPE_PACKAGE_PURCHASE:
+        return 7
+    return 30
+
+
+def _generate_voucher_code():
+    for _ in range(20):
+        code = f"TKV{random.randint(10000000, 99999999)}"
+        if not ConsumerVoucher.objects.filter(code=code).exists():
+            return code
+    return f"TKV{timezone.now().strftime('%y%m%d%H%M%S%f')[-14:]}"
+
+
+def _expire_active_vouchers_for_user(user):
+    from decimal import Decimal as D
+
+    now = timezone.now()
+    qs = ConsumerVoucher.objects.select_for_update().filter(
+        creator=user,
+        status=ConsumerVoucher.STATUS_ACTIVE,
+        expires_at__lte=now,
+        refund_transaction__isnull=True,
+    )
+    for voucher in qs:
+        wallet = Wallet.get_or_create_for_user(voucher.creator)
+        wallet = Wallet.objects.select_for_update().get(pk=wallet.pk)
+        amount = D(str(voucher.amount or "0"))
+        wallet.balance = (wallet.balance or D("0")) + amount
+        wallet.save(update_fields=["balance", "updated_at"])
+        refund_tx = WalletTransaction.objects.create(
+            user=voucher.creator,
+            amount=amount,
+            balance_after=wallet.balance,
+            type="COUPON_WALLET_REFUND",
+            source_type="VOUCHER_EXPIRED",
+            source_id=str(voucher.id),
+            meta={"voucher_code": voucher.code, "voucher_type": voucher.voucher_type},
+        )
+        voucher.status = ConsumerVoucher.STATUS_EXPIRED
+        voucher.expired_at = now
+        voucher.refund_transaction = refund_tx
+        voucher.save(update_fields=["status", "expired_at", "refund_transaction"])
+
+
+class ConsumerVoucherSerializer(serializers.ModelSerializer):
+    creator_username = serializers.CharField(source="creator.username", read_only=True)
+    assigned_to_username = serializers.CharField(source="assigned_to.username", read_only=True)
+    redeemed_by_username = serializers.CharField(source="redeemed_by.username", read_only=True)
+    voucher_type_label = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ConsumerVoucher
+        fields = [
+            "id",
+            "code",
+            "voucher_type",
+            "voucher_type_label",
+            "amount",
+            "status",
+            "note",
+            "created_at",
+            "expires_at",
+            "redeemed_at",
+            "expired_at",
+            "creator_username",
+            "assigned_to_username",
+            "redeemed_by_username",
+        ]
+
+    def get_voucher_type_label(self, obj):
+        return dict(ConsumerVoucher.TYPE_CHOICES).get(obj.voucher_type, obj.voucher_type)
+
+
+class ConsumerVoucherListCreate(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        with transaction.atomic():
+            _expire_active_vouchers_for_user(request.user)
+        qs = ConsumerVoucher.objects.filter(
+            Q(creator=request.user) | Q(assigned_to=request.user) | Q(redeemed_by=request.user)
+        ).select_related("creator", "assigned_to", "redeemed_by").order_by("-created_at", "-id")
+        status_filter = str(request.query_params.get("status") or "").strip().upper()
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        data = ConsumerVoucherSerializer(qs[:200], many=True).data
+        return Response({
+            "coupon_wallet_balance": str(_coupon_wallet_balance(request.user)),
+            "package_coupon_wallet_balance": str(_package_coupon_wallet_balance(request.user)),
+            "results": data,
+        })
+
+    def post(self, request):
+        from decimal import Decimal as D
+
+        voucher_type = str(request.data.get("voucher_type") or "").strip().upper()
+        if voucher_type not in {choice[0] for choice in ConsumerVoucher.TYPE_CHOICES}:
+            return Response({"detail": "Invalid voucher_type."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            amount = D(str(request.data.get("amount") or "0")).quantize(D("0.01"))
+        except Exception:
+            return Response({"detail": "Invalid amount."}, status=status.HTTP_400_BAD_REQUEST)
+        if amount <= D("0"):
+            return Response({"detail": "Amount must be greater than 0."}, status=status.HTTP_400_BAD_REQUEST)
+
+        assigned_to = None
+        assigned_identifier = request.data.get("assigned_to") or request.data.get("consumer_id") or request.data.get("username")
+        if voucher_type == ConsumerVoucher.TYPE_PACKAGE_PURCHASE:
+            assigned_to = _resolve_consumer_user(assigned_identifier)
+            if not assigned_to:
+                return Response({"detail": "Package purchase coupon requires a valid consumer username/ID."}, status=status.HTTP_400_BAD_REQUEST)
+            if assigned_to.id == request.user.id:
+                return Response({"detail": "Package purchase coupon must be assigned to another consumer."}, status=status.HTTP_400_BAD_REQUEST)
+
+        note = str(request.data.get("note") or "").strip()
+        with transaction.atomic():
+            _expire_active_vouchers_for_user(request.user)
+            available = _coupon_wallet_balance(request.user)
+            if available < amount:
+                return Response({"detail": "Insufficient Coupon Pocket balance."}, status=status.HTTP_400_BAD_REQUEST)
+
+            wallet = Wallet.get_or_create_for_user(request.user)
+            wallet = Wallet.objects.select_for_update().get(pk=wallet.pk)
+            wallet.balance = (wallet.balance or D("0")) - amount
+            if wallet.balance < D("0"):
+                return Response({"detail": "Insufficient wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
+            wallet.save(update_fields=["balance", "updated_at"])
+
+            voucher = ConsumerVoucher.objects.create(
+                creator=request.user,
+                assigned_to=assigned_to,
+                voucher_type=voucher_type,
+                code=_generate_voucher_code(),
+                amount=amount,
+                expires_at=timezone.now() + timedelta(days=_voucher_validity_days(voucher_type)),
+                note=note,
+            )
+            debit_tx = WalletTransaction.objects.create(
+                user=request.user,
+                amount=amount * D("-1"),
+                balance_after=wallet.balance,
+                type="VOUCHER_CREATE_DEBIT",
+                source_type="CONSUMER_VOUCHER",
+                source_id=str(voucher.id),
+                meta={
+                    "voucher_code": voucher.code,
+                    "voucher_type": voucher.voucher_type,
+                    "assigned_to_user_id": getattr(assigned_to, "id", None),
+                },
+            )
+            voucher.debit_transaction = debit_tx
+            voucher.save(update_fields=["debit_transaction"])
+
+        return Response(ConsumerVoucherSerializer(voucher).data, status=status.HTTP_201_CREATED)
+
+
+class ConsumerVoucherRedeem(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from decimal import Decimal as D
+
+        code = str(request.data.get("code") or "").strip().upper()
+        if not code:
+            return Response({"detail": "Voucher code is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            voucher = ConsumerVoucher.objects.select_for_update().filter(code__iexact=code).select_related("creator", "assigned_to").first()
+            if not voucher:
+                return Response({"detail": "Voucher not found."}, status=status.HTTP_404_NOT_FOUND)
+            _expire_active_vouchers_for_user(voucher.creator)
+            voucher = ConsumerVoucher.objects.select_for_update().get(pk=voucher.pk)
+            if voucher.status != ConsumerVoucher.STATUS_ACTIVE:
+                return Response({"detail": f"Voucher is {voucher.status.lower()}."}, status=status.HTTP_400_BAD_REQUEST)
+            if voucher.voucher_type != ConsumerVoucher.TYPE_PACKAGE_PURCHASE:
+                return Response({"detail": "Only package purchase coupons can be redeemed from this wallet screen."}, status=status.HTTP_400_BAD_REQUEST)
+            if voucher.expires_at <= timezone.now():
+                _expire_active_vouchers_for_user(voucher.creator)
+                return Response({"detail": "Voucher has expired."}, status=status.HTTP_400_BAD_REQUEST)
+            if voucher.creator_id == request.user.id:
+                return Response({"detail": "You cannot redeem your own voucher."}, status=status.HTTP_400_BAD_REQUEST)
+            if voucher.assigned_to_id and voucher.assigned_to_id != request.user.id:
+                return Response({"detail": "This voucher is assigned to another consumer."}, status=status.HTTP_403_FORBIDDEN)
+
+            amount = D(str(voucher.amount or "0"))
+            receiver_wallet = Wallet.get_or_create_for_user(request.user)
+            receiver_wallet = Wallet.objects.select_for_update().get(pk=receiver_wallet.pk)
+            receiver_wallet.balance = (receiver_wallet.balance or D("0")) + amount
+            receiver_wallet.save(update_fields=["balance", "updated_at"])
+            tx = WalletTransaction.objects.create(
+                user=request.user,
+                amount=amount,
+                balance_after=receiver_wallet.balance,
+                type="VOUCHER_REDEEM_CREDIT",
+                source_type="CONSUMER_VOUCHER",
+                source_id=str(voucher.id),
+                meta={
+                    "voucher_code": voucher.code,
+                    "voucher_type": voucher.voucher_type,
+                    "creator_user_id": voucher.creator_id,
+                    "destination_wallet": "PACKAGE_PURCHASE_COUPON" if voucher.voucher_type == ConsumerVoucher.TYPE_PACKAGE_PURCHASE else "COUPON_REDEEMED",
+                },
+            )
+            voucher.status = ConsumerVoucher.STATUS_REDEEMED
+            voucher.redeemed_by = request.user
+            voucher.redeemed_at = timezone.now()
+            voucher.redeem_transaction = tx
+            voucher.save(update_fields=["status", "redeemed_by", "redeemed_at", "redeem_transaction"])
+
+        return Response(ConsumerVoucherSerializer(voucher).data, status=status.HTTP_200_OK)
 
 
 class WalletTransactionSerializer(serializers.ModelSerializer):
@@ -2773,6 +3096,7 @@ def wallet_me_history(request):
         "self_account": self_list,
         "cashback": cashback,
         "redeem": redeem_list,
+        "recent": [txmap(x) for x in WalletTransaction.objects.filter(user=user).order_by("-created_at")[:50]],
     }
     return Response(data)
 
