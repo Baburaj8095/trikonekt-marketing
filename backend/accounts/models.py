@@ -509,16 +509,17 @@ class Wallet(models.Model):
         w = Wallet.objects.select_for_update().get(pk=self.pk)
 
         if tx_type == "INTERNAL_WALLET_DEBIT":
+            upload_sources = ["WALLET_UPLOAD", "UPLOAD_TO_WALLET", "PACKAGE_UPLOAD", "PACKAGE_BUY_UPLOAD"]
             internal_credit = WalletTransaction.objects.filter(
                 user=self.user,
                 type="INTERNAL_WALLET_CREDIT",
                 amount__gt=0,
-            ).aggregate(total=models.Sum("amount"))["total"] or D("0")
+            ).exclude(source_type__in=upload_sources).aggregate(total=models.Sum("amount"))["total"] or D("0")
             internal_debit = WalletTransaction.objects.filter(
                 user=self.user,
                 type="INTERNAL_WALLET_DEBIT",
                 amount__lt=0,
-            ).aggregate(total=models.Sum("amount"))["total"] or D("0")
+            ).exclude(source_type__in=upload_sources).aggregate(total=models.Sum("amount"))["total"] or D("0")
             internal_available = D(str(internal_credit)) + D(str(internal_debit))
             if internal_available < amt:
                 raise ValueError("Insufficient internal wallet balance.")
@@ -894,8 +895,8 @@ class WalletTransaction(models.Model):
 class WalletUploadRequest(models.Model):
     """User-submitted wallet upload request (amount + UTR + proof).
 
-    On admin approval, the amount is credited into the user's INTERNAL pocket
-    (Self Package Pocket) via WalletTransaction with type INTERNAL_WALLET_CREDIT.
+    On admin approval, the amount is credited into the user's Add Money pocket
+    via WalletTransaction with type INTERNAL_WALLET_CREDIT and source_type=WALLET_UPLOAD.
     """
 
     STATUS_CHOICES = [
@@ -948,10 +949,10 @@ class ConsumerVoucher(models.Model):
     TYPE_PACKAGE_PURCHASE = "PACKAGE_PURCHASE"
 
     TYPE_CHOICES = [
-        (TYPE_TRIZONE, "Trizone Voucher"),
+        (TYPE_TRIZONE, "Triozone Coupon"),
         (TYPE_ONLINE, "Online Coupon"),
         (TYPE_NEAR_STORE, "Near Store Coupon"),
-        (TYPE_PACKAGE_PURCHASE, "Package Purchase Coupon"),
+        (TYPE_PACKAGE_PURCHASE, "Self Package Coupon"),
     ]
 
     STATUS_ACTIVE = "ACTIVE"

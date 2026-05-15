@@ -31,7 +31,9 @@ import {
   getUpgradeEligibility,
   initiateUpgrade,
   createRankUpgradePayment,
+  createRankUpgradeFromWallet,
   getEcouponStoreBootstrap,
+  getWalletMe,
   getMyLevelBonusProgress,
   getMyRankCommissionHolds,
   listMyPromoPurchases,
@@ -120,6 +122,7 @@ function RankPaymentSheet({ open, onClose, data, onSuccess }) {
   const [file, setFile] = useState(null);
   const [copied, setCopied] = useState(false);
   const [payment, setPayment] = useState(null); // admin-configured UPI info
+  const [walletMe, setWalletMe] = useState(null);
   const [zoomOpen, setZoomOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorOpen, setErrorOpen] = useState(false);
@@ -136,6 +139,14 @@ function RankPaymentSheet({ open, onClose, data, onSuccess }) {
           if (alive) setPayment(null);
         }
       })();
+      (async () => {
+        try {
+          const wallet = await getWalletMe();
+          if (alive) setWalletMe(wallet || null);
+        } catch {
+          if (alive) setWalletMe(null);
+        }
+      })();
     }
     return () => {
       alive = false;
@@ -144,6 +155,8 @@ function RankPaymentSheet({ open, onClose, data, onSuccess }) {
 
   if (!data || !data.upgrade) return null;
   const amount = Number(data.upgrade.upgrade_amount || 0);
+  const addMoneyBal = Number(walletMe?.transfer_wallets?.packageUpload || 0);
+  const canPayAddMoney = addMoneyBal >= amount && amount > 0;
 
   return (
     <>
@@ -228,6 +241,46 @@ function RankPaymentSheet({ open, onClose, data, onSuccess }) {
         <Alert severity="info" sx={{ mt: 2 }}>
           Amount is auto‑calculated and locked. Pay the exact amount.
         </Alert>
+
+        <Box sx={{ p: 1.25, mt: 2, borderRadius: 2, border: "1px solid", borderColor: "divider", bgcolor: "grey.50" }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+            <Typography variant="body2" color="text.secondary">
+              Add Money Pocket Balance
+            </Typography>
+            <Typography fontWeight={900}>Rs. {addMoneyBal.toFixed(2)}</Typography>
+          </Stack>
+          <Button
+            fullWidth
+            variant="contained"
+            sx={{ mt: 1, height: 46 }}
+            disabled={!canPayAddMoney || submitting}
+            onClick={async () => {
+              setSubmitting(true);
+              setErrorMsg("");
+              try {
+                await createRankUpgradeFromWallet({
+                  upgrade_id: data.upgrade.id,
+                  wallet_source: "package_upload",
+                });
+                onClose?.();
+                onSuccess?.();
+                setTxnId("");
+                setFile(null);
+              } catch (e) {
+                const msg =
+                  e?.response?.data?.detail ||
+                  e?.message ||
+                  "Wallet payment failed. Please try again.";
+                setErrorMsg(msg);
+                setErrorOpen(true);
+              } finally {
+                setSubmitting(false);
+              }
+            }}
+          >
+            {submitting ? "Processing..." : "Pay from Add Money Pocket"}
+          </Button>
+        </Box>
 
         <TextField
           label="Transaction / UTR ID (Optional)"

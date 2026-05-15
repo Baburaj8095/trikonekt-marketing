@@ -202,8 +202,27 @@ export default function NotificationsBell() {
 
   return (
     <>
-      <IconButton color="inherit" onClick={handleOpen} size="small" aria-label="Notifications">
-        <Badge badgeContent={unread > 99 ? "99+" : unread} color="error">
+      <IconButton
+        color="inherit"
+        onClick={handleOpen}
+        size="small"
+        aria-label="Notifications"
+        sx={{
+          width: 38,
+          height: 38,
+          borderRadius: 3,
+          border: "1px solid rgba(226,232,240,0.92)",
+          background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+          boxShadow: "0 8px 18px rgba(15,23,42,0.08)",
+          transition: "transform 140ms ease, box-shadow 160ms ease",
+          "&:active": { transform: "scale(0.94)" },
+        }}
+      >
+        <Badge
+          badgeContent={unread > 99 ? "99+" : unread}
+          color="error"
+          sx={{ "& .MuiBadge-badge": { boxShadow: "0 6px 14px rgba(239,68,68,0.26)", fontWeight: 900 } }}
+        >
           <NotificationsNoneIcon />
         </Badge>
       </IconButton>
@@ -213,9 +232,18 @@ export default function NotificationsBell() {
         onClose={handleClose}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         transformOrigin={{ vertical: "top", horizontal: "right" }}
-        PaperProps={{ sx: { width: 360, maxWidth: "calc(100vw - 24px)" } }}
+        PaperProps={{
+          sx: {
+            width: 360,
+            maxWidth: "calc(100vw - 24px)",
+            borderRadius: 4,
+            overflow: "hidden",
+            border: "1px solid rgba(226,232,240,0.9)",
+            boxShadow: "0 24px 80px rgba(15,23,42,0.22)",
+          },
+        }}
       >
-        <Box sx={{ p: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+        <Box sx={{ p: 1.5, display: "flex", alignItems: "center", gap: 1, background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)" }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 800, flex: 1 }}>
             Notifications
           </Typography>

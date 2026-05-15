@@ -108,7 +108,7 @@ export default function PackageCouponPocket() {
       <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1.5} sx={{ mb: 2 }}>
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 900, color: "#0f172a" }}>
-            Package Purchase Coupon
+            Package Purchase Coupon Received
           </Typography>
           <Typography sx={{ color: "#64748b", fontSize: 13 }}>
             Redeem package coupons assigned to your consumer ID and use the balance to buy packages.
@@ -154,7 +154,7 @@ export default function PackageCouponPocket() {
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
           <TextField
             size="small"
-            label="Package Coupon Code"
+            label="Self Package Coupon Code"
             value={code}
             onChange={(e) => setCode(e.target.value)}
             fullWidth
@@ -165,7 +165,7 @@ export default function PackageCouponPocket() {
         </Stack>
       </Paper>
 
-      <Typography sx={{ fontWeight: 900, mb: 1 }}>Your Package Coupon Vouchers</Typography>
+      <Typography sx={{ fontWeight: 900, mb: 1 }}>Your Received Package Coupon Vouchers</Typography>
       <Stack spacing={1}>
         {assigned.map((voucher) => (
           <Paper key={voucher.id} variant="outlined" sx={{ p: 1.2, borderRadius: 2 }}>

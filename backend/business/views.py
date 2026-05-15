@@ -1046,7 +1046,7 @@ class PromoPurchasePayFromWalletView(APIView):
     Server will:
       - Validate payload using PromoPurchaseSerializer rules
       - Compute authoritative amount_paid
-      - Debit INTERNAL wallet or PACKAGE_COUPON wallet immediately
+      - Debit INTERNAL wallet, PACKAGE_COUPON wallet, or ADD MONEY upload pocket immediately
       - Create PromoPurchase PENDING with payment_mode=WALLET and link wallet tx
     """
 
@@ -1088,8 +1088,10 @@ class PromoPurchasePayFromWalletView(APIView):
             return Response({"detail": "Invalid payable amount."}, status=status.HTTP_400_BAD_REQUEST)
 
         wallet_source = str(request.data.get("wallet_source") or request.data.get("walletSource") or "internal").strip().lower()
-        if wallet_source not in {"internal", "package_coupon"}:
+        if wallet_source not in {"internal", "package_coupon", "package_upload", "add_money"}:
             return Response({"detail": "Invalid wallet_source."}, status=status.HTTP_400_BAD_REQUEST)
+        if wallet_source == "add_money":
+            wallet_source = "package_upload"
 
         with transaction.atomic():
             w = Wallet.get_or_create_for_user(request.user)
@@ -1121,6 +1123,35 @@ class PromoPurchasePayFromWalletView(APIView):
                     source_type="PROMO_PURCHASE",
                     source_id="",
                 )
+            elif wallet_source == "package_upload":
+                upload_sources = ["WALLET_UPLOAD", "UPLOAD_TO_WALLET", "PACKAGE_UPLOAD", "PACKAGE_BUY_UPLOAD"]
+                credit = WalletTransaction.objects.filter(
+                    user=request.user,
+                    source_type__in=upload_sources,
+                    amount__gt=0,
+                ).aggregate(total=Sum("amount"))["total"] or D("0.00")
+                debit = WalletTransaction.objects.filter(
+                    user=request.user,
+                    source_type__in=upload_sources,
+                    amount__lt=0,
+                ).aggregate(total=Sum("amount"))["total"] or D("0.00")
+                available = D(str(credit)) + D(str(debit))
+                if available < total:
+                    return Response({"detail": "Insufficient Add Money Pocket balance."}, status=status.HTTP_400_BAD_REQUEST)
+                w = Wallet.objects.select_for_update().get(pk=w.pk)
+                w.balance = (w.balance or D("0")) - total
+                if w.balance < D("0"):
+                    return Response({"detail": "Insufficient wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
+                w.save(update_fields=["balance", "updated_at"])
+                WalletTransaction.objects.create(
+                    user=request.user,
+                    amount=total * D("-1"),
+                    balance_after=w.balance,
+                    type="INTERNAL_WALLET_DEBIT",
+                    meta={"reason": "PROMO_PURCHASE", "package_id": getattr(pkg, "id", None), "wallet_source": "package_upload"},
+                    source_type="WALLET_UPLOAD",
+                    source_id="",
+                )
             else:
                 try:
                     w.debit(
@@ -1149,12 +1180,18 @@ class PromoPurchasePayFromWalletView(APIView):
 
             # Link the debit tx we just created (find by source_type + user + amount)
             debit_type = "PACKAGE_COUPON_WALLET_DEBIT" if wallet_source == "package_coupon" else "INTERNAL_WALLET_DEBIT"
-            tx = WalletTransaction.objects.filter(
-                user=request.user,
-                type=debit_type,
-                source_type="PROMO_PURCHASE",
-                amount=D(str(total)) * D("-1"),
-            ).order_by("-id").first()
+            tx_source_type = "WALLET_UPLOAD" if wallet_source == "package_upload" else "PROMO_PURCHASE"
+            tx = (
+                WalletTransaction.objects
+                .filter(
+                    user=request.user,
+                    type=debit_type,
+                    source_type=tx_source_type,
+                    amount=D(str(total)) * D("-1"),
+                )
+                .order_by("-id")
+                .first()
+            )
             if tx:
                 # Fill source_id and backlink
                 try:

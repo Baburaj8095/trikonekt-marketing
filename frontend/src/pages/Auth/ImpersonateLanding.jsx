@@ -12,6 +12,7 @@ export default function ImpersonateLanding() {
         const access = params.get("access");
         const refresh = params.get("refresh");
         const next = params.get("next");
+        const loginContext = String(params.get("login_context") || "").toLowerCase();
 
         // Resolve namespace: prefer ?ns=, else path prefix, else token role claim
         const path = window.location.pathname || "";
@@ -62,6 +63,14 @@ export default function ImpersonateLanding() {
         // Remove legacy non-namespaced cache used by some older components
         try { localStorage.removeItem("user"); } catch (_) {}
         try { sessionStorage.removeItem("user"); } catch (_) {}
+
+        if (loginContext === "team" || loginContext === "consumer") {
+          try {
+            localStorage.setItem(`login_context_${ns}`, loginContext);
+          } catch (_) {
+            try { sessionStorage.setItem(`login_context_${ns}`, loginContext); } catch (_) {}
+          }
+        }
 
         // Prefetch /accounts/me and wait briefly so the dashboard reads the new identity
         let wroteIdentity = false;

@@ -24,6 +24,46 @@ import normalizeMediaUrl from "../utils/media";
 import { useNavigate } from "react-router-dom";
 import { addAgencyPackage } from "../store/cart";
 
+const nativeSheetPaperSx = {
+  borderTopLeftRadius: 28,
+  borderTopRightRadius: 28,
+  height: "88vh",
+  p: { xs: 2, sm: 2.5 },
+  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+  boxShadow: "0 -22px 60px rgba(15, 23, 42, 0.22)",
+  border: "1px solid rgba(226, 232, 240, 0.9)",
+  overflow: "hidden",
+};
+
+const primaryPaymentButtonSx = {
+  height: 52,
+  borderRadius: 3,
+  fontWeight: 900,
+  boxShadow: "0 16px 32px rgba(37, 99, 235, 0.24)",
+  background: "linear-gradient(135deg, #2563eb 0%, #0f766e 100%)",
+  transition: "transform 160ms ease, box-shadow 160ms ease, filter 160ms ease",
+  "&:hover": {
+    boxShadow: "0 18px 36px rgba(37, 99, 235, 0.3)",
+    filter: "brightness(1.02)",
+  },
+  "&:active": { transform: "scale(0.985)" },
+  "&.Mui-disabled": {
+    background: "linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%)",
+    color: "rgba(255,255,255,0.78)",
+    boxShadow: "none",
+  },
+};
+
+const softFieldSx = {
+  "& .MuiOutlinedInput-root": {
+    borderRadius: 2.5,
+    boxShadow: "0 1px 0 rgba(15, 23, 42, 0.03)",
+    "& fieldset": { borderColor: "#e2e8f0" },
+    "&:hover fieldset": { borderColor: "#bfdbfe" },
+    "&.Mui-focused fieldset": { borderColor: "#2563eb", borderWidth: 1.5 },
+  },
+};
+
 /**
  * Sub‑franchise Packages + Rewards UI
  *
@@ -359,19 +399,19 @@ export default function SubFranchisePrimePricing({
         anchor="bottom"
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        PaperProps={{
-          sx: {
-            borderTopLeftRadius: 16,
-            borderTopRightRadius: 16,
-            height: "88vh",
-            p: 2,
+        ModalProps={{
+          BackdropProps: {
+            sx: { backgroundColor: "rgba(15, 23, 42, 0.48)", backdropFilter: "blur(10px)" },
           },
+        }}
+        PaperProps={{
+          sx: nativeSheetPaperSx,
         }}
       >
         {/* Handle bar */}
-        <Box sx={{ width: 40, height: 4, bgcolor: "divider", mx: "auto", mb: 1 }} />
+        <Box sx={{ width: 44, height: 5, bgcolor: "#cbd5e1", mx: "auto", mb: 1.5, borderRadius: 99 }} />
 
-        <Typography fontWeight={900} fontSize={18} textAlign="center">
+        <Typography fontWeight={900} fontSize={19} lineHeight={1.2} textAlign="center" color="#0f172a">
           Complete Payment
         </Typography>
 
@@ -380,17 +420,17 @@ export default function SubFranchisePrimePricing({
           sx={{
             p: 2,
             mt: 2,
-            bgcolor: "grey.50",
-            borderRadius: 1.5,
-            border: "1px solid",
-            borderColor: "divider",
+            bgcolor: "rgba(255,255,255,0.92)",
+            borderRadius: 3,
+            border: "1px solid rgba(226,232,240,0.92)",
+            boxShadow: "0 12px 30px rgba(15, 23, 42, 0.07)",
           }}
         >
           <Typography fontWeight={700}>{selectedPkg?.name || "Package"}</Typography>
 
           <Stack direction="row" justifyContent="space-between" mt={1}>
             <Typography color="text.secondary">Total Amount</Typography>
-            <Typography fontWeight={900} fontSize={20}>
+            <Typography fontWeight={900} fontSize={22} color="#0f172a">
               ₹
               {(() => {
                 try {
@@ -406,10 +446,10 @@ export default function SubFranchisePrimePricing({
             </Typography>
           </Stack>
         </Box>
-        <Divider sx={{ my: 1.5 }} />
+        <Divider sx={{ my: 1.5, borderColor: "rgba(226,232,240,0.9)" }} />
 
         {/* UPI Section */}
-        <Box sx={{ p: 2, mt: 2 }}>
+        <Box sx={{ p: 2, mt: 1.5, borderRadius: 3, bgcolor: "rgba(248,250,252,0.9)", border: "1px solid #e2e8f0" }}>
           <Typography fontWeight={700} mb={1}>
             UPI Payment
           </Typography>
@@ -419,7 +459,17 @@ export default function SubFranchisePrimePricing({
               component="img"
               src={normalizeMediaUrl(payment.upi_qr_image_url)}
               alt="UPI QR"
-              sx={{ width: 180, mx: "auto", display: "block", mb: 2, cursor: "pointer", borderRadius: 1 }}
+              sx={{
+                width: 180,
+                mx: "auto",
+                display: "block",
+                mb: 2,
+                cursor: "pointer",
+                borderRadius: 3,
+                p: 1,
+                bgcolor: "#fff",
+                boxShadow: "0 12px 26px rgba(15,23,42,0.10)",
+              }}
               onClick={() => setZoomOpen(true)}
             />
           ) : null}
@@ -428,6 +478,7 @@ export default function SubFranchisePrimePricing({
             label="UPI ID"
             value={payment?.upi_id || ""}
             fullWidth
+            sx={softFieldSx}
             onClick={() => {
               const v = payment?.upi_id || "";
               if (v) navigator.clipboard.writeText(v);
@@ -460,12 +511,12 @@ export default function SubFranchisePrimePricing({
           label="Transaction / UTR ID"
           fullWidth
           required
-          sx={{ mt: 2 }}
+          sx={{ mt: 2, ...softFieldSx }}
           value={txnId}
           onChange={(e) => setTxnId(e.target.value)}
         />
 
-        <Button component="label" sx={{ mt: 2 }}>
+        <Button component="label" variant="outlined" sx={{ mt: 2, borderRadius: 3, minHeight: 48 }}>
           Upload Payment Screenshot
           <input type="file" hidden onChange={(e) => setFile(e.target.files?.[0] || null)} />
         </Button>
@@ -473,7 +524,7 @@ export default function SubFranchisePrimePricing({
         <Button
           fullWidth
           variant="contained"
-          sx={{ mt: 3, height: 52 }}
+          sx={{ mt: 3, ...primaryPaymentButtonSx }}
           disabled={!txnId || submitting || !selectedPkg}
           onClick={async () => {
             // UI-only flow: create/ensure assignment and refresh; do not alter API contracts
@@ -508,13 +559,17 @@ export default function SubFranchisePrimePricing({
           {submitting ? "Submitting..." : "Submit Payment"}
         </Button>
 
-        <Button fullWidth variant="text" sx={{ mt: 1 }} onClick={() => setDrawerOpen(false)}>
+        <Button fullWidth variant="text" sx={{ mt: 1, borderRadius: 3 }} onClick={() => setDrawerOpen(false)}>
           Cancel
         </Button>
       </Drawer>
 
       {/* QR Zoom Dialog */}
-      <Dialog open={zoomOpen} onClose={() => setZoomOpen(false)}>
+      <Dialog
+        open={zoomOpen}
+        onClose={() => setZoomOpen(false)}
+        PaperProps={{ sx: { borderRadius: 4, boxShadow: "0 24px 80px rgba(15,23,42,0.24)" } }}
+      >
         <Box sx={{ p: 2 }}>
           {payment?.upi_qr_image_url ? (
             <Box

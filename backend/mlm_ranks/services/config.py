@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import List, Optional
+from typing import Iterable, List, Optional, Set
 
 
 # -------- Global constants (override via env if wired later) --------
@@ -46,19 +46,24 @@ class Prime750StatusAdapter:
     """
 
     @classmethod
-    def is_user_prime750_active(cls, user) -> bool:
+    def prime750_active_user_ids(cls, user_ids: Iterable[int]) -> Set[int]:
+        """
+        Return user ids with an APPROVED PRIME 750 purchase using the same rules as
+        is_user_prime750_active(), but in one batched query.
+        """
         try:
-            from business.models import PromoPurchase, PromoPackage
+            ids = sorted({int(uid) for uid in user_ids if uid})
+        except Exception:
+            ids = []
+        if not ids:
+            return set()
+
+        active_ids: Set[int] = set()
+        try:
+            from business.models import PromoPurchase
             from django.db.models import Q
-            if not user or not getattr(user, "id", None):
-                return False
-            qs = (
-                PromoPurchase.objects
-                .filter(user_id=getattr(user, "id", None), status="APPROVED")
-                .select_related("package")
-            )
-            # Heuristics: price ~ 750 or code contains 750; type PRIME preferred
-            qs = qs.filter(
+
+            prime750_filter = (
                 Q(package__type="PRIME")
                 & (
                     Q(package__price__gte=Decimal("749.00"), package__price__lte=Decimal("751.00"))
@@ -66,7 +71,28 @@ class Prime750StatusAdapter:
                     | Q(package__name__icontains="750")
                 )
             )
-            return qs.exists()
+            chunk_size = 1000
+            for start in range(0, len(ids), chunk_size):
+                chunk = ids[start:start + chunk_size]
+                qs = (
+                    PromoPurchase.objects
+                    .filter(user_id__in=chunk, status="APPROVED")
+                    .filter(prime750_filter)
+                    .values_list("user_id", flat=True)
+                    .distinct()
+                )
+                active_ids.update(int(uid) for uid in qs if uid)
+        except Exception:
+            return set()
+        return active_ids
+
+    @classmethod
+    def is_user_prime750_active(cls, user) -> bool:
+        try:
+            if not user or not getattr(user, "id", None):
+                return False
+            user_id = int(getattr(user, "id", 0) or 0)
+            return user_id in cls.prime750_active_user_ids([user_id])
         except Exception:
             return False
 
@@ -77,17 +103,14 @@ class Prime750StatusAdapter:
         """
         try:
             from accounts.models import CustomUser
-            directs = CustomUser.objects.filter(registered_by_id=getattr(user, "id", None)).only("id")
+            direct_ids = list(
+                CustomUser.objects
+                .filter(registered_by_id=getattr(user, "id", None))
+                .values_list("id", flat=True)
+            )
         except Exception:
             return 0
-        count = 0
-        for d in directs:
-            try:
-                if cls.is_user_prime750_active(d):
-                    count += 1
-            except Exception:
-                continue
-        return int(count)
+        return int(len(cls.prime750_active_user_ids(direct_ids)))
 
 
 @dataclass

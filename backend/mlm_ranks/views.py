@@ -46,23 +46,36 @@ class RanksListView(APIView):
 class UserUpgradeEligibilityView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    def _achieved_level(self, user) -> int:
+        try:
+            hi = (
+                RankUpgrade.objects
+                .filter(user=user, payment_status=RankUpgrade.STATUS_SUCCESS)
+                .aggregate(m=Max("to_rank__level_number"))
+                .get("m") or 0
+            )
+            return int(hi or 0)
+        except Exception:
+            return 0
+
     def get(self, request):
+        if str(request.query_params.get("summary") or "").lower() in ("1", "true", "achieved"):
+            ur, cur = RankEligibilityService.get_or_bootstrap_user_rank(request.user)
+            return Response(
+                {
+                    "current_rank": getattr(cur, "rank_name", None),
+                    "current_level": getattr(cur, "level_number", None),
+                    "achieved_level": self._achieved_level(request.user),
+                }
+            )
+
         res = RankEligibilityService.evaluate(request.user)
         payload = EligibilitySerializer.from_result(res).data
         ur, cur = RankEligibilityService.get_or_bootstrap_user_rank(request.user)
         current_rank_name = getattr(cur, "rank_name", None)
         current_level = getattr(cur, "level_number", None)
         # Highest approved rank level (based solely on admin-approved upgrades)
-        try:
-            hi = (
-                RankUpgrade.objects
-                .filter(user=request.user, payment_status=RankUpgrade.STATUS_SUCCESS)
-                .aggregate(m=Max("to_rank__level_number"))
-                .get("m") or 0
-            )
-            achieved_level = int(hi or 0)
-        except Exception:
-            achieved_level = 0
+        achieved_level = self._achieved_level(request.user)
         # For frontend quick use:
         return Response(
             {
@@ -308,6 +321,77 @@ class UpgradePaymentRequestView(APIView):
             utr=utr,
             remarks=remarks,
             payment_proof=proof,
+        )
+        return Response(RankUpgradePaymentSerializer(rup).data, status=status.HTTP_201_CREATED)
+
+
+class UpgradePayFromWalletView(APIView):
+    """
+    Pay an initiated rank upgrade from the Add Money Pocket.
+    The uploaded-money pocket is tracked by wallet transactions with source_type=WALLET_UPLOAD.
+    Admin still approves the rank upgrade through the existing review flow.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request):
+        from decimal import Decimal as D
+        from accounts.models import Wallet, WalletTransaction
+
+        upgrade_id = request.data.get("upgrade_id")
+        if not upgrade_id:
+            return Response({"detail": "upgrade_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        upg = (
+            RankUpgrade.objects
+            .select_for_update()
+            .filter(id=int(upgrade_id), user_id=request.user.id)
+            .first()
+        )
+        if not upg:
+            return Response({"detail": "Upgrade not found"}, status=status.HTTP_404_NOT_FOUND)
+        if upg.payment_status != RankUpgrade.STATUS_INITIATED:
+            return Response({"detail": f"Cannot pay for status '{upg.payment_status}'"}, status=status.HTTP_400_BAD_REQUEST)
+
+        amount = D(str(getattr(upg, "upgrade_amount", 0) or 0)).quantize(D("0.01"))
+        if amount <= 0:
+            return Response({"detail": "Invalid payable amount."}, status=status.HTTP_400_BAD_REQUEST)
+
+        upload_sources = ["WALLET_UPLOAD", "UPLOAD_TO_WALLET", "PACKAGE_UPLOAD", "PACKAGE_BUY_UPLOAD"]
+        credit = WalletTransaction.objects.filter(
+            user=request.user,
+            source_type__in=upload_sources,
+            amount__gt=0,
+        ).aggregate(total=Sum("amount"))["total"] or D("0.00")
+        debit = WalletTransaction.objects.filter(
+            user=request.user,
+            source_type__in=upload_sources,
+            amount__lt=0,
+        ).aggregate(total=Sum("amount"))["total"] or D("0.00")
+        available = D(str(credit)) + D(str(debit))
+        if available < amount:
+            return Response({"detail": "Insufficient Add Money Pocket balance."}, status=status.HTTP_400_BAD_REQUEST)
+
+        w = Wallet.get_or_create_for_user(request.user)
+        w = Wallet.objects.select_for_update().get(pk=w.pk)
+        w.balance = (w.balance or D("0")) - amount
+        if w.balance < D("0"):
+            return Response({"detail": "Insufficient wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
+        w.save(update_fields=["balance", "updated_at"])
+
+        WalletTransaction.objects.create(
+            user=request.user,
+            amount=amount * D("-1"),
+            balance_after=w.balance,
+            type="INTERNAL_WALLET_DEBIT",
+            source_type="WALLET_UPLOAD",
+            source_id=str(upg.id),
+            meta={"reason": "RANK_UPGRADE", "upgrade_id": upg.id, "wallet_source": "package_upload"},
+        )
+        rup = RankUpgradePayment.objects.create(
+            upgrade=upg,
+            utr="",
+            remarks="Paid from Add Money Pocket",
         )
         return Response(RankUpgradePaymentSerializer(rup).data, status=status.HTTP_201_CREATED)
 

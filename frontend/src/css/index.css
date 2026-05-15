@@ -6,12 +6,17 @@
 
 html, body {
   margin: 0; /* Remove default 8px body margin */
-  background-color: #f9fafc;
+  background-color: #f6f8fb;
+  min-height: 100%;
+  overscroll-behavior-y: none;
 }
 
 body {
   font-family: 'Montserrat', 'Segoe UI', Roboto, Helvetica, Arial, 'Noto Sans', 'Noto Sans Symbols 2', 'Segoe UI Symbol', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;
   color: #0f172a; /* Ensure readable default text color on light backgrounds */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  touch-action: manipulation;
 }
 
 /* Ensure common surfaces remain light with readable text, without breaking AppBar contrast */
@@ -34,11 +39,63 @@ body {
 #root {
   background-color: transparent;
   color: inherit;
+  min-height: 100dvh;
 }
 
 /* Optional: links inherit readable color unless explicitly styled */
 a {
   color: inherit;
+}
+
+button,
+a,
+.MuiButton-root,
+.MuiIconButton-root,
+.MuiBottomNavigationAction-root {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.role-shell-scope {
+  background:
+    radial-gradient(circle at 12% -8%, rgba(14, 165, 233, 0.08), transparent 34%),
+    radial-gradient(circle at 96% 0%, rgba(34, 197, 94, 0.06), transparent 30%),
+    #f6f8fb !important;
+}
+
+.role-shell-scope main {
+  -webkit-overflow-scrolling: touch;
+}
+
+.role-shell-scope .MuiPaper-root,
+.role-shell-scope .MuiCard-root {
+  background-clip: padding-box;
+}
+
+@supports (backdrop-filter: blur(16px)) {
+  .native-glass {
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+  }
+}
+
+@media (max-width: 600px) {
+  .MuiDialog-paper {
+    margin: 12px !important;
+    width: calc(100% - 24px) !important;
+  }
+
+  .MuiDrawer-paperAnchorBottom {
+    padding-bottom: max(16px, env(safe-area-inset-bottom)) !important;
+  }
+
+  .MuiButton-root {
+    min-height: 46px;
+  }
+
+  .MuiIconButton-root {
+    min-width: 40px;
+    min-height: 40px;
+  }
 }
 
 /* KPI mobile full-width enforcement removed to rely on proper MUI Grid props (xs=12) and default gutters to avoid overlap */

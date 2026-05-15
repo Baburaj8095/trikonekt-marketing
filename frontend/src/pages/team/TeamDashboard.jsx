@@ -19,8 +19,8 @@ import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneR
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
 import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceWalletRounded";
-import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
+import ShareRoundedIcon from "@mui/icons-material/ShareRounded";
 import PlayCircleRoundedIcon from "@mui/icons-material/PlayCircleRounded";
 import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
 import FlightTakeoffRoundedIcon from "@mui/icons-material/FlightTakeoffRounded";
@@ -52,7 +52,7 @@ function resolveApiMediaUrl(item, MEDIA_BASE) {
 }
 
 const C = {
-  appBg: "#f4f7fb",
+  appBg: "#f6f8fb",
   surface: "#ffffff",
   primary: "#2563eb",
   primaryDark: "#1e40af",
@@ -61,7 +61,7 @@ const C = {
   text: "#111827",
   textSec: "#64748b",
   border: "#e2e8f0",
-  shadow: "0 14px 34px rgba(15, 23, 42, 0.08)",
+  shadow: "0 16px 42px rgba(15, 23, 42, 0.08), 0 1px 0 rgba(15, 23, 42, 0.03)",
 };
 
 const MotionPaper = motion.create(Paper);
@@ -110,7 +110,7 @@ function WishingBannerCarousel({ items = [], loading = false, error = "" }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
       sx={{
-        borderRadius: 2,
+        borderRadius: 3,
         border: `1px solid ${C.border}`,
         background: C.surface,
         boxShadow: C.shadow,
@@ -205,10 +205,10 @@ function TopAchieversRow({ items = [], loading = false, error = "" }) {
                 flexShrink: 0,
                 width: { xs: 170, sm: 210 },
                 border: `1px solid ${C.border}`,
-                borderRadius: 2,
+                borderRadius: 3,
                 p: 1.25,
                 background: C.surface,
-                boxShadow: "0 8px 18px rgba(2, 6, 23, 0.05)",
+                boxShadow: "0 10px 26px rgba(2, 6, 23, 0.07)",
               }}
             >
               <Stack direction="row" spacing={1} alignItems="center">
@@ -300,10 +300,13 @@ function VideoScroller({ videos = [], loading = false, onOpenFallback, onBuyPrim
                 flex: "0 0 180px",
                 scrollSnapAlign: "start",
                 p: 1,
-                borderRadius: 2,
+                borderRadius: 3,
                 border: `1px solid ${C.border}`,
                 cursor: "pointer",
                 bgcolor: C.surface,
+                boxShadow: "0 8px 22px rgba(15, 23, 42, 0.06)",
+                transition: "transform 160ms ease, box-shadow 160ms ease",
+                "&:active": { transform: "scale(0.985)" },
               }}
             >
               <Box
@@ -401,11 +404,14 @@ function TourScroller({ onTour, onShop, onCoupons }) {
             sx={{
               flex: "0 0 132px",
               scrollSnapAlign: "start",
-              borderRadius: 2,
+              borderRadius: 3,
               overflow: "hidden",
               border: `1px solid ${C.border}`,
               bgcolor: C.surface,
               cursor: "pointer",
+              boxShadow: "0 8px 22px rgba(15, 23, 42, 0.06)",
+              transition: "transform 160ms ease, box-shadow 160ms ease",
+              "&:active": { transform: "scale(0.985)" },
             }}
           >
             <Box component="img" src={d.image} alt={d.name} sx={{ width: "100%", height: 94, objectFit: "cover", display: "block" }} />
@@ -476,7 +482,7 @@ function MobileBottomNav({ value, onChange }) {
     { key: "home", label: "Home", icon: <HomeRoundedIcon />, value: 0 },
     { key: "team", label: "Team", icon: <GroupsRoundedIcon />, value: 1 },
     { key: "wallet", label: "Wallet", icon: <AccountBalanceWalletRoundedIcon />, value: 2 },
-    { key: "history", label: "History", icon: <HistoryRoundedIcon />, value: 3 },
+    { key: "refer", label: "Refer", icon: <ShareRoundedIcon />, value: 3 },
     { key: "profile", label: "Profile", icon: <PersonRoundedIcon />, value: 4 },
   ];
 
@@ -492,11 +498,13 @@ function MobileBottomNav({ value, onChange }) {
         maxWidth: 520,
         borderTop: `1px solid ${C.border}`,
         zIndex: 1030,
-        borderRadius: "18px 18px 0 0",
+        borderRadius: "24px 24px 0 0",
         overflow: "hidden",
+        boxShadow: "0 -18px 44px rgba(15,23,42,0.16)",
+        backdropFilter: "blur(16px)",
       }}
     >
-      <Box sx={{ display: "flex", justifyContent: "space-around", py: 1, bgcolor: C.surface }}>
+      <Box sx={{ display: "flex", justifyContent: "space-around", py: 1, bgcolor: "rgba(255,255,255,0.96)" }}>
         {items.map((it) => {
           const active = value === it.value;
           return (
@@ -505,9 +513,21 @@ function MobileBottomNav({ value, onChange }) {
               onClick={() => onChange(it.value)}
               role="button"
               tabIndex={0}
-              sx={{ width: "20%", display: "flex", flexDirection: "column", alignItems: "center", gap: 0.25, color: active ? C.primary : "#94a3b8", cursor: "pointer" }}
+              sx={{
+                width: "20%",
+                minHeight: 54,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 0.25,
+                color: active ? C.primary : "#94a3b8",
+                cursor: "pointer",
+                transition: "transform 140ms ease, color 140ms ease",
+                "&:active": { transform: "scale(0.94)" },
+              }}
             >
-              <Box sx={{ width: 42, height: 30, borderRadius: 99, display: "grid", placeItems: "center", bgcolor: active ? "rgba(37,99,235,0.12)" : "transparent" }}>
+              <Box sx={{ width: 42, height: 30, borderRadius: 99, display: "grid", placeItems: "center", bgcolor: active ? "rgba(37,99,235,0.12)" : "transparent", boxShadow: active ? "inset 0 0 0 1px rgba(37,99,235,0.08)" : "none" }}>
                 {React.cloneElement(it.icon, { fontSize: "small" })}
               </Box>
               <Typography sx={{ fontSize: 11, fontWeight: active ? 900 : 700, lineHeight: 1 }}>{it.label}</Typography>
@@ -636,7 +656,7 @@ export default function TeamDashboard() {
         const [videoRes, rankRes, eligRes] = await Promise.allSettled([
           API.get("/business/team-consumer/educational-videos/", { cacheTTL: 2500, retryAttempts: 1 }),
           API.get("/ranks/", { cacheTTL: 10000, retryAttempts: 1 }),
-          API.get("/user/upgrade-eligibility/", { cacheTTL: 2500, retryAttempts: 1, timeout: 60000 }),
+          API.get("/user/upgrade-eligibility/", { params: { summary: "achieved" }, cacheTTL: 2500, retryAttempts: 1, timeout: 15000 }),
         ]);
         if (!alive) return;
         if (videoRes.status === "fulfilled") {
@@ -688,7 +708,7 @@ export default function TeamDashboard() {
     const p = location.pathname || "";
     if (p.includes("/genealogy")) return 1;
     if (p.includes("/wallet")) return 2;
-    if (p.includes("/history")) return 3;
+    if (p.includes("/refer-earn")) return 3;
     if (p.includes("/profile")) return 4;
     return 0;
   }, [location.pathname]);
@@ -696,9 +716,13 @@ export default function TeamDashboard() {
   const handleNav = (idx) => {
     if (idx === 0) navigate("/user/team-dashboard");
     if (idx === 1) navigate("/user/genealogy-5");
-    if (idx === 2) navigate("/user/wallet");
-    if (idx === 3) navigate("/user/history");
-    if (idx === 4) navigate("/user/profile");
+    if (idx === 2) navigate("/user/team-wallet");
+    if (idx === 3) navigate("/user/refer-earn");
+    if (idx === 4) {
+      try {
+        window.dispatchEvent(new CustomEvent("trikonekt:open-consumer-sidebar"));
+      } catch (_) {}
+    }
   };
 
   const resolveDocumentUrl = useCallback((raw) => {
@@ -743,10 +767,10 @@ export default function TeamDashboard() {
           sx={{
             mb: 2,
             p: { xs: 1.5, md: 2 },
-            borderRadius: 2,
+            borderRadius: 3,
             border: `1px solid ${C.border}`,
             background: C.surface,
-            boxShadow: "0 8px 20px rgba(15, 23, 42, 0.05)",
+            boxShadow: "0 14px 36px rgba(15, 23, 42, 0.08)",
           }}
         >
           <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1.5}>

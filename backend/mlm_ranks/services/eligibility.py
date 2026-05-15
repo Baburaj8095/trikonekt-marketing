@@ -4,8 +4,6 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Optional, Tuple, List, Set
 
-from django.db.models import Q
-
 from ..models import Rank, UserRank
 from .config import Prime750StatusAdapter, REQUIRE_PRIME750_FOR_DOWNLINE_COUNT, REQUIRE_MIN_5_PRIME750_DIRECTS_FOR_ALL_RANKS
 
@@ -81,17 +79,13 @@ class RankEligibilityService:
             # expand one level
             children = cls._children_of(frontier)
             frontier = []
+            active_children = Prime750StatusAdapter.prime750_active_user_ids(children)
             for uid in children:
                 if uid in visited:
                     continue
                 visited.add(uid)
                 # include in team size if Prime 750 active
-                try:
-                    from accounts.models import CustomUser
-                    u = CustomUser.objects.only("id").get(id=uid)
-                except Exception:
-                    u = None
-                if u and Prime750StatusAdapter.is_user_prime750_active(u):
+                if uid in active_children:
                     total += 1
                 frontier.append(uid)
             level += 1

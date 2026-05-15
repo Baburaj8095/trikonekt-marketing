@@ -72,6 +72,49 @@ const getPlanOptions = (price) => {
 
 const monthShort = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13"];
 
+const nativeSheetPaperSx = {
+  borderTopLeftRadius: 28,
+  borderTopRightRadius: 28,
+  height: "88vh",
+  p: { xs: 2, sm: 2.5 },
+  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+  boxShadow: "0 -22px 60px rgba(15, 23, 42, 0.22)",
+  border: "1px solid rgba(226, 232, 240, 0.9)",
+  overflow: "hidden",
+};
+
+const primaryPaymentButtonSx = {
+  height: 52,
+  borderRadius: 3,
+  fontWeight: 900,
+  letterSpacing: 0,
+  boxShadow: "0 16px 32px rgba(37, 99, 235, 0.24)",
+  background: "linear-gradient(135deg, #2563eb 0%, #0f766e 100%)",
+  transition: "transform 160ms ease, box-shadow 160ms ease, filter 160ms ease",
+  "&:hover": {
+    boxShadow: "0 18px 36px rgba(37, 99, 235, 0.3)",
+    filter: "brightness(1.02)",
+  },
+  "&:active": {
+    transform: "scale(0.985)",
+  },
+  "&.Mui-disabled": {
+    background: "linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%)",
+    color: "rgba(255,255,255,0.78)",
+    boxShadow: "none",
+  },
+};
+
+const softFieldSx = {
+  "& .MuiOutlinedInput-root": {
+    borderRadius: 2.5,
+    boxShadow: "0 1px 0 rgba(15, 23, 42, 0.03)",
+    "& fieldset": { borderColor: "#e2e8f0" },
+    "&:hover fieldset": { borderColor: "#bfdbfe" },
+    "&.Mui-focused fieldset": { borderColor: "#2563eb", borderWidth: 1.5 },
+  },
+};
+
 /* ======================================================================== */
 /* Payment Sheet (shared)  unchanged logic; UI summary added */
 /* ======================================================================== */
@@ -129,24 +172,33 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
         anchor="bottom"
         open={open}
         onClose={onClose}
-        PaperProps={{
-          sx: {
-            borderTopLeftRadius: 16,
-            borderTopRightRadius: 16,
-            height: "88vh",
-            p: 2,
+        ModalProps={{
+          BackdropProps: {
+            sx: { backgroundColor: "rgba(15, 23, 42, 0.48)", backdropFilter: "blur(10px)" },
           },
+        }}
+        PaperProps={{
+          sx: nativeSheetPaperSx,
         }}
       >
         {/* Handle bar */}
-        <Box sx={{ width: 40, height: 4, bgcolor: "divider", mx: "auto", mb: 1 }} />
+        <Box sx={{ width: 44, height: 5, bgcolor: "#cbd5e1", mx: "auto", mb: 1.5, borderRadius: 99 }} />
 
-        <Typography fontWeight={900} fontSize={18} textAlign="center">
+        <Typography fontWeight={900} fontSize={19} lineHeight={1.2} textAlign="center" color="#0f172a">
           Complete Payment
         </Typography>
 
         {/* Summary */}
-        <Box sx={{ p: 2, mt: 2, bgcolor: "grey.50", borderRadius: 1.5, border: "1px solid", borderColor: "divider" }}>
+        <Box
+          sx={{
+            p: 2,
+            mt: 2,
+            bgcolor: "rgba(255,255,255,0.92)",
+            borderRadius: 3,
+            border: "1px solid rgba(226,232,240,0.92)",
+            boxShadow: "0 12px 30px rgba(15, 23, 42, 0.07)",
+          }}
+        >
           <Typography fontWeight={700}>{data.pkg?.name || "Package"}</Typography>
           {summaryLines.length > 0 ? (
             <Box sx={{ mt: 0.5 }}>
@@ -159,15 +211,15 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
           ) : null}
           <Stack direction="row" justifyContent="space-between" mt={1}>
             <Typography color="text.secondary">Total Amount</Typography>
-            <Typography fontWeight={900} fontSize={20}>
+            <Typography fontWeight={900} fontSize={22} color="#0f172a">
               ₹{Number(data.amount || 0)}
             </Typography>
           </Stack>
         </Box>
-        <Divider sx={{ my: 1.5 }} />
+        <Divider sx={{ my: 1.5, borderColor: "rgba(226,232,240,0.9)" }} />
 
         {/* UPI Section */}
-        <Box sx={{ p: 2, mt: 2 }}>
+        <Box sx={{ p: 2, mt: 1.5, borderRadius: 3, bgcolor: "rgba(248,250,252,0.9)", border: "1px solid #e2e8f0" }}>
           <Typography fontWeight={700} mb={1}>
             UPI Payment
           </Typography>
@@ -177,7 +229,17 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
               component="img"
               src={normalizeMediaUrl(payment.upi_qr_image_url)}
               alt="UPI QR"
-              sx={{ width: 180, mx: "auto", display: "block", mb: 2, cursor: "pointer", borderRadius: 1 }}
+              sx={{
+                width: 180,
+                mx: "auto",
+                display: "block",
+                mb: 2,
+                cursor: "pointer",
+                borderRadius: 3,
+                p: 1,
+                bgcolor: "#fff",
+                boxShadow: "0 12px 26px rgba(15,23,42,0.10)",
+              }}
               onClick={() => setZoomOpen(true)}
             />
           ) : null}
@@ -186,6 +248,7 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
             label="UPI ID"
             value={payment?.upi_id || ""}
             fullWidth
+            sx={softFieldSx}
             onClick={() => {
               const v = payment?.upi_id || "";
               if (v) navigator.clipboard.writeText(v);
@@ -217,12 +280,12 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
         <TextField
           label="Transaction / UTR ID (Optional)"
           fullWidth
-          sx={{ mt: 2 }}
+          sx={{ mt: 2, ...softFieldSx }}
           value={txnId}
           onChange={(e) => setTxnId(e.target.value)}
         />
 
-        <Button component="label" sx={{ mt: 2 }}>
+        <Button component="label" variant="outlined" sx={{ mt: 2, borderRadius: 3, minHeight: 48 }}>
           Upload Payment Screenshot
           <input type="file" hidden onChange={(e) => setFile(e.target.files?.[0])} />
         </Button>
@@ -230,7 +293,7 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
         <Button
           fullWidth
           variant="contained"
-          sx={{ mt: 3, height: 52 }}
+          sx={{ mt: 3, ...primaryPaymentButtonSx }}
           disabled={!file || submitting}
           onClick={async () => {
             setSubmitting(true);
@@ -261,12 +324,16 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
           {submitting ? "Submitting..." : "Submit Payment"}
         </Button>
 
-        <Button fullWidth variant="text" sx={{ mt: 1 }} onClick={onClose}>
+        <Button fullWidth variant="text" sx={{ mt: 1, borderRadius: 3 }} onClick={onClose}>
           Cancel
         </Button>
       </Drawer>
 
-      <Dialog open={zoomOpen} onClose={() => setZoomOpen(false)}>
+      <Dialog
+        open={zoomOpen}
+        onClose={() => setZoomOpen(false)}
+        PaperProps={{ sx: { borderRadius: 4, boxShadow: "0 24px 80px rgba(15,23,42,0.24)" } }}
+      >
         <Box sx={{ p: 2 }}>
           {payment?.upi_qr_image_url ? (
             <Box
@@ -307,37 +374,59 @@ function PaymentMethodDialog({ open, onClose, intent, walletMe, onPickManual, on
   const amount = Number(intent?.amount || intent?.pkg?.price || 0);
   const internalBal = Number(walletMe?.transfer_wallets?.internal || walletMe?.internal_wallet_balance || 0);
   const packageCouponBal = Number(walletMe?.transfer_wallets?.packagePurchaseCoupon || 0);
+  const addMoneyBal = Number(walletMe?.transfer_wallets?.packageUpload || 0);
   const canWallet = internalBal >= amount && amount > 0;
   const canPackageCoupon = packageCouponBal >= amount && amount > 0;
+  const canAddMoney = addMoneyBal >= amount && amount > 0;
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>Select Payment Method</DialogTitle>
-      <DialogContent dividers>
-        <Typography variant="body2" color="text.secondary">
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="xs"
+      PaperProps={{
+        sx: {
+          borderRadius: 4,
+          background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+          boxShadow: "0 24px 80px rgba(15,23,42,0.24)",
+          overflow: "hidden",
+        },
+      }}
+      BackdropProps={{ sx: { backgroundColor: "rgba(15, 23, 42, 0.44)", backdropFilter: "blur(8px)" } }}
+    >
+      <DialogTitle sx={{ fontWeight: 900, color: "#0f172a", pb: 1 }}>Select Payment Method</DialogTitle>
+      <DialogContent dividers sx={{ borderColor: "rgba(226,232,240,0.9)", pt: 1.5 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
           Amount: <b>₹{amount}</b>
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, lineHeight: 1.7 }}>
           Self Package Wallet Balance: <b>₹{internalBal.toFixed(2)}</b>
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, lineHeight: 1.7 }}>
           Package Purchase Coupon Wallet Balance: <b>₹{packageCouponBal.toFixed(2)}</b>
         </Typography>
-        {!canWallet && !canPackageCoupon ? (
-          <Alert severity="info" sx={{ mt: 1.5 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, lineHeight: 1.7 }}>
+          Add Money Pocket Balance: <b>₹{addMoneyBal.toFixed(2)}</b>
+        </Typography>
+        {!canWallet && !canPackageCoupon && !canAddMoney ? (
+          <Alert severity="info" sx={{ mt: 1.5, borderRadius: 3 }}>
             Wallet payment is available only when one package wallet balance is enough.
           </Alert>
         ) : null}
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button variant="outlined" onClick={onPickManual}>
+      <DialogActions sx={{ p: 1.5, gap: 1, flexWrap: "wrap" }}>
+        <Button onClick={onClose} sx={{ borderRadius: 3 }}>Cancel</Button>
+        <Button variant="outlined" onClick={onPickManual} sx={{ borderRadius: 3, fontWeight: 900 }}>
           Manual Payment
         </Button>
-        <Button variant="contained" disabled={!canWallet} onClick={() => onPickWallet("internal")}>
+        <Button variant="contained" disabled={!canWallet} onClick={() => onPickWallet("internal")} sx={{ borderRadius: 3, fontWeight: 900 }}>
           Pay from Self Package
         </Button>
-        <Button variant="contained" disabled={!canPackageCoupon} onClick={() => onPickWallet("package_coupon")}>
+        <Button variant="contained" disabled={!canPackageCoupon} onClick={() => onPickWallet("package_coupon")} sx={{ borderRadius: 3, fontWeight: 900 }}>
           Pay from Coupon Wallet
+        </Button>
+        <Button variant="contained" disabled={!canAddMoney} onClick={() => onPickWallet("package_upload")} sx={{ borderRadius: 3, fontWeight: 900 }}>
+          Pay from Add Money Pocket
         </Button>
       </DialogActions>
     </Dialog>

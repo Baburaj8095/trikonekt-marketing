@@ -106,7 +106,7 @@ class AdminWalletUploadRequestListView(APIView):
 
 
 class AdminWalletUploadRequestApproveView(APIView):
-    """Approve a request and credit INTERNAL wallet pocket.
+    """Approve a request and credit Add Money wallet pocket.
 
     POST /api/accounts/admin/wallet/upload-requests/<id>/approve/
     """
@@ -2150,7 +2150,20 @@ class WalletMe(APIView):
                 ["COUPON_WALLET_CREDIT", "COUPON_WALLET_REFUND"],
                 ["COUPON_WALLET_DEBIT", "VOUCHER_CREATE_DEBIT"],
             )
-            internal_wallet_balance = _wallet_sum(["INTERNAL_WALLET_CREDIT"], ["INTERNAL_WALLET_DEBIT"])
+            upload_sources = ["WALLET_UPLOAD", "UPLOAD_TO_WALLET", "PACKAGE_UPLOAD", "PACKAGE_BUY_UPLOAD"]
+            internal_credit = (
+                tx_all
+                .filter(type="INTERNAL_WALLET_CREDIT", amount__gt=0)
+                .exclude(source_type__in=upload_sources)
+                .aggregate(total=Sum("amount"))["total"] or D("0.00")
+            )
+            internal_debit = (
+                tx_all
+                .filter(type="INTERNAL_WALLET_DEBIT", amount__lt=0)
+                .exclude(source_type__in=upload_sources)
+                .aggregate(total=Sum("amount"))["total"] or D("0.00")
+            )
+            internal_wallet_balance = str((D(str(internal_credit)) + D(str(internal_debit))).quantize(D("0.01")))
             package_coupon_wallet_balance = _wallet_sum(["PACKAGE_COUPON_WALLET_CREDIT", "VOUCHER_REDEEM_CREDIT"], ["PACKAGE_COUPON_WALLET_DEBIT"])
             wallet_transfer_total = _wallet_sum(["WALLET_TO_WALLET_IN"], ["WALLET_TO_WALLET_OUT"])
             withdrawal_wallet_balance = str((D(str(getattr(w, "withdrawable_balance", 0) or 0))).quantize(D("0.01")))
@@ -2168,7 +2181,6 @@ class WalletMe(APIView):
                 ],
             )
             try:
-                upload_sources = ["WALLET_UPLOAD", "UPLOAD_TO_WALLET", "PACKAGE_UPLOAD", "PACKAGE_BUY_UPLOAD"]
                 source_credit = tx_all.filter(source_type__in=upload_sources, amount__gt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")
                 source_debit = tx_all.filter(source_type__in=upload_sources, amount__lt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")
                 typed_total = D(str(package_upload_balance or "0"))
@@ -2605,17 +2617,36 @@ def _package_coupon_wallet_balance(user):
 
 
 def _voucher_validity_days(voucher_type):
-    if voucher_type == ConsumerVoucher.TYPE_PACKAGE_PURCHASE:
+    if voucher_type in {ConsumerVoucher.TYPE_NEAR_STORE, ConsumerVoucher.TYPE_PACKAGE_PURCHASE}:
         return 7
     return 30
 
 
-def _generate_voucher_code():
+def _voucher_code_prefix(voucher_type):
+    return {
+        ConsumerVoucher.TYPE_TRIZONE: "ZONE",
+        ConsumerVoucher.TYPE_NEAR_STORE: "NEAR",
+        ConsumerVoucher.TYPE_ONLINE: "ONLINE",
+        ConsumerVoucher.TYPE_PACKAGE_PURCHASE: "PACKAGE",
+    }.get(voucher_type, "COUPON")
+
+
+def _creator_mobile_digits(user):
+    raw = getattr(user, "phone", "") or getattr(user, "username", "") or ""
+    digits = "".join(ch for ch in str(raw) if ch.isdigit())
+    if len(digits) >= 10:
+        return digits[-10:]
+    return digits.zfill(10)
+
+
+def _generate_voucher_code(user, voucher_type):
+    mobile = _creator_mobile_digits(user)
+    prefix = _voucher_code_prefix(voucher_type)
     for _ in range(20):
-        code = f"TKV{random.randint(10000000, 99999999)}"
+        code = f"{mobile}-{prefix}{random.randint(100000, 999999)}"
         if not ConsumerVoucher.objects.filter(code=code).exists():
             return code
-    return f"TKV{timezone.now().strftime('%y%m%d%H%M%S%f')[-14:]}"
+    return f"{mobile}-{prefix}{timezone.now().strftime('%H%M%S%f')[-6:]}"
 
 
 def _expire_active_vouchers_for_user(user):
@@ -2737,7 +2768,7 @@ class ConsumerVoucherListCreate(APIView):
                 creator=request.user,
                 assigned_to=assigned_to,
                 voucher_type=voucher_type,
-                code=_generate_voucher_code(),
+                code=_generate_voucher_code(request.user, voucher_type),
                 amount=amount,
                 expires_at=timezone.now() + timedelta(days=_voucher_validity_days(voucher_type)),
                 note=note,

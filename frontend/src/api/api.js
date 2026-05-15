@@ -1522,6 +1522,11 @@ export async function createRankUpgradePayment({ upgrade_id, utr = "", remarks =
   return res?.data || res;
 }
 
+export async function createRankUpgradeFromWallet({ upgrade_id, wallet_source = "package_upload" } = {}) {
+  const res = await API.post("/upgrade/pay-from-wallet/", { upgrade_id, wallet_source }, { timeout: 30000 });
+  return res?.data || res;
+}
+
 export async function listMyRankUpgrades(params = {}) {
   const res = await API.get("/user/rank-upgrades/", { params, dedupe: "cancelPrevious", cacheTTL: 5000 });
   return res?.data || res;

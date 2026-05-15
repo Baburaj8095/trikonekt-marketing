@@ -53,6 +53,14 @@ export default function ShellBase({
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
+  useEffect(() => {
+    function openSidebar() {
+      setSidebarOpen(true);
+    }
+    window.addEventListener("trikonekt:open-consumer-sidebar", openSidebar);
+    return () => window.removeEventListener("trikonekt:open-consumer-sidebar", openSidebar);
+  }, []);
+
   // Close drawer on route change (mobile only)
   useEffect(() => {
     if (isMobile) setSidebarOpen(false);
@@ -223,16 +231,27 @@ export default function ShellBase({
           display: "flex",
           alignItems: "center",
           gap: 10,
-          padding: "10px 12px",
-          borderRadius: 8,
+          padding: "11px 12px",
+          borderRadius: 12,
           color: active ? "#0ea5e9" : "#cbd5e1",
           textDecoration: "none",
-          background: active ? "rgba(14,165,233,0.12)" : "transparent",
-          border: active ? "1px solid rgba(14,165,233,0.35)" : "1px solid transparent",
-          cursor: "pointer"
+          background: active ? "linear-gradient(135deg, rgba(14,165,233,0.18), rgba(34,197,94,0.10))" : "transparent",
+          border: active ? "1px solid rgba(14,165,233,0.36)" : "1px solid transparent",
+          cursor: "pointer",
+          boxShadow: active ? "0 10px 24px rgba(2,132,199,0.12)" : "none",
+          transition: "background 160ms ease, color 160ms ease, transform 140ms ease, border-color 160ms ease"
         }}
         onClick={() => {
           if (isMobile) setSidebarOpen(false);
+        }}
+        onMouseDown={(e) => {
+          try { e.currentTarget.style.transform = "scale(0.985)"; } catch {}
+        }}
+        onMouseUp={(e) => {
+          try { e.currentTarget.style.transform = "scale(1)"; } catch {}
+        }}
+        onMouseLeave={(e) => {
+          try { e.currentTarget.style.transform = "scale(1)"; } catch {}
         }}
       >
         {icon ? <Icon name={icon} active={active} /> : null}
@@ -313,21 +332,24 @@ export default function ShellBase({
   }
 
   return (
-    <div className="role-shell-scope" style={{ minHeight: "100vh", background: "#f1f5f9" }}>
+    <div className="role-shell-scope" style={{ minHeight: "100vh", background: "#f6f8fb" }}>
       {/* Top bar: shown only on mobile */}
       {isMobile ? (
         <div
+  className="native-glass"
   style={{
     position: "sticky",
     top: 0,
     zIndex: 1060,
-    height: 56,
+    height: 58,
     display: "grid",
     gridTemplateColumns: "48px 1fr max-content",
     alignItems: "center",
-    padding: "0 8px",
-    borderBottom: "1px solid #e2e8f0",
-    background: "#ffffff",
+    padding: "0 10px",
+    paddingTop: "env(safe-area-inset-top)",
+    borderBottom: "1px solid rgba(226,232,240,0.82)",
+    background: "rgba(255,255,255,0.86)",
+    boxShadow: "0 10px 30px rgba(15,23,42,0.07)",
   }}
 >
   {/* LEFT */}
@@ -338,12 +360,17 @@ export default function ShellBase({
       style={{
         width: 36,
         height: 36,
-        borderRadius: 8,
-        border: "1px solid #e2e8f0",
-        background: "#fff",
+        borderRadius: 12,
+        border: "1px solid rgba(226,232,240,0.92)",
+        background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+        boxShadow: "0 8px 18px rgba(15,23,42,0.08)",
         cursor: "pointer",
         justifySelf: "start",
+        transition: "transform 140ms ease, box-shadow 160ms ease",
       }}
+      onMouseDown={(e) => { try { e.currentTarget.style.transform = "scale(0.94)"; } catch {} }}
+      onMouseUp={(e) => { try { e.currentTarget.style.transform = "scale(1)"; } catch {} }}
+      onMouseLeave={(e) => { try { e.currentTarget.style.transform = "scale(1)"; } catch {} }}
       >
       ☰
     </button>
@@ -354,12 +381,17 @@ export default function ShellBase({
       style={{
         width: 36,
         height: 36,
-        borderRadius: 8,
-        border: "1px solid #e2e8f0",
-        background: "#fff",
+        borderRadius: 12,
+        border: "1px solid rgba(226,232,240,0.92)",
+        background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+        boxShadow: "0 8px 18px rgba(15,23,42,0.08)",
         cursor: "pointer",
         justifySelf: "start",
+        transition: "transform 140ms ease, box-shadow 160ms ease",
       }}
+      onMouseDown={(e) => { try { e.currentTarget.style.transform = "scale(0.94)"; } catch {} }}
+      onMouseUp={(e) => { try { e.currentTarget.style.transform = "scale(1)"; } catch {} }}
+      onMouseLeave={(e) => { try { e.currentTarget.style.transform = "scale(1)"; } catch {} }}
       >
       ←
     </button>
@@ -393,7 +425,17 @@ export default function ShellBase({
         gap: 6,
         textDecoration: "none",
         color: "#0f172a",
+        minHeight: 38,
+        padding: "0 8px",
+        borderRadius: 12,
+        border: "1px solid rgba(226,232,240,0.92)",
+        background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+        boxShadow: "0 8px 18px rgba(15,23,42,0.08)",
+        transition: "transform 140ms ease",
       }}
+      onMouseDown={(e) => { try { e.currentTarget.style.transform = "scale(0.96)"; } catch {} }}
+      onMouseUp={(e) => { try { e.currentTarget.style.transform = "scale(1)"; } catch {} }}
+      onMouseLeave={(e) => { try { e.currentTarget.style.transform = "scale(1)"; } catch {} }}
     >
       <CartIcon size={22} />
       <span
@@ -406,6 +448,7 @@ export default function ShellBase({
           minWidth: 18,
           height: 18,
           padding: "0 6px",
+          boxShadow: "0 6px 14px rgba(239,68,68,0.26)",
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
@@ -427,7 +470,9 @@ export default function ShellBase({
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(15,23,42,0.35)",
+            background: "rgba(15,23,42,0.42)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
             zIndex: 1040,
           }}
         />
@@ -450,9 +495,10 @@ export default function ShellBase({
             WebkitOverflowScrolling: "touch",
             overscrollBehavior: "contain",
             touchAction: "pan-y",
-            transition: isMobile ? "width 200ms ease, min-width 200ms ease" : "none",
-            background: "#0f172a",
-            borderRight: "1px solid #0b1220",
+            transition: isMobile ? "width 220ms cubic-bezier(.2,.8,.2,1), min-width 220ms cubic-bezier(.2,.8,.2,1)" : "none",
+            background: "linear-gradient(180deg, #0f172a 0%, #111827 52%, #0b1120 100%)",
+            borderRight: "1px solid rgba(148,163,184,0.14)",
+            boxShadow: isMobile ? "18px 0 50px rgba(15,23,42,0.28)" : "10px 0 30px rgba(15,23,42,0.08)",
             padding: (isMobile && !sidebarOpen) ? 0 : "12px",
           }}
         >
@@ -626,13 +672,31 @@ export default function ShellBase({
             flex: 1,
             minWidth: 0,
             padding: isMobile ? 12 : 16,
+            paddingBottom: isMobile ? "max(12px, env(safe-area-inset-bottom))" : 16,
             marginLeft: isMobile ? 0 : (sidebarWidth + sidebarGap),
             width: "100%",
           }}
         >
           <div style={{ width: "100%", margin: "0 auto", maxWidth: 1400 }}>
             {!isMobile ? (
-              <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <div
+                className="native-glass"
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 10,
+                  position: "sticky",
+                  top: 0,
+                  zIndex: 20,
+                  padding: "8px 10px",
+                  borderRadius: 16,
+                  background: "rgba(255,255,255,0.78)",
+                  border: "1px solid rgba(226,232,240,0.82)",
+                  boxShadow: "0 10px 30px rgba(15,23,42,0.06)",
+                }}
+              >
                 {rightHeaderContent ? <div>{rightHeaderContent}</div> : null}
                 <NotificationsBell />
                 <Link
@@ -644,6 +708,12 @@ export default function ShellBase({
                     gap: 6,
                     textDecoration: "none",
                     color: "#0f172a",
+                    minHeight: 38,
+                    padding: "0 8px",
+                    borderRadius: 12,
+                    border: "1px solid rgba(226,232,240,0.92)",
+                    background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+                    boxShadow: "0 8px 18px rgba(15,23,42,0.08)",
                   }}
                 >
                   <CartIcon size={22} />
@@ -657,6 +727,7 @@ export default function ShellBase({
                       minWidth: 18,
                       height: 18,
                       padding: "0 6px",
+                      boxShadow: "0 6px 14px rgba(239,68,68,0.26)",
                       display: "inline-flex",
                       alignItems: "center",
                       justifyContent: "center",

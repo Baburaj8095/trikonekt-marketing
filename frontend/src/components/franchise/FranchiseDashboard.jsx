@@ -36,11 +36,12 @@ const COLORS = {
   primaryDark: "#0284c7",
   success: "#22c55e",
   secondary: "#a855f7",
-  background: "#f1f5f9",
+  background: "#f6f8fb",
   surface: "#ffffff",
   text: "#0f172a",
   textSecondary: "#64748b",
   border: "#e5e7eb",
+  shadow: "0 16px 42px rgba(15, 23, 42, 0.08), 0 1px 0 rgba(15, 23, 42, 0.03)",
 };
 
 function AchieverCard({ name, subtitle, achieved, photoUrl }) {
@@ -51,7 +52,7 @@ function AchieverCard({ name, subtitle, achieved, photoUrl }) {
   }, [name]);
 
   return (
-    <motion.div whileHover={{ y: -4 }} transition={{ duration: 0.2 }}>
+    <motion.div whileHover={{ y: -3 }} whileTap={{ scale: 0.985 }} transition={{ duration: 0.18 }}>
       <Box
         sx={{
           display: "flex",
@@ -60,11 +61,12 @@ function AchieverCard({ name, subtitle, achieved, photoUrl }) {
           width: "100%",
           p: 2,
           minWidth: 190,
-          borderRadius: 2,
+          borderRadius: 3,
           bgcolor: COLORS.surface,
           border: `1px solid ${COLORS.border}`,
-          transition: "all 0.3s ease",
-          "&:hover": { boxShadow: "0 4px 12px rgba(0,0,0,0.1)" },
+          boxShadow: "0 10px 28px rgba(15,23,42,0.07)",
+          transition: "box-shadow 180ms ease, border-color 180ms ease",
+          "&:hover": { boxShadow: "0 14px 34px rgba(15,23,42,0.11)", borderColor: "rgba(14,165,233,0.22)" },
         }}
       >
         <Avatar
@@ -92,7 +94,7 @@ function AchieverCard({ name, subtitle, achieved, photoUrl }) {
 
 function OverviewMetricCard({ title, value, icon, accent }) {
   return (
-    <motion.div whileHover={{ y: -6 }} transition={{ duration: 0.24 }}>
+    <motion.div whileHover={{ y: -4 }} whileTap={{ scale: 0.985 }} transition={{ duration: 0.2 }}>
       <Box
         sx={{
           height: "100%",
@@ -101,7 +103,9 @@ function OverviewMetricCard({ title, value, icon, accent }) {
           borderRadius: 4,
           bgcolor: COLORS.surface,
           border: `1px solid ${COLORS.border}`,
-          boxShadow: "0 10px 30px rgba(15,23,42,0.07)",
+          boxShadow: COLORS.shadow,
+          transition: "box-shadow 180ms ease, border-color 180ms ease",
+          "&:hover": { borderColor: "rgba(14,165,233,0.22)", boxShadow: "0 18px 48px rgba(15,23,42,0.12)" },
         }}
       >
         <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 2, mb: 2 }}>
@@ -115,6 +119,7 @@ function OverviewMetricCard({ title, value, icon, accent }) {
               bgcolor: `${accent}14`,
               color: accent,
               border: `1px solid ${accent}22`,
+              boxShadow: `0 10px 24px ${accent}18`,
             }}
           >
             {icon}
@@ -146,8 +151,9 @@ function OverviewSection({ title, metrics, horizontalSwipe = false }) {
     <Card
       sx={{
         borderRadius: 4,
-        boxShadow: "0 12px 36px rgba(15,23,42,0.08)",
+        boxShadow: COLORS.shadow,
         border: `1px solid ${COLORS.border}`,
+        background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
       }}
     >
       <CardContent sx={{ p: { xs: 3, md: 4 } }}>
@@ -190,7 +196,7 @@ function OverviewSection({ title, metrics, horizontalSwipe = false }) {
 
 function PincodeWiseScroller({ title, icon, rows }) {
   return (
-    <Card sx={{ borderRadius: 3, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", border: `1px solid ${COLORS.border}` }}>
+    <Card sx={{ borderRadius: 4, boxShadow: COLORS.shadow, border: `1px solid ${COLORS.border}`, background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)" }}>
       <CardContent sx={{ p: { xs: 3, md: 4 } }}>
         <Typography variant="h6" sx={{ fontWeight: 900, color: COLORS.text, mb: 2 }}>
           {title}
@@ -198,7 +204,7 @@ function PincodeWiseScroller({ title, icon, rows }) {
         <Box sx={{ overflowX: "auto", pb: 1 }}>
           <Stack direction="row" spacing={2} sx={{ minWidth: "max-content" }}>
             {(rows || []).map((r) => (
-              <Card key={r.pincode} sx={{ minWidth: 220, borderRadius: 3, border: `1px solid ${COLORS.border}`, boxShadow: "none" }}>
+              <Card key={r.pincode} sx={{ minWidth: 220, borderRadius: 3, border: `1px solid ${COLORS.border}`, boxShadow: "0 8px 22px rgba(15,23,42,0.06)" }}>
                 <CardContent sx={{ p: 2.5 }}>
                   <Stack direction="row" spacing={1.5} alignItems="center">
                     <Box
@@ -378,16 +384,16 @@ export default function FranchiseDashboard() {
   const perPin = metrics?.per_pincode || {};
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: COLORS.background, py: { xs: 2, md: 4 } }}>
+    <Box sx={{ minHeight: "100vh", bgcolor: COLORS.background, py: { xs: 2, md: 4 }, WebkitOverflowScrolling: "touch" }}>
       <Container maxWidth="xl">
-        <Stack spacing={4}>
+        <Stack spacing={{ xs: 2.5, md: 4 }}>
           {err ? <Alert severity="error">{err}</Alert> : null}
 
           {/* Wishing banner scroller */}
           {loading ? (
             <Skeleton variant="rounded" height={210} />
           ) : banners?.length ? (
-            <Card sx={{ borderRadius: 3, overflow: "hidden", border: `1px solid ${COLORS.border}` }}>
+            <Card sx={{ borderRadius: 4, overflow: "hidden", border: `1px solid ${COLORS.border}`, boxShadow: COLORS.shadow }}>
               <CardContent sx={{ p: 0 }}>
                 <Box sx={{ overflowX: "auto" }}>
                   <Stack direction="row" spacing={0} sx={{ minWidth: "max-content" }}>
@@ -414,9 +420,9 @@ export default function FranchiseDashboard() {
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
             <Card
               sx={{
-                background: `linear-gradient(135deg, ${COLORS.success} 0%, ${COLORS.primary} 100%)`,
+                background: `linear-gradient(135deg, ${COLORS.success} 0%, ${COLORS.primary} 58%, ${COLORS.primaryDark} 100%)`,
                 borderRadius: 4,
-                boxShadow: "0 8px 32px rgba(34, 197, 94, 0.3)",
+                boxShadow: "0 22px 54px rgba(14, 165, 233, 0.22)",
                 border: "none",
                 overflow: "hidden",
               }}
@@ -430,6 +436,7 @@ export default function FranchiseDashboard() {
                         height: 48,
                         borderRadius: 2,
                         bgcolor: "rgba(255,255,255,0.2)",
+                        boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.22)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -448,16 +455,16 @@ export default function FranchiseDashboard() {
                   </Box>
 
                   <Stack direction="row" spacing={1}>
-                    <IconButton sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "white" }}>
+                    <IconButton sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "white", border: "1px solid rgba(255,255,255,0.22)", transition: "transform 140ms ease", "&:active": { transform: "scale(0.94)" } }}>
                       <NotificationsNoneRoundedIcon />
                     </IconButton>
                     <IconButton
                       onClick={() => navigate("/agency/franchise-wallet")}
-                      sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "white" }}
+                      sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "white", border: "1px solid rgba(255,255,255,0.22)", transition: "transform 140ms ease", "&:active": { transform: "scale(0.94)" } }}
                     >
                       <CurrencyRupeeRoundedIcon />
                     </IconButton>
-                    <IconButton sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "white" }}>
+                    <IconButton sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "white", border: "1px solid rgba(255,255,255,0.22)", transition: "transform 140ms ease", "&:active": { transform: "scale(0.94)" } }}>
                       <PublicRoundedIcon />
                     </IconButton>
                   </Stack>
@@ -478,6 +485,7 @@ export default function FranchiseDashboard() {
                       bgcolor: "rgba(255,255,255,0.15)",
                       backdropFilter: "blur(10px)",
                       border: "1px solid rgba(255,255,255,0.2)",
+                      boxShadow: "inset 0 1px 0 rgba(255,255,255,0.16)",
                     }}
                   >
                     <Grid container spacing={3}>
@@ -530,7 +538,7 @@ export default function FranchiseDashboard() {
           </motion.div>
 
           {/* Achievers */}
-          <Card sx={{ borderRadius: 3, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", border: `1px solid ${COLORS.border}` }}>
+          <Card sx={{ borderRadius: 4, boxShadow: COLORS.shadow, border: `1px solid ${COLORS.border}`, background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)" }}>
             <CardContent sx={{ p: { xs: 3, md: 4 } }}>
               <Typography variant="h5" sx={{ fontWeight: 900, color: COLORS.text, mb: 3 }}>
                 Top Achievers

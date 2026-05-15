@@ -44,8 +44,8 @@ const TRANSFER_OPTIONS = [
   },
   {
     value: "shopping",
-    label: "Gift Card Pocket",
-    helper: "Use for shopping in consumer dashboard and product purchases.",
+    label: "Shopping Self Re-birth",
+    helper: "Shopping reward/re-birth pocket for shopping related benefits.",
   },
   {
     value: "internal",
@@ -66,27 +66,31 @@ const TRANSFER_OPTIONS = [
 
 const WALLET_DEFINITIONS = [
   { slNo: 1, name: "Total Earning Wallet", section: "core" },
-  { slNo: 2, name: "Self Rebirth Wallet", section: "core" },
-  { slNo: 3, name: "Shopping Reward Wallet", section: "core" },
+  { slNo: 2, name: "Team Consumer Self Re-birth", section: "core" },
+  { slNo: 3, name: "Shopping Self Re-birth", section: "core" },
   { slNo: 4, name: "Redeem Points Wallet", section: "core" },
   { slNo: 5, name: "Main Wallet", section: "core", highlight: true },
   { slNo: 6, name: "Coupon Pocket Wallet", section: "operational" },
-  { slNo: 7, name: "Shopping Wallet", section: "operational" },
-  { slNo: 8, name: "Buy Package (Internal)", section: "operational" },
-  { slNo: 9, name: "Wallet to Wallet Transfer", section: "operational" },
-  { slNo: 10, name: "Withdrawal Wallet", section: "operational" },
-  { slNo: 11, name: "Package Purchase Coupon Wallet", section: "rewards" },
+  { slNo: 7, name: "Self Package Pocket (Buy Package)", section: "operational" },
+  { slNo: 9, name: "Add Money (Buy Package)", section: "operational" },
+  { slNo: 10, name: "Withdrawal To Pocket", section: "operational" },
+  { slNo: 11, name: "Package Purchase Coupon Received (Buy Package)", section: "operational" },
   { slNo: 12, name: "Direct Benefit Wallet", section: "rewards" },
   { slNo: 13, name: "Prime Subscription Spin & Win", section: "rewards" },
   { slNo: 14, name: "Level Benefit Wallet", section: "rewards" },
   { slNo: 15, name: "Reward Gift", section: "rewards" },
+  { slNo: 16, name: "Franchisee Self Re-birth", section: "rewards" },
+  { slNo: 17, name: "Captain Self Re-birth", section: "rewards" },
+  { slNo: 18, name: "Franchise Reference Reward", section: "rewards" },
+  { slNo: 19, name: "Zonal Reward", section: "rewards" },
+  { slNo: 20, name: "Smart Product Pocket", section: "rewards" },
 ];
 
 const VOUCHER_TYPES = [
-  { value: "TRIZONE", label: "Trizone Voucher", validity: "30 days" },
+  { value: "TRIZONE", label: "Triozone Coupon", validity: "30 days" },
   { value: "ONLINE", label: "Online Coupon", validity: "30 days" },
-  { value: "NEAR_STORE", label: "Near Store Coupon", validity: "30 days" },
-  { value: "PACKAGE_PURCHASE", label: "Package Purchase Coupon", validity: "7 days" },
+  { value: "NEAR_STORE", label: "Near Store Coupon", validity: "7 days" },
+  { value: "PACKAGE_PURCHASE", label: "Self Package Coupon", validity: "7 days" },
 ];
 
 const walletPanelSx = {
@@ -462,19 +466,26 @@ export default function TeamWallet() {
           ];
           break;
         case 7:
-          amount = Number(transferWallets?.shopping || 0);
-          icon = <ShoppingCartIcon />;
-          label = "Consumer shopping";
-          break;
-        case 8:
           amount = Number(transferWallets?.internal || 0);
           icon = <StoreIcon />;
-          label = "Buy promo internally";
+          label = "Use for Join Subscription, SPP, Digital Education Prime, and Tri Tour package purchase";
+          break;
+        case 8:
+          amount = Number(transferWallets?.withdrawal || walletData?.withdrawable_balance || 0);
+          icon = <PaymentsIcon />;
+          label = `Min Rs. ${limits?.minWithdraw || 500}`;
+          actions = [
+            {
+              label: "Withdraw",
+              onClick: () => (window.location.href = "/user/wallet"),
+              disabled: !kycVerified,
+            },
+          ];
           break;
         case 9:
-          amount = Number(transferWallets?.walletToWallet || 0);
-          icon = <SwapHorizIcon />;
-          label = "Consumer transfer";
+          amount = Number(transferWallets?.packageUpload || 0);
+          icon = <AccountBalanceWalletIcon />;
+          label = "Admin-approved uploaded money for buying packages";
           break;
         case 10:
           amount = Number(transferWallets?.withdrawal || walletData?.withdrawable_balance || 0);
@@ -491,7 +502,7 @@ export default function TeamWallet() {
         case 11:
           amount = Number(transferWallets?.packagePurchaseCoupon || voucherData?.package_coupon_wallet_balance || 0);
           icon = <PeopleIcon />;
-          label = "Redeemed package vouchers";
+          label = "Coupons received and redeemed for buying packages";
           break;
         case 12:
           amount = Number(income?.directReferral || 0);
@@ -542,21 +553,27 @@ export default function TeamWallet() {
       },
       {
         no: 2,
-        transferType: "shopping",
-        title: "Gift Card Pocket",
+        transferType: "internal",
+        title: "Self Package Pocket",
         wallet: walletByNo[7],
       },
       {
         no: 3,
-        transferType: "internal",
-        title: "Self Package Pocket",
-        wallet: walletByNo[8],
-      },
-      {
-        no: 4,
         transferType: "withdrawal",
         title: "Withdrawal To Pocket",
         wallet: walletByNo[10],
+      },
+      {
+        no: 4,
+        title: "Add Money (Buy Package)",
+        wallet: walletByNo[9],
+        onClick: () => (window.location.href = "/user/upload-wallet"),
+      },
+      {
+        no: 5,
+        title: "Package Purchase Coupon Received (Buy Package)",
+        wallet: walletByNo[11],
+        onClick: () => (window.location.href = "/user/package-coupon-pocket"),
       },
     ],
     [walletByNo]
@@ -565,7 +582,7 @@ export default function TeamWallet() {
   const summaryWallets = useMemo(
     () => [
       { title: "Total Earning", wallet: walletByNo[1] },
-      { title: "Self Re-birth", wallet: walletByNo[2] },
+      { title: "Team Consumer Self Re-birth", wallet: walletByNo[2] },
       { title: "Redeem Points", wallet: walletByNo[4] },
     ],
     [walletByNo]
@@ -574,10 +591,10 @@ export default function TeamWallet() {
   const manualWallets = useMemo(
     () => [
       {
-        title: "Package Purchase GiftCard (Buy Package)",
+        title: "Package Purchase Coupon Received (Buy Package)",
         amount: walletByNo[11]?.amount,
         icon: walletByNo[11]?.icon,
-        caption: "Redeemed package coupon amount",
+        caption: "Received coupon redeemed amount",
         tone: 3,
       },
       {
@@ -879,7 +896,7 @@ export default function TeamWallet() {
                 caption={wallet?.label}
                 actions={pocket.transferType === "withdrawal" ? [] : wallet?.actions}
                 tone={pocket.no + 1}
-                onClick={() => openTransferType(pocket.transferType)}
+                onClick={pocket.onClick || (pocket.transferType ? () => openTransferType(pocket.transferType) : undefined)}
               />
             );
           })}
@@ -887,7 +904,7 @@ export default function TeamWallet() {
       </Box>
 
       <Box sx={{ mb: "14px" }}>
-        <SectionHeader title="Gift Card & Package Entry" accentColor="success.main" />
+        <SectionHeader title="Purchase Coupon Entry & Buy Package" accentColor="success.main" />
         <Box
           sx={{
             display: "grid",

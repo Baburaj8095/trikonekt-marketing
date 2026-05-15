@@ -413,7 +413,16 @@ export default function AdminUsers() {
               const pickNs = (s) => (s.startsWith("agency") ? "agency" : s.startsWith("employee") ? "employee" : "");
               let ns = pickNs(r) || pickNs(c) || (r === "agency" ? "agency" : r === "employee" ? "employee" : "user");
               const base = ns === "user" ? "" : `/${ns}`;
-              const url = `${base}/impersonate?access=${encodeURIComponent(access)}&refresh=${encodeURIComponent(refresh)}&ns=${encodeURIComponent(ns)}`;
+              const query = new URLSearchParams({
+                access,
+                refresh,
+                ns,
+              });
+              if (ns === "user") {
+                query.set("next", "/user/team-dashboard");
+                query.set("login_context", "team");
+              }
+              const url = `${base}/impersonate?${query.toString()}`;
               window.location.assign(url);
             } catch (_) {}
           };
