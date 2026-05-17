@@ -1228,7 +1228,12 @@ const Login3 = () => {
       if (payload?.is_staff || payload?.is_superuser) {
         navigate("/admin/dashboard", { replace: true });
       } else {
-        navigate(`/${roleEffective || tokenRole || "user"}/dashboard`, { replace: true });
+        const eff = String(roleEffective || tokenRole || "user").toLowerCase();
+        if (eff === "agency") {
+          navigate("/agency/franchise-dashboard", { replace: true });
+        } else {
+          navigate(`/${eff}/dashboard`, { replace: true });
+        }
       }
     } catch (err) {
       const data = err?.response?.data;

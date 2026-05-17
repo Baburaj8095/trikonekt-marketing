@@ -159,6 +159,23 @@ class TeamConsumerEducationalVideoSerializer(serializers.ModelSerializer):
             "can_access",
         ]
 
+    def validate(self, attrs):
+        rank = attrs.get("required_rank")
+        if self.instance is not None and "required_rank" not in attrs:
+            rank = getattr(self.instance, "required_rank", None)
+        if not rank:
+            raise serializers.ValidationError({"required_rank": "Digital Education Prime rank is required."})
+
+        qs = TeamConsumerEducationalVideo.objects.filter(required_rank=rank)
+        if self.instance is not None:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError({"required_rank": "This Prime rank already has an educational video. Edit that video instead."})
+
+        if self.instance is None and not attrs.get("video"):
+            raise serializers.ValidationError({"video": "Video file is required."})
+        return attrs
+
     def _is_admin_request(self):
         try:
             request = self.context.get("request") if hasattr(self, "context") else None

@@ -125,6 +125,7 @@ import PermissionsPage from "./pages/admin/PermissionsPage";
 import UserPermissionMap from "./pages/admin/UserPermissionMap";
 import AdminMerchantCategories from "./pages/admin/AdminMerchantCategories";
 import AdminMerchantSubcategories from "./pages/admin/AdminMerchantSubcategories";
+import AdminWorkflowScreen from "./pages/admin/AdminWorkflowScreen";
 import BusinessShell from "./components/layouts/BusinessShell";
 import BusinessDashboard from "./pages/business/BusinessDashboard";
 import BusinessProfile from "./pages/business/BusinessProfile";
@@ -1941,6 +1942,16 @@ function App() {
             <AdminProtectedRoute>
               <AdminShell>
                 <AdminMerchantSubcategories />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/workflows/:slug"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminWorkflowScreen />
               </AdminShell>
             </AdminProtectedRoute>
           }

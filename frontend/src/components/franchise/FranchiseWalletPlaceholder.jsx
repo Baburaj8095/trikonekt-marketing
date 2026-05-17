@@ -435,8 +435,8 @@ export default function FranchiseWalletPlaceholder() {
   const backTarget = useMemo(
     () =>
       location.pathname.startsWith("/agency/")
-        ? "/agency/dashboard"
-        : "/agency/dashboard",
+        ? "/agency/franchise-dashboard"
+        : "/agency/franchise-dashboard",
     [location.pathname]
   );
 

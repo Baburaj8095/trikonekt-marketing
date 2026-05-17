@@ -1938,6 +1938,13 @@ class TeamConsumerEducationalVideo(models.Model):
 
     class Meta:
         ordering = ["sort_order", "-created_at", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["required_rank"],
+                condition=models.Q(required_rank__isnull=False),
+                name="uniq_team_consumer_education_video_per_rank",
+            ),
+        ]
         verbose_name = "Team/Consumer Educational Video"
         verbose_name_plural = "Team/Consumer Educational Videos"
 

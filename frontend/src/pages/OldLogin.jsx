@@ -180,7 +180,7 @@ export default function Login() {
         // ignore storage errors
       }
 
-      if (role === "agency") navigate("/agency/dashboard");
+      if (role === "agency") navigate("/agency/franchise-dashboard");
       else if (role === "employee") navigate("/employee/dashboard");
       else navigate("/user/dashboard");
     } catch (err) {

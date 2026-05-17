@@ -95,7 +95,7 @@ export default function ImpersonateLanding() {
         // Default destination per role namespace
         let dest = "/";
         if (ns === "user") dest = "/user/dashboard";
-        if (ns === "agency") dest = "/agency/dashboard";
+        if (ns === "agency") dest = "/agency/franchise-dashboard";
         if (ns === "employee") dest = "/employee/dashboard";
         if (next && typeof next === "string") dest = next;
 

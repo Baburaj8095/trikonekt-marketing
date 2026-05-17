@@ -6,6 +6,7 @@ import {
   Button,
   Card,
   CardContent,
+  Chip,
   Container,
   Dialog,
   DialogActions,
@@ -48,6 +49,18 @@ function resolveMedia(raw) {
   return MEDIA_BASE ? `${MEDIA_BASE}${s.startsWith("/") ? "" : "/"}${s}` : s;
 }
 
+function apiErrorMessage(e, fallback) {
+  const data = e?.response?.data;
+  if (!data) return fallback;
+  if (typeof data === "string") return data;
+  if (data.detail) return data.detail;
+  const firstKey = Object.keys(data)[0];
+  const firstValue = firstKey ? data[firstKey] : "";
+  if (Array.isArray(firstValue)) return firstValue.join(" ");
+  if (typeof firstValue === "string") return firstValue;
+  return fallback;
+}
+
 export default function AdminTeamConsumerEducationalVideos() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -63,6 +76,16 @@ export default function AdminTeamConsumerEducationalVideos() {
     if (!s) return rows;
     return rows.filter((r) => `${r.title || ""} ${r.description || ""}`.toLowerCase().includes(s));
   }, [rows, q]);
+
+  const videoByRank = useMemo(() => {
+    const map = new Map();
+    rows.forEach((row) => {
+      if (row.required_rank && !map.has(String(row.required_rank))) {
+        map.set(String(row.required_rank), row);
+      }
+    });
+    return map;
+  }, [rows]);
 
   const fetchRows = async () => {
     setLoading(true);
@@ -91,14 +114,16 @@ export default function AdminTeamConsumerEducationalVideos() {
     fetchRanks();
   }, []);
 
-  const openCreate = () => {
+  const openCreate = (rankId = "") => {
     setNotice("");
-    setForm({ ...emptyForm });
+    setErr("");
+    setForm({ ...emptyForm, required_rank: rankId, sort_order: rankId ? Number(ranks.find((r) => String(r.id) === String(rankId))?.level_number || 0) : 0 });
     setOpen(true);
   };
 
   const openEdit = (row) => {
     setNotice("");
+    setErr("");
     setForm({
       id: row.id,
       title: row.title || "",
@@ -117,11 +142,19 @@ export default function AdminTeamConsumerEducationalVideos() {
   const onSave = async () => {
     setErr("");
     setNotice("");
+    if (!form.required_rank) {
+      setErr("Select Digital Education Prime rank.");
+      return;
+    }
+    if (!form.id && !form.video) {
+      setErr("Select a video file before saving.");
+      return;
+    }
     try {
       const fd = new FormData();
       fd.append("title", String(form.title || "").trim());
       fd.append("description", String(form.description || ""));
-      if (form.required_rank) fd.append("required_rank", String(form.required_rank));
+      fd.append("required_rank", String(form.required_rank));
       fd.append("sort_order", String(Number(form.sort_order || 0)));
       fd.append("is_active", form.is_active ? "true" : "false");
       if (form.video) fd.append("video", form.video);
@@ -141,7 +174,7 @@ export default function AdminTeamConsumerEducationalVideos() {
       setOpen(false);
       await fetchRows();
     } catch (e) {
-      setErr(e?.response?.data?.detail || "Save failed.");
+      setErr(apiErrorMessage(e, "Save failed."));
     }
   };
 
@@ -167,11 +200,11 @@ export default function AdminTeamConsumerEducationalVideos() {
               Team/Consumer - Educational Video Uploads
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Upload videos shown in the Team Dashboard horizontal education scroller.
+              Map one educational video to each Digital Education Prime rank.
             </Typography>
           </Box>
-          <Button variant="contained" onClick={openCreate}>
-            Upload Video
+          <Button variant="contained" onClick={() => openCreate()}>
+            Add Rank Video
           </Button>
         </Box>
 
@@ -180,6 +213,48 @@ export default function AdminTeamConsumerEducationalVideos() {
 
         <TextField label="Search videos" value={q} onChange={(e) => setQ(e.target.value)} fullWidth />
         <Divider />
+
+        <Box>
+          <Typography variant="subtitle1" sx={{ fontWeight: 900, mb: 1 }}>
+            Prime Rank Video Map
+          </Typography>
+          <Grid container spacing={1.5}>
+            {ranks.map((rank) => {
+              const mapped = videoByRank.get(String(rank.id));
+              return (
+                <Grid item xs={12} sm={6} md={4} key={rank.id}>
+                  <Card variant="outlined" sx={{ height: "100%" }}>
+                    <CardContent>
+                      <Stack spacing={1}>
+                        <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                          <Typography sx={{ fontWeight: 900 }}>
+                            L{rank.level_number} - {rank.rank_name}
+                          </Typography>
+                          <Chip size="small" color={mapped ? "success" : "default"} label={mapped ? "Mapped" : "Empty"} />
+                        </Stack>
+                        <Typography variant="caption" color="text.secondary">
+                          Prime amount Rs.{Number(rank.upgrade_amount || 0).toFixed(2)}
+                        </Typography>
+                        {mapped ? (
+                          <Typography variant="body2" color="text.secondary" noWrap>
+                            {mapped.title || `Video #${mapped.id}`}
+                          </Typography>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            No video uploaded for this rank.
+                          </Typography>
+                        )}
+                        <Button size="small" variant={mapped ? "outlined" : "contained"} onClick={() => (mapped ? openEdit(mapped) : openCreate(rank.id))}>
+                          {mapped ? "Edit Video" : "Upload Video"}
+                        </Button>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              );
+            })}
+          </Grid>
+        </Box>
 
         <Grid container spacing={2}>
           {filtered.map((r) => (
@@ -240,10 +315,14 @@ export default function AdminTeamConsumerEducationalVideos() {
                 value={form.required_rank || ""}
                 onChange={(e) => setForm((f) => ({ ...f, required_rank: e.target.value }))}
               >
-                <MenuItem value="">Not mapped</MenuItem>
                 {ranks.map((rank) => (
-                  <MenuItem key={rank.id} value={rank.id}>
+                  <MenuItem
+                    key={rank.id}
+                    value={rank.id}
+                    disabled={videoByRank.has(String(rank.id)) && String(form.required_rank) !== String(rank.id)}
+                  >
                     L{rank.level_number} - {rank.rank_name} - Rs.{Number(rank.upgrade_amount || 0).toFixed(2)}
+                    {videoByRank.has(String(rank.id)) && String(form.required_rank) !== String(rank.id) ? " - already mapped" : ""}
                   </MenuItem>
                 ))}
               </Select>

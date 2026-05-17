@@ -2059,6 +2059,8 @@ class WalletMe(APIView):
             withdrawal_benefit_total = _sum_t(tx_all.filter(type="LIFETIME_WITHDRAWAL_BONUS"))
             commission_total = _sum_t(tx_all.filter(type="COMMISSION_CREDIT"))
             franchise_total = _sum_t(tx_all.filter(type="FRANCHISE_INCOME"))
+            franchise_reference_total = _sum_t(tx_all.filter(type="REWARD_CREDIT", source_type="ADMIN_FRANCHISE_REFERENCE_REWARD"))
+            zonal_reward_total = _sum_t(tx_all.filter(type="REWARD_CREDIT", source_type="ADMIN_ZONAL_REWARD"))
             direct_ref_withdraw_commission_total = _sum_t(
                 tx_all.filter(type="DIRECT_REF_BONUS").filter(Q(meta__auto_rule="AUTO_1K_BLOCK") | Q(source_type="AUTO_1K_BLOCK"))
             )
@@ -2113,6 +2115,8 @@ class WalletMe(APIView):
             withdrawal_benefit_total = "0"
             commission_total = "0"
             franchise_total = "0"
+            franchise_reference_total = "0"
+            zonal_reward_total = "0"
             level_bonus_total = "0"
             today_earning = "0"
             direct_ref_withdraw_commission_total = "0"
@@ -2269,6 +2273,8 @@ class WalletMe(APIView):
                 "levelBonus": str(level_bonus_total),
                 "commission": str(commission_total),
                 "franchise": str(franchise_total),
+                "franchise_reference": str(franchise_reference_total),
+                "zonal": str(zonal_reward_total),
                 "directRefWithdrawCommission": str(direct_ref_withdraw_commission_total),
                 "withdrawalBenefit": str(withdrawal_benefit_total),
                 "matrixLevel": str(matrix_total),

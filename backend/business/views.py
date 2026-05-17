@@ -312,13 +312,179 @@ class _IsAgencyUser(permissions.BasePermission):
             return False
 
 
+FRANCHISE_DASHBOARD_CATEGORIES = {
+    "agency_state_coordinator",
+    "agency_state",
+    "agency_district_coordinator",
+    "agency_district",
+    "agency_pincode_coordinator",
+    "agency_pincode",
+}
+
+
+def _clean_pin(value):
+    pin = _digits_only(value)[:6]
+    return pin if len(pin) == 6 else ""
+
+
+def _scope_label_for_category(category):
+    return {
+        "agency_state_coordinator": "State Coordinator",
+        "agency_state": "State",
+        "agency_district_coordinator": "District Coordinator",
+        "agency_district": "District",
+        "agency_pincode_coordinator": "Pincode Coordinator",
+        "agency_pincode": "Pincode",
+    }.get(category, "Franchise")
+
+
+def _pins_for_state_name(state_name):
+    try:
+        from locations.views import _build_district_index
+
+        skey = str(state_name or "").strip().lower()
+        if not skey:
+            return set()
+        idx = _build_district_index() or {}
+        pins = set()
+        for key, values in idx.items():
+            state_key, district_key = key
+            if state_key == skey and district_key:
+                pins.update(values or set())
+        return {_clean_pin(p) for p in pins if _clean_pin(p)}
+    except Exception:
+        return set()
+
+
+def _pins_for_district_name(district_name, state_name=""):
+    try:
+        from locations.views import _build_district_index, _scan_raw_for_pincodes, india_place_variants
+
+        dname = str(district_name or "").strip()
+        if not dname:
+            return set()
+        skey = str(state_name or "").strip().lower()
+        idx = _build_district_index() or {}
+        pins = set()
+        for variant in (india_place_variants(dname) or [dname]):
+            dkey = str(variant or "").strip().lower()
+            if not dkey:
+                continue
+            if skey:
+                pins.update(idx.get((skey, dkey), set()))
+            pins.update(idx.get(("", dkey), set()))
+        if not pins:
+            pins.update(_scan_raw_for_pincodes(dname, state_name) or set())
+        return {_clean_pin(p) for p in pins if _clean_pin(p)}
+    except Exception:
+        return set()
+
+
+def _resolve_franchise_dashboard_scope(user):
+    """
+    Resolve the logged-in agency account into the pincodes it is allowed to see.
+
+    The admin/registration flow stores multi-region ownership in AgencyRegionAssignment:
+    state coordinators can own multiple states, district coordinators multiple districts,
+    and pincode coordinators multiple pincodes. Single state/district/pincode agency users
+    use the same assignment table with profile-field fallbacks for older records.
+    """
+    from accounts.models import AgencyRegionAssignment
+
+    category = str(getattr(user, "category", "") or "").lower()
+    if category not in FRANCHISE_DASHBOARD_CATEGORIES:
+        return None, f"{_scope_label_for_category(category)} accounts cannot access this dashboard."
+
+    assignments = list(
+        AgencyRegionAssignment.objects.filter(user=user)
+        .select_related("state")
+        .order_by("level", "state__name", "district", "pincode")
+    )
+
+    states = []
+    districts = []
+    pincodes = []
+    pins = set()
+
+    def add_state(state_obj):
+        if not state_obj:
+            return
+        state_id = getattr(state_obj, "id", None)
+        state_name = str(getattr(state_obj, "name", "") or "").strip()
+        if not state_name:
+            return
+        if not any(s.get("id") == state_id and s.get("name") == state_name for s in states):
+            states.append({"id": state_id, "name": state_name})
+        pins.update(_pins_for_state_name(state_name))
+
+    def add_district(district_name, state_obj=None):
+        district = str(district_name or "").strip()
+        if not district:
+            return
+        state_id = getattr(state_obj, "id", None) if state_obj else None
+        state_name = str(getattr(state_obj, "name", "") or "").strip() if state_obj else ""
+        row = {"district": district, "state_id": state_id, "state": state_name}
+        if not any(
+            d.get("district", "").lower() == district.lower() and d.get("state_id") == state_id
+            for d in districts
+        ):
+            districts.append(row)
+        pins.update(_pins_for_district_name(district, state_name))
+
+    def add_pincode(pin_value):
+        pin = _clean_pin(pin_value)
+        if not pin:
+            return
+        if pin not in pincodes:
+            pincodes.append(pin)
+        pins.add(pin)
+
+    if category in {"agency_state_coordinator", "agency_state"}:
+        for a in assignments:
+            if a.level == "state":
+                add_state(a.state)
+        if not states:
+            add_state(getattr(user, "state", None))
+    elif category in {"agency_district_coordinator", "agency_district"}:
+        for a in assignments:
+            if a.level == "district":
+                add_district(a.district, a.state)
+        if not districts:
+            city = getattr(user, "city", None)
+            add_district(getattr(city, "name", "") or "", getattr(user, "state", None))
+    elif category in {"agency_pincode_coordinator", "agency_pincode"}:
+        for a in assignments:
+            if a.level == "pincode":
+                add_pincode(a.pincode)
+        if not pincodes:
+            add_pincode(getattr(user, "pincode", ""))
+
+    sorted_pins = sorted(pins)
+    scope_level = (
+        "state"
+        if category in {"agency_state_coordinator", "agency_state"}
+        else "district"
+        if category in {"agency_district_coordinator", "agency_district"}
+        else "pincode"
+    )
+    return {
+        "category": category,
+        "label": _scope_label_for_category(category),
+        "level": scope_level,
+        "states": states,
+        "districts": districts,
+        "pincodes": sorted_pins,
+        "assigned_pincodes": pincodes,
+        "pincode_count": len(sorted_pins),
+    }, None
+
+
 class FranchiseDashboardMetricsView(APIView):
     """
     GET /api/business/franchise/dashboard-metrics/
 
-    Intended for agency_pincode_coordinator.
     Returns:
-      - assigned pincodes
+      - assigned scope + resolved pincodes
       - overall counts + per-pincode counts for:
           consumers (category=consumer)
           captain_office (sub-franchise registrations under pincode) (category=agency_sub_franchise)
@@ -342,28 +508,14 @@ class FranchiseDashboardMetricsView(APIView):
         return start, end
 
     def get(self, request):
-        from accounts.models import CustomUser, AgencyRegionAssignment, WalletTransaction
+        from accounts.models import CustomUser, WalletTransaction
 
         user = request.user
-        cat = str(getattr(user, "category", "") or "").lower()
-        if cat != "agency_pincode_coordinator":
-            # For now, restrict; later we can expand to district/state dashboards.
-            return Response({"detail": "Only Pincode Coordinator accounts can access this dashboard."}, status=status.HTTP_403_FORBIDDEN)
+        scope, scope_error = _resolve_franchise_dashboard_scope(user)
+        if scope_error:
+            return Response({"detail": scope_error}, status=status.HTTP_403_FORBIDDEN)
 
-        pins = list(
-            AgencyRegionAssignment.objects.filter(user=user, level="pincode")
-            .exclude(pincode="")
-            .values_list("pincode", flat=True)
-        )
-        # Normalize to 6-digit only
-        pins = sorted({"".join(ch for ch in str(p or "") if ch.isdigit())[:6] for p in pins if p})
-        pins = [p for p in pins if len(p) == 6]
-
-        # If none assigned, fallback to profile pincode
-        if not pins:
-            up = "".join(ch for ch in str(getattr(user, "pincode", "") or "") if ch.isdigit())[:6]
-            if len(up) == 6:
-                pins = [up]
+        pins = scope.get("pincodes") or []
 
         # Base query for users within pincodes
         base_users = CustomUser.objects.filter(pincode__in=pins).only("id", "category", "account_active", "date_joined", "pincode")
@@ -439,6 +591,7 @@ class FranchiseDashboardMetricsView(APIView):
 
         return Response(
             {
+                "scope": scope,
                 "overall": overall,
                 "per_pincode": per_pincode,
                 "consumer_stats": consumer_stats,
@@ -459,7 +612,7 @@ class FranchiseWishingBannersPublicView(APIView):
 
 
 class FranchiseAchieversPublicView(APIView):
-    """Agency-facing endpoint: achievers filtered by pincode(s)."""
+    """Agency-facing endpoint: achievers filtered by the logged-in agency scope."""
 
     permission_classes = [permissions.IsAuthenticated, _IsAgencyUser]
 
@@ -468,17 +621,17 @@ class FranchiseAchieversPublicView(APIView):
         pins = [p.strip() for p in (request.query_params.get("pincodes") or "").split(",") if p.strip()]
         if pin:
             pins = [pin]
-        # If no explicit pins given, fallback to request user's pincode (single)
+        # If no explicit pins are given, use the same dynamic state/district/pincode
+        # scope as the franchise dashboard metrics endpoint.
         if not pins:
-            try:
-                up = (getattr(request.user, "pincode", "") or "").strip()
-                if up:
-                    pins = [up]
-            except Exception:
-                pins = []
+            scope, scope_error = _resolve_franchise_dashboard_scope(request.user)
+            if scope_error:
+                return Response({"detail": scope_error}, status=status.HTTP_403_FORBIDDEN)
+            pins = list((scope or {}).get("pincodes") or [])
         qs = FranchiseAchiever.objects.filter(is_active=True)
-        if pins:
-            qs = qs.filter(pincode__in=pins)
+        if not pins:
+            return Response({"results": []}, status=status.HTTP_200_OK)
+        qs = qs.filter(pincode__in=pins)
         qs = qs.order_by("sort_order", "-created_at", "id")
         ser = FranchiseAchieverSerializer(qs, many=True, context={"request": request})
         return Response({"results": ser.data}, status=status.HTTP_200_OK)

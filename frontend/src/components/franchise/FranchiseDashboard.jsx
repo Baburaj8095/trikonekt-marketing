@@ -353,16 +353,40 @@ export default function FranchiseDashboard() {
     }
   };
 
+  const scope = metrics?.scope || {};
+  const scopeLabel = scope?.label || "Franchise";
+  const scopeEntityLabel = scope?.level === "state" ? "State" : scope?.level === "district" ? "District" : "Pincode";
+  const stateFallback = storedUser?.state?.name || (typeof storedUser?.state === "string" ? storedUser.state : "");
+  const districtFallback = storedUser?.city?.name || (typeof storedUser?.city === "string" ? storedUser.city : "");
+  const assignedScopeText = useMemo(() => {
+    if (scope?.level === "state") {
+      const names = Array.isArray(scope?.states) ? scope.states.map((s) => s?.name).filter(Boolean) : [];
+      return names.length ? names.join(", ") : stateFallback || "-";
+    }
+    if (scope?.level === "district") {
+      const names = Array.isArray(scope?.districts)
+        ? scope.districts.map((d) => [d?.district, d?.state].filter(Boolean).join(", ")).filter(Boolean)
+        : [];
+      return names.length ? names.join(" | ") : districtFallback || "-";
+    }
+    const pins = Array.isArray(scope?.assigned_pincodes) && scope.assigned_pincodes.length
+      ? scope.assigned_pincodes
+      : Array.isArray(scope?.pincodes)
+        ? scope.pincodes
+        : [];
+    return pins.length ? pins.join(", ") : storedUser?.pincode || "-";
+  }, [scope, stateFallback, districtFallback, storedUser?.pincode]);
+
   const pincodeOverviewMetrics = useMemo(() => {
     const counts = metrics?.overall?.counts || {};
     return [
-      { title: "Pincode Total Consumer Count", value: String(counts.consumers ?? 0), icon: <GroupsOutlinedIcon />, accent: COLORS.primary },
-      { title: "Pincode Captain Office Count", value: String(counts.captain_office ?? 0), icon: <ApartmentOutlinedIcon />, accent: COLORS.success },
-      { title: "Pincode Sarathi Count", value: String(counts.sarathi ?? 0), icon: <WorkOutlineOutlinedIcon />, accent: COLORS.secondary },
-      { title: "Pincode Merchant Count", value: String(counts.merchants ?? 0), icon: <StoreOutlinedIcon />, accent: COLORS.primaryDark },
-      { title: "Pincode Total Self Rebirth ID", value: String(counts.self_rebirth_ids ?? 0), icon: <TrendingUpOutlinedIcon />, accent: COLORS.success },
+      { title: `${scopeEntityLabel} Total Consumer Count`, value: String(counts.consumers ?? 0), icon: <GroupsOutlinedIcon />, accent: COLORS.primary },
+      { title: `${scopeEntityLabel} Captain Office Count`, value: String(counts.captain_office ?? 0), icon: <ApartmentOutlinedIcon />, accent: COLORS.success },
+      { title: `${scopeEntityLabel} Sarathi Count`, value: String(counts.sarathi ?? 0), icon: <WorkOutlineOutlinedIcon />, accent: COLORS.secondary },
+      { title: `${scopeEntityLabel} Merchant Count`, value: String(counts.merchants ?? 0), icon: <StoreOutlinedIcon />, accent: COLORS.primaryDark },
+      { title: `${scopeEntityLabel} Total Self Rebirth ID`, value: String(counts.self_rebirth_ids ?? 0), icon: <TrendingUpOutlinedIcon />, accent: COLORS.success },
     ];
-  }, [metrics]);
+  }, [metrics, scopeEntityLabel]);
 
   const consumerStatsCards = useMemo(() => {
     const cs = metrics?.consumer_stats || {};
@@ -449,7 +473,7 @@ export default function FranchiseDashboard() {
                         Franchise Dashboard
                       </Typography>
                       <Typography variant="subtitle1" sx={{ opacity: 0.9, fontSize: { xs: "0.9rem", md: "1rem" } }}>
-                        Pincode coordinator overview
+                        {scopeLabel} overview
                       </Typography>
                     </Box>
                   </Box>
@@ -508,10 +532,10 @@ export default function FranchiseDashboard() {
                           <LocationOnOutlinedIcon sx={{ color: "white", opacity: 0.9, fontSize: 20 }} />
                           <Box>
                             <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)", display: "block" }}>
-                              Pincode
+                              Assigned {scopeEntityLabel}
                             </Typography>
                             <Typography variant="body2" sx={{ color: "white", fontWeight: 800 }}>
-                              {storedUser?.pincode || "—"}
+                              {assignedScopeText}
                             </Typography>
                           </Box>
                         </Stack>
@@ -522,10 +546,10 @@ export default function FranchiseDashboard() {
                           <TrendingUpOutlinedIcon sx={{ color: "white", opacity: 0.9, fontSize: 20 }} />
                           <Box>
                             <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)", display: "block" }}>
-                              Assigned pincodes
+                              Resolved pincodes
                             </Typography>
                             <Typography variant="body2" sx={{ color: "white", fontWeight: 900 }}>
-                              {Array.isArray(metrics?.overall?.pincodes) ? metrics.overall.pincodes.length : 0}
+                              {Number(scope?.pincode_count ?? (Array.isArray(metrics?.overall?.pincodes) ? metrics.overall.pincodes.length : 0))}
                             </Typography>
                           </Box>
                         </Stack>
@@ -562,7 +586,7 @@ export default function FranchiseDashboard() {
                     ))
                   ) : (
                     <Typography variant="body2" sx={{ color: COLORS.textSecondary }}>
-                      No achievers configured for your pincodes.
+                      No achievers configured for your assigned region.
                     </Typography>
                   )}
                 </Stack>
@@ -572,7 +596,7 @@ export default function FranchiseDashboard() {
 
           {/* Overview counts */}
           <Stack spacing={3}>
-            <OverviewSection title="Pincode Overview Counts" metrics={pincodeOverviewMetrics} horizontalSwipe />
+            <OverviewSection title={`${scopeEntityLabel} Overview Counts`} metrics={pincodeOverviewMetrics} horizontalSwipe />
             <OverviewSection title="Consumer Stats (Overall + Month)" metrics={consumerStatsCards} />
           </Stack>
 

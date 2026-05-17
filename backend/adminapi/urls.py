@@ -15,6 +15,8 @@ from .views import (
     AdminWalletDetailView,
     AdminWalletLedgerView,
     AdminWalletAdjustPocketView,
+    AdminTeamRewardValidateConsumerView,
+    AdminTeamRewardCreditView,
     AdminWalletVoucherListView,
     AdminWalletVoucherCancelRefundView,
     AdminWalletReconcileView,
@@ -99,6 +101,8 @@ urlpatterns = [
     path("wallets/<int:user_id>/", AdminWalletDetailView.as_view()),
     path("wallets/<int:user_id>/ledger/", AdminWalletLedgerView.as_view()),
     path("wallets/<int:user_id>/adjust/", AdminWalletAdjustPocketView.as_view()),
+    path("rewards/team/validate-consumer/", AdminTeamRewardValidateConsumerView.as_view()),
+    path("rewards/team/credit/", AdminTeamRewardCreditView.as_view()),
     path("wallet-vouchers/", AdminWalletVoucherListView.as_view()),
     path("wallet-vouchers/<int:pk>/cancel-refund/", AdminWalletVoucherCancelRefundView.as_view()),
 

@@ -243,6 +243,14 @@ export default function AdminShell({ children }) {
     if (to.startsWith("/admin/notifications")) return "support";
     if (to.startsWith("/admin/franchise/")) return "promo";
     if (to.startsWith("/admin/team-consumer/")) return "promo";
+    if (
+      to.startsWith("/admin/workflows/franchise-reference-reward") ||
+      to.startsWith("/admin/workflows/zonal-reward") ||
+      to.startsWith("/admin/workflows/redeem-point-coupon-summary") ||
+      to.startsWith("/admin/workflows/generate-coupon")
+    )
+      return "reports_finance";
+    if (to.startsWith("/admin/workflows/")) return "promo";
     return null;
   }
 
@@ -286,17 +294,57 @@ export default function AdminShell({ children }) {
         items: [
           // { to: "/admin/packages", label: "Packages", icon: "box" },
           { to: "/admin/payments", label: "Payments", icon: "wallet" },
+          // { to: "/admin/payments?view=gateway", label: "Gateway", icon: "wallet" },
+          // { to: "/admin/payments?view=scanner", label: "Payment Scanner", icon: "upload" },
           // { to: "/admin/agency-prime-requests", label: "Agency Prime Requests", icon: "wallet" },
         ],
       },
       {
-        key: "merchant_config",
-        label: "Merchant Categories",
+        key: "package_management_requested",
+        label: "All Packages",
         items: [
-          { to: "/admin/merchant-categories", label: "Merchant Categories", icon: "box" },
-          { to: "/admin/merchant-subcategories", label: "Merchant Subcategories", icon: "box" },
+          { to: "/admin/packages", label: "All Packages (Edit)", icon: "box" },
+          { to: "/admin/package-management", label: "Package Management", icon: "box" },
+          { to: "/admin/packages/join-subscription", label: "Subscription ₹750", icon: "ticket" },
+          { to: "/admin/packages/spp", label: "Smart Product Package", icon: "ticket" },
+          { to: "/admin/promo-purchases?status=PENDING", label: "Digital Education Prime Package", icon: "ticket" },
+          { to: "/admin/packages/tri-tour", label: "Tri Tour", icon: "ticket" },
         ],
       },
+      {
+        key: "rewards_requested",
+        label: "Rewards",
+        items: [
+         
+          { to: "/admin/workflows/franchise-reference-reward", label: "Franchise Reference Reward", icon: "wallet" },
+          { to: "/admin/workflows/zonal-reward", label: "Zonal Reward", icon: "wallet" },
+        ],
+      },
+      {
+        key: "configuration_requested",
+        label: "Configuration",
+        items: [
+          { to: "/admin/workflows/social-media-links", label: "Social Media Links", icon: "file" },
+          { to: "/admin/workflows/tree-toggle", label: "Tree On / Off", icon: "tree" },
+          { to: "/admin/ui-config", label: "UI Configuration", icon: "box" },
+        ],
+      },
+      {
+        key: "coupon_requested",
+        label: "Coupon",
+        items: [
+          { to: "/admin/workflows/generate-coupon", label: "Generate Coupon", icon: "ticket" },
+          { to: "/admin/wallet-vouchers", label: "Coupon Summary", icon: "ticket" },
+        ],
+      },
+      // {
+      //   key: "merchant_config",
+      //   label: "Merchant Categories",
+      //   items: [
+      //     { to: "/admin/merchant-categories", label: "Merchant Categories", icon: "box" },
+      //     { to: "/admin/merchant-subcategories", label: "Merchant Subcategories", icon: "box" },
+      //   ],
+      // },
       {
         key: "compliance",
         label: "Kyc & Withdrawals",
@@ -345,24 +393,30 @@ export default function AdminShell({ children }) {
         ],
       },
 
-      {
-        key: "franchise",
-        label: "Franchise",
-        items: [
-          { to: "/admin/franchise/achievers", label: "Achievers", icon: "users" },
-          { to: "/admin/franchise/wishing-banners", label: "Wishing Banners", icon: "box" },
-        ],
-      },
-
+      
       {
         key: "team_consumer",
         label: "Team / Consumer",
         items: [
+          { to: "/admin/workflows/team-admin-board", label: "Team Admin Board", icon: "dashboard" },
+          { to: "/admin/users?category=consumer", label: "ID Card / Team Consumers", icon: "users" },
           { to: "/admin/team-consumer/wishing-banners", label: "Wishing Banners", icon: "box" },
           { to: "/admin/team-consumer/top-achievers", label: "Top Achievers", icon: "users" },
           { to: "/admin/team-consumer/educational-videos", label: "Educational Videos", icon: "file" },
           { to: "/admin/team-consumer/pdf-uploads", label: "Trikonekt PDF Uploads", icon: "file" },
           { to: "/admin/team-consumer/certificate-uploads", label: "Certificate Uploads", icon: "file" },
+          // { to: "/admin/team-consumer/certificate-uploads?view=training", label: "Training Certificate", icon: "file" },
+        ],
+      },
+      {
+        key: "content_requested",
+        label: "Content / Front Page",
+        items: [
+          { to: "/admin/team-consumer/pdf-uploads?view=business", label: "Trikonekt Business PDF", icon: "file" },
+          { to: "/admin/workflows/crm-connect", label: "CRM Connect", icon: "briefcase" },
+          { to: "/admin/workflows/ecommerce-digital-education-frontpage", label: "E-Commerce / Digital Education Front Page", icon: "box" },
+          { to: "/admin/home-cards", label: "Home Cards", icon: "box" },
+          { to: "/admin/dashboard-cards", label: "Dashboard Cards", icon: "dashboard" },
         ],
       },
       // {
@@ -383,7 +437,7 @@ export default function AdminShell({ children }) {
         label: "Reports & Business",
         items: [
           { to: "/admin/reports", label: "Reports", icon: "chart" },
-          { to: "/admin/business", label: "Business", icon: "briefcase" },
+          // { to: "/admin/business", label: "Business", icon: "briefcase" },
         ],
       },
       {
@@ -400,6 +454,15 @@ export default function AdminShell({ children }) {
         label: "Engagement",
         items: [{ to: "/admin/notifications", label: "Notifications", icon: "ticket" }],
       },
+      {
+        key: "franchise",
+        label: "Franchise",
+        items: [
+          { to: "/admin/franchise/achievers", label: "Achievers", icon: "users" },
+          { to: "/admin/franchise/wishing-banners", label: "Wishing Banners", icon: "box" },
+        ],
+      },
+
       // {
       //   key: "dev",
       //   label: "Developer Tools",
@@ -442,15 +505,15 @@ export default function AdminShell({ children }) {
     out.push({ type: "section", label: "Users — Quick Filters", collapsible: true, groupChildren: true });
     out.push({ to: "/admin/users", label: "All Users", icon: "users" });
     out.push({ to: "/admin/users?category=consumer", label: "Consumers", icon: "users" });
-    out.push({ to: "/admin/users?category=merchant", label: "Business / Merchant", icon: "briefcase" });
-    out.push({ to: "/admin/users?category=employee", label: "Sarathi / Employee", icon: "users" });
-    out.push({ to: "/admin/users?category=agency_state_coordinator", label: "Agency: State Coordinator", icon: "users" });
-    out.push({ to: "/admin/users?category=agency_state", label: "Agency: State", icon: "users" });
-    out.push({ to: "/admin/users?category=agency_district_coordinator", label: "Agency: District Coordinator", icon: "users" });
-    out.push({ to: "/admin/users?category=agency_district", label: "Agency: District", icon: "users" });
-    out.push({ to: "/admin/users?category=agency_pincode_coordinator", label: "Agency: Pincode Coordinator", icon: "users" });
-    out.push({ to: "/admin/users?category=agency_pincode", label: "Agency: Pincode", icon: "users" });
-    out.push({ to: "/admin/users?category=agency_sub_franchise", label: "Agency: Sub Franchise", icon: "users" });
+    // out.push({ to: "/admin/users?category=merchant", label: "Business / Merchant", icon: "briefcase" });
+    // out.push({ to: "/admin/users?category=employee", label: "Sarathi / Employee", icon: "users" });
+    // out.push({ to: "/admin/users?category=agency_state_coordinator", label: "Agency: State Coordinator", icon: "users" });
+    // out.push({ to: "/admin/users?category=agency_state", label: "Agency: State", icon: "users" });
+    // out.push({ to: "/admin/users?category=agency_district_coordinator", label: "Agency: District Coordinator", icon: "users" });
+    // out.push({ to: "/admin/users?category=agency_district", label: "Agency: District", icon: "users" });
+    // out.push({ to: "/admin/users?category=agency_pincode_coordinator", label: "Agency: Pincode Coordinator", icon: "users" });
+    // out.push({ to: "/admin/users?category=agency_pincode", label: "Agency: Pincode", icon: "users" });
+    // out.push({ to: "/admin/users?category=agency_sub_franchise", label: "Agency: Sub Franchise", icon: "users" });
 
     visibleGroups.forEach((g) => {
       const items = (g.items || []).filter(filterItem);
@@ -497,23 +560,41 @@ export default function AdminShell({ children }) {
     const toPath = toStr.split("?")[0];
     if (toPath === "/admin/dashboard/models") return String(location.pathname || "").startsWith("/admin/dashboard/models");
 
+    const queryMatches = (candidate) => {
+      const candidateStr = String(candidate || "");
+      if (!candidateStr.includes("?")) return false;
+      const candidatePath = candidateStr.split("?")[0];
+      if (location.pathname !== candidatePath) return false;
+      const candidateQuery = candidateStr.split("?")[1] || "";
+      const candidateParams = new URLSearchParams(candidateQuery);
+      const locParams = new URLSearchParams(location.search || "");
+      for (const [k, v] of candidateParams.entries()) {
+        if (locParams.get(k) !== v) return false;
+      }
+      return true;
+    };
+
     // If the menu item includes query params, treat it as a *filter selector*.
     // In that case, mark active when:
     //  - pathname matches, AND
     //  - all query params in `to` match the current URL (allowing extra params like page=2)
     if (toStr.includes("?")) {
-      if (location.pathname !== toPath) return false;
-      const toQuery = toStr.split("?")[1] || "";
-      const toParams = new URLSearchParams(toQuery);
-      const locParams = new URLSearchParams(location.search || "");
-      for (const [k, v] of toParams.entries()) {
-        if (locParams.get(k) !== v) return false;
-      }
-      return true;
+      return queryMatches(toStr);
     }
 
     // Special-case: keep "All Users" un-highlighted when any quick-filter query is present.
     if (toPath === "/admin/users" && (location.search || "")) return false;
+
+    // When an alias item with query params points at the same screen, only that
+    // alias should highlight. This prevents "Payments", "Gateway", and
+    // "Payment Scanner" all lighting up together on the same component.
+    if (location.search) {
+      const hasMatchingQueryAlias = (menu || []).some((item) => {
+        const itemTo = String(item?.to || "");
+        return itemTo !== toStr && itemTo.split("?")[0] === toPath && queryMatches(itemTo);
+      });
+      if (hasMatchingQueryAlias) return false;
+    }
 
     return location.pathname === toPath || location.pathname.startsWith(toPath + "/");
   };

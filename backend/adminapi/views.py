@@ -1302,6 +1302,102 @@ class AdminWalletAdjustPocketView(APIView):
         return Response(_wallet_summary_payload(user))
 
 
+def _admin_reward_consumer_payload(user):
+    return {
+        "id": user.id,
+        "username": user.username,
+        "prefixed_id": getattr(user, "prefixed_id", "") or "",
+        "full_name": getattr(user, "full_name", "") or "",
+        "phone": getattr(user, "phone", "") or "",
+        "email": getattr(user, "email", "") or "",
+        "category": getattr(user, "category", "") or "",
+    }
+
+
+def _resolve_admin_reward_consumer(identifier):
+    value = str(identifier or "").strip()
+    if not value:
+        return None
+    query = Q(username__iexact=value) | Q(prefixed_id__iexact=value) | Q(unique_id__iexact=value)
+    digits = "".join(ch for ch in value if ch.isdigit())
+    if digits:
+        query = query | Q(phone__iexact=digits)
+    return CustomUser.objects.filter(query, category="consumer").first()
+
+
+class AdminTeamRewardValidateConsumerView(APIView):
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
+
+    def get(self, request):
+        username = request.query_params.get("username") or request.query_params.get("q") or ""
+        user = _resolve_admin_reward_consumer(username)
+        if not user:
+            return Response({"detail": "Consumer username not found."}, status=404)
+        return Response({"consumer": _admin_reward_consumer_payload(user)}, status=200)
+
+
+class AdminTeamRewardCreditView(APIView):
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
+
+    REWARD_TYPES = {
+        "franchise_reference": {
+            "source_type": "ADMIN_FRANCHISE_REFERENCE_REWARD",
+            "label": "Franchise Reference Reward",
+        },
+        "zonal": {
+            "source_type": "ADMIN_ZONAL_REWARD",
+            "label": "Zonal Reward",
+        },
+    }
+
+    def post(self, request):
+        data = request.data or {}
+        reward_type = str(data.get("reward_type") or "").strip().lower()
+        config = self.REWARD_TYPES.get(reward_type)
+        if not config:
+            return Response({"detail": "reward_type must be franchise_reference or zonal."}, status=400)
+
+        user = _resolve_admin_reward_consumer(data.get("username") or data.get("consumer") or data.get("q"))
+        if not user:
+            return Response({"detail": "Consumer username not found."}, status=404)
+
+        try:
+            amount = Decimal(str(data.get("amount") or "0")).quantize(Decimal("0.01"))
+        except Exception:
+            return Response({"detail": "Invalid amount."}, status=400)
+        if amount <= 0:
+            return Response({"detail": "Amount must be greater than 0."}, status=400)
+
+        note = str(data.get("note") or "").strip()
+        with transaction.atomic():
+            wallet = Wallet.get_or_create_for_user(user)
+            wallet.credit(
+                amount,
+                tx_type="REWARD_CREDIT",
+                source_type=config["source_type"],
+                source_id=str(getattr(request.user, "id", "")),
+                meta={
+                    "reward_type": reward_type,
+                    "reward_label": config["label"],
+                    "note": note,
+                    "by_admin": getattr(request.user, "username", "") or "",
+                    "admin_user_id": getattr(request.user, "id", None),
+                    "no_withhold": True,
+                },
+            )
+
+        return Response(
+            {
+                "detail": f"{config['label']} credited successfully.",
+                "consumer": _admin_reward_consumer_payload(user),
+                "reward_type": reward_type,
+                "amount": str(amount),
+                "wallet": _wallet_summary_payload(user),
+            },
+            status=201,
+        )
+
+
 class AdminWalletVoucherListView(APIView):
     permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
 

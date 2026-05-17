@@ -197,6 +197,8 @@ export default function LoginV2() {
           } else {
             navigate("/user/dashboard2", { replace: true });
           }
+        } else if (eff === "agency") {
+          navigate("/agency/franchise-dashboard", { replace: true });
         } else {
           navigate(`/${eff}/dashboard`, { replace: true });
         }

@@ -135,7 +135,11 @@ const Login = () => {
           sessionStorage.getItem(`token_${preferredNs}`);
         if (has) {
           const to =
-            preferredNs === "admin" ? "/admin/dashboard" : `/${preferredNs}/dashboard`;
+            preferredNs === "admin"
+              ? "/admin/dashboard"
+              : preferredNs === "agency"
+                ? "/agency/franchise-dashboard"
+                : `/${preferredNs}/dashboard`;
           navigate(to, { replace: true });
         }
       } else {
@@ -146,7 +150,12 @@ const Login = () => {
             sessionStorage.getItem(`token_${ns}`)
         );
         if (found) {
-          const to = found === "admin" ? "/admin/dashboard" : `/${found}/dashboard`;
+          const to =
+            found === "admin"
+              ? "/admin/dashboard"
+              : found === "agency"
+                ? "/agency/franchise-dashboard"
+                : `/${found}/dashboard`;
           navigate(to, { replace: true });
         }
       }
