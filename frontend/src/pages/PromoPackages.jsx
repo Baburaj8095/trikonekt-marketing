@@ -378,6 +378,15 @@ function PaymentMethodDialog({ open, onClose, intent, walletMe, onPickManual, on
   const canWallet = internalBal >= amount && amount > 0;
   const canPackageCoupon = packageCouponBal >= amount && amount > 0;
   const canAddMoney = addMoneyBal >= amount && amount > 0;
+  const money = (value) => Number(value || 0).toFixed(2);
+  const WalletButtonLabel = ({ title, balance }) => (
+    <Stack component="span" spacing={0.25} alignItems="center" sx={{ lineHeight: 1.15 }}>
+      <span>{title}</span>
+      <Typography component="span" sx={{ fontSize: 11, fontWeight: 800, color: "inherit", opacity: 0.86 }}>
+        Available Rs. {money(balance)}
+      </Typography>
+    </Stack>
+  );
   return (
     <Dialog
       open={open}
@@ -419,14 +428,14 @@ function PaymentMethodDialog({ open, onClose, intent, walletMe, onPickManual, on
         <Button variant="outlined" onClick={onPickManual} sx={{ borderRadius: 3, fontWeight: 900 }}>
           Manual Payment
         </Button>
-        <Button variant="contained" disabled={!canWallet} onClick={() => onPickWallet("internal")} sx={{ borderRadius: 3, fontWeight: 900 }}>
-          Pay from Self Package
+        <Button variant="contained" disabled={!canWallet} onClick={() => onPickWallet("internal")} sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
+          <WalletButtonLabel title="Pay from Self Package" balance={internalBal} />
         </Button>
-        <Button variant="contained" disabled={!canPackageCoupon} onClick={() => onPickWallet("package_coupon")} sx={{ borderRadius: 3, fontWeight: 900 }}>
-          Pay from Coupon Wallet
+        <Button variant="contained" disabled={!canPackageCoupon} onClick={() => onPickWallet("package_coupon")} sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
+          <WalletButtonLabel title="Pay from Coupon Wallet" balance={packageCouponBal} />
         </Button>
-        <Button variant="contained" disabled={!canAddMoney} onClick={() => onPickWallet("package_upload")} sx={{ borderRadius: 3, fontWeight: 900 }}>
-          Pay from Add Money Pocket
+        <Button variant="contained" disabled={!canAddMoney} onClick={() => onPickWallet("package_upload")} sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
+          <WalletButtonLabel title="Pay from Add Money Pocket" balance={addMoneyBal} />
         </Button>
       </DialogActions>
     </Dialog>

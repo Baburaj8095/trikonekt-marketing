@@ -1,7 +1,7 @@
 from datetime import date
 from decimal import Decimal
 
-from django.db.models import Count, Q, Sum, Prefetch
+from django.db.models import Count, Prefetch, Q, Sum
 from django.db import transaction
 from django.utils import timezone
 from django.core.cache import cache
@@ -12,7 +12,7 @@ from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.http import HttpResponse
 
-from accounts.models import CustomUser, Wallet, WalletTransaction, ConsumerVoucher, UserKYC, WithdrawalRequest, SupportTicket, SupportTicketMessage, AgencyRegionAssignment
+from accounts.models import CustomUser, LedgerEntry, Wallet, WalletAccount, WalletTransaction, ConsumerVoucher, UserKYC, WithdrawalRequest, SupportTicket, SupportTicketMessage, AgencyRegionAssignment
 from coupons.models import Coupon, CouponCode, CouponSubmission, CouponBatch
 from uploads.models import FileUpload, DashboardCard, HomeCard, LuckyDrawSubmission
 from market.models import Product, PurchaseRequest, Banner, BannerItem, BannerPurchaseRequest
@@ -1006,7 +1006,10 @@ class AdminUserWalletAdjustView(APIView):
 
 
 def _wallet_bucket_sums(user):
-    tx = WalletTransaction.objects.filter(user=user)
+    return _wallet_bucket_sums_from_qs(WalletTransaction.objects.filter(user=user))
+
+
+def _wallet_bucket_sums_from_qs(tx):
 
     def sum_types(credit_types, debit_types=None):
         credit = tx.filter(type__in=list(credit_types or []), amount__gt=0).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
@@ -1029,9 +1032,70 @@ def _wallet_bucket_sums(user):
     }
 
 
-def _wallet_summary_payload(user):
-    w = Wallet.get_or_create_for_user(user)
-    buckets = _wallet_bucket_sums(user)
+def _empty_wallet_buckets():
+    return {
+        "coupon": Decimal("0.00"),
+        "shopping": Decimal("0.00"),
+        "self_package": Decimal("0.00"),
+        "package_purchase_coupon": Decimal("0.00"),
+        "wallet_to_wallet": Decimal("0.00"),
+        "direct_benefit": Decimal("0.00"),
+        "level_benefit": Decimal("0.00"),
+        "admin_service_charges": Decimal("0.00"),
+    }
+
+
+def _wallet_bucket_sums_for_users(user_ids):
+    ids = [int(x) for x in (user_ids or []) if x]
+    if not ids:
+        return {}
+    rows = (
+        WalletTransaction.objects
+        .filter(user_id__in=ids)
+        .values("user_id")
+        .annotate(
+            coupon_credit=Sum("amount", filter=Q(type__in=["COUPON_WALLET_CREDIT", "COUPON_WALLET_REFUND"], amount__gt=0)),
+            coupon_debit=Sum("amount", filter=Q(type__in=["COUPON_WALLET_DEBIT", "VOUCHER_CREATE_DEBIT"], amount__lt=0)),
+            shopping_credit=Sum("amount", filter=Q(type__in=["SHOPPING_WALLET_CREDIT"], amount__gt=0)),
+            shopping_debit=Sum("amount", filter=Q(type__in=["SHOPPING_WALLET_DEBIT"], amount__lt=0)),
+            self_package_credit=Sum("amount", filter=Q(type__in=["INTERNAL_WALLET_CREDIT"], amount__gt=0)),
+            self_package_debit=Sum("amount", filter=Q(type__in=["INTERNAL_WALLET_DEBIT"], amount__lt=0)),
+            package_coupon_credit=Sum("amount", filter=Q(type__in=["PACKAGE_COUPON_WALLET_CREDIT", "VOUCHER_REDEEM_CREDIT"], amount__gt=0)),
+            package_coupon_debit=Sum("amount", filter=Q(type__in=["PACKAGE_COUPON_WALLET_DEBIT"], amount__lt=0)),
+            wallet_transfer_credit=Sum("amount", filter=Q(type__in=["WALLET_TO_WALLET_IN"], amount__gt=0)),
+            wallet_transfer_debit=Sum("amount", filter=Q(type__in=["WALLET_TO_WALLET_OUT"], amount__lt=0)),
+            direct_benefit=Sum("amount", filter=Q(type__in=["DIRECT_REF_BONUS"], amount__gt=0)),
+            level_benefit=Sum("amount", filter=Q(type__in=["LEVEL_BONUS", "AUTOPOOL_BONUS_THREE", "AUTOPOOL_BONUS_FIVE"], amount__gt=0)),
+            admin_service_charges=Sum("amount", filter=Q(source_type="ADMIN_SERVICE_CHARGE", amount__lt=0)),
+        )
+    )
+    out = {}
+    for row in rows:
+        def dec(key):
+            return Decimal(str(row.get(key) or "0.00"))
+
+        out[row["user_id"]] = {
+            "coupon": (dec("coupon_credit") + dec("coupon_debit")).quantize(Decimal("0.01")),
+            "shopping": (dec("shopping_credit") + dec("shopping_debit")).quantize(Decimal("0.01")),
+            "self_package": (dec("self_package_credit") + dec("self_package_debit")).quantize(Decimal("0.01")),
+            "package_purchase_coupon": (dec("package_coupon_credit") + dec("package_coupon_debit")).quantize(Decimal("0.01")),
+            "wallet_to_wallet": (dec("wallet_transfer_credit") + dec("wallet_transfer_debit")).quantize(Decimal("0.01")),
+            "direct_benefit": dec("direct_benefit").quantize(Decimal("0.01")),
+            "level_benefit": dec("level_benefit").quantize(Decimal("0.01")),
+            "admin_service_charges": abs(dec("admin_service_charges")).quantize(Decimal("0.01")),
+        }
+    return out
+
+
+def _wallet_summary_payload(user, buckets=None, create_missing_wallet=True):
+    if create_missing_wallet:
+        w = Wallet.get_or_create_for_user(user)
+    else:
+        try:
+            w = user.wallet
+        except Exception:
+            w = None
+    buckets = buckets if buckets is not None else _wallet_bucket_sums(user)
     return {
         "user_id": user.id,
         "username": user.username,
@@ -1039,9 +1103,9 @@ def _wallet_summary_payload(user):
         "full_name": getattr(user, "full_name", "") or "",
         "phone": getattr(user, "phone", "") or "",
         "category": getattr(user, "category", "") or "",
-        "balance": str(w.balance or 0),
-        "main_balance": str(w.main_balance or 0),
-        "withdrawable_balance": str(w.withdrawable_balance or 0),
+        "balance": str(getattr(w, "balance", 0) or 0),
+        "main_balance": str(getattr(w, "main_balance", 0) or 0),
+        "withdrawable_balance": str(getattr(w, "withdrawable_balance", 0) or 0),
         "self_account_balance": str(getattr(w, "self_account_balance", 0) or 0),
         "pockets": {k: str(v) for k, v in buckets.items()},
         "updated_at": getattr(w, "updated_at", None),
@@ -1109,7 +1173,16 @@ class AdminWalletListView(APIView):
             users = users.filter(category=category)
         total = users.count()
         start = (page - 1) * page_size
-        rows = [_wallet_summary_payload(u) for u in users[start:start + page_size]]
+        page_users = list(users[start:start + page_size])
+        bucket_map = _wallet_bucket_sums_for_users([u.id for u in page_users])
+        rows = [
+            _wallet_summary_payload(
+                u,
+                buckets=bucket_map.get(u.id, _empty_wallet_buckets()),
+                create_missing_wallet=False,
+            )
+            for u in page_users
+        ]
         return Response({"count": total, "page": page, "page_size": page_size, "results": rows})
 
 
@@ -1323,19 +1396,81 @@ class AdminWalletReconcileView(APIView):
         if q:
             users = users.filter(Q(username__icontains=q) | Q(prefixed_id__icontains=q) | Q(full_name__icontains=q) | Q(phone__icontains=q))
         limit = min(500, max(1, int(request.query_params.get("limit") or 100)))
+        page_users = list(users[:limit])
+        user_ids = [u.id for u in page_users]
+        bucket_map = _wallet_bucket_sums_for_users(user_ids)
+        ledger_map = {
+            row["user_id"]: Decimal(str(row.get("total") or "0.00")).quantize(Decimal("0.01"))
+            for row in (
+                WalletTransaction.objects
+                .filter(user_id__in=user_ids)
+                .values("user_id")
+                .annotate(total=Sum("amount"))
+            )
+        }
         rows = []
-        for user in users[:limit]:
-            w = Wallet.get_or_create_for_user(user)
-            ledger_total = WalletTransaction.objects.filter(user=user).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-            diff = (Decimal(str(w.balance or 0)) - Decimal(str(ledger_total))).quantize(Decimal("0.01"))
+        for user in page_users:
+            try:
+                w = user.wallet
+            except Exception:
+                w = None
+            ledger_total = ledger_map.get(user.id, Decimal("0.00"))
+            wallet_balance = Decimal(str(getattr(w, "balance", 0) or 0))
+            diff = (wallet_balance - Decimal(str(ledger_total))).quantize(Decimal("0.01"))
             rows.append({
-                **_wallet_summary_payload(user),
+                **_wallet_summary_payload(
+                    user,
+                    buckets=bucket_map.get(user.id, _empty_wallet_buckets()),
+                    create_missing_wallet=False,
+                ),
                 "ledger_total": str(Decimal(str(ledger_total)).quantize(Decimal("0.01"))),
                 "balance_vs_ledger_diff": str(diff),
                 "status": "OK" if diff == Decimal("0.00") else "MISMATCH",
             })
         mismatches = sum(1 for r in rows if r["status"] != "OK")
-        return Response({"count": len(rows), "mismatches": mismatches, "results": rows})
+        finance_accounts = WalletAccount.objects.select_related("user").order_by("-updated_at", "-id")[:limit]
+        account_ids = [a.id for a in finance_accounts]
+        ledger_totals = {
+            row["wallet_account_id"]: (
+                Decimal(str(row.get("credit_total") or "0.00")) -
+                Decimal(str(row.get("debit_total") or "0.00"))
+            ).quantize(Decimal("0.01"))
+            for row in (
+                LedgerEntry.objects
+                .filter(wallet_account_id__in=account_ids)
+                .values("wallet_account_id")
+                .annotate(
+                    credit_total=Sum("amount", filter=Q(direction="CREDIT")),
+                    debit_total=Sum("amount", filter=Q(direction="DEBIT")),
+                )
+            )
+        }
+        finance_rows = []
+        for account in finance_accounts:
+            ledger_balance = ledger_totals.get(account.id, Decimal("0.00"))
+            stored_balance = Decimal(str(account.current_balance or "0.00")).quantize(Decimal("0.01"))
+            diff = (stored_balance - ledger_balance).quantize(Decimal("0.01"))
+            finance_rows.append({
+                "wallet_account_id": account.id,
+                "user_id": account.user_id,
+                "username": getattr(account.user, "username", "") if account.user_id else "",
+                "wallet_type": account.wallet_type,
+                "stored_balance": str(stored_balance),
+                "ledger_balance": str(ledger_balance),
+                "diff": str(diff),
+                "status": "OK" if diff == Decimal("0.00") else "MISMATCH",
+            })
+        finance_mismatches = sum(1 for r in finance_rows if r["status"] != "OK")
+        return Response({
+            "count": len(rows),
+            "mismatches": mismatches,
+            "results": rows,
+            "finance_ledger": {
+                "count": len(finance_rows),
+                "mismatches": finance_mismatches,
+                "results": finance_rows,
+            },
+        })
 
 
 class AdminECouponBulkCreateView(APIView):

@@ -1,6 +1,7 @@
 from typing import Dict, Any, List, Set, Tuple
 
-from django.db.models import Q
+from django.core.cache import cache
+from django.db.models import Q, Sum
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -1082,7 +1083,7 @@ class MyMatrixRootsBreakdownView(APIView):
 
             sums: Dict[int, D] = {rid: D("0") for rid in root_ids}
 
-            rows = (
+            base = (
                 WalletTransaction.objects
                 .filter(user=request.user, amount__gt=0)
                 .filter(
@@ -1092,6 +1093,19 @@ class MyMatrixRootsBreakdownView(APIView):
                         & Q(meta__orig_type=orig_type)
                     )
                 )
+            )
+
+            for row in base.filter(matrix_account_id__in=root_ids).values("matrix_account_id").annotate(total=Sum("amount")):
+                try:
+                    rid = int(row.get("matrix_account_id") or 0)
+                    if rid in sums:
+                        sums[rid] = sums[rid] + D(str(row.get("total") or "0"))
+                except Exception:
+                    continue
+
+            rows = (
+                base
+                .exclude(matrix_account_id__in=root_ids)
                 .only("amount", "type", "matrix_account_id", "meta")
                 .iterator(chunk_size=2000)
             )
@@ -1128,6 +1142,12 @@ class MyMatrixRootsBreakdownView(APIView):
                 r["total_earned"] = "0"
 
     def get(self, request):
+        cache_key = f"matrix_roots_breakdown_v2:{getattr(request.user, 'id', 0)}"
+        if str(request.query_params.get("refresh") or "").lower() not in {"1", "true", "yes"}:
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return Response(cached, status=status.HTTP_200_OK)
+
         # Collect roots for both pools
         five_roots = self._collect_roots(request, "FIVE_150")
         three_roots = self._collect_roots(request, "THREE_150")
@@ -1161,18 +1181,17 @@ class MyMatrixRootsBreakdownView(APIView):
                     pass
             return out
 
-        return Response(
-            {
-                "five": {
-                    "pool": "FIVE_150",
-                    "roots": five_roots,
-                    "totals_by_category": totals(five_roots),
-                },
-                "three": {
-                    "pool": "THREE_150",
-                    "roots": three_roots,
-                    "totals_by_category": totals(three_roots),
-                },
+        payload = {
+            "five": {
+                "pool": "FIVE_150",
+                "roots": five_roots,
+                "totals_by_category": totals(five_roots),
             },
-            status=status.HTTP_200_OK,
-        )
+            "three": {
+                "pool": "THREE_150",
+                "roots": three_roots,
+                "totals_by_category": totals(three_roots),
+            },
+        }
+        cache.set(cache_key, payload, 20)
+        return Response(payload, status=status.HTTP_200_OK)

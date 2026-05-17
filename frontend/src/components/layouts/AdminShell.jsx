@@ -207,7 +207,20 @@ export default function AdminShell({ children }) {
     if (to.startsWith("/admin/e-coupons")) return "ecoupons";
     if (to.startsWith("/admin/kyc")) return "kyc";
     if (to.startsWith("/admin/withdrawals")) return "withdrawals";
-    if (to.startsWith("/admin/wallets") || to.startsWith("/admin/wallet-vouchers") || to.startsWith("/admin/wallet-reconcile")) return "reports_finance";
+    if (
+      to.startsWith("/admin/wallet-command-center") ||
+      to.startsWith("/admin/wallet-ledger") ||
+      to.startsWith("/admin/team-wallet-dashboard") ||
+      to.startsWith("/admin/wallet-monitoring") ||
+      to.startsWith("/admin/wallet-settlements") ||
+      to.startsWith("/admin/wallet-upload-approvals") ||
+      to.startsWith("/admin/package-management") ||
+      to.startsWith("/admin/reward-distribution") ||
+      to.startsWith("/admin/wallets") ||
+      to.startsWith("/admin/wallet-vouchers") ||
+      to.startsWith("/admin/wallet-reconcile")
+    )
+      return "reports_finance";
     if (to.startsWith("/admin/support")) return "support";
     if (to.startsWith("/admin/autopool")) return "autopool";
     if (to.startsWith("/admin/commissions")) return "commissions";
@@ -289,17 +302,25 @@ export default function AdminShell({ children }) {
         label: "Kyc & Withdrawals",
         items: [
           { to: "/admin/kyc", label: "KYC", icon: "shield" },
-          { to: "/admin/withdrawals", label: "Withdrawals", icon: "wallet" },
           { to: "/admin/support", label: "Support", icon: "ticket" },
         ],
       },
       {
-        key: "wallets",
-        label: "Wallet Control",
+        key: "finance_wallet_ops",
+        label: "Finance & Wallet Operations",
         items: [
+          { to: "/admin/wallet-command-center", label: "Wallet Command Center", icon: "dashboard" },
+          { to: "/admin/team-wallet-dashboard", label: "Team Wallet Dashboard", icon: "chart" },
+          { to: "/admin/wallet-ledger", label: "Central Ledger", icon: "wallet" },
           { to: "/admin/wallets", label: "Wallet Overview", icon: "wallet" },
+          { to: "/admin/wallet-upload-approvals", label: "Add Money Requests", icon: "upload" },
+          { to: "/admin/withdrawals", label: "Withdrawal Requests", icon: "wallet" },
           { to: "/admin/wallet-vouchers", label: "Voucher Maintenance", icon: "ticket" },
+          { to: "/admin/package-management", label: "Package Management", icon: "box" },
+          { to: "/admin/reward-distribution", label: "Reward Distribution", icon: "wallet" },
           { to: "/admin/wallet-reconcile", label: "Wallet Reconcile", icon: "chart" },
+          { to: "/admin/wallet-settlements", label: "Settlement Reports", icon: "chart" },
+          { to: "/admin/wallet-monitoring", label: "Risk & OTP Monitoring", icon: "shield" },
         ],
       },
       {
@@ -319,8 +340,6 @@ export default function AdminShell({ children }) {
           { to: "/admin/packages/join-subscription", label: "Approvals: Join Subscription", icon: "ticket" },
           { to: "/admin/packages/spp", label: "Approvals: SPP", icon: "ticket" },
           { to: "/admin/packages/tri-tour", label: "Approvals: Tri Tour", icon: "ticket" },
-
-          { to: "/admin/wallet-upload-approvals", label: "Wallet Upload Approvals", icon: "wallet" },
 
           { to: "/admin/rank-upgrades", label: "Rank Upgrades", icon: "wallet" },
         ],

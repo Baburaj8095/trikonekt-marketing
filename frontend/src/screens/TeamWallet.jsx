@@ -327,6 +327,7 @@ export default function TeamWallet() {
   const [success, setSuccess] = useState("");
   const [walletData, setWalletData] = useState({});
   const [historyData, setHistoryData] = useState({});
+  const [rootsBreakdown, setRootsBreakdown] = useState(null);
   const [voucherData, setVoucherData] = useState({ results: [] });
   const [kycData, setKycData] = useState({});
   const [withdrawals, setWithdrawals] = useState([]);
@@ -351,15 +352,17 @@ export default function TeamWallet() {
     try {
       setLoading(true);
       setError("");
-      const [walletRes, kycRes, historyRes, withdrawalsRes, vouchersRes] = await Promise.all([
+      const [walletRes, kycRes, historyRes, withdrawalsRes, vouchersRes, rootsRes] = await Promise.all([
         API.get("/accounts/wallet/me/"),
         API.get("/accounts/kyc/me/"),
         API.get("/accounts/wallet/me/history/"),
         API.get("/accounts/withdrawals/me/"),
         API.get("/accounts/wallet/vouchers/"),
+        API.get("/accounts/genealogy/roots/breakdown/").catch(() => ({ data: null })),
       ]);
       setWalletData(walletRes?.data || {});
       setVoucherData(vouchersRes?.data || { results: [] });
+      setRootsBreakdown(rootsRes?.data || null);
       setKycData(kycRes?.data || {});
       setHistoryData(historyRes?.data || {});
       setWithdrawals(
@@ -408,6 +411,19 @@ export default function TeamWallet() {
     [walletData]
   );
 
+  const selfRebirthStats = useMemo(() => {
+    const roots = [
+      ...(Array.isArray(rootsBreakdown?.five?.roots) ? rootsBreakdown.five.roots : []),
+      ...(Array.isArray(rootsBreakdown?.three?.roots) ? rootsBreakdown.three.roots : []),
+    ].filter((root) => String(root?.category || root?.inferred_category || "").toUpperCase() === "SELF_REBIRTH");
+    const uniqueIds = new Set(roots.map((root) => `${String(root?.pool_type || "")}:${String(root?.id || "")}`));
+    const earned = roots.reduce((sum, root) => sum + Number(root?.total_earned || 0), 0);
+    return {
+      count: uniqueIds.size || Number(coupons?.selfActivated || 0),
+      earned: earned || Number(top?.self_account_balance || walletData?.self_account_balance || 0),
+    };
+  }, [coupons, rootsBreakdown, top, walletData]);
+
   const wallets = useMemo(() => {
     return WALLET_DEFINITIONS.map((def) => {
       let amount = 0;
@@ -422,9 +438,9 @@ export default function TeamWallet() {
           label = "Incl. withdrawn amount";
           break;
         case 2:
-          amount = Number(top?.self_account_balance || walletData?.self_account_balance || 0);
+          amount = selfRebirthStats.earned;
           icon = <SwapHorizIcon />;
-          label = `${coupons?.selfActivated || 0} IDs activated`;
+          label = `${selfRebirthStats.count || 0} self rebirth IDs`;
           break;
         case 3:
           amount = Number(top?.shopping_rewards_points || 0);
@@ -530,7 +546,7 @@ export default function TeamWallet() {
 
       return { ...def, amount, icon, label, actions };
     });
-  }, [coupons, income, kycVerified, limits, prime, smartPurchase, top, totalEarningBonus, transferWallets, voucherData, walletData]);
+  }, [coupons, income, kycVerified, limits, prime, selfRebirthStats, smartPurchase, top, totalEarningBonus, transferWallets, voucherData, walletData]);
 
   const sections = useMemo(() => ({
     core: wallets.filter((w) => w.section === "core"),
@@ -550,6 +566,7 @@ export default function TeamWallet() {
         transferType: "coupon",
         title: "Coupon Pocket",
         wallet: walletByNo[6],
+        onClick: () => (window.location.href = "/user/coupon-pocket"),
       },
       {
         no: 2,
@@ -582,10 +599,10 @@ export default function TeamWallet() {
   const summaryWallets = useMemo(
     () => [
       { title: "Total Earning", wallet: walletByNo[1] },
-      { title: "Team Consumer Self Re-birth", wallet: walletByNo[2] },
+      { title: "Team Consumer Self Re-birth", wallet: walletByNo[2], idCount: selfRebirthStats.count || 0 },
       { title: "Redeem Points", wallet: walletByNo[4] },
     ],
-    [walletByNo]
+    [selfRebirthStats, walletByNo]
   );
 
   const manualWallets = useMemo(
@@ -602,7 +619,7 @@ export default function TeamWallet() {
         amount: walletByNo[3]?.amount,
         icon: walletByNo[3]?.icon,
         caption: walletByNo[3]?.label,
-        idCount: coupons?.selfActivated || 0,
+        idCount: selfRebirthStats.count || 0,
         tone: 4,
       },
       {
@@ -650,7 +667,7 @@ export default function TeamWallet() {
         tone: 0,
       },
     ],
-    [coupons, income, walletByNo, walletData]
+    [coupons, income, selfRebirthStats, walletByNo, walletData]
   );
 
   const openTransferType = (transferType) => {
@@ -870,6 +887,7 @@ export default function TeamWallet() {
               amount={item.wallet?.amount}
               icon={item.wallet?.icon}
               caption={item.wallet?.label}
+              idCount={item.idCount}
               tone={index}
             />
           ))}

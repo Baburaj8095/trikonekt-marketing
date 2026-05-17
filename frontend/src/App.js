@@ -69,6 +69,13 @@ import AdminWallets from "./pages/admin/AdminWallets";
 import AdminWalletDetail from "./pages/admin/AdminWalletDetail";
 import AdminWalletVouchers from "./pages/admin/AdminWalletVouchers";
 import AdminWalletReconcile from "./pages/admin/AdminWalletReconcile";
+import AdminWalletCommandCenter from "./pages/admin/AdminWalletCommandCenter";
+import AdminWalletLedger from "./pages/admin/AdminWalletLedger";
+import AdminTeamWalletDashboard from "./pages/admin/AdminTeamWalletDashboard";
+import AdminWalletMonitoring from "./pages/admin/AdminWalletMonitoring";
+import AdminPackageManagement from "./pages/admin/AdminPackageManagement";
+import AdminRewardDistribution from "./pages/admin/AdminRewardDistribution";
+import AdminWalletSettlements from "./pages/admin/AdminWalletSettlements";
 import AdminPromoPackageProducts from "./pages/admin/AdminPromoPackageProducts";
 import AdminDashboardCards from "./pages/admin/AdminDashboardCards";
 import AdminHomeCards from "./pages/admin/AdminHomeCards";
@@ -1418,6 +1425,76 @@ function App() {
             <AdminProtectedRoute>
               <AdminShell>
                 <AdminWalletUploadApprovals />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/wallet-command-center"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminWalletCommandCenter />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/wallet-ledger"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminWalletLedger />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/team-wallet-dashboard"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminTeamWalletDashboard />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/wallet-monitoring"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminWalletMonitoring />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/package-management"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminPackageManagement />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/reward-distribution"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminRewardDistribution />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/wallet-settlements"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminWalletSettlements />
               </AdminShell>
             </AdminProtectedRoute>
           }

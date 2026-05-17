@@ -887,6 +887,176 @@ class WalletTransaction(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
+class WalletAccount(models.Model):
+    WALLET_TYPE_CHOICES = [
+        ("MAIN", "Main Wallet"),
+        ("TOTAL_EARNINGS", "Total Earnings"),
+        ("REDEEM_POINTS", "Redeem Points"),
+        ("COUPON_POCKET", "Coupon Pocket"),
+        ("SELF_PACKAGE_POCKET", "Self Package Pocket"),
+        ("ADD_MONEY_POCKET", "Add Money Pocket"),
+        ("WITHDRAWAL_WALLET", "Withdrawal Wallet"),
+        ("PACKAGE_PURCHASE_COUPON", "Package Purchase Coupon"),
+        ("SHOPPING_REBIRTH", "Shopping/Rebirth Wallets"),
+        ("REWARD_WALLET", "Reward Wallet"),
+        ("GIFT_CARD", "Gift Cards"),
+        ("ECOMMERCE", "B2B/B2C Orders"),
+        ("SYSTEM", "System/Company Wallet"),
+    ]
+    STATUS_CHOICES = [
+        ("ACTIVE", "Active"),
+        ("LOCKED", "Locked"),
+        ("SUSPENDED", "Suspended"),
+        ("CLOSED", "Closed"),
+    ]
+
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="wallet_accounts", db_index=True)
+    wallet_type = models.CharField(max_length=40, choices=WALLET_TYPE_CHOICES, db_index=True)
+    current_balance = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    available_balance = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    locked_balance = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    pending_balance = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="ACTIVE", db_index=True)
+    legacy_wallet = models.ForeignKey(Wallet, null=True, blank=True, on_delete=models.SET_NULL, related_name="wallet_accounts")
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["user_id", "wallet_type"]
+        constraints = [
+            models.UniqueConstraint(fields=["user", "wallet_type"], name="uniq_wallet_account_user_type"),
+        ]
+        indexes = [
+            models.Index(fields=["wallet_type", "status"]),
+            models.Index(fields=["user", "status"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"WalletAccount<{self.user_id}:{self.wallet_type}:{self.current_balance}>"
+
+
+class FinancialTransaction(models.Model):
+    CATEGORY_CHOICES = [
+        ("ADD_MONEY", "Add Money"),
+        ("WITHDRAWAL", "Withdrawal"),
+        ("WALLET_TRANSFER", "Wallet Transfer"),
+        ("VOUCHER_CREATE", "Voucher Creation"),
+        ("VOUCHER_REDEEM", "Voucher Redemption"),
+        ("PACKAGE_PURCHASE", "Package Purchase"),
+        ("MLM_INCOME", "MLM Income"),
+        ("SPONSOR_INCOME", "Sponsor Income"),
+        ("MATRIX_INCOME", "Matrix Earnings"),
+        ("SELF_REBIRTH", "Self Rebirth"),
+        ("SHOPPING_REWARD", "Shopping Rewards"),
+        ("FRANCHISE_REWARD", "Franchise Rewards"),
+        ("REWARD_DISTRIBUTION", "Reward Distribution"),
+        ("GST_INVOICE", "GST Invoice"),
+        ("ADMIN_ADJUSTMENT", "Admin Adjustment"),
+        ("REFUND", "Refund"),
+        ("SETTLEMENT", "Settlement"),
+    ]
+    STATUS_CHOICES = [
+        ("DRAFT", "Draft"),
+        ("PENDING", "Pending"),
+        ("PROCESSING", "Processing"),
+        ("COMPLETED", "Completed"),
+        ("FAILED", "Failed"),
+        ("REVERSED", "Reversed"),
+        ("CANCELLED", "Cancelled"),
+    ]
+    APPROVAL_STATUS_CHOICES = [
+        ("NOT_REQUIRED", "Not Required"),
+        ("PENDING", "Pending"),
+        ("APPROVED", "Approved"),
+        ("REJECTED", "Rejected"),
+        ("CANCELLED", "Cancelled"),
+    ]
+
+    transaction_ref = models.CharField(max_length=64, unique=True, db_index=True)
+    flow_id = models.CharField(max_length=64, blank=True, db_index=True)
+    idempotency_key = models.CharField(max_length=128, null=True, blank=True, unique=True)
+    user = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.SET_NULL, related_name="financial_transactions", db_index=True)
+    category = models.CharField(max_length=40, choices=CATEGORY_CHOICES, db_index=True)
+    source_module = models.CharField(max_length=80, blank=True, db_index=True)
+    source_id = models.CharField(max_length=80, blank=True, db_index=True)
+    destination_module = models.CharField(max_length=80, blank=True)
+    gross_amount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    charges_amount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    gst_amount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    tds_amount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    net_amount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="PENDING", db_index=True)
+    approval_status = models.CharField(max_length=20, choices=APPROVAL_STATUS_CHOICES, default="NOT_REQUIRED", db_index=True)
+    payment_gateway_reference = models.CharField(max_length=120, blank=True, db_index=True)
+    utr_number = models.CharField(max_length=80, blank=True, db_index=True)
+    reference_id = models.CharField(max_length=100, blank=True, db_index=True)
+    legacy_wallet_transaction = models.ForeignKey(
+        WalletTransaction,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="financial_transactions",
+    )
+    created_by = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.SET_NULL, related_name="created_financial_transactions")
+    approved_by = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.SET_NULL, related_name="approved_financial_transactions")
+    approved_at = models.DateTimeField(null=True, blank=True)
+    remarks = models.TextField(blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["category", "status", "created_at"]),
+            models.Index(fields=["source_module", "source_id"]),
+            models.Index(fields=["user", "status", "created_at"]),
+            models.Index(fields=["approval_status", "created_at"]),
+            models.Index(fields=["flow_id", "created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"FinancialTransaction<{self.transaction_ref}:{self.category}:{self.status}>"
+
+
+class LedgerEntry(models.Model):
+    DIRECTION_CHOICES = [
+        ("DEBIT", "Debit"),
+        ("CREDIT", "Credit"),
+    ]
+    ENTRY_STATUS_CHOICES = [
+        ("POSTED", "Posted"),
+        ("PENDING", "Pending"),
+        ("REVERSED", "Reversed"),
+    ]
+
+    financial_transaction = models.ForeignKey(FinancialTransaction, on_delete=models.PROTECT, related_name="ledger_entries")
+    wallet_account = models.ForeignKey(WalletAccount, on_delete=models.PROTECT, related_name="ledger_entries")
+    user = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.SET_NULL, related_name="ledger_entries", db_index=True)
+    direction = models.CharField(max_length=10, choices=DIRECTION_CHOICES, db_index=True)
+    amount = models.DecimalField(max_digits=14, decimal_places=2)
+    balance_before = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    balance_after = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    status = models.CharField(max_length=20, choices=ENTRY_STATUS_CHOICES, default="POSTED", db_index=True)
+    entry_ref = models.CharField(max_length=80, blank=True, db_index=True)
+    remarks = models.TextField(blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["wallet_account", "created_at"]),
+            models.Index(fields=["financial_transaction", "direction"]),
+            models.Index(fields=["user", "created_at"]),
+            models.Index(fields=["status", "created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"LedgerEntry<{self.financial_transaction_id}:{self.direction}:{self.amount}>"
+
+
 # ======================
 # Upload to Wallet (admin approval)
 # ======================

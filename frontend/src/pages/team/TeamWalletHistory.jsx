@@ -111,15 +111,19 @@ function VoucherTable({ rows }) {
         <Typography sx={{ fontWeight: 900, color: "#0f172a" }}>Voucher History</Typography>
       </Box>
       <TableContainer sx={{ overflowX: "auto" }}>
-        <Table size="small" sx={{ minWidth: 760 }}>
+        <Table size="small" sx={{ minWidth: 1040 }}>
           <TableHead>
             <TableRow sx={{ bgcolor: "#f8fafc" }}>
               <TableCell sx={{ fontWeight: 900 }}>SL No</TableCell>
               <TableCell sx={{ fontWeight: 900 }}>Code</TableCell>
               <TableCell sx={{ fontWeight: 900 }}>Type</TableCell>
               <TableCell sx={{ fontWeight: 900 }}>Amount</TableCell>
+              <TableCell sx={{ fontWeight: 900 }}>Created By</TableCell>
+              <TableCell sx={{ fontWeight: 900 }}>Sent To</TableCell>
+              <TableCell sx={{ fontWeight: 900 }}>Redeemed By</TableCell>
               <TableCell sx={{ fontWeight: 900 }}>Created</TableCell>
               <TableCell sx={{ fontWeight: 900 }}>Valid Till</TableCell>
+              <TableCell sx={{ fontWeight: 900 }}>Redeemed At</TableCell>
               <TableCell sx={{ fontWeight: 900 }}>Status</TableCell>
             </TableRow>
           </TableHead>
@@ -130,14 +134,18 @@ function VoucherTable({ rows }) {
                 <TableCell>{row.code}</TableCell>
                 <TableCell>{row.voucher_type_label || row.voucher_type}</TableCell>
                 <TableCell>Rs. {fmtAmount(row.amount)}</TableCell>
+                <TableCell>{row.creator_username || "-"}</TableCell>
+                <TableCell>{row.assigned_to_username || "-"}</TableCell>
+                <TableCell>{row.redeemed_by_username || "-"}</TableCell>
                 <TableCell>{fmtDate(row.created_at)}</TableCell>
                 <TableCell>{fmtDate(row.expires_at)}</TableCell>
+                <TableCell>{fmtDate(row.redeemed_at)}</TableCell>
                 <TableCell><Chip size="small" label={row.status} sx={{ fontWeight: 800 }} /></TableCell>
               </TableRow>
             ))}
             {!rows.length && (
               <TableRow>
-                <TableCell colSpan={7} sx={{ color: "#94a3b8", py: 3, textAlign: "center" }}>
+                <TableCell colSpan={11} sx={{ color: "#94a3b8", py: 3, textAlign: "center" }}>
                   No voucher history found.
                 </TableCell>
               </TableRow>
@@ -155,6 +163,7 @@ export default function TeamWalletHistory() {
   const [transactions, setTransactions] = useState([]);
   const [vouchers, setVouchers] = useState([]);
   const [tab, setTab] = useState("coupon");
+  const [voucherType, setVoucherType] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
@@ -188,6 +197,12 @@ export default function TeamWalletHistory() {
     const withdrawal = buildTransferRows(transactions, "MAIN_TO_WITHDRAWAL", "WITHDRAWAL_WALLET_CREDIT", "Withdrawal Pocket");
     return { coupon, internal, withdrawal };
   }, [transactions]);
+
+  const filteredVouchers = useMemo(() => {
+    const list = Array.isArray(vouchers) ? vouchers : [];
+    if (!voucherType) return list;
+    return list.filter((item) => String(item?.voucher_type || "").toUpperCase() === voucherType);
+  }, [voucherType, vouchers]);
 
   return (
     <Box sx={{ maxWidth: 1120, mx: "auto", px: { xs: 1.2, sm: 2 }, py: { xs: 1.5, sm: 2.5 } }}>
@@ -225,6 +240,24 @@ export default function TeamWalletHistory() {
         </Tabs>
       </Paper>
 
+      {tab === "vouchers" && (
+        <Paper variant="outlined" sx={{ p: 1, borderRadius: 2, mb: 1.5 }}>
+          <Tabs
+            value={voucherType}
+            onChange={(_, v) => setVoucherType(v)}
+            variant="scrollable"
+            scrollButtons="auto"
+            sx={{ minHeight: 40, "& .MuiTab-root": { minHeight: 40, fontWeight: 800, textTransform: "none" } }}
+          >
+            <Tab value="" label="All" />
+            <Tab value="TRIZONE" label="Trizone" />
+            <Tab value="ONLINE" label="Online" />
+            <Tab value="NEAR_STORE" label="Near Store" />
+            <Tab value="PACKAGE_PURCHASE" label="Package Purchase" />
+          </Tabs>
+        </Paper>
+      )}
+
       <Stack spacing={2}>
         {tab === "coupon" && (
           <HistoryTable title="Coupon Pocket History" rows={rows.coupon} pocketHeader="Coupon Pocket Wallet" />
@@ -235,7 +268,7 @@ export default function TeamWalletHistory() {
         {tab === "withdrawal" && (
           <HistoryTable title="Withdrawal To Pocket History" rows={rows.withdrawal} pocketHeader="Withdrawal To Wallet" />
         )}
-        {tab === "vouchers" && <VoucherTable rows={vouchers} />}
+        {tab === "vouchers" && <VoucherTable rows={filteredVouchers} />}
       </Stack>
     </Box>
   );

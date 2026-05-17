@@ -11,7 +11,7 @@ from .models import (
     ConsumerAccount, EmployeeAccount, CompanyAccount,
     AgencyStateCoordinator, AgencyState, AgencyDistrictCoordinator, AgencyDistrict,
     AgencyPincodeCoordinator, AgencyPincode, AgencySubFranchise, AgencyRegionAssignment,
-    Wallet, WalletTransaction, UserKYC, WithdrawalRequest
+    Wallet, WalletTransaction, WalletAccount, FinancialTransaction, LedgerEntry, UserKYC, WithdrawalRequest
 )
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from locations.models import State, City
@@ -1134,6 +1134,35 @@ class WalletTransactionAdmin(admin.ModelAdmin):
             ])
         return resp
     export_as_csv.short_description = "Export selected to CSV"
+
+
+@admin.register(WalletAccount)
+class WalletAccountAdmin(admin.ModelAdmin):
+    list_display = ("user", "wallet_type", "current_balance", "available_balance", "locked_balance", "pending_balance", "status", "updated_at")
+    list_filter = ("wallet_type", "status")
+    search_fields = ("user__username", "user__prefixed_id", "user__unique_id")
+    raw_id_fields = ("user", "legacy_wallet")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(FinancialTransaction)
+class FinancialTransactionAdmin(admin.ModelAdmin):
+    list_display = ("transaction_ref", "user", "category", "source_module", "gross_amount", "net_amount", "status", "approval_status", "created_at")
+    list_filter = ("category", "status", "approval_status", "source_module")
+    search_fields = ("transaction_ref", "flow_id", "source_id", "reference_id", "utr_number", "user__username", "user__prefixed_id")
+    raw_id_fields = ("user", "legacy_wallet_transaction", "created_by", "approved_by")
+    readonly_fields = ("created_at", "updated_at")
+    date_hierarchy = "created_at"
+
+
+@admin.register(LedgerEntry)
+class LedgerEntryAdmin(admin.ModelAdmin):
+    list_display = ("financial_transaction", "wallet_account", "direction", "amount", "balance_before", "balance_after", "status", "created_at")
+    list_filter = ("direction", "status", "wallet_account__wallet_type")
+    search_fields = ("financial_transaction__transaction_ref", "entry_ref", "user__username", "user__prefixed_id")
+    raw_id_fields = ("financial_transaction", "wallet_account", "user")
+    readonly_fields = ("created_at",)
+    date_hierarchy = "created_at"
 
 
 @admin.register(UserKYC)

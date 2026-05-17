@@ -110,7 +110,7 @@ export default function AdminWalletUploadApprovals() {
     try {
       await adminApproveWalletUploadRequest(r.id);
       await fetchRows();
-      alert("Approved and wallet credited (INTERNAL_WALLET_CREDIT).");
+      alert("Approved. Amount is now visible in Add Money Pocket.");
     } catch (e) {
       alert(e?.response?.data?.detail || "Failed to approve");
     }
@@ -133,7 +133,7 @@ export default function AdminWalletUploadApprovals() {
         <div>
           <h2 style={{ margin: 0, fontSize: 18 }}>Wallet Upload Approvals</h2>
           <div style={{ color: "#64748b", fontSize: 13, marginTop: 4 }}>
-            Approve will credit <b>Self Package Pocket</b> via <code>INTERNAL_WALLET_CREDIT</code>.
+            Approve will credit <b>Add Money Pocket</b> for package purchase payments.
           </div>
         </div>
         <div style={{ display: "flex", gap: 12, alignItems: "flex-end" }}>

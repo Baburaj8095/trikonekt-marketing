@@ -98,6 +98,8 @@ export default function UploadToWallet() {
     "Consumer";
 
   const billName = form.bill?.name || "";
+  const amountValue = Number(form.amount);
+  const canSubmit = Number.isFinite(amountValue) && amountValue > 0 && Boolean(form.bill);
 
   const onChange = (field) => (event) => {
     const value = event?.target?.value ?? "";
@@ -125,11 +127,6 @@ export default function UploadToWallet() {
       return;
     }
 
-    if (!String(form.utr || "").trim()) {
-      setScreenError("Please enter the UTR number.");
-      return;
-    }
-
     if (!form.bill) {
       setScreenError("Please upload the bill or payment screenshot.");
       return;
@@ -143,7 +140,7 @@ export default function UploadToWallet() {
         proof: form.bill,
       });
       setSuccessMsg(
-        "Wallet upload request submitted. It will be added to your Self Package Wallet after admin approval."
+        "Wallet upload request submitted. After admin approval it will show in Add Money Pocket."
       );
       setForm({ amount: "", utr: "", bill: null });
       setFileInputKey((prev) => prev + 1);
@@ -343,8 +340,8 @@ export default function UploadToWallet() {
                   </Paper>
 
                   <TextField
-                    label="UTR No"
-                    placeholder="Enter UTR number"
+                    label="UTR No (Optional)"
+                    placeholder="Enter UTR number if available"
                     size="small"
                     fullWidth
                     value={form.utr}
@@ -403,7 +400,7 @@ export default function UploadToWallet() {
                     <Button
                       type="submit"
                       variant="contained"
-                      disabled={submitting}
+                      disabled={submitting || !canSubmit}
                       sx={{
                         minWidth: 160,
                         textTransform: "none",

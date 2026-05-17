@@ -1072,9 +1072,7 @@ export async function createWalletUploadRequest({ amount, utr, proof, remarks = 
   form.append("utr", utr);
   if (proof) form.append("proof", proof);
   if (remarks) form.append("remarks", remarks);
-  const res = await API.post("/accounts/wallet/upload-requests/", form, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+  const res = await API.post("/accounts/wallet/upload-requests/", form);
   return res.data;
 }
 

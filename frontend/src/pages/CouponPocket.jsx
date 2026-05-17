@@ -104,6 +104,16 @@ export default function CouponPocket() {
     }
   };
 
+  const copyVoucher = async (voucher) => {
+    const text = `${voucher.code} - Rs. ${fmtAmount(voucher.amount)} (${voucher.voucher_type_label || voucher.voucher_type})`;
+    try {
+      await navigator.clipboard.writeText(text);
+      setSuccess("Coupon voucher copied. You can share it with the receiver.");
+    } catch (_) {
+      setSuccess(`Coupon voucher: ${text}`);
+    }
+  };
+
   return (
     <Box sx={{ maxWidth: 960, mx: "auto", px: { xs: 1.2, sm: 2 }, py: 2 }}>
       <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1.5} sx={{ mb: 2 }}>
@@ -211,10 +221,14 @@ export default function CouponPocket() {
                 <Typography sx={{ color: "#64748b", fontSize: 12 }}>
                   {voucher.voucher_type_label || voucher.voucher_type}
                   {voucher.assigned_to_username ? ` - Receiver ${voucher.assigned_to_username}` : ""}
+                  {voucher.redeemed_by_username ? ` - Redeemed by ${voucher.redeemed_by_username}` : ""}
                   {" "} - Valid till {fmtDate(voucher.expires_at)}
                 </Typography>
               </Box>
               <Chip size="small" label={voucher.status} sx={{ fontWeight: 800 }} />
+              <Button size="small" variant="outlined" onClick={() => copyVoucher(voucher)}>
+                Copy
+              </Button>
             </Stack>
           </Paper>
         ))}

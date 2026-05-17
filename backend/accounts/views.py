@@ -23,6 +23,8 @@ from .serializers import (
     WalletUploadRequestSerializer,
     WalletUploadRequestCreateSerializer,
 )
+from .finance_constants import FinanceCategories, WalletTypes
+from .wallet_engine import WalletEngine
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from adminapi.permissions import IsAdminOrStaff, HasAdminModuleAccess
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -63,7 +65,7 @@ class WalletUploadRequestCreateView(APIView):
     """User submits a wallet upload request for admin approval.
 
     POST /api/accounts/wallet/upload-requests/
-    body: multipart/form-data { amount, utr, proof(file), remarks? }
+    body: multipart/form-data { amount, utr?, proof(file), remarks? }
 
     Credits are NOT applied immediately.
     """
@@ -77,7 +79,7 @@ class WalletUploadRequestCreateView(APIView):
         obj = WalletUploadRequest.objects.create(
             user=request.user,
             amount=ser.validated_data.get("amount"),
-            utr=ser.validated_data.get("utr"),
+            utr=(ser.validated_data.get("utr") or "").strip(),
             proof=ser.validated_data.get("proof"),
             remarks=ser.validated_data.get("remarks", ""),
             status="PENDING",
@@ -144,7 +146,30 @@ class AdminWalletUploadRequestApproveView(APIView):
                 type="INTERNAL_WALLET_CREDIT",
                 source_type="WALLET_UPLOAD",
                 source_id=str(obj.id),
-                meta={"wallet_upload_request_id": obj.id, "utr": obj.utr},
+                meta={
+                    "wallet_upload_request_id": obj.id,
+                    "utr": obj.utr,
+                    "wallet": "ADD_MONEY",
+                    "destination_wallet": "ADD_MONEY_POCKET",
+                },
+            )
+            WalletEngine.post_system_credit(
+                user=obj.user,
+                wallet_type=WalletTypes.ADD_MONEY_POCKET,
+                amount=amt,
+                category=FinanceCategories.ADD_MONEY,
+                source_module="WALLET_UPLOAD",
+                source_id=str(obj.id),
+                idempotency_key=f"wallet_upload_approve:{obj.id}",
+                legacy_wallet_transaction=tx,
+                actor=request.user,
+                remarks="Admin approved wallet upload request",
+                metadata={
+                    "wallet_upload_request_id": obj.id,
+                    "legacy_wallet_type": "ADD_MONEY_POCKET",
+                    "utr": obj.utr,
+                },
+                utr_number=obj.utr,
             )
 
             obj.status = "APPROVED"
@@ -2601,19 +2626,32 @@ class WalletTransferConfirm(APIView):
 def _coupon_wallet_balance(user):
     from decimal import Decimal as D
 
-    tx = WalletTransaction.objects.filter(user=user)
-    credit = tx.filter(type__in=["COUPON_WALLET_CREDIT", "COUPON_WALLET_REFUND"], amount__gt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")
-    debit = tx.filter(type__in=["COUPON_WALLET_DEBIT", "VOUCHER_CREATE_DEBIT"], amount__lt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")
-    return (D(str(credit)) + D(str(debit))).quantize(D("0.01"))
+    return _consumer_coupon_balances(user).get("coupon", D("0.00"))
 
 
 def _package_coupon_wallet_balance(user):
     from decimal import Decimal as D
 
-    tx = WalletTransaction.objects.filter(user=user)
-    credit = tx.filter(type__in=["PACKAGE_COUPON_WALLET_CREDIT", "VOUCHER_REDEEM_CREDIT"], amount__gt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")
-    debit = tx.filter(type="PACKAGE_COUPON_WALLET_DEBIT", amount__lt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")
-    return (D(str(credit)) + D(str(debit))).quantize(D("0.01"))
+    return _consumer_coupon_balances(user).get("package_coupon", D("0.00"))
+
+
+def _consumer_coupon_balances(user):
+    from decimal import Decimal as D
+
+    row = WalletTransaction.objects.filter(user=user).aggregate(
+        coupon_credit=Sum("amount", filter=Q(type__in=["COUPON_WALLET_CREDIT", "COUPON_WALLET_REFUND"], amount__gt=0)),
+        coupon_debit=Sum("amount", filter=Q(type__in=["COUPON_WALLET_DEBIT", "VOUCHER_CREATE_DEBIT"], amount__lt=0)),
+        package_credit=Sum("amount", filter=Q(type__in=["PACKAGE_COUPON_WALLET_CREDIT", "VOUCHER_REDEEM_CREDIT"], amount__gt=0)),
+        package_debit=Sum("amount", filter=Q(type="PACKAGE_COUPON_WALLET_DEBIT", amount__lt=0)),
+    )
+
+    def dec(key):
+        return D(str(row.get(key) or "0.00"))
+
+    return {
+        "coupon": (dec("coupon_credit") + dec("coupon_debit")).quantize(D("0.01")),
+        "package_coupon": (dec("package_credit") + dec("package_debit")).quantize(D("0.01")),
+    }
 
 
 def _voucher_validity_days(voucher_type):
@@ -2722,9 +2760,10 @@ class ConsumerVoucherListCreate(APIView):
         if status_filter:
             qs = qs.filter(status=status_filter)
         data = ConsumerVoucherSerializer(qs[:200], many=True).data
+        balances = _consumer_coupon_balances(request.user)
         return Response({
-            "coupon_wallet_balance": str(_coupon_wallet_balance(request.user)),
-            "package_coupon_wallet_balance": str(_package_coupon_wallet_balance(request.user)),
+            "coupon_wallet_balance": str(balances["coupon"]),
+            "package_coupon_wallet_balance": str(balances["package_coupon"]),
             "results": data,
         })
 
@@ -2884,6 +2923,13 @@ class WalletTransactionSerializer(serializers.ModelSerializer):
             meta = {}
         uid = meta.get("from_user_id") or meta.get("user_id")
         uname = meta.get("from_user") or meta.get("username")
+        cache_key = f"id:{uid}" if uid else f"username:{str(uname).lower()}" if uname else f"self:{getattr(obj, 'user_id', '')}"
+        cache = getattr(self, "_counterparty_cache", None)
+        if cache is None:
+            cache = {}
+            self._counterparty_cache = cache
+        if cache_key in cache:
+            return cache[cache_key]
         u = None
         try:
             if uid:
@@ -2892,7 +2938,9 @@ class WalletTransactionSerializer(serializers.ModelSerializer):
                 u = CustomUser.objects.filter(username__iexact=str(uname)).only("id", "username", "full_name", "pincode").first()
         except Exception:
             u = None
-        return u or getattr(obj, "user", None)
+        u = u or getattr(obj, "user", None)
+        cache[cache_key] = u
+        return u
 
     def get_tr_username(self, obj):
         u = self._resolve_counterparty(obj)
@@ -2942,7 +2990,7 @@ class WalletTransactionsList(generics.ListAPIView):
     pagination_class = LenientWalletTxnPagination
 
     def get_queryset(self):
-        qs = WalletTransaction.objects.filter(user=self.request.user).order_by("-created_at")
+        qs = WalletTransaction.objects.filter(user=self.request.user).select_related("user").order_by("-created_at")
         t = (self.request.query_params.get("type") or "").strip()
         if t:
             qs = qs.filter(type=t)

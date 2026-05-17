@@ -1763,6 +1763,9 @@ class WalletUploadRequestCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = WalletUploadRequest
         fields = ["amount", "utr", "proof", "remarks"]
+        extra_kwargs = {
+            "utr": {"required": False, "allow_blank": True},
+        }
 
     def validate_amount(self, v):
         from decimal import Decimal
@@ -1777,7 +1780,7 @@ class WalletUploadRequestCreateSerializer(serializers.ModelSerializer):
     def validate_utr(self, v):
         s = str(v or "").strip()
         if not s:
-            raise serializers.ValidationError("UTR is required")
+            return ""
         if len(s) < 6:
             raise serializers.ValidationError("UTR seems too short")
         return s
