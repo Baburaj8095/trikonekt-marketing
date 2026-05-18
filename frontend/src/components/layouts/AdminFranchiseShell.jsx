@@ -13,6 +13,9 @@ const FRANCHISE_MENU = [
       { to: "/admin/franchise/users?category=agency_state_coordinator", label: "State Coordinators", icon: "users" },
       { to: "/admin/franchise/users?category=agency_district_coordinator", label: "District Coordinators", icon: "users" },
       { to: "/admin/franchise/users?category=agency_pincode_coordinator", label: "Pincode Coordinators", icon: "users" },
+      { to: "/admin/franchise/category/agency_state_coordinator", label: "State Coordinator Dashboard", icon: "dashboard" },
+      { to: "/admin/franchise/category/agency_district_coordinator", label: "District Coordinator Dashboard", icon: "dashboard" },
+      { to: "/admin/franchise/category/agency_pincode_coordinator", label: "Pincode Coordinator Dashboard", icon: "dashboard" },
     ],
   },
   {
@@ -23,6 +26,9 @@ const FRANCHISE_MENU = [
       { to: "/admin/franchise/users?category=agency_state", label: "State Codes", icon: "tree" },
       { to: "/admin/franchise/users?category=agency_district", label: "District Codes", icon: "tree" },
       { to: "/admin/franchise/users?category=agency_pincode", label: "Pincode Codes", icon: "tree" },
+      { to: "/admin/franchise/category/agency_state", label: "State Dashboard", icon: "dashboard" },
+      { to: "/admin/franchise/category/agency_district", label: "District Dashboard", icon: "dashboard" },
+      { to: "/admin/franchise/category/agency_pincode", label: "Pincode Dashboard", icon: "dashboard" },
     ],
   },
   {

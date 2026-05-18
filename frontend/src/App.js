@@ -35,6 +35,7 @@ import AdminShell from "./components/layouts/AdminShell";
 import AdminFranchiseShell from "./components/layouts/AdminFranchiseShell";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminFranchiseDashboard from "./pages/admin/AdminFranchiseDashboard";
+import AdminFranchiseCategoryDashboard from "./pages/admin/AdminFranchiseCategoryDashboard";
 import AdminFranchiseUsers from "./pages/admin/AdminFranchiseUsers";
 import AdminFranchisePlaceholder from "./pages/admin/AdminFranchisePlaceholder";
 import AdminUserTree from "./pages/admin/AdminUserTree";
@@ -1235,6 +1236,16 @@ function App() {
             <AdminProtectedRoute>
               <AdminFranchiseShell>
                 <AdminFranchiseUsers />
+              </AdminFranchiseShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/franchise/category/:category"
+          element={
+            <AdminProtectedRoute>
+              <AdminFranchiseShell>
+                <AdminFranchiseCategoryDashboard />
               </AdminFranchiseShell>
             </AdminProtectedRoute>
           }

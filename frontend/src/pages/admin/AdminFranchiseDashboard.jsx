@@ -158,7 +158,7 @@ export default function AdminFranchiseDashboard() {
               title={cat.label}
               value={counts[cat.key] || 0}
               hint={`${cat.short} records`}
-              to={`/admin/franchise/users?category=${cat.key}`}
+              to={`/admin/franchise/category/${cat.key}`}
             />
           ))}
         </Box>
