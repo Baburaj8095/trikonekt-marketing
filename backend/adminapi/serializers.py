@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from accounts.models import CustomUser, WithdrawalRequest, UserKYC, WalletTransaction, SupportTicket, SupportTicketMessage, AgencyRegionAssignment
+from accounts.models import CustomUser, WithdrawalRequest, UserKYC, WalletTransaction, WalletAccount, RewardPointsAccount, SupportTicket, SupportTicketMessage, AgencyRegionAssignment
 from market.models import PurchaseRequest, BannerPurchaseRequest
 from business.models import UserMatrixProgress, CommissionConfig, AutoPoolAccount
 from locations.models import Country, State, City
@@ -11,6 +11,51 @@ from django.db import transaction
 
 
 class AdminUserNodeSerializer(serializers.ModelSerializer):
+    CONSUMER_SUMMARY_FIELDS = {
+        "system_serial_number",
+        "user_code",
+        "sponsor_name",
+        "sponsor_display",
+        "address_pincode",
+        "package_buy_date",
+        "main_wallet",
+        "total_earning",
+        "coupon_pocket",
+        "self_package_pocket",
+        "withdrawal_pocket",
+        "redeem_points",
+        "add_money_pocket",
+        "package_purchase_coupon_pocket",
+        "smart_product_package",
+        "digital_education",
+        "subscription_1",
+        "subscription_2",
+        "subscription_3",
+        "new_tour_package",
+        "coupon_pocket_breakdown",
+        "self_package_pocket_details",
+        "withdrawal_to_pocket",
+    }
+    CONSUMER_PRESET_FIELDS = {
+        "basic": {
+            "system_serial_number", "user_code", "sponsor_name", "sponsor_display", "address_pincode",
+        },
+        "package": {
+            "user_code", "package_buy_date", "subscription_1", "subscription_2", "subscription_3",
+            "smart_product_package", "digital_education", "new_tour_package",
+        },
+        "wallet": {
+            "user_code", "main_wallet", "total_earning", "coupon_pocket", "self_package_pocket",
+            "withdrawal_pocket", "redeem_points", "add_money_pocket", "withdrawal_to_pocket",
+        },
+        "coupons": {
+            "user_code", "coupon_pocket", "package_purchase_coupon_pocket", "coupon_pocket_breakdown",
+            "self_package_pocket", "self_package_pocket_details",
+        },
+        "rewards": {"user_code"},
+        "team": {"user_code"},
+    }
+
     state_name = serializers.SerializerMethodField()
     country_name = serializers.SerializerMethodField()
     district_name = serializers.SerializerMethodField()
@@ -19,6 +64,29 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
     sponsor_id = serializers.SerializerMethodField()
     wallet_balance = serializers.SerializerMethodField()
     wallet_status = serializers.SerializerMethodField()
+    system_serial_number = serializers.SerializerMethodField()
+    user_code = serializers.SerializerMethodField()
+    sponsor_name = serializers.SerializerMethodField()
+    sponsor_display = serializers.SerializerMethodField()
+    address_pincode = serializers.SerializerMethodField()
+    package_buy_date = serializers.SerializerMethodField()
+    main_wallet = serializers.SerializerMethodField()
+    total_earning = serializers.SerializerMethodField()
+    coupon_pocket = serializers.SerializerMethodField()
+    self_package_pocket = serializers.SerializerMethodField()
+    withdrawal_pocket = serializers.SerializerMethodField()
+    redeem_points = serializers.SerializerMethodField()
+    add_money_pocket = serializers.SerializerMethodField()
+    package_purchase_coupon_pocket = serializers.SerializerMethodField()
+    smart_product_package = serializers.SerializerMethodField()
+    digital_education = serializers.SerializerMethodField()
+    subscription_1 = serializers.SerializerMethodField()
+    subscription_2 = serializers.SerializerMethodField()
+    subscription_3 = serializers.SerializerMethodField()
+    new_tour_package = serializers.SerializerMethodField()
+    coupon_pocket_breakdown = serializers.SerializerMethodField()
+    self_package_pocket_details = serializers.SerializerMethodField()
+    withdrawal_to_pocket = serializers.SerializerMethodField()
     avatar_url = serializers.SerializerMethodField()
     kyc_verified = serializers.SerializerMethodField()
     kyc_verified_at = serializers.SerializerMethodField()
@@ -48,6 +116,20 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
     monthly_total_boxes_current = serializers.SerializerMethodField()
     monthly_boxes_remaining_current = serializers.SerializerMethodField()
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        ctx = getattr(self, "context", {}) or {}
+        if ctx.get("purpose") != "list":
+            return
+        preset = str(ctx.get("consumer_columns") or "").strip().lower()
+        if preset == "all":
+            return
+        allowed = set(self.CONSUMER_PRESET_FIELDS.get(preset, set()))
+        if not preset:
+            allowed = set()
+        for name in self.CONSUMER_SUMMARY_FIELDS - allowed:
+            self.fields.pop(name, None)
+
     class Meta:
         model = CustomUser
         fields = [
@@ -68,6 +150,29 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
             "date_joined",
             "wallet_balance",
             "wallet_status",
+            "system_serial_number",
+            "user_code",
+            "sponsor_name",
+            "sponsor_display",
+            "address_pincode",
+            "package_buy_date",
+            "main_wallet",
+            "total_earning",
+            "coupon_pocket",
+            "self_package_pocket",
+            "withdrawal_pocket",
+            "redeem_points",
+            "add_money_pocket",
+            "package_purchase_coupon_pocket",
+            "smart_product_package",
+            "digital_education",
+            "subscription_1",
+            "subscription_2",
+            "subscription_3",
+            "new_tour_package",
+            "coupon_pocket_breakdown",
+            "self_package_pocket_details",
+            "withdrawal_to_pocket",
             "commission_percent",
             "service_mode",
             "business_name",
@@ -300,6 +405,221 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
             return "OK" if getattr(obj, "wallet", None) else ""
         except Exception:
             return ""
+
+    def get_system_serial_number(self, obj):
+        return getattr(obj, "id", "") or ""
+
+    def get_user_code(self, obj):
+        try:
+            return (
+                (getattr(obj, "prefixed_id", "") or "").strip()
+                or (getattr(obj, "unique_id", "") or "").strip()
+                or (getattr(obj, "username", "") or "").strip()
+            )
+        except Exception:
+            return getattr(obj, "username", "") or ""
+
+    def get_sponsor_name(self, obj):
+        try:
+            rb = getattr(obj, "registered_by", None)
+            if rb:
+                return (getattr(rb, "full_name", "") or "").strip() or (getattr(rb, "username", "") or "").strip()
+        except Exception:
+            pass
+        return ""
+
+    def get_sponsor_display(self, obj):
+        sid = self.get_sponsor_id(obj)
+        sname = self.get_sponsor_name(obj)
+        if sid and sname:
+            return f"{sid} - {sname}"
+        return sid or sname or ""
+
+    def get_address_pincode(self, obj):
+        parts = []
+        try:
+            area = self.get_area(obj)
+            district = self.get_district_name(obj)
+            state = self.get_state_name(obj)
+            pin = (getattr(obj, "pincode", "") or "").strip()
+            for v in (area, district, state):
+                if v and v not in parts:
+                    parts.append(v)
+            if pin:
+                parts.append(pin)
+        except Exception:
+            pass
+        return ", ".join(parts)
+
+    def _wallet_accounts_map(self, obj):
+        try:
+            pre = getattr(obj, "prefetched_wallet_accounts", None)
+            if pre is None:
+                pre = list(WalletAccount.objects.filter(user_id=getattr(obj, "id", None)))
+            return {str(a.wallet_type): a for a in pre or []}
+        except Exception:
+            return {}
+
+    def _wallet_account_balance(self, obj, wallet_type):
+        try:
+            acc = self._wallet_accounts_map(obj).get(wallet_type)
+            if not acc:
+                return ""
+            return float(getattr(acc, "current_balance", 0) or 0)
+        except Exception:
+            return ""
+
+    def get_main_wallet(self, obj):
+        return self.get_wallet_balance(obj)
+
+    def get_total_earning(self, obj):
+        val = self._wallet_account_balance(obj, "TOTAL_EARNINGS")
+        if val != "":
+            return val
+        try:
+            w = getattr(obj, "wallet", None)
+            bal = getattr(w, "main_balance", None) if w else None
+            return float(bal) if bal is not None else ""
+        except Exception:
+            return ""
+
+    def get_coupon_pocket(self, obj):
+        val = self._wallet_account_balance(obj, "COUPON_POCKET")
+        return val if val != "" else self._wallet_account_balance(obj, "PACKAGE_PURCHASE_COUPON")
+
+    def get_self_package_pocket(self, obj):
+        val = self._wallet_account_balance(obj, "SELF_PACKAGE_POCKET")
+        if val != "":
+            return val
+        try:
+            w = getattr(obj, "wallet", None)
+            bal = getattr(w, "self_account_balance", None) if w else None
+            return float(bal) if bal is not None else ""
+        except Exception:
+            return ""
+
+    def get_withdrawal_pocket(self, obj):
+        val = self._wallet_account_balance(obj, "WITHDRAWAL_WALLET")
+        if val != "":
+            return val
+        try:
+            w = getattr(obj, "wallet", None)
+            bal = getattr(w, "withdrawable_balance", None) if w else None
+            return float(bal) if bal is not None else ""
+        except Exception:
+            return ""
+
+    def get_redeem_points(self, obj):
+        try:
+            pre = getattr(obj, "reward_points_account", None)
+            if pre:
+                return float(getattr(pre, "balance_points", 0) or 0)
+            acc = RewardPointsAccount.objects.filter(user_id=getattr(obj, "id", None)).first()
+            return float(getattr(acc, "balance_points", 0) or 0) if acc else 0
+        except Exception:
+            return 0
+
+    def get_add_money_pocket(self, obj):
+        return self._wallet_account_balance(obj, "ADD_MONEY_POCKET")
+
+    def get_package_purchase_coupon_pocket(self, obj):
+        return self._wallet_account_balance(obj, "PACKAGE_PURCHASE_COUPON")
+
+    def get_package_buy_date(self, obj):
+        try:
+            pp = self._approved_promo_purchases(obj)
+            if pp:
+                return getattr(pp[0], "approved_at", None) or getattr(pp[0], "requested_at", None)
+            return getattr(obj, "first_purchase_activated_at", None)
+        except Exception:
+            return getattr(obj, "first_purchase_activated_at", None)
+
+    def _approved_package_labels(self, obj):
+        labels = []
+        try:
+            for p in self._approved_promo_purchases(obj):
+                pkg = getattr(p, "package", None)
+                code = (getattr(pkg, "code", "") or "").strip()
+                name = (getattr(pkg, "name", "") or "").strip()
+                typ = (getattr(pkg, "type", "") or "").strip()
+                label = code or name or typ
+                if label:
+                    labels.append(label)
+        except Exception:
+            pass
+        return labels
+
+    def get_subscription_1(self, obj):
+        labels = self._approved_package_labels(obj)
+        return labels[0] if len(labels) > 0 else ""
+
+    def get_subscription_2(self, obj):
+        labels = self._approved_package_labels(obj)
+        return labels[1] if len(labels) > 1 else ""
+
+    def get_subscription_3(self, obj):
+        labels = self._approved_package_labels(obj)
+        return labels[2] if len(labels) > 2 else ""
+
+    def get_smart_product_package(self, obj):
+        labels = []
+        try:
+            for p in self._approved_promo_purchases(obj):
+                pkg = getattr(p, "package", None)
+                code = (getattr(pkg, "code", "") or "").strip()
+                name = (getattr(pkg, "name", "") or "").strip()
+                typ = (getattr(pkg, "type", "") or "").strip().upper()
+                hay = f"{code} {name} {typ}".upper()
+                if "SPP" in hay or "SMART" in hay:
+                    labels.append(code or name or typ)
+        except Exception:
+            pass
+        return ", ".join(labels)
+
+    def get_digital_education(self, obj):
+        labels = []
+        try:
+            for p in self._approved_promo_purchases(obj):
+                pkg = getattr(p, "package", None)
+                code = (getattr(pkg, "code", "") or "").strip()
+                name = (getattr(pkg, "name", "") or "").strip()
+                hay = f"{code} {name}".upper()
+                if "DIGITAL" in hay or "EDUCATION" in hay:
+                    labels.append(code or name)
+        except Exception:
+            pass
+        return ", ".join(labels)
+
+    def get_new_tour_package(self, obj):
+        labels = []
+        try:
+            for p in self._approved_promo_purchases(obj):
+                pkg = getattr(p, "package", None)
+                code = (getattr(pkg, "code", "") or "").strip()
+                name = (getattr(pkg, "name", "") or "").strip()
+                hay = f"{code} {name} {getattr(p, 'tri_app_slug', '')}".upper()
+                if "TOUR" in hay or "TRI-TOUR" in hay or "TRI_TOUR" in hay:
+                    labels.append(code or name or getattr(p, "tri_app_slug", ""))
+        except Exception:
+            pass
+        return ", ".join(labels)
+
+    def get_coupon_pocket_breakdown(self, obj):
+        cp = self.get_coupon_pocket(obj)
+        pc = self.get_package_purchase_coupon_pocket(obj)
+        parts = []
+        if cp not in ("", None):
+            parts.append(f"Coupon: {cp}")
+        if pc not in ("", None):
+            parts.append(f"Package coupon: {pc}")
+        return " | ".join(parts)
+
+    def get_self_package_pocket_details(self, obj):
+        val = self.get_self_package_pocket(obj)
+        return f"Balance: {val}" if val not in ("", None) else ""
+
+    def get_withdrawal_to_pocket(self, obj):
+        return self.get_withdrawal_pocket(obj)
 
     def get_avatar_url(self, obj):
         try:

@@ -708,7 +708,11 @@ class TeamConsumerDocumentLatestPublicView(APIView):
 
     def get(self, request, kind):
         k = str(kind or "").strip().upper()
-        allowed = {TeamConsumerDocument.KIND_PDF, TeamConsumerDocument.KIND_CERTIFICATE}
+        allowed = {
+            TeamConsumerDocument.KIND_PDF,
+            TeamConsumerDocument.KIND_BUSINESS_PDF,
+            TeamConsumerDocument.KIND_CERTIFICATE,
+        }
         if k not in allowed:
             return Response({"detail": "Invalid document kind."}, status=status.HTTP_400_BAD_REQUEST)
         obj = (

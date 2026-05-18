@@ -33,8 +33,9 @@ class AdminMetricsView(APIView):
             refresh = str(request.query_params.get("refresh") or "").lower()
         except Exception:
             refresh = ""
+        cache_key = "admin_metrics_v3"
         if refresh not in ("1", "true", "yes"):
-            cached = cache.get("admin_metrics_v1")
+            cached = cache.get(cache_key)
             if cached is not None:
                 return Response(cached, status=status.HTTP_200_OK)
 
@@ -48,6 +49,7 @@ class AdminMetricsView(APIView):
         users_agg = CustomUser.objects.aggregate(
             total=Count("id"),
             active=Count("id", filter=Q(account_active=True)),
+            blocked=Count("id", filter=Q(is_active=False)),
             todayNew=Count("id", filter=Q(date_joined__date=today)),
             consumers_without_kyc=Count("id", filter=Q(category="consumer") & Q(kyc__isnull=True)),
         )
@@ -60,6 +62,7 @@ class AdminMetricsView(APIView):
             "total": users_agg.get("total") or 0,
             "active": users_agg.get("active") or 0,
             "inactive": (users_agg.get("total") or 0) - (users_agg.get("active") or 0),
+            "blocked": users_agg.get("blocked") or 0,
             "todayNew": users_agg.get("todayNew") or 0,
             "kycPending": int(kyc_pending),
         }
@@ -154,6 +157,106 @@ class AdminMetricsView(APIView):
             total=Count("id"),
         )
 
+        def wallet_credit_stats(qs):
+            today_filter = Q(created_at__date=today)
+            agg = qs.aggregate(
+                today_count=Count("user", filter=today_filter, distinct=True),
+                today_amount=Sum("amount", filter=today_filter),
+                total_count=Count("user", distinct=True),
+                total_amount=Sum("amount"),
+            )
+            return {
+                "todayCount": int(agg.get("today_count") or 0),
+                "todayAmount": float(agg.get("today_amount") or Decimal("0.00")),
+                "totalCount": int(agg.get("total_count") or 0),
+                "totalAmount": float(agg.get("total_amount") or Decimal("0.00")),
+            }
+
+        upload_sources = ["WALLET_UPLOAD", "UPLOAD_TO_WALLET", "PACKAGE_UPLOAD", "PACKAGE_BUY_UPLOAD"]
+        wallet_pocket_stats = {
+            # User-approved add-money uploads. This is money added into Add Money pocket, not money spent.
+            "addMoney": wallet_credit_stats(WalletTransaction.objects.filter(
+                source_type__in=upload_sources,
+                amount__gt=0,
+            )),
+            # Normal internal/self package pocket credits, excluding add-money upload credits.
+            "selfPackagePocket": wallet_credit_stats(WalletTransaction.objects.filter(
+                type="INTERNAL_WALLET_CREDIT",
+                amount__gt=0,
+            ).exclude(source_type__in=upload_sources)),
+            # Package purchase coupon wallet credits.
+            "packageCouponPocket": wallet_credit_stats(WalletTransaction.objects.filter(
+                type__in=["PACKAGE_COUPON_WALLET_CREDIT", "VOUCHER_REDEEM_CREDIT"],
+                amount__gt=0,
+            )),
+            # General coupon pocket credits.
+            "couponPocket": wallet_credit_stats(WalletTransaction.objects.filter(
+                type__in=["COUPON_WALLET_CREDIT", "COUPON_WALLET_REFUND"],
+                amount__gt=0,
+            )),
+            "shoppingWallet": wallet_credit_stats(WalletTransaction.objects.filter(
+                type="SHOPPING_WALLET_CREDIT",
+                amount__gt=0,
+            )),
+            "withdrawalWallet": wallet_credit_stats(WalletTransaction.objects.filter(
+                type="WITHDRAWAL_WALLET_CREDIT",
+                amount__gt=0,
+            )),
+        }
+
+        def promo_package_stats_for_queryset(base):
+            today_filter = Q(approved_at__date=today)
+
+            def summarize(qs):
+                agg = qs.aggregate(
+                    today_count=Count("user", filter=today_filter, distinct=True),
+                    today_amount=Sum("amount_paid", filter=today_filter),
+                    total_count=Count("user", distinct=True),
+                    total_amount=Sum("amount_paid"),
+                )
+                return {
+                    "todayCount": int(agg.get("today_count") or 0),
+                    "todayAmount": float(agg.get("today_amount") or Decimal("0.00")),
+                    "totalCount": int(agg.get("total_count") or 0),
+                    "totalAmount": float(agg.get("total_amount") or Decimal("0.00")),
+                }
+
+            return {
+                "overall": summarize(base),
+                # Internal self-package pocket: wallet-paid purchase using normal internal package balance.
+                "selfPackagePocket": summarize(base.filter(
+                    payment_mode="WALLET",
+                    wallet_debit_tx__type="INTERNAL_WALLET_DEBIT",
+                    wallet_debit_tx__source_type="PROMO_PURCHASE",
+                )),
+                # Add Money pocket: wallet-paid purchase using funds uploaded/approved into Add Money.
+                "addMoney": summarize(base.filter(
+                    payment_mode="WALLET",
+                    wallet_debit_tx__type="INTERNAL_WALLET_DEBIT",
+                    wallet_debit_tx__source_type="WALLET_UPLOAD",
+                )),
+                # Package coupon pocket: wallet-paid purchase using package-purchase coupon balance.
+                "couponPocket": summarize(base.filter(
+                    payment_mode="WALLET",
+                    wallet_debit_tx__type="PACKAGE_COUPON_WALLET_DEBIT",
+                )),
+            }
+
+        def promo_package_stats(price):
+            price = Decimal(str(price))
+            lo = price - Decimal("0.50")
+            hi = price + Decimal("0.50")
+            return promo_package_stats_for_queryset(PromoPurchase.objects.filter(
+                status="APPROVED",
+                package__price__gte=lo,
+                package__price__lte=hi,
+            ))
+
+        smart_product_qs = PromoPurchase.objects.filter(status="APPROVED").filter(
+            Q(package__type="MONTHLY") |
+            Q(package__price__gte=Decimal("999.50"), package__price__lte=Decimal("1000.50"))
+        )
+
         # Autopool aggregates (single DB hit)
         acc_by_status = list(
             AutoPoolAccount.objects.values("status")
@@ -178,13 +281,18 @@ class AdminMetricsView(APIView):
                 "dailyReportsToday": ragg.get("today") or 0,
                 "dailyReportsTotal": ragg.get("total") or 0,
             },
+            "packageStats": {
+                "subscription750": promo_package_stats(750),
+                "smartProduct1000": promo_package_stats_for_queryset(smart_product_qs),
+            },
+            "walletPocketStats": wallet_pocket_stats,
             "commission": {
                 "configs": CommissionConfig.objects.count(),
             },
         }
         # Cache for a short duration to avoid heavy repeated aggregation under load
         try:
-            cache.set("admin_metrics_v1", payload, timeout=20)  # seconds
+            cache.set(cache_key, payload, timeout=20)  # seconds
         except Exception:
             pass
         return Response(payload, status=status.HTTP_200_OK)
@@ -374,37 +482,59 @@ class AdminUsersList(ListAPIView):
     permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("users")]
     serializer_class = AdminUserNodeSerializer
 
+    def _consumer_columns_preset(self):
+        return str(self.request.query_params.get("consumer_columns") or "").strip().lower()
+
+    def _needs_package_summary(self):
+        return self._consumer_columns_preset() in ("package", "all")
+
+    def _needs_wallet_summary(self):
+        return self._consumer_columns_preset() in ("wallet", "coupons", "all")
+
     def get_queryset(self):
+        select_related = ["country", "state", "city", "wallet", "kyc", "registered_by", "merchant_profile"]
+        only_fields = [
+            # Base fields used by AdminUserNodeSerializer and filters
+            "id", "username", "full_name", "email", "role", "category",
+            "phone", "pincode", "date_joined", "is_active", "account_active",
+            "prefixed_id", "sponsor_id", "unique_id", "first_purchase_activated_at",
+            "avatar",
+            # Geo relations displayed in serializer
+            "country__id", "country__name",
+            "state__id", "state__name",
+            "city__id", "city__name",
+            # Registered by (for sponsor display)
+            "registered_by__username", "registered_by__prefixed_id", "registered_by__full_name",
+            # Wallet summary used in list grid
+            "wallet__main_balance", "wallet__balance",
+            "wallet__self_account_balance", "wallet__withdrawable_balance",
+            # KYC status in list grid
+            "kyc__verified", "kyc__verified_at",
+            # Merchant profile fields used in Admin grids
+            "merchant_profile",
+            "merchant_profile__business_name",
+            "merchant_profile__business_category",
+            "merchant_profile__address",
+            "merchant_profile__commission_percent",
+            "merchant_profile__service_mode",
+            # Password metadata (status/algo only)
+            "password", "last_password_encrypted",
+        ]
+        prefetches = []
+        if self._needs_wallet_summary():
+            select_related.append("reward_points_account")
+            only_fields.append("reward_points_account__balance_points")
+            prefetches.append(Prefetch("wallet_accounts", queryset=WalletAccount.objects.only("user_id", "wallet_type", "current_balance"), to_attr="prefetched_wallet_accounts"))
+        if self._needs_package_summary():
+            prefetches.append(Prefetch("promo_purchases", queryset=PromoPurchase.objects.select_related("package").filter(status="APPROVED").only("id", "user_id", "package_id", "status", "approved_at", "requested_at", "tri_app_slug", "package__id", "package__code", "package__name", "package__type", "package__price").order_by("-approved_at", "-id"), to_attr="approved_promo_purchases"))
+
         qs = (
             CustomUser.objects
-            .select_related("country", "state", "city", "wallet", "kyc", "registered_by", "merchant_profile")
-            .only(
-                # Base fields used by AdminUserNodeSerializer and filters
-                "id", "username", "full_name", "email", "role", "category",
-                "phone", "pincode", "date_joined", "is_active", "account_active",
-                "prefixed_id", "sponsor_id", "unique_id", "first_purchase_activated_at",
-                "avatar",
-                # Geo relations displayed in serializer
-                "country__id", "country__name",
-                "state__id", "state__name",
-                "city__id", "city__name",
-                # Registered by (for sponsor display)
-                "registered_by__username", "registered_by__prefixed_id",
-                # Wallet summary used in list grid
-                "wallet__main_balance", "wallet__balance",
-                # KYC status in list grid
-                "kyc__verified", "kyc__verified_at",
-                # Merchant profile fields used in Admin grids
-                "merchant_profile",
-                "merchant_profile__business_name",
-                "merchant_profile__business_category",
-                "merchant_profile__address",
-                "merchant_profile__commission_percent",
-                "merchant_profile__service_mode",
-                # Password metadata (status/algo only)
-                "password", "last_password_encrypted",
-            )
+            .select_related(*select_related)
+            .only(*only_fields)
         )
+        if prefetches:
+            qs = qs.prefetch_related(*prefetches)
         role = (self.request.query_params.get("role") or "").strip()
         phone = (self.request.query_params.get("phone") or "").strip()
         category = (self.request.query_params.get("category") or "").strip()
@@ -413,6 +543,7 @@ class AdminUsersList(ListAPIView):
         kyc = (self.request.query_params.get("kyc") or "").strip()
         search = (self.request.query_params.get("search") or "").strip()
         activated = (self.request.query_params.get("activated") or "").strip().lower()
+        is_active = (self.request.query_params.get("is_active") or "").strip().lower()
 
         # Normalize role/category to be case-insensitive and accept human labels/tokens
         if role:
@@ -464,6 +595,11 @@ class AdminUsersList(ListAPIView):
         elif account_active in ("0", "false", "no", "inactive"):
             qs = qs.filter(account_active=False)
 
+        if is_active in ("1", "true", "yes", "active", "enabled"):
+            qs = qs.filter(is_active=True)
+        elif is_active in ("0", "false", "no", "inactive", "blocked", "disabled"):
+            qs = qs.filter(is_active=False)
+
         if activated in ("1", "true", "yes", "activated"):
             qs = qs.filter(first_purchase_activated_at__isnull=False)
         elif activated in ("0", "false", "no", "inactive", "not_activated", "unactivated", "notactivated"):
@@ -487,6 +623,7 @@ class AdminUsersList(ListAPIView):
         ctx = super().get_serializer_context()
         # List view context: keep response lightweight and avoid decryption and heavy work
         ctx["purpose"] = "list"
+        ctx["consumer_columns"] = self._consumer_columns_preset()
         return ctx
 
     def list(self, request, *args, **kwargs):
@@ -670,12 +807,19 @@ class AdminUsersExportXLSX(APIView):
 
         # Column order mirrors Admin Users grid (plus a few essentials)
         headers = [
-            "id", "username", "full_name", "email", "role", "category", "phone",
-            "sponsor_id", "pincode", "district_name", "state_name", "country_name",
-            "kyc_status", "kyc_verified", "kyc_verified_at",
-            "commission_level", "activated_ecoupon_count", "last_promo_package",
-            "wallet_balance", "wallet_status", "direct_count", "has_children",
-            "account_active", "is_active", "date_joined",
+            "SI No", "Edit/View", "Login", "Active/Inactive", "Joining Date", "Package Buy Date",
+            "System Serial Number", "User ID", "User Name", "Sponsor ID & Name", "Address & Pincode",
+            "KYC Profile", "Subscription 1", "Subscription 2", "Subscription 3", "Smart Product Package",
+            "Digital Education", "Certified Training Certificate", "Package Purchase Gift Card Received",
+            "New Tour Package", "Team Consumer Self Package ID Count", "Team Consumer Block ID",
+            "Total Earning", "Main Wallet", "Coupon Pocket", "Self Package Pocket", "Withdrawal Pocket",
+            "Redeem Points", "Add Money", "Withdrawal To Pocket", "Coupon Pocket Breakdown",
+            "Self Package Pocket Details", "Coupon Admin Charges", "Withdrawal Admin Charges",
+            "Package Admin Charges", "Franchisee Reference Reward", "Zonal Reward",
+            "Direct Sponsor Benefit", "Level Income Benefit", "Smart Product Pocket", "SPP Spin & Win",
+            "Digital Education Prime Package Spin & Win", "Shopping Self Re-birth ID Count",
+            "Franchisee Self Rebirth ID Count", "Caption/Coupon Self Re-birth ID Count",
+            "Raw ID", "Username", "Email", "Role", "Category", "Phone", "Wallet Status",
         ]
 
         wb = openpyxl.Workbook()
@@ -683,33 +827,60 @@ class AdminUsersExportXLSX(APIView):
         ws.title = "Users"
         ws.append(headers)
 
-        for obj in items:
+        for idx, obj in enumerate(items, start=1):
             ws.append([
+                idx,
+                "Available in admin UI",
+                "Available in admin UI",
+                "Active" if obj.get("account_active") else "Inactive",
+                obj.get("date_joined") or "",
+                obj.get("package_buy_date") or "",
+                obj.get("system_serial_number") or obj.get("id") or "",
+                obj.get("user_code") or obj.get("username") or "",
+                obj.get("full_name") or obj.get("username") or "",
+                obj.get("sponsor_display") or obj.get("sponsor_id") or "",
+                obj.get("address_pincode") or obj.get("pincode") or "",
+                obj.get("kyc_status") or "",
+                obj.get("subscription_1") or "",
+                obj.get("subscription_2") or "",
+                obj.get("subscription_3") or "",
+                obj.get("smart_product_package") or "",
+                obj.get("digital_education") or "",
+                "Needs source",
+                "Needs source",
+                obj.get("new_tour_package") or "",
+                "Needs business rule",
+                "Needs business rule",
+                obj.get("total_earning") if obj.get("total_earning") not in (None, "") else "",
+                obj.get("main_wallet") if obj.get("main_wallet") not in (None, "") else "",
+                obj.get("coupon_pocket") if obj.get("coupon_pocket") not in (None, "") else "",
+                obj.get("self_package_pocket") if obj.get("self_package_pocket") not in (None, "") else "",
+                obj.get("withdrawal_pocket") if obj.get("withdrawal_pocket") not in (None, "") else "",
+                obj.get("redeem_points") if obj.get("redeem_points") not in (None, "") else "",
+                obj.get("add_money_pocket") if obj.get("add_money_pocket") not in (None, "") else "",
+                obj.get("withdrawal_to_pocket") if obj.get("withdrawal_to_pocket") not in (None, "") else "",
+                obj.get("coupon_pocket_breakdown") or "",
+                obj.get("self_package_pocket_details") or "",
+                "Needs charge rule",
+                "Needs charge rule",
+                "Needs charge rule",
+                "Needs aggregation",
+                "Needs aggregation",
+                "Needs aggregation",
+                "Needs aggregation",
+                "Needs aggregation",
+                "Needs source",
+                "Needs source",
+                "Needs business rule",
+                "Needs business rule",
+                "Needs business rule",
                 obj.get("id"),
                 obj.get("username") or "",
-                obj.get("full_name") or "",
                 obj.get("email") or "",
                 obj.get("role") or "",
                 obj.get("category") or "",
                 obj.get("phone") or "",
-                obj.get("sponsor_id") or "",
-                obj.get("pincode") or "",
-                obj.get("district_name") or "",
-                obj.get("state_name") or "",
-                obj.get("country_name") or "",
-                obj.get("kyc_status") or "",
-                bool(obj.get("kyc_verified")) if obj.get("kyc_verified") is not None else "",
-                obj.get("kyc_verified_at") or "",
-                obj.get("commission_level") or 0,
-                obj.get("activated_ecoupon_count") or 0,
-                obj.get("last_promo_package") or "",
-                obj.get("wallet_balance") if obj.get("wallet_balance") not in (None, "") else "",
                 obj.get("wallet_status") or "",
-                obj.get("direct_count") or 0,
-                bool(obj.get("has_children")) if obj.get("has_children") is not None else "",
-                bool(obj.get("account_active")) if obj.get("account_active") is not None else "",
-                bool(obj.get("is_active")) if obj.get("is_active") is not None else "",
-                obj.get("date_joined") or "",
             ])
 
         # Auto-size columns
@@ -825,9 +996,19 @@ class AdminUserDetail(APIView):
     permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("users"), HasAnyPermission("manage_users", "show_users", "edit_users")]
 
     def get(self, request, pk: int):
-        user = CustomUser.objects.filter(pk=pk).first()
+        profile = str(request.query_params.get("profile") or "").strip().lower() in ("1", "true", "yes")
+        qs = CustomUser.objects.filter(pk=pk)
+        if profile:
+            qs = qs.select_related("country", "state", "city", "wallet", "kyc", "registered_by", "merchant_profile", "reward_points_account").prefetch_related(
+                Prefetch("wallet_accounts", queryset=WalletAccount.objects.only("user_id", "wallet_type", "current_balance"), to_attr="prefetched_wallet_accounts"),
+                Prefetch("promo_purchases", queryset=PromoPurchase.objects.select_related("package").filter(status="APPROVED").order_by("-approved_at", "-id"), to_attr="approved_promo_purchases"),
+            )
+        user = qs.first()
         if not user:
             return Response({"detail": "Not found"}, status=404)
+        if profile:
+            data = AdminUserNodeSerializer(user, context={"request": request, "purpose": "detail"}).data
+            return Response(data, status=200)
         data = AdminUserEditSerializer(user).data
         return Response(data, status=200)
 

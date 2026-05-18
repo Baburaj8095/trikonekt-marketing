@@ -1,706 +1,454 @@
-﻿import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
+import PersonAddAltRoundedIcon from "@mui/icons-material/PersonAddAltRounded";
+import PersonOffRoundedIcon from "@mui/icons-material/PersonOffRounded";
+import BlockRoundedIcon from "@mui/icons-material/BlockRounded";
+import VerifiedUserRoundedIcon from "@mui/icons-material/VerifiedUserRounded";
+import ConfirmationNumberRoundedIcon from "@mui/icons-material/ConfirmationNumberRounded";
+import ShoppingCartRoundedIcon from "@mui/icons-material/ShoppingCartRounded";
+import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceWalletRounded";
+import SchoolRoundedIcon from "@mui/icons-material/SchoolRounded";
+import CurrencyRupeeRoundedIcon from "@mui/icons-material/CurrencyRupeeRounded";
+import RedeemRoundedIcon from "@mui/icons-material/RedeemRounded";
+import PaymentsRoundedIcon from "@mui/icons-material/PaymentsRounded";
+import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
+import ShieldRoundedIcon from "@mui/icons-material/ShieldRounded";
+import EmojiEventsRoundedIcon from "@mui/icons-material/EmojiEventsRounded";
+import CasinoRoundedIcon from "@mui/icons-material/CasinoRounded";
+import AccountTreeRoundedIcon from "@mui/icons-material/AccountTreeRounded";
+import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
+import QrCodeScannerRoundedIcon from "@mui/icons-material/QrCodeScannerRounded";
+import CreditCardRoundedIcon from "@mui/icons-material/CreditCardRounded";
+import DashboardCustomizeRoundedIcon from "@mui/icons-material/DashboardCustomizeRounded";
 import API from "../../api/api";
-import { getAdminMeta } from "../../admin-panel/api/adminMeta";
 import RequirePermission from "../../components/admin/RequirePermission";
 
-function paletteStyles(key) {
-  // Solid, high-contrast gradients for colored cards with elevated shadows
-  switch (key) {
-    case "indigo":
-      return {
-        bg: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
-        border: "rgba(99,102,241,0.35)",
-        text: "#ffffff",
-        sub: "rgba(255,255,255,0.92)",
-        shadow: "0 10px 24px rgba(99,102,241,0.32)",
-        hoverShadow: "0 14px 30px rgba(99,102,241,0.38)",
-      };
-    case "blue":
-      return {
-        bg: "linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%)",
-        border: "rgba(59,130,246,0.35)",
-        text: "#ffffff",
-        sub: "rgba(255,255,255,0.92)",
-        shadow: "0 10px 24px rgba(59,130,246,0.32)",
-        hoverShadow: "0 14px 30px rgba(59,130,246,0.38)",
-      };
-    case "green":
-      return {
-        bg: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-        border: "rgba(16,185,129,0.35)",
-        text: "#ffffff",
-        sub: "rgba(255,255,255,0.92)",
-        shadow: "0 10px 24px rgba(16,185,129,0.32)",
-        hoverShadow: "0 14px 30px rgba(16,185,129,0.38)",
-      };
-    case "red":
-      return {
-        bg: "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
-        border: "rgba(244,63,94,0.35)",
-        text: "#ffffff",
-        sub: "rgba(255,255,255,0.92)",
-        shadow: "0 10px 24px rgba(244,63,94,0.32)",
-        hoverShadow: "0 14px 30px rgba(244,63,94,0.38)",
-      };
-    case "amber":
-      return {
-        bg: "linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)",
-        border: "rgba(245,158,11,0.35)",
-        text: "#0f172a",
-        sub: "rgba(15,23,42,0.8)",
-        shadow: "0 10px 24px rgba(245,158,11,0.30)",
-        hoverShadow: "0 14px 30px rgba(245,158,11,0.36)",
-      };
-    case "purple":
-      return {
-        bg: "linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)",
-        border: "rgba(168,85,247,0.35)",
-        text: "#ffffff",
-        sub: "rgba(255,255,255,0.92)",
-        shadow: "0 10px 24px rgba(168,85,247,0.32)",
-        hoverShadow: "0 14px 30px rgba(168,85,247,0.38)",
-      };
-    case "pink":
-      return {
-        bg: "linear-gradient(135deg, #ec4899 0%, #db2777 100%)",
-        border: "rgba(236,72,153,0.35)",
-        text: "#ffffff",
-        sub: "rgba(255,255,255,0.92)",
-        shadow: "0 10px 24px rgba(236,72,153,0.32)",
-        hoverShadow: "0 14px 30px rgba(236,72,153,0.38)",
-      };
-    case "teal":
-      return {
-        bg: "linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)",
-        border: "rgba(20,184,166,0.35)",
-        text: "#ffffff",
-        sub: "rgba(255,255,255,0.92)",
-        shadow: "0 10px 24px rgba(20,184,166,0.32)",
-        hoverShadow: "0 14px 30px rgba(20,184,166,0.38)",
-      };
-    case "cyan":
-      return {
-        bg: "linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)",
-        border: "rgba(6,182,212,0.35)",
-        text: "#ffffff",
-        sub: "rgba(255,255,255,0.92)",
-        shadow: "0 10px 24px rgba(6,182,212,0.32)",
-        hoverShadow: "0 14px 30px rgba(6,182,212,0.38)",
-      };
-    case "lime":
-      return {
-        bg: "linear-gradient(135deg, #84cc16 0%, #65a30d 100%)",
-        border: "rgba(132,204,22,0.35)",
-        text: "#0f172a",
-        sub: "rgba(15,23,42,0.8)",
-        shadow: "0 10px 24px rgba(132,204,22,0.30)",
-        hoverShadow: "0 14px 30px rgba(132,204,22,0.36)",
-      };
-    case "orange":
-      return {
-        bg: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
-        border: "rgba(249,115,22,0.35)",
-        text: "#ffffff",
-        sub: "rgba(255,255,255,0.92)",
-        shadow: "0 10px 24px rgba(249,115,22,0.32)",
-        hoverShadow: "0 14px 30px rgba(249,115,22,0.38)",
-      };
-    case "rose":
-      return {
-        bg: "linear-gradient(135deg, #fb7185 0%, #e11d48 100%)",
-        border: "rgba(251,113,133,0.35)",
-        text: "#ffffff",
-        sub: "rgba(255,255,255,0.92)",
-        shadow: "0 10px 24px rgba(251,113,133,0.30)",
-        hoverShadow: "0 14px 30px rgba(251,113,133,0.36)",
-      };
-    default:
-      return {
-        bg: "#ffffff",
-        border: "#e2e8f0",
-        text: "#0f172a",
-        sub: "#64748b",
-        shadow: "0 6px 14px rgba(15,23,42,0.10)",
-        hoverShadow: "0 12px 24px rgba(15,23,42,0.16)",
-      };
-  }
+const DASHBOARD_COLORS = [
+  { bg: "#fff1f2", fg: "#e11d48", soft: "#ffe4e6" },
+  { bg: "#eef2ff", fg: "#4f46e5", soft: "#e0e7ff" },
+  { bg: "#ecfdf5", fg: "#059669", soft: "#d1fae5" },
+  { bg: "#fff7ed", fg: "#ea580c", soft: "#fed7aa" },
+  { bg: "#f5f3ff", fg: "#7c3aed", soft: "#ede9fe" },
+  { bg: "#eff6ff", fg: "#2563eb", soft: "#dbeafe" },
+  { bg: "#fdf2f8", fg: "#db2777", soft: "#fce7f3" },
+  { bg: "#f0fdfa", fg: "#0d9488", soft: "#ccfbf1" },
+];
+
+const currency = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "-";
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 2,
+  }).format(n);
+};
+
+const number = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "-";
+  return new Intl.NumberFormat("en-IN").format(n);
+};
+
+function dashboardColor(index) {
+  return DASHBOARD_COLORS[(index - 1) % DASHBOARD_COLORS.length];
 }
 
-const paletteOrder = ["indigo", "blue", "green", "red", "amber", "purple", "pink", "teal", "cyan", "lime", "orange", "rose"];
-
-function hashIndex(str) {
-  let h = 5381;
-  for (let i = 0; i < str.length; i++) {
-    h = ((h << 5) + h) + str.charCodeAt(i); // h * 33 + c
-  }
-  return Math.abs(h);
-}
-function choosePaletteForModel(app, model) {
-  const key = `${String(app || "")}.${String(model || "")}`.toLowerCase();
-  return paletteOrder[hashIndex(key) % paletteOrder.length];
-}
-
-function Card({ title, value, subtitle, onClick, palette = "blue" }) {
-  const pal = paletteStyles(palette);
+function MetricLine({ label, value }) {
   return (
-    <div
-      onClick={onClick}
-      role={onClick ? "button" : undefined}
-      tabIndex={onClick ? 0 : undefined}
-      style={{
-        cursor: onClick ? "pointer" : "default",
-        background: pal.bg,
-        border: `1px solid ${pal.border}`,
-        borderRadius: 14,
-        padding: 16,
-        boxShadow: pal.shadow,
-        display: "flex",
-        flexDirection: "column",
-        gap: 8,
-        transition: "transform 120ms ease, box-shadow 120ms ease",
-        color: pal.text,
-        minHeight: 104,
-      }}
-      onKeyDown={(e) => {
-        if (onClick && (e.key === "Enter" || e.key === " ")) {
-          e.preventDefault();
-          onClick();
-        }
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = "translateY(-2px)";
-        e.currentTarget.style.boxShadow = pal.hoverShadow || "0 12px 24px rgba(15,23,42,0.16)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = "translateY(0)";
-        e.currentTarget.style.boxShadow = pal.shadow;
-      }}
-    >
-      <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 0.3, opacity: 0.95 }}>
-        {title}
+    <div style={{ minWidth: 0 }}>
+      <div style={{ color: "#64748b", fontSize: 11, fontWeight: 800 }}>{label}</div>
+      <div style={{ color: "#0f172a", fontSize: 13, fontWeight: 900, marginTop: 3, overflowWrap: "anywhere" }}>
+        {value ?? "-"}
       </div>
-      <div style={{ fontSize: 28, fontWeight: 900, lineHeight: 1.1, wordBreak: "break-word" }}>
-        {value}
-      </div>
-      {subtitle ? (
-        <div style={{ fontSize: 12, color: pal.sub, lineHeight: 1.4 }}>
-          {subtitle}
-        </div>
-      ) : null}
     </div>
   );
 }
 
-/**
- * AdminDashboard
- * - Merged overview counters and Admin Models into a single responsive card grid.
- * - Keeps only the requested account counters: Users, Withdrawal Requests, User KYC, Wallets, Transactions.
- * - Removed Quick Actions and Recent E‑Coupon Assignments sections as requested.
- */
-export default function AdminDashboard() {
-  const [data, setData] = useState(null);
-  const [err, setErr] = useState("");
-  const [loading, setLoading] = useState(true);
-
-  // Dynamic models (from Django Admin)
-  const [modelsMeta, setModelsMeta] = useState([]);
-  const [modelsErr, setModelsErr] = useState("");
-  const nav = useNavigate();
-  const didRunRef = React.useRef(false);
-
-
-  // Admin: Agency Package Cards
-  const [agencyQuery, setAgencyQuery] = useState("");
-  const [resolvedAgency, setResolvedAgency] = useState(null);
-  const [pkgCards, setPkgCards] = useState([]);
-  const [cardsLoading, setCardsLoading] = useState(false);
-  const [cardsError, setCardsError] = useState("");
-
-  const resolveAgencyId = async (q) => {
-    const s = String(q || "").trim();
-    if (!s) throw new Error("Enter agency username or numeric ID");
-    if (/^\d+$/.test(s)) return Number(s);
-    // Resolve by username via hierarchy endpoint
-    const res = await API.get("accounts/hierarchy/", { params: { username: s } });
-    const id = res?.data?.user?.id;
-    if (!id) throw new Error("Agency not found");
-    return id;
-  };
-
-  const loadAdminAgencyCards = async () => {
-    try {
-      setCardsLoading(true);
-      setCardsError("");
-      const id = await resolveAgencyId(agencyQuery);
-      setResolvedAgency({ id, username: agencyQuery });
-      const res = await API.get("business/agency-packages/", { params: { agency_id: id }, retryAttempts: 1 });
-      const arr = Array.isArray(res.data) ? res.data : res.data?.results || [];
-      setPkgCards(arr || []);
-    } catch (e) {
-      const msg =
-        e?.response?.data?.detail ||
-        (typeof e?.response?.data === "string" ? e.response.data : "") ||
-        e?.message ||
-        "Failed to load packages";
-      setCardsError(msg);
-      setPkgCards([]);
-    } finally {
-      setCardsLoading(false);
-    }
-  };
-
-  const statusBg = (status) => {
-    const s = String(status || "").toLowerCase();
-    if (s === "inactive") return "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)";
-    if (s === "partial") return "linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)";
-    return "linear-gradient(135deg, #10b981 0%, #059669 100%)";
-  };
-
-  // Load metrics
-  useEffect(() => {
-    if (didRunRef.current) return;
-    didRunRef.current = true;
-    let mounted = true;
-    setLoading(true);
-
-    // Global gate to prevent duplicate fetch in React 18 StrictMode (dev double mount)
-    if (typeof window !== "undefined" && window.__tk_admin_metrics_inflight) {
-      return;
-    }
-    if (typeof window !== "undefined") {
-      window.__tk_admin_metrics_inflight = true;
-    }
-
-    const fetchMetrics = async () => {
-      try {
-        const res = await API.get("admin/metrics/", { timeout: 12000, retryAttempts: 1, cacheTTL: 15000, dedupe: "cancelPrevious" });
-        if (!mounted) return;
-        setData(res?.data || {});
-        setErr("");
-      } catch (e1) {
-        try {
-          // Fallback alias path registered in backend/core/urls.py
-          const res2 = await API.get("adminapi/metrics/", { timeout: 12000, retryAttempts: 1, cacheTTL: 15000, dedupe: "cancelPrevious" });
-          if (!mounted) return;
-          setData(res2?.data || {});
-          setErr("");
-        } catch (e2) {
-          if (!mounted) return;
-          const msg = (e2 && (e2.message || e2.code)) || "";
-          if (msg === "deduped" || msg === "ERR_CANCELED" || msg === "canceled") return;
-          setData({});
-          setErr("Failed to load metrics");
-        }
-      } finally {
-        if (typeof window !== "undefined") {
-          try { delete window.__tk_admin_metrics_inflight; } catch (_) {}
-        }
-        if (mounted) setLoading(false);
-      }
-    };
-    fetchMetrics();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  // Load admin model metadata for cards
-  useEffect(() => {
-    let mounted = true;
-    getAdminMeta()
-      .then((meta) => {
-        if (!mounted) return;
-        setModelsMeta(meta?.models || []);
-        setModelsErr("");
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setModelsMeta([]);
-        setModelsErr("Failed to load admin models");
-      });
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-
-
-  const users = data?.users || {};
-  const wallets = data?.wallets || {};
-  const withdrawals = data?.withdrawals || {};
-
-  // User category KPI counts
-  const [catCounts, setCatCounts] = useState({});
-  const [catErr, setCatErr] = useState("");
-  const [catLoading, setCatLoading] = useState(false);
-  const [merchantsCount, setMerchantsCount] = useState(null);
-
-  // Load user category counts (aggregated endpoint)
-  useEffect(() => {
-    let mounted = true;
-    async function loadCounts() {
-      try {
-        setCatLoading(true);
-        setCatErr("");
-        const res = await API.get("admin/users/category-counts/", { timeout: 8000, retryAttempts: 0, cacheTTL: 30000, dedupe: "cancelPrevious" });
-        if (!mounted) return;
-        const obj = res?.data || {};
-        setCatCounts(obj);
-      } catch (_e) {
-        if (mounted) {
-          setCatErr("Failed to load category counts");
-          setCatCounts({});
-        }
-      } finally {
-        if (mounted) setCatLoading(false);
-      }
-    }
-    loadCounts();
-    return () => { mounted = false; };
-  }, []);
-
-  // Fetch merchants count to include both legacy (user.category in {merchant,business}) and role=business
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      const parseCount = (raw) => {
-        if (typeof raw === "number" && Number.isFinite(raw)) return raw;
-        if (typeof raw === "string") {
-          const n = parseInt(raw, 10);
-          if (Number.isFinite(n)) return n;
-        }
-        return 0;
-      };
-      try {
-        const [resRoleBusiness, resUserCatMerchant, resUserCatBusiness] = await Promise.all([
-          API.get("/api/admin/users/", {
-            params: { role: "business", page: 1, page_size: 1 },
-            timeout: 8000,
-            retryAttempts: 0,
-            dedupe: "cancelPrevious",
-          }),
-          API.get("/api/admin/users/", {
-            params: { role: "user", category: "merchant", page: 1, page_size: 1 },
-            timeout: 8000,
-            retryAttempts: 0,
-            dedupe: "cancelPrevious",
-          }),
-          API.get("/api/admin/users/", {
-            params: { role: "user", category: "business", page: 1, page_size: 1 },
-            timeout: 8000,
-            retryAttempts: 0,
-            dedupe: "cancelPrevious",
-          }),
-        ]);
-        const total =
-          parseCount(resRoleBusiness?.data?.count) +
-          parseCount(resUserCatMerchant?.data?.count) +
-          parseCount(resUserCatBusiness?.data?.count);
-        if (mounted) setMerchantsCount(total);
-      } catch (_) {
-        if (mounted) setMerchantsCount(null);
-      }
-    })();
-    return () => { mounted = false; };
-  }, []);
-
-  // Group models by app with de-duplication
-  const modelsByApp = React.useMemo(() => {
-    const norm = (s) => String(s || "").toLowerCase();
-    const seen = new Set();
-    const grouped = {};
-    for (const m of (modelsMeta || [])) {
-      if (!m) continue;
-      const app = norm(m.app_label);
-      const model = norm(m.model);
-      const key = `${app}.${model}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      (grouped[m.app_label] = grouped[m.app_label] || []).push(m);
-    }
-    return grouped;
-  }, [modelsMeta]);
+function DashboardCard({ card, index, onOpen }) {
+  const color = dashboardColor(index);
+  const Icon = card.icon || DashboardCustomizeRoundedIcon;
+  const clickable = !!card.to;
 
   return (
-    <RequirePermission anyOf={["reports_basic", "manage_dashboard", "show_dashboard"]}>
-      <div>
-      {/* Page heading */}
-      <div
-        style={{
-          marginBottom: 12,
-          display: "flex",
-          alignItems: "baseline",
-          justifyContent: "space-between",
-          gap: 8,
-          flexWrap: "wrap",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-          <h2 style={{ margin: 0, color: "#0f172a", fontSize: 20, fontWeight: 900 }}>Overview</h2>
-          <span style={{ color: "#64748b", fontSize: 12 }}>Accounts and Admin Models</span>
-        </div>
-        <div style={{ color: "#64748b", fontSize: 12 }}>
-          {new Date().toLocaleDateString()}
-        </div>
-      </div>
-
-      {/* Agency Package Cards (Admin) */}
-      <div style={{ border: "1px solid #e2e8f0", borderRadius: 14, background: "#fff", marginBottom: 12, overflow: "hidden" }}>
-        <div style={{ padding: 10, background: "#f8fafc", borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-          <div style={{ fontWeight: 900, color: "#0f172a" }}>Agency Package Cards</div>
-          <div style={{ color: "#64748b", fontSize: 12 }}>View package status for any agency (Amount, Paid, Remaining)</div>
-        </div>
-        <div style={{ padding: 12 }}>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
-            <input
-              type="text"
-              placeholder="Agency username or ID"
-              value={agencyQuery}
-              onChange={(e) => setAgencyQuery(e.target.value)}
-              style={{ padding: "8px 10px", border: "1px solid #e2e8f0", borderRadius: 8, minWidth: 220, outline: "none" }}
-            />
-            <button
-              onClick={loadAdminAgencyCards}
-              style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #93c5fd", background: "#eff6ff", color: "#1d4ed8", fontWeight: 800, cursor: "pointer" }}
-            >
-              Load
-            </button>
-            {resolvedAgency ? (
-              <div style={{ color: "#64748b", fontSize: 12 }}>
-                Showing for ID #{resolvedAgency.id} ({resolvedAgency.username})
+    <button
+      type="button"
+      onClick={() => clickable && onOpen(card.to)}
+      disabled={!clickable}
+      style={{
+        border: "1px solid #e5e7eb",
+        background: "#ffffff",
+        borderRadius: 8,
+        minHeight: 136,
+        padding: 14,
+        textAlign: "left",
+        boxShadow: "0 8px 22px rgba(15,23,42,0.06)",
+        cursor: clickable ? "pointer" : "default",
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+        transition: "transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease",
+      }}
+      onMouseEnter={(e) => {
+        if (!clickable) return;
+        e.currentTarget.style.transform = "translateY(-2px)";
+        e.currentTarget.style.boxShadow = "0 14px 30px rgba(15,23,42,0.11)";
+        e.currentTarget.style.borderColor = color.soft;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = "translateY(0)";
+        e.currentTarget.style.boxShadow = "0 8px 22px rgba(15,23,42,0.06)";
+        e.currentTarget.style.borderColor = "#e5e7eb";
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+        <div style={{ display: "flex", gap: 10, minWidth: 0 }}>
+          <span
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: 999,
+              background: color.soft,
+              color: color.fg,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 12,
+              fontWeight: 950,
+              flex: "0 0 auto",
+            }}
+          >
+            {index}
+          </span>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ color: "#0f172a", fontSize: 14, fontWeight: 950, lineHeight: 1.2 }}>
+              {card.title}
+            </div>
+            {card.subtitle ? (
+              <div style={{ color: "#94a3b8", fontSize: 11, fontWeight: 800, marginTop: 4 }}>
+                {card.subtitle}
               </div>
             ) : null}
           </div>
-
-          {cardsLoading ? (
-            <div style={{ color: "#64748b" }}>Loading packages...</div>
-          ) : cardsError ? (
-            <div style={{ color: "#dc2626" }}>{cardsError}</div>
-          ) : (pkgCards || []).length > 0 ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, alignItems: "stretch", minWidth: 0, width: "100%" }}>
-              {(pkgCards || []).map((p) => {
-                const st = String(p.status || "").toLowerCase();
-                const inactive = st === "inactive";
-                const bg = statusBg(st);
-                const color = inactive ? "#fff" : "#0f172a";
-                const title = p?.package?.name || p?.package?.code || "Package";
-                const mark = inactive ? "âœ—" : "âœ“";
-                const stText = inactive ? "Inactive" : st === "partial" ? "Partial" : "Active";
-                return (
-                  <div key={p.id} style={{ padding: 12, borderRadius: 12, background: bg, color, boxShadow: "0 8px 18px rgba(0,0,0,0.12)", border: "1px solid rgba(0,0,0,0.05)", boxSizing: "border-box", minWidth: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%" }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, minWidth: 0, flexWrap: "wrap" }}>
-                      <div style={{ fontWeight: 900, whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere", minWidth: 0 }}>{title}</div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 800, flexWrap: "wrap", minWidth: 0 }}>
-                        <span>{mark}</span>
-                        <span>{stText}</span>
-                      </div>
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 8, marginTop: 8, width: "100%", minWidth: 0 }}>
-                      <div style={{ padding: 8, borderRadius: 8, background: "rgba(255,255,255,0.15)", minWidth: 0 }}>
-                      <div style={{ fontSize: 12, opacity: 0.9, color: inactive ? "#f1f5f9" : "#0f172a" }}>Amount</div>
-                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a", whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere", minWidth: 0 }}>₹{p.total_amount || "0.00"}</div>
-                      </div>
-                      <div style={{ padding: 8, borderRadius: 8, background: "rgba(255,255,255,0.15)", minWidth: 0 }}>
-                      <div style={{ fontSize: 12, opacity: 0.9, color: inactive ? "#f1f5f9" : "#0f172a" }}>Paid</div>
-                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a", whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere", minWidth: 0 }}>₹{p.paid_amount || "0.00"}</div>
-                      </div>
-                      <div style={{ padding: 8, borderRadius: 8, background: "rgba(255,255,255,0.15)", minWidth: 0 }}>
-                      <div style={{ fontSize: 12, opacity: 0.9, color: inactive ? "#f1f5f9" : "#0f172a" }}>Remaining</div>
-                      <div style={{ fontWeight: 900, color: inactive ? "#fff" : "#0f172a", whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere", minWidth: 0 }}>₹{p.remaining_amount || "0.00"}</div>
-                      </div>
-                    </div>
-                    <div style={{ marginTop: 6, fontSize: 12, fontWeight: 700, whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere" }}>
-                      Renewal: {typeof p.months_remaining === "number" ? `${p.months_remaining} month${p.months_remaining === 1 ? "" : "s"} remaining` : ""}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div style={{ color: "#64748b" }}>No package assigned for this agency.</div>
-          )}
         </div>
+        <span
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 7,
+            background: color.bg,
+            color: color.fg,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flex: "0 0 auto",
+          }}
+        >
+          <Icon sx={{ fontSize: 20 }} />
+        </span>
       </div>
 
-      {loading ? (
-        <div style={{ color: "#64748b" }}>Loading...</div>
-      ) : null /* do not block UI on metrics errors */}
-      {/* Always render the cards with safe fallbacks so the dashboard never hard-fails */}
-      <>
-        <>
-          {/* Merged Overview Counters + Admin Models */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-              gap: 12,
-            }}
-          >
-            {/* User category KPIs */}
-            <>
-              <Card
-                title="Consumers"
-                value={(catCounts.consumer ?? 0)}
-                subtitle=""
-                onClick={() => nav("/admin/users?category=consumer")}
-                palette="blue"
-              />
-              <Card
-                title="Merchants"
-                value={(merchantsCount ?? ((catCounts.merchant ?? 0) + (catCounts.business ?? 0)))}
-                subtitle=""
-                onClick={() => nav("/admin/merchants")}
-                palette="green"
-              />
-              <Card
-                title="Agencies"
-                value={(
-                  (catCounts.agency_state_coordinator ?? 0) +
-                  (catCounts.agency_state ?? 0) +
-                  (catCounts.agency_district_coordinator ?? 0) +
-                  (catCounts.agency_district ?? 0) +
-                  (catCounts.agency_pincode_coordinator ?? 0) +
-                  (catCounts.agency_pincode ?? 0) +
-                  (catCounts.agency_sub_franchise ?? 0)
-                )}
-                subtitle=""
-                onClick={() => nav("/admin/users?role=agency")}
-                palette="orange"
-              />
-              <Card
-                title="State Coordinators"
-                value={(catCounts.agency_state_coordinator ?? 0)}
-                subtitle=""
-                onClick={() => nav("/admin/users?category=agency_state_coordinator")}
-                palette="purple"
-              />
-              <Card
-                title="States"
-                value={(catCounts.agency_state ?? 0)}
-                subtitle=""
-                onClick={() => nav("/admin/users?category=agency_state")}
-                palette="indigo"
-              />
-              <Card
-                title="Sub‑Franchises"
-                value={(catCounts.agency_sub_franchise ?? 0)}
-                subtitle=""
-                onClick={() => nav("/admin/users?category=agency_sub_franchise")}
-                palette="amber"
-              />
-              <Card
-                title="Employees"
-                value={(catCounts.employee ?? 0)}
-                subtitle=""
-                onClick={() => nav("/admin/users?category=employee")}
-                palette="teal"
-              />
-            </>
+      {card.primary ? (
+        <div style={{ color: "#0f172a", fontSize: 22, fontWeight: 950, lineHeight: 1 }}>
+          {card.primary}
+        </div>
+      ) : null}
 
-            {/* Required account counters */}
-            <Card
-              title="Wallets"
-              value={(wallets.count ?? 0)}
-              subtitle=""
-              onClick={() => nav("/admin/users")}
-              palette="green"
-            />
-              <Card
-                title="KYC"
-                value={(data?.kyc?.submitted ?? data?.kyc?.unverified ?? data?.kyc?.pending ?? 0)}
-                subtitle={`Submitted: ${(data?.kyc?.submitted ?? data?.kyc?.unverified ?? data?.kyc?.pending ?? 0)} | Approved: ${(data?.kyc?.approved ?? 0)}`}
-                onClick={() => nav("/admin/kyc?status=submitted")}
-                palette="indigo"
-              />
-            <Card
-              title="Genealogy"
-              value={"Tree"}
-              subtitle=""
-              onClick={() => nav("/admin/user-tree")}
-              palette="cyan"
-            />
-            <Card
-              title="E‑Coupons"
-              value={(data?.coupons?.total ?? 0)}
-              subtitle=""
-              onClick={() => nav("/admin/e-coupons")}
-              palette="purple"
-            />
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${Math.min(card.metrics?.length || 1, 4)}, minmax(0, 1fr))`,
+          gap: 10,
+          marginTop: "auto",
+        }}
+      >
+        {(card.metrics || [{ label: "Count", value: "-" }]).map((metric) => (
+          <MetricLine key={metric.label} label={metric.label} value={metric.value} />
+        ))}
+      </div>
+    </button>
+  );
+}
 
-            <Card
-              title="Promo Packages"
-              value={"Manage"}
-              subtitle=""
-              onClick={() => nav("/admin/dashboard/models/business/promopackage")}
-              palette="purple"
-            />
-            <Card
-              title="Prime History"
-              value="Approved"
-              subtitle=""
-              onClick={() => nav("/admin/promo-purchases?status=APPROVED")}
-              palette="rose"
-            />
-
-            {/* Admin models as cards (flattened) */}
-            {false && Object.keys(modelsByApp)
-              .sort()
-              .flatMap((appLabel) =>
-                (modelsByApp[appLabel] || [])
-                  .slice()
-                  .sort((a, b) => (a.verbose_name || a.model).localeCompare(b.verbose_name || b.model))
-                  .map((m) => {
-                    const palName = choosePaletteForModel(m.app_label, m.model);
-                    const pal = paletteStyles(palName);
-                    return (
-                      <div
-                        key={`${m.app_label}.${m.model}`}
-                        onClick={() => nav(`/admin/dashboard/models/${m.app_label}/${m.model}`)}
-                        role="button"
-                        tabIndex={0}
-                        style={{
-                          cursor: "pointer",
-                          background: pal.bg,
-                          border: `1px solid ${pal.border}`,
-                          color: pal.text,
-                          borderRadius: 14,
-                          padding: 12,
-                          boxShadow: pal.shadow,
-                          transition: "transform 120ms ease, box-shadow 120ms ease",
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            nav(`/admin/dashboard/models/${m.app_label}/${m.model}`);
-                          }
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = "translateY(-2px)";
-                          e.currentTarget.style.boxShadow = pal.hoverShadow || "0 12px 24px rgba(15,23,42,0.16)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = "translateY(0)";
-                          e.currentTarget.style.boxShadow = pal.shadow;
-                        }}
-                      >
-                        <div style={{ fontWeight: 800 }}>{m.verbose_name || m.model}</div>
-                        <div style={{ fontSize: 12, color: pal.sub }}>
-                          {m.app_label}.{m.model}
-                        </div>
-                      </div>
-                    );
-                  })
-              )}
+function SummaryPanel({ title, rows }) {
+  return (
+    <section
+      style={{
+        border: "1px solid #e5e7eb",
+        borderRadius: 8,
+        background: "#ffffff",
+        padding: 16,
+        boxShadow: "0 8px 22px rgba(15,23,42,0.05)",
+      }}
+    >
+      <h3 style={{ margin: "0 0 12px", color: "#0f172a", fontSize: 14, fontWeight: 950 }}>{title}</h3>
+      <div style={{ display: "grid", gap: 10 }}>
+        {rows.map((row) => (
+          <div key={row.label} style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+            <span style={{ color: "#64748b", fontSize: 12, fontWeight: 800 }}>{row.label}</span>
+            <span style={{ color: "#0f172a", fontSize: 12, fontWeight: 950, textAlign: "right" }}>{row.value}</span>
           </div>
+        ))}
+      </div>
+    </section>
+  );
+}
 
-          {/* Model meta load error (non-blocking) */}
-          {false && modelsErr ? (
-            <div style={{ marginTop: 8, color: "#94a3b8", fontSize: 12 }}>{modelsErr}</div>
-          ) : null}
-        </>
-      </>
-    </div>
+export default function AdminDashboard() {
+  const navigate = useNavigate();
+  const [data, setData] = useState({});
+  const [catCounts, setCatCounts] = useState({});
+  const [merchantsCount, setMerchantsCount] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadMetrics() {
+      setLoading(true);
+      setErr("");
+      try {
+        const res = await API.get("admin/metrics/", {
+          timeout: 12000,
+          retryAttempts: 1,
+          cacheTTL: 15000,
+          dedupe: "cancelPrevious",
+        });
+        if (mounted) setData(res?.data || {});
+      } catch (_e) {
+        try {
+          const res = await API.get("adminapi/metrics/", {
+            timeout: 12000,
+            retryAttempts: 1,
+            cacheTTL: 15000,
+            dedupe: "cancelPrevious",
+          });
+          if (mounted) setData(res?.data || {});
+        } catch {
+          if (mounted) {
+            setData({});
+            setErr("Failed to load dashboard metrics.");
+          }
+        }
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    loadMetrics();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadCounts() {
+      try {
+        const res = await API.get("admin/users/category-counts/", {
+          timeout: 8000,
+          retryAttempts: 0,
+          cacheTTL: 30000,
+          dedupe: "cancelPrevious",
+        });
+        if (mounted) setCatCounts(res?.data || {});
+      } catch {
+        if (mounted) setCatCounts({});
+      }
+    }
+
+    loadCounts();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    const parseCount = (raw) => {
+      const n = Number(raw);
+      return Number.isFinite(n) ? n : 0;
+    };
+
+    async function loadMerchantTotal() {
+      try {
+        const [roleBusiness, catMerchant, catBusiness] = await Promise.all([
+          API.get("/api/admin/users/", { params: { role: "business", page: 1, page_size: 1 }, timeout: 8000, retryAttempts: 0 }),
+          API.get("/api/admin/users/", { params: { role: "user", category: "merchant", page: 1, page_size: 1 }, timeout: 8000, retryAttempts: 0 }),
+          API.get("/api/admin/users/", { params: { role: "user", category: "business", page: 1, page_size: 1 }, timeout: 8000, retryAttempts: 0 }),
+        ]);
+        const total = parseCount(roleBusiness?.data?.count) + parseCount(catMerchant?.data?.count) + parseCount(catBusiness?.data?.count);
+        if (mounted) setMerchantsCount(total);
+      } catch {
+        if (mounted) setMerchantsCount(null);
+      }
+    }
+
+    loadMerchantTotal();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const cards = useMemo(() => {
+    const users = data?.users || {};
+    const kyc = data?.kyc || {};
+    const wallets = data?.wallets || {};
+    const withdrawals = data?.withdrawals || {};
+    const coupons = data?.coupons || {};
+    const uploadsModels = data?.uploadsModels || {};
+    const market = data?.market || {};
+    const reports = data?.reports || {};
+    const autopool = data?.autopool || {};
+    const packageStats = data?.packageStats || {};
+    const subscription750 = packageStats.subscription750 || {};
+    const smartProduct1000 = packageStats.smartProduct1000 || {};
+    const walletPocketStats = data?.walletPocketStats || {};
+    const totalConsumers = catCounts.consumer ?? users.total ?? 0;
+    const businessTotal = merchantsCount ?? (catCounts.merchant ?? 0) + (catCounts.business ?? 0);
+
+    const packageMetrics = (stats = {}) => [
+      { label: "Today ID", value: number(stats.todayCount) },
+      { label: "Today Amount", value: currency(stats.todayAmount) },
+      { label: "Total ID", value: number(stats.totalCount) },
+      { label: "Total Amount", value: currency(stats.totalAmount) },
+    ];
+
+    const simple = (title, icon, to, count = "-", amount = "-") => ({
+      title,
+      icon,
+      to,
+      metrics: [
+        { label: "Count", value: count },
+        { label: "Amount", value: amount },
+      ],
+    });
+
+    return [
+      { title: "Team Consumers", icon: GroupsRoundedIcon, to: "/admin/users?category=consumer", metrics: [{ label: "Count", value: number(totalConsumers) }] },
+      {
+        title: "Active Users",
+        icon: PersonAddAltRoundedIcon,
+        to: "/admin/users?account_active=1",
+        primary: number(users.active),
+        metrics: [
+          { label: "Today", value: number(users.todayNew) },
+          { label: "Total", value: number(users.active) },
+          { label: "Amount", value: "-" },
+        ],
+      },
+      { title: "Inactive Users", icon: PersonOffRoundedIcon, to: "/admin/users?account_active=0", metrics: [{ label: "Count", value: number(users.inactive) }] },
+      { title: "Blocked Users", icon: BlockRoundedIcon, to: "/admin/users?is_active=0", metrics: [{ label: "Count", value: number(users.blocked) }] },
+      { title: "Profile & KYC", icon: VerifiedUserRoundedIcon, to: "/admin/kyc?status=submitted", metrics: [{ label: "Submitted", value: number(kyc.submitted) }, { label: "Approved", value: number(kyc.approved) }, { label: "Pending", value: number(kyc.pending_all ?? kyc.pending) }] },
+      { title: "Subscription Rs 750", icon: ConfirmationNumberRoundedIcon, to: "/admin/promo-purchases?kind=750&status=APPROVED", metrics: packageMetrics(subscription750.overall) },
+      { title: "Subscription Rs 750 Coupon Pocket", icon: ConfirmationNumberRoundedIcon, to: "/admin/promo-purchases?kind=750&status=APPROVED", metrics: packageMetrics(subscription750.couponPocket) },
+      { title: "Subscription Rs 750 Self Package Pocket", icon: ShoppingCartRoundedIcon, to: "/admin/promo-purchases?kind=750&status=APPROVED", metrics: packageMetrics(subscription750.selfPackagePocket) },
+      { title: "Subscription Rs 750 Add Money", icon: AccountBalanceWalletRoundedIcon, to: "/admin/promo-purchases?kind=750&status=APPROVED", metrics: packageMetrics(subscription750.addMoney) },
+      { title: "Subscription Rs 750 Redeem Point Wallet", icon: AccountBalanceWalletRoundedIcon, to: "/admin/workflows/redeem-point-coupon-summary", metrics: [{ label: "Count", value: number(coupons.redeemed) }, { label: "Amount Approval", value: "-" }] },
+      { title: "Smart Product Package Rs 1000", icon: ShoppingCartRoundedIcon, to: "/admin/promo-purchases?kind=759&status=APPROVED", metrics: packageMetrics(smartProduct1000.overall) },
+      { title: "Smart Product Package Rs 1000 Coupon Pocket", icon: ConfirmationNumberRoundedIcon, to: "/admin/promo-purchases?kind=759&status=APPROVED", metrics: packageMetrics(smartProduct1000.couponPocket) },
+      { title: "Smart Product Package Rs 1000 Self Package Pocket", icon: ShoppingCartRoundedIcon, to: "/admin/promo-purchases?kind=759&status=APPROVED", metrics: packageMetrics(smartProduct1000.selfPackagePocket) },
+      { title: "Smart Product Package Rs 1000 Add Money", icon: AccountBalanceWalletRoundedIcon, to: "/admin/promo-purchases?kind=759&status=APPROVED", metrics: packageMetrics(smartProduct1000.addMoney) },
+      { title: "Digital Education Prime Package", icon: SchoolRoundedIcon, to: "/admin/promo-purchases?status=PENDING", metrics: [{ label: "Today Count", value: "-" }, { label: "Total Count", value: "-" }, { label: "Today Amount", value: "-" }, { label: "Total Amount", value: "-" }] },
+      simple("Digital Education Prime Package Coupon Pocket", ConfirmationNumberRoundedIcon, "/admin/wallet-vouchers"),
+      simple("Digital Education Prime Package Self Package Pocket", SchoolRoundedIcon, "/admin/promo-purchases?status=APPROVED"),
+      simple("Digital Education Prime Package Add Money", AccountBalanceWalletRoundedIcon, "/admin/wallet-upload-approvals"),
+      { title: "Total Earning", icon: CurrencyRupeeRoundedIcon, to: "/admin/wallet-ledger", primary: currency(wallets.totalBalance), metrics: [{ label: "Amount", value: currency(wallets.totalBalance) }] },
+      { title: "Main Wallet", icon: AccountBalanceWalletRoundedIcon, to: "/admin/wallets", primary: currency(wallets.totalBalance), metrics: [{ label: "Wallets", value: number(wallets.count) }] },
+      simple("Team Consumer Self Re-birth", RedeemRoundedIcon, "/admin/workflows/team-admin-board"),
+      { title: "Coupon Purchase Pocket", icon: ShoppingCartRoundedIcon, to: "/admin/wallet-vouchers", metrics: packageMetrics(walletPocketStats.couponPocket) },
+      { title: "Self Re-birth Pocket", icon: RedeemRoundedIcon, to: "/admin/workflows/redeem-point-coupon-summary", metrics: packageMetrics(walletPocketStats.selfPackagePocket) },
+      { title: "Add Money", icon: PaymentsRoundedIcon, to: "/admin/wallet-upload-approvals", metrics: packageMetrics(walletPocketStats.addMoney) },
+      { title: "Purchase Package Coupon", icon: ConfirmationNumberRoundedIcon, to: "/admin/wallet-vouchers", metrics: packageMetrics(walletPocketStats.packageCouponPocket) },
+      { title: "Withdrawal", icon: PaymentsRoundedIcon, to: "/admin/withdrawals", metrics: [{ label: "Overall Count", value: number(withdrawals.pendingCount) }, { label: "Overall Amount", value: currency(withdrawals.pendingAmount) }] },
+      simple("Shopping Consumer Self Re-birth", StorefrontRoundedIcon, "/admin/workflows/team-admin-board"),
+      simple("Franchisee Self Re-birth", ShieldRoundedIcon, "/admin/workflows/franchise-reference-reward"),
+      simple("Captain Self Re-birth", EmojiEventsRoundedIcon, "/admin/workflows/zonal-reward"),
+      { title: "Spin & Win SPP", icon: CasinoRoundedIcon, to: "/admin/lucky-draw", subtitle: "List inside", metrics: [{ label: "Entries", value: number(uploadsModels.luckyDrawSubmissions) }] },
+      { title: "Spin & Win Digital Education", icon: CasinoRoundedIcon, to: "/admin/lucky-draw", subtitle: "List inside", metrics: [{ label: "Pending", value: number(uploadsModels.luckyDrawPendingAgency) }] },
+      { title: "Tri Tour", icon: EmojiEventsRoundedIcon, to: "/admin/packages/tri-tour", subtitle: "List inside", metrics: [{ label: "Count", value: "-" }] },
+      { title: "Subscription Rs 750 5 Matrix", icon: AccountTreeRoundedIcon, to: "/admin/commissions/history", metrics: [{ label: "ID Count", value: "-" }] },
+      { title: "Smart Product Package Rs 1000 5 Matrix", icon: AccountTreeRoundedIcon, to: "/admin/commissions/history", metrics: [{ label: "ID Count", value: "-" }] },
+      { title: "Digital Education 5 Matrix", icon: AccountTreeRoundedIcon, to: "/admin/commissions/history", metrics: [{ label: "ID Count", value: "-" }] },
+      { title: "Subscription Rs 750 3 Matrix", icon: AccountTreeRoundedIcon, to: "/admin/autopool", metrics: [{ label: "ID Count", value: number(autopool.total) }] },
+      { title: "Smart Product Package Rs 1000 3 Matrix", icon: AccountTreeRoundedIcon, to: "/admin/autopool", metrics: [{ label: "ID Count", value: number(autopool.total) }] },
+      { title: "Digital Education 3 Matrix", icon: AccountTreeRoundedIcon, to: "/admin/autopool", metrics: [{ label: "ID Count", value: number(autopool.total) }] },
+      { title: "5 Matrix Tree", icon: AccountTreeRoundedIcon, to: "/admin/user-tree", metrics: [{ label: "Tree", value: "Open" }] },
+      { title: "3 Matrix Tree", icon: AccountTreeRoundedIcon, to: "/admin/user-tree", metrics: [{ label: "Tree", value: "Open" }] },
+      { title: "Digital Education 5 Matrix Tree", icon: AccountTreeRoundedIcon, to: "/admin/user-tree", metrics: [{ label: "Tree", value: "Open" }] },
+      { title: "Package GST Bills", icon: ReceiptLongRoundedIcon, to: "/admin/package-management", metrics: [{ label: "Count", value: number(reports.dailyReportsTotal) }] },
+      simple("QR Scanner Payment", QrCodeScannerRoundedIcon, "/admin/payments"),
+      simple("Gateway Mode of Payment", CreditCardRoundedIcon, "/admin/payments"),
+      { title: "CRM Connect Website", icon: DashboardCustomizeRoundedIcon, to: "/admin/workflows/crm-connect", metrics: [{ label: "Status", value: "Manage" }] },
+      { title: "Business / Merchant", icon: StorefrontRoundedIcon, to: "/admin/merchants", metrics: [{ label: "Count", value: number(businessTotal) }, { label: "Products", value: number(market.products) }] },
+      { title: "Dashboard Cards", icon: DashboardCustomizeRoundedIcon, to: "/admin/dashboard-cards", metrics: [{ label: "Count", value: number(uploadsModels.dashboardCards) }] },
+    ];
+  }, [catCounts, data, merchantsCount]);
+
+  return (
+    <RequirePermission anyOf={["reports_basic", "manage_dashboard", "show_dashboard"]}>
+      <div style={{ display: "grid", gap: 18 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <h2 style={{ margin: 0, color: "#0f172a", fontSize: 22, fontWeight: 950 }}>Dashboard</h2>
+            <div style={{ color: "#64748b", fontSize: 12, fontWeight: 700, marginTop: 4 }}>
+              Team consumer overview, package pockets, matrix trees, wallets, and payment summaries.
+            </div>
+          </div>
+          <div style={{ color: "#64748b", fontSize: 12, fontWeight: 800 }}>
+            {new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+          </div>
+        </div>
+
+        {loading ? <div style={{ color: "#64748b", fontSize: 13, fontWeight: 800 }}>Loading dashboard cards...</div> : null}
+        {err ? <div style={{ color: "#b91c1c", fontSize: 13, fontWeight: 800 }}>{err}</div> : null}
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))",
+            gap: 12,
+            alignItems: "stretch",
+          }}
+        >
+          {cards.map((card, idx) => (
+            <DashboardCard key={`${idx}-${card.title}`} card={card} index={idx + 1} onOpen={navigate} />
+          ))}
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
+          <SummaryPanel
+            title="Wallet Summary"
+            rows={[
+              { label: "Main Wallet", value: currency(data?.wallets?.totalBalance) },
+              { label: "Purchase Wallet", value: "-" },
+              { label: "Earning Wallet", value: "-" },
+              { label: "Total Balance", value: currency(data?.wallets?.totalBalance) },
+            ]}
+          />
+          <SummaryPanel
+            title="Top Summary"
+            rows={[
+              { label: "Active Users", value: number(data?.users?.active) },
+              { label: "Total Earning", value: currency(data?.wallets?.totalBalance) },
+              { label: "Total Withdrawal", value: currency(data?.withdrawals?.pendingAmount) },
+              { label: "Total Re-birth", value: "-" },
+            ]}
+          />
+          <SummaryPanel
+            title="System Overview"
+            rows={[
+              { label: "Total Users", value: number(data?.users?.total) },
+              { label: "Today New Users", value: number(data?.users?.todayNew) },
+              { label: "KYC Verified Users", value: number(data?.kyc?.approved) },
+              { label: "Today Transactions", value: number(data?.wallets?.transactionsToday) },
+            ]}
+          />
+        </div>
+      </div>
     </RequirePermission>
   );
 }

@@ -1956,9 +1956,11 @@ class TeamConsumerDocument(models.Model):
     """Admin-managed PDF documents for Team/Consumer dashboard actions."""
 
     KIND_PDF = "PDF"
+    KIND_BUSINESS_PDF = "BUSINESS_PDF"
     KIND_CERTIFICATE = "CERTIFICATE"
     KIND_CHOICES = (
         (KIND_PDF, "Trikonekt PDF"),
+        (KIND_BUSINESS_PDF, "Trikonekt Business PDF"),
         (KIND_CERTIFICATE, "Certificate"),
     )
 

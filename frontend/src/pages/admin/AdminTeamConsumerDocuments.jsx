@@ -39,6 +39,11 @@ const labels = {
     helper: "Upload the PDF opened from the Team Dashboard Trikonekt PDF action.",
     button: "Upload PDF",
   },
+  BUSINESS_PDF: {
+    title: "Team/Consumer - Trikonekt Business PDF",
+    helper: "Upload the business PDF used by Trikonekt Business front-page/content actions.",
+    button: "Upload Business PDF",
+  },
   CERTIFICATE: {
     title: "Team/Consumer - Certificate Uploads",
     helper: "Upload the certificate PDF downloaded from the Team Dashboard certificate action.",

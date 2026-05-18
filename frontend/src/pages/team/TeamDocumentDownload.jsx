@@ -19,6 +19,11 @@ const copyByKind = {
     empty: "Trikonekt PDF is not uploaded yet.",
     filename: "trikonekt-pdf.pdf",
   },
+  BUSINESS_PDF: {
+    title: "Trikonekt Business PDF",
+    empty: "Trikonekt Business PDF is not uploaded yet.",
+    filename: "trikonekt-business-pdf.pdf",
+  },
   CERTIFICATE: {
     title: "Certificate Download",
     empty: "Certificate is not uploaded yet.",
