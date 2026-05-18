@@ -72,7 +72,23 @@ function Badge({ children, color = "#0369a1", bg = "#e0f2fe" }) {
   );
 }
 
-export default function AdminKYC() {
+const FRANCHISE_CATEGORY_OPTIONS = [
+  { value: "", label: "All franchise levels" },
+  { value: "agency_state_coordinator", label: "State Coordinator" },
+  { value: "agency_state", label: "State" },
+  { value: "agency_district_coordinator", label: "District Coordinator" },
+  { value: "agency_district", label: "District" },
+  { value: "agency_pincode_coordinator", label: "Pincode Coordinator" },
+  { value: "agency_pincode", label: "Pincode" },
+];
+
+function categoryLabel(value) {
+  const option = FRANCHISE_CATEGORY_OPTIONS.find((item) => item.value === value);
+  return option?.label || value || "";
+}
+
+export default function AdminKYC({ audience = "consumer" }) {
+  const isFranchise = audience === "franchise";
   // View mode bifurcation: 'kyc' vs 'nominee'
   const [viewMode, setViewMode] = useState("kyc"); // 'kyc' | 'nominee'
 
@@ -82,6 +98,7 @@ export default function AdminKYC() {
     user: "",
     state: "",
     pincode: "",
+    category: "",
     date_from: "",
     date_to: "",
   });
@@ -165,6 +182,17 @@ export default function AdminKYC() {
       { field: "username", headerName: "Username", minWidth: 160, flex: 1 },
       { field: "full_name", headerName: "Full Name", minWidth: 200, flex: 1 },
       { field: "phone", headerName: "Phone", minWidth: 140 },
+      ...(isFranchise
+        ? [
+            {
+              field: "category",
+              headerName: "Franchise Level",
+              minWidth: 190,
+              renderCell: (params) => categoryLabel(params?.row?.category),
+              valueGetter: (_, row) => categoryLabel(row?.category),
+            },
+          ]
+        : []),
       { field: "pincode", headerName: "Pincode", minWidth: 120 },
       {
         field: "bank",
@@ -249,7 +277,7 @@ export default function AdminKYC() {
         },
       },
     ],
-    []
+    [isFranchise]
   );
 
   // Nominee DataGrid columns (aligned with accounts.UserNomineeSerializer; admin endpoint may include user fields optionally)
@@ -287,6 +315,7 @@ export default function AdminKYC() {
   const fetcherKyc = useCallback(
     async ({ page, pageSize, search, ordering }) => {
       const params = { page, page_size: pageSize };
+      params.audience = isFranchise ? "franchise" : "consumer";
       // Merge active filters (omit empty)
       Object.entries(kycFilters).forEach(([k, v]) => {
         if (v !== null && v !== undefined && String(v).trim() !== "") {
@@ -305,7 +334,7 @@ export default function AdminKYC() {
       const count = typeof data?.count === "number" ? data.count : results.length;
       return { results, count };
     },
-    [kycFilters, reloadKeyKyc]
+    [isFranchise, kycFilters, reloadKeyKyc]
   );
 
   // Note: This expects an admin endpoint to list nominee records. If not present yet,
@@ -407,10 +436,12 @@ export default function AdminKYC() {
       {/* Page header + view toggle */}
       <div style={{ marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
-          <h2 style={{ margin: 0, color: "#0f172a" }}>{viewMode === "kyc" ? "KYC Verification" : "Nominee Details"}</h2>
+          <h2 style={{ margin: 0, color: "#0f172a" }}>{viewMode === "kyc" ? (isFranchise ? "Franchise KYC Verification" : "KYC Verification") : "Nominee Details"}</h2>
           <div style={{ color: "#64748b", fontSize: 13 }}>
             {viewMode === "kyc"
-              ? "Review and decide user KYC. Use filters to find records quickly, and quick filter in the table toolbar."
+              ? isFranchise
+                ? "Review only franchise hierarchy KYC records. Consumer KYC is excluded from this workspace."
+                : "Review and decide consumer KYC. Use filters to find records quickly, and quick filter in the table toolbar."
               : "Review consumer nominee details. Use filters to find records quickly, and quick filter in the table toolbar."}
           </div>
         </div>
@@ -489,6 +520,14 @@ export default function AdminKYC() {
             onChange={(v) => setKycF("pincode", v)}
             placeholder="contains"
           />
+          {isFranchise ? (
+            <Select
+              label="Franchise Level"
+              value={kycFilters.category}
+              onChange={(v) => setKycF("category", v)}
+              options={FRANCHISE_CATEGORY_OPTIONS}
+            />
+          ) : null}
           <TextInput
             label="Updated From"
             type="date"

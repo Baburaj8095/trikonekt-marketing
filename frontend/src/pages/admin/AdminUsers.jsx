@@ -129,6 +129,21 @@ const CONSUMER_COLUMN_FIELDS = {
   ],
 };
 
+const CONSUMER_ONLY_ROLE = "user";
+const CONSUMER_ONLY_CATEGORY = "consumer";
+const CONSUMER_ALL_COLUMN_FIELDS = Array.from(
+  new Set(Object.values(CONSUMER_COLUMN_FIELDS).flat())
+);
+const CONSUMER_COLUMN_VIEW_OPTIONS = [
+  { id: "basic", label: "Basic" },
+  { id: "package", label: "Package" },
+  { id: "wallet", label: "Wallet" },
+  { id: "coupons", label: "Coupons" },
+  { id: "rewards", label: "Rewards" },
+  { id: "team", label: "Team / Rebirth" },
+  { id: "all", label: "All Fields" },
+];
+
 const NEEDS_SOURCE_LABEL = "Needs source";
 const NEEDS_RULE_LABEL = "Needs rule";
 
@@ -284,12 +299,11 @@ function UserProfileDrawer({ open, loading, user, onClose, onEdit }) {
 export default function AdminUsers() {
   // Filters applied to server fetch
   const [filters, setFilters] = useState(() => {
-    // Default to "All" unless URL explicitly specifies role/category
+    // Admin Users is now the Team Consumer admin table. Franchise/agency flows
+    // live in separate admin screens, so this page is hard-locked to consumers.
     let activated = "";
     let account_active = "";
     let is_active = "";
-    let role = "";
-    let category = "";
     try {
       const qs = typeof window !== "undefined" ? (window.location.search || "") : "";
       const params = new URLSearchParams(qs);
@@ -305,15 +319,11 @@ export default function AdminUsers() {
       is_active = ["1", "true", "yes", "active", "enabled"].includes(rawIsActive)
         ? "1"
         : (["0", "false", "no", "inactive", "blocked", "disabled"].includes(rawIsActive) ? "0" : "");
-      const rawRole = params.get("role") || "";
-      role = String(rawRole || "").toLowerCase();
-      const rawCategory = params.get("category") || "";
-      category = String(rawCategory || "").toLowerCase().replace(/cordinator\b/g, "coordinator");
     } catch (_) {}
     return {
-      role,
+      role: CONSUMER_ONLY_ROLE,
       phone: "",
-      category,
+      category: CONSUMER_ONLY_CATEGORY,
       pincode: "",
       state: "",
       kyc: "",
@@ -323,7 +333,8 @@ export default function AdminUsers() {
     };
   });
   const [density, setDensity] = useState("standard");
-  const [view, setView] = useState("all");
+  const [view, setView] = useState("consumers");
+  const [consumerColumnView, setConsumerColumnView] = useState("basic");
   const [reloadKey, setReloadKey] = useState(0);
   const [editOpen, setEditOpen] = useState(false);
   const [selected, setSelected] = useState(null);
@@ -358,7 +369,11 @@ export default function AdminUsers() {
 
 
   function setF(key, val) {
-    setFilters((f) => ({ ...f, [key]: val }));
+    if (key === "role" || key === "category") {
+      setFilters((f) => ({ ...f, role: CONSUMER_ONLY_ROLE, category: CONSUMER_ONLY_CATEGORY }));
+      return;
+    }
+    setFilters((f) => ({ ...f, [key]: val, role: CONSUMER_ONLY_ROLE, category: CONSUMER_ONLY_CATEGORY }));
   }
 
   const buildBaseParamsFromFilters = useCallback((f) => {
@@ -515,7 +530,7 @@ export default function AdminUsers() {
     };
   }, []);
 
-  // Sync filters from URL; role/category apply only if explicitly present
+  // Sync filters from URL, but keep this page consumer-only regardless of query.
   const location = useLocation();
   useEffect(() => {
     const params = new URLSearchParams(location.search || "");
@@ -531,17 +546,13 @@ export default function AdminUsers() {
     const normIsActive = ["1", "true", "yes", "active", "enabled"].includes(rawIsActive)
       ? "1"
       : (["0", "false", "no", "inactive", "blocked", "disabled"].includes(rawIsActive) ? "0" : "");
-    const rawRole = params.get("role") || "";
-    const normRole = String(rawRole || "").toLowerCase();
-    const rawCategory = params.get("category") || "";
-    const normCategory = String(rawCategory || "").toLowerCase().replace(/cordinator\b/g, "coordinator");
     setFilters((f) => {
       let next = f;
       if ((f.activated || "") !== normActivated) next = { ...next, activated: normActivated };
       if ((f.account_active || "") !== normAccountActive) next = { ...next, account_active: normAccountActive };
       if ((f.is_active || "") !== normIsActive) next = { ...next, is_active: normIsActive };
-      if ((f.role || "") !== normRole) next = { ...next, role: normRole };
-      if ((f.category || "") !== normCategory) next = { ...next, category: normCategory };
+      if ((f.role || "") !== CONSUMER_ONLY_ROLE) next = { ...next, role: CONSUMER_ONLY_ROLE };
+      if ((f.category || "") !== CONSUMER_ONLY_CATEGORY) next = { ...next, category: CONSUMER_ONLY_CATEGORY };
       return next;
     });
   }, [location.search]);
@@ -1470,34 +1481,22 @@ export default function AdminUsers() {
   );
 
   const tableColumns = useMemo(() => {
-    const isConsumerView = String(filters.category || "").toLowerCase() === "consumer" || view === "consumers";
-    if (!isConsumerView) return columns;
     const byField = new Map();
     [...columns, ...consumerSummaryColumns].forEach((col) => {
       if (!col?.field || byField.has(col.field)) return;
       byField.set(col.field, col);
     });
-    const fields = CONSUMER_COLUMN_FIELDS.basic;
+    const fields =
+      consumerColumnView === "all"
+        ? CONSUMER_ALL_COLUMN_FIELDS
+        : (CONSUMER_COLUMN_FIELDS[consumerColumnView] || CONSUMER_COLUMN_FIELDS.basic);
     return fields.map((field) => byField.get(field)).filter(Boolean);
-  }, [columns, consumerSummaryColumns, filters.category, view]);
+  }, [columns, consumerSummaryColumns, consumerColumnView]);
 
-  // Quick-view segmented control for role/category
+  // Kept for older toolbar/menu wiring, but this page is consumer-only.
   const applyView = useCallback((v) => {
-    setView(v);
-    if (v === "all") { setF("role", ""); setF("category", ""); }
-    else if (v === "consumers") { setF("role", "user"); setF("category", "consumer"); }
-    else if (v === "merchants") { try { window.location.assign("/admin/merchants"); } catch (_) {} return; }
-    else if (v === "agencies") { setF("role", "agency"); setF("category", ""); }
-    else if (v === "employees") { setF("role", "employee"); setF("category", "employee"); }
-    // Optional: column visibility per view
-    setColVis((prev) => ({
-      ...prev,
-      __packages: v === "agencies" ? true : false,
-      __commissions: v === "agencies" || v === "employees",
-      __prime150: v === "agencies" || v === "employees",
-      __prime750: v === "agencies" || v === "employees",
-      __monthly759: v === "agencies" || v === "employees",
-    }));
+    setView("consumers");
+    setFilters((f) => ({ ...f, role: CONSUMER_ONLY_ROLE, category: CONSUMER_ONLY_CATEGORY }));
   }, []);
 
   // Server-side fetcher for DataTable
@@ -1512,8 +1511,9 @@ export default function AdminUsers() {
       });
       if (search && String(search).trim()) params.search = String(search).trim();
       if (ordering) params.ordering = ordering;
-      const isConsumerView = String(filters.category || "").toLowerCase() === "consumer" || view === "consumers";
-      if (isConsumerView) params.consumer_columns = "basic";
+      params.role = CONSUMER_ONLY_ROLE;
+      params.category = CONSUMER_ONLY_CATEGORY;
+      params.consumer_columns = consumerColumnView === "all" ? "all" : consumerColumnView;
 
       try {
 
@@ -1567,7 +1567,7 @@ export default function AdminUsers() {
         return { results: [], count: 0 };
       }
     },
-    [filters, reloadKey, view]
+    [filters, reloadKey, consumerColumnView]
   );
 
   const handleExport = async () => {
@@ -1579,6 +1579,9 @@ export default function AdminUsers() {
         params[k] = v;
       }
     });
+    params.role = CONSUMER_ONLY_ROLE;
+    params.category = CONSUMER_ONLY_CATEGORY;
+    params.consumer_columns = "all";
 
     // Try backend export endpoint first (if available), otherwise fall back to client-side CSV export
     try {
@@ -1765,30 +1768,41 @@ const count = Number.isFinite(countNum) ? countNum : results.length;
 
   const toolbar = (
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-      <div style={{ display: "inline-flex", gap: 6, marginRight: 8 }}>
-        {[
-          { id: "all", label: "All" },
-          { id: "consumers", label: "Consumers" },
-          // { id: "merchants", label: "Merchants" },
-          { id: "agencies", label: "Agencies" },
-          { id: "employees", label: "Employees" },
-        ].map((v) => (
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginRight: 8 }}>
+        <span
+          title="This page is locked to role=user and category=consumer."
+          style={{
+            padding: "6px 10px",
+            borderRadius: 8,
+            border: "1px solid #bbf7d0",
+            background: "#dcfce7",
+            color: "#166534",
+            fontSize: 12,
+            fontWeight: 800,
+          }}
+        >
+          Consumers{segmentCounts?.consumers != null ? ` (${segmentCounts.consumers})` : ""}
+        </span>
+      </div>
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+        <label style={{ fontSize: 12, color: "#64748b" }}>Columns</label>
+        {CONSUMER_COLUMN_VIEW_OPTIONS.map((v) => (
           <button
             key={v.id}
-            onClick={() => applyView(v.id)}
-            aria-pressed={view === v.id}
+            onClick={() => setConsumerColumnView(v.id)}
+            aria-pressed={consumerColumnView === v.id}
             style={{
               padding: "6px 10px",
               borderRadius: 8,
               border: "1px solid #e5e7eb",
-              background: view === v.id ? "#0f172a" : "#fff",
-              color: view === v.id ? "#fff" : "#0f172a",
+              background: consumerColumnView === v.id ? "#0f172a" : "#fff",
+              color: consumerColumnView === v.id ? "#fff" : "#0f172a",
               cursor: "pointer",
               fontSize: 12,
               fontWeight: 700,
             }}
           >
-            {v.label}{segmentCounts?.[v.id] != null ? ` (${segmentCounts[v.id]})` : ""}
+            {v.label}
           </button>
         ))}
       </div>
@@ -1842,7 +1856,7 @@ const count = Number.isFinite(countNum) ? countNum : results.length;
         </div>
       </div>
       <div style={{ display: "inline-flex", gap: 8 }}>
-        {/* <button
+        <button
           onClick={newConsumer}
           style={{
             padding: "8px 12px",
@@ -1857,76 +1871,6 @@ const count = Number.isFinite(countNum) ? countNum : results.length;
         >
           New Consumer
         </button>
-        <button
-          onClick={(e) => e.preventDefault()}
-          disabled
-          style={{
-            padding: "8px 12px",
-            borderRadius: 8,
-            border: "1px solid #e5e7eb",
-            background: "#f8fafc",
-            color: "#94a3b8",
-            cursor: "not-allowed",
-            fontWeight: 600,
-            opacity: 0.7,
-          }}
-          title="Employee creation is disabled for now"
-        >
-          New Employee
-        </button>
-        <button
-          onClick={(e) => e.preventDefault()}
-          disabled
-          style={{
-            padding: "8px 12px",
-            borderRadius: 8,
-            border: "1px solid #e5e7eb",
-            background: "#f8fafc",
-            color: "#94a3b8",
-            cursor: "not-allowed",
-            fontWeight: 600,
-            opacity: 0.7,
-          }}
-          title="Merchant creation is disabled for now"
-        >
-          New Merchant
-        </button> */}
-        <div style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
-          {[
-            { id: "state_coordinator", label: "New State Coord." },
-            { id: "state", label: "New State" },
-            { id: "district_coordinator", label: "New District Coord." },
-            { id: "district", label: "New District" },
-            { id: "pincode_coordinator", label: "New Pincode Coord." },
-            { id: "pincode", label: "New Pincode" },
-            { id: "sub_franchise", label: "New Sub Franchise" },
-          ].map((t) => (
-            <button
-              key={t.id}
-              onClick={() => {
-                try {
-                  window.open(
-                    `/auth/register-v2/agency?admin=1&agency_level=${encodeURIComponent(t.id)}`,
-                    "_blank"
-                  );
-                } catch (_) {}
-              }}
-              style={{
-                padding: "8px 12px",
-                borderRadius: 8,
-                border: "1px solid #eab308",
-                background: "#fef08a",
-                color: "#92400e",
-                cursor: "pointer",
-                fontWeight: 700,
-                whiteSpace: "nowrap",
-              }}
-              title={`Create ${t.label.replace(/^New /, "")}`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
       </div>
       <button
         onClick={handleExport}
@@ -2026,9 +1970,9 @@ const count = Number.isFinite(countNum) ? countNum : results.length;
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: 0, color: "#0f172a" }}>Users</h2>
+        <h2 style={{ margin: 0, color: "#0f172a" }}>Team Consumers</h2>
         <div style={{ color: "#64748b", fontSize: 13 }}>
-          Filter and browse users. Use the search box in the table toolbar to quickly find specific entries.
+          Consumer-only admin table. Agency and franchise users will be managed in the separate franchise admin flow.
         </div>
       </div>
 
@@ -2041,18 +1985,22 @@ const count = Number.isFinite(countNum) ? countNum : results.length;
           marginBottom: 12,
         }}
       >
-        <Select
-          label="Role"
-          value={filters.role}
-          onChange={(v) => setF("role", v)}
-          options={roleOptions}
-        />
-        <Select
-          label="Category"
-          value={filters.category}
-          onChange={(v) => setF("category", v)}
-          options={categoryOptions}
-        />
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <label style={{ fontSize: 12, color: "#64748b" }}>Data Scope</label>
+          <div
+            style={{
+              padding: "10px 12px",
+              borderRadius: 8,
+              border: "1px solid #bbf7d0",
+              background: "#f0fdf4",
+              color: "#166534",
+              fontWeight: 800,
+              fontSize: 13,
+            }}
+          >
+            Consumers only
+          </div>
+        </div>
         <TextInput
           label="Phone"
           value={filters.phone}

@@ -1,8 +1,10 @@
-from datetime import date
+import csv
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.db.models import Count, Prefetch, Q, Sum
 from django.db import transaction
+from django.db.models.functions import TruncDate, TruncMonth, TruncYear
 from django.utils import timezone
 from django.core.cache import cache
 from rest_framework.views import APIView
@@ -12,7 +14,7 @@ from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.http import HttpResponse
 
-from accounts.models import CustomUser, LedgerEntry, Wallet, WalletAccount, WalletTransaction, ConsumerVoucher, UserKYC, WithdrawalRequest, SupportTicket, SupportTicketMessage, AgencyRegionAssignment
+from accounts.models import AuditLog, CustomUser, FinancialTransaction, LedgerEntry, Wallet, WalletAccount, WalletTransaction, WalletUploadRequest, ConsumerVoucher, UserKYC, WithdrawalRequest, SupportTicket, SupportTicketMessage, AgencyRegionAssignment
 from coupons.models import Coupon, CouponCode, CouponSubmission, CouponBatch
 from uploads.models import FileUpload, DashboardCard, HomeCard, LuckyDrawSubmission
 from market.models import Product, PurchaseRequest, Banner, BannerItem, BannerPurchaseRequest
@@ -1308,6 +1310,201 @@ def _tx_payload(tx):
     }
 
 
+def _admin_name(user):
+    if not user:
+        return ""
+    return getattr(user, "username", "") or getattr(user, "prefixed_id", "") or str(getattr(user, "id", ""))
+
+
+def _entry_payload(entry):
+    tx = getattr(entry, "financial_transaction", None)
+    account = getattr(entry, "wallet_account", None)
+    return {
+        "id": entry.id,
+        "entry_ref": entry.entry_ref,
+        "transaction_id": getattr(tx, "id", None),
+        "transaction_ref": getattr(tx, "transaction_ref", ""),
+        "wallet_account_id": getattr(account, "id", None),
+        "wallet_type": getattr(account, "wallet_type", ""),
+        "user_id": entry.user_id,
+        "username": _admin_name(getattr(entry, "user", None)),
+        "direction": entry.direction,
+        "amount": str(entry.amount),
+        "balance_before": str(entry.balance_before),
+        "balance_after": str(entry.balance_after),
+        "status": entry.status,
+        "remarks": entry.remarks,
+        "metadata": entry.metadata or {},
+        "created_at": entry.created_at,
+    }
+
+
+def _finance_tx_payload(tx, *, include_entries=False):
+    entries = list(getattr(tx, "prefetched_ledger_entries", []) or [])
+    if not entries and include_entries:
+        entries = list(tx.ledger_entries.select_related("wallet_account", "user").order_by("id")[:100])
+    wallet_types = []
+    before_balance = ""
+    after_balance = ""
+    source_destination = []
+    for entry in entries:
+        account = getattr(entry, "wallet_account", None)
+        wallet_type = getattr(account, "wallet_type", "")
+        if wallet_type and wallet_type not in wallet_types:
+            wallet_types.append(wallet_type)
+        source_destination.append(f"{entry.direction}:{_admin_name(getattr(entry, 'user', None))}:{wallet_type}")
+        if before_balance == "":
+            before_balance = str(entry.balance_before)
+        after_balance = str(entry.balance_after)
+    meta = tx.metadata or {}
+    return {
+        "id": tx.id,
+        "transaction_id": tx.transaction_ref,
+        "transaction_ref": tx.transaction_ref,
+        "flow_id": tx.flow_id,
+        "user_id": tx.user_id,
+        "username": _admin_name(getattr(tx, "user", None)),
+        "wallet_type": ", ".join(wallet_types),
+        "wallet_types": wallet_types,
+        "transaction_type": tx.category,
+        "category": tx.category,
+        "mlm_income_type": meta.get("mlm_income_type") or meta.get("reward_type") or meta.get("income_type") or "",
+        "source_module": tx.source_module,
+        "source_id": tx.source_id,
+        "destination_module": tx.destination_module,
+        "source_destination": " | ".join(source_destination),
+        "gross_amount": str(tx.gross_amount),
+        "service_charge": str(tx.charges_amount),
+        "charges_amount": str(tx.charges_amount),
+        "gst_amount": str(tx.gst_amount),
+        "tds_amount": str(tx.tds_amount),
+        "net_amount": str(tx.net_amount),
+        "before_balance": before_balance,
+        "after_balance": after_balance,
+        "status": tx.status,
+        "approval_status": tx.approval_status,
+        "created_by": _admin_name(getattr(tx, "created_by", None)),
+        "approved_by": _admin_name(getattr(tx, "approved_by", None)),
+        "created_at": tx.created_at,
+        "updated_at": tx.updated_at,
+        "approved_at": tx.approved_at,
+        "payment_gateway_reference": tx.payment_gateway_reference,
+        "utr_number": tx.utr_number,
+        "reference_id": tx.reference_id,
+        "legacy_wallet_transaction_id": tx.legacy_wallet_transaction_id,
+        "remarks": tx.remarks,
+        "metadata": meta,
+        "linked_transaction_flow": _money_flow_steps(tx, entries),
+        "ledger_entries": [_entry_payload(e) for e in entries] if include_entries else [],
+    }
+
+
+def _money_flow_steps(tx, entries=None):
+    meta = tx.metadata or {}
+    category = str(tx.category or "")
+    steps = []
+    if category == "PACKAGE_PURCHASE":
+        steps = ["Package Purchase", "Sponsor Commission", "Level Bonus", "Wallet Credit", "Withdrawal", "Settlement"]
+    elif category in {"MLM_INCOME", "SPONSOR_INCOME", "MATRIX_INCOME", "REWARD_DISTRIBUTION", "FRANCHISE_REWARD"}:
+        steps = ["Source Event", "MLM Rule", "Payout Calculation", "Wallet Credit", "Withdrawal Eligibility"]
+    elif category == "WITHDRAWAL":
+        steps = ["Withdrawal Request", "Approval", "Wallet Debit", "Payout Reference", "Settlement"]
+    elif category in {"VOUCHER_CREATE", "VOUCHER_REDEEM"}:
+        steps = ["Voucher Created", "Wallet Hold/Debit", "Redemption", "Wallet Credit/Refund", "Expiry Review"]
+    elif category == "ADD_MONEY":
+        steps = ["Payment Proof", "Admin Approval", "Wallet Credit", "Ledger Reconcile"]
+    else:
+        steps = ["Transaction Created", "Ledger Posting", "Balance Updated", "Reconciliation"]
+    return [
+        {
+            "label": label,
+            "status": "completed" if tx.status in {"COMPLETED", "REVERSED"} else ("failed" if tx.status == "FAILED" else "pending"),
+            "reference": tx.transaction_ref if index == 0 else (meta.get("flow_id") or tx.flow_id or tx.reference_id or ""),
+        }
+        for index, label in enumerate(steps)
+    ]
+
+
+def _finance_filtered_queryset(request, user_id=None):
+    qs = (
+        FinancialTransaction.objects
+        .select_related("user", "created_by", "approved_by")
+        .prefetch_related(
+            Prefetch(
+                "ledger_entries",
+                queryset=LedgerEntry.objects.select_related("wallet_account", "user").order_by("id"),
+                to_attr="prefetched_ledger_entries",
+            )
+        )
+        .order_by("-created_at", "-id")
+    )
+    if user_id is not None:
+        qs = qs.filter(Q(user_id=user_id) | Q(ledger_entries__user_id=user_id)).distinct()
+    q = str(request.query_params.get("q") or "").strip()
+    wallet_type = str(request.query_params.get("wallet_type") or request.query_params.get("source_type") or "").strip()
+    category = str(request.query_params.get("category") or request.query_params.get("type") or "").strip()
+    source_module = str(request.query_params.get("source_module") or "").strip()
+    mlm_income_type = str(request.query_params.get("mlm_income_type") or "").strip()
+    status_filter = str(request.query_params.get("status") or "").strip()
+    package = str(request.query_params.get("package") or "").strip()
+    voucher = str(request.query_params.get("voucher") or "").strip()
+    withdrawal = str(request.query_params.get("withdrawal") or "").strip()
+    if q:
+        qs = qs.filter(
+            Q(transaction_ref__icontains=q) |
+            Q(flow_id__icontains=q) |
+            Q(source_id__icontains=q) |
+            Q(reference_id__icontains=q) |
+            Q(utr_number__icontains=q) |
+            Q(user__username__icontains=q) |
+            Q(user__prefixed_id__icontains=q)
+        )
+    if wallet_type:
+        qs = qs.filter(ledger_entries__wallet_account__wallet_type=wallet_type).distinct()
+    if category:
+        qs = qs.filter(category=category)
+    if source_module:
+        qs = qs.filter(source_module__icontains=source_module)
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+    if mlm_income_type:
+        qs = qs.filter(category__in=["MLM_INCOME", "SPONSOR_INCOME", "MATRIX_INCOME", "REWARD_DISTRIBUTION"])
+    if package:
+        qs = qs.filter(Q(source_module__icontains="PACKAGE") | Q(source_id__icontains=package))
+    if voucher:
+        qs = qs.filter(Q(source_module__icontains="VOUCHER") | Q(reference_id__icontains=voucher))
+    if withdrawal:
+        qs = qs.filter(Q(source_module__icontains="WITHDRAWAL") | Q(reference_id__icontains=withdrawal) | Q(source_id__icontains=withdrawal))
+    date_from = request.query_params.get("date_from")
+    date_to = request.query_params.get("date_to")
+    if date_from:
+        qs = qs.filter(created_at__date__gte=date_from)
+    if date_to:
+        qs = qs.filter(created_at__date__lte=date_to)
+    return qs
+
+
+def _paginate(request, qs, *, default_page_size=50, max_page_size=200):
+    try:
+        page = max(1, int(request.query_params.get("page") or 1))
+        page_size = min(max_page_size, max(1, int(request.query_params.get("page_size") or default_page_size)))
+    except Exception:
+        page, page_size = 1, default_page_size
+    total = qs.count()
+    start = (page - 1) * page_size
+    return page, page_size, total, qs[start:start + page_size]
+
+
+def _csv_response(filename, headers, rows):
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    writer = csv.writer(response)
+    writer.writerow(headers)
+    for row in rows:
+        writer.writerow(row)
+    return response
+
+
 def _voucher_payload(v):
     return {
         "id": v.id,
@@ -1374,39 +1571,118 @@ class AdminWalletDetailView(APIView):
         user = CustomUser.objects.filter(pk=user_id).first()
         if not user:
             return Response({"detail": "User not found."}, status=404)
-        return Response(_wallet_summary_payload(user))
+        payload = _wallet_summary_payload(user)
+        accounts = list(WalletAccount.objects.filter(user=user).order_by("wallet_type"))
+        account_ids = [a.id for a in accounts]
+        entry_totals = {
+            row["wallet_account_id"]: row
+            for row in (
+                LedgerEntry.objects
+                .filter(wallet_account_id__in=account_ids)
+                .values("wallet_account_id")
+                .annotate(
+                    total_credits=Sum("amount", filter=Q(direction="CREDIT")),
+                    total_debits=Sum("amount", filter=Q(direction="DEBIT")),
+                )
+            )
+        }
+        payload["finance_accounts"] = [
+            {
+                "id": account.id,
+                "wallet_type": account.wallet_type,
+                "current_balance": str(account.current_balance),
+                "available_balance": str(account.available_balance),
+                "locked_balance": str(account.locked_balance),
+                "pending_balance": str(account.pending_balance),
+                "total_credits": str(Decimal(str(entry_totals.get(account.id, {}).get("total_credits") or "0.00")).quantize(Decimal("0.01"))),
+                "total_debits": str(Decimal(str(entry_totals.get(account.id, {}).get("total_debits") or "0.00")).quantize(Decimal("0.01"))),
+                "status": account.status,
+                "updated_at": account.updated_at,
+            }
+            for account in accounts
+        ]
+        category_rows = (
+            FinancialTransaction.objects
+            .filter(Q(user=user) | Q(ledger_entries__user=user))
+            .values("category")
+            .annotate(total=Sum("net_amount"), count=Count("id", distinct=True))
+            .order_by("category")
+        )
+        payload["income_breakdown"] = [
+            {"category": row["category"], "total": str(row["total"] or "0.00"), "count": row["count"]}
+            for row in category_rows
+        ]
+        payload["transaction_timeline"] = [
+            _finance_tx_payload(tx, include_entries=True)
+            for tx in _finance_filtered_queryset(request, user_id=user_id)[:25]
+        ]
+        payload["audit_timeline"] = [
+            {
+                "id": a.id,
+                "actor": _admin_name(getattr(a, "actor_user", None)),
+                "action": a.action,
+                "module": a.resource_type,
+                "reference_id": a.resource_id,
+                "ip_address": a.ip_address,
+                "device": a.user_agent,
+                "created_at": a.created_at,
+            }
+            for a in AuditLog.objects.select_related("actor_user").filter(
+                Q(actor_user=user) | Q(resource_id=str(user.id))
+            ).order_by("-created_at", "-id")[:25]
+        ]
+        return Response(payload)
 
 
 class AdminWalletLedgerView(APIView):
     permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
 
     def get(self, request, user_id: int | None = None):
-        qs = WalletTransaction.objects.select_related("user").order_by("-created_at", "-id")
-        if user_id is not None:
-            qs = qs.filter(user_id=user_id)
-        q = str(request.query_params.get("q") or "").strip()
-        tx_type = str(request.query_params.get("type") or "").strip()
-        source_type = str(request.query_params.get("source_type") or "").strip()
-        if q:
-            qs = qs.filter(Q(user__username__icontains=q) | Q(user__prefixed_id__icontains=q) | Q(source_id__icontains=q))
-        if tx_type:
-            qs = qs.filter(type=tx_type)
-        if source_type:
-            qs = qs.filter(source_type=source_type)
-        date_from = request.query_params.get("date_from")
-        date_to = request.query_params.get("date_to")
-        if date_from:
-            qs = qs.filter(created_at__date__gte=date_from)
-        if date_to:
-            qs = qs.filter(created_at__date__lte=date_to)
-        try:
-            page = max(1, int(request.query_params.get("page") or 1))
-            page_size = min(200, max(1, int(request.query_params.get("page_size") or 50)))
-        except Exception:
-            page, page_size = 1, 50
-        total = qs.count()
-        start = (page - 1) * page_size
-        return Response({"count": total, "page": page, "page_size": page_size, "results": [_tx_payload(x) for x in qs[start:start + page_size]]})
+        if str(request.query_params.get("legacy") or "").lower() in {"1", "true", "yes"}:
+            qs = WalletTransaction.objects.select_related("user").order_by("-created_at", "-id")
+            if user_id is not None:
+                qs = qs.filter(user_id=user_id)
+            q = str(request.query_params.get("q") or "").strip()
+            tx_type = str(request.query_params.get("type") or "").strip()
+            source_type = str(request.query_params.get("source_type") or "").strip()
+            if q:
+                qs = qs.filter(Q(user__username__icontains=q) | Q(user__prefixed_id__icontains=q) | Q(source_id__icontains=q))
+            if tx_type:
+                qs = qs.filter(type=tx_type)
+            if source_type:
+                qs = qs.filter(source_type=source_type)
+            page, page_size, total, rows = _paginate(request, qs)
+            return Response({"count": total, "page": page, "page_size": page_size, "results": [_tx_payload(x) for x in rows]})
+
+        qs = _finance_filtered_queryset(request, user_id=user_id)
+        if str(request.query_params.get("export") or "").lower() == "csv":
+            rows = [_finance_tx_payload(x, include_entries=True) for x in qs[:10000]]
+            return _csv_response(
+                "finance-ledger.csv",
+                ["transaction_id", "user", "wallet_type", "category", "source_module", "gross_amount", "service_charge", "gst", "tds", "net_amount", "status", "created_by", "approved_by", "created_at", "reference_id"],
+                [
+                    [
+                        row.get("transaction_ref"),
+                        row.get("username"),
+                        row.get("wallet_type"),
+                        row.get("category"),
+                        row.get("source_module"),
+                        row.get("gross_amount"),
+                        row.get("service_charge"),
+                        row.get("gst_amount"),
+                        row.get("tds_amount"),
+                        row.get("net_amount"),
+                        row.get("status"),
+                        row.get("created_by"),
+                        row.get("approved_by"),
+                        row.get("created_at"),
+                        row.get("reference_id"),
+                    ]
+                    for row in rows
+                ],
+            )
+        page, page_size, total, rows = _paginate(request, qs)
+        return Response({"count": total, "page": page, "page_size": page_size, "results": [_finance_tx_payload(x, include_entries=True) for x in rows]})
 
 
 class AdminWalletAdjustPocketView(APIView):
@@ -1750,6 +2026,217 @@ class AdminWalletReconcileView(APIView):
         })
 
 
+class AdminFinanceOverviewView(APIView):
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
+
+    def get(self, request):
+        today = timezone.now().date()
+        month_start = today.replace(day=1)
+        tx = FinancialTransaction.objects.all()
+        today_tx = tx.filter(created_at__date=today)
+        month_tx = tx.filter(created_at__date__gte=month_start)
+        withdrawals = WithdrawalRequest.objects.all()
+        vouchers = ConsumerVoucher.objects.all()
+        risk = _risk_alerts()
+        data = {
+            "transaction_volume": str(tx.aggregate(total=Sum("gross_amount")).get("total") or "0.00"),
+            "today_volume": str(today_tx.aggregate(total=Sum("gross_amount")).get("total") or "0.00"),
+            "month_volume": str(month_tx.aggregate(total=Sum("gross_amount")).get("total") or "0.00"),
+            "pending_withdrawals": withdrawals.filter(status="pending").count(),
+            "failed_transactions": tx.filter(status="FAILED").count(),
+            "mlm_payout_volume": str(tx.filter(category__in=["MLM_INCOME", "SPONSOR_INCOME", "MATRIX_INCOME", "REWARD_DISTRIBUTION"]).aggregate(total=Sum("net_amount")).get("total") or "0.00"),
+            "voucher_activity": vouchers.count(),
+            "tax_collected": str(tx.aggregate(total=Sum("gst_amount")).get("total") or "0.00"),
+            "tds_deducted": str(tx.aggregate(total=Sum("tds_amount")).get("total") or "0.00"),
+            "company_revenue": str(tx.aggregate(total=Sum("charges_amount")).get("total") or "0.00"),
+            "active_users": CustomUser.objects.filter(account_active=True).count(),
+            "suspicious_activity_alerts": len(risk),
+            "alerts": risk[:8],
+        }
+        return Response(data)
+
+
+class AdminFinanceTaxDashboardView(APIView):
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
+
+    def get(self, request):
+        period = str(request.query_params.get("period") or "daily").lower()
+        if period == "yearly":
+            trunc = TruncYear("created_at")
+        elif period == "monthly":
+            trunc = TruncMonth("created_at")
+        else:
+            trunc = TruncDate("created_at")
+        qs = _finance_filtered_queryset(request).order_by()
+        rows = (
+            qs.annotate(period_bucket=trunc).values("period_bucket")
+            .annotate(
+                gross_amount=Sum("gross_amount"),
+                service_charge=Sum("charges_amount"),
+                gst_amount=Sum("gst_amount"),
+                tds_amount=Sum("tds_amount"),
+                net_amount=Sum("net_amount"),
+                transfer_charges=Sum("charges_amount", filter=Q(category="WALLET_TRANSFER")),
+                withdrawal_charges=Sum("charges_amount", filter=Q(category="WITHDRAWAL")),
+                voucher_fees=Sum("charges_amount", filter=Q(category__in=["VOUCHER_CREATE", "VOUCHER_REDEEM"])),
+                package_charges=Sum("charges_amount", filter=Q(category="PACKAGE_PURCHASE")),
+                count=Count("id"),
+            )
+            .order_by("-period_bucket")[:370]
+        )
+        summary = qs.aggregate(
+            gross_amount=Sum("gross_amount"),
+            service_charge=Sum("charges_amount"),
+            gst_amount=Sum("gst_amount"),
+            tds_amount=Sum("tds_amount"),
+            net_amount=Sum("net_amount"),
+            platform_revenue=Sum("charges_amount"),
+        )
+        if str(request.query_params.get("export") or "").lower() == "csv":
+            return _csv_response(
+                "tax-service-charge-summary.csv",
+                ["period", "gross_amount", "service_charge", "gst_amount", "tds_amount", "net_amount", "transfer_charges", "withdrawal_charges", "voucher_fees", "package_charges", "count"],
+                [
+                    [
+                        row.get("period_bucket"),
+                        row.get("gross_amount") or "0.00",
+                        row.get("service_charge") or "0.00",
+                        row.get("gst_amount") or "0.00",
+                        row.get("tds_amount") or "0.00",
+                        row.get("net_amount") or "0.00",
+                        row.get("transfer_charges") or "0.00",
+                        row.get("withdrawal_charges") or "0.00",
+                        row.get("voucher_fees") or "0.00",
+                        row.get("package_charges") or "0.00",
+                        row.get("count") or 0,
+                    ]
+                    for row in rows
+                ],
+            )
+        return Response({
+            "period": period,
+            "summary": {k: str(v or "0.00") for k, v in summary.items()},
+            "results": [
+                {("period" if k == "period_bucket" else k): (str(v or "0.00") if k not in {"period_bucket", "count"} else v) for k, v in row.items()}
+                for row in rows
+            ],
+        })
+
+
+def _risk_alerts():
+    alerts = []
+    recent = timezone.now() - timedelta(days=7)
+    duplicate_utrs = (
+        WalletUploadRequest.objects
+        .filter(requested_at__gte=recent)
+        .exclude(utr="")
+        .values("utr")
+        .annotate(count=Count("id"))
+        .filter(count__gt=1)
+        [:10]
+    )
+    for row in duplicate_utrs:
+        alerts.append({"type": "DUPLICATE_UTR", "severity": "high", "message": f"Duplicate UTR uploaded {row.get('utr')}", "count": row["count"]})
+    duplicate_withdrawals = (
+        WithdrawalRequest.objects
+        .filter(requested_at__gte=recent)
+        .values("user_id", "amount", "status")
+        .annotate(count=Count("id"))
+        .filter(count__gt=1)[:10]
+    )
+    for row in duplicate_withdrawals:
+        alerts.append({"type": "DUPLICATE_WITHDRAWAL", "severity": "medium", "message": f"Repeated withdrawal user #{row['user_id']} amount {row['amount']}", "count": row["count"]})
+    high_frequency = (
+        WalletTransaction.objects
+        .filter(created_at__gte=timezone.now() - timedelta(hours=24))
+        .values("user_id")
+        .annotate(count=Count("id"), volume=Sum("amount"))
+        .filter(count__gte=15)[:10]
+    )
+    for row in high_frequency:
+        alerts.append({"type": "HIGH_FREQUENCY_WALLET_MOVEMENT", "severity": "medium", "message": f"High wallet activity for user #{row['user_id']}", "count": row["count"], "volume": str(row.get("volume") or "0.00")})
+    duplicate_vouchers = (
+        ConsumerVoucher.objects
+        .values("code")
+        .annotate(count=Count("id"))
+        .filter(count__gt=1)[:10]
+    )
+    for row in duplicate_vouchers:
+        alerts.append({"type": "DUPLICATE_VOUCHER_CODE", "severity": "high", "message": f"Duplicate voucher code {row['code']}", "count": row["count"]})
+    return alerts
+
+
+class AdminFinanceRiskView(APIView):
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
+
+    def get(self, request):
+        return Response({"count": len(_risk_alerts()), "results": _risk_alerts()})
+
+
+class AdminFinanceFlowView(APIView):
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
+
+    def get(self, request, transaction_ref: str):
+        tx = (
+            FinancialTransaction.objects
+            .select_related("user", "created_by", "approved_by")
+            .prefetch_related(Prefetch("ledger_entries", queryset=LedgerEntry.objects.select_related("wallet_account", "user").order_by("id"), to_attr="prefetched_ledger_entries"))
+            .filter(Q(transaction_ref=transaction_ref) | Q(flow_id=transaction_ref) | Q(reference_id=transaction_ref))
+            .first()
+        )
+        if not tx:
+            return Response({"detail": "Transaction flow not found."}, status=404)
+        related_query = Q(reference_id=tx.transaction_ref)
+        if tx.flow_id:
+            related_query |= Q(flow_id=tx.flow_id)
+        if tx.source_id:
+            related_query |= Q(source_id=tx.source_id)
+        related = FinancialTransaction.objects.filter(related_query).exclude(id=tx.id).select_related("user").order_by("created_at", "id")[:50]
+        return Response({
+            "transaction": _finance_tx_payload(tx, include_entries=True),
+            "nodes": _money_flow_steps(tx, getattr(tx, "prefetched_ledger_entries", [])),
+            "related_transactions": [_finance_tx_payload(row, include_entries=True) for row in related],
+        })
+
+
+class AdminAuditTimelineView(APIView):
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
+
+    def get(self, request):
+        qs = AuditLog.objects.select_related("actor_user").order_by("-created_at", "-id")
+        q = str(request.query_params.get("q") or "").strip()
+        module = str(request.query_params.get("module") or "").strip()
+        action = str(request.query_params.get("action") or "").strip()
+        if q:
+            qs = qs.filter(Q(actor_user__username__icontains=q) | Q(resource_id__icontains=q) | Q(resource_type__icontains=q) | Q(action__icontains=q))
+        if module:
+            qs = qs.filter(resource_type__icontains=module)
+        if action:
+            qs = qs.filter(action__icontains=action)
+        page, page_size, total, rows = _paginate(request, qs, default_page_size=50, max_page_size=100)
+        return Response({
+            "count": total,
+            "page": page,
+            "page_size": page_size,
+            "results": [
+                {
+                    "id": row.id,
+                    "actor": _admin_name(getattr(row, "actor_user", None)),
+                    "actor_user_id": row.actor_user_id,
+                    "action": row.action,
+                    "module": row.resource_type,
+                    "reference_id": row.resource_id,
+                    "before_json": row.before_json,
+                    "after_json": row.after_json,
+                    "ip_address": row.ip_address,
+                    "device": row.user_agent,
+                    "created_at": row.created_at,
+                }
+                for row in rows
+            ],
+        })
+
+
 class AdminECouponBulkCreateView(APIView):
     """
     Bulk-generate E-Coupons with prefix (default 'ELC') and sequential serials.
@@ -1990,9 +2477,29 @@ class AdminKYCList(ListAPIView):
         user_q = (self.request.query_params.get("user") or "").strip()
         state_id = (self.request.query_params.get("state") or "").strip()
         pincode = (self.request.query_params.get("pincode") or "").strip()
+        category = (self.request.query_params.get("category") or "").strip()
+        audience = (self.request.query_params.get("audience") or "").strip().lower()
         date_from = (self.request.query_params.get("date_from") or "").strip()
         date_to = (self.request.query_params.get("date_to") or "").strip()
         ordering = (self.request.query_params.get("ordering") or "-updated_at").strip()
+
+        if audience == "franchise":
+            qs = qs.filter(user__category__in=[
+                "agency_state_coordinator",
+                "agency_state",
+                "agency_district_coordinator",
+                "agency_district",
+                "agency_pincode_coordinator",
+                "agency_pincode",
+            ])
+        elif audience == "consumer":
+            qs = qs.filter(user__category="consumer")
+
+        if category:
+            c_key = str(category).strip().lower().replace(" ", "_").replace("-", "_")
+            if "cordinator" in c_key:
+                c_key = c_key.replace("cordinator", "coordinator")
+            qs = qs.filter(user__category__iexact=c_key)
 
         if status_in == "pending":
             qs = qs.filter(verified=False)

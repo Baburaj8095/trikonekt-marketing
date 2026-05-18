@@ -73,17 +73,19 @@ export default function AdminWalletCommandCenter() {
   const [uploadRows, setUploadRows] = useState([]);
   const [voucherData, setVoucherData] = useState({ results: [], count: 0 });
   const [reconcile, setReconcile] = useState({ results: [], mismatches: 0 });
+  const [financeOverview, setFinanceOverview] = useState(null);
 
   async function load() {
     setLoading(true);
     setErr("");
     try {
-      const [wallets, withdrawals, uploads, vouchers, rec] = await Promise.allSettled([
+      const [wallets, withdrawals, uploads, vouchers, rec, overview] = await Promise.allSettled([
         API.get("/admin/wallets/", { params: { page_size: 50 }, dedupe: "cancelPrevious" }),
         API.get("/admin/withdrawals/", { params: { status: "pending", page_size: 50 }, dedupe: "cancelPrevious" }),
         adminListWalletUploadRequests({ status: "PENDING" }),
         API.get("/admin/wallet-vouchers/", { params: { page_size: 50 }, dedupe: "cancelPrevious" }),
         API.get("/admin/wallets/reconcile/", { params: { limit: 100 }, dedupe: "cancelPrevious" }),
+        API.get("/admin/finance/overview/", { dedupe: "cancelPrevious" }),
       ]);
 
       if (wallets.status === "fulfilled") setWalletRows(wallets.value?.data?.results || []);
@@ -91,6 +93,7 @@ export default function AdminWalletCommandCenter() {
       if (uploads.status === "fulfilled") setUploadRows(Array.isArray(uploads.value) ? uploads.value : []);
       if (vouchers.status === "fulfilled") setVoucherData(vouchers.value?.data || { results: [] });
       if (rec.status === "fulfilled") setReconcile(rec.value?.data || { results: [], mismatches: 0 });
+      if (overview.status === "fulfilled") setFinanceOverview(overview.value?.data || null);
     } catch (e) {
       setErr(e?.response?.data?.detail || "Failed to load wallet command center.");
     } finally {
@@ -120,8 +123,13 @@ export default function AdminWalletCommandCenter() {
       pendingUploadAmount: sumRows(uploadRows, (row) => row.amount),
       activeVouchers: (voucherData?.results || []).filter((row) => row.status === "ACTIVE").length,
       voucherCount: countFrom(voucherData),
+      transactionVolume: financeOverview?.transaction_volume,
+      mlmPayoutVolume: financeOverview?.mlm_payout_volume,
+      taxCollected: financeOverview?.tax_collected,
+      companyRevenue: financeOverview?.company_revenue,
+      riskAlerts: financeOverview?.suspicious_activity_alerts,
     };
-  }, [uploadRows, voucherData, walletRows, withdrawalRows]);
+  }, [financeOverview, uploadRows, voucherData, walletRows, withdrawalRows]);
 
   return (
     <Box sx={{ p: { xs: 1, md: 2 }, maxWidth: 1440, mx: "auto" }}>
@@ -147,10 +155,10 @@ export default function AdminWalletCommandCenter() {
         <MetricCard label="Pending Withdrawals" value={`Rs. ${money(totals.pendingWithdrawalAmount)}`} hint={`${withdrawalRows.length} requests awaiting action`} tone={withdrawalRows.length ? "warning" : "success"} />
         <MetricCard label="Pending Add Money" value={`Rs. ${money(totals.pendingUploadAmount)}`} hint={`${uploadRows.length} upload approvals`} tone={uploadRows.length ? "warning" : "success"} />
         <MetricCard label="Reconciliation Mismatches" value={Number(reconcile?.mismatches || 0)} hint="Stored balance vs ledger checks" tone={reconcile?.mismatches ? "danger" : "success"} />
-        <MetricCard label="Coupon Pocket" value={`Rs. ${money(totals.coupon)}`} hint="Coupon Wallet exposure" />
-        <MetricCard label="Self Package Pocket" value={`Rs. ${money(totals.selfPackage)}`} hint="Package purchase wallet exposure" />
-        <MetricCard label="Withdrawal Wallet" value={`Rs. ${money(totals.withdrawal)}`} hint="Withdrawable balance exposure" />
-        <MetricCard label="Active Vouchers" value={totals.activeVouchers} hint={`${totals.voucherCount} vouchers in current view`} />
+        <MetricCard label="MLM Payout Volume" value={`Rs. ${money(totals.mlmPayoutVolume)}`} hint="Sponsor, level, matrix, and reward finance ledger" />
+        <MetricCard label="GST / Tax Collected" value={`Rs. ${money(totals.taxCollected)}`} hint="Structured GST finance fields" />
+        <MetricCard label="Company Revenue" value={`Rs. ${money(totals.companyRevenue)}`} hint="Service charge and fee summary" />
+        <MetricCard label="Risk Alerts" value={Number(totals.riskAlerts || 0)} hint="Duplicate and velocity monitoring" tone={totals.riskAlerts ? "warning" : "success"} />
       </Box>
 
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2, 1fr)", xl: "repeat(3, 1fr)" }, gap: 1.5 }}>

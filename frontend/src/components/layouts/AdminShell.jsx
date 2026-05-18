@@ -260,7 +260,7 @@ export default function AdminShell({ children }) {
         key: "user",
         label: "User Management",
         items: [
-          { to: "/admin/users", label: "Users", icon: "users" },
+          { to: "/admin/users", label: "Team Consumers", icon: "users" },
           { to: "/admin/user-tree", label: "Genealogy", icon: "tree" },
         ],
       },
@@ -458,6 +458,7 @@ export default function AdminShell({ children }) {
         key: "franchise",
         label: "Franchise",
         items: [
+          { to: "/admin/franchise/dashboard", label: "Franchise Dashboard", icon: "dashboard" },
           { to: "/admin/franchise/achievers", label: "Achievers", icon: "users" },
           { to: "/admin/franchise/wishing-banners", label: "Wishing Banners", icon: "box" },
         ],
@@ -500,11 +501,9 @@ export default function AdminShell({ children }) {
 
     out.push({ to: "/admin/dashboard", label: "Dashboard", icon: "dashboard" });
 
-    // Quick user-category bifurcation (requested): each links to AdminUsers with query params.
-    // AdminUsers already reads URLSearchParams(role/category) and applies server-side filters.
-    out.push({ type: "section", label: "Users — Quick Filters", collapsible: true, groupChildren: true });
-    out.push({ to: "/admin/users", label: "All Users", icon: "users" });
-    out.push({ to: "/admin/users?category=consumer", label: "Consumers", icon: "users" });
+    // AdminUsers is consumer-only. Franchise/agency admin gets a separate flow.
+    out.push({ type: "section", label: "Team Consumer", collapsible: true, groupChildren: true });
+    out.push({ to: "/admin/users", label: "Team Consumers", icon: "users" });
     // out.push({ to: "/admin/users?category=merchant", label: "Business / Merchant", icon: "briefcase" });
     // out.push({ to: "/admin/users?category=employee", label: "Sarathi / Employee", icon: "users" });
     // out.push({ to: "/admin/users?category=agency_state_coordinator", label: "Agency: State Coordinator", icon: "users" });

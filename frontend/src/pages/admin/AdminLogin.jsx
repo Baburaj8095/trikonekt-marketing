@@ -29,6 +29,16 @@ function clearTokens() {
 export default function AdminLogin() {
   const navigate = useNavigate();
   const location = useLocation();
+  const initialWorkspace = (() => {
+    try {
+      const params = new URLSearchParams(location.search || "");
+      const mode = String(params.get("workspace") || params.get("mode") || "").toLowerCase();
+      const fromPath = String(location.state?.from?.pathname || "");
+      if (mode === "franchise" || fromPath.startsWith("/admin/franchise")) return "franchise";
+    } catch (_) {}
+    return "team";
+  })();
+  const [workspace, setWorkspace] = useState(initialWorkspace);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
@@ -90,9 +100,10 @@ export default function AdminLogin() {
   }
 
   function navigateAfterLogin() {
-    const redirectTo =
-      (location.state && location.state.from && location.state.from.pathname) ||
-      "/admin/dashboard";
+    const fromPath = location.state && location.state.from && location.state.from.pathname;
+    const fromSearch = location.state && location.state.from && location.state.from.search;
+    const fallback = workspace === "franchise" ? "/admin/franchise/dashboard" : "/admin/dashboard";
+    const redirectTo = fromPath && fromPath !== "/admin/login" ? `${fromPath}${fromSearch || ""}` : fallback;
     navigate(redirectTo, { replace: true });
   }
 
@@ -296,7 +307,7 @@ export default function AdminLogin() {
         <div style={{ marginBottom: 16 }}>
           <h2 style={{ margin: 0, color: "#0f172a" }}>Admin Login</h2>
           <div style={{ color: "#64748b", fontSize: 13 }}>
-            Sign in with an Admin/Staff account to access the Admin Panel.
+            Choose a workspace, then sign in with an Admin/Staff account.
           </div>
         </div>
 
@@ -318,6 +329,45 @@ export default function AdminLogin() {
 
         <form onSubmit={handleSubmit}>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "grid", gap: 8 }}>
+              <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>Admin workspace</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                {[
+                  {
+                    id: "team",
+                    title: "Team Consumer",
+                    body: "Users, MLM, rewards, wallets",
+                  },
+                  {
+                    id: "franchise",
+                    title: "Franchise",
+                    body: "State, district, pincode flow",
+                  },
+                ].map((option) => {
+                  const active = workspace === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setWorkspace(option.id)}
+                      style={{
+                        textAlign: "left",
+                        padding: "10px 11px",
+                        borderRadius: 10,
+                        border: active ? "1px solid #0f172a" : "1px solid #e2e8f0",
+                        background: active ? "#0f172a" : "#fff",
+                        color: active ? "#fff" : "#0f172a",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <div style={{ fontSize: 13, fontWeight: 900 }}>{option.title}</div>
+                      <div style={{ marginTop: 3, fontSize: 11, color: active ? "#cbd5e1" : "#64748b", lineHeight: 1.25 }}>{option.body}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <label style={{ fontSize: 12, color: "#64748b" }}>
                 Phone or Username

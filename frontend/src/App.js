@@ -32,7 +32,11 @@ import EmployeeDailyReport from "./pages/reports/EmployeeDailyReport";
 import AgencyDailyReport from "./pages/reports/AgencyDailyReport";
 import AdminProtectedRoute from "./components/AdminProtectedRoute";
 import AdminShell from "./components/layouts/AdminShell";
+import AdminFranchiseShell from "./components/layouts/AdminFranchiseShell";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminFranchiseDashboard from "./pages/admin/AdminFranchiseDashboard";
+import AdminFranchiseUsers from "./pages/admin/AdminFranchiseUsers";
+import AdminFranchisePlaceholder from "./pages/admin/AdminFranchisePlaceholder";
 import AdminUserTree from "./pages/admin/AdminUserTree";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminMerchants from "./pages/admin/AdminMerchants";
@@ -1206,6 +1210,66 @@ function App() {
         />
         {/* Admin Routes */}
         <Route
+          path="/admin/franchise"
+          element={
+            <AdminProtectedRoute>
+              <AdminFranchiseShell>
+                <Navigate to="/admin/franchise/dashboard" replace />
+              </AdminFranchiseShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/franchise/dashboard"
+          element={
+            <AdminProtectedRoute>
+              <AdminFranchiseShell>
+                <AdminFranchiseDashboard />
+              </AdminFranchiseShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/franchise/users"
+          element={
+            <AdminProtectedRoute>
+              <AdminFranchiseShell>
+                <AdminFranchiseUsers />
+              </AdminFranchiseShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/franchise/wallets"
+          element={
+            <AdminProtectedRoute>
+              <AdminFranchiseShell>
+                <AdminWallets />
+              </AdminFranchiseShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/franchise/withdrawals"
+          element={
+            <AdminProtectedRoute>
+              <AdminFranchiseShell>
+                <AdminWithdrawals />
+              </AdminFranchiseShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/franchise/kyc"
+          element={
+            <AdminProtectedRoute>
+              <AdminFranchiseShell>
+                <AdminKYC audience="franchise" />
+              </AdminFranchiseShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/dashboard"
           element={
             <AdminProtectedRoute>
@@ -1271,9 +1335,9 @@ function App() {
           path="/admin/franchise/achievers"
           element={
             <AdminProtectedRoute>
-              <AdminShell>
+              <AdminFranchiseShell>
                 <AdminFranchiseAchievers />
-              </AdminShell>
+              </AdminFranchiseShell>
             </AdminProtectedRoute>
           }
         />
@@ -1281,9 +1345,19 @@ function App() {
           path="/admin/franchise/wishing-banners"
           element={
             <AdminProtectedRoute>
-              <AdminShell>
+              <AdminFranchiseShell>
                 <AdminFranchiseWishingBanners />
-              </AdminShell>
+              </AdminFranchiseShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/franchise/:module"
+          element={
+            <AdminProtectedRoute>
+              <AdminFranchiseShell>
+                <AdminFranchisePlaceholder />
+              </AdminFranchiseShell>
             </AdminProtectedRoute>
           }
         />

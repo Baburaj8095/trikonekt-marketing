@@ -10,7 +10,9 @@ function money(v) {
 export default function AdminWalletReconcile() {
   const [q, setQ] = useState("");
   const [rows, setRows] = useState([]);
+  const [financeRows, setFinanceRows] = useState([]);
   const [mismatches, setMismatches] = useState(0);
+  const [financeMismatches, setFinanceMismatches] = useState(0);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
@@ -21,6 +23,8 @@ export default function AdminWalletReconcile() {
       const res = await API.get("/admin/wallets/reconcile/", { params: { q, limit: 200 } });
       setRows(res?.data?.results || []);
       setMismatches(res?.data?.mismatches || 0);
+      setFinanceRows(res?.data?.finance_ledger?.results || []);
+      setFinanceMismatches(res?.data?.finance_ledger?.mismatches || 0);
     } catch (e) {
       setErr(e?.response?.data?.detail || "Failed to reconcile wallets");
     } finally {
@@ -39,7 +43,10 @@ export default function AdminWalletReconcile() {
           <Typography variant="h5" sx={{ fontWeight: 900 }}>Wallet Reconcile</Typography>
           <Typography sx={{ color: "#64748b", fontSize: 13 }}>Compares stored wallet balance against ledger transaction totals.</Typography>
         </Box>
-        <Chip label={`${mismatches} mismatches`} color={mismatches ? "error" : "success"} />
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          <Chip label={`${mismatches} legacy mismatches`} color={mismatches ? "error" : "success"} />
+          <Chip label={`${financeMismatches} ledger mismatches`} color={financeMismatches ? "error" : "success"} />
+        </Stack>
       </Stack>
       {err && <Alert severity="error" sx={{ mb: 1 }}>{err}</Alert>}
       {loading && <LinearProgress sx={{ mb: 1 }} />}
@@ -49,7 +56,8 @@ export default function AdminWalletReconcile() {
           <Button variant="contained" onClick={load}>Run</Button>
         </Stack>
       </Paper>
-      <Stack spacing={1}>
+      <Typography sx={{ fontWeight: 900, mb: 1 }}>Wallet Balance Reconciliation</Typography>
+      <Stack spacing={1} sx={{ mb: 2 }}>
         {rows.map((r) => (
           <Paper key={r.user_id} variant="outlined" sx={{ p: 1.25, borderRadius: 2, borderColor: r.status === "OK" ? "#e2e8f0" : "#fca5a5" }}>
             <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={1}>
@@ -61,6 +69,24 @@ export default function AdminWalletReconcile() {
                 <Chip label={`Stored Rs. ${money(r.balance)}`} />
                 <Chip label={`Ledger Rs. ${money(r.ledger_total)}`} />
                 <Chip label={`Diff Rs. ${money(r.balance_vs_ledger_diff)}`} color={r.status === "OK" ? "success" : "error"} />
+              </Stack>
+            </Stack>
+          </Paper>
+        ))}
+      </Stack>
+      <Typography sx={{ fontWeight: 900, mb: 1 }}>Pocket-Level Ledger Reconciliation</Typography>
+      <Stack spacing={1}>
+        {financeRows.map((r) => (
+          <Paper key={r.wallet_account_id} variant="outlined" sx={{ p: 1.25, borderRadius: 2, borderColor: r.status === "OK" ? "#e2e8f0" : "#fca5a5" }}>
+            <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={1}>
+              <Box>
+                <Typography sx={{ fontWeight: 900 }}>{r.username || `User #${r.user_id}`}</Typography>
+                <Typography sx={{ color: "#64748b", fontSize: 12 }}>{r.wallet_type}</Typography>
+              </Box>
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                <Chip label={`Stored Rs. ${money(r.stored_balance)}`} />
+                <Chip label={`Derived Rs. ${money(r.ledger_balance)}`} />
+                <Chip label={`Diff Rs. ${money(r.diff)}`} color={r.status === "OK" ? "success" : "error"} />
               </Stack>
             </Stack>
           </Paper>

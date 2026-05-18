@@ -1153,6 +1153,7 @@ class AdminKYCSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source="user.username", read_only=True)
     full_name = serializers.CharField(source="user.full_name", read_only=True)
     phone = serializers.CharField(source="user.phone", read_only=True)
+    category = serializers.CharField(source="user.category", read_only=True)
     state_name = serializers.SerializerMethodField()
     pincode = serializers.CharField(source="user.pincode", read_only=True)
 
@@ -1163,6 +1164,7 @@ class AdminKYCSerializer(serializers.ModelSerializer):
             "username",
             "full_name",
             "phone",
+            "category",
             "state_name",
             "pincode",
             "bank_name",
