@@ -529,6 +529,13 @@ class AdminUsersList(ListAPIView):
             prefetches.append(Prefetch("wallet_accounts", queryset=WalletAccount.objects.only("user_id", "wallet_type", "current_balance"), to_attr="prefetched_wallet_accounts"))
         if self._needs_package_summary():
             prefetches.append(Prefetch("promo_purchases", queryset=PromoPurchase.objects.select_related("package").filter(status="APPROVED").only("id", "user_id", "package_id", "status", "approved_at", "requested_at", "tri_app_slug", "package__id", "package__code", "package__name", "package__type", "package__price").order_by("-approved_at", "-id"), to_attr="approved_promo_purchases"))
+        prefetches.append(
+            Prefetch(
+                "region_assignments",
+                queryset=AgencyRegionAssignment.objects.select_related("state").order_by("level", "state__name", "district", "pincode"),
+                to_attr="prefetched_agency_assignments",
+            )
+        )
 
         qs = (
             CustomUser.objects

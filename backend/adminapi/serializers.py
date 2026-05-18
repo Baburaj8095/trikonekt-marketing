@@ -115,6 +115,10 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
     monthly_boxes_paid_current = serializers.SerializerMethodField()
     monthly_total_boxes_current = serializers.SerializerMethodField()
     monthly_boxes_remaining_current = serializers.SerializerMethodField()
+    states_assigned = serializers.SerializerMethodField()
+    districts_assigned = serializers.SerializerMethodField()
+    pincodes_assigned = serializers.SerializerMethodField()
+    assigned_regions_summary = serializers.SerializerMethodField()
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -205,7 +209,81 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
             "monthly_total_boxes_current",
             "monthly_boxes_remaining_current",
             "account_active",
+            "states_assigned",
+            "districts_assigned",
+            "pincodes_assigned",
+            "assigned_regions_summary",
         ]
+
+    def _region_assignments(self, obj):
+        try:
+            pref = getattr(obj, "prefetched_agency_assignments", None)
+            if pref is not None:
+                return list(pref or [])
+            return list(
+                AgencyRegionAssignment.objects.select_related("state")
+                .filter(user_id=getattr(obj, "id", None))
+                .order_by("level", "state__name", "district", "pincode")
+            )
+        except Exception:
+            return []
+
+    def get_states_assigned(self, obj):
+        out = []
+        seen = set()
+        for assignment in self._region_assignments(obj):
+            if getattr(assignment, "level", "") != "state":
+                continue
+            state = getattr(assignment, "state", None)
+            sid = getattr(assignment, "state_id", None)
+            if sid and sid not in seen:
+                seen.add(sid)
+                out.append({"id": sid, "name": getattr(state, "name", "") or ""})
+        return out
+
+    def get_districts_assigned(self, obj):
+        out = []
+        seen = set()
+        for assignment in self._region_assignments(obj):
+            if getattr(assignment, "level", "") != "district":
+                continue
+            district = (getattr(assignment, "district", "") or "").strip()
+            state = getattr(assignment, "state", None)
+            key = (getattr(assignment, "state_id", None), district.lower())
+            if district and key not in seen:
+                seen.add(key)
+                out.append({"district": district, "state_id": getattr(assignment, "state_id", None), "state_name": getattr(state, "name", "") or ""})
+        return out
+
+    def get_pincodes_assigned(self, obj):
+        out = []
+        seen = set()
+        for assignment in self._region_assignments(obj):
+            if getattr(assignment, "level", "") != "pincode":
+                continue
+            pincode = (getattr(assignment, "pincode", "") or "").strip()
+            if pincode and pincode not in seen:
+                seen.add(pincode)
+                out.append(pincode)
+        return out
+
+    def get_assigned_regions_summary(self, obj):
+        cat = str(getattr(obj, "category", "") or "").lower()
+        if cat == "agency_state_coordinator":
+            states = [row.get("name") for row in self.get_states_assigned(obj) if row.get("name")]
+            return ", ".join(states)
+        if cat == "agency_district_coordinator":
+            districts = []
+            for row in self.get_districts_assigned(obj):
+                label = row.get("district") or ""
+                if row.get("state_name"):
+                    label = f"{label}, {row.get('state_name')}"
+                if label:
+                    districts.append(label)
+            return ", ".join(districts)
+        if cat == "agency_pincode_coordinator":
+            return ", ".join(self.get_pincodes_assigned(obj))
+        return self.get_state_name(obj)
 
     def get_state_name(self, obj):
         try:

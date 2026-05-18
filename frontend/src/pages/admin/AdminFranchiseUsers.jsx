@@ -61,6 +61,13 @@ export default function AdminFranchiseUsers() {
         renderCell: (params) => <Chip size="small" label={labelFor(params?.row?.category)} />,
       },
       { field: "state_name", headerName: "State", minWidth: 150, flex: 1, valueGetter: (params) => params?.row?.state_name || params?.row?.state || "" },
+      {
+        field: "assigned_regions_summary",
+        headerName: "Assigned Regions",
+        minWidth: 260,
+        flex: 1,
+        renderCell: (params) => params?.row?.assigned_regions_summary || "-",
+      },
       { field: "pincode", headerName: "Pincode", minWidth: 110 },
       {
         field: "account_active",
