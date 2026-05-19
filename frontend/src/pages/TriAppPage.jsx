@@ -108,7 +108,11 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
             borderTopLeftRadius: 16,
             borderTopRightRadius: 16,
             height: "88vh",
+            maxHeight: "calc(100dvh - 24px)",
             p: 2,
+            pb: 3,
+            overflowY: "auto",
+            WebkitOverflowScrolling: "touch",
           },
         }}
       >
@@ -599,7 +603,7 @@ export default function TriAppPage() {
       <Dialog open={paymentSuccessOpen} onClose={() => setPaymentSuccessOpen(false)}>
         <Box sx={{ p: 3, textAlign: "center", minWidth: 280 }}>
           <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>
-            Payment Request Submitted
+            Payment is successful
           </Typography>
           <Typography variant="body2" color="text.secondary">
             We will review it shortly.

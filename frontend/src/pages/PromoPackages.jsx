@@ -76,11 +76,14 @@ const nativeSheetPaperSx = {
   borderTopLeftRadius: 28,
   borderTopRightRadius: 28,
   height: "88vh",
+  maxHeight: "calc(100dvh - 24px)",
   p: { xs: 2, sm: 2.5 },
+  pb: { xs: 3, sm: 3.5 },
   background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
   boxShadow: "0 -22px 60px rgba(15, 23, 42, 0.22)",
   border: "1px solid rgba(226, 232, 240, 0.9)",
-  overflow: "hidden",
+  overflowY: "auto",
+  WebkitOverflowScrolling: "touch",
 };
 
 const primaryPaymentButtonSx = {
@@ -1490,7 +1493,7 @@ export default function PromoPackages({
       <Dialog open={paymentSuccessOpen} onClose={() => setPaymentSuccessOpen(false)}>
         <Box sx={{ p: 3, textAlign: "center", minWidth: 280 }}>
           <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>
-            Payment Request Submitted
+            Payment is successful
           </Typography>
           <Typography variant="body2" color="text.secondary">
             We will review it shortly.
