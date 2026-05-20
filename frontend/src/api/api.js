@@ -549,7 +549,13 @@ API.interceptors.response.use(
     // Attempt to repair mojibake in response payloads (strings and JSON objects)
     try {
       const d = res?.data;
-      if (typeof d === "string") {
+      const isBinary =
+        (typeof Blob !== "undefined" && d instanceof Blob) ||
+        (typeof File !== "undefined" && d instanceof File) ||
+        (typeof ArrayBuffer !== "undefined" && d instanceof ArrayBuffer);
+      if (isBinary) {
+        // Keep downloads intact. Blob/File/ArrayBuffer responses must not be walked as JSON objects.
+      } else if (typeof d === "string") {
         res.data = fixMojibakeString(d);
       } else if (d && typeof d === "object") {
         res.data = deepFixMojibake(d);

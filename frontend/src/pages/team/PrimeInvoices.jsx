@@ -34,6 +34,9 @@ function fmtDate(value) {
 }
 
 function downloadBlob(blob, filename) {
+  if (!(blob instanceof Blob)) {
+    throw new Error("Invoice download did not return a PDF file.");
+  }
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -94,14 +97,15 @@ export default function PrimeInvoices() {
         responseType: "blob",
         timeout: 60000,
       });
-      const contentType = String(res?.headers?.["content-type"] || "");
-      if (contentType.includes("application/json")) {
-        const text = await res.data.text();
+      const blob = res?.data instanceof Blob ? res.data : res instanceof Blob ? res : null;
+      const contentType = String(res?.headers?.["content-type"] || blob?.type || "");
+      if (blob && contentType.includes("application/json")) {
+        const text = await blob.text();
         const parsed = JSON.parse(text || "{}");
         throw new Error(parsed?.detail || "Failed to download invoice.");
       }
       const safeNo = String(row.invoice_number || row.id).replace(/[^\w.-]+/g, "_");
-      downloadBlob(res.data, `Trikonekt_Invoice_${safeNo}.pdf`);
+      downloadBlob(blob, `Trikonekt_Invoice_${safeNo}.pdf`);
     } catch (err) {
       const msg = await readBlobError(err);
       setError(msg || "Failed to download invoice.");
