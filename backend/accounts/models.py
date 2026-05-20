@@ -528,15 +528,15 @@ class Wallet(models.Model):
                 raise ValueError("Insufficient wallet balance.")
             w.save(update_fields=["balance", "updated_at"])
         elif tx_type == "WITHDRAWAL_DEBIT":
-            # Debit specifically from Main Wallet as per new policy
-            new_main = (w.main_balance or D("0")) - amt
-            if new_main < 0:
-                raise ValueError("Insufficient main wallet balance.")
-            w.main_balance = new_main
+            # Debit specifically from the withdrawal pocket.
+            new_wd = (w.withdrawable_balance or D("0")) - amt
+            if new_wd < 0:
+                raise ValueError("Insufficient withdrawal wallet balance.")
+            w.withdrawable_balance = new_wd
             w.balance = (w.balance or D("0")) - amt
             if w.balance < 0:
                 w.balance = D("0")
-            w.save(update_fields=['balance', 'main_balance', 'updated_at'])
+            w.save(update_fields=['balance', 'withdrawable_balance', 'updated_at'])
         else:
             # Generic debit from total; reduce main first
             new_main = (w.main_balance or D("0"))

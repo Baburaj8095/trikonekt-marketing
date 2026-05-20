@@ -5,39 +5,49 @@ import CssBaseline from "@mui/material/CssBaseline";
 /**
  * Global MUI theme
  * - Unifies font
- * - Professional, colorful primary buttons (gradient)
+ * - Fintech-grade mobile-first surfaces and controls
  * - Keeps admin grids/dialogs on clean white surfaces
- * - Light UI background consistent with admin shell
+ * - Light UI background consistent with role shells
  */
 const theme = createTheme({
   palette: {
     mode: "light",
     primary: {
-      main: "#0ea5e9",       // Admin accent (sky blue)
-      dark: "#0284c7",
+      main: "#2563eb",
+      dark: "#1d4ed8",
+      light: "#dbeafe",
       contrastText: "#ffffff",
     },
     secondary: {
-      main: "#a855f7",       // Purple accent for variety
+      main: "#0f766e",
       contrastText: "#ffffff",
     },
     success: {
-      main: "#22c55e",       // Green for gradient blend
+      main: "#16a34a",
+    },
+    warning: {
+      main: "#f59e0b",
+    },
+    error: {
+      main: "#dc2626",
     },
     background: {
-      default: "#f6f8fb",    // Native-app light background
-      paper: "#ffffff",      // Cards/dialogs on white
+      default: "#F5F7FA",
+      paper: "#ffffff",
     },
     text: {
       primary: "#0f172a",
+      secondary: "#64748b",
     },
-    divider: "#e5e7eb",
+    divider: "#e2e8f0",
   },
   typography: {
-    // Professional, readable stack; use Montserrat globally
     fontFamily:
-      'Montserrat, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Noto Sans", "Noto Sans Symbols 2", "Segoe UI Symbol", "Apple Color Emoji", "Segoe UI Emoji"',
+      'Inter, Manrope, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Noto Sans", "Segoe UI Emoji"',
     fontSize: 14,
+    allVariants: {
+      letterSpacing: 0,
+    },
     button: {
       textTransform: "none",
       fontWeight: 700,
@@ -57,8 +67,7 @@ const theme = createTheme({
         },
         body: {
           color: "#0f172a",
-          background:
-            "radial-gradient(circle at 15% -10%, rgba(14,165,233,0.08), transparent 34%), radial-gradient(circle at 92% 0%, rgba(34,197,94,0.07), transparent 30%), #f6f8fb",
+          background: "#F5F7FA",
           WebkitFontSmoothing: "antialiased",
           MozOsxFontSmoothing: "grayscale",
           overscrollBehaviorY: "none",
@@ -96,8 +105,8 @@ const theme = createTheme({
         root: {
           borderRadius: 14,
           fontWeight: 800,
-          minHeight: 46,
-          padding: "10px 16px",
+          minHeight: 44,
+          padding: "9px 16px",
           letterSpacing: 0,
           transition: "transform 140ms ease, box-shadow 180ms ease, background-color 180ms ease",
           "&:active": {
@@ -105,13 +114,12 @@ const theme = createTheme({
           },
         },
         containedPrimary: {
-          // Subtle blue->green gradient for primary actions across the app
-          backgroundImage: "linear-gradient(135deg, #0ea5e9 0%, #22c55e 100%)",
+          backgroundImage: "linear-gradient(135deg, #2563eb 0%, #0f766e 100%)",
           color: "#ffffff",
-          boxShadow: "0 12px 26px rgba(14,165,233,0.24)",
+          boxShadow: "0 12px 24px rgba(37,99,235,0.22)",
           "&:hover": {
-            backgroundImage: "linear-gradient(135deg, #0284c7 0%, #16a34a 100%)",
-            boxShadow: "0 16px 34px rgba(2,132,199,0.28)",
+            backgroundImage: "linear-gradient(135deg, #1d4ed8 0%, #0f766e 100%)",
+            boxShadow: "0 16px 30px rgba(37,99,235,0.26)",
           },
           "&:active": {
             boxShadow: "0 6px 10px rgba(2,132,199,0.22)",
@@ -121,17 +129,17 @@ const theme = createTheme({
           },
         },
         outlinedPrimary: {
-          borderColor: "rgba(14,165,233,0.35)",
-          color: "#0284c7",
+          borderColor: "rgba(37,99,235,0.32)",
+          color: "#1d4ed8",
           "&:hover": {
-            borderColor: "rgba(14,165,233,0.6)",
-            backgroundColor: "rgba(14,165,233,0.08)",
+            borderColor: "rgba(37,99,235,0.58)",
+            backgroundColor: "rgba(37,99,235,0.06)",
           },
         },
         textPrimary: {
-          color: "#0284c7",
+          color: "#1d4ed8",
           "&:hover": {
-            backgroundColor: "rgba(14,165,233,0.08)",
+            backgroundColor: "rgba(37,99,235,0.06)",
           },
         },
       },
@@ -168,6 +176,7 @@ const theme = createTheme({
           "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
             borderColor: "#2563eb",
             borderWidth: 1.5,
+            boxShadow: "0 0 0 4px rgba(37,99,235,0.10)",
           },
           "&.Mui-disabled .MuiOutlinedInput-notchedOutline": {
             borderColor: "#e5e7eb",
@@ -198,7 +207,7 @@ const theme = createTheme({
     MuiPaper: {
       styleOverrides: {
         root: {
-          borderRadius: 18,
+          borderRadius: 16,
           backgroundColor: "#ffffff",
         },
       },
@@ -206,10 +215,10 @@ const theme = createTheme({
     MuiCard: {
       styleOverrides: {
         root: {
-          borderRadius: 18,
+          borderRadius: 16,
           overflow: "hidden",
           transition: "box-shadow 200ms ease, transform 180ms ease, border-color 180ms ease",
-          boxShadow: "0 14px 38px rgba(15,23,42,0.07), 0 1px 2px rgba(15,23,42,0.04)",
+          boxShadow: "0 12px 28px rgba(15,23,42,0.07), 0 1px 2px rgba(15,23,42,0.04)",
           border: "1px solid rgba(226,232,240,0.86)",
           "&:hover": {
             boxShadow: "0 18px 46px rgba(15,23,42,0.11), 0 3px 6px rgba(15,23,42,0.06)",
@@ -244,6 +253,55 @@ const theme = createTheme({
           padding: "12px 16px 16px",
           gap: 8,
           flexWrap: "wrap",
+        },
+      },
+    },
+
+    MuiChip: {
+      styleOverrides: {
+        root: {
+          borderRadius: 999,
+          fontWeight: 800,
+        },
+      },
+    },
+
+    MuiTabs: {
+      styleOverrides: {
+        root: {
+          minHeight: 44,
+        },
+        indicator: {
+          height: 3,
+          borderRadius: 999,
+        },
+      },
+    },
+
+    MuiTab: {
+      styleOverrides: {
+        root: {
+          minHeight: 44,
+          textTransform: "none",
+          fontWeight: 800,
+          color: "#64748b",
+          "&.Mui-selected": {
+            color: "#1d4ed8",
+          },
+        },
+      },
+    },
+
+    MuiTableCell: {
+      styleOverrides: {
+        head: {
+          color: "#334155",
+          fontWeight: 900,
+          backgroundColor: "#f8fafc",
+          borderBottom: "1px solid #e2e8f0",
+        },
+        body: {
+          borderBottom: "1px solid #eef2f7",
         },
       },
     },

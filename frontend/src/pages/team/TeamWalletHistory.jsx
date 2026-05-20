@@ -17,6 +17,7 @@ import {
   Tabs,
   TextField,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
 import { useSearchParams } from "react-router-dom";
 import API, { listWalletUploadRequests } from "../../api/api";
@@ -60,9 +61,73 @@ function buildTransferRows(transactions, sourceType, creditType, pocketLabel) {
     });
 }
 
-function HistoryTable({ title, rows, pocketHeader }) {
+function EmptyState({ children }) {
   return (
-    <Paper variant="outlined" sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff" }}>
+    <Paper
+      elevation={0}
+      sx={{
+        p: 3,
+        borderRadius: 3,
+        border: "1px dashed #cbd5e1",
+        bgcolor: "#f8fafc",
+        textAlign: "center",
+        color: "#64748b",
+        fontWeight: 700,
+      }}
+    >
+      {children}
+    </Paper>
+  );
+}
+
+function DetailRow({ label, value }) {
+  return (
+    <Stack direction="row" justifyContent="space-between" spacing={2} sx={{ py: 0.45 }}>
+      <Typography sx={{ fontSize: 12, color: "#64748b", fontWeight: 750 }}>{label}</Typography>
+      <Typography component="div" sx={{ fontSize: 12.5, color: "#0f172a", fontWeight: 850, textAlign: "right", overflowWrap: "anywhere" }}>
+        {value}
+      </Typography>
+    </Stack>
+  );
+}
+
+function HistoryCard({ row, index, pocketHeader }) {
+  return (
+    <Paper elevation={0} className="consumer-fintech-card" sx={{ p: 1.5, borderRadius: 3 }}>
+      <Stack direction="row" justifyContent="space-between" spacing={1.5} sx={{ mb: 1 }}>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#0f172a" }}>{pocketHeader}</Typography>
+          <Typography sx={{ fontSize: 11.5, color: "#64748b", fontWeight: 700 }}>{fmtDate(row.date)}</Typography>
+        </Box>
+        <Chip size="small" color="success" label={row.status} sx={{ height: 24 }} />
+      </Stack>
+      <DetailRow label="SL No" value={index + 1} />
+      <DetailRow label="Main Wallet" value={`Rs. ${fmtAmount(row.mainWallet)}`} />
+      <DetailRow label="Admin Service Charge" value={row.adminCharge} />
+      <DetailRow label={pocketHeader} value={`Rs. ${fmtAmount(row.pocketAmount)}`} />
+    </Paper>
+  );
+}
+
+function HistoryTable({ title, rows, pocketHeader }) {
+  const isMobile = useMediaQuery("(max-width:700px)");
+
+  if (isMobile) {
+    return (
+      <Box>
+        <Typography sx={{ fontWeight: 900, color: "#0f172a", mb: 1 }}>{title}</Typography>
+        <Stack spacing={1.2}>
+          {rows.map((row, index) => (
+            <HistoryCard key={row.id || index} row={row} index={index} pocketHeader={pocketHeader} />
+          ))}
+          {!rows.length ? <EmptyState>No history found.</EmptyState> : null}
+        </Stack>
+      </Box>
+    );
+  }
+
+  return (
+    <Paper elevation={0} className="consumer-fintech-card" sx={{ borderRadius: 3, overflow: "hidden", bgcolor: "#fff" }}>
       <Box sx={{ px: 1.5, py: 1.25, borderBottom: "1px solid #e2e8f0" }}>
         <Typography sx={{ fontWeight: 900, color: "#0f172a" }}>{title}</Typography>
       </Box>
@@ -106,8 +171,40 @@ function HistoryTable({ title, rows, pocketHeader }) {
 }
 
 function VoucherTable({ rows }) {
+  const isMobile = useMediaQuery("(max-width:700px)");
+
+  if (isMobile) {
+    return (
+      <Box>
+        <Typography sx={{ fontWeight: 900, color: "#0f172a", mb: 1 }}>Voucher History</Typography>
+        <Stack spacing={1.2}>
+          {rows.map((row, index) => (
+            <Paper key={row.id || index} elevation={0} className="consumer-fintech-card" sx={{ p: 1.5, borderRadius: 3 }}>
+              <Stack direction="row" justifyContent="space-between" spacing={1.5} sx={{ mb: 1 }}>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#0f172a" }}>{row.code}</Typography>
+                  <Typography sx={{ fontSize: 11.5, color: "#64748b", fontWeight: 700 }}>{row.voucher_type_label || row.voucher_type}</Typography>
+                </Box>
+                <Chip size="small" label={row.status} sx={{ height: 24 }} />
+              </Stack>
+              <DetailRow label="SL No" value={index + 1} />
+              <DetailRow label="Amount" value={`Rs. ${fmtAmount(row.amount)}`} />
+              <DetailRow label="Created By" value={row.creator_username || "-"} />
+              <DetailRow label="Sent To" value={row.assigned_to_username || "-"} />
+              <DetailRow label="Redeemed By" value={row.redeemed_by_username || "-"} />
+              <DetailRow label="Created" value={fmtDate(row.created_at)} />
+              <DetailRow label="Valid Till" value={fmtDate(row.expires_at)} />
+              <DetailRow label="Redeemed At" value={fmtDate(row.redeemed_at)} />
+            </Paper>
+          ))}
+          {!rows.length ? <EmptyState>No voucher history found.</EmptyState> : null}
+        </Stack>
+      </Box>
+    );
+  }
+
   return (
-    <Paper variant="outlined" sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff" }}>
+    <Paper elevation={0} className="consumer-fintech-card" sx={{ borderRadius: 3, overflow: "hidden", bgcolor: "#fff" }}>
       <Box sx={{ px: 1.5, py: 1.25, borderBottom: "1px solid #e2e8f0" }}>
         <Typography sx={{ fontWeight: 900, color: "#0f172a" }}>Voucher History</Typography>
       </Box>
@@ -172,8 +269,48 @@ function statusChipColor(status) {
 }
 
 function AddMoneyTable({ rows }) {
+  const isMobile = useMediaQuery("(max-width:700px)");
+
+  if (isMobile) {
+    return (
+      <Box>
+        <Typography sx={{ fontWeight: 900, color: "#0f172a", mb: 1 }}>Add Money History</Typography>
+        <Stack spacing={1.2}>
+          {rows.map((row, index) => (
+            <Paper key={row.id || index} elevation={0} className="consumer-fintech-card" sx={{ p: 1.5, borderRadius: 3 }}>
+              <Stack direction="row" justifyContent="space-between" spacing={1.5} sx={{ mb: 1 }}>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#0f172a" }}>Rs. {fmtAmount(row.amount)}</Typography>
+                  <Typography sx={{ fontSize: 11.5, color: "#64748b", fontWeight: 700 }}>{fmtDate(row.requested_at)}</Typography>
+                </Box>
+                <Chip size="small" color={statusChipColor(row.status)} label={row.status || "-"} sx={{ height: 24 }} />
+              </Stack>
+              <DetailRow label="SL No" value={index + 1} />
+              <DetailRow label="UTR No" value={row.utr || "-"} />
+              <DetailRow
+                label="Proof"
+                value={
+                  row.proof ? (
+                    <Button size="small" href={row.proof} target="_blank" rel="noreferrer" sx={{ minHeight: 30, px: 1.2 }}>
+                      View
+                    </Button>
+                  ) : (
+                    "-"
+                  )
+                }
+              />
+              <DetailRow label="Approved / Rejected At" value={fmtDate(row.decided_at)} />
+              <DetailRow label="Remarks" value={row.reject_reason || row.remarks || "-"} />
+            </Paper>
+          ))}
+          {!rows.length ? <EmptyState>No add money history found.</EmptyState> : null}
+        </Stack>
+      </Box>
+    );
+  }
+
   return (
-    <Paper variant="outlined" sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff" }}>
+    <Paper elevation={0} className="consumer-fintech-card" sx={{ borderRadius: 3, overflow: "hidden", bgcolor: "#fff" }}>
       <Box sx={{ px: 1.5, py: 1.25, borderBottom: "1px solid #e2e8f0" }}>
         <Typography sx={{ fontWeight: 900, color: "#0f172a" }}>Add Money History</Typography>
       </Box>
@@ -301,7 +438,7 @@ export default function TeamWalletHistory() {
   }, [voucherType, vouchers]);
 
   return (
-    <Box sx={{ maxWidth: 1120, mx: "auto", px: { xs: 1.2, sm: 2 }, py: { xs: 1.5, sm: 2.5 } }}>
+    <Box className="consumer-fintech-page" sx={{ px: { xs: 0.5, sm: 2 }, py: { xs: 1, sm: 2.5 } }}>
       <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1.5} sx={{ mb: 2 }}>
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 900, color: "#0f172a" }}>
@@ -311,17 +448,17 @@ export default function TeamWalletHistory() {
             Main wallet transfer and voucher transaction history.
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1}>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ width: { xs: "100%", sm: "auto" } }}>
           <TextField size="small" type="date" label="From" InputLabelProps={{ shrink: true }} value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
           <TextField size="small" type="date" label="To" InputLabelProps={{ shrink: true }} value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-          <Button variant="contained" onClick={load}>Search</Button>
+          <Button variant="contained" onClick={load} sx={{ width: { xs: "100%", sm: "auto" } }}>Search</Button>
         </Stack>
       </Stack>
 
       {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
       {loading && <LinearProgress sx={{ mb: 1 }} />}
 
-      <Paper variant="outlined" sx={{ borderRadius: 2, mb: 1.5 }}>
+      <Paper elevation={0} className="consumer-fintech-card" sx={{ borderRadius: 3, mb: 1.5 }}>
         <Tabs
           value={tab}
           onChange={(_, v) => setTab(v)}
@@ -338,7 +475,7 @@ export default function TeamWalletHistory() {
       </Paper>
 
       {tab === "vouchers" && (
-        <Paper variant="outlined" sx={{ p: 1, borderRadius: 2, mb: 1.5 }}>
+        <Paper elevation={0} className="consumer-fintech-card" sx={{ p: 1, borderRadius: 3, mb: 1.5 }}>
           <Tabs
             value={voucherType}
             onChange={(_, v) => setVoucherType(v)}

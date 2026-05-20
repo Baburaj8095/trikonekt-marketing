@@ -52,16 +52,16 @@ function resolveApiMediaUrl(item, MEDIA_BASE) {
 }
 
 const C = {
-  appBg: "#f6f8fb",
+  appBg: "#F5F7FA",
   surface: "#ffffff",
   primary: "#2563eb",
   primaryDark: "#1e40af",
-  accent: "#10b981",
-  warm: "#f97316",
+  accent: "#0f766e",
+  warm: "#f59e0b",
   text: "#111827",
   textSec: "#64748b",
   border: "#e2e8f0",
-  shadow: "0 16px 42px rgba(15, 23, 42, 0.08), 0 1px 0 rgba(15, 23, 42, 0.03)",
+  shadow: "0 12px 28px rgba(15, 23, 42, 0.07), 0 1px 0 rgba(15, 23, 42, 0.03)",
 };
 
 const MotionPaper = motion.create(Paper);
@@ -69,7 +69,7 @@ const MotionPaper = motion.create(Paper);
 function SectionTitle({ title, action, onAction }) {
   return (
     <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.25 }}>
-      <Typography sx={{ fontSize: 16, fontWeight: 1000, color: C.text }}>{title}</Typography>
+      <Typography sx={{ fontSize: 15.5, fontWeight: 900, color: C.text }}>{title}</Typography>
       {action ? (
         <Button
           size="small"
@@ -117,7 +117,7 @@ function WishingBannerCarousel({ items = [], loading = false, error = "" }) {
         overflow: "hidden",
       }}
     >
-      <Box sx={{ px: 2, pt: 1.5, pb: 1 }}>
+      <Box sx={{ px: { xs: 1.5, sm: 2 }, pt: 1.35, pb: 0.75 }}>
         <SectionTitle title="Daily Wishing Banner" />
       </Box>
 
@@ -135,26 +135,26 @@ function WishingBannerCarousel({ items = [], loading = false, error = "" }) {
           component="img"
           src={activeSrc}
           alt={active.title || "Wishing banner"}
-          sx={{ width: "100%", height: { xs: 190, md: 280 }, objectFit: "cover", display: "block" }}
+          sx={{ width: "100%", height: { xs: 230, sm: 250, md: 280 }, objectFit: "cover", objectPosition: "center", display: "block" }}
         />
       ) : !loading && !error ? (
         <Box
           sx={{
-            minHeight: { xs: 180, md: 260 },
+            minHeight: { xs: 220, sm: 240, md: 270 },
             display: "grid",
             placeItems: "center",
             px: 2,
             background: "linear-gradient(135deg, #dbeafe 0%, #ffffff 55%, #dcfce7 100%)",
           }}
         >
-          <Typography sx={{ fontSize: { xs: 22, md: 30 }, fontWeight: 1000, color: C.primaryDark, textAlign: "center" }}>
+          <Typography sx={{ fontSize: { xs: 20, md: 28 }, fontWeight: 1000, color: C.primaryDark, textAlign: "center" }}>
             Welcome to Team Consumer
           </Typography>
         </Box>
       ) : null}
 
       {banners.length > 1 ? (
-        <Stack direction="row" spacing={0.75} justifyContent="center" sx={{ py: 1.25 }}>
+        <Stack direction="row" spacing={0.75} justifyContent="center" sx={{ py: 1 }}>
           {banners.map((_, i) => (
             <Box
               key={i}
@@ -203,9 +203,9 @@ function TopAchieversRow({ items = [], loading = false, error = "" }) {
               elevation={0}
               sx={{
                 flexShrink: 0,
-                width: { xs: 170, sm: 210 },
+                width: { xs: 172, sm: 210 },
                 border: `1px solid ${C.border}`,
-                borderRadius: 3,
+                borderRadius: 2.5,
                 p: 1.25,
                 background: C.surface,
                 boxShadow: "0 10px 26px rgba(2, 6, 23, 0.07)",
@@ -297,7 +297,7 @@ function VideoScroller({ videos = [], loading = false, onOpenFallback, onBuyPrim
                 else if (!isPurchased) onBuyPrime?.(v);
               }}
               sx={{
-                flex: "0 0 180px",
+                flex: "0 0 184px",
                 scrollSnapAlign: "start",
                 p: 1,
                 borderRadius: 3,
@@ -402,7 +402,7 @@ function TourScroller({ onTour, onShop, onCoupons }) {
             elevation={0}
             onClick={d.onClick}
             sx={{
-              flex: "0 0 132px",
+              flex: "0 0 136px",
               scrollSnapAlign: "start",
               borderRadius: 3,
               overflow: "hidden",
@@ -488,23 +488,28 @@ function MobileBottomNav({ value, onChange }) {
 
   return (
     <Paper
-      elevation={10}
+      elevation={0}
       sx={{
         position: "fixed",
         bottom: 0,
-        left: "50%",
-        transform: "translateX(-50%)",
+        left: 0,
+        right: 0,
         width: "100%",
-        maxWidth: 520,
+        maxWidth: "none",
+        minHeight: "calc(72px + env(safe-area-inset-bottom))",
         borderTop: `1px solid ${C.border}`,
+        borderLeft: 0,
+        borderRight: 0,
+        borderBottom: 0,
         zIndex: 1030,
-        borderRadius: "24px 24px 0 0",
+        borderRadius: 0,
         overflow: "hidden",
-        boxShadow: "0 -18px 44px rgba(15,23,42,0.16)",
-        backdropFilter: "blur(16px)",
+        boxShadow: "0 -8px 22px rgba(15,23,42,0.08)",
+        backdropFilter: "blur(10px)",
+        WebkitBackdropFilter: "blur(10px)",
       }}
     >
-      <Box sx={{ display: "flex", justifyContent: "space-around", py: 1, bgcolor: "rgba(255,255,255,0.96)" }}>
+      <Box sx={{ display: "flex", justifyContent: "space-around", height: 72, pb: "env(safe-area-inset-bottom)", bgcolor: "rgba(255,255,255,0.96)" }}>
         {items.map((it) => {
           const active = value === it.value;
           return (
@@ -515,22 +520,22 @@ function MobileBottomNav({ value, onChange }) {
               tabIndex={0}
               sx={{
                 width: "20%",
-                minHeight: 54,
+                minHeight: 72,
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: 0.25,
+                gap: 0.35,
                 color: active ? C.primary : "#94a3b8",
                 cursor: "pointer",
                 transition: "transform 140ms ease, color 140ms ease",
-                "&:active": { transform: "scale(0.94)" },
+                "&:active": { transform: "scale(0.96)" },
               }}
             >
-              <Box sx={{ width: 42, height: 30, borderRadius: 99, display: "grid", placeItems: "center", bgcolor: active ? "rgba(37,99,235,0.12)" : "transparent", boxShadow: active ? "inset 0 0 0 1px rgba(37,99,235,0.08)" : "none" }}>
+              <Box sx={{ width: 26, height: 26, display: "grid", placeItems: "center", bgcolor: "transparent", color: "inherit" }}>
                 {React.cloneElement(it.icon, { fontSize: "small" })}
               </Box>
-              <Typography sx={{ fontSize: 11, fontWeight: active ? 900 : 700, lineHeight: 1 }}>{it.label}</Typography>
+              <Typography sx={{ fontSize: 11, fontWeight: active ? 800 : 650, lineHeight: 1 }}>{it.label}</Typography>
             </Box>
           );
         })}
@@ -760,34 +765,34 @@ export default function TeamDashboard() {
   }, [location.search, openLatestDocument]);
 
   return (
-    <Box sx={{ minHeight: "100dvh", bgcolor: C.appBg, pb: isMobile ? 10 : 3 }}>
-      <Box sx={{ width: "100%", maxWidth: 1180, mx: "auto", px: { xs: 0, sm: 1, md: 2 }, py: { xs: 0.5, md: 1.5 } }}>
+    <Box sx={{ minHeight: "100dvh", bgcolor: C.appBg, pb: isMobile ? "calc(84px + env(safe-area-inset-bottom))" : 3 }}>
+      <Box className="consumer-fintech-page" sx={{ width: "100%", maxWidth: 1180, mx: "auto", px: { xs: 0, sm: 1, md: 2 }, py: { xs: 0.5, md: 1.5 } }}>
         <Paper
           elevation={0}
           sx={{
-            mb: 2,
-            p: { xs: 1.5, md: 2 },
+            mb: { xs: 1.5, md: 2 },
+            p: { xs: 1.25, md: 2 },
             borderRadius: 3,
             border: `1px solid ${C.border}`,
             background: C.surface,
-            boxShadow: "0 14px 36px rgba(15, 23, 42, 0.08)",
+            boxShadow: C.shadow,
           }}
         >
           <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1.5}>
-            <Stack direction="row" alignItems="center" spacing={1.25} sx={{ minWidth: 0 }}>
-              <Avatar sx={{ width: 52, height: 52, bgcolor: C.primary, fontWeight: 1000 }}>{initials}</Avatar>
+            <Stack direction="row" alignItems="center" spacing={1.1} sx={{ minWidth: 0 }}>
+              <Avatar sx={{ width: { xs: 46, md: 52 }, height: { xs: 46, md: 52 }, bgcolor: C.primary, fontWeight: 900, boxShadow: "0 8px 18px rgba(37,99,235,0.20)" }}>{initials}</Avatar>
               <Box sx={{ minWidth: 0 }}>
-                <Typography sx={{ fontSize: 12, fontWeight: 900, color: C.textSec, lineHeight: 1 }}>Team Consumer</Typography>
-                <Typography sx={{ fontSize: { xs: 18, md: 22 }, fontWeight: 1000, color: C.text }} noWrap>
+                <Typography sx={{ fontSize: 11.5, fontWeight: 750, color: C.textSec, lineHeight: 1 }}>Team Consumer</Typography>
+                <Typography sx={{ fontSize: { xs: 17, md: 22 }, fontWeight: 900, color: C.text }} noWrap>
                   {profileUser?.full_name || fullName}
                 </Typography>
-                <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.5, flexWrap: "wrap" }}>
-                  <Chip size="small" label={`ID: ${profileUser?.prefixed_id || profileUser?.unique_id || username || "-"}`} sx={{ fontWeight: 900, bgcolor: "rgba(37,99,235,0.1)", color: C.primary }} />
-                  <Chip size="small" label={`Status: ${status}`} sx={{ fontWeight: 900, bgcolor: "rgba(16,185,129,0.12)", color: "#047857" }} />
+                <Stack direction="row" spacing={0.65} alignItems="center" sx={{ mt: 0.45, flexWrap: "wrap" }}>
+                  <Chip size="small" label={`ID: ${profileUser?.prefixed_id || profileUser?.unique_id || username || "-"}`} sx={{ height: 22, fontSize: 10.5, fontWeight: 750, bgcolor: "rgba(37,99,235,0.08)", color: C.primary }} />
+                  <Chip size="small" label={`Status: ${status}`} sx={{ height: 22, fontSize: 10.5, fontWeight: 750, bgcolor: "rgba(22,163,74,0.10)", color: "#047857" }} />
                 </Stack>
               </Box>
             </Stack>
-            <IconButton aria-label="notifications" sx={{ bgcolor: "#f8fafc", border: `1px solid ${C.border}` }}>
+            <IconButton aria-label="notifications" sx={{ width: 38, height: 38, bgcolor: "#f8fafc", border: `1px solid ${C.border}` }}>
               <NotificationsNoneRoundedIcon />
             </IconButton>
           </Stack>
@@ -799,7 +804,7 @@ export default function TeamDashboard() {
           </Paper>
         ) : null}
 
-        <Stack spacing={2}>
+        <Stack spacing={2.5}>
           <WishingBannerCarousel items={banners} loading={bannersLoading} error={bannersErr} />
           <TopAchieversRow items={achievers} loading={achieversLoading} error={achieversErr} />
           <VideoScroller

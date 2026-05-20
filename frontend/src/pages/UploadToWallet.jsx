@@ -168,7 +168,7 @@ export default function UploadToWallet() {
   };
 
   return (
-    <Box sx={{ maxWidth: 900, mx: "auto", px: { xs: 1, sm: 2 }, py: 2 }}>
+    <Box className="consumer-fintech-page" sx={{ maxWidth: 900, mx: "auto", px: { xs: 0.5, sm: 2 }, py: { xs: 1, sm: 2 } }}>
       <Stack
         direction={{ xs: "column", sm: "row" }}
         justifyContent="space-between"
@@ -177,7 +177,7 @@ export default function UploadToWallet() {
         sx={{ mb: 2 }}
       >
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 800, color: "#0C2D48" }}>
+          <Typography variant="h5" sx={{ fontWeight: 950, color: "#0f172a" }}>
             Upload to Wallet
           </Typography>
           <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.5 }}>
@@ -189,7 +189,7 @@ export default function UploadToWallet() {
           variant="outlined"
           startIcon={<HistoryRoundedIcon />}
           onClick={() => navigate("/user/team-history?tab=add-money")}
-          sx={{ textTransform: "none", borderRadius: 2 }}
+          sx={{ borderRadius: 2.5, width: { xs: "100%", sm: "auto" } }}
         >
           History
         </Button>
@@ -209,9 +209,9 @@ export default function UploadToWallet() {
 
       <Paper
         elevation={0}
+        className="consumer-fintech-card"
         sx={{
-          borderRadius: 4,
-          border: "1px solid #E2E8F0",
+          borderRadius: 3,
           overflow: "hidden",
         }}
       >
@@ -219,7 +219,7 @@ export default function UploadToWallet() {
           sx={{
             px: { xs: 2, sm: 3 },
             py: 2,
-            background: "linear-gradient(135deg, #0C2D48 0%, #145DA0 100%)",
+            background: "linear-gradient(135deg, #2563eb 0%, #0f766e 100%)",
             color: "#fff",
           }}
         >
@@ -237,7 +237,7 @@ export default function UploadToWallet() {
               <AccountBalanceWalletRoundedIcon />
             </Box>
             <Box>
-              <Typography sx={{ fontWeight: 800, fontSize: 18 }}>
+              <Typography sx={{ fontWeight: 950, fontSize: 18 }}>
                 Wallet Upload Request
               </Typography>
               <Typography sx={{ fontSize: 13, opacity: 0.85 }}>
@@ -255,15 +255,14 @@ export default function UploadToWallet() {
           ) : (
             <Stack spacing={2.5}>
               <Paper
-                variant="outlined"
-                sx={{ p: 2, borderRadius: 3, bgcolor: "#F8FAFC", borderColor: "#E2E8F0" }}
+                elevation={0}
+                sx={{ p: 2, borderRadius: 3, bgcolor: "#f8fafc", border: "1px solid #e2e8f0" }}
               >
                 <Stack spacing={1.25}>
                   <Chip
                     label="Auto Show"
-                    color="primary"
                     size="small"
-                    sx={{ width: "fit-content", fontWeight: 700 }}
+                    sx={{ width: "fit-content", fontWeight: 850, bgcolor: "#eff6ff", color: "#2563eb" }}
                   />
                   <Typography sx={{ fontWeight: 600 }}>
                     Consumer ID: <Box component="span" sx={{ fontWeight: 400 }}>{consumerId}</Box>
@@ -288,12 +287,14 @@ export default function UploadToWallet() {
                   />
 
                   <Paper
-                    variant="outlined"
+                    elevation={0}
                     sx={{
                       p: 2,
                       borderRadius: 3,
                       borderStyle: "dashed",
                       borderColor: "#CBD5E1",
+                      borderWidth: 1,
+                      bgcolor: "#ffffff",
                     }}
                   >
                     <Stack spacing={1.5}>
@@ -308,8 +309,9 @@ export default function UploadToWallet() {
                           src={normalizeMediaUrl(paymentConfig.upi_qr_image_url)}
                           alt="Payment scanner"
                           sx={{
-                            width: 170,
-                            height: 170,
+                            width: { xs: "100%", sm: 178 },
+                            maxWidth: 210,
+                            height: 178,
                             objectFit: "contain",
                             borderRadius: 2,
                             border: "1px solid #E2E8F0",
@@ -320,8 +322,9 @@ export default function UploadToWallet() {
                       ) : (
                         <Box
                           sx={{
-                            width: 170,
-                            height: 170,
+                            width: { xs: "100%", sm: 178 },
+                            maxWidth: 210,
+                            height: 178,
                             borderRadius: 2,
                             border: "1px solid #E2E8F0",
                             bgcolor: "#F8FAFC",
@@ -354,8 +357,8 @@ export default function UploadToWallet() {
                   />
 
                   <Paper
-                    variant="outlined"
-                    sx={{ p: 2, borderRadius: 3, borderColor: "#E2E8F0" }}
+                    elevation={0}
+                    sx={{ p: 2, borderRadius: 3, border: "1px solid #E2E8F0" }}
                   >
                     <Stack
                       direction={{ xs: "column", sm: "row" }}
@@ -381,7 +384,7 @@ export default function UploadToWallet() {
                         component="label"
                         variant="outlined"
                         startIcon={<UploadFileRoundedIcon />}
-                        sx={{ textTransform: "none", borderRadius: 2 }}
+                        sx={{ borderRadius: 2.5, width: { xs: "100%", sm: "auto" } }}
                       >
                         Choose File
                         <input
@@ -409,7 +412,7 @@ export default function UploadToWallet() {
                       sx={{
                         minWidth: 160,
                         textTransform: "none",
-                        borderRadius: 2,
+                        borderRadius: 2.5,
                         fontWeight: 700,
                       }}
                     >
@@ -419,7 +422,7 @@ export default function UploadToWallet() {
                     <Button
                       variant="text"
                       onClick={() => navigate("/user/team-history?tab=add-money")}
-                      sx={{ textTransform: "none", fontWeight: 700 }}
+                      sx={{ fontWeight: 850 }}
                     >
                       View History
                     </Button>

@@ -1573,7 +1573,7 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
         """
         Create a withdrawal request with the following business rules:
         - KYC must be verified
-        - Requested amount must not exceed the user's available main wallet balance
+        - Requested amount must not exceed the user's withdrawal pocket balance
         - Window rules enforced by CommissionConfig.get_withdrawals_window()
         """
         from decimal import Decimal
@@ -1612,17 +1612,17 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
         # Wallet balance must be sufficient for the requested amount
         w = Wallet.get_or_create_for_user(user)
         try:
-            mb = Decimal(w.main_balance or 0)
+            wd = Decimal(w.withdrawable_balance or 0)
         except Exception:
-            mb = Decimal("0")
-        if mb <= Decimal("0"):
+            wd = Decimal("0")
+        if wd <= Decimal("0"):
             raise serializers.ValidationError({
-                "detail": "Insufficient main wallet balance for withdrawal.",
+                "detail": "Insufficient withdrawal wallet balance for withdrawal.",
                 "code": "INSUFFICIENT_BALANCE",
             })
-        if amount > mb:
+        if amount > wd:
             raise serializers.ValidationError({
-                "detail": f"Available to withdraw now: ₹{mb.quantize(Decimal('0.00'))}.",
+                "detail": f"Available to withdraw now: Rs. {wd.quantize(Decimal('0.00'))}.",
                 "code": "AMOUNT_EXCEEDS_BALANCE",
             })
 

@@ -47,6 +47,7 @@ export default function ConsumerShell({ children }) {
       return [
         { to: "/user/team-dashboard", label: "Dashboard", icon: "dashboard" },
         { to: "/user/upload-wallet", label: "Add Money", icon: "upload" },
+        { to: "/user/team-wallet", label: "Team Wallet", icon: "wallet" },
 
         {
           type: "section",
@@ -89,6 +90,7 @@ export default function ConsumerShell({ children }) {
       { to: "/user/refer-earn", label: "Refer & Earn", icon: "upload" },
       { to: "/user/gift-card-summary", label: "Gift Card Summary", icon: "ticket" },
       { to: "/user/gift-cards", label: "Hubble Gift Cards", icon: "ticket" },
+      { to: "/user/team-wallet", label: "Team Wallet", icon: "wallet" },
       { to: "/user/team-history", label: "Team History", icon: "orders" },
       { to: "/user/prime-invoices", label: "Prime Invoices", icon: "file" },
       { to: "/user/coupon-pocket", label: "Coupon Pocket", icon: "ticket" },
@@ -144,7 +146,7 @@ export default function ConsumerShell({ children }) {
 
   return (
     <ShellBase
-      title=" "
+      title={isTeamLogin ? "Team Consumer" : "Consumer"}
       menu={menu}
       isActive={isActive}
       onLogout={onLogout}

@@ -39,13 +39,8 @@ function fmtAmount(value) {
 const TRANSFER_OPTIONS = [
   {
     value: "coupon",
-    label: "Coupon Pocket",
+    label: "Coupon Pocket Wallet",
     helper: "Use this pocket to create Trizone, online, near store, and package purchase vouchers.",
-  },
-  {
-    value: "shopping",
-    label: "Shopping Self Re-birth",
-    helper: "Shopping reward/re-birth pocket for shopping related benefits.",
   },
   {
     value: "internal",
@@ -53,13 +48,8 @@ const TRANSFER_OPTIONS = [
     helper: "Use this wallet to buy promo packages internally.",
   },
   {
-    value: "wallet_to_wallet",
-    label: "Wallet to Wallet",
-    helper: "Transfer to another consumer via consumer ID + mail OTP.",
-  },
-  {
     value: "withdrawal",
-    label: "Withdrawal To Pocket",
+    label: "Withdraw Pocket",
     helper: "Move amount to withdrawal wallet before bank withdrawal.",
   },
 ];
@@ -95,8 +85,8 @@ const VOUCHER_TYPES = [
 
 const walletPanelSx = {
   border: "1px solid",
-  borderColor: "#EEF2F6",
-  borderRadius: 2.2,
+  borderColor: "#e2e8f0",
+  borderRadius: 3,
   bgcolor: "#fff",
   overflow: "hidden",
 };
@@ -123,7 +113,7 @@ function WalletPanel({
   tone = 0,
 }) {
   const colors = highlight
-    ? { iconBg: "primary.light", iconColor: "primary.dark", amount: "#0f172a" }
+    ? { iconBg: "rgba(255,255,255,0.18)", iconColor: "#ffffff", amount: "#ffffff" }
     : walletTones[tone % walletTones.length];
   const visibleActions = highlight ? [] : actions;
 
@@ -133,25 +123,27 @@ function WalletPanel({
       onClick={onClick}
       sx={{
         ...walletPanelSx,
-        borderColor: "#EEF2F6",
-        bgcolor: "#fff",
+        borderColor: highlight ? "transparent" : "#e2e8f0",
+        bgcolor: highlight ? "transparent" : "#fff",
+        background: highlight ? "linear-gradient(135deg, #2563eb 0%, #0f766e 100%)" : "#fff",
+        color: highlight ? "#fff" : "inherit",
         cursor: onClick ? "pointer" : "default",
-        height: highlight ? { xs: 100, sm: 106 } : { xs: 98, sm: 104 },
+        minHeight: highlight ? { xs: 108, sm: 120 } : { xs: 104, sm: 112 },
         width: "100%",
         display: "flex",
         flexDirection: "column",
-        borderRadius: 2.2,
-        boxShadow: "none",
-        transition: "transform 120ms ease, box-shadow 120ms ease",
-        "&:active": onClick ? { transform: "scale(0.99)" } : undefined,
+        borderRadius: 3,
+        boxShadow: highlight ? "0 18px 34px rgba(37,99,235,0.24)" : "0 10px 24px rgba(15,23,42,0.06)",
+        transition: "transform 140ms ease, box-shadow 160ms ease",
+        "&:active": onClick ? { transform: "scale(0.985)" } : undefined,
       }}
     >
         <Box
           sx={{
             flex: 1,
             minWidth: 0,
-            px: { xs: 1, sm: 1.15 },
-            py: { xs: 0.85, sm: 0.95 },
+            px: { xs: 1.15, sm: 1.35 },
+            py: { xs: 1, sm: 1.2 },
             display: "flex",
             flexDirection: "column",
           }}
@@ -159,24 +151,24 @@ function WalletPanel({
           <Stack direction="row" alignItems="center" spacing={0.75}>
             <Box
               sx={{
-                width: highlight ? 38 : 34,
-                height: highlight ? 38 : 34,
-                borderRadius: "50%",
+                width: highlight ? 36 : 32,
+                height: highlight ? 36 : 32,
+                borderRadius: 2.2,
                 bgcolor: colors.iconBg,
                 color: colors.iconColor,
                 display: "grid",
                 placeItems: "center",
                 flexShrink: 0,
-                "& svg": { fontSize: 18 },
+                "& svg": { fontSize: highlight ? 21 : 18 },
               }}
             >
               {icon}
             </Box>
             <Typography
               sx={{
-                color: "text.secondary",
+                color: highlight ? "rgba(255,255,255,0.86)" : "text.secondary",
                 fontSize: highlight ? { xs: 12.5, sm: 13 } : { xs: 11, sm: 11.5 },
-                fontWeight: 900,
+                fontWeight: 850,
                 lineHeight: 1.2,
                 display: "-webkit-box",
                 WebkitLineClamp: 2,
@@ -194,7 +186,7 @@ function WalletPanel({
               direction="row"
               alignItems="center"
               spacing={1}
-              sx={{ mt: 0.7, borderTop: "1px solid #e2e8f0", pt: 0.55 }}
+              sx={{ mt: 0.9, borderTop: "1px solid #eef2f7", pt: 0.75 }}
             >
               <Typography sx={{ fontSize: 11, color: "#64748b", whiteSpace: "nowrap" }}>
                 ID Count
@@ -202,8 +194,8 @@ function WalletPanel({
               <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#0f172a" }}>
                 {idCount}
               </Typography>
-              <Box sx={{ flex: 1, height: 1, bgcolor: "#cbd5e1" }} />
-              <Typography sx={{ fontSize: 13, fontWeight: 900, color: colors.amount }}>
+              <Box sx={{ flex: 1, height: 1, bgcolor: "#e2e8f0" }} />
+              <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: colors.amount }}>
                 {amountPrefix} {fmtAmount(amount)}
               </Typography>
             </Stack>
@@ -213,7 +205,7 @@ function WalletPanel({
                 sx={{
                   mt: highlight ? "auto" : 0.35,
                   color: colors.amount,
-                  fontSize: highlight ? { xs: 22, sm: 24 } : { xs: 14, sm: 15 },
+                  fontSize: highlight ? { xs: 24, sm: 27 } : { xs: 15, sm: 16 },
                   lineHeight: 1.15,
                   fontWeight: 900,
                 }}
@@ -224,8 +216,8 @@ function WalletPanel({
                 <Typography
                   sx={{
                     mt: 0.2,
-                    color: "text.secondary",
-                    fontSize: 10,
+                    color: highlight ? "rgba(255,255,255,0.78)" : "text.secondary",
+                    fontSize: 10.5,
                     lineHeight: 1.25,
                     display: "-webkit-box",
                     WebkitLineClamp: 2,
@@ -241,7 +233,7 @@ function WalletPanel({
           )}
 
           {visibleActions?.length ? (
-            <Stack direction="row" spacing={0.7} sx={{ mt: "auto", pt: 0.8, flexWrap: "wrap", gap: 0.7 }}>
+            <Stack direction="row" spacing={0.7} sx={{ mt: "auto", pt: 0.9, flexWrap: "wrap", gap: 0.7 }}>
               {visibleActions.map((action) => (
                 <Button
                   key={action.label}
@@ -256,7 +248,7 @@ function WalletPanel({
                     minWidth: 0,
                     px: 1,
                     py: 0.25,
-                    borderRadius: "4px",
+                    borderRadius: 999,
                     fontSize: 10.5,
                     fontWeight: 800,
                     textTransform: "none",
@@ -273,47 +265,20 @@ function WalletPanel({
   );
 }
 
-// Compact stat pill for the summary bar
-function StatPill({ label, value, color = "#0f172a" }) {
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        px: "12px",
-        py: "6px",
-        bgcolor: "#fff",
-        borderRadius: "8px",
-        border: "1px solid #e2e8f0",
-        minWidth: 80,
-        flexShrink: 0,
-      }}
-    >
-      <Typography sx={{ fontSize: 14, fontWeight: 800, color, lineHeight: 1.2 }}>
-        {value}
-      </Typography>
-      <Typography sx={{ fontSize: 10, color: "#94a3b8", mt: "2px", textAlign: "center" }}>
-        {label}
-      </Typography>
-    </Box>
-  );
-}
-
 // Section header with accent bar
 function SectionHeader({ title, accentColor = "primary.main" }) {
   return (
-    <Stack direction="row" alignItems="center" spacing="6px" sx={{ mb: "10px" }}>
+    <Stack direction="row" alignItems="center" spacing="8px" sx={{ mb: "10px", mt: 0.5 }}>
       <Box
         sx={{
-          width: 3,
-          height: 16,
+          width: 4,
+          height: 18,
           bgcolor: accentColor,
           borderRadius: "2px",
           flexShrink: 0,
         }}
       />
-      <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#334155" }}>
+      <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#0f172a" }}>
         {title}
       </Typography>
     </Stack>
@@ -342,7 +307,7 @@ export default function TeamWallet() {
   const [otpRequested, setOtpRequested] = useState(false);
   const [lookupResult, setLookupResult] = useState(null);
   const [transferForm, setTransferForm] = useState({
-    transfer_type: "shopping",
+    transfer_type: "coupon",
     amount: "",
     consumer_id: "",
     otp: "",
@@ -579,6 +544,7 @@ export default function TeamWallet() {
         transferType: "withdrawal",
         title: "Withdrawal To Pocket",
         wallet: walletByNo[10],
+        onClick: () => (window.location.href = "/user/wallet"),
       },
       {
         no: 4,
@@ -749,7 +715,7 @@ export default function TeamWallet() {
       setTransferOpen(false);
       setOtpRequested(false);
       setLookupResult(null);
-      setTransferForm({ transfer_type: "shopping", amount: "", consumer_id: "", otp: "" });
+      setTransferForm({ transfer_type: "coupon", amount: "", consumer_id: "", otp: "" });
       await loadData();
     } catch (err) {
       setError(err?.response?.data?.detail || "Transfer confirmation failed.");
@@ -799,20 +765,21 @@ export default function TeamWallet() {
 
   return (
     <Box
+      className="consumer-fintech-page"
       sx={{
-        maxWidth: 760,
+        maxWidth: 840,
         mx: "auto",
-        px: { xs: "10px", sm: "16px" },
-        py: { xs: "10px", sm: "18px" },
-        bgcolor: "#f8fafc",
-        minHeight: "100vh",
+        px: { xs: "2px", sm: "16px" },
+        py: { xs: "6px", sm: "18px" },
       }}
     >
       {/* ── Header ── */}
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.4 }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.6 }}>
         <Stack direction="row" alignItems="center" spacing="8px">
-          <AccountBalanceWalletIcon sx={{ fontSize: 22, color: "#2563eb" }} />
-          <Typography sx={{ fontSize: { xs: 18, sm: 22 }, fontWeight: 900, color: "#0f172a" }}>
+          <Box sx={{ width: 38, height: 38, borderRadius: 2.5, display: "grid", placeItems: "center", bgcolor: "#eff6ff", color: "#2563eb" }}>
+            <AccountBalanceWalletIcon sx={{ fontSize: 22 }} />
+          </Box>
+          <Typography sx={{ fontSize: { xs: 19, sm: 23 }, fontWeight: 950, color: "#0f172a" }}>
             Team Wallet
           </Typography>
         </Stack>
@@ -820,7 +787,7 @@ export default function TeamWallet() {
           size="small"
           color={kycVerified ? "success" : "warning"}
           label={kycVerified ? "KYC ✓" : "KYC Pending"}
-          sx={{ fontSize: 11, height: 24 }}
+          sx={{ fontSize: 11, height: 26 }}
         />
       </Stack>
 
@@ -838,26 +805,25 @@ export default function TeamWallet() {
 
       <Paper
         elevation={0}
+        className="consumer-fintech-card"
         sx={{
-          p: 1.2,
-          mb: "14px",
-          borderRadius: 2.5,
-          border: "1px solid",
-          borderColor: "#EEF2F6",
+          p: { xs: 1.15, sm: 1.5 },
+          mb: 2,
+          borderRadius: 3,
           bgcolor: "#fff",
         }}
       >
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns: { xs: "1fr", sm: "1fr 220px" },
-            gap: 1,
+            gridTemplateColumns: { xs: "1fr", sm: "1fr 260px" },
+            gap: 1.2,
             alignItems: "start",
           }}
         >
           <Stack direction="row" spacing={0.8} alignItems="center">
             <AccountBalanceWalletIcon sx={{ fontSize: 20, color: "#64748b" }} />
-            <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#475569" }}>
+            <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#475569" }}>
               Growth Wallet
             </Typography>
           </Stack>
@@ -876,8 +842,8 @@ export default function TeamWallet() {
           sx={{
             display: "grid",
             gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", sm: "repeat(3, minmax(0, 1fr))" },
-            gap: 1,
-            mt: 1,
+            gap: { xs: 1, sm: 1.2 },
+            mt: 1.2,
           }}
         >
           {summaryWallets.map((item, index) => (
@@ -900,7 +866,7 @@ export default function TeamWallet() {
           sx={{
             display: "grid",
             gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-            gap: 1,
+            gap: { xs: 1, sm: 1.2 },
           }}
         >
           {transferPockets.map((pocket) => {
@@ -927,7 +893,7 @@ export default function TeamWallet() {
           sx={{
             display: "grid",
             gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-            gap: 1,
+            gap: { xs: 1, sm: 1.2 },
           }}
         >
           {manualWallets.map((wallet) => (
@@ -950,9 +916,9 @@ export default function TeamWallet() {
         onClose={() => !actionLoading && setVoucherOpen(false)}
         fullWidth
         maxWidth="sm"
-        PaperProps={{ sx: { borderRadius: "16px", mx: "12px" } }}
+        PaperProps={{ sx: { borderRadius: 3, mx: "12px" } }}
       >
-        <DialogTitle sx={{ fontSize: 15, fontWeight: 800, pb: 1 }}>
+        <DialogTitle sx={{ fontSize: 18, fontWeight: 900, pb: 1 }}>
           Coupon Pocket Vouchers
         </DialogTitle>
         <DialogContent sx={{ pt: "4px !important" }}>
@@ -1019,8 +985,8 @@ export default function TeamWallet() {
                     key={item.id}
                     sx={{
                       border: "1px solid #e2e8f0",
-                      borderRadius: "8px",
-                      p: "8px",
+                      borderRadius: 2,
+                      p: 1,
                       bgcolor: "#fff",
                     }}
                   >
@@ -1058,9 +1024,9 @@ export default function TeamWallet() {
         onClose={() => !actionLoading && setTransferOpen(false)}
         fullWidth
         maxWidth="sm"
-        PaperProps={{ sx: { borderRadius: "16px", mx: "12px" } }}
+        PaperProps={{ sx: { borderRadius: 3, mx: "12px" } }}
       >
-        <DialogTitle sx={{ fontSize: 15, fontWeight: 800, pb: 1 }}>
+        <DialogTitle sx={{ fontSize: 18, fontWeight: 900, pb: 1 }}>
           Main Wallet Transfer
         </DialogTitle>
         <DialogContent sx={{ pt: "4px !important" }}>

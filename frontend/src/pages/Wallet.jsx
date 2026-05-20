@@ -21,6 +21,15 @@ function fmtAmount(value) {
   return num.toFixed(2);
 }
 
+function readStoredUser() {
+  try {
+    const raw = localStorage.getItem("user_user") || sessionStorage.getItem("user_user");
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
 function computeWindowLocal(cfg) {
   // cfg: { enabled, weekday(0=Mon..6=Sun), start_time:'HH:MM', end_time:'HH:MM' }
   // Uses the browser's local timezone; backend enforcement is done in IST.
@@ -98,7 +107,6 @@ export default function Wallet() {
   const [balance, setBalance] = useState("0.00"); // legacy total (for backward compatibility)
   const [mainBalance, setMainBalance] = useState("0.00"); // gross earnings
   const [withdrawableBalance, setWithdrawableBalance] = useState("0.00"); // net (can withdraw)
-  const [taxPercent, setTaxPercent] = useState("0");
   const [updatedAt, setUpdatedAt] = useState(null);
   const [err, setErr] = useState("");
   const [autoBlock, setAutoBlock] = useState(null);
@@ -120,15 +128,9 @@ export default function Wallet() {
   // Gross "all earnings" (without TDS) from backend totals; fallback to mainBalance if absent
   const [allEarningsGross, setAllEarningsGross] = useState("0.00");
   const [couponSummary, setCouponSummary] = useState({ selfActivated: 0, monthlyActivated: 0 });
-
-  // Show Withdraw Wallet as Income minus 10% TDS (preview for UI display)
-  const computedNetPreview = useMemo(() => {
-    const gross = Number(mainBalance || 0);
-    // Use admin-configured withdrawal tax percent from backend wallet payload
-    const tdsPct = Number(taxPercent || 0);
-    const net = gross - (gross * tdsPct / 100);
-    return net < 0 ? 0 : net;
-  }, [mainBalance, taxPercent]);
+  const [profile, setProfile] = useState(null);
+  const [withdrawalMode, setWithdrawalMode] = useState("bank");
+  const storedUser = useMemo(() => readStoredUser(), []);
 
   // Sum of money earnings (wallet credits) per spec: direct refer, 5/3 matrix, global incomes, withdrawal benefits, any bonus
   const grossMoneyIncome = useMemo(() => {
@@ -194,7 +196,7 @@ export default function Wallet() {
 
   const disableReason = useMemo(() => {
     if (!kyc?.verified) return "KYC verification required";
-    if (Number(mainBalance) < 500) return "Minimum withdrawable balance ₹500 required";
+    if (Number(withdrawableBalance) < 500) return "Minimum withdrawable balance ₹500 required";
     if (!windowInfo?.enabled) return "Withdrawals are currently disabled.";
     if (!windowInfo?.isOpen) {
       const day = weekdayLabel(withdrawalsWindowCfg?.weekday);
@@ -203,7 +205,19 @@ export default function Wallet() {
       return `Withdrawals are allowed only on ${day} between ${st} and ${et} (IST).`;
     }
     return "";
-  }, [kyc, mainBalance, windowInfo, withdrawalsWindowCfg]);
+  }, [kyc, withdrawableBalance, windowInfo, withdrawalsWindowCfg]);
+
+  const consumerDetails = useMemo(() => {
+    const src = { ...(storedUser || {}), ...(profile || {}) };
+    return {
+      name: src.full_name || src.name || src.username || "-",
+      phone: src.phone || src.mobile || src.phone_number || "-",
+      pincode: src.pincode || src.pin_code || "-",
+      bankName: kyc?.bank_name || "-",
+      accountNumber: kyc?.bank_account_number || "-",
+      ifsc: kyc?.ifsc_code || "-",
+    };
+  }, [kyc, profile, storedUser]);
 
   useEffect(() => {
     const id = setInterval(() => setWindowInfo(computeWindowLocal(withdrawalsWindowCfg)), 30000);
@@ -216,21 +230,20 @@ export default function Wallet() {
       try {
         setLoading(true);
         setErr("");
-        const [w, mw, kycRes] = await Promise.all([
+        const [w, mw, kycRes, profileRes] = await Promise.all([
           API.get("/accounts/wallet/me/"),
           API.get("/accounts/withdrawals/me/"),
           API.get("/accounts/kyc/me/"),
+          API.get("/accounts/profile/").catch(() => ({ data: null })),
         ]);
         if (!mounted) return;
         const bal = String(w?.data?.balance ?? "0.00");
         const mainBal = String(w?.data?.main_balance ?? "0.00");
         const wdBal = String(w?.data?.withdrawable_balance ?? "0.00");
-        const tax = String(w?.data?.tax_percent ?? "0");
         const upd = w?.data?.updated_at || null;
         setBalance(bal);
         setMainBalance(mainBal);
         setWithdrawableBalance(wdBal);
-        setTaxPercent(tax);
         setUpdatedAt(upd);
         setAutoBlock(w?.data?.auto_block || null);
         setBreakdown(w?.data?.breakdown_per_block || { coupon_cost: "150.00", tds: "50.00", direct_ref_bonus: "50.00" });
@@ -257,6 +270,7 @@ export default function Wallet() {
         const wlist = Array.isArray(mw?.data) ? mw.data : mw?.data?.results || [];
         setMyWithdrawals(wlist || []);
         setKyc(kycRes?.data || { verified: false });
+        setProfile(profileRes?.data || null);
         // Load withdrawals window from admin master config
         try {
           const cfgRes = await API.get("/admin/commission/master/", { cacheTTL: 10_000, dedupe: "cancelPrevious" });
@@ -361,9 +375,7 @@ export default function Wallet() {
       setWdrErr("Enter a valid amount.");
       return;
     }
-    // No fixed per-request cap. Validate against mainBalance as requested.
-    // (Backend may expose withdrawableBalance, but UI validation should use mainBalance.)
-    const availableToWithdraw = Number(mainBalance || 0);
+    const availableToWithdraw = Number(withdrawableBalance || 0);
     if (amtNum > availableToWithdraw) {
       setWdrErr(`Amount cannot exceed your available balance (₹${fmtAmount(availableToWithdraw)}).`);
       return;
@@ -384,13 +396,11 @@ export default function Wallet() {
       const bal = String(w?.data?.balance ?? "0.00");
       const mainBal = String(w?.data?.main_balance ?? "0.00");
       const wdBal = String(w?.data?.withdrawable_balance ?? "0.00");
-      const tax = String(w?.data?.tax_percent ?? "0");
       const upd = w?.data?.updated_at || null;
       const wlist = Array.isArray(mw?.data) ? mw.data : mw?.data?.results || [];
       setBalance(bal);
       setMainBalance(mainBal);
       setWithdrawableBalance(wdBal);
-      setTaxPercent(tax);
       setUpdatedAt(upd);
       setMyWithdrawals(wlist || []);
       setAutoBlock(w?.data?.auto_block || null);
@@ -489,7 +499,7 @@ export default function Wallet() {
                   Please complete KYC in the KYC section.
                 </Alert>
               ) : null}
-              {Number(mainBalance) < 500 ? (
+              {Number(withdrawableBalance) < 500 ? (
                 <Alert severity="warning" sx={{ mb: 1 }}>
                   Minimum Balance to Withdraw 500
                 </Alert>
@@ -527,15 +537,15 @@ export default function Wallet() {
                     Withdrawable Balance
                   </Typography>
                   <Typography sx={{ fontSize: 24, fontWeight: 900, mt: 0.2 }}>
-                    ₹ {fmtAmount(mainBalance)}
+                    ₹ {fmtAmount(withdrawableBalance)}
                   </Typography>
                   <Typography sx={{ fontSize: 12, color: "text.secondary", fontWeight: 700, mt: 0.4 }}>
-                    Tax/TDS: {Number(taxPercent || 0).toFixed(2)}% • After tax: ₹ {fmtAmount(computedNetPreview)}
+                    Amount moved into the withdraw pocket from Team Wallet.
                   </Typography>
                 </Box>
 
                 <Chip
-                  label="Bank Transfer"
+                  label={withdrawalMode === "bank" ? "Bank Transfer" : "Instant UPI"}
                   sx={{
                     bgcolor: "#F1F5F9",
                     fontWeight: 900,
@@ -555,17 +565,88 @@ export default function Wallet() {
                 bgcolor: "#fff",
               }}
             >
+              <Typography sx={{ fontWeight: 900, mb: 1 }}>Withdrawal Option</Typography>
+              <Grid container spacing={1}>
+                {[
+                  { key: "upi", title: "Option 1 Instant UPI Withdrawal", hint: "Payment gateway will connect here." },
+                  { key: "bank", title: "Option 2 Bank Account Withdrawal", hint: "Submit to admin using KYC bank details." },
+                ].map((option) => {
+                  const selected = withdrawalMode === option.key;
+                  return (
+                    <Grid item xs={12} sm={6} key={option.key}>
+                      <Paper
+                        elevation={0}
+                        onClick={() => setWithdrawalMode(option.key)}
+                        sx={{
+                          p: 1.25,
+                          borderRadius: 2,
+                          border: "1px solid",
+                          borderColor: selected ? "primary.main" : "#E2E8F0",
+                          bgcolor: selected ? "#EFF6FF" : "#fff",
+                          cursor: "pointer",
+                          minHeight: 86,
+                        }}
+                      >
+                        <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0C2D48" }}>
+                          {option.title}
+                        </Typography>
+                        <Typography sx={{ fontSize: 12, color: "text.secondary", mt: 0.5 }}>
+                          {option.hint}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  );
+                })}
+              </Grid>
+              {withdrawalMode === "upi" ? (
+                <Alert severity="info" sx={{ mt: 1 }}>
+                  Instant UPI withdrawal will be enabled after the payment gateway is connected.
+                </Alert>
+              ) : null}
+            </Paper>
+
+            <Paper
+              elevation={0}
+              sx={{
+                p: 1.4,
+                borderRadius: 2.5,
+                border: "1px solid",
+                borderColor: "#EEF2F6",
+                bgcolor: "#fff",
+              }}
+            >
               <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <Avatar sx={{ bgcolor: "#F1F5F9", color: "#0C2D48", width: 34, height: 34 }}>
                     <AccountBalanceIcon fontSize="small" />
                   </Avatar>
-                  <Typography sx={{ fontWeight: 900 }}>Bank Account</Typography>
+                  <Typography sx={{ fontWeight: 900 }}>Bank Account Details</Typography>
                 </Stack>
               </Stack>
 
-              <Typography sx={{ color: "text.secondary", fontSize: 13 }}>
-                Bank details are captured in the KYC screen. Update them there.
+              <Grid container spacing={1}>
+                {[
+                  ["Name", consumerDetails.name],
+                  ["Phone Number", consumerDetails.phone],
+                  ["Pincode", consumerDetails.pincode],
+                  ["Bank Name", consumerDetails.bankName],
+                  ["Account Number", consumerDetails.accountNumber],
+                  ["IFSC Code", consumerDetails.ifsc],
+                ].map(([label, value]) => (
+                  <Grid item xs={12} sm={6} key={label}>
+                    <Box sx={{ border: "1px solid #E2E8F0", borderRadius: 2, p: 1 }}>
+                      <Typography sx={{ fontSize: 11, color: "text.secondary", fontWeight: 800 }}>
+                        {label}
+                      </Typography>
+                      <Typography sx={{ fontSize: 13, color: "#0C2D48", fontWeight: 900, mt: 0.25, overflowWrap: "anywhere" }}>
+                        {value || "-"}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                ))}
+              </Grid>
+              <Typography sx={{ color: "text.secondary", fontSize: 12, mt: 1 }}>
+                Bank details are auto-filled from KYC. Update them in the KYC screen if needed.
               </Typography>
             </Paper>
 
@@ -586,39 +667,50 @@ export default function Wallet() {
                 <Typography sx={{ fontWeight: 900 }}>Request Withdrawal</Typography>
               </Stack>
 
-              <Box component="form" onSubmit={submitWithdrawal}>
-                <Stack spacing={1.2}>
-                  <TextField
-                    size="small"
-                    label="Amount"
-                    placeholder="Enter amount"
-                    name="amount"
-                    value={wdrForm.amount}
-                    onChange={onWdrChange}
-                    type="number"
-                    inputProps={{ inputMode: "decimal", max: Number(mainBalance || 0), step: "0.01" }}
-                    required
-                  />
+              {withdrawalMode === "bank" ? (
+                <Box component="form" onSubmit={submitWithdrawal}>
+                  <Stack spacing={1.2}>
+                    <TextField
+                      size="small"
+                      label="Amount"
+                      placeholder="Enter amount"
+                      name="amount"
+                      value={wdrForm.amount}
+                      onChange={onWdrChange}
+                      type="number"
+                      inputProps={{ inputMode: "decimal", max: Number(withdrawableBalance || 0), step: "0.01" }}
+                      required
+                    />
 
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    disabled={Boolean(disableReason) || wdrSubmitting}
-                    sx={{
-                      fontWeight: 900,
-                      textTransform: "none",
-                      borderRadius: 2,
-                      py: 1.2,
-                    }}
-                  >
-                    {wdrSubmitting ? "Requesting..." : "Withdraw to Bank"}
-                  </Button>
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      disabled={Boolean(disableReason) || wdrSubmitting}
+                      sx={{
+                        fontWeight: 900,
+                        textTransform: "none",
+                        borderRadius: 2,
+                        py: 1.2,
+                      }}
+                    >
+                      {wdrSubmitting ? "Requesting..." : "Submit Bank Withdrawal"}
+                    </Button>
 
-                  <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
-                    Note: Withdrawals are debited only from your Withdrawable Wallet (Net). Bank details are captured in the KYC screen.
-                  </Typography>
-                </Stack>
-              </Box>
+                    <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                      Note: Withdrawals are debited from your withdraw pocket. Bank details are captured in the KYC screen.
+                    </Typography>
+                  </Stack>
+                </Box>
+              ) : (
+                <Button
+                  variant="contained"
+                  disabled
+                  fullWidth
+                  sx={{ fontWeight: 900, textTransform: "none", borderRadius: 2, py: 1.2 }}
+                >
+                  Instant UPI Withdrawal Coming Soon
+                </Button>
+              )}
             </Paper>
 
             <Paper

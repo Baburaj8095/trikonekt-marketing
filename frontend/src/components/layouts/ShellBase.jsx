@@ -3,20 +3,18 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import NotificationsBell from "../NotificationsBell";
 import { useCartStore } from "../../store/cartStore";
 
-/**
- * ShellBase
- * - Dark, professional sidebar (matches AdminShell)
- * - Mobile top bar with burger menu
- * - Content area with light background
- *
- * Props:
- * - title: string (used in mobile header and sidebar title)
- * - menu: Array<{ to: string; label: string; icon?: string; badge?: number|string }>
- * - isActive?: (to: string, location: ReturnType<useLocation>) => boolean
- * - onLogout?: () => void (if provided, Logout button is shown in sidebar footer)
- * - footerText?: string
- * - children: ReactNode
- */
+const shellTokens = {
+  bg: "#F5F7FA",
+  surface: "#ffffff",
+  text: "#0f172a",
+  muted: "#64748b",
+  border: "#e2e8f0",
+  primary: "#2563eb",
+  primarySoft: "rgba(37,99,235,0.08)",
+  sidebar: "#F8FAFC",
+  shadow: "0 14px 34px rgba(15,23,42,0.10)",
+};
+
 export default function ShellBase({
   title = "Console",
   menu = [],
@@ -73,7 +71,7 @@ export default function ShellBase({
   const activeCheck = useMemo(() => isActive || defaultIsActive, [isActive]);
 
   function Icon({ name, active }) {
-    const stroke = active ? "#0ea5e9" : "#94a3b8";
+    const stroke = active ? shellTokens.primary : "#64748b";
     const size = 18;
     switch (name) {
       case "dashboard":
@@ -230,15 +228,17 @@ export default function ShellBase({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 10,
-          padding: "11px 12px",
+          gap: 9,
+          position: "relative",
+          minHeight: 48,
+          padding: "8px 10px 8px 15px",
           borderRadius: 12,
-          color: active ? "#0ea5e9" : "#cbd5e1",
+          color: active ? shellTokens.primary : "#334155",
           textDecoration: "none",
-          background: active ? "linear-gradient(135deg, rgba(14,165,233,0.18), rgba(34,197,94,0.10))" : "transparent",
-          border: active ? "1px solid rgba(14,165,233,0.36)" : "1px solid transparent",
+          background: active ? shellTokens.primarySoft : "transparent",
+          border: "1px solid transparent",
           cursor: "pointer",
-          boxShadow: active ? "0 10px 24px rgba(2,132,199,0.12)" : "none",
+          boxShadow: "none",
           transition: "background 160ms ease, color 160ms ease, transform 140ms ease, border-color 160ms ease"
         }}
         onClick={() => {
@@ -254,8 +254,22 @@ export default function ShellBase({
           try { e.currentTarget.style.transform = "scale(1)"; } catch {}
         }}
       >
+        {active ? (
+          <span
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              left: 5,
+              top: 10,
+              bottom: 10,
+              width: 3,
+              borderRadius: 999,
+              background: shellTokens.primary,
+            }}
+          />
+        ) : null}
         {icon ? <Icon name={icon} active={active} /> : null}
-        <span style={{ fontWeight: active ? 700 : 600, fontSize: 14, flex: 1, minWidth: 0 }}>{label}</span>
+        <span style={{ fontWeight: active ? 800 : 600, fontSize: 13.25, flex: 1, minWidth: 0, lineHeight: 1.2 }}>{label}</span>
         {showBadge ? (
           <span
             aria-label="count"
@@ -284,7 +298,7 @@ export default function ShellBase({
     );
   }
 
-  const headerHeightMobile = 56;
+  const headerHeightMobile = 54;
   const sidebarWidth = 260;
   const sidebarGap = 20;
   const topOffset = isMobile ? headerHeightMobile : 0;
@@ -332,7 +346,7 @@ export default function ShellBase({
   }
 
   return (
-    <div className="role-shell-scope" style={{ minHeight: "100vh", background: "#f6f8fb" }}>
+    <div className="role-shell-scope" style={{ minHeight: "100vh", background: shellTokens.bg }}>
       {/* Top bar: shown only on mobile */}
       {isMobile ? (
         <div
@@ -341,15 +355,15 @@ export default function ShellBase({
     position: "sticky",
     top: 0,
     zIndex: 1060,
-    height: 58,
+    height: 54,
     display: "grid",
-    gridTemplateColumns: "48px 1fr max-content",
+    gridTemplateColumns: "46px 1fr max-content",
     alignItems: "center",
     padding: "0 10px",
     paddingTop: "env(safe-area-inset-top)",
-    borderBottom: "1px solid rgba(226,232,240,0.82)",
-    background: "rgba(255,255,255,0.86)",
-    boxShadow: "0 10px 30px rgba(15,23,42,0.07)",
+    borderBottom: "1px solid rgba(226,232,240,0.92)",
+    background: "rgba(255,255,255,0.92)",
+    boxShadow: "0 10px 24px rgba(15,23,42,0.06)",
   }}
 >
   {/* LEFT */}
@@ -358,12 +372,12 @@ export default function ShellBase({
       aria-label="Toggle sidebar"
       onClick={() => setSidebarOpen((v) => !v)}
       style={{
-        width: 36,
-        height: 36,
-        borderRadius: 12,
+        width: 34,
+        height: 34,
+        borderRadius: 14,
         border: "1px solid rgba(226,232,240,0.92)",
-        background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
-        boxShadow: "0 8px 18px rgba(15,23,42,0.08)",
+        background: "#ffffff",
+        boxShadow: "0 8px 18px rgba(15,23,42,0.06)",
         cursor: "pointer",
         justifySelf: "start",
         transition: "transform 140ms ease, box-shadow 160ms ease",
@@ -379,12 +393,12 @@ export default function ShellBase({
       aria-label="Go back"
       onClick={handleBack}
       style={{
-        width: 36,
-        height: 36,
-        borderRadius: 12,
+        width: 34,
+        height: 34,
+        borderRadius: 14,
         border: "1px solid rgba(226,232,240,0.92)",
-        background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
-        boxShadow: "0 8px 18px rgba(15,23,42,0.08)",
+        background: "#ffffff",
+        boxShadow: "0 8px 18px rgba(15,23,42,0.06)",
         cursor: "pointer",
         justifySelf: "start",
         transition: "transform 140ms ease, box-shadow 160ms ease",
@@ -401,9 +415,9 @@ export default function ShellBase({
   <div
     style={{
       textAlign: "center",
-      fontWeight: 700,
-      fontSize: 16,
-      color: "#0f172a",
+      fontWeight: 850,
+      fontSize: 15.5,
+      color: shellTokens.text,
       whiteSpace: "nowrap",
       overflow: "hidden",
       textOverflow: "ellipsis",
@@ -424,13 +438,13 @@ export default function ShellBase({
         alignItems: "center",
         gap: 6,
         textDecoration: "none",
-        color: "#0f172a",
-        minHeight: 38,
+        color: shellTokens.text,
+        minHeight: 36,
         padding: "0 8px",
-        borderRadius: 12,
+        borderRadius: 14,
         border: "1px solid rgba(226,232,240,0.92)",
-        background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
-        boxShadow: "0 8px 18px rgba(15,23,42,0.08)",
+        background: "#ffffff",
+        boxShadow: "0 8px 18px rgba(15,23,42,0.06)",
         transition: "transform 140ms ease",
       }}
       onMouseDown={(e) => { try { e.currentTarget.style.transform = "scale(0.96)"; } catch {} }}
@@ -470,7 +484,7 @@ export default function ShellBase({
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(15,23,42,0.42)",
+            background: "rgba(15,23,42,0.35)",
             backdropFilter: "blur(8px)",
             WebkitBackdropFilter: "blur(8px)",
             zIndex: 1040,
@@ -496,19 +510,19 @@ export default function ShellBase({
             overscrollBehavior: "contain",
             touchAction: "pan-y",
             transition: isMobile ? "width 220ms cubic-bezier(.2,.8,.2,1), min-width 220ms cubic-bezier(.2,.8,.2,1)" : "none",
-            background: "linear-gradient(180deg, #0f172a 0%, #111827 52%, #0b1120 100%)",
-            borderRight: "1px solid rgba(148,163,184,0.14)",
-            boxShadow: isMobile ? "18px 0 50px rgba(15,23,42,0.28)" : "10px 0 30px rgba(15,23,42,0.08)",
-            padding: (isMobile && !sidebarOpen) ? 0 : "12px",
+            background: shellTokens.sidebar,
+            borderRight: `1px solid ${shellTokens.border}`,
+            boxShadow: isMobile ? "18px 0 50px rgba(15,23,42,0.16)" : "8px 0 24px rgba(15,23,42,0.04)",
+            padding: (isMobile && !sidebarOpen) ? 0 : "10px",
           }}
         >
           {(isMobile && !sidebarOpen) ? null : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, minHeight: "100%" }}>
-              <div style={{ color: "#cbd5e1", fontWeight: 900, fontSize: 14, padding: "2px 4px 10px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, minHeight: "100%" }}>
+              <div style={{ color: shellTokens.text, fontWeight: 850, fontSize: 14, padding: "6px 6px 10px", borderBottom: `1px solid rgba(226,232,240,0.72)`, marginBottom: 4 }}>
                 {title} Menu
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1, minHeight: 0 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1, minHeight: 0 }}>
 
               {(() => {
                 const nodes = [];
@@ -541,18 +555,17 @@ export default function ShellBase({
                     const open = collapsible ? ((openSections[label] ?? true) || anyActive) : true;
 
                     nodes.push(
-                      <div key={`secwrap-${label}-${i}`} style={{ marginTop: 6 }}>
+                      <div key={`secwrap-${label}-${i}`} style={{ marginTop: 5, paddingTop: 3 }}>
                         <div
                           style={{
                             display: "flex",
                             alignItems: "center",
-                            gap: 8,
-                            padding: "10px 8px",
-                            borderRadius: 8,
-                            color: "#cbd5e1",
-                            background: anyActive ? "rgba(14,165,233,0.08)" : "transparent",
-                            border: "1px solid",
-                            borderColor: anyActive ? "rgba(14,165,233,0.25)" : "transparent",
+                            gap: 7,
+                            padding: "6px 6px 5px",
+                            borderRadius: 10,
+                            color: "#94A3B8",
+                            background: "transparent",
+                            border: "1px solid transparent",
                           }}
                         >
                           {to ? (
@@ -574,14 +587,14 @@ export default function ShellBase({
                               aria-expanded={open ? "true" : "false"}
                             >
                               {secIcon ? <Icon name={secIcon} active={anyActive} /> : null}
-                              <span style={{ fontWeight: 800, fontSize: 12, textTransform: "uppercase", letterSpacing: 0.6 }}>
+                              <span style={{ fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em" }}>
                                 {label}
                               </span>
                             </Link>
                           ) : (
                             <>
                               {secIcon ? <Icon name={secIcon} active={anyActive} /> : null}
-                              <span style={{ fontWeight: 800, fontSize: 12, textTransform: "uppercase", letterSpacing: 0.6 }}>
+                              <span style={{ fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em" }}>
                                 {label}
                               </span>
                             </>
@@ -594,7 +607,7 @@ export default function ShellBase({
                                 marginLeft: "auto",
                                 background: "transparent",
                                 border: "none",
-                                color: "#94a3b8",
+                                color: shellTokens.muted,
                                 cursor: "pointer",
                                 fontSize: 14,
                                 lineHeight: 1,
@@ -606,7 +619,7 @@ export default function ShellBase({
                         </div>
 
                         {open ? (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 6, paddingLeft: 8 }}>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 2, paddingLeft: 2 }}>
                             {children.map((c, cidx) => (
                               <NavLink
                                 key={c.to || c.label || `c${cidx}`}
@@ -639,20 +652,20 @@ export default function ShellBase({
               </div>
 
               <div style={{ marginTop: "auto", paddingTop: 8 }}>
-                <div style={{ borderTop: "1px solid #0b1220" }} />
+                <div style={{ borderTop: `1px solid ${shellTokens.border}` }} />
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "8px 4px", flexWrap: "wrap" }}>
-                <div style={{ color: "#64748b", fontSize: 11 }}>
+                <div style={{ color: shellTokens.muted, fontSize: 11, lineHeight: 1.35 }}>
                   {footerText || `© ${new Date().getFullYear()}`}
                 </div>
                 {onLogout ? (
                   <button
                     onClick={onLogout}
                     style={{
-                      border: "1px solid rgba(14,165,233,0.35)",
-                      background: "linear-gradient(135deg, #0ea5e9 0%, #22c55e 100%)",
+                      border: "1px solid rgba(37,99,235,0.25)",
+                      background: "linear-gradient(135deg, #2563eb 0%, #0f766e 100%)",
                       color: "#fff",
                       fontWeight: 700,
-                      borderRadius: 8,
+                      borderRadius: 12,
                       padding: "6px 10px",
                       cursor: "pointer",
                     }}
@@ -671,7 +684,7 @@ export default function ShellBase({
           style={{
             flex: 1,
             minWidth: 0,
-            padding: isMobile ? 12 : 16,
+            padding: isMobile ? 10 : 16,
             paddingBottom: isMobile ? "max(12px, env(safe-area-inset-bottom))" : 16,
             marginLeft: isMobile ? 0 : (sidebarWidth + sidebarGap),
             width: "100%",
@@ -691,10 +704,10 @@ export default function ShellBase({
                   top: 0,
                   zIndex: 20,
                   padding: "8px 10px",
-                  borderRadius: 16,
-                  background: "rgba(255,255,255,0.78)",
-                  border: "1px solid rgba(226,232,240,0.82)",
-                  boxShadow: "0 10px 30px rgba(15,23,42,0.06)",
+                  borderRadius: 18,
+                  background: "rgba(255,255,255,0.90)",
+                  border: "1px solid rgba(226,232,240,0.92)",
+                  boxShadow: "0 10px 24px rgba(15,23,42,0.06)",
                 }}
               >
                 {rightHeaderContent ? <div>{rightHeaderContent}</div> : null}
@@ -707,13 +720,13 @@ export default function ShellBase({
                     alignItems: "center",
                     gap: 6,
                     textDecoration: "none",
-                    color: "#0f172a",
+                    color: shellTokens.text,
                     minHeight: 38,
                     padding: "0 8px",
-                    borderRadius: 12,
+                    borderRadius: 14,
                     border: "1px solid rgba(226,232,240,0.92)",
-                    background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
-                    boxShadow: "0 8px 18px rgba(15,23,42,0.08)",
+                    background: "#ffffff",
+                    boxShadow: "0 8px 18px rgba(15,23,42,0.06)",
                   }}
                 >
                   <CartIcon size={22} />

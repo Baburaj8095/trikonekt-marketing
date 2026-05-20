@@ -318,12 +318,12 @@ export default function Profile() {
     kyc.verified && !kyc.kyc_reopen_allowed && !kyc.can_submit_kyc;
 
   return (
-    <Box sx={{ maxWidth: 880, mx: "auto" }}>
-      <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
+    <Box className="consumer-fintech-page" sx={{ maxWidth: 880, mx: "auto", px: { xs: 0.5, sm: 0 } }}>
+      <Typography variant="h5" sx={{ mb: 1.5, fontWeight: 950, color: "#0f172a" }}>
         Profile
       </Typography>
 
-      <Paper sx={{ p: 2, mb: 2 }}>
+      <Paper elevation={0} className="consumer-fintech-card" sx={{ p: { xs: 0.75, sm: 1 }, mb: 2, borderRadius: 3 }}>
         <Tabs
           value={tab}
           onChange={(_, v) => setTab(v)}
@@ -353,15 +353,15 @@ export default function Profile() {
             </Alert>
           ) : null}
 
-          <Paper sx={{ p: 2 }}>
+          <Paper elevation={0} className="consumer-fintech-card" sx={{ p: { xs: 2, sm: 2.5 }, borderRadius: 3 }}>
             <Stack spacing={2}>
-              <Stack direction="row" spacing={2} alignItems="center">
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "flex-start", sm: "center" }}>
                 <Avatar
                   src={avatarUrl ? normalizeMediaUrl(avatarUrl) : undefined}
                   alt={storedUser?.username || "You"}
-                  sx={{ width: 72, height: 72 }}
+                  sx={{ width: 78, height: 78, boxShadow: "0 12px 28px rgba(15,23,42,0.12)" }}
                 />
-                <Button variant="outlined" component="label">
+                <Button variant="outlined" component="label" sx={{ width: { xs: "100%", sm: "auto" } }}>
                   Upload personal photo
                   <input
                     type="file"
@@ -443,7 +443,7 @@ export default function Profile() {
                 size="small"
               />
 
-              <Stack direction="row" spacing={2}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                 <Button variant="contained" disabled={busy} onClick={onSavePersonal}>
                   {busy ? "Saving..." : "Save"}
                 </Button>
@@ -467,12 +467,12 @@ export default function Profile() {
             </Alert>
           ) : null}
 
-          <Paper sx={{ p: 2 }}>
+          <Paper elevation={0} className="consumer-fintech-card" sx={{ p: { xs: 2, sm: 2.5 }, borderRadius: 3 }}>
             <Stack spacing={2}>
               <Stack
-                direction="row"
+                direction={{ xs: "column", sm: "row" }}
                 spacing={1}
-                alignItems="center"
+                alignItems={{ xs: "flex-start", sm: "center" }}
                 justifyContent="space-between"
               >
                 <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
@@ -539,7 +539,7 @@ export default function Profile() {
 
               <Divider />
 
-              <Stack direction="row" spacing={2}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                 <Button
                   variant="contained"
                   disabled={kycBusy || kycLocked}
@@ -567,7 +567,7 @@ export default function Profile() {
             </Alert>
           ) : null}
 
-          <Paper sx={{ p: 2 }}>
+          <Paper elevation={0} className="consumer-fintech-card" sx={{ p: { xs: 2, sm: 2.5 }, borderRadius: 3 }}>
             <Stack spacing={2}>
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
                 Aadhaar DigiLocker
@@ -592,7 +592,7 @@ export default function Profile() {
                 disabled={kycLocked}
               />
 
-              <Stack direction="row" spacing={2}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                 <Button
                   variant="contained"
                   disabled={aadhaarBusy || kycLocked}
@@ -614,7 +614,7 @@ export default function Profile() {
               {nomineeOk}
             </Alert>
           ) : null}
-          <Paper sx={{ p: 2 }}>
+          <Paper elevation={0} className="consumer-fintech-card" sx={{ p: { xs: 2, sm: 2.5 }, borderRadius: 3 }}>
             <Stack spacing={2}>
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
                 Nominee details
@@ -667,7 +667,7 @@ export default function Profile() {
                 minRows={3}
               />
 
-              <Stack direction="row" spacing={2}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                 <Button variant="contained" onClick={saveNomineeLocal}>
                   Save Nominee (Local)
                 </Button>
