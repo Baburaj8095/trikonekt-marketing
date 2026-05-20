@@ -2363,6 +2363,7 @@ class PromoPurchase(models.Model):
                     raise ValidationError({"boxes_json": "Boxes must be integers."})
                 if not boxes_int:
                     raise ValidationError({"boxes_json": "Select at least one box."})
+
                 # Determine total boxes from seed (if present) else default 12
                 total = 12
                 try:
@@ -2413,6 +2414,67 @@ class PromoPurchase(models.Model):
             except Exception:
                 self.amount_paid = 0
         super().save(*args, **kwargs)
+
+
+class InvoiceSettings(models.Model):
+    company_name = models.CharField(max_length=180, default="Trikonekt")
+    gst_number = models.CharField(max_length=32, blank=True, default="")
+    company_address = models.TextField(blank=True, default="")
+    company_phone = models.CharField(max_length=32, blank=True, default="")
+    company_email = models.EmailField(blank=True, default="")
+    logo = models.ImageField(upload_to="uploads/invoice/", null=True, blank=True, storage=MEDIA_STORAGE)
+    invoice_prefix = models.CharField(max_length=24, default="TRK/INV/")
+    gst_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    footer_text = models.TextField(blank=True, default="Thank you for your purchase.")
+    is_active = models.BooleanField(default=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-is_active", "-updated_at", "-id"]
+
+    def __str__(self):
+        return f"InvoiceSettings<{self.company_name}>"
+
+
+class PackageInvoice(models.Model):
+    promo_purchase = models.OneToOneField(PromoPurchase, on_delete=models.CASCADE, related_name="invoice")
+    invoice_number = models.CharField(max_length=48, unique=True, db_index=True)
+    invoice_date = models.DateTimeField(default=timezone.now, db_index=True)
+
+    company_name = models.CharField(max_length=180)
+    company_gst_number = models.CharField(max_length=32, blank=True, default="")
+    company_address = models.TextField(blank=True, default="")
+    company_phone = models.CharField(max_length=32, blank=True, default="")
+    company_email = models.EmailField(blank=True, default="")
+    logo_url = models.CharField(max_length=500, blank=True, default="")
+
+    consumer_name = models.CharField(max_length=180, blank=True, default="")
+    consumer_phone = models.CharField(max_length=32, blank=True, default="")
+    consumer_username = models.CharField(max_length=180, blank=True, default="")
+    consumer_address = models.TextField(blank=True, default="")
+    consumer_city = models.CharField(max_length=120, blank=True, default="")
+    consumer_state = models.CharField(max_length=120, blank=True, default="")
+    consumer_pincode = models.CharField(max_length=20, blank=True, default="")
+
+    package_name = models.CharField(max_length=180)
+    package_code = models.CharField(max_length=80, blank=True, default="")
+    quantity = models.PositiveIntegerField(default=1)
+    taxable_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    gst_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    gst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    payment_mode = models.CharField(max_length=32, blank=True, default="")
+    footer_text = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-invoice_date", "-id"]
+        indexes = [
+            models.Index(fields=["invoice_date", "invoice_number"]),
+        ]
+
+    def __str__(self):
+        return self.invoice_number
 
 
 class PromoProductOrder(models.Model):

@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.http import HttpResponse
 from django.db.models import Q, Sum, Count
 from django.conf import settings
+from io import BytesIO
 import time
 import logging
 import os
@@ -2058,7 +2059,70 @@ class AdminPromoPurchaseApproveView(APIView):
             except Exception:
                 pass
 
+            try:
+                from .invoices import ensure_invoice_for_purchase
+                transaction.on_commit(lambda: ensure_invoice_for_purchase(obj))
+            except Exception:
+                pass
+
         return Response(PromoPurchaseSerializer(obj, context={"request": request}).data, status=status.HTTP_200_OK)
+
+
+class PrimePackageInvoiceListView(APIView):
+    """List invoices for the logged-in consumer's approved Prime package purchases."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from .invoices import ensure_invoice_for_purchase, invoice_payload
+        from .models import PackageInvoice, PromoPurchase
+
+        purchases = PromoPurchase.objects.select_related("user", "user__city", "user__state", "package").filter(
+            user=request.user,
+            status="APPROVED",
+            package__type="PRIME",
+        ).order_by("-approved_at", "-id")[:200]
+
+        for purchase in purchases:
+            try:
+                ensure_invoice_for_purchase(purchase)
+            except Exception:
+                pass
+
+        invoices = PackageInvoice.objects.filter(promo_purchase__user=request.user).select_related(
+            "promo_purchase", "promo_purchase__package"
+        ).order_by("-invoice_date", "-id")[:200]
+        return Response([invoice_payload(inv) for inv in invoices], status=status.HTTP_200_OK)
+
+
+class PrimePackageInvoicePdfView(APIView):
+    """Download one logged-in consumer Prime package invoice as PDF."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk: int):
+        from .invoices import invoice_html
+        from .models import PackageInvoice
+
+        inv = PackageInvoice.objects.filter(pk=pk, promo_purchase__user=request.user).select_related("promo_purchase").first()
+        if not inv:
+            return Response({"detail": "Invoice not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            from xhtml2pdf import pisa
+            from accounts.views import _xhtml2pdf_link_callback
+        except Exception:
+            return Response({"detail": "PDF engine is not available."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        pdf_io = BytesIO()
+        result = pisa.CreatePDF(src=invoice_html(inv), dest=pdf_io, link_callback=_xhtml2pdf_link_callback)
+        if getattr(result, "err", False):
+            return Response({"detail": "Failed to generate invoice PDF."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        filename = f"Trikonekt_Invoice_{inv.invoice_number.replace('/', '_')}.pdf"
+        resp = HttpResponse(pdf_io.getvalue(), content_type="application/pdf")
+        resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return resp
 
 
 class AdminPromoPurchaseRejectView(APIView):

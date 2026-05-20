@@ -24,6 +24,8 @@ from .views import (
     AdminPromoPurchaseListView,
     AdminPromoPurchaseApproveView,
     AdminPromoPurchaseRejectView,
+    PrimePackageInvoiceListView,
+    PrimePackageInvoicePdfView,
     # Rewards points summary
     RewardPointsSummaryView,
     # Promo 750 preview
@@ -105,6 +107,8 @@ urlpatterns = [
     path('promo/packages/', PromoPackageListView.as_view(), name='promo_packages_list'),
     path('promo/purchases/', PromoPurchaseMeListCreateView.as_view(), name='promo_purchases_me'),
     path('promo/purchases/pay-from-wallet/', PromoPurchasePayFromWalletView.as_view(), name='promo_purchases_pay_from_wallet'),
+    path('promo/prime-invoices/', PrimePackageInvoiceListView.as_view(), name='promo_prime_invoices'),
+    path('promo/prime-invoices/<int:pk>/pdf/', PrimePackageInvoicePdfView.as_view(), name='promo_prime_invoice_pdf'),
     path('admin/promo/purchases/', AdminPromoPurchaseListView.as_view(), name='admin_promo_purchases_list'),
     path('admin/promo/purchases/<int:pk>/approve/', AdminPromoPurchaseApproveView.as_view(), name='admin_promo_purchase_approve'),
     path('admin/promo/purchases/<int:pk>/reject/', AdminPromoPurchaseRejectView.as_view(), name='admin_promo_purchase_reject'),

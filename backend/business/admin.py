@@ -7,8 +7,23 @@ from django import forms
 from decimal import Decimal
 import json
 
-from .models import BusinessRegistration, MerchantCategory, MerchantSubCategory, CommissionConfig, RootConsumerConfig, AutoPoolAccount, RewardProgress, RewardRedemption, UserMatrixProgress, ReferralJoinPayout, FranchisePayout, DailyReport, WithholdingReserve, Package, AgencyPackageAssignment, AgencyPackagePayment, PromoPackage, PromoProduct, PromoPurchase, PromoPackageProduct, PromoMonthlyPackage, PromoMonthlyBox, PromoEBook, PromoPackageEBook, EBookAccess, TriApp, TriAppProduct, TeamConsumerEducationalVideo, TeamConsumerDocument
+from .models import BusinessRegistration, MerchantCategory, MerchantSubCategory, CommissionConfig, RootConsumerConfig, AutoPoolAccount, RewardProgress, RewardRedemption, UserMatrixProgress, ReferralJoinPayout, FranchisePayout, DailyReport, WithholdingReserve, Package, AgencyPackageAssignment, AgencyPackagePayment, PromoPackage, PromoProduct, PromoPurchase, PromoPackageProduct, PromoMonthlyPackage, PromoMonthlyBox, PromoEBook, PromoPackageEBook, EBookAccess, TriApp, TriAppProduct, TeamConsumerEducationalVideo, TeamConsumerDocument, InvoiceSettings, PackageInvoice
 from accounts.models import CustomUser
+
+
+@admin.register(InvoiceSettings)
+class InvoiceSettingsAdmin(admin.ModelAdmin):
+    list_display = ("company_name", "gst_number", "invoice_prefix", "gst_percent", "is_active", "updated_at")
+    list_filter = ("is_active",)
+    search_fields = ("company_name", "gst_number")
+
+
+@admin.register(PackageInvoice)
+class PackageInvoiceAdmin(admin.ModelAdmin):
+    list_display = ("invoice_number", "consumer_name", "consumer_phone", "package_name", "total_amount", "invoice_date")
+    search_fields = ("invoice_number", "consumer_name", "consumer_phone", "consumer_username", "package_name")
+    list_filter = ("payment_mode", "invoice_date")
+    readonly_fields = ("promo_purchase", "invoice_number", "invoice_date", "created_at")
 
 
 @admin.register(TeamConsumerEducationalVideo)

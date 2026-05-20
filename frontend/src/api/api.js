@@ -1076,6 +1076,16 @@ export async function createWalletUploadRequest({ amount, utr, proof, remarks = 
   return res.data;
 }
 
+export async function listWalletUploadRequests(params = {}) {
+  const res = await API.get("/accounts/wallet/upload-requests/", { params });
+  return res.data;
+}
+
+export async function listPrimePackageInvoices(params = {}) {
+  const res = await API.get("/business/promo/prime-invoices/", { params });
+  return res.data;
+}
+
 /**
  * Marketplace: Product purchase request (consumer checkout -> admin/owner approval)
  * Payload: { product, quantity, consumer_name, consumer_email, consumer_phone, consumer_address, payment_method }

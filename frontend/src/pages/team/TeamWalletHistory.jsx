@@ -18,7 +18,8 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import API from "../../api/api";
+import { useSearchParams } from "react-router-dom";
+import API, { listWalletUploadRequests } from "../../api/api";
 
 function fmtAmount(value) {
   const num = Number(value || 0);
@@ -157,12 +158,96 @@ function VoucherTable({ rows }) {
   );
 }
 
+function statusChipColor(status) {
+  switch (String(status || "").toUpperCase()) {
+    case "APPROVED":
+      return "success";
+    case "REJECTED":
+      return "error";
+    case "PENDING":
+      return "warning";
+    default:
+      return "default";
+  }
+}
+
+function AddMoneyTable({ rows }) {
+  return (
+    <Paper variant="outlined" sx={{ borderRadius: 2, overflow: "hidden", bgcolor: "#fff" }}>
+      <Box sx={{ px: 1.5, py: 1.25, borderBottom: "1px solid #e2e8f0" }}>
+        <Typography sx={{ fontWeight: 900, color: "#0f172a" }}>Add Money History</Typography>
+      </Box>
+      <TableContainer sx={{ overflowX: "auto" }}>
+        <Table size="small" sx={{ minWidth: 920 }}>
+          <TableHead>
+            <TableRow sx={{ bgcolor: "#f8fafc" }}>
+              <TableCell sx={{ fontWeight: 900 }}>SL No</TableCell>
+              <TableCell sx={{ fontWeight: 900 }}>Requested At</TableCell>
+              <TableCell sx={{ fontWeight: 900 }}>Amount</TableCell>
+              <TableCell sx={{ fontWeight: 900 }}>UTR No</TableCell>
+              <TableCell sx={{ fontWeight: 900 }}>Proof</TableCell>
+              <TableCell sx={{ fontWeight: 900 }}>Approved / Rejected At</TableCell>
+              <TableCell sx={{ fontWeight: 900 }}>Remarks</TableCell>
+              <TableCell sx={{ fontWeight: 900 }}>Status</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {rows.map((row, index) => (
+              <TableRow key={row.id || index}>
+                <TableCell>{index + 1}</TableCell>
+                <TableCell>{fmtDate(row.requested_at)}</TableCell>
+                <TableCell>Rs. {fmtAmount(row.amount)}</TableCell>
+                <TableCell>{row.utr || "-"}</TableCell>
+                <TableCell>
+                  {row.proof ? (
+                    <Button
+                      size="small"
+                      href={row.proof}
+                      target="_blank"
+                      rel="noreferrer"
+                      sx={{ textTransform: "none", fontWeight: 800 }}
+                    >
+                      View
+                    </Button>
+                  ) : (
+                    "-"
+                  )}
+                </TableCell>
+                <TableCell>{fmtDate(row.decided_at)}</TableCell>
+                <TableCell>{row.reject_reason || row.remarks || "-"}</TableCell>
+                <TableCell>
+                  <Chip
+                    size="small"
+                    color={statusChipColor(row.status)}
+                    label={row.status || "-"}
+                    sx={{ fontWeight: 800 }}
+                  />
+                </TableCell>
+              </TableRow>
+            ))}
+            {!rows.length && (
+              <TableRow>
+                <TableCell colSpan={8} sx={{ color: "#94a3b8", py: 3, textAlign: "center" }}>
+                  No add money history found.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Paper>
+  );
+}
+
 export default function TeamWalletHistory() {
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [transactions, setTransactions] = useState([]);
   const [vouchers, setVouchers] = useState([]);
-  const [tab, setTab] = useState("coupon");
+  const initialTab = searchParams.get("tab") === "add-money" ? "add-money" : "coupon";
+  const [uploadRequests, setUploadRequests] = useState([]);
+  const [tab, setTab] = useState(initialTab);
   const [voucherType, setVoucherType] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -171,14 +256,19 @@ export default function TeamWalletHistory() {
     try {
       setLoading(true);
       setError("");
-      const [txRes, voucherRes] = await Promise.all([
+      const [txRes, voucherRes, uploadRes] = await Promise.all([
         API.get("/accounts/wallet/me/transactions/", {
           params: { page_size: 100, date_from: dateFrom || undefined, date_to: dateTo || undefined },
         }),
         API.get("/accounts/wallet/vouchers/"),
+        listWalletUploadRequests({
+          date_from: dateFrom || undefined,
+          date_to: dateTo || undefined,
+        }),
       ]);
       setTransactions(txRes?.data?.results || []);
       setVouchers(voucherRes?.data?.results || []);
+      setUploadRequests(Array.isArray(uploadRes) ? uploadRes : uploadRes?.results || []);
     } catch (err) {
       setError(err?.response?.data?.detail || "Failed to load team wallet history.");
     } finally {
@@ -190,6 +280,12 @@ export default function TeamWalletHistory() {
     load();
     // Load once on mount. Filters use the Search button.
   }, []);
+
+  useEffect(() => {
+    if (searchParams.get("tab") === "add-money") {
+      setTab("add-money");
+    }
+  }, [searchParams]);
 
   const rows = useMemo(() => {
     const coupon = buildTransferRows(transactions, "MAIN_TO_COUPON", "COUPON_WALLET_CREDIT", "Coupon Pocket");
@@ -236,6 +332,7 @@ export default function TeamWalletHistory() {
           <Tab value="coupon" label="Coupon Pocket" />
           <Tab value="internal" label="Buy Package Pocket" />
           <Tab value="withdrawal" label="Withdrawal Pocket" />
+          <Tab value="add-money" label="Add Money" />
           <Tab value="vouchers" label="Vouchers" />
         </Tabs>
       </Paper>
@@ -268,6 +365,7 @@ export default function TeamWalletHistory() {
         {tab === "withdrawal" && (
           <HistoryTable title="Withdrawal To Pocket History" rows={rows.withdrawal} pocketHeader="Withdrawal To Wallet" />
         )}
+        {tab === "add-money" && <AddMoneyTable rows={uploadRequests} />}
         {tab === "vouchers" && <VoucherTable rows={filteredVouchers} />}
       </Stack>
     </Box>

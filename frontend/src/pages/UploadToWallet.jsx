@@ -6,6 +6,10 @@ import {
   Chip,
   CircularProgress,
   Divider,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Paper,
   Stack,
   TextField,
@@ -15,6 +19,7 @@ import QrCode2RoundedIcon from "@mui/icons-material/QrCode2Rounded";
 import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
 import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceWalletRounded";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import normalizeMediaUrl from "../utils/media";
 import API, { createWalletUploadRequest, getEcouponStoreBootstrap } from "../api/api";
 import { useNavigate } from "react-router-dom";
@@ -39,6 +44,7 @@ export default function UploadToWallet() {
   const [loading, setLoading] = useState(true);
   const [screenError, setScreenError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [successOpen, setSuccessOpen] = useState(false);
   const [paymentConfig, setPaymentConfig] = useState(null);
   const [profile, setProfile] = useState(null);
 
@@ -139,9 +145,8 @@ export default function UploadToWallet() {
         utr: String(form.utr || "").trim(),
         proof: form.bill,
       });
-      setSuccessMsg(
-        "Wallet upload request submitted. After admin approval it will show in Add Money Pocket."
-      );
+      setSuccessMsg("Payment is successfully inittated");
+      setSuccessOpen(true);
       setForm({ amount: "", utr: "", bill: null });
       setFileInputKey((prev) => prev + 1);
     } catch (err) {
@@ -183,7 +188,7 @@ export default function UploadToWallet() {
         <Button
           variant="outlined"
           startIcon={<HistoryRoundedIcon />}
-          onClick={() => navigate("/user/history")}
+          onClick={() => navigate("/user/team-history?tab=add-money")}
           sx={{ textTransform: "none", borderRadius: 2 }}
         >
           History
@@ -413,7 +418,7 @@ export default function UploadToWallet() {
 
                     <Button
                       variant="text"
-                      onClick={() => navigate("/user/history")}
+                      onClick={() => navigate("/user/team-history?tab=add-money")}
                       sx={{ textTransform: "none", fontWeight: 700 }}
                     >
                       View History
@@ -425,6 +430,32 @@ export default function UploadToWallet() {
           )}
         </Box>
       </Paper>
+
+      <Dialog open={successOpen} onClose={() => setSuccessOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ textAlign: "center", pt: 3 }}>
+          <CheckCircleRoundedIcon color="success" sx={{ fontSize: 56, mb: 1 }} />
+          <Typography sx={{ fontWeight: 900, color: "#0f172a" }}>
+            {successMsg || "Payment is successfully inittated"}
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ textAlign: "center", color: "text.secondary" }}>
+            Your Add Money request is waiting for admin approval.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: "center", px: 3, pb: 3 }}>
+          <Button onClick={() => setSuccessOpen(false)} sx={{ textTransform: "none" }}>
+            Close
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => navigate("/user/team-history?tab=add-money")}
+            sx={{ textTransform: "none", fontWeight: 800 }}
+          >
+            View History
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

@@ -64,6 +64,7 @@ except Exception:
 class WalletUploadRequestCreateView(APIView):
     """User submits a wallet upload request for admin approval.
 
+    GET /api/accounts/wallet/upload-requests/
     POST /api/accounts/wallet/upload-requests/
     body: multipart/form-data { amount, utr?, proof(file), remarks? }
 
@@ -72,6 +73,20 @@ class WalletUploadRequestCreateView(APIView):
 
     permission_classes = [IsAuthenticated]
     parser_classes = [parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser]
+
+    def get(self, request):
+        qs = WalletUploadRequest.objects.filter(user=request.user).order_by("-requested_at", "-id")
+        st = (request.query_params.get("status") or "").strip().upper()
+        if st in ("PENDING", "APPROVED", "REJECTED", "CANCELLED"):
+            qs = qs.filter(status=st)
+        date_from = (request.query_params.get("date_from") or "").strip()
+        date_to = (request.query_params.get("date_to") or "").strip()
+        if date_from:
+            qs = qs.filter(requested_at__date__gte=date_from)
+        if date_to:
+            qs = qs.filter(requested_at__date__lte=date_to)
+        data = WalletUploadRequestSerializer(qs[:500], many=True, context={"request": request}).data
+        return Response(data, status=status.HTTP_200_OK)
 
     def post(self, request):
         ser = WalletUploadRequestCreateSerializer(data=request.data, context={"request": request})

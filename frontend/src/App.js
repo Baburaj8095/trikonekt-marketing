@@ -28,6 +28,7 @@ import MyTeam from "./pages/team/MyTeam";
 import Genealogy5 from "./pages/team/Genealogy5";
 import TeamDocumentDownload from "./pages/team/TeamDocumentDownload";
 import TeamWalletHistory from "./pages/team/TeamWalletHistory";
+import PrimeInvoices from "./pages/team/PrimeInvoices";
 import EmployeeDailyReport from "./pages/reports/EmployeeDailyReport";
 import AgencyDailyReport from "./pages/reports/AgencyDailyReport";
 import AdminProtectedRoute from "./components/AdminProtectedRoute";
@@ -486,6 +487,16 @@ function App() {
             <ProtectedRoute allowedRoles={["user"]}>
               <ConsumerShell>
                 <TeamWalletHistory />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/prime-invoices"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <PrimeInvoices />
               </ConsumerShell>
             </ProtectedRoute>
           }
