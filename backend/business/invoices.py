@@ -124,7 +124,7 @@ def invoice_payload(inv):
     }
 
 
-def invoice_html(inv):
+def invoice_html(inv, include_logo=True):
     def money(value):
         try:
             return f"{Decimal(str(value or 0)):.2f}"
@@ -153,7 +153,7 @@ def invoice_html(inv):
         ]
         if x
     )
-    logo = f'<img src="{escape(inv.logo_url)}" class="logo" />' if inv.logo_url else ""
+    logo = f'<img src="{escape(inv.logo_url)}" class="logo" />' if include_logo and inv.logo_url else ""
     date_text = timezone.localtime(inv.invoice_date).strftime("%d %b %Y, %I:%M %p")
 
     return f"""

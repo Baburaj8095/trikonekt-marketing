@@ -73,6 +73,8 @@ function renderStatusBadge(s) {
 }
 
 export default function AdminWalletUploadApprovals() {
+  const tableMinWidth = 960;
+  const tableColumns = "140px 160px minmax(260px, 1fr) 120px 120px 160px";
   const [status, setStatus] = useState("PENDING");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
@@ -128,15 +130,15 @@ export default function AdminWalletUploadApprovals() {
   }
 
   return (
-    <div style={{ padding: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
-        <div>
+    <div style={{ padding: 16, maxWidth: "100%", overflowX: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+        <div style={{ minWidth: 0 }}>
           <h2 style={{ margin: 0, fontSize: 18 }}>Wallet Upload Approvals</h2>
           <div style={{ color: "#64748b", fontSize: 13, marginTop: 4 }}>
             Approve will credit <b>Add Money Pocket</b> for package purchase payments.
           </div>
         </div>
-        <div style={{ display: "flex", gap: 12, alignItems: "flex-end" }}>
+        <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
           <Select label="Status" value={status} onChange={setStatus} options={statusOptions} />
           <button
             onClick={fetchRows}
@@ -161,8 +163,9 @@ export default function AdminWalletUploadApprovals() {
         </div>
       ) : null}
 
-      <div style={{ marginTop: 16, border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "140px 160px 1fr 120px 120px 160px", background: "#f8fafc", padding: 10, fontSize: 12, color: "#475569", fontWeight: 700 }}>
+      <div style={{ marginTop: 16, border: "1px solid #e2e8f0", borderRadius: 12, overflowX: "auto", overflowY: "hidden", WebkitOverflowScrolling: "touch" }}>
+        <div style={{ minWidth: tableMinWidth }}>
+        <div style={{ display: "grid", gridTemplateColumns: tableColumns, background: "#f8fafc", padding: 10, fontSize: 12, color: "#475569", fontWeight: 700 }}>
           <div>ID</div>
           <div>User</div>
           <div>Payment</div>
@@ -183,7 +186,7 @@ export default function AdminWalletUploadApprovals() {
                 key={r.id}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "140px 160px 1fr 120px 120px 160px",
+                  gridTemplateColumns: tableColumns,
                   padding: 10,
                   borderTop: "1px solid #e2e8f0",
                   alignItems: "center",
@@ -199,7 +202,7 @@ export default function AdminWalletUploadApprovals() {
                   <div style={{ fontWeight: 700 }}>{r?.username || "-"}</div>
                   <div style={{ fontSize: 12, color: "#64748b" }}>{r?.full_name || ""}</div>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
                   <div>UTR: <b>{r?.utr || "-"}</b></div>
                   {proofUrl ? (
                     <a href={proofUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
@@ -208,12 +211,12 @@ export default function AdminWalletUploadApprovals() {
                   ) : (
                     <span style={{ fontSize: 12, color: "#94a3b8" }}>No proof</span>
                   )}
-                  {r?.remarks ? <div style={{ fontSize: 12, color: "#64748b" }}>Remarks: {r.remarks}</div> : null}
-                  {r?.reject_reason ? <div style={{ fontSize: 12, color: "#991b1b" }}>Reject: {r.reject_reason}</div> : null}
+                  {r?.remarks ? <div style={{ fontSize: 12, color: "#64748b", wordBreak: "break-word" }}>Remarks: {r.remarks}</div> : null}
+                  {r?.reject_reason ? <div style={{ fontSize: 12, color: "#991b1b", wordBreak: "break-word" }}>Reject: {r.reject_reason}</div> : null}
                 </div>
                 <div style={{ fontWeight: 900 }}>₹{Number(r?.amount || 0).toLocaleString("en-IN")}</div>
                 <div>{renderStatusBadge(r?.status)}</div>
-                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
                   {String(r?.status || "").toUpperCase() === "PENDING" ? (
                     <>
                       <button
@@ -253,6 +256,7 @@ export default function AdminWalletUploadApprovals() {
             );
           })
         )}
+        </div>
       </div>
     </div>
   );

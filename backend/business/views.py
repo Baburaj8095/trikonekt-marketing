@@ -2115,9 +2115,19 @@ class PrimePackageInvoicePdfView(APIView):
             return Response({"detail": "PDF engine is not available."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         pdf_io = BytesIO()
-        result = pisa.CreatePDF(src=invoice_html(inv), dest=pdf_io, link_callback=_xhtml2pdf_link_callback)
-        if getattr(result, "err", False):
-            return Response({"detail": "Failed to generate invoice PDF."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        try:
+            result = pisa.CreatePDF(src=invoice_html(inv), dest=pdf_io, link_callback=_xhtml2pdf_link_callback)
+        except Exception:
+            result = None
+        if not result or getattr(result, "err", False):
+            # Retry without logo/image references; broken static/media paths should not block invoice download.
+            pdf_io = BytesIO()
+            try:
+                result = pisa.CreatePDF(src=invoice_html(inv, include_logo=False), dest=pdf_io, link_callback=_xhtml2pdf_link_callback)
+            except Exception:
+                result = None
+        if not result or getattr(result, "err", False):
+            return Response({"detail": "Failed to generate invoice PDF. Please check invoice logo/static file configuration."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         filename = f"Trikonekt_Invoice_{inv.invoice_number.replace('/', '_')}.pdf"
         resp = HttpResponse(pdf_io.getvalue(), content_type="application/pdf")

@@ -44,6 +44,25 @@ function downloadBlob(blob, filename) {
   window.URL.revokeObjectURL(url);
 }
 
+async function readBlobError(err) {
+  const data = err?.response?.data;
+  if (data instanceof Blob) {
+    try {
+      const text = await data.text();
+      if (!text) return "";
+      try {
+        const parsed = JSON.parse(text);
+        return parsed?.detail || parsed?.message || text;
+      } catch {
+        return text;
+      }
+    } catch {
+      return "";
+    }
+  }
+  return err?.response?.data?.detail || err?.message || "";
+}
+
 export default function PrimeInvoices() {
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState(null);
@@ -73,11 +92,19 @@ export default function PrimeInvoices() {
       setDownloadingId(row.id);
       const res = await API.get(`/business/promo/prime-invoices/${row.id}/pdf/`, {
         responseType: "blob",
+        timeout: 60000,
       });
+      const contentType = String(res?.headers?.["content-type"] || "");
+      if (contentType.includes("application/json")) {
+        const text = await res.data.text();
+        const parsed = JSON.parse(text || "{}");
+        throw new Error(parsed?.detail || "Failed to download invoice.");
+      }
       const safeNo = String(row.invoice_number || row.id).replace(/[^\w.-]+/g, "_");
       downloadBlob(res.data, `Trikonekt_Invoice_${safeNo}.pdf`);
     } catch (err) {
-      setError(err?.response?.data?.detail || "Failed to download invoice.");
+      const msg = await readBlobError(err);
+      setError(msg || "Failed to download invoice.");
     } finally {
       setDownloadingId(null);
     }

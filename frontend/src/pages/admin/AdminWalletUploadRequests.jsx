@@ -214,14 +214,24 @@ export default function AdminWalletUploadRequests() {
             <CircularProgress />
           </Box>
         ) : (
-          <DataGrid
-            rows={requests}
-            columns={columns}
-            pageSize={10}
-            rowsPerPageOptions={[10]}
-            disableSelectionOnClick
-            getRowId={(row) => row.id}
-          />
+          <Box sx={{ width: "100%", height: "100%", overflowX: "auto" }}>
+            <Box sx={{ minWidth: 1650, height: "100%" }}>
+              <DataGrid
+                rows={requests}
+                columns={columns}
+                pageSize={10}
+                rowsPerPageOptions={[10]}
+                disableSelectionOnClick
+                getRowId={(row) => row.id}
+                sx={{
+                  minWidth: 1650,
+                  "& .MuiDataGrid-cell": {
+                    alignItems: "center",
+                  },
+                }}
+              />
+            </Box>
+          </Box>
         )}
       </Paper>
 
