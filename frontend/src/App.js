@@ -70,6 +70,7 @@ import AdminPackagePromoPurchases from "./pages/admin/AdminPackagePromoPurchases
 import AdminJoinSubscriptionPurchases from "./pages/admin/AdminJoinSubscriptionPurchases";
 import AdminSPPPurchases from "./pages/admin/AdminSPPPurchases";
 import AdminTriTourPurchases from "./pages/admin/AdminTriTourPurchases";
+import AdminDigitalEducationPrimeApprovals from "./pages/admin/AdminDigitalEducationPrimeApprovals";
 import AdminWalletUploadApprovals from "./pages/admin/AdminWalletUploadApprovals";
 import AdminWallets from "./pages/admin/AdminWallets";
 import AdminWalletDetail from "./pages/admin/AdminWalletDetail";
@@ -1906,6 +1907,16 @@ function App() {
             <AdminProtectedRoute>
               <AdminShell>
                 <AdminAdminUsers />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/packages/digital-education-prime"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminDigitalEducationPrimeApprovals />
               </AdminShell>
             </AdminProtectedRoute>
           }

@@ -1653,11 +1653,42 @@ class AdminWalletLedgerView(APIView):
             tx_type = str(request.query_params.get("type") or "").strip()
             source_type = str(request.query_params.get("source_type") or "").strip()
             if q:
-                qs = qs.filter(Q(user__username__icontains=q) | Q(user__prefixed_id__icontains=q) | Q(source_id__icontains=q))
+                qs = qs.filter(
+                    Q(user__username__icontains=q) |
+                    Q(user__prefixed_id__icontains=q) |
+                    Q(source_id__icontains=q) |
+                    Q(source_type__icontains=q) |
+                    Q(type__icontains=q)
+                )
             if tx_type:
                 qs = qs.filter(type=tx_type)
             if source_type:
                 qs = qs.filter(source_type=source_type)
+            date_from = request.query_params.get("date_from")
+            date_to = request.query_params.get("date_to")
+            if date_from:
+                qs = qs.filter(created_at__date__gte=date_from)
+            if date_to:
+                qs = qs.filter(created_at__date__lte=date_to)
+            if str(request.query_params.get("export") or "").lower() == "csv":
+                rows = [_tx_payload(x) for x in qs[:10000]]
+                return _csv_response(
+                    "legacy-wallet-ledger.csv",
+                    ["id", "user", "type", "source_type", "source_id", "amount", "balance_after", "created_at"],
+                    [
+                        [
+                            row.get("id"),
+                            row.get("username"),
+                            row.get("type"),
+                            row.get("source_type"),
+                            row.get("source_id"),
+                            row.get("amount"),
+                            row.get("balance_after"),
+                            row.get("created_at"),
+                        ]
+                        for row in rows
+                    ],
+                )
             page, page_size, total, rows = _paginate(request, qs)
             return Response({"count": total, "page": page, "page_size": page_size, "results": [_tx_payload(x) for x in rows]})
 

@@ -13,7 +13,7 @@ export default function AdminTriTourPurchases() {
     try {
       const qs = new URLSearchParams(loc.search || "");
       if (!qs.get("status")) qs.set("status", "PENDING");
-      if (!qs.get("tri_app_slug")) qs.set("tri_app_slug", "tri-holidays");
+      qs.set("tri_app_slug", "tri-holidays");
       qs.delete("kind");
       const next = `${loc.pathname}?${qs.toString()}`;
       const cur = `${loc.pathname}${loc.search || ""}`;

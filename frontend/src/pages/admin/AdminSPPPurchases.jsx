@@ -13,7 +13,7 @@ export default function AdminSPPPurchases() {
     try {
       const qs = new URLSearchParams(loc.search || "");
       if (!qs.get("status")) qs.set("status", "PENDING");
-      if (!qs.get("kind")) qs.set("kind", "monthly");
+      qs.set("kind", "monthly");
       qs.delete("tri_app_slug");
       const next = `${loc.pathname}?${qs.toString()}`;
       const cur = `${loc.pathname}${loc.search || ""}`;
@@ -24,7 +24,7 @@ export default function AdminSPPPurchases() {
   return (
     <div>
       <div style={{ marginBottom: 10, fontWeight: 900, color: "#0f172a" }}>
-        Approvals: SPP (Monthly Boxes)
+        Approvals: Smart Product Purchase (Monthly 1000/750)
       </div>
       <AdminPromoPurchases />
     </div>

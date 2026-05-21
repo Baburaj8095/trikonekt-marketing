@@ -137,6 +137,29 @@ export default function AdminPromoPurchases() {
   const [rows, setRows] = useState([]);
   const [isMobile, setIsMobile] = useState(false);
 
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(location.search || "");
+      const nextStatus = String(params.get("status") || "PENDING").toUpperCase();
+      const nextKind = String(params.get("kind") || "").toLowerCase();
+      const nextUserId = params.get("user_id") || "";
+
+      setStatus(["PENDING", "APPROVED", "REJECTED", "CANCELLED"].includes(nextStatus) ? nextStatus : "PENDING");
+      setKind(["150", "750", "759", "monthly"].includes(nextKind) ? nextKind : "");
+      setTriAppSlug((params.get("tri_app_slug") || "").trim());
+      setUserId(nextUserId && /^\d+$/.test(nextUserId) ? nextUserId : "");
+      setDateFrom(params.get("date_from") || "");
+      setDateTo(params.get("date_to") || "");
+    } catch {
+      setStatus("PENDING");
+      setKind("");
+      setTriAppSlug("");
+      setUserId("");
+      setDateFrom("");
+      setDateTo("");
+    }
+  }, [location.search]);
+
   const statusOptions = useMemo(
     () => [
       { value: "PENDING", label: "Pending" },

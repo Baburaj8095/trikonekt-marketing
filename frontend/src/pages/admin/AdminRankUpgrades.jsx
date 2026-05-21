@@ -308,7 +308,7 @@ function UpgradeRow({ u, onViewCommissions, onApprove, onReject }) {
 }
 
 
-export default function AdminRankUpgrades() {
+export default function AdminRankUpgrades({ title = "Rank Upgrades", defaultStatus = "" }) {
   const [ranks, setRanks] = useState([]);
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -317,7 +317,7 @@ export default function AdminRankUpgrades() {
   const [fUserId, setFUserId] = useState("");
   const [fToRank, setFToRank] = useState("");
   const [fFromRank, setFFromRank] = useState("");
-  const [fStatus, setFStatus] = useState("");
+  const [fStatus, setFStatus] = useState(defaultStatus);
 
   const [commDialogOpen, setCommDialogOpen] = useState(false);
   const [selectedUpgrade, setSelectedUpgrade] = useState(null);
@@ -450,7 +450,7 @@ export default function AdminRankUpgrades() {
   return (
     <Box sx={{ p: 2 }}>
       <Typography fontWeight={900} fontSize={18} sx={{ mb: 1 }}>
-        Rank Upgrades
+        {title}
       </Typography>
 
       <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>

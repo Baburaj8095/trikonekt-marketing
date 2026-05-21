@@ -50,6 +50,7 @@ export default function AdminWalletLedger() {
   const [userQuery, setUserQuery] = useState("");
   const [selectedUserId, setSelectedUserId] = useState("");
   const [users, setUsers] = useState([]);
+  const [ledgerMode, setLedgerMode] = useState("legacy");
   const [walletType, setWalletType] = useState("");
   const [txType, setTxType] = useState("");
   const [mlmIncomeType, setMlmIncomeType] = useState("");
@@ -63,11 +64,18 @@ export default function AdminWalletLedger() {
 
   async function exportCsv() {
     const params = { export: "csv" };
-    if (walletType) params.source_type = walletType;
-    if (txType) params.category = txType;
+    if (ledgerMode === "legacy") params.legacy = "1";
+    if (walletType && ledgerMode !== "legacy") params.source_type = walletType;
+    if (txType) {
+      if (ledgerMode === "legacy") params.type = txType;
+      else params.category = txType;
+    }
     if (mlmIncomeType) params.mlm_income_type = mlmIncomeType;
     if (status) params.status = status;
-    if (sourceModule) params.source_module = sourceModule;
+    if (sourceModule) {
+      if (ledgerMode === "legacy") params.source_type = sourceModule;
+      else params.source_module = sourceModule;
+    }
     if (reference) params.q = reference;
     if (dateFrom) params.date_from = dateFrom;
     if (dateTo) params.date_to = dateTo;
@@ -90,13 +98,20 @@ export default function AdminWalletLedger() {
   const fetcher = useCallback(
     async ({ page, pageSize, search, ordering }) => {
       const params = { page, page_size: pageSize };
+      if (ledgerMode === "legacy") params.legacy = "1";
       if (search) params.q = search;
       if (ordering) params.ordering = ordering;
-      if (walletType) params.source_type = walletType;
-      if (txType) params.category = txType;
+      if (walletType && ledgerMode !== "legacy") params.source_type = walletType;
+      if (txType) {
+        if (ledgerMode === "legacy") params.type = txType;
+        else params.category = txType;
+      }
       if (mlmIncomeType) params.mlm_income_type = mlmIncomeType;
       if (status) params.status = status;
-      if (sourceModule) params.source_module = sourceModule;
+      if (sourceModule) {
+        if (ledgerMode === "legacy") params.source_type = sourceModule;
+        else params.source_module = sourceModule;
+      }
       if (reference) params.q = `${params.q || ""} ${reference}`.trim();
       if (dateFrom) params.date_from = dateFrom;
       if (dateTo) params.date_to = dateTo;
@@ -108,16 +123,45 @@ export default function AdminWalletLedger() {
         count: data.count || (Array.isArray(data.results) ? data.results.length : Array.isArray(data) ? data.length : 0),
       };
     },
-    [dateFrom, dateTo, mlmIncomeType, reference, selectedUserId, sourceModule, status, txType, walletType]
+    [dateFrom, dateTo, ledgerMode, mlmIncomeType, reference, selectedUserId, sourceModule, status, txType, walletType]
   );
 
   const columns = useMemo(
     () => [
-      { field: "transaction_ref", headerName: "Transaction ID", minWidth: 190, flex: 1 },
+      {
+        field: "transaction_ref",
+        headerName: "Transaction ID",
+        minWidth: 190,
+        flex: 1,
+        renderCell: (params) => params?.row?.transaction_ref || params?.row?.transaction_id || params?.row?.id || "",
+      },
       { field: "username", headerName: "User", minWidth: 150, flex: 1 },
-      { field: "wallet_type", headerName: "Wallet Type", minWidth: 190, flex: 1 },
-      { field: "category", headerName: "Transaction Type", minWidth: 170, flex: 1 },
-      { field: "source_module", headerName: "Source Module", minWidth: 170, flex: 1 },
+      {
+        field: "wallet_type",
+        headerName: "Wallet Type",
+        minWidth: 190,
+        flex: 1,
+        renderCell: (params) =>
+          params?.row?.wallet_type ||
+          params?.row?.meta?.destination_wallet ||
+          params?.row?.meta?.wallet ||
+          params?.row?.meta?.ledger ||
+          "",
+      },
+      {
+        field: "category",
+        headerName: "Transaction Type",
+        minWidth: 170,
+        flex: 1,
+        renderCell: (params) => params?.row?.category || params?.row?.type || "",
+      },
+      {
+        field: "source_module",
+        headerName: "Source Module",
+        minWidth: 170,
+        flex: 1,
+        renderCell: (params) => params?.row?.source_module || params?.row?.source_type || "",
+      },
       {
         field: "gross_amount",
         headerName: "Gross",
@@ -187,6 +231,10 @@ export default function AdminWalletLedger() {
           </MenuItem>
         ))}
       </TextField>
+      <TextField select size="small" label="Ledger Source" value={ledgerMode} onChange={(e) => setLedgerMode(e.target.value)} sx={{ minWidth: 190 }}>
+        <MenuItem value="legacy">Legacy Wallet History</MenuItem>
+        <MenuItem value="finance">Finance Ledger</MenuItem>
+      </TextField>
       <TextField select size="small" label="Source Module" value={walletType} onChange={(e) => setWalletType(e.target.value)} sx={{ minWidth: 190 }}>
         <MenuItem value="">All</MenuItem>
         <MenuItem value="MAIN">Main Wallet</MenuItem>
@@ -248,7 +296,7 @@ export default function AdminWalletLedger() {
         toolbar={toolbar}
         checkboxSelection={false}
         density="standard"
-        extraKey={`${walletType}-${txType}-${mlmIncomeType}-${status}-${sourceModule}-${reference}-${dateFrom}-${dateTo}-${selectedUserId}`}
+        extraKey={`${ledgerMode}-${walletType}-${txType}-${mlmIncomeType}-${status}-${sourceModule}-${reference}-${dateFrom}-${dateTo}-${selectedUserId}`}
       />
 
       <Drawer anchor="right" open={Boolean(selectedTx)} onClose={() => setSelectedTx(null)} PaperProps={{ sx: { width: { xs: "100%", sm: 460 }, p: 2 } }}>

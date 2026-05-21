@@ -13,7 +13,7 @@ export default function AdminJoinSubscriptionPurchases() {
     try {
       const qs = new URLSearchParams(loc.search || "");
       if (!qs.get("status")) qs.set("status", "PENDING");
-      if (!qs.get("kind")) qs.set("kind", "750");
+      qs.set("kind", "750");
       qs.delete("tri_app_slug");
       const next = `${loc.pathname}?${qs.toString()}`;
       const cur = `${loc.pathname}${loc.search || ""}`;

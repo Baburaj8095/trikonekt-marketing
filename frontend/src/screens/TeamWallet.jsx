@@ -358,6 +358,38 @@ export default function TeamWallet() {
   const limits = walletData?.limits || {};
   const kycVerified = Boolean(kycData?.verified);
 
+  const addMoneyPocketBalance = useMemo(() => {
+    const summaryBalance = Number(
+      transferWallets?.packageUpload ??
+        transferWallets?.addMoney ??
+        walletData?.add_money_pocket_balance ??
+        0
+    );
+    if (summaryBalance) return summaryBalance;
+
+    const seen = new Set();
+    const historyRows = [
+      ...(Array.isArray(historyData?.incoming) ? historyData.incoming : []),
+      ...(Array.isArray(historyData?.recent) ? historyData.recent : []),
+    ].filter((row) => {
+      const key = row?.id ?? `${row?.type || ""}:${row?.source_type || ""}:${row?.source_id || ""}:${row?.created_at || ""}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    return historyRows.reduce((sum, row) => {
+      const meta = row?.meta || {};
+      const isAddMoney =
+        String(row?.source_type || "").toUpperCase() === "WALLET_UPLOAD" ||
+        String(meta?.wallet || "").toUpperCase() === "ADD_MONEY" ||
+        String(meta?.destination_wallet || "").toUpperCase() === "ADD_MONEY_POCKET" ||
+        String(meta?.legacy_wallet_type || "").toUpperCase() === "ADD_MONEY_POCKET" ||
+        String(meta?.wallet_source || "").toLowerCase() === "package_upload";
+      return isAddMoney ? sum + Number(row?.amount || 0) : sum;
+    }, 0);
+  }, [historyData, transferWallets, walletData]);
+
   const withdrawalsList = useMemo(
     () => (Array.isArray(withdrawals) ? withdrawals : []),
     [withdrawals]
@@ -464,7 +496,7 @@ export default function TeamWallet() {
           ];
           break;
         case 9:
-          amount = Number(transferWallets?.packageUpload || 0);
+          amount = addMoneyPocketBalance;
           icon = <AccountBalanceWalletIcon />;
           label = "Admin-approved uploaded money for buying packages";
           break;
@@ -511,7 +543,7 @@ export default function TeamWallet() {
 
       return { ...def, amount, icon, label, actions };
     });
-  }, [coupons, income, kycVerified, limits, prime, selfRebirthStats, smartPurchase, top, totalEarningBonus, transferWallets, voucherData, walletData]);
+  }, [addMoneyPocketBalance, coupons, income, kycVerified, limits, prime, selfRebirthStats, smartPurchase, top, totalEarningBonus, transferWallets, voucherData, walletData]);
 
   const sections = useMemo(() => ({
     core: wallets.filter((w) => w.section === "core"),

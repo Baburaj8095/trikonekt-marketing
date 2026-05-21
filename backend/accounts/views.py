@@ -4,6 +4,7 @@ from .models import (
     CustomUser,
     AgencyRegionAssignment,
     Wallet,
+    WalletAccount,
     WalletTransaction,
     ConsumerVoucher,
     SupportTicket,
@@ -2225,12 +2226,27 @@ class WalletMe(APIView):
                 ],
             )
             try:
-                source_credit = tx_all.filter(source_type__in=upload_sources, amount__gt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")
-                source_debit = tx_all.filter(source_type__in=upload_sources, amount__lt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")
+                add_money_filter = (
+                    Q(source_type__in=upload_sources)
+                    | Q(meta__wallet="ADD_MONEY")
+                    | Q(meta__destination_wallet=WalletTypes.ADD_MONEY_POCKET)
+                    | Q(meta__legacy_wallet_type=WalletTypes.ADD_MONEY_POCKET)
+                    | Q(meta__wallet_source="package_upload")
+                )
+                source_credit = tx_all.filter(add_money_filter, amount__gt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")
+                source_debit = tx_all.filter(add_money_filter, amount__lt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")
                 typed_total = D(str(package_upload_balance or "0"))
                 source_total = D(str(source_credit)) + D(str(source_debit))
                 if source_total > typed_total:
                     package_upload_balance = str(source_total.quantize(D("0.01")))
+                if source_total == D("0.00"):
+                    account_total = (
+                        WalletAccount.objects
+                        .filter(user=request.user, wallet_type=WalletTypes.ADD_MONEY_POCKET)
+                        .aggregate(total=Sum("current_balance"))["total"] or D("0.00")
+                    )
+                    if D(str(account_total)) > typed_total:
+                        package_upload_balance = str(D(str(account_total)).quantize(D("0.01")))
             except Exception:
                 pass
         except Exception:
@@ -2315,6 +2331,7 @@ class WalletMe(APIView):
                 "walletToWallet": str(wallet_transfer_total),
                 "withdrawal": str(withdrawal_wallet_balance),
                 "packageUpload": str(package_upload_balance),
+                "addMoney": str(package_upload_balance),
             },
             "smart_purchase": {
                 "seasonPurchasedCount": int(monthly_active_count),
