@@ -253,7 +253,7 @@ export default function AdminWalletLedger() {
           <MenuItem key={v} value={v}>{v}</MenuItem>
         ))}
       </TextField>
-      <TextField size="small" label="MLM income type" value={mlmIncomeType} onChange={(e) => setMlmIncomeType(e.target.value)} sx={{ minWidth: 170 }} />
+      <TextField size="small" label="income type" value={mlmIncomeType} onChange={(e) => setMlmIncomeType(e.target.value)} sx={{ minWidth: 170 }} />
       <TextField select size="small" label="Status" value={status} onChange={(e) => setStatus(e.target.value)} sx={{ minWidth: 150 }}>
         <MenuItem value="">All</MenuItem>
         {["PENDING", "PROCESSING", "COMPLETED", "FAILED", "REVERSED", "CANCELLED"].map((v) => <MenuItem key={v} value={v}>{v}</MenuItem>)}

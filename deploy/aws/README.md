@@ -752,7 +752,7 @@ After first successful migration:
 - Move media from Cloudinary/local disk to S3 using `django-storages`
 - Add CloudWatch agent for memory/disk/logs
 - Add Route 53 health checks
-- Add automated deploy script
+- Enable GitHub Actions auto deploy using `.github/workflows/deploy-backend-aws.yml`
 - Move from single EC2 to ECS/Fargate or Auto Scaling when traffic grows
 - Put RDS in private subnets in a dedicated production VPC
 

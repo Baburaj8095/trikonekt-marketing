@@ -336,7 +336,7 @@ export default function AdminLogin() {
                   {
                     id: "team",
                     title: "Team Consumer",
-                    body: "Users, MLM, rewards, wallets",
+                    body: "Users, rewards, wallets",
                   },
                   {
                     id: "franchise",
