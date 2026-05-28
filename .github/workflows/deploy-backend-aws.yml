@@ -25,7 +25,6 @@ jobs:
           mkdir -p ~/.ssh
           printf '%s\n' "${{ secrets.AWS_EC2_SSH_KEY }}" > ~/.ssh/trikonekt-prod-key.pem
           chmod 600 ~/.ssh/trikonekt-prod-key.pem
-          ssh-keyscan -H "${{ secrets.AWS_EC2_HOST }}" >> ~/.ssh/known_hosts
 
       - name: Deploy on EC2
         env:
@@ -33,5 +32,8 @@ jobs:
           EC2_USER: ${{ secrets.AWS_EC2_USER }}
           DEPLOY_BRANCH: ${{ github.ref_name }}
         run: |
-          ssh -i ~/.ssh/trikonekt-prod-key.pem "${EC2_USER}@${EC2_HOST}" \
+          ssh -i ~/.ssh/trikonekt-prod-key.pem \
+            -o StrictHostKeyChecking=accept-new \
+            -o ConnectTimeout=30 \
+            "${EC2_USER}@${EC2_HOST}" \
             "sudo env DEPLOY_BRANCH='${DEPLOY_BRANCH}' bash /srv/trikonekt/app/deploy/aws/deploy-backend.sh"

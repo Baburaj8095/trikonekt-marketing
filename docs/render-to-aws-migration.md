@@ -695,6 +695,20 @@ Repository > Settings > Secrets and variables > Actions > New repository secret
 
 Do not commit the `.pem` file.
 
+Security group note:
+
+```text
+GitHub-hosted Actions runners do not come from your laptop IP.
+```
+
+If EC2 SSH inbound allows only `My IP`, the workflow cannot connect. For a quick test, allow:
+
+```text
+SSH TCP 22 from 0.0.0.0/0
+```
+
+For stronger security, replace that later with a self-hosted runner, a VPN/bastion, AWS Systems Manager, or a deploy flow that does not require public SSH from GitHub-hosted runners.
+
 First-time setup on EC2:
 
 ```bash
