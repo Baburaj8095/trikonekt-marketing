@@ -33,6 +33,18 @@ sudo systemctl restart trikonekt-web trikonekt-worker
 sudo systemctl --no-pager --full status trikonekt-web
 sudo systemctl --no-pager --full status trikonekt-worker
 
-curl --fail --silent --show-error --location --head "$HEALTH_URL"
+echo "Waiting for health check: $HEALTH_URL"
+for attempt in $(seq 1 30); do
+  if curl --fail --silent --show-error --location --head "$HEALTH_URL"; then
+    echo "Health check passed on attempt $attempt."
+    echo "Backend deploy completed successfully."
+    exit 0
+  fi
+  echo "Health check attempt $attempt failed; retrying in 5 seconds..."
+  sleep 5
+done
 
-echo "Backend deploy completed successfully."
+echo "Health check failed after retries." >&2
+sudo systemctl --no-pager --full status trikonekt-web >&2 || true
+sudo journalctl -u trikonekt-web -n 80 --no-pager >&2 || true
+exit 1

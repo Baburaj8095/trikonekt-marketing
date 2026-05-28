@@ -677,7 +677,7 @@ Behavior:
 - Runs migrations.
 - Runs `collectstatic`.
 - Restarts `trikonekt-web` and `trikonekt-worker`.
-- Verifies `https://api.growth.vin/healthz`.
+- Verifies `https://api.growth.vin/healthz` with retries so Gunicorn has time to finish booting after restart.
 
 Required GitHub repository secrets:
 
