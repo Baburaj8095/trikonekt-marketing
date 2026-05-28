@@ -1,0 +1,50 @@
+{
+  "family": "trikonekt-prod-worker",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::<account-id>:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::<account-id>:role/trikonekt-prod-task-role",
+  "containerDefinitions": [
+    {
+      "name": "worker",
+      "image": "<account-id>.dkr.ecr.ap-south-1.amazonaws.com/trikonekt-backend:latest",
+      "essential": true,
+      "command": [
+        "python",
+        "manage.py",
+        "process_tasks",
+        "--max-runtime-seconds=50",
+        "--max-iterations=100",
+        "--sleep=0.5",
+        "--reap-on-start",
+        "--reap-stuck-seconds=120"
+      ],
+      "environment": [
+        { "name": "DEBUG", "value": "False" },
+        { "name": "DB_CONN_MAX_AGE", "value": "0" },
+        { "name": "DB_SSL_REQUIRE", "value": "True" },
+        { "name": "SKIP_HEAVY_ON_APPROVE", "value": "False" },
+        { "name": "COUPON_DIST_BATCH", "value": "50" },
+        { "name": "MONTHLY_759_BATCH", "value": "50" },
+        { "name": "PYTHONUNBUFFERED", "value": "1" }
+      ],
+      "secrets": [
+        { "name": "SECRET_KEY", "valueFrom": "arn:aws:secretsmanager:ap-south-1:<account-id>:secret:trikonekt/prod/backend:SECRET_KEY::" },
+        { "name": "DATABASE_URL", "valueFrom": "arn:aws:secretsmanager:ap-south-1:<account-id>:secret:trikonekt/prod/backend:DATABASE_URL::" },
+        { "name": "EMAIL_HOST_USER", "valueFrom": "arn:aws:secretsmanager:ap-south-1:<account-id>:secret:trikonekt/prod/backend:EMAIL_HOST_USER::" },
+        { "name": "EMAIL_HOST_PASSWORD", "valueFrom": "arn:aws:secretsmanager:ap-south-1:<account-id>:secret:trikonekt/prod/backend:EMAIL_HOST_PASSWORD::" },
+        { "name": "CLOUDINARY_URL", "valueFrom": "arn:aws:secretsmanager:ap-south-1:<account-id>:secret:trikonekt/prod/backend:CLOUDINARY_URL::" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/trikonekt-prod-worker",
+          "awslogs-region": "ap-south-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}

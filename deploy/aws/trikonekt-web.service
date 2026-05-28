@@ -1,0 +1,22 @@
+[Unit]
+Description=Trikonekt Django web service
+After=network.target
+
+[Service]
+Type=simple
+User=trikonekt
+Group=trikonekt
+WorkingDirectory=/srv/trikonekt/app/backend
+EnvironmentFile=/etc/trikonekt/backend.env
+ExecStart=/srv/trikonekt/app/backend/.venv/bin/gunicorn core.wsgi:application --bind 127.0.0.1:8000 --workers=2 --threads=2 --timeout=60 --max-requests=500 --max-requests-jitter=50 --access-logfile -
+Restart=always
+RestartSec=5
+KillSignal=SIGQUIT
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/srv/trikonekt/app/backend/media /srv/trikonekt/app/backend/staticfiles /var/log/trikonekt
+
+[Install]
+WantedBy=multi-user.target

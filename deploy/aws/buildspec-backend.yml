@@ -1,0 +1,27 @@
+version: 0.2
+
+env:
+  variables:
+    AWS_REGION: ap-south-1
+    ECR_REPOSITORY: trikonekt-backend
+    IMAGE_TAG: latest
+
+phases:
+  pre_build:
+    commands:
+      - AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - ECR_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY
+      - aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" --region "$AWS_REGION" || aws ecr create-repository --repository-name "$ECR_REPOSITORY" --region "$AWS_REGION"
+      - aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
+  build:
+    commands:
+      - docker build -t "$ECR_REPOSITORY:$IMAGE_TAG" ./backend
+      - docker tag "$ECR_REPOSITORY:$IMAGE_TAG" "$ECR_URI:$IMAGE_TAG"
+  post_build:
+    commands:
+      - docker push "$ECR_URI:$IMAGE_TAG"
+      - printf '{"imageUri":"%s"}' "$ECR_URI:$IMAGE_TAG" > image-detail.json
+
+artifacts:
+  files:
+    - image-detail.json

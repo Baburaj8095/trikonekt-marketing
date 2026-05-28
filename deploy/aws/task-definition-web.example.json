@@ -1,0 +1,83 @@
+{
+  "family": "trikonekt-prod-web",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::<account-id>:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::<account-id>:role/trikonekt-prod-task-role",
+  "containerDefinitions": [
+    {
+      "name": "web",
+      "image": "<account-id>.dkr.ecr.ap-south-1.amazonaws.com/trikonekt-backend:latest",
+      "essential": true,
+      "command": [
+        "gunicorn",
+        "core.wsgi:application",
+        "--bind",
+        "0.0.0.0:8000",
+        "--workers=2",
+        "--threads=2",
+        "--timeout=60",
+        "--max-requests=500",
+        "--max-requests-jitter=50"
+      ],
+      "portMappings": [
+        {
+          "containerPort": 8000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        { "name": "DEBUG", "value": "False" },
+        { "name": "ALLOWED_HOSTS", "value": "api.growth.vin,<alb-dns-name>" },
+        { "name": "CSRF_TRUSTED_ORIGINS", "value": "https://growth.vin,https://www.growth.vin,https://admin.growth.vin,https://api.growth.vin" },
+        { "name": "CORS_ALLOWED_ORIGINS", "value": "https://growth.vin,https://www.growth.vin,https://admin.growth.vin" },
+        { "name": "CORS_ALLOWED_ORIGIN_REGEXES", "value": "^https://.*\\.growth\\.vin$" },
+        { "name": "SECURE_SSL_REDIRECT", "value": "False" },
+        { "name": "SECURE_HSTS_SECONDS", "value": "31536000" },
+        { "name": "SECURE_HSTS_INCLUDE_SUBDOMAINS", "value": "True" },
+        { "name": "SECURE_HSTS_PRELOAD", "value": "True" },
+        { "name": "DB_CONN_MAX_AGE", "value": "0" },
+        { "name": "DB_SSL_REQUIRE", "value": "True" },
+        { "name": "DRF_PAGE_SIZE", "value": "25" },
+        { "name": "DRF_THROTTLE_ANON", "value": "60/min" },
+        { "name": "DRF_THROTTLE_USER", "value": "300/min" },
+        { "name": "DRF_THROTTLE_HUBBLE_WEBHOOK", "value": "600/min" },
+        { "name": "DATA_UPLOAD_MAX_MEMORY_SIZE", "value": "5242880" },
+        { "name": "FILE_UPLOAD_MAX_MEMORY_SIZE", "value": "5242880" },
+        { "name": "MAIL_ENABLED", "value": "True" },
+        { "name": "EMAIL_HOST", "value": "smtp.zoho.com" },
+        { "name": "EMAIL_PORT", "value": "587" },
+        { "name": "EMAIL_USE_TLS", "value": "True" },
+        { "name": "DEFAULT_FROM_EMAIL", "value": "contact@trikonekt.com" },
+        { "name": "EMAIL_TIMEOUT", "value": "10" },
+        { "name": "SERVER_EMAIL", "value": "contact@trikonekt.com" },
+        { "name": "SKIP_HEAVY_ON_APPROVE", "value": "False" },
+        { "name": "COUPON_DIST_BATCH", "value": "50" },
+        { "name": "MONTHLY_759_BATCH", "value": "50" },
+        { "name": "PYTHONUNBUFFERED", "value": "1" }
+      ],
+      "secrets": [
+        { "name": "SECRET_KEY", "valueFrom": "arn:aws:secretsmanager:ap-south-1:<account-id>:secret:trikonekt/prod/backend:SECRET_KEY::" },
+        { "name": "DATABASE_URL", "valueFrom": "arn:aws:secretsmanager:ap-south-1:<account-id>:secret:trikonekt/prod/backend:DATABASE_URL::" },
+        { "name": "EMAIL_HOST_USER", "valueFrom": "arn:aws:secretsmanager:ap-south-1:<account-id>:secret:trikonekt/prod/backend:EMAIL_HOST_USER::" },
+        { "name": "EMAIL_HOST_PASSWORD", "valueFrom": "arn:aws:secretsmanager:ap-south-1:<account-id>:secret:trikonekt/prod/backend:EMAIL_HOST_PASSWORD::" },
+        { "name": "CLOUDINARY_URL", "valueFrom": "arn:aws:secretsmanager:ap-south-1:<account-id>:secret:trikonekt/prod/backend:CLOUDINARY_URL::" },
+        { "name": "HUBBLE_CLIENT_ID", "valueFrom": "arn:aws:secretsmanager:ap-south-1:<account-id>:secret:trikonekt/prod/backend:HUBBLE_CLIENT_ID::" },
+        { "name": "HUBBLE_CLIENT_SECRET", "valueFrom": "arn:aws:secretsmanager:ap-south-1:<account-id>:secret:trikonekt/prod/backend:HUBBLE_CLIENT_SECRET::" },
+        { "name": "HUBBLE_APP_SECRET", "valueFrom": "arn:aws:secretsmanager:ap-south-1:<account-id>:secret:trikonekt/prod/backend:HUBBLE_APP_SECRET::" },
+        { "name": "HUBBLE_JWT_PRIVATE_KEY_PEM", "valueFrom": "arn:aws:secretsmanager:ap-south-1:<account-id>:secret:trikonekt/prod/backend:HUBBLE_JWT_PRIVATE_KEY_PEM::" },
+        { "name": "HUBBLE_WEBHOOK_SECRET", "valueFrom": "arn:aws:secretsmanager:ap-south-1:<account-id>:secret:trikonekt/prod/backend:HUBBLE_WEBHOOK_SECRET::" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/trikonekt-prod-web",
+          "awslogs-region": "ap-south-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}
