@@ -35,6 +35,7 @@ class FinanceCategories:
     ADMIN_ADJUSTMENT = "ADMIN_ADJUSTMENT"
     REFUND = "REFUND"
     SETTLEMENT = "SETTLEMENT"
+    
 
 
 class FinanceStatuses:

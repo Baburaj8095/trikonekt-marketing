@@ -21,7 +21,7 @@ export default function AdminRewardDistribution() {
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 950, color: "#0f172a" }}>Reward Distribution</Typography>
           <Typography sx={{ color: "#64748b", fontSize: 13 }}>
-            Admin workflow hub for MLM income, matrix earnings, sponsor income, reward points, rebirth, and commission settlement.
+            Admin workflow hub for income, matrix earnings, sponsor income, reward points, rebirth, and commission settlement.
           </Typography>
         </Box>
         <Button component={Link} to="/admin/team-wallet-dashboard" variant="contained">Team Analytics</Button>
