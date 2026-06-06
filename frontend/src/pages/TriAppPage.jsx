@@ -20,7 +20,11 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { getTriApp, getEcouponStoreBootstrap, createPromoPurchase, createPromoPurchaseFromWallet, getWalletMe, getWalletMeHistory } from "../api/api";
 import normalizeMediaUrl from "../utils/media";
 import { addProduct as addCartProduct } from "../store/cart";
-import { getAddMoneyPocketBalance } from "../utils/walletBalances";
+import {
+  getAddMoneyPocketBalance,
+  getPackagePurchaseCouponBalance,
+  getSelfPackageWalletBalance,
+} from "../utils/walletBalances";
 
 function Price({ value, currency = "₹" }) {
   const n = Number(value || 0);
@@ -42,8 +46,6 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
   const [file, setFile] = useState(null);
   const [copied, setCopied] = useState(false);
   const [payment, setPayment] = useState(null); // admin seeded payment config
-  const [walletMe, setWalletMe] = useState(null);
-  const [walletHistory, setWalletHistory] = useState(null);
   const [zoomOpen, setZoomOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorOpen, setErrorOpen] = useState(false);
@@ -60,19 +62,6 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
           if (alive) setPayment(null);
         }
       })();
-      (async () => {
-        try {
-          const [wallet, history] = await Promise.all([
-            getWalletMe(),
-            getWalletMeHistory().catch(() => null),
-          ]);
-          if (alive) setWalletMe(wallet || null);
-          if (alive) setWalletHistory(history || null);
-        } catch {
-          if (alive) setWalletMe(null);
-          if (alive) setWalletHistory(null);
-        }
-      })();
     }
     return () => {
       alive = false;
@@ -81,8 +70,6 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
 
   if (!data) return null;
   const amount = Number(data.amount || 0);
-  const addMoneyBal = getAddMoneyPocketBalance(walletMe, walletHistory);
-  const canPayAddMoney = addMoneyBal >= amount && amount > 0;
 
   const summaryLines = (() => {
     try {
@@ -215,47 +202,6 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
           Amount is auto‑calculated and locked. Pay the exact amount.
         </Alert>
 
-        <Box sx={{ p: 1.25, mt: 2, borderRadius: 2, border: "1px solid", borderColor: "divider", bgcolor: "grey.50" }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-            <Typography variant="body2" color="text.secondary">
-              Add Money Pocket Balance
-            </Typography>
-            <Typography fontWeight={900}>Rs. {addMoneyBal.toFixed(2)}</Typography>
-          </Stack>
-          <Button
-            fullWidth
-            variant="contained"
-            sx={{ mt: 1, height: 46 }}
-            disabled={!canPayAddMoney || submitting}
-            onClick={async () => {
-              setSubmitting(true);
-              setErrorMsg("");
-              try {
-                await createPromoPurchaseFromWallet({
-                  package_id: data.pkg.id,
-                  wallet_source: "package_upload",
-                  ...(data.purchasePayload || {}),
-                });
-                onClose();
-                onSuccess();
-                setTxnId("");
-                setFile(null);
-              } catch (e) {
-                const msg =
-                  e?.response?.data?.detail ||
-                  e?.message ||
-                  "Wallet payment failed. Please try again.";
-                setErrorMsg(msg);
-                setErrorOpen(true);
-              } finally {
-                setSubmitting(false);
-              }
-            }}
-          >
-            {submitting ? "Processing..." : "Pay from Add Money Pocket"}
-          </Button>
-        </Box>
-
         <TextField
           label="Transaction / UTR ID (Optional)"
           fullWidth
@@ -341,6 +287,62 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
   );
 }
 
+function PaymentMethodDialog({ open, onClose, intent, walletMe, walletHistory, busy, onPickManual, onPickWallet }) {
+  if (!open || !intent) return null;
+  const amount = Number(intent?.amount || 0);
+  const internalBal = getSelfPackageWalletBalance(walletMe);
+  const packageCouponBal = getPackagePurchaseCouponBalance(walletMe);
+  const addMoneyBal = getAddMoneyPocketBalance(walletMe, walletHistory);
+  const canWallet = internalBal >= amount && amount > 0;
+  const canPackageCoupon = packageCouponBal >= amount && amount > 0;
+  const canAddMoney = addMoneyBal >= amount && amount > 0;
+  const money = (value) => Number(value || 0).toFixed(2);
+
+  const WalletButtonLabel = ({ title, balance }) => (
+    <Stack component="span" spacing={0.25} alignItems="center" sx={{ lineHeight: 1.15 }}>
+      <span>{title}</span>
+      <Typography component="span" sx={{ fontSize: 11, fontWeight: 800, color: "inherit", opacity: 0.86 }}>
+        Available Rs. {money(balance)}
+      </Typography>
+    </Stack>
+  );
+
+  return (
+    <Dialog open={open} onClose={busy ? undefined : onClose} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: 4, overflow: "hidden" } }}>
+      <DialogTitle sx={{ fontWeight: 900, color: "#0f172a", pb: 1 }}>Select Payment Method</DialogTitle>
+      <DialogContent dividers sx={{ pt: 1.5 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
+          Amount: <b>₹{money(amount)}</b>
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, lineHeight: 1.7 }}>
+          Self Package Wallet Balance: <b>₹{money(internalBal)}</b>
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, lineHeight: 1.7 }}>
+          Package Purchase Coupon Wallet Balance: <b>₹{money(packageCouponBal)}</b>
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, lineHeight: 1.7 }}>
+          Add Money Pocket Balance: <b>₹{money(addMoneyBal)}</b>
+        </Typography>
+      </DialogContent>
+      <DialogActions sx={{ p: 1.5, gap: 1, flexWrap: "wrap" }}>
+        <Button onClick={onClose} disabled={busy} sx={{ borderRadius: 3 }}>Cancel</Button>
+        <Button variant="outlined" onClick={onPickManual} disabled={busy} sx={{ borderRadius: 3, fontWeight: 900 }}>
+          Manual Payment
+        </Button>
+        <Button variant="contained" disabled={!canWallet || busy} onClick={() => onPickWallet("internal")} sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
+          <WalletButtonLabel title="Pay from Self Package" balance={internalBal} />
+        </Button>
+        <Button variant="contained" disabled={!canPackageCoupon || busy} onClick={() => onPickWallet("package_coupon")} sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
+          <WalletButtonLabel title="Pay from Coupon Wallet" balance={packageCouponBal} />
+        </Button>
+        <Button variant="contained" disabled={!canAddMoney || busy} onClick={() => onPickWallet("package_upload")} sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
+          <WalletButtonLabel title="Pay from Add Money Pocket" balance={addMoneyBal} />
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 /* ======================================================================== */
 /* MAIN PAGE */
 /* ======================================================================== */
@@ -353,8 +355,13 @@ export default function TriAppPage() {
   const [error, setError] = useState("");
 
   // Payment drawer state (Tri Holidays)
+  const [methodOpen, setMethodOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [paymentData, setPaymentData] = useState(null);
+  const [walletMe, setWalletMe] = useState(null);
+  const [walletHistory, setWalletHistory] = useState(null);
+  const [walletBusy, setWalletBusy] = useState(false);
+  const [walletErr, setWalletErr] = useState("");
   const [paymentSuccessOpen, setPaymentSuccessOpen] = useState(false);
 
   useEffect(() => {
@@ -533,11 +540,11 @@ export default function TriAppPage() {
                     variant="contained"
                     size="small"
                     fullWidth
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.stopPropagation();
                       e.preventDefault();
                       try {
-                        setPaymentData({
+                        const intent = {
                           pkg: { id: p.id, name: p.name },
                           amount: Number(p.price || 0),
                           uiMeta: { triApp: slug || "tri-holidays", selectedProductName: p.name },
@@ -547,8 +554,20 @@ export default function TriAppPage() {
                             tri_app_slug: slug || "",
                             tri: true,
                           },
-                        });
-                        setPaymentOpen(true);
+                        };
+                        setPaymentData(intent);
+                        try {
+                          const [wallet, history] = await Promise.all([
+                            getWalletMe(),
+                            getWalletMeHistory().catch(() => null),
+                          ]);
+                          setWalletMe(wallet || null);
+                          setWalletHistory(history || null);
+                        } catch {
+                          setWalletMe(null);
+                          setWalletHistory(null);
+                        }
+                        setMethodOpen(true);
                       } catch {}
                     }}
                     sx={{ mt: 0.5, textTransform: "none", fontWeight: 800 }}
@@ -596,7 +615,38 @@ export default function TriAppPage() {
         </Alert>
       )}
 
-      {/* Payment Drawer for Tri Holidays */}
+      <PaymentMethodDialog
+        open={methodOpen}
+        onClose={() => !walletBusy && setMethodOpen(false)}
+        intent={paymentData}
+        walletMe={walletMe}
+        walletHistory={walletHistory}
+        busy={walletBusy}
+        onPickManual={() => {
+          setMethodOpen(false);
+          setPaymentOpen(true);
+        }}
+        onPickWallet={async (walletSource = "internal") => {
+          if (!paymentData?.pkg?.id) return;
+          setWalletBusy(true);
+          setWalletErr("");
+          try {
+            await createPromoPurchaseFromWallet({
+              package_id: paymentData.pkg.id,
+              wallet_source: walletSource,
+              ...(paymentData.purchasePayload || {}),
+            });
+            setMethodOpen(false);
+            setPaymentSuccessOpen(true);
+          } catch (e) {
+            setWalletErr(e?.response?.data?.detail || e?.message || "Wallet payment failed");
+          } finally {
+            setWalletBusy(false);
+          }
+        }}
+      />
+
+      {/* Manual Payment Drawer for Tri Holidays */}
       <PaymentSheet
         open={paymentOpen}
         onClose={() => setPaymentOpen(false)}
@@ -620,6 +670,18 @@ export default function TriAppPage() {
           </Button>
         </Box>
       </Dialog>
+      {walletErr ? (
+        <Snackbar
+          open={!!walletErr}
+          autoHideDuration={4000}
+          onClose={() => setWalletErr("")}
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        >
+          <Alert onClose={() => setWalletErr("")} severity="error" sx={{ width: "100%" }}>
+            {walletErr}
+          </Alert>
+        </Snackbar>
+      ) : null}
     </Box>
   );
 }

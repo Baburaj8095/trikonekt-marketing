@@ -119,13 +119,54 @@ function RankProgressStepper({ currentLevel = 1, nextLevel = null }) {
   );
 }
 
+function RankPaymentMethodDialog({ open, onClose, data, walletMe, walletHistory, busy, onPickManual, onPickWallet }) {
+  if (!open || !data?.upgrade) return null;
+  const amount = Number(data.upgrade.upgrade_amount || 0);
+  const addMoneyBal = getAddMoneyPocketBalance(walletMe, walletHistory);
+  const canAddMoney = addMoneyBal >= amount && amount > 0;
+  const money = (value) => Number(value || 0).toFixed(2);
+
+  return (
+    <Dialog open={open} onClose={busy ? undefined : onClose} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: 4, overflow: "hidden" } }}>
+      <DialogTitle sx={{ fontWeight: 900, color: "#0f172a", pb: 1 }}>Select Payment Method</DialogTitle>
+      <DialogContent dividers sx={{ pt: 1.5 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.8 }}>
+          Amount: <b>₹{money(amount)}</b>
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, lineHeight: 1.8 }}>
+          Self Package Wallet Balance: <b>₹0.00</b>
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, lineHeight: 1.8 }}>
+          Package Purchase Coupon Wallet Balance: <b>₹0.00</b>
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, lineHeight: 1.8 }}>
+          Add Money Pocket Balance: <b>₹{money(addMoneyBal)}</b>
+        </Typography>
+      </DialogContent>
+      <DialogActions sx={{ p: 1.5, gap: 1, flexWrap: "wrap" }}>
+        <Button onClick={onClose} disabled={busy} sx={{ borderRadius: 3 }}>Cancel</Button>
+        <Button variant="outlined" onClick={onPickManual} disabled={busy} sx={{ borderRadius: 3, fontWeight: 900 }}>
+          Manual Payment
+        </Button>
+        <Button variant="contained" disabled sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
+          Pay from Self Package<br />Available Rs. 0.00
+        </Button>
+        <Button variant="contained" disabled sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
+          Pay from Coupon Wallet<br />Available Rs. 0.00
+        </Button>
+        <Button variant="contained" disabled={!canAddMoney || busy} onClick={onPickWallet} sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
+          Pay from Add Money Pocket<br />Available Rs. {money(addMoneyBal)}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 function RankPaymentSheet({ open, onClose, data, onSuccess }) {
   const [txnId, setTxnId] = useState("");
   const [file, setFile] = useState(null);
   const [copied, setCopied] = useState(false);
   const [payment, setPayment] = useState(null); // admin-configured UPI info
-  const [walletMe, setWalletMe] = useState(null);
-  const [walletHistory, setWalletHistory] = useState(null);
   const [zoomOpen, setZoomOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorOpen, setErrorOpen] = useState(false);
@@ -142,19 +183,6 @@ function RankPaymentSheet({ open, onClose, data, onSuccess }) {
           if (alive) setPayment(null);
         }
       })();
-      (async () => {
-        try {
-          const [wallet, history] = await Promise.all([
-            getWalletMe(),
-            getWalletMeHistory().catch(() => null),
-          ]);
-          if (alive) setWalletMe(wallet || null);
-          if (alive) setWalletHistory(history || null);
-        } catch {
-          if (alive) setWalletMe(null);
-          if (alive) setWalletHistory(null);
-        }
-      })();
     }
     return () => {
       alive = false;
@@ -163,8 +191,6 @@ function RankPaymentSheet({ open, onClose, data, onSuccess }) {
 
   if (!data || !data.upgrade) return null;
   const amount = Number(data.upgrade.upgrade_amount || 0);
-  const addMoneyBal = getAddMoneyPocketBalance(walletMe, walletHistory);
-  const canPayAddMoney = addMoneyBal >= amount && amount > 0;
 
   return (
     <>
@@ -249,46 +275,6 @@ function RankPaymentSheet({ open, onClose, data, onSuccess }) {
         <Alert severity="info" sx={{ mt: 2 }}>
           Amount is auto‑calculated and locked. Pay the exact amount.
         </Alert>
-
-        <Box sx={{ p: 1.25, mt: 2, borderRadius: 2, border: "1px solid", borderColor: "divider", bgcolor: "grey.50" }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-            <Typography variant="body2" color="text.secondary">
-              Add Money Pocket Balance
-            </Typography>
-            <Typography fontWeight={900}>Rs. {addMoneyBal.toFixed(2)}</Typography>
-          </Stack>
-          <Button
-            fullWidth
-            variant="contained"
-            sx={{ mt: 1, height: 46 }}
-            disabled={!canPayAddMoney || submitting}
-            onClick={async () => {
-              setSubmitting(true);
-              setErrorMsg("");
-              try {
-                await createRankUpgradeFromWallet({
-                  upgrade_id: data.upgrade.id,
-                  wallet_source: "package_upload",
-                });
-                onClose?.();
-                onSuccess?.();
-                setTxnId("");
-                setFile(null);
-              } catch (e) {
-                const msg =
-                  e?.response?.data?.detail ||
-                  e?.message ||
-                  "Wallet payment failed. Please try again.";
-                setErrorMsg(msg);
-                setErrorOpen(true);
-              } finally {
-                setSubmitting(false);
-              }
-            }}
-          >
-            {submitting ? "Processing..." : "Pay from Add Money Pocket"}
-          </Button>
-        </Box>
 
         <TextField
           label="Transaction / UTR ID (Optional)"
@@ -394,8 +380,13 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
   const [busy, setBusy] = useState(false);
   const [initDialog, setInitDialog] = useState(false);
   const [createdUpgrade, setCreatedUpgrade] = useState(null);
+  const [methodOpen, setMethodOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [paymentData, setPaymentData] = useState(null);
+  const [walletMe, setWalletMe] = useState(null);
+  const [walletHistory, setWalletHistory] = useState(null);
+  const [walletBusy, setWalletBusy] = useState(false);
+  const [walletErr, setWalletErr] = useState("");
   const [successOpen, setSuccessOpen] = useState(false);
   const [error, setError] = useState("");
   const [selectedToRankId, setSelectedToRankId] = useState(null);
@@ -759,7 +750,18 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
                 setCreatedUpgrade(resp || null);
                 setInitDialog(false);
                 setPaymentData({ upgrade: resp || null });
-                setPaymentOpen(true);
+                try {
+                  const [wallet, history] = await Promise.all([
+                    getWalletMe(),
+                    getWalletMeHistory().catch(() => null),
+                  ]);
+                  setWalletMe(wallet || null);
+                  setWalletHistory(history || null);
+                } catch {
+                  setWalletMe(null);
+                  setWalletHistory(null);
+                }
+                setMethodOpen(true);
               } catch (e) {
                 setError(e?.response?.data?.detail || e?.message || "Failed to initiate upgrade");
                 setInitDialog(false);
@@ -772,6 +774,47 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <RankPaymentMethodDialog
+        open={methodOpen}
+        onClose={() => !walletBusy && setMethodOpen(false)}
+        data={paymentData || (createdUpgrade ? { upgrade: createdUpgrade } : null)}
+        walletMe={walletMe}
+        walletHistory={walletHistory}
+        busy={walletBusy}
+        onPickManual={() => {
+          setMethodOpen(false);
+          setPaymentOpen(true);
+        }}
+        onPickWallet={async () => {
+          const upgrade = (paymentData || (createdUpgrade ? { upgrade: createdUpgrade } : null))?.upgrade;
+          if (!upgrade?.id) return;
+          setWalletBusy(true);
+          setWalletErr("");
+          try {
+            await createRankUpgradeFromWallet({
+              upgrade_id: upgrade.id,
+              wallet_source: "package_upload",
+            });
+            setMethodOpen(false);
+            setSuccessOpen(true);
+            try {
+              const [eg, p, h] = await Promise.allSettled([
+                getUpgradeEligibility(),
+                getMyLevelBonusProgress(),
+                getMyRankCommissionHolds(),
+              ]);
+              if (eg.status === "fulfilled") setElig(eg.value || null);
+              if (p.status === "fulfilled") setLbProgress(p.value || null);
+              if (h.status === "fulfilled") setLbHolds(Array.isArray(h.value) ? h.value : []);
+            } catch {}
+          } catch (e) {
+            setWalletErr(e?.response?.data?.detail || e?.message || "Wallet payment failed");
+          } finally {
+            setWalletBusy(false);
+          }
+        }}
+      />
 
       {/* Payment Sheet for UPI/scanner flow */}
       <RankPaymentSheet
@@ -813,6 +856,18 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
         <Alert severity="error" sx={{ mt: 1 }}>
           {error}
         </Alert>
+      ) : null}
+      {walletErr ? (
+        <Snackbar
+          open={!!walletErr}
+          autoHideDuration={4000}
+          onClose={() => setWalletErr("")}
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        >
+          <Alert onClose={() => setWalletErr("")} severity="error" sx={{ width: "100%" }}>
+            {walletErr}
+          </Alert>
+        </Snackbar>
       ) : null}
     </Box>
   );

@@ -84,52 +84,11 @@ function VoucherTable({ rows }) {
   );
 }
 
-function WalletTable({ rows }) {
-  return (
-    <TableContainer sx={{ overflowX: "auto" }}>
-      <Table size="small" sx={{ minWidth: 760 }}>
-        <TableHead>
-          <TableRow sx={{ bgcolor: "#f8fafc" }}>
-            <TableCell sx={{ fontWeight: 900 }}>SL No</TableCell>
-            <TableCell sx={{ fontWeight: 900 }}>Date & Time</TableCell>
-            <TableCell sx={{ fontWeight: 900 }}>Transaction</TableCell>
-            <TableCell sx={{ fontWeight: 900 }}>Source</TableCell>
-            <TableCell sx={{ fontWeight: 900 }}>Amount</TableCell>
-            <TableCell sx={{ fontWeight: 900 }}>Status</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {rows.map((row, index) => (
-            <TableRow key={row.id || index}>
-              <TableCell>{index + 1}</TableCell>
-              <TableCell>{fmtDate(row.created_at)}</TableCell>
-              <TableCell>{String(row.type || "").replace(/_/g, " ")}</TableCell>
-              <TableCell>{row.source_type || "-"}</TableCell>
-              <TableCell sx={{ color: Number(row.amount) < 0 ? "#dc2626" : "#15803d", fontWeight: 900 }}>
-                Rs. {fmtAmount(row.amount)}
-              </TableCell>
-              <TableCell><Chip size="small" color="success" label="Completed" sx={{ fontWeight: 800 }} /></TableCell>
-            </TableRow>
-          ))}
-          {!rows.length && (
-            <TableRow>
-              <TableCell colSpan={6} sx={{ textAlign: "center", py: 3, color: "#94a3b8" }}>
-                No history found.
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </TableContainer>
-  );
-}
-
 export default function GiftCardSummary() {
   const [tab, setTab] = useState("trizone");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [vouchers, setVouchers] = useState([]);
-  const [transactions, setTransactions] = useState([]);
 
   useEffect(() => {
     let alive = true;
@@ -137,13 +96,9 @@ export default function GiftCardSummary() {
       try {
         setLoading(true);
         setError("");
-        const [voucherRes, txRes] = await Promise.all([
-          API.get("/accounts/wallet/vouchers/"),
-          API.get("/accounts/wallet/me/transactions/", { params: { page_size: 100 } }),
-        ]);
+        const voucherRes = await API.get("/accounts/wallet/vouchers/");
         if (!alive) return;
         setVouchers(voucherRes?.data?.results || []);
-        setTransactions(txRes?.data?.results || []);
       } catch (err) {
         if (alive) setError(err?.response?.data?.detail || "Failed to load gift card summary.");
       } finally {
@@ -158,15 +113,13 @@ export default function GiftCardSummary() {
 
   const grouped = useMemo(() => {
     const byType = (type) => vouchers.filter((v) => String(v.voucher_type || "").toUpperCase() === type);
-    const selfPackageTypes = new Set(["INTERNAL_WALLET_CREDIT", "INTERNAL_WALLET_DEBIT", "PACKAGE_COUPON_WALLET_CREDIT", "PACKAGE_COUPON_WALLET_DEBIT", "VOUCHER_REDEEM_CREDIT"]);
     return {
       trizone: byType("TRIZONE"),
       online: byType("ONLINE"),
       nearstore: byType("NEAR_STORE"),
       package: byType("PACKAGE_PURCHASE"),
-      selfPackage: transactions.filter((tx) => selfPackageTypes.has(String(tx.type || "").toUpperCase())),
     };
-  }, [transactions, vouchers]);
+  }, [vouchers]);
 
   return (
     <Box sx={{ maxWidth: 1120, mx: "auto", px: { xs: 1.2, sm: 2 }, py: 2 }}>
@@ -174,7 +127,7 @@ export default function GiftCardSummary() {
         Gift Card Summary
       </Typography>
       <Typography sx={{ color: "#64748b", fontSize: 13, mb: 2 }}>
-        History for Trizone, Online, Near Store, Package Coupons, and Self Package Pocket activity.
+        History for Trizone, Online, Near Store, and Package Coupons.
       </Typography>
 
       {loading && <LinearProgress sx={{ mb: 1 }} />}
@@ -192,7 +145,6 @@ export default function GiftCardSummary() {
           <Tab value="online" label="Online" />
           <Tab value="nearstore" label="Near Store" />
           <Tab value="package" label="Package Coupon" />
-          <Tab value="selfPackage" label="Self Package Pocket" />
         </Tabs>
       </Paper>
 
@@ -203,14 +155,9 @@ export default function GiftCardSummary() {
             {tab === "online" && "Online Coupon History"}
             {tab === "nearstore" && "Near Store Coupon History"}
             {tab === "package" && "Package Purchase Coupon History"}
-            {tab === "selfPackage" && "Self Package Pocket History"}
           </Typography>
         </Box>
-        {tab === "selfPackage" ? (
-          <WalletTable rows={grouped.selfPackage} />
-        ) : (
-          <VoucherTable rows={grouped[tab] || []} />
-        )}
+        <VoucherTable rows={grouped[tab] || []} />
       </Paper>
     </Box>
   );
