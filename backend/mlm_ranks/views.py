@@ -393,7 +393,14 @@ class UpgradePayFromWalletView(APIView):
             utr="",
             remarks="Paid from Add Money Pocket",
         )
-        return Response(RankUpgradePaymentSerializer(rup).data, status=status.HTTP_201_CREATED)
+        # Wallet-funded upgrades use already approved wallet money, so approve immediately.
+        # Reuse the admin approval implementation so rank updates, commissions, and
+        # Rank-1 matrix placement remain identical to the manual review flow.
+        approval_resp = AdminApproveRankUpgradeView().post(request, upgrade_id=upg.id)
+        if getattr(approval_resp, "status_code", 500) >= 400:
+            transaction.set_rollback(True)
+            return approval_resp
+        return Response(approval_resp.data, status=status.HTTP_201_CREATED)
 
 
 class MyRankUpgradesView(APIView):

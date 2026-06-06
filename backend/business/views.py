@@ -1362,6 +1362,15 @@ class PromoPurchasePayFromWalletView(APIView):
                 pp.wallet_debit_tx = tx
                 pp.save(update_fields=["wallet_debit_tx"])
 
+            # Wallet-funded purchases use already approved wallet money, so approve immediately.
+            # Reuse the admin approval implementation so commissions, matrix jobs,
+            # activations, invoices, and idempotency stay identical to the manual review flow.
+            approval_resp = AdminPromoPurchaseApproveView().post(request, pk=pp.id)
+            if getattr(approval_resp, "status_code", 500) >= 400:
+                transaction.set_rollback(True)
+                return approval_resp
+
+        pp = PromoPurchase.objects.select_related("package", "user").filter(pk=pp.id).first() or pp
         return Response(PromoPurchaseSerializer(pp, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
 

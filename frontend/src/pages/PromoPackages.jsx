@@ -1136,6 +1136,7 @@ export default function PromoPackages({
     };
   }, [rename]);
   const [paymentSuccessOpen, setPaymentSuccessOpen] = useState(false);
+  const [paymentSuccessMessage, setPaymentSuccessMessage] = useState("We will review it shortly.");
 
   useEffect(() => {
     (async () => {
@@ -1453,6 +1454,7 @@ export default function PromoPackages({
         data={paymentData}
         onSuccess={async () => {
           setHistory(await listMyPromoPurchases());
+          setPaymentSuccessMessage("We will review it shortly.");
           setPaymentSuccessOpen(true);
         }}
       />
@@ -1481,6 +1483,7 @@ export default function PromoPackages({
             });
             setMethodOpen(false);
             setHistory(await listMyPromoPurchases());
+            setPaymentSuccessMessage("Package purchased successfully.");
             setPaymentSuccessOpen(true);
           } catch (e) {
             const msg = e?.response?.data?.detail || e?.message || "Wallet payment failed";
@@ -1509,7 +1512,7 @@ export default function PromoPackages({
             Payment is successful
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            We will review it shortly.
+            {paymentSuccessMessage}
           </Typography>
           <Button variant="contained" sx={{ mt: 2 }} onClick={() => setPaymentSuccessOpen(false)}>
             OK

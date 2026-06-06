@@ -388,6 +388,8 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
   const [walletBusy, setWalletBusy] = useState(false);
   const [walletErr, setWalletErr] = useState("");
   const [successOpen, setSuccessOpen] = useState(false);
+  const [successTitle, setSuccessTitle] = useState("Payment Request Submitted");
+  const [successMessage, setSuccessMessage] = useState("We will review it shortly.");
   const [error, setError] = useState("");
   const [selectedToRankId, setSelectedToRankId] = useState(null);
   const [selectedToRankName, setSelectedToRankName] = useState("");
@@ -797,6 +799,8 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
               wallet_source: "package_upload",
             });
             setMethodOpen(false);
+            setSuccessTitle("Payment Successful");
+            setSuccessMessage(`${rankWord} purchased successfully.`);
             setSuccessOpen(true);
             try {
               const [eg, p, h] = await Promise.allSettled([
@@ -823,6 +827,8 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
         data={paymentData || (createdUpgrade ? { upgrade: createdUpgrade } : null)}
         onSuccess={async () => {
           setPaymentOpen(false);
+          setSuccessTitle("Payment Request Submitted");
+          setSuccessMessage("We will review it shortly.");
           setSuccessOpen(true);
           // Refresh eligibility + Level Bonus progress/holds
           try {
@@ -839,10 +845,10 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
       />
 
       <Dialog open={successOpen} onClose={() => setSuccessOpen(false)}>
-        <DialogTitle>Payment Request Submitted</DialogTitle>
+        <DialogTitle>{successTitle}</DialogTitle>
         <DialogContent dividers>
           <Typography variant="body2" color="text.secondary">
-            We will review it shortly.
+            {successMessage}
           </Typography>
         </DialogContent>
         <DialogActions>
