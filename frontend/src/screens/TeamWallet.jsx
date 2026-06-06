@@ -403,10 +403,45 @@ export default function TeamWallet() {
     [withdrawalsList]
   );
 
-  const totalEarningBonus = useMemo(
-    () => Number(walletData?.totals?.allEarnings || 0),
-    [walletData]
-  );
+  const totalEarningBonus = useMemo(() => {
+    const summaryCandidates = [
+      walletData?.totals?.allEarnings,
+      walletData?.totals?.all_earnings,
+      walletData?.totals?.totalEarning,
+      walletData?.totals?.total_earning,
+      walletData?.totalEarning,
+      walletData?.total_earning,
+      walletData?.total_earnings,
+      top?.totalEarning,
+      top?.total_earning,
+      top?.total_earnings,
+    ];
+
+    const summaryTotal = summaryCandidates
+      .map((value) => Number(value))
+      .find((value) => Number.isFinite(value) && value > 0);
+    if (summaryTotal !== undefined) return summaryTotal;
+
+    const historyTotal = (Array.isArray(historyData?.incoming) ? historyData.incoming : []).reduce(
+      (sum, tx) => {
+        const gross = Number(tx?.meta?.gross);
+        const amount = Number(tx?.amount);
+        const value = Number.isFinite(gross) && gross > 0 ? gross : amount;
+        return Number.isFinite(value) && value > 0 ? sum + value : sum;
+      },
+      0
+    );
+    if (historyTotal > 0) return historyTotal;
+
+    const currentMain = Number(
+      top?.main_income_balance ??
+        walletData?.main_income_balance ??
+        walletData?.main_balance ??
+        walletData?.balance ??
+        0
+    );
+    return (Number.isFinite(currentMain) ? currentMain : 0) + withdrawnTotal;
+  }, [historyData, top, walletData, withdrawnTotal]);
 
   const selfRebirthStats = useMemo(() => {
     const roots = [
