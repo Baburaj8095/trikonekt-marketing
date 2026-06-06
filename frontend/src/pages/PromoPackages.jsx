@@ -40,6 +40,7 @@ import {
   getEcouponStoreBootstrap,
   createPromoPurchaseFromWallet,
   getWalletMe,
+  getWalletMeHistory,
 } from "../api/api";
 import { useNavigate } from "react-router-dom";
 import RankUpgrade from "./RankUpgrade";
@@ -377,12 +378,12 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
 /* ======================================================================== */
 /* Payment Method Chooser (Wallet vs Manual) */
 /* ======================================================================== */
-function PaymentMethodDialog({ open, onClose, intent, walletMe, onPickManual, onPickWallet }) {
+function PaymentMethodDialog({ open, onClose, intent, walletMe, walletHistory, onPickManual, onPickWallet }) {
   if (!open) return null;
   const amount = Number(intent?.amount || intent?.pkg?.price || 0);
   const internalBal = getSelfPackageWalletBalance(walletMe);
   const packageCouponBal = getPackagePurchaseCouponBalance(walletMe);
-  const addMoneyBal = getAddMoneyPocketBalance(walletMe);
+  const addMoneyBal = getAddMoneyPocketBalance(walletMe, walletHistory);
   const canWallet = internalBal >= amount && amount > 0;
   const canPackageCoupon = packageCouponBal >= amount && amount > 0;
   const canAddMoney = addMoneyBal >= amount && amount > 0;
@@ -1101,6 +1102,7 @@ export default function PromoPackages({
   const [methodOpen, setMethodOpen] = useState(false);
   const [purchaseIntent, setPurchaseIntent] = useState(null);
   const [walletMe, setWalletMe] = useState(null);
+  const [walletHistory, setWalletHistory] = useState(null);
   const [walletBusy, setWalletBusy] = useState(false);
   const [walletErr, setWalletErr] = useState("");
   const [seasonsHints, setSeasonsHints] = useState([]);
@@ -1222,10 +1224,15 @@ export default function PromoPackages({
     setPurchaseIntent(data);
     setWalletErr("");
     try {
-      const w = await getWalletMe();
+      const [w, h] = await Promise.all([
+        getWalletMe(),
+        getWalletMeHistory().catch(() => null),
+      ]);
       setWalletMe(w || null);
+      setWalletHistory(h || null);
     } catch {
       setWalletMe(null);
+      setWalletHistory(null);
     }
     setMethodOpen(true);
   };
@@ -1456,6 +1463,7 @@ export default function PromoPackages({
         onClose={() => !walletBusy && setMethodOpen(false)}
         intent={purchaseIntent}
         walletMe={walletMe}
+        walletHistory={walletHistory}
         onPickManual={() => {
           setMethodOpen(false);
           setPaymentData(purchaseIntent);

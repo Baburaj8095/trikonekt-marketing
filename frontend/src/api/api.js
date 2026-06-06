@@ -1030,6 +1030,11 @@ export async function getWalletMe() {
   return res?.data || res;
 }
 
+export async function getWalletMeHistory() {
+  const res = await API.get("/accounts/wallet/me/history/", { dedupe: "cancelPrevious" });
+  return res?.data || res;
+}
+
 // Admin promo purchases
 export async function adminListPromoPurchases(params = {}) {
   const res = await API.get("/business/admin/promo/purchases/", { params });

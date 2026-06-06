@@ -34,6 +34,7 @@ import {
   createRankUpgradeFromWallet,
   getEcouponStoreBootstrap,
   getWalletMe,
+  getWalletMeHistory,
   getMyLevelBonusProgress,
   getMyRankCommissionHolds,
   listMyPromoPurchases,
@@ -124,6 +125,7 @@ function RankPaymentSheet({ open, onClose, data, onSuccess }) {
   const [copied, setCopied] = useState(false);
   const [payment, setPayment] = useState(null); // admin-configured UPI info
   const [walletMe, setWalletMe] = useState(null);
+  const [walletHistory, setWalletHistory] = useState(null);
   const [zoomOpen, setZoomOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorOpen, setErrorOpen] = useState(false);
@@ -142,10 +144,15 @@ function RankPaymentSheet({ open, onClose, data, onSuccess }) {
       })();
       (async () => {
         try {
-          const wallet = await getWalletMe();
+          const [wallet, history] = await Promise.all([
+            getWalletMe(),
+            getWalletMeHistory().catch(() => null),
+          ]);
           if (alive) setWalletMe(wallet || null);
+          if (alive) setWalletHistory(history || null);
         } catch {
           if (alive) setWalletMe(null);
+          if (alive) setWalletHistory(null);
         }
       })();
     }
@@ -156,7 +163,7 @@ function RankPaymentSheet({ open, onClose, data, onSuccess }) {
 
   if (!data || !data.upgrade) return null;
   const amount = Number(data.upgrade.upgrade_amount || 0);
-  const addMoneyBal = getAddMoneyPocketBalance(walletMe);
+  const addMoneyBal = getAddMoneyPocketBalance(walletMe, walletHistory);
   const canPayAddMoney = addMoneyBal >= amount && amount > 0;
 
   return (

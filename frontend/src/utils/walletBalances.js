@@ -16,6 +16,32 @@ function pickTransferWallet(wallet, keys) {
   return firstPositiveNumber(...keys.map((key) => transferWallets?.[key]));
 }
 
+function addMoneyHistoryBalance(history) {
+  const rows = [
+    ...(Array.isArray(history?.incoming) ? history.incoming : []),
+    ...(Array.isArray(history?.recent) ? history.recent : []),
+    ...(Array.isArray(history?.results) ? history.results : []),
+    ...(Array.isArray(history) ? history : []),
+  ];
+  const seen = new Set();
+  return rows.reduce((sum, row) => {
+    const key = row?.id ?? `${row?.type || ""}:${row?.source_type || ""}:${row?.source_id || ""}:${row?.created_at || ""}`;
+    if (seen.has(key)) return sum;
+    seen.add(key);
+
+    const meta = row?.meta || {};
+    const sourceType = String(row?.source_type || "").toUpperCase();
+    const isAddMoney =
+      ["WALLET_UPLOAD", "UPLOAD_TO_WALLET", "PACKAGE_UPLOAD", "PACKAGE_BUY_UPLOAD"].includes(sourceType) ||
+      String(meta?.wallet || "").toUpperCase() === "ADD_MONEY" ||
+      String(meta?.destination_wallet || "").toUpperCase() === "ADD_MONEY_POCKET" ||
+      String(meta?.legacy_wallet_type || "").toUpperCase() === "ADD_MONEY_POCKET" ||
+      String(meta?.wallet_source || "").toLowerCase() === "package_upload";
+
+    return isAddMoney ? sum + toMoneyNumber(row?.amount) : sum;
+  }, 0);
+}
+
 export function getSelfPackageWalletBalance(wallet) {
   return firstPositiveNumber(
     pickTransferWallet(wallet, ["internal", "selfPackage", "self_package"]),
@@ -37,10 +63,12 @@ export function getPackagePurchaseCouponBalance(wallet) {
   );
 }
 
-export function getAddMoneyPocketBalance(wallet) {
-  return firstPositiveNumber(
+export function getAddMoneyPocketBalance(wallet, history = null) {
+  const summaryBalance = firstPositiveNumber(
     pickTransferWallet(wallet, ["packageUpload", "package_upload", "addMoney", "add_money"]),
     wallet?.add_money_pocket_balance,
     wallet?.package_upload_balance
   );
+  if (summaryBalance > 0) return summaryBalance;
+  return addMoneyHistoryBalance(history);
 }

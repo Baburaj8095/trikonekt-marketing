@@ -17,7 +17,7 @@ import {
   Stack,
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
-import { getTriApp, getEcouponStoreBootstrap, createPromoPurchase, createPromoPurchaseFromWallet, getWalletMe } from "../api/api";
+import { getTriApp, getEcouponStoreBootstrap, createPromoPurchase, createPromoPurchaseFromWallet, getWalletMe, getWalletMeHistory } from "../api/api";
 import normalizeMediaUrl from "../utils/media";
 import { addProduct as addCartProduct } from "../store/cart";
 import { getAddMoneyPocketBalance } from "../utils/walletBalances";
@@ -43,6 +43,7 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
   const [copied, setCopied] = useState(false);
   const [payment, setPayment] = useState(null); // admin seeded payment config
   const [walletMe, setWalletMe] = useState(null);
+  const [walletHistory, setWalletHistory] = useState(null);
   const [zoomOpen, setZoomOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorOpen, setErrorOpen] = useState(false);
@@ -61,10 +62,15 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
       })();
       (async () => {
         try {
-          const wallet = await getWalletMe();
+          const [wallet, history] = await Promise.all([
+            getWalletMe(),
+            getWalletMeHistory().catch(() => null),
+          ]);
           if (alive) setWalletMe(wallet || null);
+          if (alive) setWalletHistory(history || null);
         } catch {
           if (alive) setWalletMe(null);
+          if (alive) setWalletHistory(null);
         }
       })();
     }
@@ -75,7 +81,7 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
 
   if (!data) return null;
   const amount = Number(data.amount || 0);
-  const addMoneyBal = getAddMoneyPocketBalance(walletMe);
+  const addMoneyBal = getAddMoneyPocketBalance(walletMe, walletHistory);
   const canPayAddMoney = addMoneyBal >= amount && amount > 0;
 
   const summaryLines = (() => {
