@@ -606,13 +606,6 @@ export default function TeamWallet() {
   const manualWallets = useMemo(
     () => [
       {
-        title: "Package Purchase Coupon Received (Buy Package)",
-        amount: walletByNo[11]?.amount,
-        icon: walletByNo[11]?.icon,
-        caption: "Received coupon redeemed amount",
-        tone: 3,
-      },
-      {
         title: "Shopping Self Re-birth",
         amount: walletByNo[3]?.amount,
         icon: walletByNo[3]?.icon,
