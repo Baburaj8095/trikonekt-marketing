@@ -107,7 +107,7 @@ function describeSource(tx = {}) {
   // Reward points
   if (type === "RP_EARN") {
     if (st === "MONTHLY_759" || src === "MONTHLY_759" || tier === 759) {
-      return "Monthly 759 Prime - Reward Points";
+      return "Monthly 1000 Prime - Reward Points";
     }
     return "Reward Points Earned";
   }
@@ -134,12 +134,12 @@ function describeSource(tx = {}) {
   // Prime self activations
   if (ot === "PRIME_150_SELF" || src === "PRIME_150_SELF" || type === "PRIME_150_SELF") return "Prime 150 Self Activation";
   if (ot === "PRIME_750_SELF" || src === "PRIME_750_SELF" || type === "PRIME_750_SELF") return "Prime 750 Self Activation";
-  if (ot === "PRIME_759_SELF" || src === "PRIME_759_SELF" || type === "PRIME_759_SELF") return "Prime 759 Self Activation";
+  if (ot === "PRIME_759_SELF" || src === "PRIME_759_SELF" || type === "PRIME_759_SELF") return "Prime 1000 Self Activation";
 
   // Monthly 759 flows
   if (st === "MONTHLY_759" || src === "MONTHLY_759" || src.includes("759")) {
-    if (src.startsWith("FIVE_MATRIX")) return "5 Matrix 759 Prime";
-    return "Monthly 759 Prime";
+    if (src.startsWith("FIVE_MATRIX")) return "5 Matrix 1000 Prime";
+    return "Monthly 1000 Prime";
   }
 
   // Matrix autopool bonuses
