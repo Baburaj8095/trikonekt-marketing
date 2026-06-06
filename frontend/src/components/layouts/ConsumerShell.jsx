@@ -71,6 +71,7 @@ export default function ConsumerShell({ children }) {
         { to: "/user/trikonekt-pdf", label: "Trikonekt PDF", icon: "file" },
         { to: "/user/certificate-download", label: "Certificate Download", icon: "file" },
         { to: "/user/prime-invoices", label: "Prime Invoices", icon: "file" },
+        { to: "/user/history", label: "History", icon: "orders" },
         { to: "/user/team-history", label: "Team History", icon: "orders" },
         { to: "/user/wallet", label: "Withdrawal", icon: "wallet" },
         { to: "/user/coupon-pocket", label: "Coupon Pocket", icon: "ticket" },
