@@ -43,6 +43,11 @@ import {
 } from "../api/api";
 import { useNavigate } from "react-router-dom";
 import RankUpgrade from "./RankUpgrade";
+import {
+  getAddMoneyPocketBalance,
+  getPackagePurchaseCouponBalance,
+  getSelfPackageWalletBalance,
+} from "../utils/walletBalances";
 
 /**
  * UI REFACTOR ONLY
@@ -375,9 +380,9 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
 function PaymentMethodDialog({ open, onClose, intent, walletMe, onPickManual, onPickWallet }) {
   if (!open) return null;
   const amount = Number(intent?.amount || intent?.pkg?.price || 0);
-  const internalBal = Number(walletMe?.transfer_wallets?.internal || walletMe?.internal_wallet_balance || 0);
-  const packageCouponBal = Number(walletMe?.transfer_wallets?.packagePurchaseCoupon || 0);
-  const addMoneyBal = Number(walletMe?.transfer_wallets?.packageUpload || 0);
+  const internalBal = getSelfPackageWalletBalance(walletMe);
+  const packageCouponBal = getPackagePurchaseCouponBalance(walletMe);
+  const addMoneyBal = getAddMoneyPocketBalance(walletMe);
   const canWallet = internalBal >= amount && amount > 0;
   const canPackageCoupon = packageCouponBal >= amount && amount > 0;
   const canAddMoney = addMoneyBal >= amount && amount > 0;

@@ -20,6 +20,7 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { getTriApp, getEcouponStoreBootstrap, createPromoPurchase, createPromoPurchaseFromWallet, getWalletMe } from "../api/api";
 import normalizeMediaUrl from "../utils/media";
 import { addProduct as addCartProduct } from "../store/cart";
+import { getAddMoneyPocketBalance } from "../utils/walletBalances";
 
 function Price({ value, currency = "₹" }) {
   const n = Number(value || 0);
@@ -74,7 +75,7 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
 
   if (!data) return null;
   const amount = Number(data.amount || 0);
-  const addMoneyBal = Number(walletMe?.transfer_wallets?.packageUpload || 0);
+  const addMoneyBal = getAddMoneyPocketBalance(walletMe);
   const canPayAddMoney = addMoneyBal >= amount && amount > 0;
 
   const summaryLines = (() => {

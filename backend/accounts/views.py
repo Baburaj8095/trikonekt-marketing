@@ -49,12 +49,15 @@ from django.core.mail import send_mail
 from django.contrib.staticfiles import finders
 from io import BytesIO
 from datetime import timedelta
+import logging
 import random
 import os
 try:
     from xhtml2pdf import pisa
 except Exception:
     pisa = None  # type: ignore
+
+logger = logging.getLogger(__name__)
 
 
 # ==================================
@@ -2361,6 +2364,9 @@ def _send_wallet_otp(user, purpose, otp):
     recipient = getattr(user, "email", None)
     if not recipient:
         raise serializers.ValidationError({"detail": "Email is required to send OTP."})
+    if not getattr(settings, "MAIL_ENABLED", False):
+        logger.info("Wallet transfer OTP generated for user_id=%s purpose=%s", user.id, purpose)
+        return
     subject = "Trikonekt Wallet Transfer OTP"
     message = (
         f"Hello {getattr(user, 'full_name', '') or getattr(user, 'username', 'User')},\n\n"
@@ -2369,13 +2375,17 @@ def _send_wallet_otp(user, purpose, otp):
         "If you did not request this, please ignore this email.\n\n"
         "Regards,\nTrikonekt Team"
     )
-    send_mail(
-        subject,
-        message,
-        getattr(settings, "DEFAULT_FROM_EMAIL", None) or getattr(settings, "EMAIL_HOST_USER", None),
-        [recipient],
-        fail_silently=False,
-    )
+    try:
+        send_mail(
+            subject,
+            message,
+            getattr(settings, "DEFAULT_FROM_EMAIL", None) or getattr(settings, "EMAIL_HOST_USER", None),
+            [recipient],
+            fail_silently=False,
+        )
+    except Exception:
+        logger.exception("Wallet transfer OTP mail failed for user_id=%s purpose=%s", user.id, purpose)
+        raise serializers.ValidationError({"detail": "Unable to send OTP right now. Please try again later."})
 
 
 def _move_main_to_derived_wallet(user, amount, target_type, extra_meta=None):
@@ -2580,6 +2590,7 @@ class WalletTransferOtpRequest(APIView):
 
         otp = f"{random.randint(100000, 999999)}"
         key = _otp_cache_key(request.user.id, transfer_type)
+        _send_wallet_otp(request.user, transfer_type, otp)
         cache.set(
             key,
             {
@@ -2590,7 +2601,6 @@ class WalletTransferOtpRequest(APIView):
             },
             timeout=600,
         )
-        _send_wallet_otp(request.user, transfer_type, otp)
         return Response({"detail": "OTP sent to your registered email.", "expires_in": 600})
 
 

@@ -40,6 +40,7 @@ import {
 } from "../api/api";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import normalizeMediaUrl from "../utils/media";
+import { getAddMoneyPocketBalance } from "../utils/walletBalances";
 
 /**
  * Rank Upgrade Screen
@@ -155,7 +156,7 @@ function RankPaymentSheet({ open, onClose, data, onSuccess }) {
 
   if (!data || !data.upgrade) return null;
   const amount = Number(data.upgrade.upgrade_amount || 0);
-  const addMoneyBal = Number(walletMe?.transfer_wallets?.packageUpload || 0);
+  const addMoneyBal = getAddMoneyPocketBalance(walletMe);
   const canPayAddMoney = addMoneyBal >= amount && amount > 0;
 
   return (
