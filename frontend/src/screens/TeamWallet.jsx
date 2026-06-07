@@ -602,9 +602,9 @@ export default function TeamWallet() {
       },
       {
         no: 2,
-        transferType: "internal",
         title: "Self Package Pocket",
         wallet: walletByNo[7],
+        disabled: true,
       },
       {
         no: 3,
@@ -617,7 +617,7 @@ export default function TeamWallet() {
         no: 4,
         title: "Add Money (Buy Package)",
         wallet: walletByNo[9],
-        onClick: () => (window.location.href = "/user/upload-wallet"),
+        disabled: true,
       },
       {
         no: 5,
@@ -938,9 +938,9 @@ export default function TeamWallet() {
                 amount={wallet?.amount}
                 icon={wallet?.icon}
                 caption={wallet?.label}
-                actions={pocket.transferType === "withdrawal" ? [] : wallet?.actions}
+                actions={pocket.disabled || pocket.transferType === "withdrawal" ? [] : wallet?.actions}
                 tone={pocket.no + 1}
-                onClick={pocket.onClick || (pocket.transferType ? () => openTransferType(pocket.transferType) : undefined)}
+                onClick={pocket.disabled ? undefined : pocket.onClick || (pocket.transferType ? () => openTransferType(pocket.transferType) : undefined)}
               />
             );
           })}

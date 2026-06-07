@@ -41,7 +41,11 @@ import {
 } from "../api/api";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import normalizeMediaUrl from "../utils/media";
-import { getAddMoneyPocketBalance } from "../utils/walletBalances";
+import {
+  getAddMoneyPocketBalance,
+  getPackagePurchaseCouponBalance,
+  getSelfPackageWalletBalance,
+} from "../utils/walletBalances";
 
 /**
  * Rank Upgrade Screen
@@ -122,9 +126,21 @@ function RankProgressStepper({ currentLevel = 1, nextLevel = null }) {
 function RankPaymentMethodDialog({ open, onClose, data, walletMe, walletHistory, busy, onPickManual, onPickWallet }) {
   if (!open || !data?.upgrade) return null;
   const amount = Number(data.upgrade.upgrade_amount || 0);
+  const internalBal = getSelfPackageWalletBalance(walletMe);
+  const packageCouponBal = getPackagePurchaseCouponBalance(walletMe);
   const addMoneyBal = getAddMoneyPocketBalance(walletMe, walletHistory);
+  const canWallet = internalBal >= amount && amount > 0;
+  const canPackageCoupon = packageCouponBal >= amount && amount > 0;
   const canAddMoney = addMoneyBal >= amount && amount > 0;
   const money = (value) => Number(value || 0).toFixed(2);
+  const WalletButtonLabel = ({ title, balance }) => (
+    <Stack component="span" spacing={0.25} alignItems="center" sx={{ lineHeight: 1.15 }}>
+      <span>{title}</span>
+      <Typography component="span" sx={{ fontSize: 11, fontWeight: 800, color: "inherit", opacity: 0.86 }}>
+        Available Rs. {money(balance)}
+      </Typography>
+    </Stack>
+  );
 
   return (
     <Dialog open={open} onClose={busy ? undefined : onClose} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: 4, overflow: "hidden" } }}>
@@ -134,28 +150,33 @@ function RankPaymentMethodDialog({ open, onClose, data, walletMe, walletHistory,
           Amount: <b>₹{money(amount)}</b>
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, lineHeight: 1.8 }}>
-          Self Package Wallet Balance: <b>₹0.00</b>
+          Self Package Wallet Balance: <b>₹{money(internalBal)}</b>
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, lineHeight: 1.8 }}>
-          Package Purchase Coupon Wallet Balance: <b>₹0.00</b>
+          Package Purchase Coupon Received (Buy Package) Balance: <b>₹{money(packageCouponBal)}</b>
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, lineHeight: 1.8 }}>
           Add Money Pocket Balance: <b>₹{money(addMoneyBal)}</b>
         </Typography>
+        {!canWallet && !canPackageCoupon && !canAddMoney ? (
+          <Alert severity="info" sx={{ mt: 1.5, borderRadius: 3 }}>
+            Wallet payment is available only when one package wallet balance is enough.
+          </Alert>
+        ) : null}
       </DialogContent>
       <DialogActions sx={{ p: 1.5, gap: 1, flexWrap: "wrap" }}>
         <Button onClick={onClose} disabled={busy} sx={{ borderRadius: 3 }}>Cancel</Button>
         <Button variant="outlined" onClick={onPickManual} disabled={busy} sx={{ borderRadius: 3, fontWeight: 900 }}>
           Manual Payment
         </Button>
-        <Button variant="contained" disabled sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
-          Pay from Self Package<br />Available Rs. 0.00
+        <Button variant="contained" disabled={!canWallet || busy} onClick={() => onPickWallet("internal")} sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
+          <WalletButtonLabel title="Pay from Self Package" balance={internalBal} />
         </Button>
-        <Button variant="contained" disabled sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
-          Pay from Coupon Wallet<br />Available Rs. 0.00
+        <Button variant="contained" disabled={!canPackageCoupon || busy} onClick={() => onPickWallet("package_coupon")} sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
+          <WalletButtonLabel title="Pay from Package Purchase Coupon Received" balance={packageCouponBal} />
         </Button>
-        <Button variant="contained" disabled={!canAddMoney || busy} onClick={onPickWallet} sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
-          Pay from Add Money Pocket<br />Available Rs. {money(addMoneyBal)}
+        <Button variant="contained" disabled={!canAddMoney || busy} onClick={() => onPickWallet("package_upload")} sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
+          <WalletButtonLabel title="Pay from Add Money Pocket" balance={addMoneyBal} />
         </Button>
       </DialogActions>
     </Dialog>
@@ -788,7 +809,7 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
           setMethodOpen(false);
           setPaymentOpen(true);
         }}
-        onPickWallet={async () => {
+        onPickWallet={async (walletSource = "package_upload") => {
           const upgrade = (paymentData || (createdUpgrade ? { upgrade: createdUpgrade } : null))?.upgrade;
           if (!upgrade?.id) return;
           setWalletBusy(true);
@@ -796,7 +817,7 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
           try {
             await createRankUpgradeFromWallet({
               upgrade_id: upgrade.id,
-              wallet_source: "package_upload",
+              wallet_source: walletSource,
             });
             setMethodOpen(false);
             setSuccessTitle("Payment Successful");

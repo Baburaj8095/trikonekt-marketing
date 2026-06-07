@@ -327,9 +327,11 @@ class UpgradePaymentRequestView(APIView):
 
 class UpgradePayFromWalletView(APIView):
     """
-    Pay an initiated rank upgrade from the Add Money Pocket.
-    The uploaded-money pocket is tracked by wallet transactions with source_type=WALLET_UPLOAD.
-    Admin still approves the rank upgrade through the existing review flow.
+    Pay an initiated rank upgrade from a package wallet pocket.
+    Supported wallet_source values:
+      - internal: Self Package Pocket
+      - package_coupon: Package Purchase Coupon Wallet
+      - package_upload/add_money: Add Money Pocket
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -357,41 +359,91 @@ class UpgradePayFromWalletView(APIView):
         if amount <= 0:
             return Response({"detail": "Invalid payable amount."}, status=status.HTTP_400_BAD_REQUEST)
 
-        upload_sources = ["WALLET_UPLOAD", "UPLOAD_TO_WALLET", "PACKAGE_UPLOAD", "PACKAGE_BUY_UPLOAD"]
-        credit = WalletTransaction.objects.filter(
-            user=request.user,
-            source_type__in=upload_sources,
-            amount__gt=0,
-        ).aggregate(total=Sum("amount"))["total"] or D("0.00")
-        debit = WalletTransaction.objects.filter(
-            user=request.user,
-            source_type__in=upload_sources,
-            amount__lt=0,
-        ).aggregate(total=Sum("amount"))["total"] or D("0.00")
-        available = D(str(credit)) + D(str(debit))
-        if available < amount:
-            return Response({"detail": "Insufficient Add Money Pocket balance."}, status=status.HTTP_400_BAD_REQUEST)
-
         w = Wallet.get_or_create_for_user(request.user)
-        w = Wallet.objects.select_for_update().get(pk=w.pk)
-        w.balance = (w.balance or D("0")) - amount
-        if w.balance < D("0"):
-            return Response({"detail": "Insufficient wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
-        w.save(update_fields=["balance", "updated_at"])
 
-        WalletTransaction.objects.create(
-            user=request.user,
-            amount=amount * D("-1"),
-            balance_after=w.balance,
-            type="INTERNAL_WALLET_DEBIT",
-            source_type="WALLET_UPLOAD",
-            source_id=str(upg.id),
-            meta={"reason": "RANK_UPGRADE", "upgrade_id": upg.id, "wallet_source": "package_upload"},
-        )
+        wallet_source = str(request.data.get("wallet_source") or request.data.get("walletSource") or "package_upload").strip().lower()
+        if wallet_source not in {"internal", "package_coupon", "package_upload", "add_money"}:
+            return Response({"detail": "Invalid wallet_source."}, status=status.HTTP_400_BAD_REQUEST)
+        if wallet_source == "add_money":
+            wallet_source = "package_upload"
+
+        if wallet_source == "package_coupon":
+            credit = WalletTransaction.objects.filter(
+                user=request.user,
+                type__in=["PACKAGE_COUPON_WALLET_CREDIT", "VOUCHER_REDEEM_CREDIT"],
+                amount__gt=0,
+            ).aggregate(total=Sum("amount"))["total"] or D("0.00")
+            debit = WalletTransaction.objects.filter(
+                user=request.user,
+                type="PACKAGE_COUPON_WALLET_DEBIT",
+                amount__lt=0,
+            ).aggregate(total=Sum("amount"))["total"] or D("0.00")
+            available = D(str(credit)) + D(str(debit))
+            if available < amount:
+                return Response({"detail": "Insufficient Package Purchase Coupon Wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
+
+            w = Wallet.objects.select_for_update().get(pk=w.pk)
+            w.balance = (w.balance or D("0")) - amount
+            if w.balance < D("0"):
+                return Response({"detail": "Insufficient wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
+            w.save(update_fields=["balance", "updated_at"])
+
+            WalletTransaction.objects.create(
+                user=request.user,
+                amount=amount * D("-1"),
+                balance_after=w.balance,
+                type="PACKAGE_COUPON_WALLET_DEBIT",
+                source_type="RANK_UPGRADE",
+                source_id=str(upg.id),
+                meta={"reason": "RANK_UPGRADE", "upgrade_id": upg.id, "wallet_source": "package_coupon"},
+            )
+        elif wallet_source == "package_upload":
+            upload_sources = ["WALLET_UPLOAD", "UPLOAD_TO_WALLET", "PACKAGE_UPLOAD", "PACKAGE_BUY_UPLOAD"]
+            credit = WalletTransaction.objects.filter(
+                user=request.user,
+                source_type__in=upload_sources,
+                amount__gt=0,
+            ).aggregate(total=Sum("amount"))["total"] or D("0.00")
+            debit = WalletTransaction.objects.filter(
+                user=request.user,
+                source_type__in=upload_sources,
+                amount__lt=0,
+            ).aggregate(total=Sum("amount"))["total"] or D("0.00")
+            available = D(str(credit)) + D(str(debit))
+            if available < amount:
+                return Response({"detail": "Insufficient Add Money Pocket balance."}, status=status.HTTP_400_BAD_REQUEST)
+
+            w = Wallet.objects.select_for_update().get(pk=w.pk)
+            w.balance = (w.balance or D("0")) - amount
+            if w.balance < D("0"):
+                return Response({"detail": "Insufficient wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
+            w.save(update_fields=["balance", "updated_at"])
+
+            WalletTransaction.objects.create(
+                user=request.user,
+                amount=amount * D("-1"),
+                balance_after=w.balance,
+                type="INTERNAL_WALLET_DEBIT",
+                source_type="WALLET_UPLOAD",
+                source_id=str(upg.id),
+                meta={"reason": "RANK_UPGRADE", "upgrade_id": upg.id, "wallet_source": "package_upload"},
+            )
+        else:
+            try:
+                w.debit(
+                    amount,
+                    tx_type="INTERNAL_WALLET_DEBIT",
+                    meta={"reason": "RANK_UPGRADE", "upgrade_id": upg.id, "wallet_source": "internal"},
+                    source_type="RANK_UPGRADE",
+                    source_id=str(upg.id),
+                )
+            except Exception:
+                return Response({"detail": "Insufficient Self Package Wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
+
         rup = RankUpgradePayment.objects.create(
             upgrade=upg,
             utr="",
-            remarks="Paid from Add Money Pocket",
+            remarks=f"Paid from {wallet_source.replace('_', ' ').title()}",
         )
         # Wallet-funded upgrades use already approved wallet money, so approve immediately.
         # Reuse the admin approval implementation so rank updates, commissions, and

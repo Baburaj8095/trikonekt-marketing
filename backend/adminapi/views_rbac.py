@@ -295,9 +295,12 @@ class AdminUserActivateView(APIView):
         user = CustomUser.objects.filter(pk=pk).first()
         if not user:
             return Response({"detail": "Not found"}, status=404)
+        before = {"is_active": bool(user.is_active)}
         if not user.is_active:
             user.is_active = True
             user.save(update_fields=["is_active"])
+            invalidate_user_tokens(user)
+            audit("user.access.activate", request=request, actor_user=request.user, resource_type="user", resource_id=user.id, before=before, after={"is_active": True})
         return Response({"id": user.id, "is_active": user.is_active}, status=200)
 
 
@@ -308,9 +311,12 @@ class AdminUserDeactivateView(APIView):
         user = CustomUser.objects.filter(pk=pk).first()
         if not user:
             return Response({"detail": "Not found"}, status=404)
+        before = {"is_active": bool(user.is_active)}
         if user.is_active:
             user.is_active = False
             user.save(update_fields=["is_active"])
+            invalidate_user_tokens(user)
+            audit("user.access.deactivate", request=request, actor_user=request.user, resource_type="user", resource_id=user.id, before=before, after={"is_active": False})
         return Response({"id": user.id, "is_active": user.is_active}, status=200)
 
 

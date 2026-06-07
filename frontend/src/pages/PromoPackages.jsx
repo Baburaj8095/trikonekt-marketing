@@ -421,7 +421,7 @@ function PaymentMethodDialog({ open, onClose, intent, walletMe, walletHistory, o
           Self Package Wallet Balance: <b>₹{internalBal.toFixed(2)}</b>
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, lineHeight: 1.7 }}>
-          Package Purchase Coupon Wallet Balance: <b>₹{packageCouponBal.toFixed(2)}</b>
+          Package Purchase Coupon Received (Buy Package) Balance: <b>₹{packageCouponBal.toFixed(2)}</b>
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, lineHeight: 1.7 }}>
           Add Money Pocket Balance: <b>₹{addMoneyBal.toFixed(2)}</b>
@@ -441,7 +441,7 @@ function PaymentMethodDialog({ open, onClose, intent, walletMe, walletHistory, o
           <WalletButtonLabel title="Pay from Self Package" balance={internalBal} />
         </Button>
         <Button variant="contained" disabled={!canPackageCoupon} onClick={() => onPickWallet("package_coupon")} sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
-          <WalletButtonLabel title="Pay from Coupon Wallet" balance={packageCouponBal} />
+          <WalletButtonLabel title="Pay from Package Purchase Coupon Received" balance={packageCouponBal} />
         </Button>
         <Button variant="contained" disabled={!canAddMoney} onClick={() => onPickWallet("package_upload")} sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
           <WalletButtonLabel title="Pay from Add Money Pocket" balance={addMoneyBal} />

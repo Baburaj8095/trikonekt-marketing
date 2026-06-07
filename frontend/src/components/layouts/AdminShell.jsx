@@ -203,7 +203,13 @@ export default function AdminShell({ children }) {
       to.startsWith("/admin/user-permissions")
     )
       return "users";
-    if (to.startsWith("/admin/users") || to.startsWith("/admin/user-tree") || to.startsWith("/admin/dashboard/models/auth/")) return "users";
+    if (
+      to.startsWith("/admin/users") ||
+      to.startsWith("/admin/user-tree") ||
+      to.startsWith("/admin/team-consumer/block-users") ||
+      to.startsWith("/admin/dashboard/models/auth/")
+    )
+      return "users";
     if (to.startsWith("/admin/e-coupons")) return "ecoupons";
     if (to.startsWith("/admin/kyc")) return "kyc";
     if (to.startsWith("/admin/withdrawals")) return "withdrawals";
@@ -402,6 +408,7 @@ export default function AdminShell({ children }) {
         items: [
           { to: "/admin/workflows/team-admin-board", label: "Team Admin Board", icon: "dashboard" },
           { to: "/admin/users?category=consumer", label: "ID Card / Team Consumers", icon: "users" },
+          { to: "/admin/team-consumer/block-users", label: "Block Team Consumers", icon: "users" },
           { to: "/admin/team-consumer/wishing-banners", label: "Wishing Banners", icon: "box" },
           { to: "/admin/team-consumer/top-achievers", label: "Top Achievers", icon: "users" },
           { to: "/admin/team-consumer/educational-videos", label: "Educational Videos", icon: "file" },

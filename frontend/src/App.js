@@ -52,6 +52,7 @@ import AdminTeamConsumerTopAchievers from "./pages/admin/AdminTeamConsumerTopAch
 import AdminTeamConsumerEducationalVideos from "./pages/admin/AdminTeamConsumerEducationalVideos";
 import AdminTeamConsumerPdfUploads from "./pages/admin/AdminTeamConsumerPdfUploads";
 import AdminTeamConsumerCertificateUploads from "./pages/admin/AdminTeamConsumerCertificateUploads";
+import AdminTeamConsumerBlockUsers from "./pages/admin/AdminTeamConsumerBlockUsers";
 import AdminMatrixFive from "./pages/admin/AdminMatrixFive";
 import AdminMatrixThree from "./pages/admin/AdminMatrixThree";
 import AdminAutopool from "./pages/admin/AdminAutopool";
@@ -1386,6 +1387,16 @@ function App() {
         />
 
         {/* Team/Consumer: Admin-managed wishing banners + top achievers */}
+        <Route
+          path="/admin/team-consumer/block-users"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminTeamConsumerBlockUsers />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
         <Route
           path="/admin/team-consumer/wishing-banners"
           element={

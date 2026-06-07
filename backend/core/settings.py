@@ -103,12 +103,16 @@ except Exception:
 # Add Postgres keepalive and SSL options to reduce "SSL connection has been closed unexpectedly" on Render
 try:
     DATABASES['default'].setdefault('OPTIONS', {})
-    DATABASES['default']['OPTIONS'].setdefault('sslmode', 'require')
-    DATABASES['default']['OPTIONS'].setdefault('connect_timeout', int(os.environ.get('DB_CONNECT_TIMEOUT', '10')))
-    DATABASES['default']['OPTIONS'].setdefault('keepalives', 1)
-    DATABASES['default']['OPTIONS'].setdefault('keepalives_idle', int(os.environ.get('DB_KEEPALIVES_IDLE', '30')))
-    DATABASES['default']['OPTIONS'].setdefault('keepalives_interval', int(os.environ.get('DB_KEEPALIVES_INTERVAL', '10')))
-    DATABASES['default']['OPTIONS'].setdefault('keepalives_count', int(os.environ.get('DB_KEEPALIVES_COUNT', '5')))
+    if 'postgresql' in str(DATABASES['default'].get('ENGINE', '')).lower():
+        DATABASES['default']['OPTIONS'].setdefault('sslmode', 'require')
+        DATABASES['default']['OPTIONS'].setdefault('connect_timeout', int(os.environ.get('DB_CONNECT_TIMEOUT', '10')))
+        DATABASES['default']['OPTIONS'].setdefault('keepalives', 1)
+        DATABASES['default']['OPTIONS'].setdefault('keepalives_idle', int(os.environ.get('DB_KEEPALIVES_IDLE', '30')))
+        DATABASES['default']['OPTIONS'].setdefault('keepalives_interval', int(os.environ.get('DB_KEEPALIVES_INTERVAL', '10')))
+        DATABASES['default']['OPTIONS'].setdefault('keepalives_count', int(os.environ.get('DB_KEEPALIVES_COUNT', '5')))
+    else:
+        for _pg_only in ("sslmode", "connect_timeout", "keepalives", "keepalives_idle", "keepalives_interval", "keepalives_count"):
+            DATABASES['default']['OPTIONS'].pop(_pg_only, None)
 except Exception:
     # Fallback silently if OPTIONS cannot be set
     pass

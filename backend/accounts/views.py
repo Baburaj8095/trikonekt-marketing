@@ -2735,9 +2735,41 @@ def _generate_voucher_code(user, voucher_type):
     return f"{mobile}-{prefix}{timezone.now().strftime('%H%M%S%f')[-6:]}"
 
 
-def _expire_active_vouchers_for_user(user):
+def _expire_consumer_voucher(voucher):
     from decimal import Decimal as D
 
+    if not voucher:
+        return voucher
+    now = timezone.now()
+    if (
+        voucher.status != ConsumerVoucher.STATUS_ACTIVE
+        or voucher.expires_at > now
+        or voucher.refund_transaction_id
+    ):
+        return voucher
+
+    wallet = Wallet.get_or_create_for_user(voucher.creator)
+    wallet = Wallet.objects.select_for_update().get(pk=wallet.pk)
+    amount = D(str(voucher.amount or "0"))
+    wallet.balance = (wallet.balance or D("0")) + amount
+    wallet.save(update_fields=["balance", "updated_at"])
+    refund_tx = WalletTransaction.objects.create(
+        user=voucher.creator,
+        amount=amount,
+        balance_after=wallet.balance,
+        type="COUPON_WALLET_REFUND",
+        source_type="VOUCHER_EXPIRED",
+        source_id=str(voucher.id),
+        meta={"voucher_code": voucher.code, "voucher_type": voucher.voucher_type},
+    )
+    voucher.status = ConsumerVoucher.STATUS_EXPIRED
+    voucher.expired_at = now
+    voucher.refund_transaction = refund_tx
+    voucher.save(update_fields=["status", "expired_at", "refund_transaction"])
+    return voucher
+
+
+def _expire_active_vouchers_for_user(user):
     now = timezone.now()
     qs = ConsumerVoucher.objects.select_for_update().filter(
         creator=user,
@@ -2746,24 +2778,7 @@ def _expire_active_vouchers_for_user(user):
         refund_transaction__isnull=True,
     )
     for voucher in qs:
-        wallet = Wallet.get_or_create_for_user(voucher.creator)
-        wallet = Wallet.objects.select_for_update().get(pk=wallet.pk)
-        amount = D(str(voucher.amount or "0"))
-        wallet.balance = (wallet.balance or D("0")) + amount
-        wallet.save(update_fields=["balance", "updated_at"])
-        refund_tx = WalletTransaction.objects.create(
-            user=voucher.creator,
-            amount=amount,
-            balance_after=wallet.balance,
-            type="COUPON_WALLET_REFUND",
-            source_type="VOUCHER_EXPIRED",
-            source_id=str(voucher.id),
-            meta={"voucher_code": voucher.code, "voucher_type": voucher.voucher_type},
-        )
-        voucher.status = ConsumerVoucher.STATUS_EXPIRED
-        voucher.expired_at = now
-        voucher.refund_transaction = refund_tx
-        voucher.save(update_fields=["status", "expired_at", "refund_transaction"])
+        _expire_consumer_voucher(voucher)
 
 
 class ConsumerVoucherSerializer(serializers.ModelSerializer):
@@ -2885,7 +2900,13 @@ class ConsumerVoucherRedeem(APIView):
     def post(self, request):
         from decimal import Decimal as D
 
-        code = str(request.data.get("code") or "").strip().upper()
+        if isinstance(request.data, str):
+            raw_code = request.data
+        elif isinstance(request.data, dict):
+            raw_code = request.data.get("code") or request.data.get("voucher_code") or request.data.get("voucher")
+        else:
+            raw_code = ""
+        code = str(raw_code or "").strip().upper()
         if not code:
             return Response({"detail": "Voucher code is required."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -2893,14 +2914,12 @@ class ConsumerVoucherRedeem(APIView):
             voucher = ConsumerVoucher.objects.select_for_update().filter(code__iexact=code).select_related("creator", "assigned_to").first()
             if not voucher:
                 return Response({"detail": "Voucher not found."}, status=status.HTTP_404_NOT_FOUND)
-            _expire_active_vouchers_for_user(voucher.creator)
-            voucher = ConsumerVoucher.objects.select_for_update().get(pk=voucher.pk)
             if voucher.status != ConsumerVoucher.STATUS_ACTIVE:
                 return Response({"detail": f"Voucher is {voucher.status.lower()}."}, status=status.HTTP_400_BAD_REQUEST)
             if voucher.voucher_type != ConsumerVoucher.TYPE_PACKAGE_PURCHASE:
                 return Response({"detail": "Only package purchase coupons can be redeemed from this wallet screen."}, status=status.HTTP_400_BAD_REQUEST)
             if voucher.expires_at <= timezone.now():
-                _expire_active_vouchers_for_user(voucher.creator)
+                _expire_consumer_voucher(voucher)
                 return Response({"detail": "Voucher has expired."}, status=status.HTTP_400_BAD_REQUEST)
             if voucher.creator_id == request.user.id:
                 return Response({"detail": "You cannot redeem your own voucher."}, status=status.HTTP_400_BAD_REQUEST)

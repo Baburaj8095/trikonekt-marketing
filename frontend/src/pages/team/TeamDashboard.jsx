@@ -564,6 +564,12 @@ export default function TeamDashboard() {
   const [profileUser, setProfileUser] = useState(storedUser);
   const [idCardOpen, setIdCardOpen] = useState(false);
   const [docErr, setDocErr] = useState("");
+  const consumerPhone = useMemo(() => {
+    const value = profileUser?.phone || storedUser?.phone || "";
+    if (value) return value;
+    const usernameDigits = String(profileUser?.username || username || "").replace(/\D/g, "");
+    return usernameDigits.length >= 10 ? usernameDigits : "-";
+  }, [profileUser?.phone, profileUser?.username, storedUser?.phone, username]);
   const initials = useMemo(() => {
     const n = String(profileUser?.full_name || fullName || username || "T").trim();
     const parts = n.split(" ").filter(Boolean);
@@ -787,7 +793,7 @@ export default function TeamDashboard() {
                   {profileUser?.full_name || fullName}
                 </Typography>
                 <Stack direction="row" spacing={0.65} alignItems="center" sx={{ mt: 0.45, flexWrap: "wrap" }}>
-                  <Chip size="small" label={`ID: ${profileUser?.prefixed_id || profileUser?.unique_id || username || "-"}`} sx={{ height: 22, fontSize: 10.5, fontWeight: 750, bgcolor: "rgba(37,99,235,0.08)", color: C.primary }} />
+                  <Chip size="small" label={`Phone: ${consumerPhone}`} sx={{ height: 22, fontSize: 10.5, fontWeight: 750, bgcolor: "rgba(37,99,235,0.08)", color: C.primary }} />
                   <Chip size="small" label={`Status: ${status}`} sx={{ height: 22, fontSize: 10.5, fontWeight: 750, bgcolor: "rgba(22,163,74,0.10)", color: "#047857" }} />
                 </Stack>
               </Box>

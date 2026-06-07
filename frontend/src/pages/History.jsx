@@ -107,7 +107,7 @@ function describeSource(tx = {}) {
   // Reward points
   if (type === "RP_EARN") {
     if (st === "MONTHLY_759" || src === "MONTHLY_759" || tier === 759) {
-      return "Monthly 1000 Prime - Reward Points";
+      return "SPP 1000 - Reward Points";
     }
     return "Reward Points Earned";
   }
@@ -117,7 +117,7 @@ function describeSource(tx = {}) {
   if (isRankUpgrade) {
     const orig = String(meta.orig_type || type || "").toUpperCase();
     if (orig === "DIRECT_REF_BONUS" || type === "DIRECT_REF_BONUS") {
-      return "Rank Direct Referral Bonus";
+      return "Digital Education Referral Bonus";
     }
     if (orig === "LEVEL_BONUS" || type === "LEVEL_BONUS") {
       const lvl = Number(meta.level ?? meta.level_index);
@@ -139,7 +139,7 @@ function describeSource(tx = {}) {
   // Monthly 759 flows
   if (st === "MONTHLY_759" || src === "MONTHLY_759" || src.includes("759")) {
     if (src.startsWith("FIVE_MATRIX")) return "5 Matrix 1000 Prime";
-    return "Monthly 1000 Prime";
+    return "SPP 1000";
   }
 
   // Matrix autopool bonuses

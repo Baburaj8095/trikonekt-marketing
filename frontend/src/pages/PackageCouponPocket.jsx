@@ -94,7 +94,7 @@ export default function PackageCouponPocket() {
       setSuccess("");
       await API.post("/accounts/wallet/vouchers/redeem/", { code: String(value || "").trim() });
       setCode("");
-      setSuccess("Voucher redeemed. Amount added to your Package Purchase Coupon Wallet.");
+      setSuccess("Voucher redeemed. Amount added to your Package Purchase Coupon Received (Buy Package) wallet.");
       await load();
     } catch (err) {
       setError(err?.response?.data?.detail || "Failed to redeem voucher.");
