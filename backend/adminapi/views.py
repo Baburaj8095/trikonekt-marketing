@@ -19,6 +19,7 @@ from coupons.models import Coupon, CouponCode, CouponSubmission, CouponBatch
 from uploads.models import FileUpload, DashboardCard, HomeCard, LuckyDrawSubmission
 from market.models import Product, PurchaseRequest, Banner, BannerItem, BannerPurchaseRequest
 from business.models import UserMatrixProgress, AutoPoolAccount, DailyReport, CommissionConfig, PromoPurchase
+from mlm_ranks.models import RankUpgrade
 from .permissions import IsAdminOrStaff, IsSuperAdmin, HasAdminModuleAccess, HasAnyPermission, has_admin_module_access, MODULE_KEYS
 from .serializers import AdminUserNodeSerializer, AdminKYCSerializer, AdminWithdrawalSerializer, AdminMatrixProgressSerializer, AdminSupportTicketSerializer, AdminSupportTicketMessageSerializer, AdminUserEditSerializer, AdminAutopoolTxnSerializer, AdminAutopoolConfigSerializer
 from .dynamic import field_meta_from_serializer
@@ -259,6 +260,31 @@ class AdminMetricsView(APIView):
             Q(package__price__gte=Decimal("999.50"), package__price__lte=Decimal("1000.50"))
         )
 
+        def rank_upgrade_stats(qs):
+            today_filter = Q(created_at__date=today)
+            agg = qs.aggregate(
+                today_count=Count("user", filter=today_filter, distinct=True),
+                today_amount=Sum("upgrade_amount", filter=today_filter),
+                total_count=Count("user", distinct=True),
+                total_amount=Sum("upgrade_amount"),
+            )
+            return {
+                "todayCount": int(agg.get("today_count") or 0),
+                "todayAmount": float(agg.get("today_amount") or Decimal("0.00")),
+                "totalCount": int(agg.get("total_count") or 0),
+                "totalAmount": float(agg.get("total_amount") or Decimal("0.00")),
+            }
+
+        digital_education_prime_stats = {
+            "pendingApproval": rank_upgrade_stats(
+                RankUpgrade.objects.filter(payment_status=RankUpgrade.STATUS_INITIATED)
+            ),
+            "approved": rank_upgrade_stats(
+                RankUpgrade.objects.filter(payment_status=RankUpgrade.STATUS_SUCCESS)
+            ),
+            "overall": rank_upgrade_stats(RankUpgrade.objects.all()),
+        }
+
         # Autopool aggregates (single DB hit)
         acc_by_status = list(
             AutoPoolAccount.objects.values("status")
@@ -286,6 +312,7 @@ class AdminMetricsView(APIView):
             "packageStats": {
                 "subscription750": promo_package_stats(750),
                 "smartProduct1000": promo_package_stats_for_queryset(smart_product_qs),
+                "digitalEducationPrime": digital_education_prime_stats,
             },
             "walletPocketStats": wallet_pocket_stats,
             "commission": {

@@ -58,6 +58,7 @@ const CONSUMER_COLUMN_FIELDS = {
     "__slno",
     "__edit_view",
     "__login",
+    "is_active",
     "__account_joining",
     "system_serial_number",
     "user_code",
@@ -679,7 +680,9 @@ export default function AdminUsers() {
       {
         field: "__login",
         headerName: "Login",
-        minWidth: 110,
+        width: 92,
+        align: "center",
+        headerAlign: "center",
         sortable: false,
         filterable: false,
         renderCell: (params) => {
@@ -710,23 +713,28 @@ export default function AdminUsers() {
             } catch (_) {}
           };
           return (
-            <button
-              type="button"
-              onClick={onLogin}
-              title="Login as this user"
-              style={{
-                borderRadius: 8,
-                padding: "6px 10px",
-                background: "#2563eb",
-                color: "#fff",
-                border: "1px solid #1d4ed8",
-                cursor: "pointer",
-                fontSize: 12,
-                fontWeight: 700,
-              }}
-            >
-              Login
-            </button>
+            <div style={{ width: "100%", display: "flex", justifyContent: "center", alignItems: "center" }}>
+              <button
+                type="button"
+                onClick={onLogin}
+                title="Login as this user"
+                style={{
+                  minWidth: 64,
+                  borderRadius: 7,
+                  padding: "5px 10px",
+                  background: "#2563eb",
+                  color: "#fff",
+                  border: "1px solid #1d4ed8",
+                  cursor: "pointer",
+                  fontSize: 12,
+                  lineHeight: "16px",
+                  fontWeight: 800,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Login
+              </button>
+            </div>
           );
         },
       },
@@ -1154,8 +1162,10 @@ export default function AdminUsers() {
       { field: "wallet_status", headerName: "Wallet Status", minWidth: 140 },
       {
         field: "is_active",
-        headerName: "Access",
-        minWidth: 150,
+        headerName: "Block User",
+        width: 128,
+        align: "center",
+        headerAlign: "center",
         renderCell: (params) => {
           const row = params?.row || {};
           const canLogin = row.is_active !== false;
@@ -1179,23 +1189,29 @@ export default function AdminUsers() {
           };
 
           return (
-            <button
-              type="button"
-              onClick={onToggleAccess}
-              title={canLogin ? "Block login access" : "Allow login access"}
-              style={{
-                borderRadius: 999,
-                padding: "5px 10px",
-                background: canLogin ? "#dcfce7" : "#fee2e2",
-                color: canLogin ? "#166534" : "#991b1b",
-                border: `1px solid ${canLogin ? "#86efac" : "#fecaca"}`,
-                cursor: "pointer",
-                fontSize: 12,
-                fontWeight: 800,
-              }}
-            >
-              {canLogin ? "Can login" : "Blocked"}
-            </button>
+            <div style={{ width: "100%", display: "flex", justifyContent: "center", alignItems: "center" }}>
+              <button
+                type="button"
+                onClick={onToggleAccess}
+                title={canLogin ? "Block this consumer" : "Unblock this consumer"}
+                style={{
+                  minWidth: 82,
+                  borderRadius: 7,
+                  padding: "5px 10px",
+                  background: canLogin ? "#dc2626" : "#16a34a",
+                  color: "#fff",
+                  border: `1px solid ${canLogin ? "#b91c1c" : "#15803d"}`,
+                  cursor: "pointer",
+                  fontSize: 12,
+                  lineHeight: "16px",
+                  fontWeight: 800,
+                  whiteSpace: "nowrap",
+                  boxShadow: "none",
+                }}
+              >
+                {canLogin ? "Block" : "Unblock"}
+              </button>
+            </div>
           );
         },
       },

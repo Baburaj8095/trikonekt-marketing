@@ -460,11 +460,13 @@ function PaymentMethodDialog({ open, onClose, intent, walletMe, walletHistory, o
  * - Requires choice: Redeem | Product
  * - Bonus ₹150 info is UI-only (no backend flag; reflected in uiMeta for summary)
  */
-function Prime750Section({ pkg, prime150Active, prime750Active, onBuy }) {
-  const [choice, setChoice] = useState("");
+function Prime750Section({ pkg, prime150Active, prime750Active, onBuy, redeemOnly = false }) {
+  const [choice, setChoice] = useState(redeemOnly ? "REDEEM" : "");
   const [selProd, setSelProd] = useState("");
 
-  const options = getPlanOptions(pkg?.price || 0);
+  const options = redeemOnly
+    ? getPlanOptions(pkg?.price || 0).filter((opt) => !/product/i.test(String(opt || "")))
+    : getPlanOptions(pkg?.price || 0);
 
   const canBuy =
     !!pkg &&
@@ -510,10 +512,12 @@ function Prime750Section({ pkg, prime150Active, prime750Active, onBuy }) {
           onChange={(e) => setChoice(e.target.value)}
         >
           <FormControlLabel value="REDEEM" control={<Radio size="small" />} label="Redeem" />
-          <FormControlLabel value="PRODUCT" control={<Radio size="small" />} label="Product" />
+          {!redeemOnly ? (
+            <FormControlLabel value="PRODUCT" control={<Radio size="small" />} label="Product" />
+          ) : null}
         </RadioGroup>
 
-        {choice === "PRODUCT" ? (
+        {!redeemOnly && choice === "PRODUCT" ? (
           <TextField
             select
             fullWidth
@@ -1093,6 +1097,7 @@ export default function PromoPackages({
   historyScope = "all",
   // Optional UI renames (used for SPP)
   rename = null,
+  primeRedeemOnly = false,
 } = {}) {
   const [packages, setPackages] = useState([]);
   const [history, setHistory] = useState([]);
@@ -1405,6 +1410,7 @@ export default function PromoPackages({
                 prime150Active={prime150Active}
                 prime750Active={prime750Active}
                 onBuy={onBuy}
+                redeemOnly={primeRedeemOnly}
               />
             ) : (
               <Alert severity="warning">Prime 750 package not available.</Alert>

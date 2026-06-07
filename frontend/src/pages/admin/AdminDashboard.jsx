@@ -306,6 +306,7 @@ export default function AdminDashboard() {
     const packageStats = data?.packageStats || {};
     const subscription750 = packageStats.subscription750 || {};
     const smartProduct1000 = packageStats.smartProduct1000 || {};
+    const digitalEducationPrime = packageStats.digitalEducationPrime || {};
     const walletPocketStats = data?.walletPocketStats || {};
     const totalConsumers = catCounts.consumer ?? users.total ?? 0;
     const businessTotal = merchantsCount ?? (catCounts.merchant ?? 0) + (catCounts.business ?? 0);
@@ -352,10 +353,10 @@ export default function AdminDashboard() {
       { title: "Smart Product Package Rs 1000 Coupon Pocket", icon: ConfirmationNumberRoundedIcon, to: "/admin/promo-purchases?kind=759&status=APPROVED", metrics: packageMetrics(smartProduct1000.couponPocket) },
       { title: "Smart Product Package Rs 1000 Self Package Pocket", icon: ShoppingCartRoundedIcon, to: "/admin/promo-purchases?kind=759&status=APPROVED", metrics: packageMetrics(smartProduct1000.selfPackagePocket) },
       { title: "Smart Product Package Rs 1000 Add Money", icon: AccountBalanceWalletRoundedIcon, to: "/admin/promo-purchases?kind=759&status=APPROVED", metrics: packageMetrics(smartProduct1000.addMoney) },
-      { title: "Digital Education Prime Package", icon: SchoolRoundedIcon, to: "/admin/promo-purchases?status=PENDING", metrics: [{ label: "Today Count", value: "-" }, { label: "Total Count", value: "-" }, { label: "Today Amount", value: "-" }, { label: "Total Amount", value: "-" }] },
-      simple("Digital Education Prime Package Coupon Pocket", ConfirmationNumberRoundedIcon, "/admin/wallet-vouchers"),
-      simple("Digital Education Prime Package Self Package Pocket", SchoolRoundedIcon, "/admin/promo-purchases?status=APPROVED"),
-      simple("Digital Education Prime Package Add Money", AccountBalanceWalletRoundedIcon, "/admin/wallet-upload-approvals"),
+      { title: "Digital Education Prime Package", icon: SchoolRoundedIcon, to: "/admin/packages/digital-education-prime", metrics: packageMetrics(digitalEducationPrime.overall) },
+      simple("Digital Education Prime Package Coupon Pocket", ConfirmationNumberRoundedIcon, "/admin/packages/digital-education-prime"),
+      simple("Digital Education Prime Package Self Package Pocket", SchoolRoundedIcon, "/admin/packages/digital-education-prime"),
+      simple("Digital Education Prime Package Add Money", AccountBalanceWalletRoundedIcon, "/admin/packages/digital-education-prime"),
       { title: "Total Earning", icon: CurrencyRupeeRoundedIcon, to: "/admin/wallet-ledger", primary: currency(wallets.totalBalance), metrics: [{ label: "Amount", value: currency(wallets.totalBalance) }] },
       { title: "Main Wallet", icon: AccountBalanceWalletRoundedIcon, to: "/admin/wallets", primary: currency(wallets.totalBalance), metrics: [{ label: "Wallets", value: number(wallets.count) }] },
       simple("Team Consumer Self Re-birth", RedeemRoundedIcon, "/admin/workflows/team-admin-board"),

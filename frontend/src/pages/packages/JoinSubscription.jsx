@@ -7,5 +7,5 @@ import PromoPackages from "../PromoPackages";
  * - Reuses PromoPackages and forces the Prime tab.
  */
 export default function JoinSubscription() {
-  return <PromoPackages title="Join Subscription" initialTabKey="prime750" historyScope="prime750" />;
+  return <PromoPackages title="Join Subscription" initialTabKey="prime750" historyScope="prime750" primeRedeemOnly />;
 }

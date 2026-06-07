@@ -642,10 +642,10 @@ export default function TeamWallet() {
     () => [
       {
         title: "Shopping Self Re-birth",
-        amount: walletByNo[3]?.amount,
+        amount: 0,
         icon: walletByNo[3]?.icon,
         caption: walletByNo[3]?.label,
-        idCount: selfRebirthStats.count || 0,
+        idCount: 0,
         tone: 4,
       },
       {
