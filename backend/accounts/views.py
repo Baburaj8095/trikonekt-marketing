@@ -2902,7 +2902,7 @@ class ConsumerVoucherRedeem(APIView):
 
         if isinstance(request.data, str):
             raw_code = request.data
-        elif isinstance(request.data, dict):
+        elif hasattr(request.data, "get"):
             raw_code = request.data.get("code") or request.data.get("voucher_code") or request.data.get("voucher")
         else:
             raw_code = ""
@@ -2910,46 +2910,61 @@ class ConsumerVoucherRedeem(APIView):
         if not code:
             return Response({"detail": "Voucher code is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        with transaction.atomic():
-            voucher = ConsumerVoucher.objects.select_for_update().filter(code__iexact=code).select_related("creator", "assigned_to").first()
-            if not voucher:
-                return Response({"detail": "Voucher not found."}, status=status.HTTP_404_NOT_FOUND)
-            if voucher.status != ConsumerVoucher.STATUS_ACTIVE:
-                return Response({"detail": f"Voucher is {voucher.status.lower()}."}, status=status.HTTP_400_BAD_REQUEST)
-            if voucher.voucher_type != ConsumerVoucher.TYPE_PACKAGE_PURCHASE:
-                return Response({"detail": "Only package purchase coupons can be redeemed from this wallet screen."}, status=status.HTTP_400_BAD_REQUEST)
-            if voucher.expires_at <= timezone.now():
-                _expire_consumer_voucher(voucher)
-                return Response({"detail": "Voucher has expired."}, status=status.HTTP_400_BAD_REQUEST)
-            if voucher.creator_id == request.user.id:
-                return Response({"detail": "You cannot redeem your own voucher."}, status=status.HTTP_400_BAD_REQUEST)
-            if voucher.assigned_to_id and voucher.assigned_to_id != request.user.id:
-                return Response({"detail": "This voucher is assigned to another consumer."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            with transaction.atomic():
+                voucher = (
+                    ConsumerVoucher.objects
+                    .select_for_update()
+                    .select_related("creator", "assigned_to")
+                    .filter(code__iexact=code)
+                    .first()
+                )
+                if not voucher:
+                    return Response({"detail": "Voucher not found."}, status=status.HTTP_404_NOT_FOUND)
+                if voucher.status != ConsumerVoucher.STATUS_ACTIVE:
+                    return Response({"detail": f"Voucher is {voucher.status.lower()}."}, status=status.HTTP_400_BAD_REQUEST)
+                if voucher.voucher_type != ConsumerVoucher.TYPE_PACKAGE_PURCHASE:
+                    return Response({"detail": "Only package purchase coupons can be redeemed from this wallet screen."}, status=status.HTTP_400_BAD_REQUEST)
+                if voucher.expires_at <= timezone.now():
+                    _expire_consumer_voucher(voucher)
+                    return Response({"detail": "Voucher has expired."}, status=status.HTTP_400_BAD_REQUEST)
+                if voucher.creator_id == request.user.id:
+                    return Response({"detail": "You cannot redeem your own voucher."}, status=status.HTTP_400_BAD_REQUEST)
+                if voucher.assigned_to_id and voucher.assigned_to_id != request.user.id:
+                    return Response({"detail": "This voucher is assigned to another consumer."}, status=status.HTTP_403_FORBIDDEN)
 
-            amount = D(str(voucher.amount or "0"))
-            receiver_wallet = Wallet.get_or_create_for_user(request.user)
-            receiver_wallet = Wallet.objects.select_for_update().get(pk=receiver_wallet.pk)
-            receiver_wallet.balance = (receiver_wallet.balance or D("0")) + amount
-            receiver_wallet.save(update_fields=["balance", "updated_at"])
-            tx = WalletTransaction.objects.create(
-                user=request.user,
-                amount=amount,
-                balance_after=receiver_wallet.balance,
-                type="VOUCHER_REDEEM_CREDIT",
-                source_type="CONSUMER_VOUCHER",
-                source_id=str(voucher.id),
-                meta={
-                    "voucher_code": voucher.code,
-                    "voucher_type": voucher.voucher_type,
-                    "creator_user_id": voucher.creator_id,
-                    "destination_wallet": "PACKAGE_PURCHASE_COUPON" if voucher.voucher_type == ConsumerVoucher.TYPE_PACKAGE_PURCHASE else "COUPON_REDEEMED",
-                },
+                amount = D(str(voucher.amount or "0")).quantize(D("0.01"))
+                if amount <= D("0.00"):
+                    return Response({"detail": "Voucher amount is invalid."}, status=status.HTTP_400_BAD_REQUEST)
+
+                receiver_wallet = Wallet.get_or_create_for_user(request.user)
+                receiver_wallet = Wallet.objects.select_for_update().get(pk=receiver_wallet.pk)
+                receiver_wallet.balance = (receiver_wallet.balance or D("0.00")) + amount
+                receiver_wallet.save(update_fields=["balance", "updated_at"])
+                tx = WalletTransaction.objects.create(
+                    user=request.user,
+                    amount=amount,
+                    balance_after=receiver_wallet.balance,
+                    type="VOUCHER_REDEEM_CREDIT",
+                    source_type="CONSUMER_VOUCHER",
+                    source_id=str(voucher.id),
+                    meta={
+                        "voucher_code": voucher.code,
+                        "voucher_type": voucher.voucher_type,
+                        "creator_user_id": voucher.creator_id,
+                        "destination_wallet": "PACKAGE_PURCHASE_COUPON",
+                    },
+                )
+                voucher.status = ConsumerVoucher.STATUS_REDEEMED
+                voucher.redeemed_by = request.user
+                voucher.redeemed_at = timezone.now()
+                voucher.redeem_transaction = tx
+                voucher.save(update_fields=["status", "redeemed_by", "redeemed_at", "redeem_transaction"])
+        except Exception as exc:
+            return Response(
+                {"detail": "Voucher redeem failed. Please try again or contact support.", "error": str(exc)[:160]},
+                status=status.HTTP_400_BAD_REQUEST,
             )
-            voucher.status = ConsumerVoucher.STATUS_REDEEMED
-            voucher.redeemed_by = request.user
-            voucher.redeemed_at = timezone.now()
-            voucher.redeem_transaction = tx
-            voucher.save(update_fields=["status", "redeemed_by", "redeemed_at", "redeem_transaction"])
 
         return Response(ConsumerVoucherSerializer(voucher).data, status=status.HTTP_200_OK)
 
