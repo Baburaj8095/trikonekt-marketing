@@ -2915,7 +2915,7 @@ class ConsumerVoucherRedeem(APIView):
                 voucher = (
                     ConsumerVoucher.objects
                     .select_for_update()
-                    .select_related("creator", "assigned_to")
+                    .select_related("creator")
                     .filter(code__iexact=code)
                     .first()
                 )
