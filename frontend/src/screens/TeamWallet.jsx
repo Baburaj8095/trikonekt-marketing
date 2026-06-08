@@ -650,7 +650,7 @@ export default function TeamWallet() {
       },
       {
         title: "Franchisee Self Re-birth",
-        amount: walletByNo[11]?.amount,
+        amount: 0,
         icon: walletByNo[11]?.icon,
         caption: "Franchisee rebirth",
         idCount: coupons?.franchiseActivated || 0,

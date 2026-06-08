@@ -1103,6 +1103,8 @@ class AdminUserImpersonateView(APIView):
         user = CustomUser.objects.filter(pk=pk).first()
         if not user:
             return Response({"detail": "Not found"}, status=404)
+        if not getattr(user, "is_active", False):
+            return Response({"detail": "User is blocked. Unblock before login."}, status=400)
         try:
             refresh = RefreshToken.for_user(user)
             data = {

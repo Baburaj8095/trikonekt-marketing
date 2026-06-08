@@ -687,10 +687,11 @@ export default function AdminUsers() {
         filterable: false,
         renderCell: (params) => {
           const row = params?.row || {};
+          const canLogin = row.is_active !== false;
           const onLogin = async (e) => {
             e?.stopPropagation?.();
             try {
-              if (!row?.id) return;
+              if (!row?.id || !canLogin) return;
               const res = await API.post(`/admin/users/${row.id}/impersonate/`);
               const { access, refresh, role } = res?.data || {};
               if (!access || !refresh) return;
@@ -717,19 +718,21 @@ export default function AdminUsers() {
               <button
                 type="button"
                 onClick={onLogin}
-                title="Login as this user"
+                disabled={!canLogin}
+                title={canLogin ? "Login as this user" : "User is blocked. Unblock before login."}
                 style={{
                   minWidth: 64,
                   borderRadius: 7,
                   padding: "5px 10px",
-                  background: "#2563eb",
+                  background: canLogin ? "#2563eb" : "#94a3b8",
                   color: "#fff",
-                  border: "1px solid #1d4ed8",
-                  cursor: "pointer",
+                  border: `1px solid ${canLogin ? "#1d4ed8" : "#64748b"}`,
+                  cursor: canLogin ? "pointer" : "not-allowed",
                   fontSize: 12,
                   lineHeight: "16px",
                   fontWeight: 800,
                   whiteSpace: "nowrap",
+                  opacity: canLogin ? 1 : 0.78,
                 }}
               >
                 Login
@@ -1219,6 +1222,8 @@ export default function AdminUsers() {
         field: "account_active",
         headerName: "Account",
         minWidth: 160,
+        align: "center",
+        headerAlign: "center",
         renderCell: (params) => {
           const row = params?.row || {};
           const active = !!row.account_active;
@@ -1269,17 +1274,19 @@ export default function AdminUsers() {
             : (active ? "Active" : "Inactive");
 
           return (
-            <div
-              role="switch"
-              aria-checked={active}
-              aria-disabled={disabled}
-              tabIndex={0}
-              onClick={onToggle}
-              onKeyDown={(e) => { if (!disabled && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onToggle(e); } }}
-              title={title}
-              style={trackStyle}
-            >
-              <div style={knobStyle} />
+            <div style={{ width: "100%", display: "flex", justifyContent: "center", alignItems: "center" }}>
+              <div
+                role="switch"
+                aria-checked={active}
+                aria-disabled={disabled}
+                tabIndex={0}
+                onClick={onToggle}
+                onKeyDown={(e) => { if (!disabled && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onToggle(e); } }}
+                title={title}
+                style={trackStyle}
+              >
+                <div style={knobStyle} />
+              </div>
             </div>
           );
         },
@@ -1369,11 +1376,13 @@ export default function AdminUsers() {
         field: "__account_joining",
         headerName: "Active / Joined",
         minWidth: 210,
+        align: "center",
+        headerAlign: "center",
         renderCell: (params) => {
           const row = params?.row || {};
           const active = !!row.account_active;
           return (
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
               <span
                 style={{
                   display: "inline-flex",
@@ -1395,32 +1404,44 @@ export default function AdminUsers() {
         },
       },
       { field: "system_serial_number", headerName: "System Serial Number", minWidth: 170 },
-      { field: "user_code", headerName: "User ID", minWidth: 150 },
+      {
+        field: "user_code",
+        headerName: "User ID",
+        minWidth: 150,
+        renderCell: (params) => {
+          const row = params?.row || {};
+          return row.phone || row.username || row.user_code || "";
+        },
+      },
       { field: "sponsor_display", headerName: "Sponsor ID & Name", minWidth: 220, flex: 1 },
       { field: "address_pincode", headerName: "Address & Pincode", minWidth: 260, flex: 1 },
       {
         field: "__kyc_profile",
         headerName: "KYC Profile",
         minWidth: 140,
+        align: "center",
+        headerAlign: "center",
         renderCell: (params) => {
           const row = params?.row || {};
           const verified = !!row.kyc_verified;
           const label = verified ? "Verified" : row.kyc_status || "Pending";
           return (
-            <span
-              title={row.kyc_verified_at ? `Verified: ${formatDateTime(row.kyc_verified_at)}` : label}
-              style={{
-                display: "inline-flex",
-                padding: "4px 8px",
-                borderRadius: 8,
-                fontSize: 12,
-                fontWeight: 800,
-                background: verified ? "#10b981" : "#f59e0b",
-                color: "#fff",
-              }}
-            >
-              {label}
-            </span>
+            <div style={{ width: "100%", display: "flex", justifyContent: "center", alignItems: "center" }}>
+              <span
+                title={row.kyc_verified_at ? `Verified: ${formatDateTime(row.kyc_verified_at)}` : label}
+                style={{
+                  display: "inline-flex",
+                  padding: "4px 8px",
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontWeight: 800,
+                  background: verified ? "#10b981" : "#f59e0b",
+                  color: "#fff",
+                }}
+              >
+                {label}
+              </span>
+            </div>
           );
         },
       },

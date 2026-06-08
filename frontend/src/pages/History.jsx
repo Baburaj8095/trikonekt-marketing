@@ -19,7 +19,6 @@ import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import SavingsIcon from "@mui/icons-material/Savings";
 import RedeemIcon from "@mui/icons-material/Redeem";
-import CardGiftcardIcon from "@mui/icons-material/CardGiftcard";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 
 /** ---------- helpers ---------- */
@@ -648,12 +647,6 @@ export default function History() {
           value={`₹ ${fmtAmount(top.self_account_balance)}`}
           icon={<AccountBalanceWalletIcon fontSize="small" />}
           color="warning"
-        />
-        <MiniCard
-          title="Shopping Rewards"
-          value={`${fmtAmount(top.shopping_rewards_points)} pts`}
-          icon={<CardGiftcardIcon fontSize="small" />}
-          color="info"
         />
         <MiniCard
           title="Redeem Points"
