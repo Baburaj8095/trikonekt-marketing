@@ -1,6 +1,7 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
+  Alert,
   Avatar,
   Box,
   Card,
@@ -13,9 +14,11 @@ import {
   Stack,
   Typography,
   Button,
+  LinearProgress,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
+import API from "../../api/api";
 import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceWalletRounded";
 import WalletRoundedIcon from "@mui/icons-material/WalletRounded";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
@@ -147,7 +150,7 @@ function SectionHeader({ icon, title, subtitle, color }) {
 }
 
 // ─── Desktop Wallet Card ──────────────────────────────────────────────────────
-function GroupWalletCard({ title, amount, icon, accent, tint, badge, suffix }) {
+function GroupWalletCard({ title, amount, icon, accent, tint, badge, suffix, source, payEnabled, payDisabledReason, onPay, paying }) {
   return (
     <Card
       sx={{
@@ -271,22 +274,26 @@ function GroupWalletCard({ title, amount, icon, accent, tint, badge, suffix }) {
               <MoreHorizRoundedIcon />
             </IconButton>
             <Button
-              endIcon={<ArrowForwardRoundedIcon />}
+              endIcon={source ? null : <ArrowForwardRoundedIcon />}
               fullWidth
+              disabled={source ? (!payEnabled || paying) : false}
+              onClick={() => source && onPay?.(source)}
+              title={source && !payEnabled ? payDisabledReason : undefined}
               sx={{
                 borderRadius: 2,
                 px: { xs: 1.25, md: 2.25 },
                 py: { xs: 0.8, md: 1 },
                 border: `1px solid ${COLORS.border}`,
-                color: COLORS.muted,
+                color: source && payEnabled ? "#fff" : COLORS.muted,
                 textTransform: "none",
                 fontWeight: 700,
-                bgcolor: "#fff",
+                bgcolor: source && payEnabled ? accent : "#fff",
                 fontSize: { xs: "0.78rem", md: "0.92rem" },
                 whiteSpace: "nowrap",
+                "&:hover": { bgcolor: source && payEnabled ? accent : "#fff" },
               }}
             >
-              View Details
+              {source ? (paying ? "Paying..." : "Pay") : "View Details"}
             </Button>
           </Stack>
         </Stack>
@@ -350,6 +357,11 @@ const MobileWalletRowCard = ({
   badge,
   tint,
   accent,
+  source,
+  payEnabled,
+  payDisabledReason,
+  onPay,
+  paying,
 }) => {
   return (
     <Card
@@ -414,6 +426,29 @@ const MobileWalletRowCard = ({
                 {badge}
               </Typography>
             )}
+            {source ? (
+              <Button
+                size="small"
+                disabled={!payEnabled || paying}
+                onClick={() => onPay?.(source)}
+                title={!payEnabled ? payDisabledReason : undefined}
+                sx={{
+                  mt: 0.4,
+                  minWidth: 58,
+                  borderRadius: 2,
+                  px: 1,
+                  py: 0.25,
+                  bgcolor: payEnabled ? accent : "#eef2f7",
+                  color: payEnabled ? "#fff" : COLORS.muted,
+                  textTransform: "none",
+                  fontSize: "0.72rem",
+                  fontWeight: 800,
+                  "&:hover": { bgcolor: payEnabled ? accent : "#eef2f7" },
+                }}
+              >
+                {paying ? "..." : "Pay"}
+              </Button>
+            ) : null}
           </Stack>
 
         </Stack>
@@ -431,6 +466,10 @@ export default function FranchiseWalletPlaceholder() {
   const location = useLocation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md")); // < 900px
+  const [walletInfo, setWalletInfo] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  const [payingSource, setPayingSource] = useState("");
 
   const backTarget = useMemo(
     () =>
@@ -439,6 +478,139 @@ export default function FranchiseWalletPlaceholder() {
         : "/agency/franchise-dashboard",
     [location.pathname]
   );
+
+  const loadWallet = async () => {
+    try {
+      setErr("");
+      setLoading(true);
+      const res = await API.get("/accounts/franchise/wallet/me/", { dedupe: "cancelPrevious" });
+      setWalletInfo(res?.data || null);
+    } catch (e) {
+      setErr(e?.response?.data?.detail || "Failed to load franchise wallet.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadWallet();
+  }, []);
+
+  const money = (value) => `\u20B9${Number(value || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+  const wallets = walletInfo?.wallets || {};
+  const displaySummaryStats = [
+    {
+      label: "Withdrawal Wallet",
+      value: money(wallets?.withdrawal?.amount),
+      icon: <AccountBalanceWalletRoundedIcon />,
+      tint: "#e8f0ff",
+      color: COLORS.blue,
+    },
+  ];
+  const displayEarningWallets = [
+    {
+      title: "Total Earning Wallet",
+      amount: money(wallets?.total_earning?.amount),
+      icon: <TrendingUpRoundedIcon sx={{ fontSize: 38 }} />,
+      accent: COLORS.green,
+      tint: "#dff5ec",
+      badge: "All-Time",
+      suffix: "Total franchise earnings",
+    },
+    {
+      title: "Franchise Self Rebirth",
+      amount: money(wallets?.self_rebirth?.amount),
+      icon: <SavingsRoundedIcon sx={{ fontSize: 38 }} />,
+      accent: COLORS.purple,
+      tint: "#efe4ff",
+      badge: "25%",
+      suffix: "Non-withdrawable bucket",
+    },
+    {
+      title: "Franchise Reward Point",
+      amount: money(wallets?.reward_points?.amount),
+      icon: <AccountBalanceWalletRoundedIcon sx={{ fontSize: 38 }} />,
+      accent: COLORS.green,
+      tint: "#dff5ec",
+      badge: `Min ${money(wallets?.reward_points?.minimum_transfer || 1000)}`,
+      suffix: "Admin credited reward",
+      source: "reward_points",
+      payEnabled: !!wallets?.reward_points?.pay_enabled,
+      payDisabledReason: "Reward transfer opens after reaching the minimum reward balance.",
+    },
+    {
+      title: "Shopping Scanner Wallet",
+      amount: money(wallets?.shopping_scanner?.amount),
+      icon: <SwapHorizRoundedIcon sx={{ fontSize: 38 }} />,
+      accent: COLORS.orange,
+      tint: "#ffede5",
+      badge: "0",
+      suffix: "Reserved for scanner flow",
+    },
+  ];
+  const displayWorkWallets = [
+    {
+      title: "Active Work Wallet",
+      amount: money(wallets?.active_work?.amount),
+      icon: <BoltRoundedIcon sx={{ fontSize: 38 }} />,
+      accent: COLORS.blue,
+      tint: "#e6efff",
+      badge: "18.75%",
+      suffix: "Pay enabled after admin approval",
+      source: "active_work",
+      payEnabled: !!wallets?.active_work?.pay_enabled,
+      payDisabledReason: "Admin must approve this month's work report first.",
+    },
+    {
+      title: "Inactive Work Wallet",
+      amount: money(wallets?.inactive_work?.amount),
+      icon: <PowerSettingsNewRoundedIcon sx={{ fontSize: 38 }} />,
+      accent: COLORS.orange,
+      tint: "#ffede5",
+      badge: "18.75%",
+      suffix: `Pay day ${walletInfo?.settings?.inactive_work_day || 30}`,
+      source: "inactive_work",
+      payEnabled: !!wallets?.inactive_work?.pay_enabled,
+      payDisabledReason: "Inactive work transfer is available only in the admin-configured window.",
+    },
+  ];
+  const displayOtherWallets = [
+    {
+      title: "Withdrawal Wallet",
+      amount: money(wallets?.withdrawal?.amount),
+      icon: <WalletRoundedIcon />,
+      tint: "#eef2ff",
+      accent: COLORS.blue,
+    },
+    {
+      title: "Company Marketing Wallet",
+      amount: money(wallets?.company_marketing?.amount),
+      icon: <CampaignRoundedIcon />,
+      tint: "#f5f3ff",
+      accent: COLORS.purple,
+      badge: "37.5%",
+      suffix: "Company marketing allocation",
+    },
+  ];
+
+  const handlePay = async (source) => {
+    const sourceWallet = [...displayEarningWallets, ...displayWorkWallets].find((w) => w.source === source);
+    const rawAmount = source === "active_work"
+      ? wallets?.active_work?.amount
+      : source === "inactive_work"
+        ? wallets?.inactive_work?.amount
+        : wallets?.reward_points?.amount;
+    try {
+      setErr("");
+      setPayingSource(source);
+      await API.post("/accounts/franchise/wallet/transfer-to-withdrawal/", { source, amount: rawAmount });
+      await loadWallet();
+    } catch (e) {
+      setErr(e?.response?.data?.detail || `Failed to transfer ${sourceWallet?.title || "wallet"} to withdrawal wallet.`);
+    } finally {
+      setPayingSource("");
+    }
+  };
 
   // ── MOBILE LAYOUT ────────────────────────────────────────────────────────────
 if (isMobile) {
@@ -472,10 +644,12 @@ if (isMobile) {
           </Stack>
 
           {/* SUMMARY */}
+          {err ? <Alert severity="error">{err}</Alert> : null}
+          {loading ? <LinearProgress /> : null}
           <Card sx={{ borderRadius: 3, border: "1px solid #e6ebf5", boxShadow: "none" }}>
             <CardContent sx={{ py: 1.5 }}>
               <Stack spacing={1}>
-                {summaryStats.map((item) => (
+                {displaySummaryStats.map((item) => (
                   <Stack key={item.label} direction="row" justifyContent="space-between">
                     <Typography color="text.secondary">{item.label}</Typography>
                     <Typography fontWeight={600}>{item.value}</Typography>
@@ -487,8 +661,8 @@ if (isMobile) {
 
           {/* EARNINGS + WORK */}
           {[ 
-            { title: "Earnings", data: earningWallets },
-            { title: "Work", data: workWallets },
+            { title: "Earnings", data: displayEarningWallets },
+            { title: "Work", data: displayWorkWallets },
           ].map((section) => (
             <Stack key={section.title} spacing={1.2}>
               <Typography fontWeight={600} fontSize="0.9rem" color="text.secondary">
@@ -497,7 +671,7 @@ if (isMobile) {
 
               <Stack spacing={1}>
                 {section.data.map((wallet) => (
-                  <MobileWalletRowCard key={wallet.title} {...wallet} />
+                  <MobileWalletRowCard key={wallet.title} {...wallet} onPay={handlePay} paying={payingSource === wallet.source} />
                 ))}
               </Stack>
             </Stack>
@@ -508,22 +682,10 @@ if (isMobile) {
             <Typography fontWeight={600} fontSize="0.9rem" color="text.secondary">
               Other Wallets
             </Typography>
+            {displayOtherWallets.map((wallet) => (
+              <MobileWalletRowCard key={wallet.title} {...wallet} />
+            ))}
 
-            <MobileWalletRowCard
-              title="Main Wallet"
-              amount="₹76,000"
-              icon={<WalletRoundedIcon />}
-              tint="#eef2ff"
-              accent={COLORS.blue}
-            />
-
-            <MobileWalletRowCard
-              title="Company Marketing"
-              amount="34,500 Pts"
-              icon={<CampaignRoundedIcon />}
-              tint="#f5f3ff"
-              accent={COLORS.purple}
-            />
           </Stack>
 
           {/* QUICK ACTIONS */}
@@ -652,7 +814,7 @@ if (isMobile) {
                 >
                   <CardContent sx={{ p: { xs: 1.15, md: 2 } }}>
                     <Grid container justifyContent="flex-end">
-                      {summaryStats.map((item, index) => (
+                      {displaySummaryStats.map((item, index) => (
                         <Grid item xs={12} sm={6} key={item.label}>
                           <Stack
                             direction="row"
@@ -663,13 +825,13 @@ if (isMobile) {
                               py: { xs: 0.7, md: 0.6 },
                               borderRight: {
                                 sm:
-                                  index !== summaryStats.length - 1
+                                  index !== displaySummaryStats.length - 1
                                     ? `1px solid ${COLORS.border}`
                                     : "none",
                               },
                               borderBottom: {
                                 xs:
-                                  index !== summaryStats.length - 1
+                                  index !== displaySummaryStats.length - 1
                                     ? `1px solid ${COLORS.border}`
                                     : "none",
                                 sm: "none",
@@ -742,9 +904,9 @@ if (isMobile) {
                     color={COLORS.green}
                   />
                   <Grid container spacing={2.5}>
-                    {earningWallets.map((wallet) => (
+                    {displayEarningWallets.map((wallet) => (
                       <Grid item xs={12} md={6} key={wallet.title}>
-                        <GroupWalletCard {...wallet} />
+                        <GroupWalletCard {...wallet} onPay={handlePay} paying={payingSource === wallet.source} />
                       </Grid>
                     ))}
                   </Grid>
@@ -760,9 +922,9 @@ if (isMobile) {
                     color={COLORS.blue}
                   />
                   <Grid container spacing={2.5}>
-                    {workWallets.map((wallet) => (
+                    {displayWorkWallets.map((wallet) => (
                       <Grid item xs={12} md={6} key={wallet.title}>
-                        <GroupWalletCard {...wallet} />
+                        <GroupWalletCard {...wallet} onPay={handlePay} paying={payingSource === wallet.source} />
                       </Grid>
                     ))}
                   </Grid>
@@ -782,8 +944,8 @@ if (isMobile) {
               <Grid item xs={12} lg={4}>
                 <BottomWalletPanel
                   icon={<WalletRoundedIcon />}
-                  title="Main Wallet"
-                  subtitle="Primary wallet for all transactions"
+                  title="Withdrawal Wallet"
+                  subtitle="Transfer approved wallet amounts here before withdrawal"
                 >
                   <Card
                     sx={{
@@ -839,10 +1001,10 @@ if (isMobile) {
                                     color: COLORS.text,
                                   }}
                                 >
-                                  Main Wallet
+                                  Withdrawal Wallet
                                 </Typography>
                                 <Chip
-                                  label="Primary"
+                                  label="Withdrawable"
                                   size="small"
                                   sx={{
                                     bgcolor: "#dbeafe",
@@ -859,7 +1021,7 @@ if (isMobile) {
                                   lineHeight: 1.1,
                                 }}
                               >
-                                {"\u20B976,000"}
+                                {money(wallets?.withdrawal?.amount)}
                               </Typography>
                               <Stack
                                 direction="row"
@@ -877,7 +1039,7 @@ if (isMobile) {
                                     fontSize: { xs: "0.8rem", md: "0.9rem" },
                                   }}
                                 >
-                                  +10.3%
+                                  Ready
                                 </Typography>
                                 <Typography
                                   sx={{
@@ -886,7 +1048,7 @@ if (isMobile) {
                                     fontSize: { xs: "0.8rem", md: "0.9rem" },
                                   }}
                                 >
-                                  this month
+                                  for withdrawal
                                 </Typography>
                               </Stack>
                             </Box>
@@ -949,8 +1111,8 @@ if (isMobile) {
               <Grid item xs={12} lg={4}>
                 <BottomWalletPanel
                   icon={<CampaignRoundedIcon sx={{ color: COLORS.purple }} />}
-                  title="Company Marketing"
-                  subtitle="Non-withdrawable marketing points"
+                  title="Company Marketing Wallet"
+                  subtitle="37.5% company marketing allocation"
                 >
                   <Card
                     sx={{
@@ -999,7 +1161,7 @@ if (isMobile) {
                                   mb: 0.65,
                                 }}
                               >
-                                Company Marketing
+                                Company Marketing Wallet
                               </Typography>
                               <Typography
                                 sx={{
@@ -1009,7 +1171,7 @@ if (isMobile) {
                                   lineHeight: 1.1,
                                 }}
                               >
-                                {"34,500 Pts"}
+                                {money(wallets?.company_marketing?.amount)}
                               </Typography>
                               <Stack
                                 direction="row"
@@ -1027,7 +1189,7 @@ if (isMobile) {
                                     fontSize: { xs: "0.8rem", md: "0.9rem" },
                                   }}
                                 >
-                                  +6.7%
+                                  37.5%
                                 </Typography>
                                 <Typography
                                   sx={{
@@ -1036,7 +1198,7 @@ if (isMobile) {
                                     fontSize: { xs: "0.8rem", md: "0.9rem" },
                                   }}
                                 >
-                                  this month
+                                  allocation
                                 </Typography>
                               </Stack>
                             </Box>

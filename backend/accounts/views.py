@@ -6,6 +6,8 @@ from .models import (
     Wallet,
     WalletAccount,
     WalletTransaction,
+    FranchiseWalletSettings,
+    FranchiseWorkApproval,
     ConsumerVoucher,
     SupportTicket,
     SupportTicketMessage,
@@ -2342,6 +2344,290 @@ class WalletMe(APIView):
                 "seasonNumbers": [int(x) for x in approved_season_numbers if x is not None],
             }
         }, status=status.HTTP_200_OK)
+
+
+def _franchise_current_period():
+    now = timezone.localtime(timezone.now())
+    return int(now.year), int(now.month), now
+
+
+def _is_franchise_user(user):
+    role = str(getattr(user, "role", "") or "").lower()
+    category = str(getattr(user, "category", "") or "").lower()
+    return role == "agency" or category.startswith("agency_")
+
+
+def _money_str(value):
+    from decimal import Decimal
+    try:
+        return str(Decimal(str(value or 0)).quantize(Decimal("0.01")))
+    except Exception:
+        return "0.00"
+
+
+def _inactive_work_pay_enabled(settings_obj, now_local):
+    if not bool(getattr(settings_obj, "inactive_work_enabled", True)):
+        return False
+    day = int(getattr(settings_obj, "inactive_work_day", 30) or 30)
+    try:
+        import calendar
+        last_day = calendar.monthrange(now_local.year, now_local.month)[1]
+        effective_day = min(max(day, 1), last_day)
+        return now_local.day == effective_day
+    except Exception:
+        return now_local.day == day
+
+
+class FranchiseWalletMe(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        if not _is_franchise_user(user):
+            return Response({"detail": "Franchise wallet is available for franchise users only."}, status=status.HTTP_403_FORBIDDEN)
+
+        w = Wallet.get_or_create_for_user(user)
+        settings_obj = FranchiseWalletSettings.get_solo()
+        year, month, now_local = _franchise_current_period()
+        approval = FranchiseWorkApproval.objects.filter(user=user, year=year, month=month).first()
+        active_approved = bool(approval and approval.status == "APPROVED")
+        inactive_enabled = _inactive_work_pay_enabled(settings_obj, now_local)
+        reward_balance = getattr(w, "franchise_reward_points", 0) or 0
+        reward_min = getattr(settings_obj, "reward_min_withdrawal", 1000) or 1000
+
+        return Response({
+            "period": {"year": year, "month": month},
+            "settings": {
+                "inactive_work_day": int(getattr(settings_obj, "inactive_work_day", 30) or 30),
+                "inactive_work_enabled": bool(getattr(settings_obj, "inactive_work_enabled", True)),
+                "reward_min_withdrawal": _money_str(reward_min),
+            },
+            "wallets": {
+                "total_earning": {"label": "Total Earning Wallet", "amount": _money_str(w.franchise_total_earning)},
+                "active_work": {
+                    "label": "Active Work Wallet",
+                    "amount": _money_str(w.franchise_active_work),
+                    "pay_enabled": active_approved and (w.franchise_active_work or 0) > 0,
+                    "approval_status": getattr(approval, "status", "PENDING") if approval else "PENDING",
+                },
+                "inactive_work": {
+                    "label": "Inactive Work Wallet",
+                    "amount": _money_str(w.franchise_inactive_work),
+                    "pay_enabled": inactive_enabled and (w.franchise_inactive_work or 0) > 0,
+                },
+                "self_rebirth": {"label": "Franchise Self Rebirth", "amount": _money_str(w.franchise_self_rebirth)},
+                "company_marketing": {"label": "Company Marketing Wallet", "amount": _money_str(w.franchise_company_marketing)},
+                "reward_points": {
+                    "label": "Franchise Reward Point",
+                    "amount": _money_str(reward_balance),
+                    "pay_enabled": (reward_balance or 0) >= reward_min,
+                    "minimum_transfer": _money_str(reward_min),
+                },
+                "shopping_scanner": {"label": "Shopping Scanner Wallet", "amount": _money_str(w.franchise_shopping_scanner)},
+                "withdrawal": {"label": "Withdrawal Wallet", "amount": _money_str(w.withdrawable_balance)},
+            },
+        }, status=status.HTTP_200_OK)
+
+
+class FranchiseWalletTransferToWithdrawal(APIView):
+    permission_classes = [IsAuthenticated]
+
+    SOURCE_FIELDS = {
+        "active_work": "franchise_active_work",
+        "inactive_work": "franchise_inactive_work",
+        "reward_points": "franchise_reward_points",
+    }
+
+    def post(self, request):
+        from decimal import Decimal
+
+        user = request.user
+        if not _is_franchise_user(user):
+            return Response({"detail": "Franchise wallet is available for franchise users only."}, status=status.HTTP_403_FORBIDDEN)
+
+        source = str((request.data or {}).get("source") or "").strip().lower()
+        field = self.SOURCE_FIELDS.get(source)
+        if not field:
+            return Response({"detail": "Invalid source wallet."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            amount = Decimal(str((request.data or {}).get("amount") or "0")).quantize(Decimal("0.01"))
+        except Exception:
+            amount = Decimal("0.00")
+        if amount <= 0:
+            return Response({"detail": "Amount must be greater than 0."}, status=status.HTTP_400_BAD_REQUEST)
+
+        settings_obj = FranchiseWalletSettings.get_solo()
+        year, month, now_local = _franchise_current_period()
+        if source == "active_work":
+            approval = FranchiseWorkApproval.objects.filter(user=user, year=year, month=month, status="APPROVED").first()
+            if not approval:
+                return Response({"detail": "Active work transfer is enabled only after admin approves this month's work report."}, status=status.HTTP_400_BAD_REQUEST)
+        elif source == "inactive_work":
+            if not _inactive_work_pay_enabled(settings_obj, now_local):
+                return Response({"detail": "Inactive work transfer is not open today."}, status=status.HTTP_400_BAD_REQUEST)
+        elif source == "reward_points":
+            reward_min = Decimal(str(getattr(settings_obj, "reward_min_withdrawal", Decimal("1000.00")) or Decimal("1000.00")))
+            w_check = Wallet.get_or_create_for_user(user)
+            if Decimal(str(getattr(w_check, field, 0) or 0)) < reward_min:
+                return Response({"detail": f"Franchise reward point transfer opens after reaching Rs. {_money_str(reward_min)}."}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            w = Wallet.objects.select_for_update().get(pk=Wallet.get_or_create_for_user(user).pk)
+            current = Decimal(str(getattr(w, field, 0) or 0))
+            if amount > current:
+                return Response({"detail": f"Available in source wallet: Rs. {_money_str(current)}."}, status=status.HTTP_400_BAD_REQUEST)
+
+            setattr(w, field, (current - amount).quantize(Decimal("0.01")))
+            w.withdrawable_balance = (Decimal(str(w.withdrawable_balance or 0)) + amount).quantize(Decimal("0.01"))
+            w.save(update_fields=[field, "withdrawable_balance", "updated_at"])
+
+            meta = {"source_wallet": source, "destination_wallet": "withdrawal", "period_year": year, "period_month": month}
+            WalletTransaction.objects.create(
+                user=user,
+                amount=amount * Decimal("-1"),
+                balance_after=w.balance,
+                type="FRANCHISE_WD_TRANSFER",
+                source_type="FRANCHISE_WALLET_TRANSFER",
+                source_id=source,
+                meta=meta,
+            )
+            WalletTransaction.objects.create(
+                user=user,
+                amount=amount,
+                balance_after=w.balance,
+                type="FRANCHISE_WD_CREDIT",
+                source_type="FRANCHISE_WALLET_TRANSFER",
+                source_id=source,
+                meta=meta,
+            )
+
+        return FranchiseWalletMe().get(request)
+
+
+class AdminFranchiseWalletSettingsView(APIView):
+    permission_classes = [IsAdminOrStaff]
+
+    def get(self, request):
+        obj = FranchiseWalletSettings.get_solo()
+        return Response({
+            "inactive_work_day": int(obj.inactive_work_day or 30),
+            "inactive_work_enabled": bool(obj.inactive_work_enabled),
+            "reward_min_withdrawal": _money_str(obj.reward_min_withdrawal),
+        })
+
+    def patch(self, request):
+        from decimal import Decimal
+        obj = FranchiseWalletSettings.get_solo()
+        data = request.data or {}
+        if "inactive_work_day" in data:
+            try:
+                obj.inactive_work_day = int(data.get("inactive_work_day"))
+            except Exception:
+                return Response({"detail": "inactive_work_day must be a number."}, status=status.HTTP_400_BAD_REQUEST)
+        if "inactive_work_enabled" in data:
+            raw_enabled = data.get("inactive_work_enabled")
+            if isinstance(raw_enabled, str):
+                obj.inactive_work_enabled = raw_enabled.strip().lower() in {"1", "true", "yes", "on", "enabled"}
+            else:
+                obj.inactive_work_enabled = bool(raw_enabled)
+        if "reward_min_withdrawal" in data:
+            try:
+                obj.reward_min_withdrawal = Decimal(str(data.get("reward_min_withdrawal") or "1000")).quantize(Decimal("0.01"))
+            except Exception:
+                return Response({"detail": "Invalid reward minimum."}, status=status.HTTP_400_BAD_REQUEST)
+        obj.save()
+        return self.get(request)
+
+
+class AdminFranchiseRewardCreditView(APIView):
+    permission_classes = [IsAdminOrStaff]
+
+    def post(self, request):
+        from decimal import Decimal
+        username = str((request.data or {}).get("username") or "").strip()
+        user_id = (request.data or {}).get("user_id")
+        note = str((request.data or {}).get("note") or "").strip()
+        try:
+            amount = Decimal(str((request.data or {}).get("amount") or "0")).quantize(Decimal("0.01"))
+        except Exception:
+            amount = Decimal("0.00")
+        if amount <= 0:
+            return Response({"detail": "Amount must be greater than 0."}, status=status.HTTP_400_BAD_REQUEST)
+        user = CustomUser.objects.filter(pk=user_id).first() if user_id else CustomUser.objects.filter(username__iexact=username).first()
+        if not user or not _is_franchise_user(user):
+            return Response({"detail": "Franchise user not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        with transaction.atomic():
+            w = Wallet.objects.select_for_update().get(pk=Wallet.get_or_create_for_user(user).pk)
+            w.franchise_reward_points = (Decimal(str(w.franchise_reward_points or 0)) + amount).quantize(Decimal("0.01"))
+            w.balance = (Decimal(str(w.balance or 0)) + amount).quantize(Decimal("0.01"))
+            w.save(update_fields=["franchise_reward_points", "balance", "updated_at"])
+            WalletTransaction.objects.create(
+                user=user,
+                amount=amount,
+                balance_after=w.balance,
+                type="FRANCHISE_REWARD_CREDIT",
+                source_type="ADMIN_FRANCHISE_REWARD",
+                source_id=str(getattr(request.user, "id", "")),
+                meta={"note": note, "admin_user": getattr(request.user, "username", None)},
+            )
+        return Response({"detail": "Franchise reward credited successfully.", "username": user.username, "amount": _money_str(amount)})
+
+
+class AdminFranchiseWorkApprovalView(APIView):
+    permission_classes = [IsAdminOrStaff]
+
+    def get(self, request):
+        year, month, _ = _franchise_current_period()
+        year = int(request.query_params.get("year") or year)
+        month = int(request.query_params.get("month") or month)
+        qs = FranchiseWorkApproval.objects.select_related("user", "approved_by").filter(year=year, month=month)
+        return Response({
+            "results": [
+                {
+                    "id": row.id,
+                    "user_id": row.user_id,
+                    "username": getattr(row.user, "username", ""),
+                    "full_name": getattr(row.user, "full_name", ""),
+                    "year": row.year,
+                    "month": row.month,
+                    "status": row.status,
+                    "note": row.note,
+                    "approved_by": getattr(row.approved_by, "username", None),
+                    "approved_at": row.approved_at,
+                    "updated_at": row.updated_at,
+                }
+                for row in qs[:500]
+            ],
+            "year": year,
+            "month": month,
+        })
+
+    def post(self, request):
+        username = str((request.data or {}).get("username") or "").strip()
+        user_id = (request.data or {}).get("user_id")
+        status_value = str((request.data or {}).get("status") or "APPROVED").strip().upper()
+        note = str((request.data or {}).get("note") or "").strip()
+        year, month, _ = _franchise_current_period()
+        year = int((request.data or {}).get("year") or year)
+        month = int((request.data or {}).get("month") or month)
+        if status_value not in {"PENDING", "APPROVED", "REJECTED"}:
+            return Response({"detail": "Invalid status."}, status=status.HTTP_400_BAD_REQUEST)
+        user = CustomUser.objects.filter(pk=user_id).first() if user_id else CustomUser.objects.filter(username__iexact=username).first()
+        if not user or not _is_franchise_user(user):
+            return Response({"detail": "Franchise user not found."}, status=status.HTTP_404_NOT_FOUND)
+        obj, _ = FranchiseWorkApproval.objects.get_or_create(user=user, year=year, month=month)
+        obj.status = status_value
+        obj.note = note
+        if status_value == "APPROVED":
+            obj.approved_by = request.user
+            obj.approved_at = timezone.now()
+        else:
+            obj.approved_by = None
+            obj.approved_at = None
+        obj.save(update_fields=["status", "note", "approved_by", "approved_at", "updated_at"])
+        return Response({"detail": "Work approval saved.", "id": obj.id, "status": obj.status})
 
 
 def _resolve_consumer_user(identifier):

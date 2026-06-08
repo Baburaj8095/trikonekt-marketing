@@ -714,7 +714,7 @@ export default function AdminUsers() {
             } catch (_) {}
           };
           return (
-            <div style={{ width: "100%", display: "flex", justifyContent: "center", alignItems: "center" }}>
+            <div style={{ width: "100%", height: "100%", display: "flex", justifyContent: "center", alignItems: "center" }}>
               <button
                 type="button"
                 onClick={onLogin}
@@ -1192,7 +1192,7 @@ export default function AdminUsers() {
           };
 
           return (
-            <div style={{ width: "100%", display: "flex", justifyContent: "center", alignItems: "center" }}>
+            <div style={{ width: "100%", height: "100%", display: "flex", justifyContent: "center", alignItems: "center" }}>
               <button
                 type="button"
                 onClick={onToggleAccess}
@@ -1274,7 +1274,7 @@ export default function AdminUsers() {
             : (active ? "Active" : "Inactive");
 
           return (
-            <div style={{ width: "100%", display: "flex", justifyContent: "center", alignItems: "center" }}>
+            <div style={{ width: "100%", height: "100%", display: "flex", justifyContent: "center", alignItems: "center" }}>
               <div
                 role="switch"
                 aria-checked={active}
@@ -1382,7 +1382,7 @@ export default function AdminUsers() {
           const row = params?.row || {};
           const active = !!row.account_active;
           return (
-            <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+            <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 4 }}>
               <span
                 style={{
                   display: "inline-flex",
@@ -1426,7 +1426,7 @@ export default function AdminUsers() {
           const verified = !!row.kyc_verified;
           const label = verified ? "Verified" : row.kyc_status || "Pending";
           return (
-            <div style={{ width: "100%", display: "flex", justifyContent: "center", alignItems: "center" }}>
+            <div style={{ width: "100%", height: "100%", display: "flex", justifyContent: "center", alignItems: "center" }}>
               <span
                 title={row.kyc_verified_at ? `Verified: ${formatDateTime(row.kyc_verified_at)}` : label}
                 style={{

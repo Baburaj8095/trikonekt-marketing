@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import API from "../../api/api";
 
 import {
@@ -11,7 +11,6 @@ import {
   CardContent,
   Chip,
   Container,
-  Divider,
   Grid,
   Paper,
   Skeleton,
@@ -30,6 +29,10 @@ import WorkOutlineOutlinedIcon from "@mui/icons-material/WorkOutlineOutlined";
 import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneRounded";
 import CurrencyRupeeRoundedIcon from "@mui/icons-material/AccountBalanceWallet";
 import PublicRoundedIcon from "@mui/icons-material/MyLocation";
+import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
+import BusinessCenterRoundedIcon from "@mui/icons-material/BusinessCenterRounded";
+import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
+import AssessmentRoundedIcon from "@mui/icons-material/AssessmentRounded";
 
 const COLORS = {
   primary: "#0ea5e9",
@@ -43,6 +46,129 @@ const COLORS = {
   border: "#e5e7eb",
   shadow: "0 16px 42px rgba(15, 23, 42, 0.08), 0 1px 0 rgba(15, 23, 42, 0.03)",
 };
+
+const sectionCardSx = {
+  borderRadius: { xs: 2, sm: 4 },
+  boxShadow: {
+    xs: "0 10px 24px rgba(15, 23, 42, 0.07), 0 1px 0 rgba(15, 23, 42, 0.04)",
+    md: COLORS.shadow,
+  },
+  border: `1px solid ${COLORS.border}`,
+  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+  overflow: "hidden",
+};
+
+const scrollRowSx = {
+  display: "flex",
+  gap: { xs: 1.25, sm: 2, md: 2.5 },
+  overflowX: "auto",
+  overflowY: "hidden",
+  pb: { xs: 0.75, md: 1 },
+  px: { xs: 0.25, md: 0 },
+  scrollSnapType: "x mandatory",
+  WebkitOverflowScrolling: "touch",
+  scrollbarWidth: "none",
+  "&::-webkit-scrollbar": { display: "none" },
+};
+
+function SectionTitle({ title }) {
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1.5, mb: { xs: 1.75, md: 2.5 } }}>
+      <Typography
+        variant="h5"
+        sx={{
+          fontWeight: 900,
+          color: COLORS.text,
+          fontSize: { xs: "1rem", sm: "1.15rem", md: "1.5rem" },
+          lineHeight: 1.18,
+        }}
+      >
+        {title}
+      </Typography>
+      <Box sx={{ width: 36, height: 4, borderRadius: 999, bgcolor: "rgba(14,165,233,0.22)", flexShrink: 0 }} />
+    </Box>
+  );
+}
+
+function MobileBottomNav({ activePath, onNavigate }) {
+  const items = [
+    { label: "Home", icon: <HomeRoundedIcon />, path: "/agency/franchise-dashboard" },
+    { label: "Business Connect", icon: <BusinessCenterRoundedIcon />, path: "/agency/franchise-dashboard" },
+    { label: "Wallet", icon: <CurrencyRupeeRoundedIcon />, path: "/agency/franchise-wallet" },
+    { label: "History", icon: <HistoryRoundedIcon />, path: "/agency/transactions" },
+    { label: "Report", icon: <AssessmentRoundedIcon />, path: "/agency/daily-report" },
+  ];
+
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        position: "fixed",
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 1200,
+        display: { xs: "block", md: "none" },
+        px: 1,
+        pt: 0.75,
+        pb: "calc(0.75rem + env(safe-area-inset-bottom))",
+        bgcolor: "rgba(255,255,255,0.94)",
+        borderTop: "1px solid rgba(226,232,240,0.9)",
+        boxShadow: "0 -12px 32px rgba(15,23,42,0.12)",
+        backdropFilter: "blur(16px)",
+      }}
+    >
+      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 0.35 }}>
+        {items.map((item) => {
+          const active = activePath === item.path || (item.label === "Home" && activePath === "/franchise/dashboard");
+          return (
+            <Box
+              key={item.label}
+              component="button"
+              type="button"
+              onClick={() => onNavigate(item.path)}
+              aria-current={active ? "page" : undefined}
+              sx={{
+                minWidth: 0,
+                border: 0,
+                borderRadius: 2,
+                px: 0.25,
+                py: 0.55,
+                bgcolor: active ? "rgba(14,165,233,0.12)" : "transparent",
+                color: active ? COLORS.primaryDark : COLORS.textSecondary,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 0.25,
+                cursor: "pointer",
+                transition: "background-color 160ms ease, color 160ms ease, transform 160ms ease",
+                "&:active": { transform: "scale(0.96)" },
+                "& svg": { fontSize: 20 },
+              }}
+            >
+              {item.icon}
+              <Typography
+                component="span"
+                sx={{
+                  fontSize: item.label === "Business Connect" ? 9.5 : 10.5,
+                  lineHeight: 1.1,
+                  fontWeight: active ? 900 : 800,
+                  whiteSpace: "nowrap",
+                  maxWidth: "100%",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {item.label}
+              </Typography>
+            </Box>
+          );
+        })}
+      </Box>
+    </Paper>
+  );
+}
 
 function AchieverCard({ name, subtitle, achieved, photoUrl }) {
   const initials = useMemo(() => {
@@ -59,12 +185,14 @@ function AchieverCard({ name, subtitle, achieved, photoUrl }) {
           flexDirection: "column",
           alignItems: "center",
           width: "100%",
-          p: 2,
-          minWidth: 190,
-          borderRadius: 3,
+          p: { xs: 1.5, md: 2 },
+          minWidth: { xs: 156, sm: 190 },
+          maxWidth: { xs: 156, sm: 190 },
+          minHeight: { xs: 158, sm: 184 },
+          borderRadius: { xs: 2, sm: 3 },
           bgcolor: COLORS.surface,
           border: `1px solid ${COLORS.border}`,
-          boxShadow: "0 10px 28px rgba(15,23,42,0.07)",
+          boxShadow: "0 10px 24px rgba(15,23,42,0.07)",
           transition: "box-shadow 180ms ease, border-color 180ms ease",
           "&:hover": { boxShadow: "0 14px 34px rgba(15,23,42,0.11)", borderColor: "rgba(14,165,233,0.22)" },
         }}
@@ -72,19 +200,19 @@ function AchieverCard({ name, subtitle, achieved, photoUrl }) {
         <Avatar
           src={photoUrl || undefined}
           alt={name}
-          sx={{ width: 72, height: 72, mb: 1, bgcolor: COLORS.primary }}
+          sx={{ width: { xs: 56, sm: 72 }, height: { xs: 56, sm: 72 }, mb: 1, bgcolor: COLORS.primary, fontWeight: 900 }}
         >
           {initials}
         </Avatar>
 
-        <Typography variant="subtitle2" sx={{ fontWeight: 800, textAlign: "center" }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 900, textAlign: "center", fontSize: { xs: 12.5, sm: 14 }, lineHeight: 1.2 }}>
           {name || "Achiever"}
         </Typography>
-        <Typography variant="caption" sx={{ color: COLORS.textSecondary, textAlign: "center", mb: 1 }}>
+        <Typography variant="caption" sx={{ color: COLORS.textSecondary, textAlign: "center", mb: 0.75, fontWeight: 700, lineHeight: 1.2 }}>
           {subtitle || ""}
         </Typography>
 
-        <Typography variant="body2" sx={{ fontWeight: 700, color: COLORS.success, textAlign: "center" }}>
+        <Typography variant="body2" sx={{ fontWeight: 800, color: COLORS.success, textAlign: "center", fontSize: { xs: 12, sm: 14 }, lineHeight: 1.2 }}>
           {achieved || ""}
         </Typography>
       </Box>
@@ -98,35 +226,36 @@ function OverviewMetricCard({ title, value, icon, accent }) {
       <Box
         sx={{
           height: "100%",
-          minHeight: 180,
-          p: 3,
-          borderRadius: 4,
+          minHeight: { xs: 132, sm: 150, md: 180 },
+          p: { xs: 1.7, sm: 2, md: 3 },
+          borderRadius: { xs: 2, sm: 3, md: 4 },
           bgcolor: COLORS.surface,
           border: `1px solid ${COLORS.border}`,
-          boxShadow: COLORS.shadow,
+          boxShadow: { xs: "0 10px 22px rgba(15,23,42,0.07)", md: COLORS.shadow },
           transition: "box-shadow 180ms ease, border-color 180ms ease",
           "&:hover": { borderColor: "rgba(14,165,233,0.22)", boxShadow: "0 18px 48px rgba(15,23,42,0.12)" },
         }}
       >
-        <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 2, mb: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 2, mb: { xs: 1.25, md: 2 } }}>
           <Box
             sx={{
-              width: 52,
-              height: 52,
-              borderRadius: 3,
+              width: { xs: 38, md: 52 },
+              height: { xs: 38, md: 52 },
+              borderRadius: { xs: 2, md: 3 },
               display: "grid",
               placeItems: "center",
               bgcolor: `${accent}14`,
               color: accent,
               border: `1px solid ${accent}22`,
               boxShadow: `0 10px 24px ${accent}18`,
+              "& svg": { fontSize: { xs: 21, md: 26 } },
             }}
           >
             {icon}
           </Box>
         </Box>
 
-        <Typography variant="body1" sx={{ fontWeight: 700, color: COLORS.text, mb: 1 }}>
+        <Typography variant="body1" sx={{ fontWeight: 800, color: COLORS.text, mb: 0.75, fontSize: { xs: 12.5, md: 16 }, lineHeight: 1.25 }}>
           {title}
         </Typography>
 
@@ -134,8 +263,8 @@ function OverviewMetricCard({ title, value, icon, accent }) {
           sx={{
             fontWeight: 900,
             color: accent,
-            fontSize: { xs: "1.35rem", sm: "1.55rem" },
-            lineHeight: 1.2,
+            fontSize: { xs: "1.22rem", sm: "1.38rem", md: "1.55rem" },
+            lineHeight: 1.12,
             wordBreak: "break-word",
           }}
         >
@@ -148,32 +277,20 @@ function OverviewMetricCard({ title, value, icon, accent }) {
 
 function OverviewSection({ title, metrics, horizontalSwipe = false }) {
   return (
-    <Card
-      sx={{
-        borderRadius: 4,
-        boxShadow: COLORS.shadow,
-        border: `1px solid ${COLORS.border}`,
-        background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
-      }}
-    >
-      <CardContent sx={{ p: { xs: 3, md: 4 } }}>
-        <Typography
-          variant="h5"
-          sx={{ fontWeight: 900, color: COLORS.text, fontSize: { xs: "1.25rem", md: "1.5rem" } }}
-        >
-          {title}
-        </Typography>
-
-        <Divider sx={{ my: 3 }} />
+    <Card sx={sectionCardSx}>
+      <CardContent sx={{ p: { xs: 2, md: 4 } }}>
+        <SectionTitle title={title} />
 
         {horizontalSwipe ? (
-          <Box sx={{ display: "flex", gap: 2.5, overflowX: "auto", pb: 1 }}>
+          <Box sx={scrollRowSx}>
             {metrics.map((metric) => (
               <Box
                 key={metric.title}
                 sx={{
                   flex: "0 0 auto",
-                  width: { xs: "88%", sm: 340, md: 360, lg: 380 },
+                  width: { xs: "78vw", sm: 300, md: 360, lg: 380 },
+                  maxWidth: { xs: 290, sm: 340, md: 380 },
+                  scrollSnapAlign: "start",
                 }}
               >
                 <OverviewMetricCard {...metric} />
@@ -181,9 +298,35 @@ function OverviewSection({ title, metrics, horizontalSwipe = false }) {
             ))}
           </Box>
         ) : (
-          <Grid container spacing={2.5}>
+          <Grid
+            container
+            spacing={{ xs: 0, md: 2.5 }}
+            sx={{
+              display: "flex",
+              flexWrap: { xs: "nowrap", md: "wrap" },
+              gap: { xs: 1.25, md: 0 },
+              overflowX: { xs: "auto", md: "visible" },
+              scrollSnapType: { xs: "x mandatory", md: "none" },
+              WebkitOverflowScrolling: "touch",
+              pb: { xs: 0.75, md: 0 },
+              scrollbarWidth: "none",
+              "&::-webkit-scrollbar": { display: "none" },
+            }}
+          >
             {metrics.map((metric) => (
-              <Grid item xs={12} sm={6} lg={4} xl={3} key={metric.title}>
+              <Grid
+                item
+                xs={12}
+                sm={6}
+                lg={4}
+                xl={3}
+                key={metric.title}
+                sx={{
+                  flex: { xs: "0 0 78vw", sm: "0 0 310px", md: "unset" },
+                  maxWidth: { xs: 290, sm: 330, md: "none" },
+                  scrollSnapAlign: "start",
+                }}
+              >
                 <OverviewMetricCard {...metric} />
               </Grid>
             ))}
@@ -196,36 +339,35 @@ function OverviewSection({ title, metrics, horizontalSwipe = false }) {
 
 function PincodeWiseScroller({ title, icon, rows }) {
   return (
-    <Card sx={{ borderRadius: 4, boxShadow: COLORS.shadow, border: `1px solid ${COLORS.border}`, background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)" }}>
-      <CardContent sx={{ p: { xs: 3, md: 4 } }}>
-        <Typography variant="h6" sx={{ fontWeight: 900, color: COLORS.text, mb: 2 }}>
-          {title}
-        </Typography>
-        <Box sx={{ overflowX: "auto", pb: 1 }}>
-          <Stack direction="row" spacing={2} sx={{ minWidth: "max-content" }}>
+    <Card sx={sectionCardSx}>
+      <CardContent sx={{ p: { xs: 2, md: 4 } }}>
+        <SectionTitle title={title} />
+        <Box sx={scrollRowSx}>
+          <Stack direction="row" spacing={{ xs: 1.25, md: 2 }} sx={{ minWidth: "max-content" }}>
             {(rows || []).map((r) => (
-              <Card key={r.pincode} sx={{ minWidth: 220, borderRadius: 3, border: `1px solid ${COLORS.border}`, boxShadow: "0 8px 22px rgba(15,23,42,0.06)" }}>
-                <CardContent sx={{ p: 2.5 }}>
+              <Card key={r.pincode} sx={{ minWidth: { xs: 184, sm: 220 }, borderRadius: { xs: 2, sm: 3 }, border: `1px solid ${COLORS.border}`, boxShadow: "0 8px 20px rgba(15,23,42,0.06)", scrollSnapAlign: "start" }}>
+                <CardContent sx={{ p: { xs: 1.5, md: 2.5 } }}>
                   <Stack direction="row" spacing={1.5} alignItems="center">
                     <Box
                       sx={{
-                        width: 40,
-                        height: 40,
+                        width: { xs: 36, md: 40 },
+                        height: { xs: 36, md: 40 },
                         borderRadius: 2,
                         bgcolor: COLORS.background,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         color: COLORS.primary,
+                        "& svg": { fontSize: { xs: 20, md: 24 } },
                       }}
                     >
                       {icon}
                     </Box>
                     <Box>
-                      <Typography variant="body2" sx={{ color: COLORS.textSecondary, fontWeight: 800 }}>
+                      <Typography variant="body2" sx={{ color: COLORS.textSecondary, fontWeight: 800, fontSize: { xs: 12, md: 14 } }}>
                         Pincode {r.pincode}
                       </Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 900, color: COLORS.text, lineHeight: 1.1 }}>
+                      <Typography variant="h6" sx={{ fontWeight: 900, color: COLORS.text, lineHeight: 1.1, fontSize: { xs: "1.15rem", md: "1.25rem" } }}>
                         {r.count}
                       </Typography>
                     </Box>
@@ -267,26 +409,42 @@ const growthData = {
 
 function GrowthBar({ data, maxValue }) {
   return (
-    <Stack direction="row" spacing={1} alignItems="flex-end" justifyContent="space-around" sx={{ minHeight: 200, py: 2, overflowX: "auto" }}>
+    <Stack
+      direction="row"
+      spacing={{ xs: 0.85, md: 1 }}
+      alignItems="flex-end"
+      justifyContent="space-around"
+      sx={{
+        minHeight: { xs: 158, md: 200 },
+        py: { xs: 1, md: 2 },
+        overflowX: "auto",
+        scrollSnapType: "x mandatory",
+        WebkitOverflowScrolling: "touch",
+        scrollbarWidth: "none",
+        "&::-webkit-scrollbar": { display: "none" },
+      }}
+    >
       {data.map((item) => (
         <Box
           key={item.name}
           sx={{
             flex: 1,
-            minWidth: 40,
+            minWidth: { xs: 34, md: 40 },
             textAlign: "center",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
+            scrollSnapAlign: "start",
           }}
         >
           <Box
             sx={{
               width: "100%",
-              height: `${Math.max(30, (item.value / maxValue) * 150)}px`,
-              bgcolor: COLORS.primary,
-              borderRadius: 2,
+              height: { xs: `${Math.max(28, (item.value / maxValue) * 110)}px`, md: `${Math.max(30, (item.value / maxValue) * 150)}px` },
+              background: `linear-gradient(180deg, ${COLORS.primary} 0%, ${COLORS.primaryDark} 100%)`,
+              borderRadius: 1.5,
               mb: 1,
+              boxShadow: "0 8px 18px rgba(14,165,233,0.2)",
             }}
           />
           <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, fontSize: "0.7rem" }}>
@@ -300,6 +458,7 @@ function GrowthBar({ data, maxValue }) {
 
 export default function FranchiseDashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [selectedTab, setSelectedTab] = useState("Daily");
 
   const storedUser = useMemo(() => {
@@ -408,21 +567,29 @@ export default function FranchiseDashboard() {
   const perPin = metrics?.per_pincode || {};
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: COLORS.background, py: { xs: 2, md: 4 }, WebkitOverflowScrolling: "touch" }}>
-      <Container maxWidth="xl">
-        <Stack spacing={{ xs: 2.5, md: 4 }}>
+    <Box
+      sx={{
+        minHeight: "100vh",
+        bgcolor: COLORS.background,
+        pt: { xs: 1.25, md: 4 },
+        pb: { xs: "calc(92px + env(safe-area-inset-bottom))", md: 4 },
+        WebkitOverflowScrolling: "touch",
+      }}
+    >
+      <Container maxWidth="xl" sx={{ px: { xs: 1.25, sm: 2, md: 3 } }}>
+        <Stack spacing={{ xs: 1.5, md: 4 }}>
           {err ? <Alert severity="error">{err}</Alert> : null}
 
           {/* Wishing banner scroller */}
           {loading ? (
-            <Skeleton variant="rounded" height={210} />
+            <Skeleton variant="rounded" height={210} sx={{ borderRadius: { xs: 2, md: 4 } }} />
           ) : banners?.length ? (
-            <Card sx={{ borderRadius: 4, overflow: "hidden", border: `1px solid ${COLORS.border}`, boxShadow: COLORS.shadow }}>
+            <Card sx={{ borderRadius: { xs: 2, md: 4 }, overflow: "hidden", border: `1px solid ${COLORS.border}`, boxShadow: { xs: "0 10px 24px rgba(15,23,42,0.08)", md: COLORS.shadow } }}>
               <CardContent sx={{ p: 0 }}>
-                <Box sx={{ overflowX: "auto" }}>
+                <Box sx={{ ...scrollRowSx, gap: 0, p: 0 }}>
                   <Stack direction="row" spacing={0} sx={{ minWidth: "max-content" }}>
                     {banners.map((b) => (
-                      <Box key={b.id} sx={{ width: { xs: 320, md: 520 }, height: { xs: 160, md: 220 }, flex: "0 0 auto" }}>
+                      <Box key={b.id} sx={{ width: { xs: "calc(100vw - 20px)", sm: 420, md: 520 }, height: { xs: 142, sm: 170, md: 220 }, flex: "0 0 auto", scrollSnapAlign: "start" }}>
                         {b?.image_url ? (
                           <img
                             src={b.image_url}
@@ -445,19 +612,19 @@ export default function FranchiseDashboard() {
             <Card
               sx={{
                 background: `linear-gradient(135deg, ${COLORS.success} 0%, ${COLORS.primary} 58%, ${COLORS.primaryDark} 100%)`,
-                borderRadius: 4,
-                boxShadow: "0 22px 54px rgba(14, 165, 233, 0.22)",
+                borderRadius: { xs: 2, md: 4 },
+                boxShadow: { xs: "0 14px 34px rgba(14, 165, 233, 0.2)", md: "0 22px 54px rgba(14, 165, 233, 0.22)" },
                 border: "none",
                 overflow: "hidden",
               }}
             >
-              <CardContent sx={{ p: { xs: 3, md: 4 }, color: "white" }}>
-                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 2 }}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+              <CardContent sx={{ p: { xs: 2, md: 4 }, color: "white" }}>
+                <Box sx={{ display: "flex", alignItems: { xs: "flex-start", sm: "center" }, justifyContent: "space-between", gap: { xs: 1.5, md: 2 } }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: { xs: 1.25, md: 2 }, minWidth: 0 }}>
                     <Box
                       sx={{
-                        width: 48,
-                        height: 48,
+                        width: { xs: 42, md: 48 },
+                        height: { xs: 42, md: 48 },
                         borderRadius: 2,
                         bgcolor: "rgba(255,255,255,0.2)",
                         boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.22)",
@@ -466,75 +633,75 @@ export default function FranchiseDashboard() {
                         justifyContent: "center",
                       }}
                     >
-                      <TrendingUpOutlinedIcon sx={{ fontSize: 28, color: "white" }} />
+                      <TrendingUpOutlinedIcon sx={{ fontSize: { xs: 24, md: 28 }, color: "white" }} />
                     </Box>
-                    <Box>
-                      <Typography variant="h4" sx={{ fontWeight: 900, fontSize: { xs: "1.5rem", md: "2rem" }, mb: 0.5 }}>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography variant="h4" sx={{ fontWeight: 900, fontSize: { xs: "1.25rem", sm: "1.5rem", md: "2rem" }, mb: 0.35, lineHeight: 1.12 }}>
                         Franchise Dashboard
                       </Typography>
-                      <Typography variant="subtitle1" sx={{ opacity: 0.9, fontSize: { xs: "0.9rem", md: "1rem" } }}>
+                      <Typography variant="subtitle1" sx={{ opacity: 0.9, fontSize: { xs: "0.8rem", md: "1rem" }, lineHeight: 1.2 }}>
                         {scopeLabel} overview
                       </Typography>
                     </Box>
                   </Box>
 
-                  <Stack direction="row" spacing={1}>
-                    <IconButton sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "white", border: "1px solid rgba(255,255,255,0.22)", transition: "transform 140ms ease", "&:active": { transform: "scale(0.94)" } }}>
+                  <Stack direction="row" spacing={0.75} sx={{ flexShrink: 0 }}>
+                    <IconButton sx={{ width: { xs: 38, md: 40 }, height: { xs: 38, md: 40 }, bgcolor: "rgba(255,255,255,0.2)", color: "white", border: "1px solid rgba(255,255,255,0.22)", transition: "transform 140ms ease", "&:active": { transform: "scale(0.94)" } }}>
                       <NotificationsNoneRoundedIcon />
                     </IconButton>
                     <IconButton
                       onClick={() => navigate("/agency/franchise-wallet")}
-                      sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "white", border: "1px solid rgba(255,255,255,0.22)", transition: "transform 140ms ease", "&:active": { transform: "scale(0.94)" } }}
+                      sx={{ width: { xs: 38, md: 40 }, height: { xs: 38, md: 40 }, bgcolor: "rgba(255,255,255,0.2)", color: "white", border: "1px solid rgba(255,255,255,0.22)", transition: "transform 140ms ease", "&:active": { transform: "scale(0.94)" } }}
                     >
                       <CurrencyRupeeRoundedIcon />
                     </IconButton>
-                    <IconButton sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "white", border: "1px solid rgba(255,255,255,0.22)", transition: "transform 140ms ease", "&:active": { transform: "scale(0.94)" } }}>
+                    <IconButton sx={{ width: { xs: 38, md: 40 }, height: { xs: 38, md: 40 }, bgcolor: "rgba(255,255,255,0.2)", color: "white", border: "1px solid rgba(255,255,255,0.22)", transition: "transform 140ms ease", "&:active": { transform: "scale(0.94)" } }}>
                       <PublicRoundedIcon />
                     </IconButton>
                   </Stack>
                 </Box>
 
-                <Box sx={{ mt: 3 }}>
-                  <Typography variant="h5" sx={{ fontWeight: 800, color: "white", mb: 0.5 }}>
+                <Box sx={{ mt: { xs: 2, md: 3 } }}>
+                  <Typography variant="h5" sx={{ fontWeight: 900, color: "white", mb: 0.35, fontSize: { xs: "1.05rem", md: "1.5rem" }, lineHeight: 1.18 }}>
                     {storedUser?.full_name || storedUser?.username || "Franchise Partner"}
                   </Typography>
-                  <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.85)", mb: 1 }}>
+                  <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.85)", mb: { xs: 1.25, md: 1 }, fontSize: { xs: 12.5, md: 14 }, textTransform: "capitalize" }}>
                     {storedUser?.category ? String(storedUser.category).replaceAll("_", " ") : "Agency"}
                   </Typography>
 
                   <Paper
                     sx={{
-                      p: 3,
-                      borderRadius: 3,
+                      p: { xs: 1.5, md: 3 },
+                      borderRadius: { xs: 2, md: 3 },
                       bgcolor: "rgba(255,255,255,0.15)",
                       backdropFilter: "blur(10px)",
                       border: "1px solid rgba(255,255,255,0.2)",
                       boxShadow: "inset 0 1px 0 rgba(255,255,255,0.16)",
                     }}
                   >
-                    <Grid container spacing={3}>
+                    <Grid container spacing={{ xs: 1.25, md: 3 }}>
                       <Grid item xs={12} sm={4}>
-                        <Stack direction="row" alignItems="center" spacing={1.5}>
+                        <Stack direction="row" alignItems="center" spacing={1.25}>
                           <BadgeOutlinedIcon sx={{ color: "white", opacity: 0.9, fontSize: 20 }} />
-                          <Box>
-                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)", display: "block" }}>
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)", display: "block", fontWeight: 700, lineHeight: 1.15 }}>
                               Username
                             </Typography>
-                            <Typography variant="body2" sx={{ color: "white", fontWeight: 800 }}>
-                              {storedUser?.username || "—"}
+                            <Typography variant="body2" sx={{ color: "white", fontWeight: 900, overflowWrap: "anywhere", lineHeight: 1.2 }}>
+                              {storedUser?.username || "â€”"}
                             </Typography>
                           </Box>
                         </Stack>
                       </Grid>
 
                       <Grid item xs={12} sm={4}>
-                        <Stack direction="row" alignItems="center" spacing={1.5}>
+                        <Stack direction="row" alignItems="center" spacing={1.25}>
                           <LocationOnOutlinedIcon sx={{ color: "white", opacity: 0.9, fontSize: 20 }} />
-                          <Box>
-                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)", display: "block" }}>
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)", display: "block", fontWeight: 700, lineHeight: 1.15 }}>
                               Assigned {scopeEntityLabel}
                             </Typography>
-                            <Typography variant="body2" sx={{ color: "white", fontWeight: 800 }}>
+                            <Typography variant="body2" sx={{ color: "white", fontWeight: 900, overflowWrap: "anywhere", lineHeight: 1.2 }}>
                               {assignedScopeText}
                             </Typography>
                           </Box>
@@ -542,13 +709,13 @@ export default function FranchiseDashboard() {
                       </Grid>
 
                       <Grid item xs={12} sm={4}>
-                        <Stack direction="row" alignItems="center" spacing={1.5}>
+                        <Stack direction="row" alignItems="center" spacing={1.25}>
                           <TrendingUpOutlinedIcon sx={{ color: "white", opacity: 0.9, fontSize: 20 }} />
-                          <Box>
-                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)", display: "block" }}>
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)", display: "block", fontWeight: 700, lineHeight: 1.15 }}>
                               Resolved pincodes
                             </Typography>
-                            <Typography variant="body2" sx={{ color: "white", fontWeight: 900 }}>
+                            <Typography variant="body2" sx={{ color: "white", fontWeight: 900, lineHeight: 1.2 }}>
                               {Number(scope?.pincode_count ?? (Array.isArray(metrics?.overall?.pincodes) ? metrics.overall.pincodes.length : 0))}
                             </Typography>
                           </Box>
@@ -562,27 +729,25 @@ export default function FranchiseDashboard() {
           </motion.div>
 
           {/* Achievers */}
-          <Card sx={{ borderRadius: 4, boxShadow: COLORS.shadow, border: `1px solid ${COLORS.border}`, background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)" }}>
-            <CardContent sx={{ p: { xs: 3, md: 4 } }}>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: COLORS.text, mb: 3 }}>
-                Top Achievers
-              </Typography>
-              <Box sx={{ overflowX: "auto", pb: 2 }}>
-                <Stack direction="row" spacing={2} sx={{ minWidth: "max-content" }}>
+          <Card sx={sectionCardSx}>
+            <CardContent sx={{ p: { xs: 2, md: 4 } }}>
+              <SectionTitle title="Top Achievers" />
+              <Box sx={scrollRowSx}>
+                <Stack direction="row" spacing={{ xs: 1.25, md: 2 }} sx={{ minWidth: "max-content" }}>
                   {loading ? (
                     Array.from({ length: 5 }).map((_, idx) => (
-                      <Skeleton key={idx} variant="rounded" width={190} height={190} />
+                      <Skeleton key={idx} variant="rounded" width={156} height={158} sx={{ borderRadius: 2, scrollSnapAlign: "start" }} />
                     ))
                   ) : achievers.length ? (
                     achievers.map((a) => (
-                      <div key={a.id}>
+                      <Box key={a.id} sx={{ scrollSnapAlign: "start" }}>
                         <AchieverCard
                           name={a.name}
                           subtitle={a.pincode ? `Pincode ${a.pincode}` : ""}
                           achieved={a.achieved}
                           photoUrl={a.photo_url}
                         />
-                      </div>
+                      </Box>
                     ))
                   ) : (
                     <Typography variant="body2" sx={{ color: COLORS.textSecondary }}>
@@ -608,12 +773,10 @@ export default function FranchiseDashboard() {
           <PincodeWiseScroller title="Pincode Self Rebirth ID (pincode-wise)" icon={<TrendingUpOutlinedIcon />} rows={perPin?.self_rebirth_ids} />
 
           {/* Growth analytics placeholder (existing UI) */}
-          <Card sx={{ borderRadius: 3, boxShadow: "0 4px 20px rgba(0,0,0,0.08)", border: `1px solid ${COLORS.border}` }}>
-            <CardContent sx={{ p: { xs: 3, md: 4 } }}>
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3, flexWrap: "wrap", gap: 2 }}>
-                <Typography variant="h5" sx={{ fontWeight: 900, color: COLORS.text }}>
-                  Growth Analytics
-                </Typography>
+          <Card sx={sectionCardSx}>
+            <CardContent sx={{ p: { xs: 2, md: 4 } }}>
+              <Box sx={{ display: "flex", alignItems: { xs: "flex-start", sm: "center" }, justifyContent: "space-between", mb: { xs: 1.75, md: 3 }, flexWrap: "wrap", gap: 1.5 }}>
+                <SectionTitle title="Growth Analytics" />
 
                 <Stack direction="row" spacing={1}>
                   {Object.keys(growthData).map((tab) => (
@@ -623,8 +786,11 @@ export default function FranchiseDashboard() {
                       onClick={() => setSelectedTab(tab)}
                       sx={{
                         fontWeight: 700,
+                        height: { xs: 30, md: 32 },
+                        borderRadius: 999,
                         bgcolor: selectedTab === tab ? COLORS.primary : COLORS.background,
                         color: selectedTab === tab ? COLORS.surface : COLORS.text,
+                        border: `1px solid ${selectedTab === tab ? COLORS.primary : COLORS.border}`,
                       }}
                     />
                   ))}
@@ -636,6 +802,7 @@ export default function FranchiseDashboard() {
           </Card>
         </Stack>
       </Container>
+      <MobileBottomNav activePath={location.pathname} onNavigate={navigate} />
     </Box>
   );
 }

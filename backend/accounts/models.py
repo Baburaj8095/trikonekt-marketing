@@ -363,6 +363,13 @@ class Wallet(models.Model):
     main_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)         # Gross earnings (e.g., commissions)
     withdrawable_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0) # Net withdrawable after tax withholding
     self_account_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)  # Streamed 25% reserve for auto-activation packs
+    franchise_total_earning = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    franchise_active_work = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    franchise_inactive_work = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    franchise_self_rebirth = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    franchise_company_marketing = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    franchise_reward_points = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    franchise_shopping_scanner = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -418,6 +425,54 @@ class Wallet(models.Model):
         is_commission = (tx_upper in COMMISSION_WITHHOLD_TYPES)
         is_prime_tx = tx_upper.startswith("PRIME_") and (tx_upper.endswith("_DIRECT") or tx_upper.endswith("_SELF"))
         no_withhold = bool(meta.get("no_withhold"))
+
+        user_role = str(getattr(self.user, "role", "") or "").lower()
+        user_category = str(getattr(self.user, "category", "") or "").lower()
+        is_franchise_user = user_role == "agency" or user_category.startswith("agency_")
+        if tx_upper == "FRANCHISE_INCOME" and is_franchise_user and not no_withhold and amt > 0:
+            active_work = (amt * D("0.1875")).quantize(D("0.01"))
+            inactive_work = (amt * D("0.1875")).quantize(D("0.01"))
+            self_rebirth = (amt * D("0.25")).quantize(D("0.01"))
+            company_marketing = (amt - active_work - inactive_work - self_rebirth).quantize(D("0.01"))
+
+            w.franchise_total_earning = (w.franchise_total_earning or D("0")) + amt
+            w.franchise_active_work = (w.franchise_active_work or D("0")) + active_work
+            w.franchise_inactive_work = (w.franchise_inactive_work or D("0")) + inactive_work
+            w.franchise_self_rebirth = (w.franchise_self_rebirth or D("0")) + self_rebirth
+            w.franchise_company_marketing = (w.franchise_company_marketing or D("0")) + company_marketing
+            w.balance = (w.balance or D("0")) + amt
+            w.save(update_fields=[
+                "balance",
+                "franchise_total_earning",
+                "franchise_active_work",
+                "franchise_inactive_work",
+                "franchise_self_rebirth",
+                "franchise_company_marketing",
+                "updated_at",
+            ])
+
+            split_meta = {
+                **(meta or {}),
+                "ledger": "FRANCHISE_BUCKETS",
+                "split": "FRANCHISE_18_75_18_75_25_37_5",
+                "gross": str(amt),
+                "active_work_18_75": str(active_work),
+                "inactive_work_18_75": str(inactive_work),
+                "self_rebirth_25": str(self_rebirth),
+                "company_marketing_37_5": str(company_marketing),
+                "orig_type": str(tx_type),
+            }
+            WalletTransaction.objects.create(
+                user=self.user,
+                amount=amt,
+                balance_after=w.balance,
+                type="FRANCHISE_INCOME",
+                source_type=source_type or '',
+                source_id=str(source_id) if source_id is not None else '',
+                meta=split_meta,
+                matrix_account_id=matrix_account_id,
+            )
+            return w.balance
 
         if (is_commission or is_prime_tx) and not no_withhold and amt > 0:
             # 75/25 streaming model:
@@ -813,6 +868,64 @@ class Wallet(models.Model):
                 pass
 
 
+class FranchiseWalletSettings(models.Model):
+    inactive_work_day = models.PositiveSmallIntegerField(default=30)
+    inactive_work_enabled = models.BooleanField(default=True)
+    reward_min_withdrawal = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("1000.00"))
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Franchise Wallet Settings"
+        verbose_name_plural = "Franchise Wallet Settings"
+
+    @classmethod
+    def get_solo(cls):
+        obj, _ = cls.objects.get_or_create(pk=1, defaults={
+            "inactive_work_day": 30,
+            "inactive_work_enabled": True,
+            "reward_min_withdrawal": Decimal("1000.00"),
+        })
+        return obj
+
+    def save(self, *args, **kwargs):
+        if self.inactive_work_day < 1:
+            self.inactive_work_day = 1
+        if self.inactive_work_day > 31:
+            self.inactive_work_day = 31
+        super().save(*args, **kwargs)
+
+
+class FranchiseWorkApproval(models.Model):
+    STATUS_CHOICES = [
+        ("PENDING", "Pending"),
+        ("APPROVED", "Approved"),
+        ("REJECTED", "Rejected"),
+    ]
+
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="franchise_work_approvals", db_index=True)
+    year = models.PositiveSmallIntegerField(db_index=True)
+    month = models.PositiveSmallIntegerField(db_index=True)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="PENDING", db_index=True)
+    note = models.TextField(blank=True)
+    approved_by = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.SET_NULL, related_name="franchise_work_approvals_decided")
+    approved_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-year", "-month", "-updated_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["user", "year", "month"], name="uniq_franchise_work_approval_user_month"),
+        ]
+        indexes = [
+            models.Index(fields=["year", "month", "status"]),
+            models.Index(fields=["user", "status"]),
+        ]
+
+    def __str__(self):
+        return f"FranchiseWorkApproval<{self.user_id}:{self.year}-{self.month}:{self.status}>"
+
+
 class WalletTransaction(models.Model):
     TYPE_CHOICES = [
         ('COUPON_PURCHASE_CREDIT', 'Coupon Purchase Credit'),
@@ -863,6 +976,9 @@ class WalletTransaction(models.Model):
         ('WALLET_TO_WALLET_OUT', 'Wallet To Wallet Out'),
         ('WITHDRAWAL_WALLET_TRANSFER_OUT', 'Withdrawal Wallet Transfer Out'),
         ('WITHDRAWAL_WALLET_CREDIT', 'Withdrawal Wallet Credit'),
+        ('FRANCHISE_WD_CREDIT', 'Franchise Withdrawal Credit'),
+        ('FRANCHISE_WD_TRANSFER', 'Franchise Withdrawal Transfer'),
+        ('FRANCHISE_REWARD_CREDIT', 'Franchise Reward Credit'),
         # Streaming 75/25 support
         ('INCOME_CREDIT_75', 'Income Credit'),
         ('SELF_ACCOUNT_CREDIT', 'Self Account Credit'),

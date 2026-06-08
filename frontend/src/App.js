@@ -38,6 +38,7 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminFranchiseDashboard from "./pages/admin/AdminFranchiseDashboard";
 import AdminFranchiseCategoryDashboard from "./pages/admin/AdminFranchiseCategoryDashboard";
 import AdminFranchiseUsers from "./pages/admin/AdminFranchiseUsers";
+import AdminFranchiseWalletControls from "./pages/admin/AdminFranchiseWalletControls";
 import AdminFranchisePlaceholder from "./pages/admin/AdminFranchisePlaceholder";
 import AdminUserTree from "./pages/admin/AdminUserTree";
 import AdminUsers from "./pages/admin/AdminUsers";
@@ -1279,6 +1280,36 @@ function App() {
             <AdminProtectedRoute>
               <AdminFranchiseShell>
                 <AdminWithdrawals />
+              </AdminFranchiseShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/franchise/inactive-work-window"
+          element={
+            <AdminProtectedRoute>
+              <AdminFranchiseShell>
+                <AdminFranchiseWalletControls />
+              </AdminFranchiseShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/franchise/rewards"
+          element={
+            <AdminProtectedRoute>
+              <AdminFranchiseShell>
+                <AdminFranchiseWalletControls />
+              </AdminFranchiseShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/franchise/work-approvals"
+          element={
+            <AdminProtectedRoute>
+              <AdminFranchiseShell>
+                <AdminFranchiseWalletControls />
               </AdminFranchiseShell>
             </AdminProtectedRoute>
           }

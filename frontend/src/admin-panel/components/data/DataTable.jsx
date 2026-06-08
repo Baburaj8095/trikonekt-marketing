@@ -262,7 +262,15 @@ export default function DataTable({
         onColumnVisibilityModelChange={onColumnVisibilityModelChange}
         sx={{
           // Base text color to avoid theme inversion
-          "& .MuiDataGrid-cell": { outline: "none !important", color: "#0f172a !important", backgroundColor: "transparent", borderRight: "1px solid #e5e7eb" },
+          "& .MuiDataGrid-cell": {
+            outline: "none !important",
+            color: "#0f172a !important",
+            backgroundColor: "transparent",
+            borderRight: "1px solid #e5e7eb",
+            display: "flex",
+            alignItems: "center",
+          },
+          "& .MuiDataGrid-cell--textCenter": { justifyContent: "center" },
           "& .MuiDataGrid-cellContent": { color: "#0f172a !important" },
           "& .MuiDataGrid-columnHeaderTitle": { color: "#0f172a !important", fontWeight: 600 },
           "& .MuiDataGrid-columnHeaderTitleContainerContent": { color: "#0f172a !important" },

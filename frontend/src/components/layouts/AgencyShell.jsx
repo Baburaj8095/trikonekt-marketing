@@ -83,7 +83,7 @@ export default function AgencyShell({ children }) {
   const menu = [
     // { to: "/agency/dashboard", label: "Dashboard", icon: "dashboard" },
     { to: "/agency/franchise-dashboard", label: "Franchise Dashboard", icon: "chart" },
-    { to: "/agency/franchise-wallet", label: "Franchise Wallet", icon: "wallet" },
+    // { to: "/agency/franchise-wallet", label: "Franchise Wallet", icon: "wallet" },
     { to: "/agency/profile", label: "Profile", icon: "users" },
 
     // Refer & Earn (as in sketch order)

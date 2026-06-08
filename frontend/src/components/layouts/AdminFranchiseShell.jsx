@@ -38,6 +38,9 @@ const FRANCHISE_MENU = [
     items: [
       { to: "/admin/franchise/wallets", label: "Franchise Wallets", icon: "wallet" },
       { to: "/admin/franchise/withdrawals", label: "Withdrawals", icon: "wallet" },
+      { to: "/admin/franchise/inactive-work-window", label: "Inactive Work Window", icon: "chart" },
+      { to: "/admin/franchise/work-approvals", label: "Active Work Approvals", icon: "shield" },
+      { to: "/admin/franchise/rewards", label: "Franchise Rewards", icon: "star" },
       { to: "/admin/franchise/monthly-entry-report", label: "Monthly Entry Report", icon: "chart" },
       { to: "/admin/franchise/scanner-forms", label: "Shopping Scanner Forms", icon: "orders" },
     ],
