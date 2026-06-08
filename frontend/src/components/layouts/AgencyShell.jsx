@@ -91,6 +91,7 @@ export default function AgencyShell({ children }) {
 
     // Wallet and History
     { to: "/agency/franchise-wallet", label: "Earning Wallet", icon: "wallet" },
+    
     { to: "/agency/history", label: "History", icon: "orders" },
     { to: "/agency/monthly-report", label: "Monthly Report", icon: "chart" },
     // { to: "/agency/transactions", label: "Transactions", icon: "orders" },
