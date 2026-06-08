@@ -175,8 +175,12 @@ import FranchiseDashboard from "./components/franchise/FranchiseDashboard";
 import FranchiseWalletPlaceholder from "./components/franchise/FranchiseWalletPlaceholder";
 import TransactionHistory from "./components/franchise/pages/TransactionHistory";
 import WithdrawalHistory from "./components/franchise/pages/WithdrawalHistory";
+import FranchiseMonthlyReport from "./components/franchise/pages/FranchiseMonthlyReport";
+import FranchiseEducationPDFs from "./components/franchise/pages/FranchiseEducationPDFs";
+import FranchiseAgreementCopy from "./components/franchise/pages/FranchiseAgreementCopy";
 import HubbleGiftCards from "./pages/HubbleGiftCards";
 import GiftCardSummary from "./pages/GiftCardSummary";
+import AdminFranchiseDocuments from "./pages/admin/AdminFranchiseDocuments";
 
 function LegacyAuthEntry() {
   const location = useLocation();
@@ -385,6 +389,36 @@ function App() {
             <ProtectedRoute allowedRoles={["agency"]}>
               <AgencyShell>
                 <WithdrawalHistory />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agency/monthly-report"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <FranchiseMonthlyReport />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agency/education-pdfs"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <FranchiseEducationPDFs />
+              </AgencyShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agency/franchise-agreement"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <AgencyShell>
+                <FranchiseAgreementCopy />
               </AgencyShell>
             </ProtectedRoute>
           }
@@ -1310,6 +1344,36 @@ function App() {
             <AdminProtectedRoute>
               <AdminFranchiseShell>
                 <AdminFranchiseWalletControls />
+              </AdminFranchiseShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/franchise/monthly-entry-report"
+          element={
+            <AdminProtectedRoute>
+              <AdminFranchiseShell>
+                <AdminFranchiseWalletControls />
+              </AdminFranchiseShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/franchise/education-pdf-upload"
+          element={
+            <AdminProtectedRoute>
+              <AdminFranchiseShell>
+                <AdminFranchiseDocuments />
+              </AdminFranchiseShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/franchise/agreement-template"
+          element={
+            <AdminProtectedRoute>
+              <AdminFranchiseShell>
+                <AdminFranchiseDocuments />
               </AdminFranchiseShell>
             </AdminProtectedRoute>
           }

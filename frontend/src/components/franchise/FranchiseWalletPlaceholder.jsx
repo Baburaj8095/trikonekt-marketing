@@ -614,113 +614,289 @@ export default function FranchiseWalletPlaceholder() {
 
   // ── MOBILE LAYOUT ────────────────────────────────────────────────────────────
 if (isMobile) {
+  const featuredWallet = {
+    title: "Withdrawal Wallet",
+    amount: money(wallets?.withdrawal?.amount),
+    subtitle: "Transfer approved pockets here",
+    icon: <WalletRoundedIcon sx={{ fontSize: 30 }} />,
+  };
+  const walletTiles = [
+    ...displayEarningWallets,
+    ...displayWorkWallets,
+    ...displayOtherWallets.filter((wallet) => wallet.title !== "Withdrawal Wallet"),
+  ];
+
   return (
-  //  <Box sx={{ minHeight: "100dvh", bgcolor: "#f6f9fc" }}>
-  <Box sx={{ bgcolor: "#f6f9fc",  paddingBottom: "80px" }}>
-  <Container sx={{ px: 2, pt: 2 }}>
-    <Stack spacing={2.2} sx={{ pb: 10 }}>
-
-          {/* HEADER */}
+    <Box sx={{ bgcolor: "#f4f7fb", minHeight: "100dvh", pb: "calc(92px + env(safe-area-inset-bottom))" }}>
+      <Box
+        sx={{
+          bgcolor: "#fff",
+          borderBottom: "1px solid #e6ebf5",
+          boxShadow: "0 10px 24px rgba(15,23,42,0.04)",
+          position: "sticky",
+          top: 0,
+          zIndex: 5,
+        }}
+      >
+        <Container sx={{ px: 2, py: 1.5 }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <Stack direction="row" spacing={1.2} alignItems="center">
-              <IconButton
-                onClick={() => navigate(backTarget)}
-                sx={{
-                  bgcolor: "#eef2ff",
-                  color: COLORS.text,
-                  width: 36,
-                  height: 36,
-                }}
-              >
-                <ArrowBackRoundedIcon fontSize="small" />
+            <IconButton
+              onClick={() => navigate(backTarget)}
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: 3,
+                bgcolor: "#fff",
+                border: "1px solid #e2e8f0",
+                boxShadow: "0 10px 22px rgba(15,23,42,0.06)",
+              }}
+            >
+              <ArrowBackRoundedIcon />
+            </IconButton>
+            <Typography sx={{ color: "#111827", fontWeight: 950, fontSize: "1.25rem" }}>
+              Franchise Wallet
+            </Typography>
+            <Stack direction="row" spacing={1}>
+              <IconButton sx={{ width: 48, height: 48, borderRadius: 3, bgcolor: "#fff", border: "1px solid #e2e8f0" }}>
+                <NotificationsNoneRoundedIcon />
               </IconButton>
-
-              <Typography fontWeight={700} fontSize="1.1rem">
-                Wallets
-              </Typography>
             </Stack>
+          </Stack>
+        </Container>
+      </Box>
 
-            <Avatar sx={{ width: 34, height: 34 }}>A</Avatar>
+      <Container sx={{ px: 2, pt: 2.5 }}>
+        <Stack spacing={2.2} sx={{ pb: 2 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Stack direction="row" spacing={1.4} alignItems="center">
+              <Box sx={{ width: 58, height: 58, borderRadius: 3, display: "grid", placeItems: "center", bgcolor: "#eaf2ff", color: "#2563eb" }}>
+                <WalletRoundedIcon sx={{ fontSize: 30 }} />
+              </Box>
+              <Box>
+                <Typography sx={{ color: "#030712", fontWeight: 950, fontSize: "1.85rem", lineHeight: 1.05 }}>
+                  Franchise Wallet
+                </Typography>
+                <Typography sx={{ color: "#64748b", fontWeight: 700, fontSize: "0.82rem" }}>
+                  Growth Wallet
+                </Typography>
+              </Box>
+            </Stack>
+            <Chip
+              label="KYC Pending"
+              sx={{
+                bgcolor: "#f59e0b",
+                color: "#111827",
+                fontWeight: 950,
+                borderRadius: 999,
+                height: 42,
+                px: 1.2,
+                "& .MuiChip-label": { px: 1.1, fontSize: "0.88rem" },
+              }}
+            />
           </Stack>
 
-          {/* SUMMARY */}
           {err ? <Alert severity="error">{err}</Alert> : null}
-          {loading ? <LinearProgress /> : null}
-          <Card sx={{ borderRadius: 3, border: "1px solid #e6ebf5", boxShadow: "none" }}>
-            <CardContent sx={{ py: 1.5 }}>
-              <Stack spacing={1}>
-                {displaySummaryStats.map((item) => (
-                  <Stack key={item.label} direction="row" justifyContent="space-between">
-                    <Typography color="text.secondary">{item.label}</Typography>
-                    <Typography fontWeight={600}>{item.value}</Typography>
+          {loading ? <LinearProgress sx={{ borderRadius: 999 }} /> : null}
+
+          <Card
+            sx={{
+              borderRadius: 4,
+              border: "1px solid #dbe4f0",
+              bgcolor: "rgba(255,255,255,0.96)",
+              boxShadow: "0 18px 44px rgba(15,23,42,0.08)",
+              overflow: "hidden",
+            }}
+          >
+            <CardContent sx={{ p: 2 }}>
+              <Stack spacing={1.8}>
+                <Stack direction="row" spacing={1.1} alignItems="center">
+                  <WalletRoundedIcon sx={{ color: "#64748b" }} />
+                  <Typography sx={{ color: "#334155", fontWeight: 950, fontSize: "1rem" }}>
+                    Growth Wallet
+                  </Typography>
+                </Stack>
+
+                <Box
+                  sx={{
+                    borderRadius: 3,
+                    p: 2,
+                    minHeight: 164,
+                    color: "#fff",
+                    background: "linear-gradient(135deg, #2563eb 0%, #1d75b9 48%, #0f766e 100%)",
+                    boxShadow: "0 16px 34px rgba(37,99,235,0.22)",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <Stack direction="row" spacing={1.2} alignItems="center">
+                    <Box sx={{ width: 58, height: 58, borderRadius: 3, display: "grid", placeItems: "center", bgcolor: "rgba(255,255,255,0.18)" }}>
+                      {featuredWallet.icon}
+                    </Box>
+                    <Typography sx={{ fontSize: "1.08rem", fontWeight: 950 }}>
+                      {featuredWallet.title}
+                    </Typography>
                   </Stack>
-                ))}
+                  <Box>
+                    <Typography sx={{ fontSize: "2.25rem", fontWeight: 950, lineHeight: 1 }}>
+                      {featuredWallet.amount}
+                    </Typography>
+                    <Typography sx={{ mt: 0.7, fontSize: "0.9rem", opacity: 0.9, fontWeight: 700 }}>
+                      {featuredWallet.subtitle}
+                    </Typography>
+                  </Box>
+                </Box>
+
+                <Grid container spacing={1.4}>
+                  {walletTiles.map((wallet) => (
+                    <Grid item xs={6} key={wallet.title}>
+                      <Card
+                        sx={{
+                          height: "100%",
+                          minHeight: 176,
+                          borderRadius: 3,
+                          border: "1px solid #dfe7f2",
+                          boxShadow: "0 12px 28px rgba(15,23,42,0.06)",
+                          bgcolor: "#fff",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <CardContent sx={{ p: 1.6, height: "100%" }}>
+                          <Stack spacing={1.1} sx={{ height: "100%" }}>
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <Box
+                                sx={{
+                                  width: 46,
+                                  height: 46,
+                                  borderRadius: 2.5,
+                                  display: "grid",
+                                  placeItems: "center",
+                                  bgcolor: wallet.tint,
+                                  color: wallet.accent,
+                                  flexShrink: 0,
+                                  "& svg": { fontSize: 25 },
+                                }}
+                              >
+                                {wallet.icon}
+                              </Box>
+                              <Typography
+                                sx={{
+                                  color: "#64748b",
+                                  fontWeight: 950,
+                                  fontSize: "0.82rem",
+                                  lineHeight: 1.18,
+                                  display: "-webkit-box",
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: "vertical",
+                                  overflow: "hidden",
+                                }}
+                              >
+                                {wallet.title}
+                              </Typography>
+                            </Stack>
+
+                            <Box sx={{ mt: "auto" }}>
+                              <Typography
+                                sx={{
+                                  color: wallet.accent,
+                                  fontWeight: 950,
+                                  fontSize: "1.12rem",
+                                  lineHeight: 1.05,
+                                  wordBreak: "break-word",
+                                }}
+                              >
+                                {wallet.amount}
+                              </Typography>
+                              {wallet.suffix ? (
+                                <Typography
+                                  sx={{
+                                    mt: 0.45,
+                                    color: "#64748b",
+                                    fontWeight: 650,
+                                    fontSize: "0.75rem",
+                                    lineHeight: 1.22,
+                                    display: "-webkit-box",
+                                    WebkitLineClamp: 2,
+                                    WebkitBoxOrient: "vertical",
+                                    overflow: "hidden",
+                                  }}
+                                >
+                                  {wallet.suffix}
+                                </Typography>
+                              ) : null}
+                            </Box>
+
+                            {wallet.source ? (
+                              <Button
+                                size="small"
+                                disabled={!wallet.payEnabled || payingSource === wallet.source}
+                                onClick={() => handlePay(wallet.source)}
+                                title={!wallet.payEnabled ? wallet.payDisabledReason : undefined}
+                                sx={{
+                                  alignSelf: "flex-start",
+                                  minWidth: 70,
+                                  borderRadius: 999,
+                                  px: 1.5,
+                                  py: 0.45,
+                                  bgcolor: wallet.payEnabled ? wallet.accent : "#eef2f7",
+                                  color: wallet.payEnabled ? "#fff" : "#64748b",
+                                  textTransform: "none",
+                                  fontWeight: 950,
+                                  fontSize: "0.76rem",
+                                  "&:hover": { bgcolor: wallet.payEnabled ? wallet.accent : "#eef2f7" },
+                                }}
+                              >
+                                {payingSource === wallet.source ? "..." : "Pay"}
+                              </Button>
+                            ) : null}
+                          </Stack>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
               </Stack>
             </CardContent>
           </Card>
 
-          {/* EARNINGS + WORK */}
-          {[ 
-            { title: "Earnings", data: displayEarningWallets },
-            { title: "Work", data: displayWorkWallets },
-          ].map((section) => (
-            <Stack key={section.title} spacing={1.2}>
-              <Typography fontWeight={600} fontSize="0.9rem" color="text.secondary">
-                {section.title}
+          <Stack spacing={1.2}>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Box sx={{ width: 5, height: 28, borderRadius: 999, bgcolor: "#2563eb" }} />
+              <Typography sx={{ color: "#030712", fontWeight: 950, fontSize: "1.08rem" }}>
+                Pockets
               </Typography>
-
-              <Stack spacing={1}>
-                {section.data.map((wallet) => (
-                  <MobileWalletRowCard key={wallet.title} {...wallet} onPay={handlePay} paying={payingSource === wallet.source} />
-                ))}
-              </Stack>
             </Stack>
-          ))}
-
-          {/* OTHER WALLETS */}
-          <Stack spacing={1.2}>
-            <Typography fontWeight={600} fontSize="0.9rem" color="text.secondary">
-              Other Wallets
-            </Typography>
-            {displayOtherWallets.map((wallet) => (
-              <MobileWalletRowCard key={wallet.title} {...wallet} />
-            ))}
-
+            <Grid container spacing={1.4}>
+              {quickActions.map((action) => (
+                <Grid item xs={6} key={action.label}>
+                  <Card
+                    onClick={() => {
+                      const route = actionRoutes[action.label];
+                      if (route) navigate(route);
+                    }}
+                    sx={{
+                      minHeight: 132,
+                      borderRadius: 3,
+                      border: "1px solid #dfe7f2",
+                      boxShadow: "0 12px 28px rgba(15,23,42,0.06)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <CardContent sx={{ p: 1.6 }}>
+                      <Stack spacing={1.1}>
+                        <Box sx={{ width: 46, height: 46, borderRadius: 2.5, display: "grid", placeItems: "center", bgcolor: "#eef2ff", color: "#2563eb", "& svg": { fontSize: 25 } }}>
+                          {action.icon}
+                        </Box>
+                        <Typography sx={{ color: "#64748b", fontWeight: 950, fontSize: "0.86rem", lineHeight: 1.2 }}>
+                          {action.label}
+                        </Typography>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
           </Stack>
-
-          {/* QUICK ACTIONS */}
-          <Stack spacing={1.2}>
-            <Typography fontWeight={600} fontSize="0.9rem" color="text.secondary">
-              Quick Actions
-            </Typography>
-
-            {quickActions.map((action) => (
-              <Card
-                key={action.label}
-                onClick={() => {
-                const route = actionRoutes[action.label];
-                if (route) navigate(route);
-                }}
-                sx={{
-                  borderRadius: 3,
-                  border: "1px solid #e6ebf5",
-                  boxShadow: "none",
-                  cursor: "pointer",
-                }}
-              >
-                <CardContent sx={{ py: 1.2 }}>
-                  <Stack direction="row" justifyContent="space-between">
-                    <Stack direction="row" spacing={1}>
-                      {action.icon}
-                      <Typography>{action.label}</Typography>
-                    </Stack>
-                    <ArrowForwardRoundedIcon fontSize="small" />
-                  </Stack>
-                </CardContent>
-              </Card>
-            ))}
-          </Stack>
-
         </Stack>
       </Container>
     </Box>

@@ -43,6 +43,8 @@ const FRANCHISE_MENU = [
       { to: "/admin/franchise/rewards", label: "Franchise Rewards", icon: "star" },
       { to: "/admin/franchise/monthly-entry-report", label: "Monthly Entry Report", icon: "chart" },
       { to: "/admin/franchise/scanner-forms", label: "Shopping Scanner Forms", icon: "orders" },
+      { to: "/admin/franchise/education-pdf-upload", label: "Education PDF Upload", icon: "file" },
+      { to: "/admin/franchise/agreement-template", label: "Agreement Template", icon: "file" },
     ],
   },
   {

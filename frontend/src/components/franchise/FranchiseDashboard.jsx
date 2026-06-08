@@ -93,7 +93,7 @@ function SectionTitle({ title }) {
 function MobileBottomNav({ activePath, onNavigate }) {
   const items = [
     { label: "Home", icon: <HomeRoundedIcon />, path: "/agency/franchise-dashboard" },
-    { label: "Business Connect", icon: <BusinessCenterRoundedIcon />, path: "/agency/franchise-dashboard" },
+    // { label: "Business Connect", icon: <BusinessCenterRoundedIcon />, path: "/agency/franchise-dashboard" },
     { label: "Wallet", icon: <CurrencyRupeeRoundedIcon />, path: "/agency/franchise-wallet" },
     { label: "History", icon: <HistoryRoundedIcon />, path: "/agency/transactions" },
     { label: "Report", icon: <AssessmentRoundedIcon />, path: "/agency/daily-report" },

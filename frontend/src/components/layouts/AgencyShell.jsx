@@ -92,6 +92,7 @@ export default function AgencyShell({ children }) {
     // Wallet and History
     { to: "/agency/wallet", label: "Earning Wallet", icon: "wallet" },
     { to: "/agency/history", label: "History", icon: "orders" },
+    { to: "/agency/monthly-report", label: "Monthly Report", icon: "chart" },
     // { to: "/agency/transactions", label: "Transactions", icon: "orders" },
     { to: "/agency/withdrawals", label: "Withdrawals", icon: "orders" },
 
@@ -106,6 +107,8 @@ export default function AgencyShell({ children }) {
 
     // Reports
     { to: "/agency/daily-report", label: "Daily Employee Report", icon: "chart" },
+    { to: "/agency/education-pdfs", label: "Educating PDF Trikonekt", icon: "file" },
+    { to: "/agency/franchise-agreement", label: "Franchise Agreement Copy", icon: "file" },
 
     // Trikonekt Products
     // { to: "/agency/trikonekt-products", label: "Trikonekt Products", icon: "box" },

@@ -905,8 +905,16 @@ class FranchiseWorkApproval(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="franchise_work_approvals", db_index=True)
     year = models.PositiveSmallIntegerField(db_index=True)
     month = models.PositiveSmallIntegerField(db_index=True)
+    consumer_subscription_750_count = models.PositiveIntegerField(default=0)
+    prime_subscription_8250_count = models.PositiveIntegerField(default=0)
+    smart_purchase_plan_1000_count = models.PositiveIntegerField(default=0)
+    franchise_reference_count = models.PositiveIntegerField(default=0)
+    captain_business_connect_reference_count = models.PositiveIntegerField(default=0)
+    tri_trip_reference_count = models.PositiveIntegerField(default=0)
+    organized_meeting_count = models.PositiveIntegerField(default=0)
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="PENDING", db_index=True)
     note = models.TextField(blank=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
     approved_by = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.SET_NULL, related_name="franchise_work_approvals_decided")
     approved_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -924,6 +932,53 @@ class FranchiseWorkApproval(models.Model):
 
     def __str__(self):
         return f"FranchiseWorkApproval<{self.user_id}:{self.year}-{self.month}:{self.status}>"
+
+
+class FranchiseEducationPDF(models.Model):
+    title = models.CharField(max_length=180)
+    description = models.TextField(blank=True)
+    file = models.FileField(upload_to="franchise/education_pdfs/")
+    is_active = models.BooleanField(default=True, db_index=True)
+    uploaded_by = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.SET_NULL, related_name="franchise_education_pdfs_uploaded")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return f"FranchiseEducationPDF<{self.title}>"
+
+
+class FranchiseAgreementTemplate(models.Model):
+    title = models.CharField(max_length=180, default="Franchise Agreement")
+    content = models.TextField(blank=True)
+    updated_by = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.SET_NULL, related_name="franchise_agreement_templates_updated")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Franchise Agreement Template"
+        verbose_name_plural = "Franchise Agreement Template"
+
+    @classmethod
+    def get_solo(cls):
+        obj, _ = cls.objects.get_or_create(pk=1, defaults={
+            "title": "Franchise Agreement",
+            "content": (
+                "This Franchise Agreement is entered into between Trikonekt and {full_name}.\n\n"
+                "Agency Details:\n"
+                "Name: {full_name}\n"
+                "Phone: {phone}\n"
+                "Category/Role: {category_role}\n"
+                "Geo Location: {geo_location}\n\n"
+                "The agency agrees to follow Trikonekt operating guidelines, compliance requirements, "
+                "and franchise responsibilities as communicated by the company."
+            ),
+        })
+        return obj
+
+    def __str__(self):
+        return f"FranchiseAgreementTemplate<{self.title}>"
 
 
 class WalletTransaction(models.Model):

@@ -17,6 +17,16 @@ import API from "../../api/api";
 
 const STATUS_OPTIONS = ["APPROVED", "PENDING", "REJECTED"];
 
+const REPORT_FIELDS = [
+  { key: "consumer_subscription_750_count", label: "750" },
+  { key: "prime_subscription_8250_count", label: "8250" },
+  { key: "smart_purchase_plan_1000_count", label: "SPP 1000" },
+  { key: "franchise_reference_count", label: "Franchise Ref" },
+  { key: "captain_business_connect_reference_count", label: "Captain BCR" },
+  { key: "tri_trip_reference_count", label: "Tri Trip" },
+  { key: "organized_meeting_count", label: "Meetings" },
+];
+
 const today = new Date();
 
 const fieldSx = {
@@ -136,6 +146,28 @@ export default function AdminFranchiseWalletControls() {
       setApprovals(approvalsRes?.data?.results || []);
     } catch (e) {
       setError(e?.response?.data?.detail || "Failed to save work approval.");
+    } finally {
+      setSaving("");
+    }
+  };
+
+  const updateReportStatus = async (row, statusValue) => {
+    try {
+      setSaving(`approval-${row.id}`);
+      setError("");
+      setMessage("");
+      const res = await API.post("/accounts/admin/franchise/wallet/work-approvals/", {
+        id: row.id,
+        status: statusValue,
+        note: row.note || "",
+      });
+      setMessage(res?.data?.detail || "Monthly report status updated.");
+      const approvalsRes = await API.get("/accounts/admin/franchise/wallet/work-approvals/", {
+        params: { year: approvalForm.year, month: approvalForm.month },
+      });
+      setApprovals(approvalsRes?.data?.results || []);
+    } catch (e) {
+      setError(e?.response?.data?.detail || "Failed to update monthly report status.");
     } finally {
       setSaving("");
     }
@@ -319,32 +351,58 @@ export default function AdminFranchiseWalletControls() {
         >
           <Stack spacing={1}>
             {approvals.length ? (
-              approvals.map((row) => (
+              approvals.map((row) => {
+                const rowTotal = REPORT_FIELDS.reduce((sum, field) => sum + Number(row[field.key] || 0), 0);
+                return (
                 <Stack
                   key={row.id}
-                  direction={{ xs: "column", sm: "row" }}
-                  alignItems={{ xs: "flex-start", sm: "center" }}
-                  justifyContent="space-between"
                   spacing={1}
                   sx={{ p: 1.2, border: "1px solid #e2e8f0", borderRadius: 2, bgcolor: "#f8fafc" }}
                 >
-                  <Box>
-                    <Typography sx={{ color: "#0f172a", fontWeight: 900 }}>{row.username}</Typography>
-                    <Typography sx={{ color: "#64748b", fontSize: "0.82rem", fontWeight: 600 }}>
-                      {row.full_name || "No name"} {row.note ? `- ${row.note}` : ""}
-                    </Typography>
-                  </Box>
-                  <Chip
-                    label={row.status}
-                    size="small"
-                    sx={{
-                      fontWeight: 900,
-                      bgcolor: row.status === "APPROVED" ? "#dcfce7" : row.status === "REJECTED" ? "#fee2e2" : "#fef3c7",
-                      color: row.status === "APPROVED" ? "#166534" : row.status === "REJECTED" ? "#991b1b" : "#92400e",
-                    }}
-                  />
+                  <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between" spacing={1}>
+                    <Box>
+                      <Typography sx={{ color: "#0f172a", fontWeight: 900 }}>{row.username}</Typography>
+                      <Typography sx={{ color: "#64748b", fontSize: "0.82rem", fontWeight: 600 }}>
+                        {row.full_name || "No name"} {row.note ? `- ${row.note}` : ""}
+                      </Typography>
+                    </Box>
+                    <Chip
+                      label={row.status}
+                      size="small"
+                      sx={{
+                        fontWeight: 900,
+                        bgcolor: row.status === "APPROVED" ? "#dcfce7" : row.status === "REJECTED" ? "#fee2e2" : "#fef3c7",
+                        color: row.status === "APPROVED" ? "#166534" : row.status === "REJECTED" ? "#991b1b" : "#92400e",
+                      }}
+                    />
+                  </Stack>
+                  <Stack direction="row" spacing={0.7} flexWrap="wrap" useFlexGap>
+                    {REPORT_FIELDS.map((field) => (
+                      <Chip key={field.key} label={`${field.label}: ${row[field.key] || 0}`} size="small" sx={{ bgcolor: "#fff", fontWeight: 800 }} />
+                    ))}
+                    <Chip label={`Total: ${rowTotal}`} size="small" sx={{ bgcolor: "#dbeafe", color: "#1d4ed8", fontWeight: 900 }} />
+                  </Stack>
+                  <Stack direction="row" spacing={1} justifyContent="flex-end">
+                    <Button
+                      size="small"
+                      disabled={saving === `approval-${row.id}`}
+                      onClick={() => updateReportStatus(row, "APPROVED")}
+                      sx={{ borderRadius: 2, textTransform: "none", fontWeight: 900, bgcolor: "#16a34a", color: "#fff", "&:hover": { bgcolor: "#15803d" } }}
+                    >
+                      Approve
+                    </Button>
+                    <Button
+                      size="small"
+                      disabled={saving === `approval-${row.id}`}
+                      onClick={() => updateReportStatus(row, "REJECTED")}
+                      sx={{ borderRadius: 2, textTransform: "none", fontWeight: 900, bgcolor: "#fee2e2", color: "#991b1b" }}
+                    >
+                      Reject
+                    </Button>
+                  </Stack>
                 </Stack>
-              ))
+                );
+              })
             ) : (
               <Typography sx={{ color: "#64748b", fontWeight: 700 }}>No approvals found for this period.</Typography>
             )}

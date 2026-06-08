@@ -8,6 +8,8 @@ from .models import (
     WalletTransaction,
     FranchiseWalletSettings,
     FranchiseWorkApproval,
+    FranchiseEducationPDF,
+    FranchiseAgreementTemplate,
     ConsumerVoucher,
     SupportTicket,
     SupportTicketMessage,
@@ -2365,6 +2367,253 @@ def _money_str(value):
         return "0.00"
 
 
+FRANCHISE_REPORT_FIELDS = [
+    "consumer_subscription_750_count",
+    "prime_subscription_8250_count",
+    "smart_purchase_plan_1000_count",
+    "franchise_reference_count",
+    "captain_business_connect_reference_count",
+    "tri_trip_reference_count",
+    "organized_meeting_count",
+]
+
+
+def _franchise_report_row(row):
+    return {
+        "id": row.id,
+        "user_id": row.user_id,
+        "username": getattr(row.user, "username", ""),
+        "full_name": getattr(row.user, "full_name", ""),
+        "year": row.year,
+        "month": row.month,
+        "consumer_subscription_750_count": row.consumer_subscription_750_count,
+        "prime_subscription_8250_count": row.prime_subscription_8250_count,
+        "smart_purchase_plan_1000_count": row.smart_purchase_plan_1000_count,
+        "franchise_reference_count": row.franchise_reference_count,
+        "captain_business_connect_reference_count": row.captain_business_connect_reference_count,
+        "tri_trip_reference_count": row.tri_trip_reference_count,
+        "organized_meeting_count": row.organized_meeting_count,
+        "status": row.status,
+        "note": row.note,
+        "submitted_at": row.submitted_at,
+        "approved_by": getattr(row.approved_by, "username", None),
+        "approved_at": row.approved_at,
+        "updated_at": row.updated_at,
+    }
+
+
+def _clean_report_counts(data):
+    cleaned = {}
+    for field in FRANCHISE_REPORT_FIELDS:
+        try:
+            value = int((data or {}).get(field) or 0)
+        except Exception:
+            raise serializers.ValidationError({field: "Enter a valid count."})
+        if value < 0:
+            raise serializers.ValidationError({field: "Count cannot be negative."})
+        cleaned[field] = value
+    return cleaned
+
+
+def _file_url(request, file_field):
+    try:
+        if not file_field:
+            return ""
+        url = file_field.url
+        return request.build_absolute_uri(url) if request is not None else url
+    except Exception:
+        return ""
+
+
+def _education_pdf_row(request, obj):
+    return {
+        "id": obj.id,
+        "title": obj.title,
+        "description": obj.description,
+        "file_url": _file_url(request, obj.file),
+        "is_active": bool(obj.is_active),
+        "uploaded_by": getattr(obj.uploaded_by, "username", None),
+        "created_at": obj.created_at,
+        "updated_at": obj.updated_at,
+    }
+
+
+def _agency_geo_label(user):
+    parts = []
+    for attr in ("city", "state", "country"):
+        obj = getattr(user, attr, None)
+        name = getattr(obj, "name", None)
+        if name:
+            parts.append(str(name))
+    pincode = str(getattr(user, "pincode", "") or "").strip()
+    if pincode:
+        parts.append(f"Pincode {pincode}")
+    address = str(getattr(user, "address", "") or "").strip()
+    if address:
+        parts.append(address)
+    return ", ".join(parts) or "Not provided"
+
+
+def _agreement_context(user):
+    category = str(getattr(user, "category", "") or "").replace("_", " ").strip().title()
+    role = str(getattr(user, "role", "") or "").replace("_", " ").strip().title()
+    return {
+        "full_name": getattr(user, "full_name", "") or getattr(user, "username", "") or "",
+        "username": getattr(user, "username", "") or "",
+        "phone": getattr(user, "phone", "") or "",
+        "category": category,
+        "role": role,
+        "category_role": " / ".join([x for x in [category, role] if x]) or "Agency",
+        "geo_location": _agency_geo_label(user),
+        "pincode": getattr(user, "pincode", "") or "",
+        "date": timezone.now().strftime("%d %B %Y"),
+    }
+
+
+def _render_agreement_content(template, context):
+    raw = str(getattr(template, "content", "") or "")
+    try:
+        return raw.format(**context)
+    except Exception:
+        rendered = raw
+        for key, value in context.items():
+            rendered = rendered.replace("{" + key + "}", str(value))
+        return rendered
+
+
+class FranchiseEducationPDFListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not _is_franchise_user(request.user):
+            return Response({"detail": "Education PDFs are available for franchise users only."}, status=status.HTTP_403_FORBIDDEN)
+        qs = FranchiseEducationPDF.objects.filter(is_active=True).order_by("-created_at", "-id")
+        return Response({"results": [_education_pdf_row(request, obj) for obj in qs[:200]]}, status=status.HTTP_200_OK)
+
+
+class AdminFranchiseEducationPDFView(APIView):
+    permission_classes = [IsAdminOrStaff]
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser]
+
+    def get(self, request):
+        qs = FranchiseEducationPDF.objects.all().order_by("-created_at", "-id")
+        return Response({"results": [_education_pdf_row(request, obj) for obj in qs[:300]]}, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        title = str((request.data or {}).get("title") or "").strip()
+        description = str((request.data or {}).get("description") or "").strip()
+        file_obj = request.FILES.get("file") if hasattr(request, "FILES") else None
+        if not title:
+            return Response({"detail": "Title is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not file_obj:
+            return Response({"detail": "PDF file is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not str(getattr(file_obj, "name", "")).lower().endswith(".pdf"):
+            return Response({"detail": "Only PDF files are allowed."}, status=status.HTTP_400_BAD_REQUEST)
+        obj = FranchiseEducationPDF.objects.create(
+            title=title,
+            description=description,
+            file=file_obj,
+            is_active=True,
+            uploaded_by=request.user,
+        )
+        return Response(_education_pdf_row(request, obj), status=status.HTTP_201_CREATED)
+
+    def patch(self, request):
+        obj_id = (request.data or {}).get("id")
+        obj = FranchiseEducationPDF.objects.filter(pk=obj_id).first()
+        if not obj:
+            return Response({"detail": "PDF record not found."}, status=status.HTTP_404_NOT_FOUND)
+        if "title" in request.data:
+            obj.title = str(request.data.get("title") or "").strip() or obj.title
+        if "description" in request.data:
+            obj.description = str(request.data.get("description") or "").strip()
+        if "is_active" in request.data:
+            raw = request.data.get("is_active")
+            obj.is_active = str(raw).strip().lower() in {"1", "true", "yes", "on", "active"} if isinstance(raw, str) else bool(raw)
+        obj.save(update_fields=["title", "description", "is_active", "updated_at"])
+        return Response(_education_pdf_row(request, obj), status=status.HTTP_200_OK)
+
+
+class AdminFranchiseAgreementTemplateView(APIView):
+    permission_classes = [IsAdminOrStaff]
+
+    def get(self, request):
+        obj = FranchiseAgreementTemplate.get_solo()
+        return Response({
+            "title": obj.title,
+            "content": obj.content,
+            "updated_by": getattr(obj.updated_by, "username", None),
+            "updated_at": obj.updated_at,
+        }, status=status.HTTP_200_OK)
+
+    def patch(self, request):
+        obj = FranchiseAgreementTemplate.get_solo()
+        obj.title = str((request.data or {}).get("title") or obj.title).strip() or obj.title
+        obj.content = str((request.data or {}).get("content") or "")
+        obj.updated_by = request.user
+        obj.save(update_fields=["title", "content", "updated_by", "updated_at"])
+        return self.get(request)
+
+
+class FranchiseAgreementPDFView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        if not _is_franchise_user(user):
+            return Response({"detail": "Franchise agreement is available for franchise users only."}, status=status.HTTP_403_FORBIDDEN)
+        if pisa is None:
+            return Response({"detail": "PDF generation is not available on this server."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        template = FranchiseAgreementTemplate.get_solo()
+        context = _agreement_context(user)
+        content = _render_agreement_content(template, context)
+        safe_content = str(content).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br/>")
+        title = str(template.title or "Franchise Agreement")
+        html = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  @page {{ size: A4; margin: 22mm 18mm; }}
+  body {{ font-family: DejaVu Sans, Arial, Helvetica, sans-serif; color: #111827; font-size: 11.5pt; line-height: 1.55; }}
+  .brand {{ text-align: center; color: #0C2D48; font-size: 22pt; font-weight: 800; margin-bottom: 6px; }}
+  .title {{ text-align: center; font-size: 16pt; font-weight: 800; margin: 0 0 18px 0; text-transform: uppercase; }}
+  .meta {{ border: 1px solid #d1d5db; padding: 10px 12px; margin-bottom: 18px; }}
+  .row {{ margin: 3px 0; }}
+  .label {{ font-weight: 700; color: #374151; }}
+  .content {{ text-align: justify; }}
+  .sig {{ margin-top: 32px; }}
+</style>
+</head>
+<body>
+  <div class="brand">Trikonekt</div>
+  <div class="title">{title}</div>
+  <div class="meta">
+    <div class="row"><span class="label">Date:</span> {context["date"]}</div>
+    <div class="row"><span class="label">Agency Name:</span> {context["full_name"]}</div>
+    <div class="row"><span class="label">Phone:</span> {context["phone"]}</div>
+    <div class="row"><span class="label">Category / Role:</span> {context["category_role"]}</div>
+    <div class="row"><span class="label">Geo Location:</span> {context["geo_location"]}</div>
+  </div>
+  <div class="content">{safe_content}</div>
+  <div class="sig">
+    <div>For Trikonekt</div>
+    <br/><br/>
+    <div>Authorized Signatory</div>
+  </div>
+</body>
+</html>"""
+        pdf_io = BytesIO()
+        result = pisa.CreatePDF(src=html, dest=pdf_io, link_callback=_xhtml2pdf_link_callback)
+        if getattr(result, "err", False):
+            return Response({"detail": "Failed to generate agreement PDF."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        filename = f"Trikonekt_Franchise_Agreement_{context['username'] or user.id}.pdf"
+        resp = HttpResponse(pdf_io.getvalue(), content_type="application/pdf")
+        resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return resp
+
+
 def _inactive_work_pay_enabled(settings_obj, now_local):
     if not bool(getattr(settings_obj, "inactive_work_enabled", True)):
         return False
@@ -2376,6 +2625,80 @@ def _inactive_work_pay_enabled(settings_obj, now_local):
         return now_local.day == effective_day
     except Exception:
         return now_local.day == day
+
+
+class FranchiseMonthlyWorkReportView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        if not _is_franchise_user(user):
+            return Response({"detail": "Monthly report is available for franchise users only."}, status=status.HTTP_403_FORBIDDEN)
+
+        year, month, _ = _franchise_current_period()
+        year = int(request.query_params.get("year") or year)
+        month = int(request.query_params.get("month") or month)
+        current = FranchiseWorkApproval.objects.select_related("user", "approved_by").filter(
+            user=user,
+            year=year,
+            month=month,
+        ).first()
+        history = FranchiseWorkApproval.objects.select_related("user", "approved_by").filter(user=user).order_by("-year", "-month")[:24]
+        return Response({
+            "year": year,
+            "month": month,
+            "report": _franchise_report_row(current) if current else None,
+            "history": [_franchise_report_row(row) for row in history],
+        }, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        user = request.user
+        if not _is_franchise_user(user):
+            return Response({"detail": "Monthly report is available for franchise users only."}, status=status.HTTP_403_FORBIDDEN)
+
+        data = request.data or {}
+        year, month, _ = _franchise_current_period()
+        try:
+            year = int(data.get("year") or year)
+            month = int(data.get("month") or month)
+        except Exception:
+            return Response({"detail": "Invalid month selection."}, status=status.HTTP_400_BAD_REQUEST)
+        if month < 1 or month > 12:
+            return Response({"detail": "Month must be between 1 and 12."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            counts = _clean_report_counts(data)
+        except serializers.ValidationError as exc:
+            return Response(exc.detail, status=status.HTTP_400_BAD_REQUEST)
+
+        note = str(data.get("note") or "").strip()
+        with transaction.atomic():
+            obj, _ = FranchiseWorkApproval.objects.select_for_update().get_or_create(
+                user=user,
+                year=year,
+                month=month,
+            )
+            for field, value in counts.items():
+                setattr(obj, field, value)
+            obj.note = note
+            obj.status = "PENDING"
+            obj.submitted_at = timezone.now()
+            obj.approved_by = None
+            obj.approved_at = None
+            obj.save(update_fields=[
+                *FRANCHISE_REPORT_FIELDS,
+                "note",
+                "status",
+                "submitted_at",
+                "approved_by",
+                "approved_at",
+                "updated_at",
+            ])
+
+        return Response({
+            "detail": "Monthly report submitted for admin approval.",
+            "report": _franchise_report_row(obj),
+        }, status=status.HTTP_200_OK)
 
 
 class FranchiseWalletMe(APIView):
@@ -2584,22 +2907,7 @@ class AdminFranchiseWorkApprovalView(APIView):
         month = int(request.query_params.get("month") or month)
         qs = FranchiseWorkApproval.objects.select_related("user", "approved_by").filter(year=year, month=month)
         return Response({
-            "results": [
-                {
-                    "id": row.id,
-                    "user_id": row.user_id,
-                    "username": getattr(row.user, "username", ""),
-                    "full_name": getattr(row.user, "full_name", ""),
-                    "year": row.year,
-                    "month": row.month,
-                    "status": row.status,
-                    "note": row.note,
-                    "approved_by": getattr(row.approved_by, "username", None),
-                    "approved_at": row.approved_at,
-                    "updated_at": row.updated_at,
-                }
-                for row in qs[:500]
-            ],
+            "results": [_franchise_report_row(row) for row in qs[:500]],
             "year": year,
             "month": month,
         })
@@ -2607,6 +2915,7 @@ class AdminFranchiseWorkApprovalView(APIView):
     def post(self, request):
         username = str((request.data or {}).get("username") or "").strip()
         user_id = (request.data or {}).get("user_id")
+        approval_id = (request.data or {}).get("id")
         status_value = str((request.data or {}).get("status") or "APPROVED").strip().upper()
         note = str((request.data or {}).get("note") or "").strip()
         year, month, _ = _franchise_current_period()
@@ -2614,10 +2923,15 @@ class AdminFranchiseWorkApprovalView(APIView):
         month = int((request.data or {}).get("month") or month)
         if status_value not in {"PENDING", "APPROVED", "REJECTED"}:
             return Response({"detail": "Invalid status."}, status=status.HTTP_400_BAD_REQUEST)
-        user = CustomUser.objects.filter(pk=user_id).first() if user_id else CustomUser.objects.filter(username__iexact=username).first()
-        if not user or not _is_franchise_user(user):
-            return Response({"detail": "Franchise user not found."}, status=status.HTTP_404_NOT_FOUND)
-        obj, _ = FranchiseWorkApproval.objects.get_or_create(user=user, year=year, month=month)
+        if approval_id:
+            obj = FranchiseWorkApproval.objects.select_related("user").filter(pk=approval_id).first()
+            if not obj:
+                return Response({"detail": "Monthly report not found."}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            user = CustomUser.objects.filter(pk=user_id).first() if user_id else CustomUser.objects.filter(username__iexact=username).first()
+            if not user or not _is_franchise_user(user):
+                return Response({"detail": "Franchise user not found."}, status=status.HTTP_404_NOT_FOUND)
+            obj, _ = FranchiseWorkApproval.objects.get_or_create(user=user, year=year, month=month)
         obj.status = status_value
         obj.note = note
         if status_value == "APPROVED":
