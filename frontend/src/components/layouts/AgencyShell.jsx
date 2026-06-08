@@ -90,7 +90,7 @@ export default function AgencyShell({ children }) {
     { to: "/agency/refer-earn", label: "Refer & Earn", icon: "users" },
 
     // Wallet and History
-    { to: "/agency/wallet", label: "Earning Wallet", icon: "wallet" },
+    { to: "/agency/franchise-wallet", label: "Earning Wallet", icon: "wallet" },
     { to: "/agency/history", label: "History", icon: "orders" },
     { to: "/agency/monthly-report", label: "Monthly Report", icon: "chart" },
     // { to: "/agency/transactions", label: "Transactions", icon: "orders" },

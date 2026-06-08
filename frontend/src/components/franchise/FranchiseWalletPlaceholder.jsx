@@ -628,43 +628,6 @@ if (isMobile) {
 
   return (
     <Box sx={{ bgcolor: "#f4f7fb", minHeight: "100dvh", pb: "calc(92px + env(safe-area-inset-bottom))" }}>
-      <Box
-        sx={{
-          bgcolor: "#fff",
-          borderBottom: "1px solid #e6ebf5",
-          boxShadow: "0 10px 24px rgba(15,23,42,0.04)",
-          position: "sticky",
-          top: 0,
-          zIndex: 5,
-        }}
-      >
-        <Container sx={{ px: 2, py: 1.5 }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <IconButton
-              onClick={() => navigate(backTarget)}
-              sx={{
-                width: 48,
-                height: 48,
-                borderRadius: 3,
-                bgcolor: "#fff",
-                border: "1px solid #e2e8f0",
-                boxShadow: "0 10px 22px rgba(15,23,42,0.06)",
-              }}
-            >
-              <ArrowBackRoundedIcon />
-            </IconButton>
-            <Typography sx={{ color: "#111827", fontWeight: 950, fontSize: "1.25rem" }}>
-              Franchise Wallet
-            </Typography>
-            <Stack direction="row" spacing={1}>
-              <IconButton sx={{ width: 48, height: 48, borderRadius: 3, bgcolor: "#fff", border: "1px solid #e2e8f0" }}>
-                <NotificationsNoneRoundedIcon />
-              </IconButton>
-            </Stack>
-          </Stack>
-        </Container>
-      </Box>
-
       <Container sx={{ px: 2, pt: 2.5 }}>
         <Stack spacing={2.2} sx={{ pb: 2 }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
@@ -747,34 +710,42 @@ if (isMobile) {
                   </Box>
                 </Box>
 
-                <Grid container spacing={1.4}>
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                    gap: 1.25,
+                    alignItems: "stretch",
+                  }}
+                >
                   {walletTiles.map((wallet) => (
-                    <Grid item xs={6} key={wallet.title}>
+                    <Box key={wallet.title} sx={{ minWidth: 0 }}>
                       <Card
                         sx={{
                           height: "100%",
-                          minHeight: 176,
+                          minHeight: 158,
                           borderRadius: 3,
                           border: "1px solid #dfe7f2",
                           boxShadow: "0 12px 28px rgba(15,23,42,0.06)",
                           bgcolor: "#fff",
                           overflow: "hidden",
+                          width: "100%",
                         }}
                       >
-                        <CardContent sx={{ p: 1.6, height: "100%" }}>
-                          <Stack spacing={1.1} sx={{ height: "100%" }}>
-                            <Stack direction="row" spacing={1} alignItems="center">
+                        <CardContent sx={{ p: 1.25, height: "100%" }}>
+                          <Stack spacing={0.9} sx={{ height: "100%", minWidth: 0 }}>
+                            <Stack spacing={0.8} sx={{ minWidth: 0 }}>
                               <Box
                                 sx={{
-                                  width: 46,
-                                  height: 46,
-                                  borderRadius: 2.5,
+                                  width: 40,
+                                  height: 40,
+                                  borderRadius: 2.2,
                                   display: "grid",
                                   placeItems: "center",
                                   bgcolor: wallet.tint,
                                   color: wallet.accent,
                                   flexShrink: 0,
-                                  "& svg": { fontSize: 25 },
+                                  "& svg": { fontSize: 22 },
                                 }}
                               >
                                 {wallet.icon}
@@ -783,12 +754,13 @@ if (isMobile) {
                                 sx={{
                                   color: "#64748b",
                                   fontWeight: 950,
-                                  fontSize: "0.82rem",
+                                  fontSize: "0.73rem",
                                   lineHeight: 1.18,
                                   display: "-webkit-box",
                                   WebkitLineClamp: 2,
                                   WebkitBoxOrient: "vertical",
                                   overflow: "hidden",
+                                  overflowWrap: "anywhere",
                                 }}
                               >
                                 {wallet.title}
@@ -800,7 +772,7 @@ if (isMobile) {
                                 sx={{
                                   color: wallet.accent,
                                   fontWeight: 950,
-                                  fontSize: "1.12rem",
+                                  fontSize: "1rem",
                                   lineHeight: 1.05,
                                   wordBreak: "break-word",
                                 }}
@@ -813,12 +785,13 @@ if (isMobile) {
                                     mt: 0.45,
                                     color: "#64748b",
                                     fontWeight: 650,
-                                    fontSize: "0.75rem",
+                                    fontSize: "0.68rem",
                                     lineHeight: 1.22,
                                     display: "-webkit-box",
                                     WebkitLineClamp: 2,
                                     WebkitBoxOrient: "vertical",
                                     overflow: "hidden",
+                                    overflowWrap: "anywhere",
                                   }}
                                 >
                                   {wallet.suffix}
@@ -834,15 +807,15 @@ if (isMobile) {
                                 title={!wallet.payEnabled ? wallet.payDisabledReason : undefined}
                                 sx={{
                                   alignSelf: "flex-start",
-                                  minWidth: 70,
+                                  minWidth: 58,
                                   borderRadius: 999,
-                                  px: 1.5,
+                                  px: 1.2,
                                   py: 0.45,
                                   bgcolor: wallet.payEnabled ? wallet.accent : "#eef2f7",
                                   color: wallet.payEnabled ? "#fff" : "#64748b",
                                   textTransform: "none",
                                   fontWeight: 950,
-                                  fontSize: "0.76rem",
+                                  fontSize: "0.7rem",
                                   "&:hover": { bgcolor: wallet.payEnabled ? wallet.accent : "#eef2f7" },
                                 }}
                               >
@@ -852,9 +825,9 @@ if (isMobile) {
                           </Stack>
                         </CardContent>
                       </Card>
-                    </Grid>
+                    </Box>
                   ))}
-                </Grid>
+                </Box>
               </Stack>
             </CardContent>
           </Card>
@@ -866,9 +839,15 @@ if (isMobile) {
                 Pockets
               </Typography>
             </Stack>
-            <Grid container spacing={1.4}>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                gap: 1.25,
+              }}
+            >
               {quickActions.map((action) => (
-                <Grid item xs={6} key={action.label}>
+                <Box key={action.label} sx={{ minWidth: 0 }}>
                   <Card
                     onClick={() => {
                       const route = actionRoutes[action.label];
@@ -880,22 +859,23 @@ if (isMobile) {
                       border: "1px solid #dfe7f2",
                       boxShadow: "0 12px 28px rgba(15,23,42,0.06)",
                       cursor: "pointer",
+                      width: "100%",
                     }}
                   >
-                    <CardContent sx={{ p: 1.6 }}>
+                    <CardContent sx={{ p: 1.25 }}>
                       <Stack spacing={1.1}>
-                        <Box sx={{ width: 46, height: 46, borderRadius: 2.5, display: "grid", placeItems: "center", bgcolor: "#eef2ff", color: "#2563eb", "& svg": { fontSize: 25 } }}>
+                        <Box sx={{ width: 40, height: 40, borderRadius: 2.2, display: "grid", placeItems: "center", bgcolor: "#eef2ff", color: "#2563eb", "& svg": { fontSize: 22 } }}>
                           {action.icon}
                         </Box>
-                        <Typography sx={{ color: "#64748b", fontWeight: 950, fontSize: "0.86rem", lineHeight: 1.2 }}>
+                        <Typography sx={{ color: "#64748b", fontWeight: 950, fontSize: "0.76rem", lineHeight: 1.2, overflowWrap: "anywhere" }}>
                           {action.label}
                         </Typography>
                       </Stack>
                     </CardContent>
                   </Card>
-                </Grid>
+                </Box>
               ))}
-            </Grid>
+            </Box>
           </Stack>
         </Stack>
       </Container>
