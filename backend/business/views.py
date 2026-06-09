@@ -1235,9 +1235,9 @@ class PromoPurchasePayFromWalletView(APIView):
         qty = max(1, qty)
 
         try:
-            # MONTHLY UI price is 1000 per box (see serializer)
+            # MONTHLY/SPP price is admin-configured on the promo package.
             if str(getattr(pkg, "type", "")) == "MONTHLY":
-                unit = D("1000.00")
+                unit = D(str(getattr(pkg, "price", "0") or "0"))
             elif ser.validated_data.get("tri_app_slug") and ser.validated_data.get("tri_product_id"):
                 try:
                     trip = TriAppProduct.objects.filter(

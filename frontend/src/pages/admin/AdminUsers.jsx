@@ -965,7 +965,7 @@ export default function AdminUsers() {
           const onOpen = (e) => {
             e?.stopPropagation?.();
             if (!row?.id) return;
-            const url = `/admin/promo-purchases?user_id=${encodeURIComponent(row.id)}&kind=759&status=APPROVED`;
+            const url = `/admin/promo-purchases?user_id=${encodeURIComponent(row.id)}&kind=monthly&status=APPROVED`;
             try { window.location.assign(url); } catch (_) {}
           };
           return (

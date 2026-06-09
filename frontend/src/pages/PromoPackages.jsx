@@ -65,6 +65,14 @@ const isTourPackage = (pkg) => {
   return code.includes("tour") || name.includes("tour") || name.includes("holiday");
 };
 
+const isJoinPrimePackage = (pkg) => {
+  const code = String(pkg?.code || "").toUpperCase();
+  const name = String(pkg?.name || "").toUpperCase();
+  const type = String(pkg?.type || "").toUpperCase();
+  if (type === "MONTHLY" || isTourPackage(pkg)) return false;
+  return code === "PRIME750" || code.includes("PRIME750") || name.includes("PRIME 750") || approx(pkg?.price, 750);
+};
+
 const getPlanOptions = (price) => {
   // Prime 150: remove e‑book flow (UI hint only shows redeem points)
   if (approx(price, 150)) return ["Redeem points"];
@@ -165,7 +173,7 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
       if (ui.plan) lines.push(`Plan: ${ui.plan}`);
       if (ui.selectedSeason != null) lines.push(`Season: ${ui.selectedSeason}`);
       if (Array.isArray(ui.selectedBoxes) && ui.selectedBoxes.length) {
-        lines.push(`Boxes: ${ui.selectedBoxes.sort((a,b)=>a-b).join(", ")}`);
+        lines.push(`Months: ${ui.selectedBoxes.sort((a,b)=>a-b).join(", ")}`);
       }
       if (ui.destination) lines.push(`Destination: ${ui.destination}`);
       return lines;
@@ -462,6 +470,7 @@ function PaymentMethodDialog({ open, onClose, intent, walletMe, walletHistory, o
 function Prime750Section({ pkg, prime150Active, prime750Active, onBuy, redeemOnly = false }) {
   const [choice, setChoice] = useState(redeemOnly ? "REDEEM" : "");
   const [selProd, setSelProd] = useState("");
+  const packageAmount = Number(pkg?.price || 0);
 
   const options = redeemOnly
     ? getPlanOptions(pkg?.price || 0).filter((opt) => !/product/i.test(String(opt || "")))
@@ -478,7 +487,7 @@ function Prime750Section({ pkg, prime150Active, prime750Active, onBuy, redeemOnl
         Prime 750 {prime750Active ? <Chip size="small" color="success" sx={{ ml: 1 }} label="Active" /> : null}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Includes wallet bonus ₹150
+        Price: ₹{packageAmount.toLocaleString("en-IN")} • Includes wallet bonus ₹150
       </Typography>
       <Box component="ul" sx={{ pl: 2, mt: 0 }}>
         {options.map((opt, i) => (
@@ -543,7 +552,7 @@ function Prime750Section({ pkg, prime150Active, prime750Active, onBuy, redeemOnl
         onClick={() =>
           onBuy({
             pkg,
-            amount: 750,
+            amount: packageAmount,
             uiMeta: {
               bonus150: true,
               primeChoice: choice,
@@ -608,8 +617,8 @@ function Prime150Section({ reg150Pkg, prime150Active, onBuy }) {
 /**
  * SeasonSection  Season-first flow
  * - Season selector (Season 1 active; others locked unless admin exposes)
- * - Plan selector under Season 1: Registration ₹150 | Season Prime ₹1000
- * - Box grid (4x3) visible only for Season Prime
+ * - Plan selector uses the admin-configured MONTHLY/SPP package price
+ * - Month grid lets the user select payable monthly SPP slots
  */
 function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, seasonsHints = [], seasonActive, rename = null }) {
   const meta = seasonPkg?.monthly_meta || {};
@@ -669,6 +678,8 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
     1,
     Number(seasonDetails.get(Number(selectedSeason))?.totalBoxes || meta?.total_boxes || 12)
   );
+  const unitPrice = Math.max(0, Number(seasonPkg?.price || 0));
+  const unitPriceLabel = `Rs. ${unitPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
   useEffect(() => {
     // Ensure selected season is in the list. Default to first enabled (fallback to 1) if disabled.
     if (!enabledNumbers.includes(selectedSeason)) {
@@ -676,7 +687,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
     }
   }, [enabledNumbers, selectedSeason]);
 
-  const [plan, setPlan] = useState("SEASON1000"); // "REG150" | "SEASON1000"
+  const [plan, setPlan] = useState("MONTHLY_SPP");
 
   // Locked boxes from history for current season
   const purchasedBoxes = useMemo(() => {
@@ -734,7 +745,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
 
   const canBuy = !!seasonPkg && selectedBoxes.length > 0;
 
-  const amount = 1000 * Math.max(0, selectedBoxes.length);
+  const amount = unitPrice * Math.max(0, selectedBoxes.length);
 
   return (
     <Box sx={{ p: 2 }}>
@@ -797,20 +808,20 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
       <Box sx={{ mt: 1 }}>
         <RadioGroup value={plan} onChange={(e) => setPlan(e.target.value)}>
           <FormControlLabel
-            value="SEASON1000"
+            value="MONTHLY_SPP"
             control={<Radio size="small" />}
-            label={(rename?.seasonPlanLabel || "Season Prime ₹1000")}
+            label={(rename?.seasonPlanLabel || `Monthly SPP ${unitPriceLabel}`)}
           />
         </RadioGroup>
       </Box>
 
       <Divider sx={{ my: 1.5 }} />
 
-      {/* ③ Month grid (only for Season Prime) */}
+      {/* ③ Month grid */}
       <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
         ③ Select Months
       </Typography>
-      {plan === "SEASON1000" ? (
+      {plan === "MONTHLY_SPP" ? (
         <>
           <Box
             sx={{
@@ -872,7 +883,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
             onBuy({
               pkg: seasonPkg,
               amount,
-              uiMeta: { plan: "Season Prime ₹1000", selectedSeason, selectedBoxes },
+              uiMeta: { plan: `Monthly SPP ${unitPriceLabel}`, selectedSeason, selectedBoxes },
               purchasePayload: { package_number: selectedSeason, boxes: selectedBoxes },
             });
         }}
@@ -892,6 +903,7 @@ function PromoSection({ seasonPkg, history, onBuy, seasonActive }) {
   const meta = seasonPkg?.monthly_meta || {};
   const totalBoxes = Math.max(1, Number(meta?.total_boxes || 12));
   const packageNumber = Number(meta?.current_package_number || 1);
+  const unitPrice = Math.max(0, Number(seasonPkg?.price || 0));
 
   const purchasedBoxes = useMemo(() => {
     try {
@@ -941,12 +953,12 @@ function PromoSection({ seasonPkg, history, onBuy, seasonActive }) {
   };
 
   const canBuy = !!seasonPkg && selectedBoxes.length > 0;
-  const amount = 1000 * Math.max(0, selectedBoxes.length);
+  const amount = unitPrice * Math.max(0, selectedBoxes.length);
 
   return (
     <Box sx={{ p: 2 }}>
       <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5 }}>
-        Monthly Promo 1000 {seasonActive ? <Chip size="small" color="success" sx={{ ml: 1 }} label="Active" /> : null}
+        Monthly SPP Rs. {unitPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })} {seasonActive ? <Chip size="small" color="success" sx={{ ml: 1 }} label="Active" /> : null}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
         Pick months to include in this promotion.
@@ -1252,7 +1264,7 @@ export default function PromoPackages({
     return {
       seasonLabel: r.seasonLabel || "Season",
       seasonBuyCta: r.seasonBuyCta || "BUY SEASON",
-      seasonPlanLabel: r.seasonPlanLabel || "Season Prime ₹1000",
+      seasonPlanLabel: r.seasonPlanLabel || "",
     };
   }, [rename]);
   const [paymentSuccessOpen, setPaymentSuccessOpen] = useState(false);
@@ -1274,9 +1286,7 @@ export default function PromoPackages({
 
   // Identify packages without changing contracts
   const primePkg = useMemo(() => {
-    return (packages || []).find(
-      (p) => approx(p?.price, 750) && String(p?.type || "").toUpperCase() !== "MONTHLY" && !isTourPackage(p)
-    );
+    return (packages || []).find(isJoinPrimePackage);
   }, [packages]);
 
   const seasonPkg = useMemo(() => {
@@ -1290,7 +1300,7 @@ export default function PromoPackages({
       const withMeta = monthlyCandidates.find((p) => !!p?.monthly_meta);
       return withMeta || monthlyCandidates[0];
     }
-    // Fallback (legacy heuristic): closest price ~759
+    // Fallback for older data when type metadata is missing.
     return pkgs.find((p) => approx(p?.price, 1000)) || null;
   }, [packages]);
 

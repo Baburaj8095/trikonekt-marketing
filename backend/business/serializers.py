@@ -1513,7 +1513,7 @@ class PromoPurchaseSerializer(serializers.ModelSerializer):
             qty = 1
         try:
             if str(getattr(pp.package, "type", "")) == "MONTHLY":
-                unit = 1000
+                unit = getattr(pp.package, "price", 0) or 0
             elif getattr(pp, "tri_app_slug", "") and getattr(pp, "tri_product_id", None):
                 try:
                     from .models import TriAppProduct

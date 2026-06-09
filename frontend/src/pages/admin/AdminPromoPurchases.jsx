@@ -53,6 +53,34 @@ function Badge({ children, color = "#1f2937", bg = "#e5e7eb" }) {
   );
 }
 
+function isMonthlyPurchase(row) {
+  return String(row?.package?.type || "").toUpperCase() === "MONTHLY";
+}
+
+function formatMoney(value) {
+  const n = Number(value || 0);
+  return `₹${n.toFixed(2)}`;
+}
+
+function getMonthlyBoxes(row) {
+  if (!Array.isArray(row?.boxes_json)) return [];
+  return row.boxes_json
+    .map((box) => parseInt(box, 10))
+    .filter((box) => Number.isFinite(box) && box > 0)
+    .sort((a, b) => a - b);
+}
+
+function sppSeasonLabel(row) {
+  if (!isMonthlyPurchase(row)) return "";
+  const n = parseInt(row?.package_number, 10);
+  return n > 0 ? `SPP ${n}` : "-";
+}
+
+function sppMonthsLabel(row) {
+  const boxes = getMonthlyBoxes(row);
+  return boxes.length ? boxes.join(", ") : "-";
+}
+
 /**
  * Media helpers for payment proof and UTR display
  */
@@ -183,7 +211,7 @@ export default function AdminPromoPurchases({
       { value: "", label: "Any kind" },
       { value: "150", label: "Prime 150" },
       { value: "750", label: "Prime 750" },
-      { value: "759", label: "Monthly / Season (₹1000)" },
+      { value: "759", label: "Monthly SPP (legacy filter)" },
       { value: "monthly", label: "Monthly (all)" },
     ],
     []
@@ -308,6 +336,32 @@ export default function AdminPromoPurchases({
     );
   }
 
+  function PackageCell({ row }) {
+    const pkg = row.package || {};
+    const monthly = isMonthlyPurchase(row);
+    const pkgName = monthly ? "Monthly SPP" : (pkg.name || pkg.code || "");
+    const unitPrice = Number(pkg.price || 0);
+
+    return (
+      <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+        <div style={{ fontWeight: 700, color: "#0f172a" }}>{pkgName}</div>
+        <div style={{ fontSize: 12, color: "#64748b" }}>
+          {formatMoney(unitPrice)}
+        </div>
+        {row.tri_app_slug ? (
+          <div style={{ fontSize: 12, color: "#475569" }}>
+            TRI: {row.tri_app_slug}{row.tri_product_id ? ` • Product #${row.tri_product_id}` : ""}
+          </div>
+        ) : null}
+        {row.selected_product_name ? (
+          <div style={{ fontSize: 12, color: "#475569" }}>
+            Selected: {row.selected_product_name}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   function DesktopTable() {
     return (
       <div
@@ -324,15 +378,14 @@ export default function AdminPromoPurchases({
           style={{
             display: "grid",
             gridTemplateColumns:
-              // Added Sponsor column after User + dedicated Payment column
-              "70px 160px 160px 120px 100px 140px 140px 1.1fr 0.8fr 60px 120px 120px 140px 240px 140px",
+              "70px 160px 160px 120px 100px 140px 140px 180px 100px 140px 90px 60px 120px 120px 140px 240px 140px",
             gap: 8,
             padding: "10px",
             background: "#f8fafc",
             borderBottom: "1px solid #e2e8f0",
             fontWeight: 700,
             color: "#0f172a",
-            minWidth: 1560,
+            minWidth: 1880,
           }}
         >
           <div>ID</div>
@@ -343,6 +396,8 @@ export default function AdminPromoPurchases({
           <div>City</div>
           <div>State</div>
           <div>Package</div>
+          <div>SPP Season</div>
+          <div>Months</div>
           <div>Type</div>
           <div>Qty</div>
           <div>Amount</div>
@@ -358,12 +413,9 @@ export default function AdminPromoPurchases({
             const pkg = r.package || {};
             const requestedAt = r.requested_at ? new Date(r.requested_at).toLocaleString() : "";
             const proofUrl = r.payment_proof || "";
-            const isMonthly = (pkg.type || "") === "MONTHLY";
-            const monText = isMonthly ? ` • ${String(r.year || "")}-${String(r.month || "").toString().padStart(2, "0")}` : "";
+            const isMonthly = isMonthlyPurchase(r);
             const userLabel = r.user_username ? `${r.user_username} ${r.user_id ? `(#${r.user_id})` : ""}` : (r.user_id ? `#${r.user_id}` : "");
             const sponsorLabel = r.sponsor_username ? r.sponsor_username : (r.sponsor_user_id ? `#${r.sponsor_user_id}` : (r.sponsor_code || ""));
-            const pkgName = pkg.name || pkg.code || "";
-            const displayUnitPrice = isMonthly ? 1000 : Number(pkg.price || 0);
             const amountPaid = Number(r.amount_paid || 0);
 
             return (
@@ -372,12 +424,12 @@ export default function AdminPromoPurchases({
                 style={{
                   display: "grid",
                   gridTemplateColumns:
-                    "70px 160px 160px 120px 100px 140px 140px 1.1fr 0.8fr 60px 120px 120px 140px 240px 140px",
+                    "70px 160px 160px 120px 100px 140px 140px 180px 100px 140px 90px 60px 120px 120px 140px 240px 140px",
                   gap: 8,
                   padding: "10px",
                   borderBottom: "1px solid #e2e8f0",
                   alignItems: "center",
-                  minWidth: 1560,
+                  minWidth: 1880,
                 }}
               >
                 <div>#{r.id}</div>
@@ -400,31 +452,13 @@ export default function AdminPromoPurchases({
                 <div>{r.user_city_name || ""}</div>
                 <div>{r.user_state_name || ""}</div>
 
-                <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                  <div style={{ fontWeight: 700, color: "#0f172a" }}>{pkgName}</div>
-                  <div style={{ fontSize: 12, color: "#64748b" }}>
-                    ₹{displayUnitPrice.toFixed(2)}{monText}
-                  </div>
-                  {isMonthly ? (
-                    <div style={{ fontSize: 12, color: "#475569" }}>
-                      Pkg #: {String(r.package_number ?? "")} • Boxes: {Array.isArray(r.boxes_json) ? `${r.boxes_json.length} [${r.boxes_json.join(",")}]` : "0 []"}
-                    </div>
-                  ) : null}
-                  {r.tri_app_slug ? (
-                    <div style={{ fontSize: 12, color: "#475569" }}>
-                      TRI: {r.tri_app_slug}{r.tri_product_id ? ` • Product #${r.tri_product_id}` : ""}
-                    </div>
-                  ) : null}
-                  {r.selected_product_name ? (
-                    <div style={{ fontSize: 12, color: "#475569" }}>
-                      Selected: {r.selected_product_name}
-                    </div>
-                  ) : null}
-                </div>
+                <PackageCell row={r} />
+                <div style={{ fontWeight: 700 }}>{isMonthly ? sppSeasonLabel(r) : "-"}</div>
+                <div>{isMonthly ? sppMonthsLabel(r) : "-"}</div>
 
                 <div>{pkg.type || ""}</div>
                 <div>{r.quantity ?? 1}</div>
-                <div>₹{amountPaid.toFixed(2)}</div>
+                <div>{formatMoney(amountPaid)}</div>
                 <div>{renderStatusBadge(r.status)}</div>
                 <div style={{ fontSize: 12 }}>{requestedAt}</div>
 
@@ -484,12 +518,11 @@ export default function AdminPromoPurchases({
           const pkg = r.package || {};
           const requestedAt = r.requested_at ? new Date(r.requested_at).toLocaleString() : "";
           const proofUrl = r.payment_proof || "";
-          const isMonthly = (pkg.type || "") === "MONTHLY";
-          const monText = isMonthly ? ` • ${String(r.year || "")}-${String(r.month || "").toString().padStart(2, "0")}` : "";
+          const isMonthly = isMonthlyPurchase(r);
           const userLabel = r.user_username ? `${r.user_username} ${r.user_id ? `(#${r.user_id})` : ""}` : (r.user_id ? `#${r.user_id}` : "");
           const sponsorLabel = r.sponsor_username ? r.sponsor_username : (r.sponsor_user_id ? `#${r.sponsor_user_id}` : (r.sponsor_code || ""));
-          const pkgName = pkg.name || pkg.code || "";
-          const displayUnitPrice = isMonthly ? 1000 : Number(pkg.price || 0);
+          const pkgName = isMonthly ? "Monthly SPP" : (pkg.name || pkg.code || "");
+          const displayUnitPrice = Number(pkg.price || 0);
           const amountPaid = Number(r.amount_paid || 0);
 
           return (
@@ -536,11 +569,11 @@ export default function AdminPromoPurchases({
               <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>Package</div>
               <div style={{ fontWeight: 700, color: "#0f172a" }}>{pkgName}</div>
               <div style={{ fontSize: 12, color: "#475569" }}>
-                Type: {pkg.type || ""} • Price: ₹{displayUnitPrice.toFixed(2)}{monText}
+                Type: {pkg.type || ""} • Price: {formatMoney(displayUnitPrice)}
               </div>
               {isMonthly ? (
                 <div style={{ fontSize: 12, color: "#475569" }}>
-                  SPP #: {String(r.package_number ?? "")} • Months: {Array.isArray(r.boxes_json) ? r.boxes_json.join(", ") : ""}
+                  Season: {sppSeasonLabel(r)} • Months: {sppMonthsLabel(r)}
                 </div>
               ) : null}
               {r.tri_app_slug ? (
@@ -558,7 +591,7 @@ export default function AdminPromoPurchases({
                 <div style={{ fontSize: 12, color: "#64748b" }}>Qty</div>
                 <div style={{ fontWeight: 600 }}>{r.quantity ?? 1}</div>
                 <div style={{ fontSize: 12, color: "#64748b" }}>Amount</div>
-                <div style={{ fontWeight: 600 }}>₹{amountPaid.toFixed(2)}</div>
+                <div style={{ fontWeight: 600 }}>{formatMoney(amountPaid)}</div>
               </div>
 
               <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>Requested</div>

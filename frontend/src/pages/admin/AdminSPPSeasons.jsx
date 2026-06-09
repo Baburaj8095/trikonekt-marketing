@@ -16,6 +16,8 @@ import {
   TableRow,
   TextField,
   Typography,
+  FormControlLabel,
+  Switch,
 } from "@mui/material";
 import API from "../../api/api";
 
@@ -28,6 +30,26 @@ function asRows(data) {
 
 function isMonthlyPackage(pkg) {
   return String(pkg?.type || "").toUpperCase() === "MONTHLY";
+}
+
+function cleanSppPackageName(pkg) {
+  const code = String(pkg?.code || "").trim();
+  const name = String(pkg?.name || "").trim();
+  const base = name || code || "Monthly SPP";
+  if (/759/i.test(base) && isMonthlyPackage(pkg)) return "Monthly SPP";
+  return base;
+}
+
+function errorText(data) {
+  if (!data) return "";
+  if (typeof data === "string") return data;
+  if (Array.isArray(data)) return data.join(", ");
+  if (typeof data === "object") {
+    return Object.entries(data)
+      .map(([key, value]) => `${key}: ${errorText(value) || String(value)}`)
+      .join(" | ");
+  }
+  return String(data);
 }
 
 export default function AdminSPPSeasons() {
@@ -113,7 +135,9 @@ export default function AdminSPPSeasons() {
       const msg =
         data?.detail ||
         data?.non_field_errors?.join?.(", ") ||
+        data?.package?.join?.(", ") ||
         data?.number?.join?.(", ") ||
+        errorText(data) ||
         "Failed to create SPP season.";
       setError(msg);
     } finally {
@@ -142,10 +166,10 @@ export default function AdminSPPSeasons() {
   function packageLabel(pkgId) {
     const rawId = pkgId && typeof pkgId === "object" ? pkgId.id || pkgId.pk : pkgId;
     if (pkgId && typeof pkgId === "object" && (pkgId.name || pkgId.code)) {
-      return `${pkgId.name || pkgId.code} (#${rawId || ""})`;
+      return `${cleanSppPackageName(pkgId)} (#${rawId || ""})`;
     }
     const pkg = packages.find((p) => String(p.id) === String(rawId));
-    return pkg ? `${pkg.name || pkg.code} (#${pkg.id})` : `#${rawId || ""}`;
+    return pkg ? `${cleanSppPackageName(pkg)} (#${pkg.id})` : `#${rawId || ""}`;
   }
 
   return (
@@ -156,7 +180,7 @@ export default function AdminSPPSeasons() {
             SPP Seasons
           </Typography>
           <Typography sx={{ color: "#64748b", fontSize: 13, mt: 0.5 }}>
-            Create Season/SPP numbers that users can select on the SPP purchase screen.
+            Create monthly SPP seasons that users can select on the SPP purchase screen. Price comes from the selected MONTHLY package.
           </Typography>
         </Box>
         <Button variant="outlined" onClick={load} disabled={loading} sx={{ fontWeight: 850 }}>
@@ -181,7 +205,7 @@ export default function AdminSPPSeasons() {
           >
             {monthlyPackages.map((pkg) => (
               <MenuItem key={pkg.id} value={String(pkg.id)}>
-                {pkg.name || pkg.code} - Rs. {Number(pkg.price || 1000).toFixed(2)}
+                {cleanSppPackageName(pkg)} - Rs. {Number(pkg.price || 0).toFixed(2)}
               </MenuItem>
             ))}
           </TextField>
@@ -201,13 +225,16 @@ export default function AdminSPPSeasons() {
             onChange={(e) => setForm((prev) => ({ ...prev, total_boxes: e.target.value }))}
             inputProps={{ min: 1, step: 1 }}
           />
-          <Button
-            variant={form.is_active ? "contained" : "outlined"}
-            onClick={() => setForm((prev) => ({ ...prev, is_active: !prev.is_active }))}
-            sx={{ fontWeight: 850, minHeight: 40 }}
-          >
-            {form.is_active ? "Active" : "Inactive"}
-          </Button>
+          <FormControlLabel
+            sx={{ m: 0, whiteSpace: "nowrap" }}
+            control={
+              <Switch
+                checked={!!form.is_active}
+                onChange={(e) => setForm((prev) => ({ ...prev, is_active: e.target.checked }))}
+              />
+            }
+            label={form.is_active ? "Active" : "Inactive"}
+          />
           <Button variant="contained" onClick={createSeason} disabled={saving} sx={{ fontWeight: 900, minHeight: 40 }}>
             {saving ? "Saving..." : "Create"}
           </Button>
