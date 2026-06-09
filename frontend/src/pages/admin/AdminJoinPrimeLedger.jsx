@@ -2,18 +2,15 @@ import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import AdminPromoPurchases from "./AdminPromoPurchases";
 
-/**
- * Dedicated Admin screen: SPP (Monthly boxes)
- */
-export default function AdminSPPPurchases() {
+export default function AdminJoinPrimeLedger() {
   const loc = useLocation();
   const nav = useNavigate();
 
   React.useEffect(() => {
     try {
       const qs = new URLSearchParams(loc.search || "");
-      if (!qs.get("status")) qs.set("status", "PENDING");
-      qs.set("kind", "monthly");
+      if (!qs.get("status")) qs.set("status", "APPROVED");
+      qs.set("kind", "750");
       qs.delete("tri_app_slug");
       const next = `${loc.pathname}?${qs.toString()}`;
       const cur = `${loc.pathname}${loc.search || ""}`;
@@ -22,11 +19,11 @@ export default function AdminSPPPurchases() {
   }, [loc.pathname, loc.search, nav]);
 
   return (
-    <div>
-      <div style={{ marginBottom: 10, fontWeight: 900, color: "#0f172a" }}>
-        Approvals: Smart Product Purchase (SPP seasons and monthly boxes)
-      </div>
-      <AdminPromoPurchases />
-    </div>
+    <AdminPromoPurchases
+      title="Ledger: Join Prime 750"
+      description="List of users who purchased Join Prime 750, with amount, payment proof, wallet source, sponsor, and approval status."
+      defaultStatus="APPROVED"
+      readOnly
+    />
   );
 }

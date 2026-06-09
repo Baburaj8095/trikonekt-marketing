@@ -243,6 +243,7 @@ export default function AdminShell({ children }) {
       to.startsWith("/admin/promo-package-products") ||
       to.startsWith("/admin/agency-prime-requests") ||
       to.startsWith("/admin/rank-upgrades") ||
+      to.startsWith("/admin/ledger/") ||
       to.startsWith("/admin/tri/") ||
       to.startsWith("/admin/dashboard/models/business/")
     )
@@ -312,8 +313,10 @@ export default function AdminShell({ children }) {
         items: [
           { to: "/admin/packages", label: "All Packages (Edit)", icon: "box" },
           { to: "/admin/package-management", label: "Package Management", icon: "box" },
+          { to: "/admin/dashboard/models/business/promopackage", label: "Promo Package Setup", icon: "box" },
           { to: "/admin/packages/join-subscription", label: "Subscription ₹750", icon: "ticket" },
           { to: "/admin/packages/spp", label: "Smart Product Package", icon: "ticket" },
+          { to: "/admin/packages/spp-seasons", label: "SPP Seasons", icon: "box" },
           { to: "/admin/packages/digital-education-prime", label: "Digital Education Prime Approval", icon: "ticket" },
           { to: "/admin/packages/tri-tour", label: "Tri Tour", icon: "ticket" },
         ],
@@ -394,10 +397,15 @@ export default function AdminShell({ children }) {
           // Package-specific approval screens (requested)
           { to: "/admin/packages/join-subscription", label: "Approvals: Join Subscription", icon: "ticket" },
           { to: "/admin/packages/spp", label: "Approvals: SPP", icon: "ticket" },
+          { to: "/admin/packages/spp-seasons", label: "Manage SPP Seasons", icon: "box" },
           { to: "/admin/packages/digital-education-prime", label: "Approvals: Digital Education Prime", icon: "wallet" },
           { to: "/admin/packages/tri-tour", label: "Approvals: Tri Tour", icon: "ticket" },
 
           { to: "/admin/rank-upgrades", label: "All Rank Upgrades", icon: "wallet" },
+          { to: "/admin/ledger/join-prime", label: "Ledger: Join Prime 750", icon: "ticket" },
+          { to: "/admin/ledger/spp", label: "Ledger: SPP", icon: "ticket" },
+          { to: "/admin/ledger/digital-education", label: "Ledger: Digital Education", icon: "wallet" },
+          { to: "/admin/ledger/tri-tour", label: "Ledger: Tri Tour", icon: "ticket" },
         ],
       },
 

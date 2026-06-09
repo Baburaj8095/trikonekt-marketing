@@ -12,6 +12,9 @@ import {
   InputAdornment,
   Snackbar,
   Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   TextField,
   Divider,
   Stack,
@@ -463,9 +466,9 @@ export default function TriAppPage() {
             <Paper
               key={p.id}
               elevation={0}
-              onClick={() =>
-                navigate(`/trikonekt-products/products/${p.id}`)
-              }
+              onClick={() => {
+                if (String(slug) !== "tri-holidays") navigate(`/trikonekt-products/products/${p.id}`);
+              }}
               sx={{
                 height: 240,
                 display: "flex",
@@ -528,11 +531,17 @@ export default function TriAppPage() {
                   {p.name}
                 </Typography>
 
-                <Price value={p.price} currency={p.currency} />
+                  <Price value={p.price} currency={p.currency} />
 
-                <Typography variant="caption" color="text.secondary">
-                  Earn up to {p?.max_reward_points_percent || 0}% rewards
-                </Typography>
+                {p.description ? (
+                  <Typography variant="caption" color="text.secondary">
+                    {p.description}
+                  </Typography>
+                ) : (
+                  <Typography variant="caption" color="text.secondary">
+                    Earn up to {p?.max_reward_points_percent || 0}% rewards
+                  </Typography>
+                )}
 
                 {/* Conditional action: Tri Holidays = Buy Now (payment drawer); else Add to Cart */}
                 {String(slug) === "tri-holidays" ? (
@@ -545,14 +554,14 @@ export default function TriAppPage() {
                       e.preventDefault();
                       try {
                         const intent = {
-                          pkg: { id: p.id, name: p.name },
+                          pkg: { id: null, name: p.name },
                           amount: Number(p.price || 0),
                           uiMeta: { triApp: slug || "tri-holidays", selectedProductName: p.name },
                           purchasePayload: {
-                            // auxiliary fields to aid backend identification (non-breaking)
-                            product_id: p.id,
                             tri_app_slug: slug || "",
+                            product_id: p.id,
                             tri: true,
+                            prime750_choice: "REDEEM",
                           },
                         };
                         setPaymentData(intent);
@@ -627,14 +636,16 @@ export default function TriAppPage() {
           setPaymentOpen(true);
         }}
         onPickWallet={async (walletSource = "internal") => {
-          if (!paymentData?.pkg?.id) return;
           setWalletBusy(true);
           setWalletErr("");
           try {
-            await createPromoPurchaseFromWallet({
-              package_id: paymentData.pkg.id,
+            const payload = {
               wallet_source: walletSource,
               ...(paymentData.purchasePayload || {}),
+            };
+            if (paymentData?.pkg?.id) payload.package_id = paymentData.pkg.id;
+            await createPromoPurchaseFromWallet({
+              ...payload,
             });
             setMethodOpen(false);
             setPaymentSuccessOpen(true);

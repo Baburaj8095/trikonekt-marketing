@@ -844,6 +844,14 @@ class PromoPackageSerializer(serializers.ModelSerializer):
             seeds = list(PromoMonthlyPackage.objects.filter(package=obj, is_active=True).order_by("number"))
             # If no monthly seeds present, fallback to Admin E‑Coupon Seasons (Coupon with code/title/campaign starting with "Season")
             available_numbers = [s.number for s in seeds] if seeds else None
+            available_seasons = [
+                {
+                    "number": int(getattr(s, "number", 0) or 0),
+                    "total_boxes": int(getattr(s, "total_boxes", 12) or 12),
+                    "is_active": bool(getattr(s, "is_active", False)),
+                }
+                for s in seeds
+            ] if seeds else []
             if not seeds:
                 try:
                     from coupons.models import Coupon
@@ -905,6 +913,7 @@ class PromoPackageSerializer(serializers.ModelSerializer):
                 "purchased_boxes": [int(x) for x in purchased],
                 "total_boxes": int(total_boxes),
                 "available_numbers": available_numbers,
+                "available_seasons": available_seasons,
             }
         except Exception:
             return None
@@ -1137,7 +1146,16 @@ class PromoPurchaseSerializer(serializers.ModelSerializer):
             p = getattr(obj, "selected_product", None)
             return getattr(p, "name", None)
         except Exception:
-            return None
+            pass
+        try:
+            tri_id = getattr(obj, "tri_product_id", None)
+            if tri_id:
+                from .models import TriAppProduct
+                p = TriAppProduct.objects.filter(pk=tri_id).only("name").first()
+                return getattr(p, "name", None)
+        except Exception:
+            pass
+        return None
 
     class Meta:
         model = PromoPurchase
@@ -1288,9 +1306,9 @@ class PromoPurchaseSerializer(serializers.ModelSerializer):
                 if bad:
                     raise serializers.ValidationError({"boxes": f"Invalid box numbers: {bad}. Allowed 1..{total}."})
 
-                # Enforce progression: user can only buy for the smallest package number not yet completed
+                # Admin-created SPP seasons are user-selectable. If no explicit
+                # seeds exist, keep the older fallback progression behavior.
                 if user:
-                    # Determine current allowed number
                     allowed = None
                     try:
                         seeds = list(PromoMonthlyPackage.objects.filter(package=pkg, is_active=True).order_by("number"))
@@ -1304,13 +1322,9 @@ class PromoPurchaseSerializer(serializers.ModelSerializer):
                                     return tb if tb > 0 else 12
                         return 12
                     if seeds:
-                        for s in seeds:
-                            paid = PromoMonthlyBox.objects.filter(user=user, package=pkg, package_number=s.number).count()
-                            if int(paid) < int(total_for(s.number)):
-                                allowed = int(s.number)
-                                break
-                        if allowed is None:
-                            allowed = int(seeds[-1].number)
+                        active_numbers = {int(s.number) for s in seeds}
+                        if int(number) not in active_numbers:
+                            raise serializers.ValidationError({"package_number": "Selected SPP season is not active."})
                     else:
                         # Fallback to Admin E‑Coupon Seasons when no monthly seeds found
                         try:
@@ -1342,7 +1356,7 @@ class PromoPurchaseSerializer(serializers.ModelSerializer):
                                 allowed = int(season_numbers[-1])
                         else:
                             allowed = 1
-                    if int(number) != int(allowed):
+                    if not seeds and int(number) != int(allowed):
                         raise serializers.ValidationError({"package_number": f"Complete previous package first. Allowed package_number is {allowed}."})
 
                     # Already paid check for selected boxes
@@ -1440,6 +1454,28 @@ class PromoPurchaseSerializer(serializers.ModelSerializer):
         # Map product_id -> tri_product_id
         if d.get("product_id") is not None and d.get("tri_product_id") is None:
             d["tri_product_id"] = d.get("product_id")
+        if d.get("tri_app_slug") and d.get("tri_product_id") and not d.get("package_id"):
+            try:
+                from .models import PromoPackage
+                pkg = (
+                    PromoPackage.objects.filter(is_active=True, code__iexact="TRI_HOLIDAYS").first()
+                    or PromoPackage.objects.filter(is_active=True, code__icontains="tour").first()
+                    or PromoPackage.objects.filter(is_active=True, code__icontains="holiday").first()
+                    or PromoPackage.objects.filter(is_active=True, name__icontains="tour").first()
+                    or PromoPackage.objects.filter(is_active=True, name__icontains="holiday").first()
+                )
+                if not pkg:
+                    pkg = PromoPackage.objects.create(
+                        code="TRI_HOLIDAYS",
+                        name="Tri Tour",
+                        description="System package used to route Tri Tour trip purchases through promo approvals.",
+                        type="PRIME",
+                        price="1.00",
+                        is_active=True,
+                    )
+                d["package_id"] = getattr(pkg, "id", None)
+            except Exception:
+                pass
         return super().to_internal_value(d)
 
     def create(self, validated_data):
@@ -1478,6 +1514,13 @@ class PromoPurchaseSerializer(serializers.ModelSerializer):
         try:
             if str(getattr(pp.package, "type", "")) == "MONTHLY":
                 unit = 1000
+            elif getattr(pp, "tri_app_slug", "") and getattr(pp, "tri_product_id", None):
+                try:
+                    from .models import TriAppProduct
+                    trip = TriAppProduct.objects.filter(pk=pp.tri_product_id, is_active=True).only("price").first()
+                    unit = getattr(trip, "price", 0) or 0
+                except Exception:
+                    unit = 0
             else:
                 unit = getattr(pp.package, "price", 0) or 0
         except Exception:

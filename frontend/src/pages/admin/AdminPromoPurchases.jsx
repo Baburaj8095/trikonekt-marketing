@@ -78,15 +78,23 @@ function extractUTR(remarks = "") {
   return m ? m[1] : "";
 }
 
-export default function AdminPromoPurchases() {
+export default function AdminPromoPurchases({
+  title = "Promo Purchases",
+  description = "Approve or reject consumer promo purchases. This view is kept intentionally simple.",
+  defaultStatus = "PENDING",
+  readOnly = false,
+} = {}) {
   const location = useLocation();
+  const normalizedDefaultStatus = ["PENDING", "APPROVED", "REJECTED", "CANCELLED"].includes(String(defaultStatus || "").toUpperCase())
+    ? String(defaultStatus || "").toUpperCase()
+    : "PENDING";
   const [status, setStatus] = useState(() => {
     try {
       const params = new URLSearchParams(location.search || "");
-      const s = String(params.get("status") || "PENDING").toUpperCase();
-      return ["PENDING", "APPROVED", "REJECTED", "CANCELLED"].includes(s) ? s : "PENDING";
+      const s = String(params.get("status") || normalizedDefaultStatus).toUpperCase();
+      return ["PENDING", "APPROVED", "REJECTED", "CANCELLED"].includes(s) ? s : normalizedDefaultStatus;
     } catch {
-      return "PENDING";
+      return normalizedDefaultStatus;
     }
   });
   const [kind, setKind] = useState(() => {
@@ -140,25 +148,25 @@ export default function AdminPromoPurchases() {
   useEffect(() => {
     try {
       const params = new URLSearchParams(location.search || "");
-      const nextStatus = String(params.get("status") || "PENDING").toUpperCase();
+      const nextStatus = String(params.get("status") || normalizedDefaultStatus).toUpperCase();
       const nextKind = String(params.get("kind") || "").toLowerCase();
       const nextUserId = params.get("user_id") || "";
 
-      setStatus(["PENDING", "APPROVED", "REJECTED", "CANCELLED"].includes(nextStatus) ? nextStatus : "PENDING");
+      setStatus(["PENDING", "APPROVED", "REJECTED", "CANCELLED"].includes(nextStatus) ? nextStatus : normalizedDefaultStatus);
       setKind(["150", "750", "759", "monthly"].includes(nextKind) ? nextKind : "");
       setTriAppSlug((params.get("tri_app_slug") || "").trim());
       setUserId(nextUserId && /^\d+$/.test(nextUserId) ? nextUserId : "");
       setDateFrom(params.get("date_from") || "");
       setDateTo(params.get("date_to") || "");
     } catch {
-      setStatus("PENDING");
+      setStatus(normalizedDefaultStatus);
       setKind("");
       setTriAppSlug("");
       setUserId("");
       setDateFrom("");
       setDateTo("");
     }
-  }, [location.search]);
+  }, [location.search, normalizedDefaultStatus]);
 
   const statusOptions = useMemo(
     () => [
@@ -402,6 +410,16 @@ export default function AdminPromoPurchases() {
                       Pkg #: {String(r.package_number ?? "")} • Boxes: {Array.isArray(r.boxes_json) ? `${r.boxes_json.length} [${r.boxes_json.join(",")}]` : "0 []"}
                     </div>
                   ) : null}
+                  {r.tri_app_slug ? (
+                    <div style={{ fontSize: 12, color: "#475569" }}>
+                      TRI: {r.tri_app_slug}{r.tri_product_id ? ` • Product #${r.tri_product_id}` : ""}
+                    </div>
+                  ) : null}
+                  {r.selected_product_name ? (
+                    <div style={{ fontSize: 12, color: "#475569" }}>
+                      Selected: {r.selected_product_name}
+                    </div>
+                  ) : null}
                 </div>
 
                 <div>{pkg.type || ""}</div>
@@ -415,7 +433,7 @@ export default function AdminPromoPurchases() {
                 </div>
 
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {String(r.status || "").toUpperCase() === "PENDING" ? (
+                  {!readOnly && String(r.status || "").toUpperCase() === "PENDING" ? (
                     <>
                       <button
                         onClick={() => handleApprove(r)}
@@ -451,7 +469,7 @@ export default function AdminPromoPurchases() {
               </div>
             );
           })}
-          {!loading && rows.length === 0 ? (
+                  {!loading && rows.length === 0 ? (
             <div style={{ padding: 12, color: "#64748b" }}>No results</div>
           ) : null}
         </div>
@@ -520,6 +538,21 @@ export default function AdminPromoPurchases() {
               <div style={{ fontSize: 12, color: "#475569" }}>
                 Type: {pkg.type || ""} • Price: ₹{displayUnitPrice.toFixed(2)}{monText}
               </div>
+              {isMonthly ? (
+                <div style={{ fontSize: 12, color: "#475569" }}>
+                  SPP #: {String(r.package_number ?? "")} • Months: {Array.isArray(r.boxes_json) ? r.boxes_json.join(", ") : ""}
+                </div>
+              ) : null}
+              {r.tri_app_slug ? (
+                <div style={{ fontSize: 12, color: "#475569" }}>
+                  TRI: {r.tri_app_slug}{r.tri_product_id ? ` • Product #${r.tri_product_id}` : ""}
+                </div>
+              ) : null}
+              {r.selected_product_name ? (
+                <div style={{ fontSize: 12, color: "#475569" }}>
+                  Selected: {r.selected_product_name}
+                </div>
+              ) : null}
 
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 4 }}>
                 <div style={{ fontSize: 12, color: "#64748b" }}>Qty</div>
@@ -535,7 +568,7 @@ export default function AdminPromoPurchases() {
               <PaymentCell proofUrl={proofUrl} utr={r.utr} remarks={r.remarks} />
 
               <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                {String(r.status || "").toUpperCase() === "PENDING" ? (
+                {!readOnly && String(r.status || "").toUpperCase() === "PENDING" ? (
                   <>
                     <button
                       onClick={() => handleApprove(r)}
@@ -585,9 +618,9 @@ export default function AdminPromoPurchases() {
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: 0, color: "#0f172a" }}>Promo Purchases</h2>
+        <h2 style={{ margin: 0, color: "#0f172a" }}>{title}</h2>
         <div style={{ color: "#64748b", fontSize: 13 }}>
-          Approve or reject consumer promo purchases. This view is kept intentionally simple.
+          {description}
         </div>
       </div>
 

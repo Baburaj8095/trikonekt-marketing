@@ -28,6 +28,7 @@ from .models import (
     AgencyPackagePayment,
     CommissionConfig,
     TriApp,
+    TriAppProduct,
     AgencyPackagePaymentRequest,
     FranchiseAchiever,
     WishingBanner,
@@ -1237,6 +1238,15 @@ class PromoPurchasePayFromWalletView(APIView):
             # MONTHLY UI price is 1000 per box (see serializer)
             if str(getattr(pkg, "type", "")) == "MONTHLY":
                 unit = D("1000.00")
+            elif ser.validated_data.get("tri_app_slug") and ser.validated_data.get("tri_product_id"):
+                try:
+                    trip = TriAppProduct.objects.filter(
+                        pk=ser.validated_data.get("tri_product_id"),
+                        is_active=True,
+                    ).only("price").first()
+                    unit = D(str(getattr(trip, "price", "0") or "0"))
+                except Exception:
+                    unit = D("0")
             else:
                 unit = D(str(getattr(pkg, "price", "0") or "0"))
         except Exception:

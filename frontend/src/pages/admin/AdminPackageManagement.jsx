@@ -23,10 +23,16 @@ export default function AdminPackageManagement() {
       </Typography>
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2, 1fr)", xl: "repeat(3, 1fr)" }, gap: 1.5 }}>
         <PackageCard title="Join Subscription Packages" body="Approve subscription package purchases and payment proof using the existing approval queue." to="/admin/packages/join-subscription" />
+        <PackageCard title="Promo Package Setup" body="Create/edit Join Prime, SPP, Digital Education, and Tri Tour Prime promo packages with price and active status." to="/admin/dashboard/models/business/promopackage" />
         <PackageCard title="Smart Product Packages (SPP)" body="Approve SPP and monthly package activity with sponsor/package context." to="/admin/packages/spp" />
+        <PackageCard title="SPP Seasons" body="Create SPP 1, SPP 2, Season 3, and control how many monthly boxes each season contains." to="/admin/packages/spp-seasons" />
         <PackageCard title="Prime Education Packages" body="Monitor Prime Education package approvals through the shared promo purchase workflow." to="/admin/promo-purchases?status=PENDING" />
         <PackageCard title="Tour Packages" body="Review Tri Tour package purchase verification and payment proof." to="/admin/packages/tri-tour" />
         <PackageCard title="Rank Upgrades" body="Track wallet-paid rank upgrades and commission holds." to="/admin/rank-upgrades" />
+        <PackageCard title="Ledger: Join Prime 750" body="Approved Join Prime 750 purchase list with user, sponsor, amount, and payment status." to="/admin/ledger/join-prime" />
+        <PackageCard title="Ledger: SPP" body="Approved SPP purchase list with season/package number and selected boxes or months." to="/admin/ledger/spp" />
+        <PackageCard title="Ledger: Digital Education" body="Successful Digital Education Prime and rank upgrade purchase list." to="/admin/ledger/digital-education" />
+        <PackageCard title="Ledger: Tri Tour" body="Approved Tri Tour trip purchase list with selected trip metadata." to="/admin/ledger/tri-tour" />
         <PackageCard title="Wallet Upload Approvals" body="Credit Self Package Pocket after manual payment proof verification." to="/admin/wallet-upload-approvals" />
       </Box>
     </Box>

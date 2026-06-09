@@ -2,17 +2,14 @@ import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import AdminPromoPurchases from "./AdminPromoPurchases";
 
-/**
- * Dedicated Admin screen: SPP (Monthly boxes)
- */
-export default function AdminSPPPurchases() {
+export default function AdminSPPLedger() {
   const loc = useLocation();
   const nav = useNavigate();
 
   React.useEffect(() => {
     try {
       const qs = new URLSearchParams(loc.search || "");
-      if (!qs.get("status")) qs.set("status", "PENDING");
+      if (!qs.get("status")) qs.set("status", "APPROVED");
       qs.set("kind", "monthly");
       qs.delete("tri_app_slug");
       const next = `${loc.pathname}?${qs.toString()}`;
@@ -22,11 +19,11 @@ export default function AdminSPPPurchases() {
   }, [loc.pathname, loc.search, nav]);
 
   return (
-    <div>
-      <div style={{ marginBottom: 10, fontWeight: 900, color: "#0f172a" }}>
-        Approvals: Smart Product Purchase (SPP seasons and monthly boxes)
-      </div>
-      <AdminPromoPurchases />
-    </div>
+    <AdminPromoPurchases
+      title="Ledger: Smart Product Purchase (SPP)"
+      description="List of users who purchased SPP seasons/monthly boxes, including SPP number, selected boxes/months, amount, and status."
+      defaultStatus="APPROVED"
+      readOnly
+    />
   );
 }

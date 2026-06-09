@@ -972,7 +972,9 @@ export async function createPromoPurchase({
   boxes = [],
 }) {
   const fd = new FormData();
-  fd.append("package_id", String(package_id));
+  if (package_id != null && String(package_id).trim() !== "") {
+    fd.append("package_id", String(package_id));
+  }
 
   // MONTHLY (boxes) takes precedence over legacy year/month
   const hasBoxes = Array.isArray(boxes) && boxes.length > 0 && package_number != null;

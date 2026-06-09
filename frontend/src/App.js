@@ -71,8 +71,13 @@ import AdminPromoPurchases from "./pages/admin/AdminPromoPurchases";
 import AdminPackagePromoPurchases from "./pages/admin/AdminPackagePromoPurchases";
 import AdminJoinSubscriptionPurchases from "./pages/admin/AdminJoinSubscriptionPurchases";
 import AdminSPPPurchases from "./pages/admin/AdminSPPPurchases";
+import AdminSPPSeasons from "./pages/admin/AdminSPPSeasons";
 import AdminTriTourPurchases from "./pages/admin/AdminTriTourPurchases";
 import AdminDigitalEducationPrimeApprovals from "./pages/admin/AdminDigitalEducationPrimeApprovals";
+import AdminJoinPrimeLedger from "./pages/admin/AdminJoinPrimeLedger";
+import AdminSPPLedger from "./pages/admin/AdminSPPLedger";
+import AdminTriTourLedger from "./pages/admin/AdminTriTourLedger";
+import AdminDigitalEducationLedger from "./pages/admin/AdminDigitalEducationLedger";
 import AdminWalletUploadApprovals from "./pages/admin/AdminWalletUploadApprovals";
 import AdminWallets from "./pages/admin/AdminWallets";
 import AdminWalletDetail from "./pages/admin/AdminWalletDetail";
@@ -1766,11 +1771,61 @@ function App() {
           }
         />
         <Route
+          path="/admin/packages/spp-seasons"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminSPPSeasons />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/packages/tri-tour"
           element={
             <AdminProtectedRoute>
               <AdminShell>
                 <AdminTriTourPurchases />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/ledger/join-prime"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminJoinPrimeLedger />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/ledger/spp"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminSPPLedger />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/ledger/tri-tour"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminTriTourLedger />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/ledger/digital-education"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminDigitalEducationLedger />
               </AdminShell>
             </AdminProtectedRoute>
           }

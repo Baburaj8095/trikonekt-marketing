@@ -40,7 +40,7 @@ function ValueRow({ label, value }) {
   );
 }
 
-function UpgradeRow({ u, onViewCommissions, onApprove, onReject }) {
+function UpgradeRow({ u, onViewCommissions, onApprove, onReject, readOnly = false }) {
   const badgeColor =
     u.payment_status === "SUCCESS"
       ? "success"
@@ -155,7 +155,7 @@ function UpgradeRow({ u, onViewCommissions, onApprove, onReject }) {
           sx={{ mt: 1 }}
           flexWrap="wrap"
         >
-          {u.payment_status ===
+          {!readOnly && u.payment_status ===
           "INITIATED" ? (
             <>
               <Button
@@ -269,7 +269,7 @@ function UpgradeRow({ u, onViewCommissions, onApprove, onReject }) {
             label={u.payment_status}
           />
 
-          {u.payment_status ===
+          {!readOnly && u.payment_status ===
           "INITIATED" ? (
             <>
               <Button
@@ -308,7 +308,11 @@ function UpgradeRow({ u, onViewCommissions, onApprove, onReject }) {
 }
 
 
-export default function AdminRankUpgrades({ title = "Rank Upgrades", defaultStatus = "" }) {
+export default function AdminRankUpgrades({
+  title = "Rank Upgrades",
+  defaultStatus = "",
+  readOnly = false,
+} = {}) {
   const [ranks, setRanks] = useState([]);
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -500,6 +504,7 @@ export default function AdminRankUpgrades({ title = "Rank Upgrades", defaultStat
                 onViewCommissions={openCommissions}
                 onApprove={openApprove}
                 onReject={openReject}
+                readOnly={readOnly}
               />
             ))
           )}

@@ -42,7 +42,6 @@ import {
   getWalletMe,
   getWalletMeHistory,
 } from "../api/api";
-import { useNavigate } from "react-router-dom";
 import RankUpgrade from "./RankUpgrade";
 import {
   getAddMoneyPocketBalance,
@@ -614,8 +613,26 @@ function Prime150Section({ reg150Pkg, prime150Active, onBuy }) {
  */
 function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, seasonsHints = [], seasonActive, rename = null }) {
   const meta = seasonPkg?.monthly_meta || {};
-  const totalBoxes = Math.max(1, Number(meta?.total_boxes || 12));
   const defaultSeason = Number(meta?.current_package_number || 1);
+  const seasonDetails = useMemo(() => {
+    try {
+      const rows = Array.isArray(meta?.available_seasons) ? meta.available_seasons : [];
+      const map = new Map();
+      rows.forEach((row) => {
+        const number = parseInt(row?.number, 10);
+        if (number > 0) {
+          map.set(number, {
+            number,
+            totalBoxes: Math.max(1, Number(row?.total_boxes || 12)),
+            active: row?.is_active !== false,
+          });
+        }
+      });
+      return map;
+    } catch {
+      return new Map();
+    }
+  }, [meta?.available_seasons]);
 
   // Choose which seasons to show. Show 1..5 in UI, enable those listed by admin seeds if present; otherwise only 1.
   const hintNumbers = useMemo(() => {
@@ -648,6 +665,10 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
 
   const seasonsToShow = enabledNumbers;
   const [selectedSeason, setSelectedSeason] = useState(defaultSeason);
+  const totalBoxes = Math.max(
+    1,
+    Number(seasonDetails.get(Number(selectedSeason))?.totalBoxes || meta?.total_boxes || 12)
+  );
   useEffect(() => {
     // Ensure selected season is in the list. Default to first enabled (fallback to 1) if disabled.
     if (!enabledNumbers.includes(selectedSeason)) {
@@ -655,11 +676,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
     }
   }, [enabledNumbers, selectedSeason]);
 
-  // Plans (only for Season 1 per sketch)
   const [plan, setPlan] = useState("SEASON1000"); // "REG150" | "SEASON1000"
-  useEffect(() => {
-    if (selectedSeason !== 1) setPlan("SEASON1000");
-  }, [selectedSeason]);
 
   // Locked boxes from history for current season
   const purchasedBoxes = useMemo(() => {
@@ -757,7 +774,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
               <Radio size="small" checked={selectedSeason === n} disabled={!enabled} />
               <Typography sx={{ flex: 1 }}>{(rename?.seasonLabel || "Season")} {n}</Typography>
               {active ? (
-                <Chip size="small" label="Available" color="success" />
+                <Chip size="small" label="Next" color="success" />
               ) : locked ? (
                 <Stack direction="row" spacing={0.5} alignItems="center">
                   <LockRoundedIcon fontSize="small" />
@@ -773,26 +790,19 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
 
       <Divider sx={{ my: 1.5 }} />
 
-      {/* ② Plan selector (Season 1 only) */}
+      {/* ② Plan selector */}
       <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
         ② Choose Plan
       </Typography>
-      {selectedSeason === 1 ? (
-        <Box sx={{ mt: 1 }}>
-          
-          <RadioGroup value={plan} onChange={(e) => setPlan(e.target.value)}>
-            <FormControlLabel
-              value="SEASON1000"
-              control={<Radio size="small" />}
-              label={(rename?.seasonPlanLabel || "Season Prime ₹1000")}
-            />
-          </RadioGroup>
-        </Box>
-      ) : (
-        <Alert sx={{ mt: 1 }} severity="info">
-          Plans are available in Season 1. Complete Season 1 to unlock next seasons.
-        </Alert>
-      )}
+      <Box sx={{ mt: 1 }}>
+        <RadioGroup value={plan} onChange={(e) => setPlan(e.target.value)}>
+          <FormControlLabel
+            value="SEASON1000"
+            control={<Radio size="small" />}
+            label={(rename?.seasonPlanLabel || "Season Prime ₹1000")}
+          />
+        </RadioGroup>
+      </Box>
 
       <Divider sx={{ my: 1.5 }} />
 
@@ -1012,9 +1022,9 @@ function PromoSection({ seasonPkg, history, onBuy, seasonActive }) {
  * - Static destinations with placeholders
  * - EXPLORE & BOOK -> Tri module (no duplication of booking logic)
  */
-function TourSection({ triHolidays }) {
-  const navigate = useNavigate();
+function TourSection({ triHolidays, tourPackages = [], onBuy }) {
   const [dest, setDest] = useState("Goa");
+  const tripProducts = Array.isArray(triHolidays?.products) ? triHolidays.products : [];
 
   const destinations = [
     { key: "Goa", img: "https://images.unsplash.com/photo-1548013146-72479768bada?q=80&w=800&auto=format&fit=crop" },
@@ -1068,18 +1078,123 @@ function TourSection({ triHolidays }) {
 
       <Divider sx={{ my: 1.5 }} />
 
-      <Button
-        fullWidth
-        variant="contained"
-        sx={{ mt: 2, height: 48, textTransform: "none", fontWeight: 800 }}
-        onClick={() =>
-          navigate("/user/tri/tri-holidays", {
-            state: { source: "promo-packages", destination: dest },
-          })
-        }
-      >
-        EXPLORE & BOOK
-      </Button>
+      <Typography variant="subtitle2" sx={{ mb: 1 }}>
+        Select Tour Prime
+      </Typography>
+      {tripProducts.length ? (
+        <Stack spacing={1}>
+          {tripProducts.map((trip) => (
+            <Paper key={trip.id} variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                {trip.image_url ? (
+                  <Box
+                    component="img"
+                    src={normalizeMediaUrl(trip.image_url)}
+                    alt={trip.name}
+                    sx={{ width: 84, height: 64, objectFit: "cover", borderRadius: 1.5, flexShrink: 0 }}
+                  />
+                ) : null}
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <Typography sx={{ fontWeight: 900, color: "#0f172a" }} noWrap>
+                    {trip.name || "Tri Tour Prime"}
+                  </Typography>
+                  {trip.description ? (
+                    <Typography sx={{ color: "#64748b", fontSize: 12 }} noWrap>
+                      {trip.description}
+                    </Typography>
+                  ) : null}
+                  <Typography sx={{ color: "#64748b", fontSize: 12 }}>
+                    Destination: {dest}
+                  </Typography>
+                </Box>
+                <Box sx={{ textAlign: "right", flexShrink: 0 }}>
+                  <Typography sx={{ fontWeight: 950, color: "#0f172a" }}>
+                    ₹{Number(trip.price || 0).toLocaleString("en-IN")}
+                  </Typography>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    sx={{ mt: 0.75, textTransform: "none", fontWeight: 850 }}
+                    onClick={() =>
+                      onBuy({
+                        pkg: { id: null, name: trip.name || "Tri Tour Prime" },
+                        amount: Number(trip.price || 0),
+                        uiMeta: {
+                          destination: dest,
+                          triApp: "tri-holidays",
+                          selectedProductName: trip.name || "Tri Tour Prime",
+                        },
+                        purchasePayload: {
+                          tri: true,
+                          tri_app_slug: "tri-holidays",
+                          product_id: trip.id,
+                          prime750_choice: "REDEEM",
+                        },
+                      })
+                    }
+                  >
+                    Buy
+                  </Button>
+                </Box>
+              </Stack>
+            </Paper>
+          ))}
+        </Stack>
+      ) : tourPackages.length ? (
+        <Stack spacing={1}>
+          {tourPackages.map((pkg) => (
+            <Paper key={pkg.id} variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+              <Stack direction="row" justifyContent="space-between" spacing={1.5} alignItems="center">
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ fontWeight: 900, color: "#0f172a" }} noWrap>
+                    {pkg.name || pkg.code || "Tri Tour Prime"}
+                  </Typography>
+                  {pkg.description ? (
+                    <Typography sx={{ color: "#64748b", fontSize: 12 }} noWrap>
+                      {pkg.description}
+                    </Typography>
+                  ) : null}
+                  <Typography sx={{ color: "#64748b", fontSize: 12 }}>
+                    Destination: {dest}
+                  </Typography>
+                </Box>
+                <Box sx={{ textAlign: "right", flexShrink: 0 }}>
+                  <Typography sx={{ fontWeight: 950, color: "#0f172a" }}>
+                    ₹{Number(pkg.price || 0).toLocaleString("en-IN")}
+                  </Typography>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    sx={{ mt: 0.75, textTransform: "none", fontWeight: 850 }}
+                    onClick={() =>
+                      onBuy({
+                        pkg,
+                        amount: Number(pkg.price || 0),
+                        uiMeta: {
+                          destination: dest,
+                          triApp: "tri-holidays",
+                          selectedProductName: pkg.name || "Tri Tour Prime",
+                        },
+                        purchasePayload: {
+                          tri: true,
+                          tri_app_slug: "tri-holidays",
+                          prime750_choice: "REDEEM",
+                        },
+                      })
+                    }
+                  >
+                    Buy
+                  </Button>
+                </Box>
+              </Stack>
+            </Paper>
+          ))}
+        </Stack>
+      ) : (
+        <Alert severity="info">
+          No Tri Tour Prime package is active. Please contact admin.
+        </Alert>
+      )}
     </Box>
   );
 }
@@ -1182,6 +1297,12 @@ export default function PromoPackages({
   const reg150Pkg = useMemo(() => {
     return (packages || []).find(
       (p) => approx(p?.price, 150) && String(p?.type || "").toUpperCase() !== "MONTHLY" && !isTourPackage(p)
+    );
+  }, [packages]);
+
+  const tourPackages = useMemo(() => {
+    return (packages || []).filter(
+      (p) => String(p?.type || "").toUpperCase() !== "MONTHLY" && isTourPackage(p)
     );
   }, [packages]);
 
@@ -1444,7 +1565,7 @@ export default function PromoPackages({
           ) : null}
 
           {/* TOUR */}
-          {tab === 4 ? <TourSection triHolidays={triHolidays} /> : null}
+          {tab === 4 ? <TourSection triHolidays={triHolidays} tourPackages={tourPackages} onBuy={onBuy} /> : null}
         </Box>
       </Paper>
 
@@ -1478,15 +1599,15 @@ export default function PromoPackages({
           setPaymentOpen(true);
         }}
         onPickWallet={async (walletSource = "internal") => {
-          if (!purchaseIntent?.pkg?.id) return;
           setWalletBusy(true);
           setWalletErr("");
           try {
-            await createPromoPurchaseFromWallet({
-              package_id: purchaseIntent.pkg.id,
+            const payload = {
               wallet_source: walletSource,
               ...(purchaseIntent.purchasePayload || {}),
-            });
+            };
+            if (purchaseIntent?.pkg?.id) payload.package_id = purchaseIntent.pkg.id;
+            await createPromoPurchaseFromWallet(payload);
             setMethodOpen(false);
             setHistory(await listMyPromoPurchases());
             setPaymentSuccessMessage("Package purchased successfully.");

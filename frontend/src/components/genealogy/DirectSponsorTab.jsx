@@ -35,6 +35,20 @@ function fmt(isoStr) {
 }
 
 // ─── Person icon ────────────────────────────────────────────────────────────
+function getCallablePhone(member) {
+  const usernameDigits = String(member?.username || "").replace(/\D/g, "");
+  const raw =
+    member?.phone ||
+    member?.mobile ||
+    member?.mobile_number ||
+    member?.phone_number ||
+    (usernameDigits.length >= 10 ? member?.username : "");
+
+  return String(raw || "")
+    .trim()
+    .replace(/[^\d+]/g, "");
+}
+
 function AvatarCircle({ name = "?", active }) {
   const initials = (name || "?")
     .split(" ")
@@ -70,6 +84,7 @@ function MemberCard({ member, onView }) {
   const displayName = member?.full_name || member?.username || "Unknown";
   const username = member?.username || "";
   const joinDate = fmt(member?.date_joined);
+  const callPhone = getCallablePhone(member);
 
   return (
     <div
@@ -146,23 +161,53 @@ function MemberCard({ member, onView }) {
 
         {/* View button – only for active accounts */}
         {isActive && (
-          <button
-            onClick={() => onView(member?.id)}
+          <div
             style={{
-              padding: "5px 14px",
-              borderRadius: 99,
-              border: `1.5px solid ${C.primary}`,
-              background: C.primary,
-              color: "#fff",
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: "pointer",
-              outline: "none",
-              letterSpacing: "0.02em",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "stretch",
+              gap: 6,
             }}
           >
-            View
-          </button>
+            <button
+              onClick={() => onView(member?.id)}
+              style={{
+                padding: "5px 14px",
+                borderRadius: 99,
+                border: `1.5px solid ${C.primary}`,
+                background: C.primary,
+                color: "#fff",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+                outline: "none",
+                letterSpacing: "0.02em",
+              }}
+            >
+              View
+            </button>
+
+            {callPhone && (
+              <a
+                href={`tel:${callPhone}`}
+                style={{
+                  padding: "5px 14px",
+                  borderRadius: 99,
+                  border: `1.5px solid ${C.green}`,
+                  background: C.green,
+                  color: "#fff",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  lineHeight: 1.2,
+                  textAlign: "center",
+                  textDecoration: "none",
+                  letterSpacing: "0.02em",
+                }}
+              >
+                Call
+              </a>
+            )}
+          </div>
         )}
       </div>
     </div>

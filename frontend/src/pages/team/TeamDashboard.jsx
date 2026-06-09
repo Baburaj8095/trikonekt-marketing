@@ -793,7 +793,7 @@ export default function TeamDashboard() {
                   {profileUser?.full_name || fullName}
                 </Typography>
                 <Stack direction="row" spacing={0.65} alignItems="center" sx={{ mt: 0.45, flexWrap: "wrap" }}>
-                  <Chip size="small" label={`Phone: ${consumerPhone}`} sx={{ height: 22, fontSize: 10.5, fontWeight: 750, bgcolor: "rgba(37,99,235,0.08)", color: C.primary }} />
+                  <Chip size="small" label={`User Id: ${consumerPhone}`} sx={{ height: 22, fontSize: 10.5, fontWeight: 750, bgcolor: "rgba(37,99,235,0.08)", color: C.primary }} />
                   <Chip size="small" label={`Status: ${status}`} sx={{ height: 22, fontSize: 10.5, fontWeight: 750, bgcolor: "rgba(22,163,74,0.10)", color: "#047857" }} />
                 </Stack>
               </Box>
