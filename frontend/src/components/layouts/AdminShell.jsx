@@ -318,6 +318,7 @@ export default function AdminShell({ children }) {
           { to: "/admin/packages/spp", label: "Smart Product Package", icon: "ticket" },
           { to: "/admin/packages/spp-seasons", label: "SPP Seasons", icon: "box" },
           { to: "/admin/packages/digital-education-prime", label: "Digital Education Prime Approval", icon: "ticket" },
+          { to: "/admin/tri/tri-holidays", label: "Tri Tour Setup", icon: "box" },
           { to: "/admin/packages/tri-tour", label: "Tri Tour", icon: "ticket" },
         ],
       },
@@ -436,19 +437,13 @@ export default function AdminShell({ children }) {
           { to: "/admin/dashboard-cards", label: "Dashboard Cards", icon: "dashboard" },
         ],
       },
-      // {
-      //   key: "tri",
-      //   label: "TRI Apps",
-      //   items: [
-      //     { to: "/admin/tri/tri-holidays", label: "Manage TRI Holidays", icon: "box" },
-      //     { to: "/admin/tri/tri-ev", label: "Manage TRI EV Vehicles", icon: "box" },
-      //     { to: "/admin/tri/tri-furniture", label: "Manage TRI Furniture", icon: "box" },
-      //     { to: "/admin/tri/tri-electronics", label: "Manage TRI Electronics", icon: "box" },
-      //     { to: "/admin/tri/tri-properties", label: "Manage TRI Properties", icon: "box" },
-      //     { to: "/admin/tri/tri-saving", label: "Manage TRI Saving", icon: "box" },
-      //     { to: "/admin/tri/tri-local-store", label: "Manage Local Store", icon: "box" },
-      //   ],
-      // },
+      {
+        key: "tri",
+        label: "TRI Apps",
+        items: [
+          { to: "/admin/tri/tri-holidays", label: "Manage TRI Holidays", icon: "box" },
+        ],
+      },
       {
         key: "reports",
         label: "Reports & Business",
