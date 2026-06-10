@@ -29,7 +29,7 @@ export default function AdminPackageManagement() {
         <PackageCard title="Prime Education Packages" body="Monitor Prime Education package approvals through the shared promo purchase workflow." to="/admin/promo-purchases?status=PENDING" />
         <PackageCard title="Tour Packages" body="Review Tri Tour package purchase verification and payment proof." to="/admin/packages/tri-tour" />
         <PackageCard title="Rank Upgrades" body="Track wallet-paid rank upgrades and commission holds." to="/admin/rank-upgrades" />
-        <PackageCard title="Ledger: Join Prime 750" body="Approved Join Prime 750 purchase list with user, sponsor, amount, and payment status." to="/admin/ledger/join-prime" />
+        <PackageCard title="Ledger: Join Prime" body="Approved Join Prime purchase list with user, sponsor, amount, and payment status." to="/admin/ledger/join-prime" />
         <PackageCard title="Ledger: SPP" body="Approved SPP purchase list with season/package number and selected boxes or months." to="/admin/ledger/spp" />
         <PackageCard title="Ledger: Digital Education" body="Successful Digital Education Prime and rank upgrade purchase list." to="/admin/ledger/digital-education" />
         <PackageCard title="Ledger: Tri Tour" body="Approved Tri Tour trip purchase list with selected trip metadata." to="/admin/ledger/tri-tour" />

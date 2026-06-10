@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import AdminPromoPurchases from "./AdminPromoPurchases";
 
 /**
- * Dedicated Admin screen: Join Subscription (Prime 750)
+ * Dedicated Admin screen: Join Subscription
  */
 export default function AdminJoinSubscriptionPurchases() {
   const loc = useLocation();
@@ -24,7 +24,7 @@ export default function AdminJoinSubscriptionPurchases() {
   return (
     <div>
       <div style={{ marginBottom: 10, fontWeight: 900, color: "#0f172a" }}>
-        Approvals: Join Subscription (Prime 750)
+        Approvals: Join Subscription
       </div>
       <AdminPromoPurchases />
     </div>

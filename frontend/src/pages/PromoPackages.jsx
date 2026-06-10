@@ -73,6 +73,14 @@ const isJoinPrimePackage = (pkg) => {
   return code === "PRIME750" || code.includes("PRIME750") || name.includes("PRIME 750") || approx(pkg?.price, 750);
 };
 
+const isPrime150Package = (pkg) => {
+  const code = String(pkg?.code || "").toUpperCase();
+  const name = String(pkg?.name || "").toUpperCase();
+  const type = String(pkg?.type || "").toUpperCase();
+  if (type === "MONTHLY" || isTourPackage(pkg)) return false;
+  return code === "PRIME150" || code.includes("PRIME150") || name.includes("PRIME 150") || approx(pkg?.price, 150);
+};
+
 const getPlanOptions = (price) => {
   // Prime 150: remove e‑book flow (UI hint only shows redeem points)
   if (approx(price, 150)) return ["Redeem points"];
@@ -471,6 +479,7 @@ function Prime750Section({ pkg, prime150Active, prime750Active, onBuy, redeemOnl
   const [choice, setChoice] = useState(redeemOnly ? "REDEEM" : "");
   const [selProd, setSelProd] = useState("");
   const packageAmount = Number(pkg?.price || 0);
+  const packageName = pkg?.name || "Join Prime";
 
   const options = redeemOnly
     ? getPlanOptions(pkg?.price || 0).filter((opt) => !/product/i.test(String(opt || "")))
@@ -484,7 +493,7 @@ function Prime750Section({ pkg, prime150Active, prime750Active, onBuy, redeemOnl
   return (
     <Box sx={{ p: 2 }}>
       <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5 }}>
-        Prime 750 {prime750Active ? <Chip size="small" color="success" sx={{ ml: 1 }} label="Active" /> : null}
+        {packageName} {prime750Active ? <Chip size="small" color="success" sx={{ ml: 1 }} label="Active" /> : null}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
         Price: ₹{packageAmount.toLocaleString("en-IN")} • Includes wallet bonus ₹150
@@ -573,6 +582,8 @@ function Prime750Section({ pkg, prime150Active, prime750Active, onBuy, redeemOnl
 }
 
 function Prime150Section({ reg150Pkg, prime150Active, onBuy }) {
+  const packageAmount = Number(reg150Pkg?.price || 0);
+  const packageName = reg150Pkg?.name || "Prime 150";
   if (!reg150Pkg) {
     return (
       <Box sx={{ p: 2 }}>
@@ -583,7 +594,7 @@ function Prime150Section({ reg150Pkg, prime150Active, onBuy }) {
   return (
     <Box sx={{ p: 2 }}>
       <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5 }}>
-        Prime 150
+        {packageName}
       </Typography>
       <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
         {prime150Active ? <Chip size="small" color="success" label="Active" /> : null}
@@ -593,7 +604,7 @@ function Prime150Section({ reg150Pkg, prime150Active, onBuy }) {
       </Stack>
       <Stack direction="row" alignItems="center" justifyContent="space-between">
         <Typography>
-          Price: <b>₹150</b>
+          Price: <b>₹{packageAmount.toLocaleString("en-IN")}</b>
         </Typography>
         <Button
           variant="contained"
@@ -601,8 +612,8 @@ function Prime150Section({ reg150Pkg, prime150Active, onBuy }) {
           onClick={() =>
             onBuy({
               pkg: reg150Pkg,
-              amount: 150,
-              uiMeta: { plan: "Prime 150" },
+              amount: packageAmount,
+              uiMeta: { plan: packageName },
               purchasePayload: {},
             })
           }
@@ -1305,9 +1316,7 @@ export default function PromoPackages({
   }, [packages]);
 
   const reg150Pkg = useMemo(() => {
-    return (packages || []).find(
-      (p) => approx(p?.price, 150) && String(p?.type || "").toUpperCase() !== "MONTHLY" && !isTourPackage(p)
-    );
+    return (packages || []).find(isPrime150Package);
   }, [packages]);
 
   const tourPackages = useMemo(() => {
@@ -1521,7 +1530,7 @@ export default function PromoPackages({
               },
             }}
           >
-            <Tab label="Prime 750" />
+            <Tab label="Join Prime" />
             <Tab label={ren.seasonLabel} />
             <Tab label="Rank Upgrade" />
             <Tab label="Prime 150" />
@@ -1533,7 +1542,7 @@ export default function PromoPackages({
       
       <Paper elevation={0} sx={{ borderRadius: 2 }}>
         <Box sx={{ p: 2 }}>
-          {/* PRIME 750 */}
+          {/* JOIN PRIME */}
           {tab === 0 ? (
             primePkg ? (
               <Prime750Section
@@ -1544,7 +1553,7 @@ export default function PromoPackages({
                 redeemOnly={primeRedeemOnly}
               />
             ) : (
-              <Alert severity="warning">Prime 750 package not available.</Alert>
+              <Alert severity="warning">Join Prime package not available.</Alert>
             )
           ) : null}
 

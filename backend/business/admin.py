@@ -833,7 +833,11 @@ class PromoPurchaseAdmin(admin.ModelAdmin):
                 try:
                     from decimal import Decimal as D
                     price = D(str(getattr(obj.package, "price", "0")))
-                    is_prime_750 = str(getattr(obj.package, "type", "")) == "PRIME" and abs(price - D("750")) <= D("0.5")
+                    code = str(getattr(obj.package, "code", "") or "").upper()
+                    name = str(getattr(obj.package, "name", "") or "").upper()
+                    is_prime_750 = str(getattr(obj.package, "type", "")) == "PRIME" and (
+                        code == "PRIME750" or "PRIME750" in code or "PRIME 750" in name or abs(price - D("750")) <= D("0.5")
+                    )
                 except Exception:
                     is_prime_750 = False
                 if is_prime_750:

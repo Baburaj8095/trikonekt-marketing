@@ -1384,6 +1384,33 @@ class PromoPurchasePayFromWalletView(APIView):
         return Response(PromoPurchaseSerializer(pp, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
 
+def _promo_package_identity(pkg):
+    try:
+        if str(getattr(pkg, "type", "") or "").upper() != "PRIME":
+            return ""
+        code = str(getattr(pkg, "code", "") or "").upper()
+        name = str(getattr(pkg, "name", "") or "").upper()
+        from decimal import Decimal as D
+        price = D(str(getattr(pkg, "price", "0") or "0"))
+        if code == "PRIME750" or "PRIME750" in code or "PRIME 750" in name or abs(price - D("750")) <= D("0.5"):
+            return "750"
+        if code == "PRIME150" or "PRIME150" in code or "PRIME 150" in name or abs(price - D("150")) <= D("0.5"):
+            return "150"
+        if abs(price - D("759")) <= D("0.75"):
+            return "759"
+    except Exception:
+        return ""
+    return ""
+
+
+def _is_prime_750_package(pkg):
+    return _promo_package_identity(pkg) == "750"
+
+
+def _is_prime_150_package(pkg):
+    return _promo_package_identity(pkg) == "150"
+
+
 class AdminPromoPurchaseListView(APIView):
     """
     GET /api/business/admin/promo/purchases/
@@ -1416,9 +1443,19 @@ class AdminPromoPurchaseListView(APIView):
         kind_raw = (request.query_params.get("kind") or "").strip().lower()
         if kind_raw:
             if kind_raw in ("150",):
-                qs = qs.filter(package__type="PRIME", package__price__gte=D("149.5"), package__price__lte=D("150.5"))
+                qs = qs.filter(package__type="PRIME").filter(
+                    Q(package__code__iexact="PRIME150")
+                    | Q(package__code__icontains="PRIME150")
+                    | Q(package__name__icontains="Prime 150")
+                    | Q(package__price__gte=D("149.5"), package__price__lte=D("150.5"))
+                )
             elif kind_raw in ("750",):
-                qs = qs.filter(package__type="PRIME", package__price__gte=D("749.5"), package__price__lte=D("750.5"))
+                qs = qs.filter(package__type="PRIME").filter(
+                    Q(package__code__iexact="PRIME750")
+                    | Q(package__code__icontains="PRIME750")
+                    | Q(package__name__icontains="Prime 750")
+                    | Q(package__price__gte=D("749.5"), package__price__lte=D("750.5"))
+                )
             elif kind_raw in ("759", "monthly"):
                 qs = qs.filter(package__type="MONTHLY")
             # else: ignore unknown kind
@@ -1503,12 +1540,12 @@ class AdminPromoPurchaseApproveView(APIView):
             price = D(str(getattr(obj.package, "price", "0") or "0"))
         except Exception:
             price = D("0")
-        is_prime_150 = str(getattr(obj.package, "type", "")) == "PRIME" and abs(price - D("150")) <= D("0.5")
+        is_prime_150 = _is_prime_150_package(obj.package)
         prime150_choice = str(getattr(obj, "prime150_choice", "") or "").strip().upper()
         ebook_choice = prime150_choice == "EBOOK"
         redeem150_choice = prime150_choice == "REDEEM"
 
-        is_prime_750 = str(getattr(obj.package, "type", "")) == "PRIME" and abs(price - D("750")) <= D("0.5")
+        is_prime_750 = _is_prime_750_package(obj.package)
         prime750_choice = str(getattr(obj, "prime750_choice", "") or "").strip().upper()
         redeem750_choice = prime750_choice == "REDEEM"
         is_prime_759 = str(getattr(obj.package, "type", "")) == "PRIME" and abs(price - D("759")) <= D("0.75")
@@ -1917,9 +1954,7 @@ class AdminPromoPurchaseApproveView(APIView):
             fields_to_update = ["status", "approved_by", "approved_at", "active_from", "active_to"]
             # For PRIME 750 promo with a selected product, set delivery_by = approved_date + 30 days
             try:
-                from decimal import Decimal as D2
-                price2 = D2(str(getattr(obj.package, "price", "0")))
-                is_prime_750 = str(getattr(obj.package, "type", "")) == "PRIME" and abs(price2 - D2("750")) <= D2("0.5")
+                is_prime_750 = _is_prime_750_package(obj.package)
             except Exception:
                 is_prime_750 = False
             if is_prime_750:
@@ -1968,10 +2003,8 @@ class AdminPromoPurchaseApproveView(APIView):
 
             # Activate account on any promo package approval (e.g., 150, 750, 759)
             try:
-                from decimal import Decimal as D3
                 from .services.activation import activate_150_active, ensure_first_purchase_activation
                 from jobs.models import enqueue_prime_150_units
-                pkg_price = D3(str(getattr(obj.package, "price", "0") or "0"))
                 src = {"type": "promo_purchase", "id": obj.id}
                 activated150_active = False
                 activated50 = False
@@ -1981,8 +2014,8 @@ class AdminPromoPurchaseApproveView(APIView):
                 # Decide 150 activations by package type
                 is_prime_pkg = str(getattr(obj.package, "type", "") or "") == "PRIME"
                 is_monthly_pkg = str(getattr(obj.package, "type", "") or "") == "MONTHLY"
-                is_prime_150_now = is_prime_pkg and (abs(pkg_price - D3("150")) <= D3("0.5"))
-                is_prime_750_now = is_prime_pkg and (abs(pkg_price - D3("750")) <= D3("0.5"))
+                is_prime_150_now = _is_prime_150_package(obj.package)
+                is_prime_750_now = _is_prime_750_package(obj.package)
 
                 if is_prime_150_now:
                     # Do not auto-activate 150 on promo approval.

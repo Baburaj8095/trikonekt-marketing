@@ -20,8 +20,8 @@ export default function AdminJoinPrimeLedger() {
 
   return (
     <AdminPromoPurchases
-      title="Ledger: Join Prime 750"
-      description="List of users who purchased Join Prime 750, with amount, payment proof, wallet source, sponsor, and approval status."
+      title="Ledger: Join Prime"
+      description="List of users who purchased Join Prime, with amount, payment proof, wallet source, sponsor, and approval status."
       defaultStatus="APPROVED"
       readOnly
     />

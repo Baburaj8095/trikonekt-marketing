@@ -1401,8 +1401,15 @@ class PromoPurchaseSerializer(serializers.ModelSerializer):
             sp_promo = attrs.get("selected_promo_product") or getattr(self.instance, "selected_promo_product", None)
             sp_legacy = attrs.get("selected_product") or getattr(self.instance, "selected_product", None)
             price = D(str(getattr(pkg, "price", "0")))
-            is_prime_750 = str(getattr(pkg, "type", "")) == "PRIME" and abs(price - D("750")) <= D("0.5")
-            is_prime_150 = str(getattr(pkg, "type", "")) == "PRIME" and abs(price - D("150")) <= D("0.5")
+            code = str(getattr(pkg, "code", "") or "").upper()
+            name = str(getattr(pkg, "name", "") or "").upper()
+            is_prime_pkg = str(getattr(pkg, "type", "")) == "PRIME"
+            is_prime_750 = is_prime_pkg and (
+                code == "PRIME750" or "PRIME750" in code or "PRIME 750" in name or abs(price - D("750")) <= D("0.5")
+            )
+            is_prime_150 = is_prime_pkg and (
+                code == "PRIME150" or "PRIME150" in code or "PRIME 150" in name or abs(price - D("150")) <= D("0.5")
+            )
 
             # PRIME 150 flow: require explicit choice
             if is_prime_150:
