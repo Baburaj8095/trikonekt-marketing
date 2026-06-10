@@ -75,6 +75,27 @@ def build_serializer(model):
             model = model
             # Keep all model fields; declared SerializerMethodFields are included automatically
             fields = "__all__"
+
+        def validate(self, attrs):
+            attrs = super().validate(attrs)
+            try:
+                is_promo_package = (
+                    model._meta.app_label == "business"
+                    and model._meta.model_name == "promopackage"
+                )
+                if is_promo_package and self.instance is not None and "code" in attrs:
+                    current = str(getattr(self.instance, "code", "") or "")
+                    incoming = str(attrs.get("code") or "")
+                    if incoming != current:
+                        raise serializers.ValidationError({
+                            "code": "Package code is locked because it controls the package flow."
+                        })
+            except serializers.ValidationError:
+                raise
+            except Exception:
+                pass
+            return attrs
+
         def to_representation(self, instance):
             data = super().to_representation(instance)
             for field in list(data.keys()):

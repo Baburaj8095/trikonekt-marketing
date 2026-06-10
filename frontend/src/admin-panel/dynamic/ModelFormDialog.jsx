@@ -134,6 +134,20 @@ export default function ModelFormDialog({
           // ignore OPTIONS errors, fallback to provided fields
         }
         let finalFields = (derived && derived.length) ? derived : base;
+        try {
+          const isPromoPackageRoute = /admin\/dynamic\/business\/promopackage\//i.test(String(route || ""));
+          if (record && isPromoPackageRoute) {
+            finalFields = (finalFields || []).map((f) =>
+              String(f?.name || "") === "code"
+                ? {
+                    ...f,
+                    read_only: true,
+                    help_text: "Package code is locked because it controls the package flow.",
+                  }
+                : f
+            );
+          }
+        } catch (_) {}
         if (isAdminUsersRoute) {
           const allowed = new Set(["email", "full_name", "phone", "sponsor_id", "pincode", "state", "city", "account_active"]);
           const cat = String(record?.category || "").toLowerCase();
