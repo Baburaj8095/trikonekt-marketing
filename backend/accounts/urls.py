@@ -62,6 +62,7 @@ from .views import (
     FranchisePasswordResetOTPRequestView,
     FranchisePasswordResetOTPVerifyView,
     FranchisePasswordResetOTPConfirmView,
+    ExternalOtpTokenView,
 )
 from .token_serializers import CustomTokenRefreshView
 from .views_tree import MyFiveMatrixTeamV1, FiveMatrixCountsView, MyMatrix5EntriesTree, MyMatrixRootsBreakdownView
@@ -69,6 +70,7 @@ from .views_tree import MyFiveMatrixTeamV1, FiveMatrixCountsView, MyMatrix5Entri
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
     path('login/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('external/otp-token/', ExternalOtpTokenView.as_view(), name='external_otp_token'),
     path('password/reset/', ResetPasswordView.as_view(), name='password_reset'),
     path('consumer/password/request-otp/', ConsumerPasswordResetOTPRequestView.as_view(), name='consumer_password_request_otp'),
     path('consumer/password/verify-otp/', ConsumerPasswordResetOTPVerifyView.as_view(), name='consumer_password_verify_otp'),

@@ -182,9 +182,16 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': os.environ.get("JWT_ROTATE_REFRESH_TOKENS", "True").lower() in ("1", "true", "yes"),
     'BLACKLIST_AFTER_ROTATION': os.environ.get("JWT_BLACKLIST_AFTER_ROTATION", "True").lower() in ("1", "true", "yes"),
     'UPDATE_LAST_LOGIN': False,
+    # Keep shared auth stable across repos/services. Set JWT_SIGNING_KEY to the
+    # same value in any backend that must verify tokens issued by this service.
+    'SIGNING_KEY': os.environ.get("JWT_SIGNING_KEY", SECRET_KEY),
     'AUTH_HEADER_TYPES': ('Bearer',),
     'LEEWAY': 60,  # absorb up to 60s clock drift to avoid false token_not_valid
 }
+
+# Server-to-server secret for trusted external backends that perform their own
+# OTP verification and need Django to mint a normal user JWT afterwards.
+EXTERNAL_AUTH_SHARED_SECRET = os.environ.get("EXTERNAL_AUTH_SHARED_SECRET", "")
 
 # CORS configuration
 # Default list includes both old (trikonekt.com) and new (growth.vin) domains to support migration.
@@ -261,6 +268,7 @@ CSRF_TRUSTED_ORIGINS = _csv_env(
         'https://api.trikonekt.com',
         # Vercel preview/production hostnames (update if you have a new one for growth.vin)
         'https://trikonekt.vercel.app',
+        'https://*.vercel.app',
     ])
 )
 

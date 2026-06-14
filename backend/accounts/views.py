@@ -33,6 +33,7 @@ from .wallet_engine import WalletEngine
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from adminapi.permissions import IsAdminOrStaff, HasAdminModuleAccess
 from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.tokens import RefreshToken
 from .token_serializers import CustomTokenObtainPairSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -303,6 +304,71 @@ class RegisterView(generics.CreateAPIView):
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
+
+
+class ExternalOtpTokenView(APIView):
+    """
+    Trusted server-to-server endpoint.
+    External backend verifies OTP, then calls this endpoint with:
+      X-External-Auth-Secret: <EXTERNAL_AUTH_SHARED_SECRET>
+      { "phone": "9999999999", "role": "user" }
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        expected = str(getattr(settings, "EXTERNAL_AUTH_SHARED_SECRET", "") or "").strip()
+        provided = str(request.headers.get("X-External-Auth-Secret") or "").strip()
+        if not expected or provided != expected:
+            return Response({"detail": "Not authorized."}, status=status.HTTP_403_FORBIDDEN)
+
+        raw_phone = str((request.data or {}).get("phone") or (request.data or {}).get("mobile") or "").strip()
+        digits = "".join(ch for ch in raw_phone if ch.isdigit())
+        if len(digits) > 10 and digits.startswith("91"):
+            digits = digits[-10:]
+        if len(digits) != 10:
+            return Response({"detail": "Valid 10-digit phone is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        User = get_user_model()
+        user = (
+            User.objects.filter(Q(phone__iexact=digits) | Q(username__iexact=digits))
+            .order_by("-id")
+            .first()
+        )
+        if not user:
+            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not getattr(user, "is_active", False):
+            return Response({"detail": "Account is inactive."}, status=status.HTTP_400_BAD_REQUEST)
+
+        role = str((request.data or {}).get("role") or "user").strip().lower()
+        user_role = str(getattr(user, "role", "") or "").strip().lower()
+        user_cat = str(getattr(user, "category", "") or "").strip().lower()
+        allowed = (
+            role == user_role
+            or (role in ("user", "consumer") and user_role == "user" and user_cat == "consumer")
+            or (role == "agency" and (user_role == "agency" or user_cat.startswith("agency")))
+            or (role == "employee" and (user_role == "employee" or user_cat == "employee"))
+            or (role in ("business", "merchant") and user_cat in ("business", "merchant"))
+        )
+        if not allowed:
+            return Response({"detail": "Role mismatch: not authorized for this role."}, status=status.HTTP_400_BAD_REQUEST)
+
+        refresh = RefreshToken.for_user(user)
+        access = refresh.access_token
+        access["role"] = user.role
+        access["username"] = user.username
+        access["full_name"] = getattr(user, "full_name", "") or ""
+        access["category"] = getattr(user, "category", "") or ""
+        cat = (getattr(user, "category", "") or "").lower()
+        access["role_effective"] = "business" if cat in ("business", "merchant") else user.role
+        access["is_staff"] = bool(getattr(user, "is_staff", False))
+        access["is_superuser"] = bool(getattr(user, "is_superuser", False))
+        access["identity_type"] = getattr(user, "identity_type", "") or ("ADMIN" if getattr(user, "is_staff", False) else "END_USER")
+
+        return Response({
+            "access": str(access),
+            "refresh": str(refresh),
+            "user": PublicUserSerializer(user, context={"request": request}).data,
+        }, status=status.HTTP_200_OK)
 
 
 class ResetPasswordView(APIView):
