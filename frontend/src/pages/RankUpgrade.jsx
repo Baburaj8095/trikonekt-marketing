@@ -34,6 +34,7 @@ import {
   createRankUpgradeFromWallet,
   getEcouponStoreBootstrap,
   getWalletMe,
+  getWalletMeFresh,
   getWalletMeHistory,
   getMyLevelBonusProgress,
   getMyRankCommissionHolds,
@@ -823,16 +824,20 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
             setSuccessTitle("Payment Successful");
             setSuccessMessage(`${rankWord} purchased successfully.`);
             setSuccessOpen(true);
-            try {
-              const [eg, p, h] = await Promise.allSettled([
-                getUpgradeEligibility(),
-                getMyLevelBonusProgress(),
-                getMyRankCommissionHolds(),
-              ]);
-              if (eg.status === "fulfilled") setElig(eg.value || null);
-              if (p.status === "fulfilled") setLbProgress(p.value || null);
-              if (h.status === "fulfilled") setLbHolds(Array.isArray(h.value) ? h.value : []);
-            } catch {}
+            // Re-fetch fresh wallet balance (no cache) so next purchase shows
+            // the correctly deducted Add Money / internal balance.
+            const [eg, p, h, freshWallet, freshHistory] = await Promise.allSettled([
+              getUpgradeEligibility(),
+              getMyLevelBonusProgress(),
+              getMyRankCommissionHolds(),
+              getWalletMeFresh(),
+              getWalletMeHistory().catch(() => null),
+            ]);
+            if (eg.status === "fulfilled") setElig(eg.value || null);
+            if (p.status === "fulfilled") setLbProgress(p.value || null);
+            if (h.status === "fulfilled") setLbHolds(Array.isArray(h.value) ? h.value : []);
+            if (freshWallet.status === "fulfilled") setWalletMe(freshWallet.value || null);
+            if (freshHistory.status === "fulfilled") setWalletHistory(freshHistory.value || null);
           } catch (e) {
             setWalletErr(e?.response?.data?.detail || e?.message || "Wallet payment failed");
           } finally {

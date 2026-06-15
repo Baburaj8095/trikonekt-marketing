@@ -1,4 +1,4 @@
-﻿import axios from "axios";
+import axios from "axios";
 import { incrementLoading, decrementLoading } from "../hooks/loadingStore";
 import { deepFixMojibake, fixMojibakeString } from "../utils/encodingFix";
 
@@ -1029,6 +1029,14 @@ export async function createPromoPurchaseFromWallet(payload = {}) {
 // Wallet summary (includes internal/self-package wallet balance)
 export async function getWalletMe() {
   const res = await API.get("/accounts/wallet/me/", { dedupe: "cancelPrevious", cacheTTL: 10_000 });
+  return res?.data || res;
+}
+
+// Fresh wallet summary – bypasses the 10s cache. Use this after a wallet debit
+// (e.g. after a successful wallet-paid package purchase) so the UI immediately
+// reflects the updated Add Money / internal balance.
+export async function getWalletMeFresh() {
+  const res = await API.get("/accounts/wallet/me/", { cacheTTL: 0 });
   return res?.data || res;
 }
 

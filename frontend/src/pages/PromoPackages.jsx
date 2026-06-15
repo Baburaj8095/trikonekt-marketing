@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Paper,
@@ -40,6 +40,7 @@ import {
   getEcouponStoreBootstrap,
   createPromoPurchaseFromWallet,
   getWalletMe,
+  getWalletMeFresh,
   getWalletMeHistory,
 } from "../api/api";
 import RankUpgrade from "./RankUpgrade";
@@ -1367,11 +1368,13 @@ export default function PromoPackages({
 
   const onBuy = async (data) => {
     // New flow: ask user to choose Wallet vs Manual.
+    // Always use getWalletMeFresh() (no cache) so existing users who already
+    // made a wallet purchase see their real current balance, not a cached one.
     setPurchaseIntent(data);
     setWalletErr("");
     try {
       const [w, h] = await Promise.all([
-        getWalletMe(),
+        getWalletMeFresh(),
         getWalletMeHistory().catch(() => null),
       ]);
       setWalletMe(w || null);
@@ -1628,7 +1631,17 @@ export default function PromoPackages({
             if (purchaseIntent?.pkg?.id) payload.package_id = purchaseIntent.pkg.id;
             await createPromoPurchaseFromWallet(payload);
             setMethodOpen(false);
-            setHistory(await listMyPromoPurchases());
+            // Re-fetch history and wallet balance together.
+            // Use getWalletMeFresh() (no cache) so the deducted balance is shown
+            // immediately the next time the user opens the payment method dialog.
+            const [updatedHistory, freshWallet, freshHistory] = await Promise.allSettled([
+              listMyPromoPurchases(),
+              getWalletMeFresh(),
+              getWalletMeHistory().catch(() => null),
+            ]);
+            if (updatedHistory.status === "fulfilled") setHistory(updatedHistory.value);
+            if (freshWallet.status === "fulfilled") setWalletMe(freshWallet.value || null);
+            if (freshHistory.status === "fulfilled") setWalletHistory(freshHistory.value || null);
             setPaymentSuccessMessage("Package purchased successfully.");
             setPaymentSuccessOpen(true);
           } catch (e) {

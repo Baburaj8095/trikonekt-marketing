@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -20,7 +20,7 @@ import {
   Stack,
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
-import { getTriApp, getEcouponStoreBootstrap, createPromoPurchase, createPromoPurchaseFromWallet, getWalletMe, getWalletMeHistory } from "../api/api";
+import { getTriApp, getEcouponStoreBootstrap, createPromoPurchase, createPromoPurchaseFromWallet, getWalletMe, getWalletMeFresh, getWalletMeHistory } from "../api/api";
 import normalizeMediaUrl from "../utils/media";
 import { addProduct as addCartProduct } from "../store/cart";
 import {
@@ -648,6 +648,14 @@ export default function TriAppPage() {
               ...payload,
             });
             setMethodOpen(false);
+            // Re-fetch fresh wallet balance (no cache) so next purchase shows
+            // the correctly deducted Add Money / internal balance.
+            const [freshWallet, freshHistory] = await Promise.allSettled([
+              getWalletMeFresh(),
+              getWalletMeHistory().catch(() => null),
+            ]);
+            if (freshWallet.status === "fulfilled") setWalletMe(freshWallet.value || null);
+            if (freshHistory.status === "fulfilled") setWalletHistory(freshHistory.value || null);
             setPaymentSuccessOpen(true);
           } catch (e) {
             setWalletErr(e?.response?.data?.detail || e?.message || "Wallet payment failed");
