@@ -450,7 +450,7 @@ function PaymentMethodDialog({ open, onClose, intent, walletMe, walletHistory, o
       </DialogContent>
       <DialogActions sx={{ p: 1.5, gap: 1, flexWrap: "wrap" }}>
         <Button onClick={onClose} sx={{ borderRadius: 3 }}>Cancel</Button>
-        <Button variant="outlined" onClick={onPickManual} sx={{ borderRadius: 3, fontWeight: 900 }}>
+        <Button variant="outlined" onClick={onPickManual} disabled sx={{ borderRadius: 3, fontWeight: 900 }}>
           Manual Payment
         </Button>
         <Button variant="contained" disabled={!canWallet} onClick={() => onPickWallet("internal")} sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>

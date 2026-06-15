@@ -329,7 +329,7 @@ function PaymentMethodDialog({ open, onClose, intent, walletMe, walletHistory, b
       </DialogContent>
       <DialogActions sx={{ p: 1.5, gap: 1, flexWrap: "wrap" }}>
         <Button onClick={onClose} disabled={busy} sx={{ borderRadius: 3 }}>Cancel</Button>
-        <Button variant="outlined" onClick={onPickManual} disabled={busy} sx={{ borderRadius: 3, fontWeight: 900 }}>
+        <Button variant="outlined" onClick={onPickManual} disabled sx={{ borderRadius: 3, fontWeight: 900 }}>
           Manual Payment
         </Button>
         <Button variant="contained" disabled={!canWallet || busy} onClick={() => onPickWallet("internal")} sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>

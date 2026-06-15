@@ -2310,9 +2310,16 @@ class WalletMe(APIView):
                 source_debit = tx_all.filter(add_money_filter, amount__lt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")
                 typed_total = D(str(package_upload_balance or "0"))
                 source_total = D(str(source_credit)) + D(str(source_debit))
-                if source_total > typed_total:
-                    package_upload_balance = str(source_total.quantize(D("0.01")))
-                if source_total == D("0.00"):
+                if source_credit > D("0.00"):
+                    # When we have confirmed add-money credit transactions, the
+                    # transaction-history total is the authoritative balance.
+                    # Do NOT use `source_total > typed_total` — that condition
+                    # silently discards the deduction whenever the purchase debit
+                    # type (INTERNAL_WALLET_DEBIT) is absent from the typed-debit
+                    # list, leaving typed_total (e.g. 2000) higher than source_total
+                    # (e.g. 1250 after a ₹750 purchase) and returning the wrong value.
+                    package_upload_balance = str(max(D("0.00"), source_total).quantize(D("0.01")))
+                elif source_total == D("0.00"):
                     account_total = (
                         WalletAccount.objects
                         .filter(user=request.user, wallet_type=WalletTypes.ADD_MONEY_POCKET)
