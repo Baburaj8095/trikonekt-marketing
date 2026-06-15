@@ -1314,6 +1314,11 @@ def distribute_auto_pool_commissions(payer_user, base_amount: Decimal, fixed_key
     cfg = CommissionConfig.get_solo()
     if not cfg.enable_pool_distribution:
         return
+
+    if source_type and source_id:
+        from accounts.models import WalletTransaction
+        if WalletTransaction.objects.filter(source_type=source_type, source_id=source_id, type="COMMISSION_CREDIT").exists():
+            return
     st = source_type or "AUTO_POOL_GEO"
     sid = source_id or str(getattr(payer_user, "id", ""))
 

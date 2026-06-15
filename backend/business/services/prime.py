@@ -462,7 +462,9 @@ def distribute_prime_150_payouts(
             pass
     perform_matrix = False
     if not already_for_purchase and _is_consumer(consumer) and base150 is not None:
-        if mode150 == "NEVER":
+        if src_type == "SELF_250_PACK":
+            perform_matrix = True
+        elif mode150 == "NEVER":
             perform_matrix = False
         elif mode150 == "FIRST_TIME_ONLY":
             perform_matrix = not _matrix_any_prior_for_user(consumer, "150")
@@ -474,6 +476,10 @@ def distribute_prime_150_payouts(
     created_three = []
     if perform_matrix:
         count_eff = max(0, int(cfg_count150))
+        if src_type == "SELF_250_PACK":
+            count_eff = max(1, count_eff)
+            eff_enable_5 = True
+            eff_enable_3 = True
         if count_eff > 0:
             if eff_enable_5:
                 for _ in range(count_eff):
@@ -712,15 +718,22 @@ def distribute_prime_150_payouts(
 
     # 4) Reward points (optional, config-driven)
     try:
-        from accounts.models import RewardPointsAccount
+        from accounts.models import RewardPointsAccount, RewardPointsTransaction
         pts = _q2(p150.reward_points_amount)
         if pts > 0:
-            RewardPointsAccount.credit_points(
-                consumer,
-                pts,
-                reason="PRIME_150",
-                meta={"source_type": src_type, "source_id": src_id},
-            )
+            already_pts = RewardPointsTransaction.objects.filter(
+                user=consumer,
+                type=RewardPointsTransaction.TYPE_EARN,
+                meta__source_type=src_type,
+                meta__source_id=src_id,
+            ).exists()
+            if not already_pts:
+                RewardPointsAccount.credit_points(
+                    consumer,
+                    pts,
+                    reason="PRIME_150",
+                    meta={"source_type": src_type, "source_id": src_id},
+                )
     except Exception:
         # Best-effort; do not block other credits
         pass

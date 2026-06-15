@@ -92,6 +92,7 @@ const ACCOUNT_CATEGORIES = [
         s.includes("PRIME_150") ||
         s.includes("PRIME150") ||
         s.includes("SELF_250") ||
+        s.includes("SELF_250_PACK") ||
         s.includes("SELF_ACCOUNT") ||
         s.includes("SELF_REBIRTH")
       );

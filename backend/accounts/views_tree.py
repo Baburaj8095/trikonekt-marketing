@@ -959,7 +959,7 @@ def _infer_root_category(source_type: str, source_id: str) -> str:
     if any(x in s for x in ("MONTHLY_759", "MONTHLY_1000", "SMART_SSP", "MONTHLY_FIRST_SEASON")):
         return "SMART_SSP"
 
-    if any(x in s for x in ("SELF_ACCOUNT", "SELF_250", "ECOUPON", "COUPON_150", "PRIME_150", "PRIME150", "SELF_REBIRTH")):
+    if any(x in s for x in ("SELF_ACCOUNT", "SELF_250", "SELF_250_PACK", "ECOUPON", "COUPON_150", "PRIME_150", "PRIME150", "SELF_REBIRTH")):
         return "SELF_REBIRTH"
 
     # Fallback: infer Smart SSP by its source_id format: "{purchase_id}:{season}:{box}"
@@ -973,7 +973,6 @@ def _infer_root_category(source_type: str, source_id: str) -> str:
         pass
 
     return "OTHER"
-
 
 def _extract_matrix_root_id(meta: object) -> int:
     """Best-effort extraction of matrix root account id from WalletTransaction.meta.

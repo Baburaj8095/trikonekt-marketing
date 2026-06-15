@@ -159,8 +159,8 @@ function MemberCard({ member, onView }) {
           {isActive ? "Active" : "Inactive"}
         </span>
 
-        {/* View button – only for active accounts */}
-        {isActive && (
+        {/* Action buttons – View for active, Call for all if phone exists */}
+        {(isActive || callPhone) && (
           <div
             style={{
               display: "flex",
@@ -169,23 +169,25 @@ function MemberCard({ member, onView }) {
               gap: 6,
             }}
           >
-            <button
-              onClick={() => onView(member?.id)}
-              style={{
-                padding: "5px 14px",
-                borderRadius: 99,
-                border: `1.5px solid ${C.primary}`,
-                background: C.primary,
-                color: "#fff",
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: "pointer",
-                outline: "none",
-                letterSpacing: "0.02em",
-              }}
-            >
-              View
-            </button>
+            {isActive && (
+              <button
+                onClick={() => onView(member?.id)}
+                style={{
+                  padding: "5px 14px",
+                  borderRadius: 99,
+                  border: `1.5px solid ${C.primary}`,
+                  background: C.primary,
+                  color: "#fff",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  outline: "none",
+                  letterSpacing: "0.02em",
+                }}
+              >
+                View
+              </button>
+            )}
 
             {callPhone && (
               <a
