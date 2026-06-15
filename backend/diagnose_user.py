@@ -4,64 +4,76 @@ import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings")
 django.setup()
 
-from django.db.models import Q
-from accounts.models import CustomUser, WalletTransaction
-from business.models import AutoPoolAccount
-
-def count_descendants(node_id, pool_type):
-    visited = set()
-    frontier = [node_id]
-    while frontier:
-        next_frontier = []
-        children = AutoPoolAccount.objects.filter(
-            pool_type=pool_type,
-            status="ACTIVE",
-            parent_account_id__in=frontier
-        ).values_list('id', flat=True)
-        for cid in children:
-            if cid not in visited:
-                visited.add(cid)
-                next_frontier.append(cid)
-        frontier = next_frontier
-    return len(visited)
+from decimal import Decimal
+from accounts.models import CustomUser
+from business.models import is_matrix_eligible, AutoPoolAccount
+from business.services.placement import GenericPlacement
 
 def run_diagnostics():
     username = "7975657678"
-    print(f"=== DIAGNOSTICS FOR USER {username} ===")
+    print(f"=== TRACING PLACEMENT FOR USER {username} ===")
     user = CustomUser.objects.filter(username=username).first()
     if not user:
         print(f"[-] User {username} not found.")
         return
         
     print(f"[+] User: {user.username} (ID: {user.id})")
+    print(f"  - Role: {user.role}")
+    print(f"  - Category: {user.category}")
+    print(f"  - Is Staff: {user.is_staff}")
+    print(f"  - Is Superuser: {user.is_superuser}")
+    print(f"  - Is Active: {user.is_active}")
+    print(f"  - Eligible (is_matrix_eligible): {is_matrix_eligible(user)}")
     
-    # 1. Check all SELF_250_PACK transactions for this user
-    txs = WalletTransaction.objects.filter(user=user, source_type="SELF_250_PACK").order_by("created_at")
-    print(f"\n[+] SELF_250_PACK Transactions count: {txs.count()}")
-    for tx in txs:
-        # Check if 5m/3m exist in database
-        has_5 = AutoPoolAccount.objects.filter(owner=user, pool_type="FIVE_150", source_type="SELF_250_PACK", source_id=str(tx.source_id)).exists()
-        has_3 = AutoPoolAccount.objects.filter(owner=user, pool_type="THREE_150", source_type="SELF_250_PACK", source_id=str(tx.source_id)).exists()
-        print(f"  - TX Date: {tx.created_at} | type: {tx.type} | Index (source_id): {tx.source_id} | meta: {tx.meta}")
-        print(f"    -> 5-matrix exists: {has_5} | 3-matrix exists: {has_3}")
+    print("\n[+] Tracing AutoPoolAccount.create_five_150_for_user step-by-step:")
+    
+    # own_base
+    own_base = AutoPoolAccount._base_self_account(user, "FIVE_150")
+    print(f"  - own_base: {own_base}")
+    if own_base:
+        start_id = int(own_base.id)
+    else:
+        start_id = AutoPoolAccount._sponsor_start_entry_id_for(user, "FIVE_150")
+    print(f"  - Resolved start_id: {start_id}")
+    
+    if start_id is None:
+        root = AutoPoolAccount.objects.filter(parent_account__isnull=True, pool_type="FIVE_150").first()
+        start_id = root.id if root else None
+        print(f"  - Fallback start_id (sentinel): {start_id}")
+        
+    # Let's run GenericPlacement.place_account directly and see if it fails/raises an exception
+    print("\n[+] Invoking GenericPlacement.place_account for FIVE_150...")
+    try:
+        acc = GenericPlacement.place_account(
+            owner=user,
+            pool_type="FIVE_150",
+            amount=Decimal("150.00"),
+            source_type="SELF_250_PACK",
+            source_id="4",
+            start_entry_id=start_id,
+        )
+        print(f"  [SUCCESS] Placed FIVE_150 successfully: {acc} (ID: {acc.id}, parent: {acc.parent_account_id}, position: {acc.position})")
+    except Exception as e:
+        print(f"  [FAILED] GenericPlacement.place_account for FIVE_150 raised an exception: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
 
-    # 2. Check all active FIVE_150 accounts owned by this user
-    ap_5 = AutoPoolAccount.objects.filter(owner=user, pool_type="FIVE_150").order_by("created_at")
-    print(f"\n[+] FIVE_150 accounts in DB owned by {username}: {ap_5.count()}")
-    for ap in ap_5:
-        from accounts.views_tree import _infer_root_category
-        inferred = _infer_root_category(ap.source_type, ap.source_id)
-        desc = count_descendants(ap.id, "FIVE_150")
-        print(f"  - Entry #{ap.id}: idx={ap.user_entry_index}, status={ap.status}, source_type={ap.source_type}, source_id={ap.source_id}, inferred_category={inferred}, descendants={desc}")
-
-    # 3. Check all active THREE_150 accounts owned by this user
-    ap_3 = AutoPoolAccount.objects.filter(owner=user, pool_type="THREE_150").order_by("created_at")
-    print(f"\n[+] THREE_150 accounts in DB owned by {username}: {ap_3.count()}")
-    for ap in ap_3:
-        from accounts.views_tree import _infer_root_category
-        inferred = _infer_root_category(ap.source_type, ap.source_id)
-        desc = count_descendants(ap.id, "THREE_150")
-        print(f"  - Entry #{ap.id}: idx={ap.user_entry_index}, status={ap.status}, source_type={ap.source_type}, source_id={ap.source_id}, inferred_category={inferred}, descendants={desc}")
+    # Let's run GenericPlacement.place_account directly for THREE_150
+    print("\n[+] Invoking GenericPlacement.place_account for THREE_150...")
+    try:
+        acc = GenericPlacement.place_account(
+            owner=user,
+            pool_type="THREE_150",
+            amount=Decimal("150.00"),
+            source_type="SELF_250_PACK",
+            source_id="4",
+            start_entry_id=None,  # Three pool starts at sentinel root
+        )
+        print(f"  [SUCCESS] Placed THREE_150 successfully: {acc} (ID: {acc.id}, parent: {acc.parent_account_id}, position: {acc.position})")
+    except Exception as e:
+        print(f"  [FAILED] GenericPlacement.place_account for THREE_150 raised an exception: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     run_diagnostics()
