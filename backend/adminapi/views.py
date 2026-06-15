@@ -4080,7 +4080,9 @@ class AdminMasterCommissionConfig(APIView):
                     except Exception:
                         count150 = 1
                     payload["product_matrix_open_mode"] = mode150
+                    payload["matrix_open_mode"] = mode150
                     payload["product_matrix_open_count"] = max(0, int(count150))
+                    payload["matrix_open_count"] = max(0, int(count150))
                 except Exception:
                     pass
 
@@ -4108,7 +4110,9 @@ class AdminMasterCommissionConfig(APIView):
                         except Exception:
                             count750 = 1
                     payload["product_matrix_open_mode"] = mode750
+                    payload["matrix_open_mode"] = mode750
                     payload["product_matrix_open_count"] = max(0, int(count750))
+                    payload["matrix_open_count"] = max(0, int(count750))
                 except Exception:
                     pass
 
