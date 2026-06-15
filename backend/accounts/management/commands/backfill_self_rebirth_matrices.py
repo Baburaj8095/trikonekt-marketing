@@ -19,16 +19,31 @@ class Command(BaseCommand):
             type=str,
             help="Filter backfill to a specific user's phone number.",
         )
+        parser.add_argument(
+            "--days",
+            type=int,
+            default=30,
+            help="Filter backfill to transactions created in the last N days (default: 30). Use 0 for all history.",
+        )
 
     def handle(self, *args, **options):
         dry_run = options.get("dry_run", False)
         phone = options.get("phone")
+        days = options.get("days", 30)
 
         # Query all AUTO_PURCHASE_DEBIT transactions that correspond to SELF_250_PACK purchases
         qs = WalletTransaction.objects.filter(
             type="AUTO_PURCHASE_DEBIT",
             source_type="SELF_250_PACK"
-        ).order_by("created_at")
+        )
+
+        if days > 0:
+            from django.utils import timezone
+            from datetime import timedelta
+            cutoff = timezone.now() - timedelta(days=days)
+            qs = qs.filter(created_at__gte=cutoff)
+
+        qs = qs.order_by("created_at")
 
         if phone:
             user = CustomUser.objects.filter(username=phone).first()
@@ -38,7 +53,7 @@ class Command(BaseCommand):
             qs = qs.filter(user=user)
 
         total = qs.count()
-        self.stdout.write(self.style.NOTICE(f"Scanning {total} SELF_250_PACK purchase transactions..."))
+        self.stdout.write(self.style.NOTICE(f"Scanning {total} SELF_250_PACK purchase transactions (last {days} days)..."))
 
         processed = 0
         fixed = 0
