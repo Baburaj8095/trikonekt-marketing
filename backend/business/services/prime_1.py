@@ -47,22 +47,32 @@ def _matrix_open_cfg(product_key: str) -> tuple[str, int]:
         mode = "FIRST_TIME_ONLY"
     return mode, count
 
-def _matrix_audit_exists_for_purchase(src_type: str, src_id: str, product_key: str) -> bool:
+def _matrix_audit_exists_for_purchase(src_type: str, src_id: str, product_key: str, consumer: CustomUser | None = None) -> bool:
     """
     Consider matrix 'already distributed' ONLY when wallet transactions for matrix payouts exist
-    for this purchase/source. An orphan audit without wallet evidence should not block payouts.
+    for this purchase/source, OR when the matrix accounts themselves already exist.
     """
     try:
         from coupons.models import AuditTrail  # noqa: F401 (kept for context)
         from accounts.models import WalletTransaction as WT
+        from business.models import AutoPoolAccount
         src_t = str(src_type or "")
         src_i = str(src_id or "")
-        # Wallet evidence of matrix payouts for this purchase
-        tx_exists = WT.objects.filter(
-            source_type=src_t,
-            source_id=src_i,
-            meta__orig_type__in=("AUTOPOOL_BONUS_FIVE", "AUTOPOOL_BONUS_THREE"),
-        ).exists()
+
+        # 1. Check if matrix accounts already exist for this consumer and purchase
+        if consumer:
+            pool_type = "FIVE_150" if str(product_key) == "150" else "THREE_150"
+            if AutoPoolAccount.objects.filter(owner=consumer, pool_type=pool_type, source_type=src_t, source_id=src_i).exists():
+                return True
+
+        # 2. Check wallet evidence of matrix payouts for this purchase
+        # If consumer is provided, restrict to payouts triggered by this consumer (using meta__from_user_id)
+        # to avoid matching incremental source_ids (like pack indices '5', '6') from other users.
+        q = Q(source_type=src_t, source_id=src_i, meta__orig_type__in=("AUTOPOOL_BONUS_FIVE", "AUTOPOOL_BONUS_THREE"))
+        if consumer:
+            q = q & (Q(meta__from_user_id=consumer.id) | Q(meta__from_user=consumer.username))
+
+        tx_exists = WT.objects.filter(q).exists()
         return tx_exists
     except Exception:
         return False
@@ -452,7 +462,7 @@ def distribute_prime_150_payouts(
 
     # 3) Matrix opening with UI-configurable repetition and per-purchase idempotency
     mode150, cfg_count150 = _matrix_open_cfg("150")
-    already_for_purchase = _matrix_audit_exists_for_purchase(src_type, src_id, "150")
+    already_for_purchase = _matrix_audit_exists_for_purchase(src_type, src_id, "150", consumer)
     if already_for_purchase:
         try:
             logger.info("matrix skip: already distributed for purchase", extra={"product": "150", "user_id": getattr(consumer, "id", None), "source_id": src_id})
@@ -917,7 +927,7 @@ def distribute_prime_750_payouts(
         enable_3 = False
 
     mode750, cfg_count750 = _matrix_open_cfg("750")
-    already_for_purchase = _matrix_audit_exists_for_purchase(src_type, src_id, "750")
+    already_for_purchase = _matrix_audit_exists_for_purchase(src_type, src_id, "750", consumer)
     if already_for_purchase:
         try:
             logger.info("matrix skip: already distributed for purchase", extra={"product": "750", "user_id": getattr(consumer, "id", None), "source_id": src_id})
