@@ -312,6 +312,11 @@ class Shop(models.Model):
     shop_image = models.ImageField(upload_to='merchant/shops/', null=True, blank=True, storage=MEDIA_STORAGE)
     tri_app = models.ForeignKey('business.TriApp', null=True, blank=True, on_delete=models.SET_NULL, related_name='shops', db_index=True)
 
+    discount_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    category = models.ForeignKey('business.MerchantCategory', null=True, blank=True, on_delete=models.SET_NULL, related_name='shops')
+    subcategory = models.ForeignKey('business.MerchantSubCategory', null=True, blank=True, on_delete=models.SET_NULL, related_name='shops')
+    additional_images = models.TextField(default='[]', blank=True)
+
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

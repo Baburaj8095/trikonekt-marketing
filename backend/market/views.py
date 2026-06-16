@@ -641,7 +641,7 @@ class ShopPublicList(generics.ListAPIView):
         except Exception:
             radius_km = 25.0
 
-        base_qs = Shop.objects.select_related("merchant").filter(status=Shop.STATUS_ACTIVE)
+        base_qs = Shop.objects.select_related("merchant").filter(status=Shop.STATUS_ACTIVE).exclude(merchant__category='merchant')
         if city:
             base_qs = base_qs.filter(city__iexact=city)
         if q:
@@ -687,7 +687,7 @@ class ShopPublicDetail(generics.RetrieveAPIView):
     """
     serializer_class = ShopSerializer
     permission_classes = [permissions.AllowAny]
-    queryset = Shop.objects.select_related("merchant").filter(status=Shop.STATUS_ACTIVE)
+    queryset = Shop.objects.select_related("merchant").filter(status=Shop.STATUS_ACTIVE).exclude(merchant__category='merchant')
 
 
 class ShopsNearbyView(APIView):
@@ -729,7 +729,7 @@ class ShopsNearbyView(APIView):
             limit = 20
         pincode = (params.get("pincode") or "").strip()
 
-        base_qs = Shop.objects.select_related("merchant", "tri_app").filter(status=Shop.STATUS_ACTIVE)
+        base_qs = Shop.objects.select_related("merchant", "tri_app").filter(status=Shop.STATUS_ACTIVE).exclude(merchant__category='merchant')
 
         def _img_url(obj):
             try:
@@ -835,11 +835,11 @@ class ShopProductsPublicList(generics.ListAPIView):
 
     def get_queryset(self):
         shop_id = self.kwargs.get("shop_id")
-        qs = ShopProduct.objects.select_related("shop").filter(
+        qs = ShopProduct.objects.select_related("shop", "shop__merchant").filter(
             shop_id=shop_id,
             is_active=True,
             shop__status=Shop.STATUS_ACTIVE,
-        )
+        ).exclude(shop__merchant__category='merchant')
         ordering = (self.request.query_params.get("ordering") or "").lower().strip()
         if ordering in ("price", "price_asc"):
             qs = qs.order_by("price", "-created_at")
