@@ -2041,6 +2041,8 @@ class WalletMe(APIView):
             tax_percent = "10"
 
         if inactive:
+            from django.db.models import Sum
+            from decimal import Decimal as D
             tx_all = WalletTransaction.objects.filter(user=request.user)
 
             def _wallet_sum(credit_types, debit_types=None):
