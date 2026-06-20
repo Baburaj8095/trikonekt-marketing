@@ -20,6 +20,8 @@ export default function BusinessProfile() {
   const [form, setForm] = useState({
     business_name: "",
     mobile_number: "",
+    email: "",
+    age: "",
     commission_percent: "",
     service_mode: "BOTH",
     address: "",
@@ -40,6 +42,8 @@ export default function BusinessProfile() {
           setForm({
             business_name: p?.business_name || "",
             mobile_number: p?.mobile_number || "",
+            email: p?.email || "",
+            age: p?.age != null ? String(p.age) : "",
             commission_percent:
               p?.commission_percent != null && p.commission_percent !== ""
                 ? String(p.commission_percent)
@@ -110,6 +114,8 @@ export default function BusinessProfile() {
       const payload = {
         business_name: form.business_name || "",
         mobile_number: form.mobile_number || "",
+        email: form.email || "",
+        age: form.age ? parseInt(form.age, 10) : null,
         // Only send commission if provided (avoid overwriting with empty when backend has value)
         ...(String(form.commission_percent || "").trim() !== "" && {
           commission_percent: parseFloat(form.commission_percent),
@@ -177,6 +183,31 @@ export default function BusinessProfile() {
                 sx={{ mb: { xs: 0, md: 1 } }}
                 inputProps={{ inputMode: "tel", maxLength: 10 }}
                 required
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Email"
+                name="email"
+                type="email"
+                value={form.email}
+                onChange={handleChange}
+                sx={{ mb: { xs: 0, md: 1 } }}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Age"
+                name="age"
+                type="number"
+                value={form.age}
+                onChange={handleChange}
+                sx={{ mb: { xs: 0, md: 1 } }}
+                inputProps={{ min: 0, max: 120 }}
               />
             </Grid>
 

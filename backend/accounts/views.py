@@ -2041,6 +2041,79 @@ class WalletMe(APIView):
             tax_percent = "10"
 
         if inactive:
+            tx_all = WalletTransaction.objects.filter(user=request.user)
+
+            def _wallet_sum(credit_types, debit_types=None):
+                from django.db.models import Sum
+                from decimal import Decimal as D
+                credit = tx_all.filter(type__in=list(credit_types or []), amount__gt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")
+                debit = tx_all.filter(type__in=list(debit_types or []), amount__lt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")
+                return str((D(str(credit)) + D(str(debit))).quantize(D("0.01")))
+
+            shopping_wallet_balance = _wallet_sum(["SHOPPING_WALLET_CREDIT"], ["SHOPPING_WALLET_DEBIT"])
+            coupon_wallet_balance = _wallet_sum(
+                ["COUPON_WALLET_CREDIT", "COUPON_WALLET_REFUND"],
+                ["COUPON_WALLET_DEBIT", "VOUCHER_CREATE_DEBIT"],
+            )
+            upload_sources = ["WALLET_UPLOAD", "UPLOAD_TO_WALLET", "PACKAGE_UPLOAD", "PACKAGE_BUY_UPLOAD"]
+            internal_credit = (
+                tx_all
+                .filter(type="INTERNAL_WALLET_CREDIT", amount__gt=0)
+                .exclude(source_type__in=upload_sources)
+                .aggregate(total=Sum("amount"))["total"] or D("0.00")
+            )
+            internal_debit = (
+                tx_all
+                .filter(type="INTERNAL_WALLET_DEBIT", amount__lt=0)
+                .exclude(source_type__in=upload_sources)
+                .aggregate(total=Sum("amount"))["total"] or D("0.00")
+            )
+            internal_wallet_balance = str((D(str(internal_credit)) + D(str(internal_debit))).quantize(D("0.01")))
+            package_coupon_wallet_balance = _wallet_sum(["PACKAGE_COUPON_WALLET_CREDIT", "VOUCHER_REDEEM_CREDIT"], ["PACKAGE_COUPON_WALLET_DEBIT"])
+            wallet_transfer_total = _wallet_sum(["WALLET_TO_WALLET_IN"], ["WALLET_TO_WALLET_OUT"])
+            withdrawal_wallet_balance = "0.00"
+            package_upload_balance = _wallet_sum(
+                [
+                    "WALLET_UPLOAD_CREDIT",
+                    "PACKAGE_UPLOAD_CREDIT",
+                    "PACKAGE_BUY_UPLOAD_CREDIT",
+                    "UPLOAD_TO_WALLET_CREDIT",
+                ],
+                [
+                    "PACKAGE_UPLOAD_DEBIT",
+                    "PACKAGE_BUY_UPLOAD_DEBIT",
+                    "UPLOAD_TO_WALLET_DEBIT",
+                ],
+            )
+            try:
+                from django.db.models import Q
+                from accounts.models import WalletAccount, WalletTypes
+                add_money_filter = (
+                    Q(source_type__in=upload_sources)
+                    | Q(meta__wallet="ADD_MONEY")
+                    | Q(meta__destination_wallet=WalletTypes.ADD_MONEY_POCKET)
+                    | Q(meta__legacy_wallet_type=WalletTypes.ADD_MONEY_POCKET)
+                    | Q(meta__wallet_source="package_upload")
+                )
+                from decimal import Decimal as D
+                from django.db.models import Sum
+                source_credit = tx_all.filter(add_money_filter, amount__gt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")
+                source_debit = tx_all.filter(add_money_filter, amount__lt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")
+                typed_total = D(str(package_upload_balance or "0"))
+                source_total = D(str(source_credit)) + D(str(source_debit))
+                if source_credit > D("0.00"):
+                    package_upload_balance = str(max(D("0.00"), source_total).quantize(D("0.01")))
+                elif source_total == D("0.00"):
+                    account_total = (
+                        WalletAccount.objects
+                        .filter(user=request.user, wallet_type=WalletTypes.ADD_MONEY_POCKET)
+                        .aggregate(total=Sum("current_balance"))["total"] or D("0.00")
+                    )
+                    if D(str(account_total)) > typed_total:
+                        package_upload_balance = str(D(str(account_total)).quantize(D("0.01")))
+            except Exception:
+                pass
+
             return Response({
                 "balance": "0",
                 "main_balance": "0",
@@ -2067,6 +2140,16 @@ class WalletMe(APIView):
                     "completed_in_current_block": "0.00",
                     "remaining_to_next_block": "1000.00",
                     "progress_percent": 0
+                },
+                "transfer_wallets": {
+                    "shopping": shopping_wallet_balance,
+                    "coupon": coupon_wallet_balance,
+                    "internal": internal_wallet_balance,
+                    "packagePurchaseCoupon": package_coupon_wallet_balance,
+                    "walletToWallet": wallet_transfer_total,
+                    "withdrawal": withdrawal_wallet_balance,
+                    "packageUpload": package_upload_balance,
+                    "addMoney": package_upload_balance,
                 }
             }, status=status.HTTP_200_OK)
 
