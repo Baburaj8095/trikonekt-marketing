@@ -44,6 +44,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.db.models import Q, Sum, Count
 from django.db import transaction
+from decimal import Decimal as D
 from locations.views import _build_district_index, india_place_variants
 from locations.models import State
 from django.http import HttpResponse
@@ -2041,13 +2042,9 @@ class WalletMe(APIView):
             tax_percent = "10"
 
         if inactive:
-            from django.db.models import Sum
-            from decimal import Decimal as D
             tx_all = WalletTransaction.objects.filter(user=request.user)
 
             def _wallet_sum(credit_types, debit_types=None):
-                from django.db.models import Sum
-                from decimal import Decimal as D
                 credit = tx_all.filter(type__in=list(credit_types or []), amount__gt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")
                 debit = tx_all.filter(type__in=list(debit_types or []), amount__lt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")
                 return str((D(str(credit)) + D(str(debit))).quantize(D("0.01")))
@@ -2088,8 +2085,6 @@ class WalletMe(APIView):
                 ],
             )
             try:
-                from django.db.models import Q
-                from accounts.models import WalletAccount, WalletTypes
                 add_money_filter = (
                     Q(source_type__in=upload_sources)
                     | Q(meta__wallet="ADD_MONEY")
@@ -2097,8 +2092,6 @@ class WalletMe(APIView):
                     | Q(meta__legacy_wallet_type=WalletTypes.ADD_MONEY_POCKET)
                     | Q(meta__wallet_source="package_upload")
                 )
-                from decimal import Decimal as D
-                from django.db.models import Sum
                 source_credit = tx_all.filter(add_money_filter, amount__gt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")
                 source_debit = tx_all.filter(add_money_filter, amount__lt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")
                 typed_total = D(str(package_upload_balance or "0"))
@@ -2160,7 +2153,6 @@ class WalletMe(APIView):
 
         # Enhanced wallet meta for UI (best-effort; all exceptions guarded)
         try:
-            from decimal import Decimal as D
             block_size = D("1000.00")
             main = D(str(getattr(w, "main_balance", 0) or 0))
             total_blocks = int(main // block_size)
@@ -2230,7 +2222,6 @@ class WalletMe(APIView):
             matrix_total = _sum_t(tx_all.filter(type__in=["LEVEL_BONUS", "AUTOPOOL_BONUS_THREE", "AUTOPOOL_BONUS_FIVE"]))
             global_tri_total = _sum_t(tx_all.filter(type="GLOBAL_ROYALTY"))
             global_turnover_total = _sum_t(tx_all.filter(type="GLOBAL_ACTIVATION_CREDIT"))
-            from decimal import Decimal as D
             withdrawal_benefit_total = _sum_t(tx_all.filter(type="LIFETIME_WITHDRAWAL_BONUS"))
             commission_total = _sum_t(tx_all.filter(type="COMMISSION_CREDIT"))
             franchise_total = _sum_t(tx_all.filter(type="FRANCHISE_INCOME"))
@@ -2344,7 +2335,6 @@ class WalletMe(APIView):
 
         # Derived transfer wallet balances from ledger-only buckets
         try:
-            from decimal import Decimal as D
 
             def _wallet_sum(credit_types, debit_types=None):
                 credit = tx_all.filter(type__in=list(credit_types or []), amount__gt=0).aggregate(total=Sum("amount"))["total"] or D("0.00")

@@ -502,11 +502,7 @@ export default function TeamWallet() {
           ];
           break;
         case 6:
-          amount = Number(
-            transferWallets?.coupon ||
-              voucherData?.coupon_wallet_balance ||
-              0
-          );
+          amount = Number(transferWallets?.coupon) || Number(voucherData?.coupon_wallet_balance) || 0;
           icon = <LocalShippingIcon />;
           label = "Create 30-day/7-day vouchers";
           actions = [
@@ -548,7 +544,7 @@ export default function TeamWallet() {
           ];
           break;
         case 11:
-          amount = Number(transferWallets?.packagePurchaseCoupon || voucherData?.package_coupon_wallet_balance || 0);
+          amount = Number(transferWallets?.packagePurchaseCoupon) || Number(voucherData?.package_coupon_wallet_balance) || 0;
           icon = <PeopleIcon />;
           label = "Coupons received and redeemed for buying packages";
           break;
@@ -984,7 +980,7 @@ export default function TeamWallet() {
         <DialogContent sx={{ pt: "4px !important" }}>
           <Stack spacing="12px">
             <Alert severity="info" sx={{ fontSize: 12, py: "2px" }}>
-              Coupon Pocket Balance: Rs. {fmtAmount(transferWallets?.coupon || voucherData?.coupon_wallet_balance || 0)}
+              Coupon Pocket Balance: Rs. {fmtAmount(Number(transferWallets?.coupon) || Number(voucherData?.coupon_wallet_balance) || 0)}
             </Alert>
             <TextField
               select
