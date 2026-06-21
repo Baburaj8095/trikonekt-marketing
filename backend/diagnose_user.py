@@ -27,9 +27,9 @@ try:
         response = view(request)
         
         print("Status code:", response.status_code)
-        import json
-        print("Response JSON data:")
-        print(json.dumps(response.data, indent=2))
+        print("Response data:")
+        from pprint import pprint
+        pprint(response.data)
         
 except Exception as e:
     print("Error:", e)
