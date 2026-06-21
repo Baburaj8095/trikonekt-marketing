@@ -3210,7 +3210,7 @@ def _move_main_to_derived_wallet(user, amount, target_type, extra_meta=None):
                 source_id="",
                 meta=meta,
             )
-            WalletTransaction.objects.create(
+            tx_credit = WalletTransaction.objects.create(
                 user=user,
                 amount=net_amount,
                 balance_after=wallet.balance,
@@ -3219,6 +3219,29 @@ def _move_main_to_derived_wallet(user, amount, target_type, extra_meta=None):
                 source_id="",
                 meta=meta,
             )
+            try:
+                from accounts.finance_constants import WalletTypes, FinanceCategories
+                from accounts.wallet_engine import WalletEngine
+                WalletEngine.post_system_credit(
+                    user=user,
+                    wallet_type=WalletTypes.WITHDRAWAL_WALLET,
+                    amount=net_amount,
+                    category=FinanceCategories.WALLET_TRANSFER,
+                    source_module="MAIN_WALLET",
+                    source_id="",
+                    idempotency_key=f"main_to_withdrawal:{tx_credit.id}",
+                    legacy_wallet_transaction=tx_credit,
+                    actor=user,
+                    remarks="Transfer from main wallet to withdrawal pocket",
+                    metadata={
+                        "target_wallet": "withdrawal",
+                        "gross_amount": str(amount),
+                        "net_amount": str(net_amount),
+                        "admin_service_charge_amount": str(charge_amount),
+                    },
+                )
+            except Exception:
+                pass
             if charge_amount > D("0"):
                 WalletTransaction.objects.create(
                     user=user,
@@ -3269,7 +3292,7 @@ def _move_main_to_derived_wallet(user, amount, target_type, extra_meta=None):
             source_id="",
             meta=meta,
         )
-        WalletTransaction.objects.create(
+        tx_credit = WalletTransaction.objects.create(
             user=user,
             amount=net_amount,
             balance_after=wallet.balance,
@@ -3278,6 +3301,37 @@ def _move_main_to_derived_wallet(user, amount, target_type, extra_meta=None):
             source_id="",
             meta=meta,
         )
+        try:
+            from accounts.finance_constants import WalletTypes, FinanceCategories
+            from accounts.wallet_engine import WalletEngine
+
+            pocket_wallet_map = {
+                "coupon": WalletTypes.COUPON_POCKET,
+                "shopping": WalletTypes.SHOPPING_REBIRTH,
+                "internal": WalletTypes.SELF_PACKAGE_POCKET,
+            }
+            if target_type in pocket_wallet_map:
+                wtype = pocket_wallet_map[target_type]
+                WalletEngine.post_system_credit(
+                    user=user,
+                    wallet_type=wtype,
+                    amount=net_amount,
+                    category=FinanceCategories.WALLET_TRANSFER,
+                    source_module="MAIN_WALLET",
+                    source_id="",
+                    idempotency_key=f"main_to_{target_type}:{tx_credit.id}",
+                    legacy_wallet_transaction=tx_credit,
+                    actor=user,
+                    remarks=f"Transfer from main wallet to {target_type} pocket",
+                    metadata={
+                        "target_wallet": target_type,
+                        "gross_amount": str(amount),
+                        "net_amount": str(net_amount),
+                        "admin_service_charge_amount": str(charge_amount),
+                    },
+                )
+        except Exception:
+            pass
         if charge_amount > D("0"):
             WalletTransaction.objects.create(
                 user=user,
@@ -3649,6 +3703,36 @@ class ConsumerVoucherListCreate(APIView):
             )
             voucher.debit_transaction = debit_tx
             voucher.save(update_fields=["debit_transaction"])
+            try:
+                from accounts.finance_constants import WalletTypes, FinanceCategories, LedgerDirections
+                from accounts.wallet_engine import WalletEngine, LedgerPosting
+
+                system_user = WalletEngine.get_system_user()
+                WalletEngine.post_transaction(
+                    category=FinanceCategories.VOUCHER_CREATE,
+                    user=request.user,
+                    source_module="CONSUMER_VOUCHER",
+                    source_id=str(voucher.id),
+                    destination_module=WalletTypes.SYSTEM,
+                    gross_amount=amount,
+                    net_amount=amount,
+                    idempotency_key=f"voucher_create_debit:{voucher.id}",
+                    legacy_wallet_transaction=debit_tx,
+                    created_by=request.user,
+                    approved_by=request.user,
+                    remarks="Consumer voucher creation debit from coupon pocket",
+                    metadata={
+                        "voucher_code": voucher.code,
+                        "voucher_type": voucher.voucher_type,
+                        "assigned_to_user_id": getattr(assigned_to, "id", None),
+                    },
+                    postings=[
+                        LedgerPosting(request.user, WalletTypes.COUPON_POCKET, LedgerDirections.DEBIT, amount, metadata={"voucher_code": voucher.code}),
+                        LedgerPosting(system_user, WalletTypes.SYSTEM, LedgerDirections.CREDIT, amount, metadata={"counterparty_user_id": request.user.id}),
+                    ],
+                )
+            except Exception:
+                pass
 
         return Response(ConsumerVoucherSerializer(voucher).data, status=status.HTTP_201_CREATED)
 

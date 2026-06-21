@@ -388,7 +388,7 @@ class UpgradePayFromWalletView(APIView):
                 return Response({"detail": "Insufficient wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
             w.save(update_fields=["balance", "updated_at"])
 
-            WalletTransaction.objects.create(
+            tx = WalletTransaction.objects.create(
                 user=request.user,
                 amount=amount * D("-1"),
                 balance_after=w.balance,
@@ -397,6 +397,32 @@ class UpgradePayFromWalletView(APIView):
                 source_id=str(upg.id),
                 meta={"reason": "RANK_UPGRADE", "upgrade_id": upg.id, "wallet_source": "package_coupon"},
             )
+            try:
+                from accounts.finance_constants import WalletTypes, FinanceCategories, LedgerDirections
+                from accounts.wallet_engine import WalletEngine, LedgerPosting
+                
+                system_user = WalletEngine.get_system_user()
+                WalletEngine.post_transaction(
+                    category=FinanceCategories.PACKAGE_PURCHASE,
+                    user=request.user,
+                    source_module="RANK_UPGRADE",
+                    source_id=str(upg.id),
+                    destination_module=WalletTypes.SYSTEM,
+                    gross_amount=amount,
+                    net_amount=amount,
+                    idempotency_key=f"rank_upgrade_coupon_debit:{upg.id}",
+                    legacy_wallet_transaction=tx,
+                    created_by=request.user,
+                    approved_by=request.user,
+                    remarks="Rank upgrade debit from package purchase coupon wallet",
+                    metadata={"upgrade_id": upg.id, "wallet_source": "package_coupon"},
+                    postings=[
+                        LedgerPosting(request.user, WalletTypes.PACKAGE_PURCHASE_COUPON, LedgerDirections.DEBIT, amount, metadata={"upgrade_id": upg.id}),
+                        LedgerPosting(system_user, WalletTypes.SYSTEM, LedgerDirections.CREDIT, amount, metadata={"counterparty_user_id": request.user.id}),
+                    ],
+                )
+            except Exception:
+                pass
         elif wallet_source == "package_upload":
             upload_sources = ["WALLET_UPLOAD", "UPLOAD_TO_WALLET", "PACKAGE_UPLOAD", "PACKAGE_BUY_UPLOAD"]
             credit = WalletTransaction.objects.filter(
@@ -419,7 +445,7 @@ class UpgradePayFromWalletView(APIView):
                 return Response({"detail": "Insufficient wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
             w.save(update_fields=["balance", "updated_at"])
 
-            WalletTransaction.objects.create(
+            tx = WalletTransaction.objects.create(
                 user=request.user,
                 amount=amount * D("-1"),
                 balance_after=w.balance,
@@ -428,6 +454,32 @@ class UpgradePayFromWalletView(APIView):
                 source_id=str(upg.id),
                 meta={"reason": "RANK_UPGRADE", "upgrade_id": upg.id, "wallet_source": "package_upload"},
             )
+            try:
+                from accounts.finance_constants import WalletTypes, FinanceCategories, LedgerDirections
+                from accounts.wallet_engine import WalletEngine, LedgerPosting
+                
+                system_user = WalletEngine.get_system_user()
+                WalletEngine.post_transaction(
+                    category=FinanceCategories.PACKAGE_PURCHASE,
+                    user=request.user,
+                    source_module="RANK_UPGRADE",
+                    source_id=str(upg.id),
+                    destination_module=WalletTypes.SYSTEM,
+                    gross_amount=amount,
+                    net_amount=amount,
+                    idempotency_key=f"rank_upgrade_upload_debit:{upg.id}",
+                    legacy_wallet_transaction=tx,
+                    created_by=request.user,
+                    approved_by=request.user,
+                    remarks="Rank upgrade debit from add money pocket",
+                    metadata={"upgrade_id": upg.id, "wallet_source": "package_upload"},
+                    postings=[
+                        LedgerPosting(request.user, WalletTypes.ADD_MONEY_POCKET, LedgerDirections.DEBIT, amount, metadata={"upgrade_id": upg.id}),
+                        LedgerPosting(system_user, WalletTypes.SYSTEM, LedgerDirections.CREDIT, amount, metadata={"counterparty_user_id": request.user.id}),
+                    ],
+                )
+            except Exception:
+                pass
         else:
             try:
                 w.debit(
@@ -437,6 +489,39 @@ class UpgradePayFromWalletView(APIView):
                     source_type="RANK_UPGRADE",
                     source_id=str(upg.id),
                 )
+                tx = WalletTransaction.objects.filter(
+                    user=request.user,
+                    type="INTERNAL_WALLET_DEBIT",
+                    source_type="RANK_UPGRADE",
+                    source_id=str(upg.id)
+                ).order_by("-id").first()
+                if tx:
+                    try:
+                        from accounts.finance_constants import WalletTypes, FinanceCategories, LedgerDirections
+                        from accounts.wallet_engine import WalletEngine, LedgerPosting
+                        
+                        system_user = WalletEngine.get_system_user()
+                        WalletEngine.post_transaction(
+                            category=FinanceCategories.PACKAGE_PURCHASE,
+                            user=request.user,
+                            source_module="RANK_UPGRADE",
+                            source_id=str(upg.id),
+                            destination_module=WalletTypes.SYSTEM,
+                            gross_amount=amount,
+                            net_amount=amount,
+                            idempotency_key=f"rank_upgrade_internal_debit:{upg.id}",
+                            legacy_wallet_transaction=tx,
+                            created_by=request.user,
+                            approved_by=request.user,
+                            remarks="Rank upgrade debit from self package pocket",
+                            metadata={"upgrade_id": upg.id, "wallet_source": "internal"},
+                            postings=[
+                                LedgerPosting(request.user, WalletTypes.SELF_PACKAGE_POCKET, LedgerDirections.DEBIT, amount, metadata={"upgrade_id": upg.id}),
+                                LedgerPosting(system_user, WalletTypes.SYSTEM, LedgerDirections.CREDIT, amount, metadata={"counterparty_user_id": request.user.id}),
+                            ],
+                        )
+                    except Exception:
+                        pass
             except Exception:
                 return Response({"detail": "Insufficient Self Package Wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
 

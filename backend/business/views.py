@@ -1399,6 +1399,60 @@ class PromoPurchasePayFromWalletView(APIView):
                         )
                     except Exception:
                         pass
+                elif wallet_source == "package_upload":
+                    try:
+                        from accounts.finance_constants import WalletTypes, FinanceCategories, LedgerDirections
+                        from accounts.wallet_engine import WalletEngine, LedgerPosting
+                        
+                        system_user = WalletEngine.get_system_user()
+                        WalletEngine.post_transaction(
+                            category=FinanceCategories.PACKAGE_PURCHASE,
+                            user=request.user,
+                            source_module="PROMO_PURCHASE",
+                            source_id=str(pp.id),
+                            destination_module=WalletTypes.SYSTEM,
+                            gross_amount=total,
+                            net_amount=total,
+                            idempotency_key=f"promo_purchase_upload_debit:{pp.id}",
+                            legacy_wallet_transaction=tx,
+                            created_by=request.user,
+                            approved_by=request.user,
+                            remarks="Promo purchase debit from add money pocket",
+                            metadata={"purchase_id": pp.id, "package_id": getattr(pkg, "id", None)},
+                            postings=[
+                                LedgerPosting(request.user, WalletTypes.ADD_MONEY_POCKET, LedgerDirections.DEBIT, total, metadata={"purchase_id": pp.id}),
+                                LedgerPosting(system_user, WalletTypes.SYSTEM, LedgerDirections.CREDIT, total, metadata={"counterparty_user_id": request.user.id}),
+                            ],
+                        )
+                    except Exception:
+                        pass
+                elif wallet_source == "internal":
+                    try:
+                        from accounts.finance_constants import WalletTypes, FinanceCategories, LedgerDirections
+                        from accounts.wallet_engine import WalletEngine, LedgerPosting
+                        
+                        system_user = WalletEngine.get_system_user()
+                        WalletEngine.post_transaction(
+                            category=FinanceCategories.PACKAGE_PURCHASE,
+                            user=request.user,
+                            source_module="PROMO_PURCHASE",
+                            source_id=str(pp.id),
+                            destination_module=WalletTypes.SYSTEM,
+                            gross_amount=total,
+                            net_amount=total,
+                            idempotency_key=f"promo_purchase_internal_debit:{pp.id}",
+                            legacy_wallet_transaction=tx,
+                            created_by=request.user,
+                            approved_by=request.user,
+                            remarks="Promo purchase debit from self package pocket",
+                            metadata={"purchase_id": pp.id, "package_id": getattr(pkg, "id", None)},
+                            postings=[
+                                LedgerPosting(request.user, WalletTypes.SELF_PACKAGE_POCKET, LedgerDirections.DEBIT, total, metadata={"purchase_id": pp.id}),
+                                LedgerPosting(system_user, WalletTypes.SYSTEM, LedgerDirections.CREDIT, total, metadata={"counterparty_user_id": request.user.id}),
+                            ],
+                        )
+                    except Exception:
+                        pass
 
             # Wallet-funded purchases use already approved wallet money, so approve immediately.
             # Reuse the admin approval implementation so commissions, matrix jobs,
