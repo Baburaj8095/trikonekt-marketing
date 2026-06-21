@@ -2281,6 +2281,8 @@ class WalletMe(APIView):
             ]
             all_earnings_total = _sum_t(tx_all.filter(amount__gt=0, type__in=earn_types))
         except Exception:
+            import traceback
+            traceback.print_exc()
             direct_ref_total = "0"
             matrix_five_total = "0"
             matrix_three_total = "0"
@@ -2416,6 +2418,8 @@ class WalletMe(APIView):
             except Exception:
                 pass
         except Exception:
+            import traceback
+            traceback.print_exc()
             shopping_wallet_balance = "0.00"
             coupon_wallet_balance = "0.00"
             internal_wallet_balance = "0.00"
