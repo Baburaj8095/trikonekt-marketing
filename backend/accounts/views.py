@@ -2214,10 +2214,11 @@ class WalletMe(APIView):
             refer_redeems = 0
 
         # ===== Wallet summary extras for Consumer Wallet UI (best-effort; guarded) =====
+        tx_all = WalletTransaction.objects.filter(user=request.user)
         try:
             from django.utils import timezone as _tz
             today = _tz.localdate()
-            tx_all = WalletTransaction.objects.filter(user=request.user)
+
 
             def _sum_t(qs):
                 val = qs.aggregate(total=Sum("amount"))["total"] or 0
@@ -3713,6 +3714,27 @@ class ConsumerVoucherRedeem(APIView):
                         "destination_wallet": "PACKAGE_PURCHASE_COUPON",
                     },
                 )
+                try:
+                    WalletEngine.post_system_credit(
+                        user=request.user,
+                        wallet_type=WalletTypes.PACKAGE_PURCHASE_COUPON,
+                        amount=amount,
+                        category=FinanceCategories.VOUCHER_REDEEM,
+                        source_module="CONSUMER_VOUCHER",
+                        source_id=str(voucher.id),
+                        idempotency_key=f"voucher_redeem:{voucher.id}",
+                        legacy_wallet_transaction=tx,
+                        actor=request.user,
+                        remarks="Voucher redeemed to package purchase coupon wallet",
+                        metadata={
+                            "voucher_code": voucher.code,
+                            "voucher_type": voucher.voucher_type,
+                            "creator_user_id": voucher.creator_id,
+                        },
+                    )
+                except Exception:
+                    pass
+
                 voucher.status = ConsumerVoucher.STATUS_REDEEMED
                 voucher.redeemed_by = request.user
                 voucher.redeemed_at = timezone.now()

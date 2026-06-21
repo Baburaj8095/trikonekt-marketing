@@ -1372,6 +1372,34 @@ class PromoPurchasePayFromWalletView(APIView):
                 pp.wallet_debit_tx = tx
                 pp.save(update_fields=["wallet_debit_tx"])
 
+                if wallet_source == "package_coupon":
+                    try:
+                        from accounts.finance_constants import WalletTypes, FinanceCategories, LedgerDirections
+                        from accounts.wallet_engine import WalletEngine, LedgerPosting
+                        
+                        system_user = WalletEngine.get_system_user()
+                        WalletEngine.post_transaction(
+                            category=FinanceCategories.PACKAGE_PURCHASE,
+                            user=request.user,
+                            source_module="PROMO_PURCHASE",
+                            source_id=str(pp.id),
+                            destination_module=WalletTypes.SYSTEM,
+                            gross_amount=total,
+                            net_amount=total,
+                            idempotency_key=f"promo_purchase_debit:{pp.id}",
+                            legacy_wallet_transaction=tx,
+                            created_by=request.user,
+                            approved_by=request.user,
+                            remarks="Promo purchase debit from package coupon wallet",
+                            metadata={"purchase_id": pp.id, "package_id": getattr(pkg, "id", None)},
+                            postings=[
+                                LedgerPosting(request.user, WalletTypes.PACKAGE_PURCHASE_COUPON, LedgerDirections.DEBIT, total, metadata={"purchase_id": pp.id}),
+                                LedgerPosting(system_user, WalletTypes.SYSTEM, LedgerDirections.CREDIT, total, metadata={"counterparty_user_id": request.user.id}),
+                            ],
+                        )
+                    except Exception:
+                        pass
+
             # Wallet-funded purchases use already approved wallet money, so approve immediately.
             # Reuse the admin approval implementation so commissions, matrix jobs,
             # activations, invoices, and idempotency stay identical to the manual review flow.

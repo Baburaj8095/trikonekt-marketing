@@ -1814,7 +1814,7 @@ class AdminWalletAdjustPocketView(APIView):
             if w.balance < 0:
                 return Response({"detail": "Insufficient wallet balance."}, status=400)
             w.save(update_fields=["balance", "main_balance", "withdrawable_balance", "updated_at"])
-            WalletTransaction.objects.create(
+            tx = WalletTransaction.objects.create(
                 user=user,
                 amount=signed,
                 balance_after=w.balance,
@@ -1823,6 +1823,52 @@ class AdminWalletAdjustPocketView(APIView):
                 source_id=str(getattr(request.user, "id", "")),
                 meta={"pocket": pocket, "note": note, "by_admin": getattr(request.user, "username", "")},
             )
+
+            # Sync to WalletAccount via WalletEngine
+            if pocket in {"coupon", "shopping", "self_package", "package_purchase_coupon"}:
+                try:
+                    from accounts.finance_constants import WalletTypes, FinanceCategories, LedgerDirections
+                    from accounts.wallet_engine import WalletEngine, LedgerPosting
+
+                    pocket_wallet_map = {
+                        "coupon": WalletTypes.COUPON_POCKET,
+                        "shopping": WalletTypes.SHOPPING_REBIRTH,
+                        "self_package": WalletTypes.SELF_PACKAGE_POCKET,
+                        "package_purchase_coupon": WalletTypes.PACKAGE_PURCHASE_COUPON,
+                    }
+                    wtype = pocket_wallet_map[pocket]
+                    system_user = WalletEngine.get_system_user()
+                    
+                    if action == "credit":
+                        postings = [
+                            LedgerPosting(system_user, WalletTypes.SYSTEM, LedgerDirections.DEBIT, amount, metadata={"counterparty_user_id": user.id}),
+                            LedgerPosting(user, wtype, LedgerDirections.CREDIT, amount, metadata={"pocket": pocket, "note": note, "by_admin": getattr(request.user, "username", "")}),
+                        ]
+                    else:
+                        postings = [
+                            LedgerPosting(user, wtype, LedgerDirections.DEBIT, amount, metadata={"pocket": pocket, "note": note, "by_admin": getattr(request.user, "username", "")}),
+                            LedgerPosting(system_user, WalletTypes.SYSTEM, LedgerDirections.CREDIT, amount, metadata={"counterparty_user_id": user.id}),
+                        ]
+                    
+                    WalletEngine.post_transaction(
+                        category=FinanceCategories.ADMIN_ADJUSTMENT,
+                        user=user,
+                        source_module="ADMIN_MANUAL",
+                        source_id=str(getattr(request.user, "id", "")),
+                        destination_module=wtype,
+                        gross_amount=amount,
+                        net_amount=amount,
+                        idempotency_key=f"admin_adjust:{tx.id}",
+                        legacy_wallet_transaction=tx,
+                        created_by=request.user,
+                        approved_by=request.user,
+                        remarks=note or f"Admin manual adjustment for {pocket}",
+                        metadata={"pocket": pocket, "action": action, "by_admin": getattr(request.user, "username", "")},
+                        postings=postings,
+                    )
+                except Exception:
+                    pass
+
         return Response(_wallet_summary_payload(user))
 
 
