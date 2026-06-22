@@ -1263,6 +1263,7 @@ class PromoPurchasePayFromWalletView(APIView):
 
         with transaction.atomic():
             w = Wallet.get_or_create_for_user(request.user)
+            w = Wallet.objects.select_for_update().get(pk=w.pk)
             if wallet_source == "package_coupon":
                 credit = WalletTransaction.objects.filter(
                     user=request.user,
@@ -1277,7 +1278,6 @@ class PromoPurchasePayFromWalletView(APIView):
                 available = D(str(credit)) + D(str(debit))
                 if available < total:
                     return Response({"detail": "Insufficient Package Purchase Coupon Wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
-                w = Wallet.objects.select_for_update().get(pk=w.pk)
                 w.balance = (w.balance or D("0")) - total
                 if w.balance < D("0"):
                     return Response({"detail": "Insufficient wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
@@ -1306,7 +1306,6 @@ class PromoPurchasePayFromWalletView(APIView):
                 available = D(str(credit)) + D(str(debit))
                 if available < total:
                     return Response({"detail": "Insufficient Add Money Pocket balance."}, status=status.HTTP_400_BAD_REQUEST)
-                w = Wallet.objects.select_for_update().get(pk=w.pk)
                 w.balance = (w.balance or D("0")) - total
                 if w.balance < D("0"):
                     return Response({"detail": "Insufficient wallet balance."}, status=status.HTTP_400_BAD_REQUEST)

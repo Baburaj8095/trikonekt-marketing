@@ -394,7 +394,7 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
 /* ======================================================================== */
 /* Payment Method Chooser (Wallet vs Manual) */
 /* ======================================================================== */
-function PaymentMethodDialog({ open, onClose, intent, walletMe, walletHistory, onPickManual, onPickWallet }) {
+function PaymentMethodDialog({ open, onClose, intent, walletMe, walletHistory, busy, onPickManual, onPickWallet }) {
   if (!open) return null;
   const amount = Number(intent?.amount || intent?.pkg?.price || 0);
   const internalBal = getSelfPackageWalletBalance(walletMe);
@@ -415,7 +415,7 @@ function PaymentMethodDialog({ open, onClose, intent, walletMe, walletHistory, o
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={() => !busy && onClose()}
       fullWidth
       maxWidth="xs"
       PaperProps={{
@@ -449,17 +449,17 @@ function PaymentMethodDialog({ open, onClose, intent, walletMe, walletHistory, o
         ) : null}
       </DialogContent>
       <DialogActions sx={{ p: 1.5, gap: 1, flexWrap: "wrap" }}>
-        <Button onClick={onClose} sx={{ borderRadius: 3 }}>Cancel</Button>
+        <Button onClick={onClose} disabled={busy} sx={{ borderRadius: 3 }}>Cancel</Button>
         <Button variant="outlined" onClick={onPickManual} disabled sx={{ borderRadius: 3, fontWeight: 900 }}>
           Manual Payment
         </Button>
-        <Button variant="contained" disabled={!canWallet} onClick={() => onPickWallet("internal")} sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
+        <Button variant="contained" disabled={!canWallet || busy} onClick={() => onPickWallet("internal")} sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
           <WalletButtonLabel title="Pay from Self Package" balance={internalBal} />
         </Button>
-        <Button variant="contained" disabled={!canPackageCoupon} onClick={() => onPickWallet("package_coupon")} sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
+        <Button variant="contained" disabled={!canPackageCoupon || busy} onClick={() => onPickWallet("package_coupon")} sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
           <WalletButtonLabel title="Pay from Package Purchase Coupon Received" balance={packageCouponBal} />
         </Button>
-        <Button variant="contained" disabled={!canAddMoney} onClick={() => onPickWallet("package_upload")} sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
+        <Button variant="contained" disabled={!canAddMoney || busy} onClick={() => onPickWallet("package_upload")} sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
           <WalletButtonLabel title="Pay from Add Money Pocket" balance={addMoneyBal} />
         </Button>
       </DialogActions>
@@ -1615,6 +1615,7 @@ export default function PromoPackages({
         intent={purchaseIntent}
         walletMe={walletMe}
         walletHistory={walletHistory}
+        busy={walletBusy}
         onPickManual={() => {
           setMethodOpen(false);
           setPaymentData(purchaseIntent);
