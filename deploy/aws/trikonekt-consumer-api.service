@@ -1,0 +1,22 @@
+[Unit]
+Description=Trikonekt Consumer Java API Service
+After=syslog.target network.target
+
+[Service]
+User=ubuntu
+Type=simple
+WorkingDirectory=/var/www/tri-consumer/backend
+ExecStart=/var/www/tri-consumer/.jdks/temurin-17/bin/java -jar /var/www/tri-consumer/backend/tri-consumer-api-0.0.1-SNAPSHOT.jar
+Restart=always
+RestartSec=10
+SuccessExitStatus=143
+
+# Environment variables
+Environment=SERVER_PORT=8080
+Environment=DJANGO_API_BASE_URL=https://api.growth.vin/api
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=trikonekt-consumer-api
+
+[Install]
+WantedBy=multi-user.target

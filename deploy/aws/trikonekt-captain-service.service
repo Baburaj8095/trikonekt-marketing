@@ -1,0 +1,24 @@
+[Unit]
+Description=Trikonekt Captain Business Java API Service
+After=syslog.target network.target
+
+[Service]
+User=ubuntu
+Type=simple
+WorkingDirectory=/var/www/tri-business/backend
+ExecStart=/usr/bin/java -jar /var/www/tri-business/backend/captain-service-1.0.0.jar
+Restart=always
+RestartSec=10
+SuccessExitStatus=143
+
+# Environment variables
+Environment=SERVER_PORT=8081
+Environment=DB_URL=jdbc:postgresql://trikonekt-prod-postgres.crm64c24gey6.ap-south-1.rds.amazonaws.com:5432/trikonekt?sslmode=require
+Environment=DB_USERNAME=trikonekt_admin
+Environment=DB_PASSWORD=Baburajnk19
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=trikonekt-captain-service
+
+[Install]
+WantedBy=multi-user.target

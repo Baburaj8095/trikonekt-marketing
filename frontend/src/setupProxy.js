@@ -1,4 +1,4 @@
-﻿const { createProxyMiddleware } = require("http-proxy-middleware");
+const { createProxyMiddleware } = require("http-proxy-middleware");
 
 /**
  * CRA dev-server proxy
@@ -11,6 +11,18 @@
  *   http://localhost:8000/api/user/upgrade-eligibility/ during `npm start`.
  */
 module.exports = function (app) {
+  // Proxy KYC and Admin KYC requests to the Java Spring Boot backend (port 8080)
+  app.use(
+    ["/api/kyc", "/api/admin/kyc"],
+    createProxyMiddleware({
+      target: "http://localhost:8080",
+      changeOrigin: true,
+      secure: false,
+      xfwd: true,
+    })
+  );
+
+  // Proxy other API requests to the Django backend (port 8000)
   app.use(
     "/api",
     createProxyMiddleware({
@@ -18,7 +30,7 @@ module.exports = function (app) {
       changeOrigin: true,
       secure: false,
       xfwd: true,
-      logLevel: "silent", // set to "debug" to troubleshoot locally
+      logLevel: "silent",
     })
   );
 };

@@ -1,6 +1,23 @@
-﻿import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import API from "../../api/api";
 import DataTable from "../../admin-panel/components/data/DataTable";
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Avatar,
+  Grid,
+  Typography,
+  Box,
+  Stack,
+  Divider,
+  List,
+  ListItem,
+  ListItemText,
+  Paper
+} from "@mui/material";
 
 function TextInput({ label, value, onChange, placeholder, type = "text", style }) {
   return (
@@ -91,6 +108,7 @@ export default function AdminKYC({ audience = "consumer" }) {
   const isFranchise = audience === "franchise";
   // View mode bifurcation: 'kyc' vs 'nominee'
   const [viewMode, setViewMode] = useState("kyc"); // 'kyc' | 'nominee'
+  const [selectedKycRow, setSelectedKycRow] = useState(null);
 
   // KYC filters
   const [kycFilters, setKycFilters] = useState({
@@ -221,16 +239,22 @@ export default function AdminKYC({ audience = "consumer" }) {
         valueGetter: (_, row) => (row && row.bank_account_number) || "",
       },
       {
-        field: "verified",
+        field: "status",
         headerName: "Status",
-        minWidth: 120,
+        minWidth: 145,
         align: "center",
         headerAlign: "center",
         renderCell: (params) => {
-          const verified = !!params?.row?.verified;
-          return verified ? <Badge color="#065f46" bg="#d1fae5">Verified</Badge> : <Badge>Pending</Badge>;
+          const status = params?.row?.status;
+          if (status === "VERIFIED") {
+            return <Badge color="#065f46" bg="#d1fae5">Verified</Badge>;
+          } else if (status === "REJECTED") {
+            return <Badge color="#991b1b" bg="#fee2e2">Rejected</Badge>;
+          } else {
+            return <Badge color="#b45309" bg="#fef3c7">Pending Approval</Badge>;
+          }
         },
-        valueFormatter: (v) => (!!v ? "Verified" : "Pending"),
+        valueFormatter: (v) => v || "Pending",
       },
       {
         field: "__actions",
@@ -243,7 +267,20 @@ export default function AdminKYC({ audience = "consumer" }) {
         renderCell: (params) => {
           const r = params?.row || {};
           return (
-            <div style={{ display: "flex", gap: 8, width: "100%", height: "100%", alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
+             <div style={{ display: "flex", gap: 8, width: "100%", height: "100%", alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
+              <button
+                onClick={() => setSelectedKycRow(r)}
+                style={{
+                  padding: "4px 8px",
+                  background: "#3b82f6",
+                  color: "#fff",
+                  border: 0,
+                  borderRadius: 6,
+                  cursor: "pointer",
+                }}
+              >
+                Details
+              </button>
               {!r.verified ? (
                 <button
                   onClick={() => handleVerify(r)}
@@ -616,6 +653,163 @@ export default function AdminKYC({ audience = "consumer" }) {
           instanceKey="nominee"
           extraKey={String(reloadKeyNominee)}
         />
+      )}
+
+      {/* Aadhaar Details Dialog */}
+      {selectedKycRow && (
+        <Dialog
+          open={!!selectedKycRow}
+          onClose={() => setSelectedKycRow(null)}
+          maxWidth="md"
+          fullWidth
+          PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+        >
+          <DialogTitle sx={{ fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span>KYC Profile Details</span>
+            {selectedKycRow.status === "VERIFIED" ? (
+              <Badge color="#065f46" bg="#d1fae5">Verified</Badge>
+            ) : selectedKycRow.status === "REJECTED" ? (
+              <Badge color="#991b1b" bg="#fee2e2">Rejected</Badge>
+            ) : (
+              <Badge color="#b45309" bg="#fef3c7">Pending Approval</Badge>
+            )}
+          </DialogTitle>
+          <DialogContent dividers>
+            <Grid container spacing={3}>
+              <Grid item xs={12} sm={3} sx={{ display: "flex", justifyContent: "center" }}>
+                {selectedKycRow.photo ? (
+                  <Avatar
+                    src={`data:image/jpeg;base64,${selectedKycRow.photo}`}
+                    variant="rounded"
+                    sx={{ width: 110, height: 130, border: "2px solid #ccc" }}
+                  />
+                ) : (
+                  <Avatar variant="rounded" sx={{ width: 110, height: 130, bgcolor: "#3b82f6" }}>
+                    {selectedKycRow.kyc_name ? selectedKycRow.kyc_name.charAt(0) : "U"}
+                  </Avatar>
+                )}
+              </Grid>
+              <Grid item xs={12} sm={9}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="caption" color="text.secondary">Name (as per Aadhaar)</Typography>
+                    <Typography sx={{ fontWeight: 700 }}>{selectedKycRow.kyc_name || selectedKycRow.full_name || "N/A"}</Typography>
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <Typography variant="caption" color="text.secondary">DOB</Typography>
+                    <Typography sx={{ fontWeight: 600 }}>{selectedKycRow.dob || "N/A"}</Typography>
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <Typography variant="caption" color="text.secondary">Gender</Typography>
+                    <Typography sx={{ fontWeight: 600 }}>{selectedKycRow.gender || "N/A"}</Typography>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="caption" color="text.secondary">Aadhaar Last 4</Typography>
+                    <Typography sx={{ fontWeight: 600 }}>xxxx-xxxx-{selectedKycRow.aadhaar_last4 || "N/A"}</Typography>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="caption" color="text.secondary">PAN Number</Typography>
+                    <Typography sx={{ fontWeight: 600 }}>{selectedKycRow.pan_number || "N/A"}</Typography>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="caption" color="text.secondary">Mobile</Typography>
+                    <Typography sx={{ fontWeight: 600 }}>{selectedKycRow.kyc_mobile || selectedKycRow.phone || "N/A"}</Typography>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="caption" color="text.secondary">Email</Typography>
+                    <Typography sx={{ fontWeight: 600 }}>{selectedKycRow.kyc_email || "N/A"}</Typography>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Typography variant="caption" color="text.secondary">Address</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>{selectedKycRow.kyc_address || "N/A"}</Typography>
+                  </Grid>
+                </Grid>
+              </Grid>
+            </Grid>
+
+            {/* Bank Payout Details Section */}
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1, color: "text.secondary" }}>
+                Bank Payout Details
+              </Typography>
+              <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: "#fafafa" }}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={4}>
+                    <Typography variant="caption" color="text.secondary">Bank Name</Typography>
+                    <Typography sx={{ fontWeight: 700 }}>{selectedKycRow.bank_name || "N/A"}</Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <Typography variant="caption" color="text.secondary">Account Number</Typography>
+                    <Typography sx={{ fontWeight: 700 }}>{selectedKycRow.bank_account_number || "N/A"}</Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <Typography variant="caption" color="text.secondary">IFSC Code</Typography>
+                    <Typography sx={{ fontWeight: 700 }}>{selectedKycRow.ifsc_code || "N/A"}</Typography>
+                  </Grid>
+                </Grid>
+              </Paper>
+            </Box>
+
+            {selectedKycRow.issued_documents_json && (
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>Linked Issued Documents</Typography>
+                <Paper variant="outlined" sx={{ borderRadius: 2 }}>
+                  <List dense>
+                    {(() => {
+                      try {
+                        const docs = JSON.parse(selectedKycRow.issued_documents_json);
+                        const items = docs?.items || [];
+                        if (items.length === 0) return <ListItem><ListItemText primary="No issued documents." /></ListItem>;
+                        return items.map((doc, idx) => (
+                          <ListItem key={idx} divider={idx < items.length - 1}>
+                            <ListItemText
+                              primary={doc.name}
+                              secondary={`URI: ${doc.uri} | Type: ${doc.type || "Document"}`}
+                              primaryTypographyProps={{ fontWeight: 700 }}
+                            />
+                          </ListItem>
+                        ));
+                      } catch {
+                        return <ListItem><ListItemText primary="No documents." /></ListItem>;
+                      }
+                    })()}
+                  </List>
+                </Paper>
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ p: 2 }}>
+            <Button onClick={() => setSelectedKycRow(null)} color="inherit">Close</Button>
+            {!selectedKycRow.verified && (
+              <>
+                <Button
+                  onClick={async () => {
+                    if (window.confirm(`Reject KYC for ${selectedKycRow.username}?`)) {
+                      await handleReject(selectedKycRow);
+                      setSelectedKycRow(null);
+                    }
+                  }}
+                  color="error"
+                  variant="outlined"
+                >
+                  Reject
+                </Button>
+                <Button
+                  onClick={async () => {
+                    if (window.confirm(`Verify KYC for ${selectedKycRow.username}?`)) {
+                      await handleVerify(selectedKycRow);
+                      setSelectedKycRow(null);
+                    }
+                  }}
+                  color="success"
+                  variant="contained"
+                >
+                  Verify & Approve
+                </Button>
+              </>
+            )}
+          </DialogActions>
+        </Dialog>
       )}
     </div>
   );

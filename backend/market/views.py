@@ -641,7 +641,7 @@ class ShopPublicList(generics.ListAPIView):
         except Exception:
             radius_km = 25.0
 
-        base_qs = Shop.objects.select_related("merchant").filter(status=Shop.STATUS_ACTIVE).exclude(merchant__category='merchant')
+        base_qs = Shop.objects.select_related("merchant").filter(status=Shop.STATUS_ACTIVE).exclude(merchant__category='merchant').exclude(merchant__merchant_profile__service_mode='ONLINE')
         if city:
             base_qs = base_qs.filter(city__iexact=city)
         if q:
@@ -687,7 +687,7 @@ class ShopPublicDetail(generics.RetrieveAPIView):
     """
     serializer_class = ShopSerializer
     permission_classes = [permissions.AllowAny]
-    queryset = Shop.objects.select_related("merchant").filter(status=Shop.STATUS_ACTIVE).exclude(merchant__category='merchant')
+    queryset = Shop.objects.select_related("merchant").filter(status=Shop.STATUS_ACTIVE).exclude(merchant__category='merchant').exclude(merchant__merchant_profile__service_mode='ONLINE')
 
 
 class ShopsNearbyView(APIView):
@@ -729,7 +729,7 @@ class ShopsNearbyView(APIView):
             limit = 20
         pincode = (params.get("pincode") or "").strip()
 
-        base_qs = Shop.objects.select_related("merchant", "tri_app").filter(status=Shop.STATUS_ACTIVE).exclude(merchant__category='merchant')
+        base_qs = Shop.objects.select_related("merchant", "tri_app").filter(status=Shop.STATUS_ACTIVE).exclude(merchant__category='merchant').exclude(merchant__merchant_profile__service_mode='ONLINE')
 
         def _img_url(obj):
             try:

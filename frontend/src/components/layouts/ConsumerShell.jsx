@@ -1,4 +1,4 @@
-﻿import React, { useMemo } from "react";
+import React, { useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import ShellBase from "./ShellBase";
 
@@ -87,7 +87,7 @@ export default function ConsumerShell({ children }) {
     return [
       { to: "/user/dashboard", label: "Dashboard", icon: "dashboard" },
       { to: "/user/profile", label: "Profile", icon: "users" },
-      // { to: "/user/kyc", label: "KYC", icon: "shield" },
+      { to: "/user/kyc", label: "KYC", icon: "shield" },
       { to: "/user/refer-earn", label: "Refer & Earn", icon: "upload" },
       { to: "/user/gift-card-summary", label: "Gift Card Summary", icon: "ticket" },
       { to: "/user/gift-cards", label: "Hubble Gift Cards", icon: "ticket" },

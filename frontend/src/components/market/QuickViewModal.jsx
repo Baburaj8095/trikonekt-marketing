@@ -1,4 +1,4 @@
-﻿import React, { memo } from "react";
+import React, { memo } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -27,7 +27,8 @@ function QuickViewModal({ open, product, onClose, onGoToDetails }) {
   const price = Number(product?.price || 0);
   const discount = Number(product?.discount || 0);
   const finalPrice = price * (1 - discount / 100);
-  const outOfStock = Number(product?.quantity || 0) <= 0;
+  const qty = product?.quantity ?? product?.stock_qty ?? product?.stockQty;
+  const outOfStock = qty !== undefined ? Number(qty) <= 0 : false;
 
   const locationLabel = [product?.city, product?.state, product?.country]
     .filter(Boolean)

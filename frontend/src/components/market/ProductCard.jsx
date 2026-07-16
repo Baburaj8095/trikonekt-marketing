@@ -1,4 +1,4 @@
-﻿import React, { memo } from "react";
+import React, { memo } from "react";
 import {
   Card,
   CardActionArea,
@@ -39,8 +39,9 @@ function ProductCard({ product, onSelect, onQuickView, onAddToCart, showAddToCar
   const price = Number(product?.price || 0);
   const discount = Number(product?.discount || 0);
   const finalPrice = price * (1 - discount / 100);
-  const hasQty = Object.prototype.hasOwnProperty.call(product || {}, "quantity");
-  const outOfStock = product?._promo ? false : (hasQty ? Number(product?.quantity || 0) <= 0 : false);
+  const hasQty = Object.prototype.hasOwnProperty.call(product || {}, "quantity") || Object.prototype.hasOwnProperty.call(product || {}, "stock_qty") || Object.prototype.hasOwnProperty.call(product || {}, "stockQty");
+  const qty = Number(product?.quantity ?? product?.stock_qty ?? product?.stockQty ?? 0);
+  const outOfStock = product?._promo ? false : (hasQty ? qty <= 0 : false);
 
   const locationLabel = [product?.city, product?.state, product?.country]
     .filter(Boolean)
