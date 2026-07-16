@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useMemo, useState, useEffect } from "react";
+import React, { useCallback, useMemo, useState, useEffect } from "react";
 import API from "../../api/api";
 import normalizeMediaUrl from "../../utils/media";
 import DataTable from "../../admin-panel/components/data/DataTable";
@@ -203,6 +203,111 @@ function DetailRow({ label, value }) {
   );
 }
 
+function UplinePathViewer({ user }) {
+  const [uplineChain, setUplineChain] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!user) return;
+    
+    let isMounted = true;
+    const fetchUplines = async () => {
+      setLoading(true);
+      setError(null);
+      const chain = [];
+      let depth = 1;
+      
+      let currentSponsorUsername = user.sponsor_id || (user.registered_by && user.registered_by.username);
+      
+      while (currentSponsorUsername && depth <= 15) {
+        currentSponsorUsername = currentSponsorUsername.trim();
+        if (!currentSponsorUsername) break;
+
+        if (currentSponsorUsername === "9999999999") {
+          chain.push({
+            level: depth,
+            id: 32,
+            username: "9999999999",
+            full_name: "Company Root",
+            sponsor_id: ""
+          });
+          break;
+        }
+
+        try {
+          const res = await API.get("/api/admin/users/", {
+            params: {
+              search: currentSponsorUsername,
+              page_size: 10
+            }
+          });
+          
+          const data = res?.data;
+          const results = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
+          
+          const matchedUser = results.find(
+            (u) => (u.username || "").toLowerCase() === currentSponsorUsername.toLowerCase()
+          );
+          
+          if (!matchedUser) {
+            break;
+          }
+
+          chain.push({
+            level: depth,
+            id: matchedUser.id,
+            username: matchedUser.username,
+            full_name: matchedUser.full_name,
+            sponsor_id: matchedUser.sponsor_id
+          });
+
+          currentSponsorUsername = matchedUser.sponsor_id;
+          depth++;
+        } catch (err) {
+          console.error("Error fetching upline:", err);
+          break;
+        }
+      }
+      
+      if (isMounted) {
+        setUplineChain(chain);
+        setLoading(false);
+      }
+    };
+    
+    fetchUplines();
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  if (loading) {
+    return <div style={{ color: "#64748b", fontSize: 13, padding: "8px 0" }}>Loading upline path...</div>;
+  }
+
+  if (error) {
+    return <div style={{ color: "#ef4444", fontSize: 13, padding: "8px 0" }}>Error loading upline path.</div>;
+  }
+
+  if (uplineChain.length === 0) {
+    return <div style={{ color: "#64748b", fontSize: 13, padding: "8px 0" }}>No upline path found.</div>;
+  }
+
+  return (
+    <div style={{ marginTop: 8, border: "1px solid #e2e8f0", borderRadius: 8, background: "#f8fafc", padding: 12 }}>
+      {uplineChain.map((u, idx) => (
+        <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: idx < uplineChain.length - 1 ? "1px solid #e2e8f0" : "none" }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b", minWidth: 60 }}>Level {u.level}:</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{u.username}</span>
+          <span style={{ fontSize: 13, color: "#475569" }}>({u.full_name})</span>
+          <span style={{ fontSize: 12, color: "#94a3b8", marginLeft: "auto" }}>ID: {u.id}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function UserProfileDrawer({ open, loading, user, onClose, onEdit }) {
   if (!open) return null;
   const groups = [
@@ -284,12 +389,18 @@ function UserProfileDrawer({ open, loading, user, onClose, onEdit }) {
           {loading ? (
             <div style={{ color: "#64748b", fontWeight: 700 }}>Loading profile...</div>
           ) : (
-            groups.map((group) => (
-              <section key={group.title} style={{ marginBottom: 18 }}>
-                <h3 style={{ margin: "0 0 8px", fontSize: 14, color: "#0f172a" }}>{group.title}</h3>
-                <div>{group.rows.map(([label, value]) => <DetailRow key={label} label={label} value={value} />)}</div>
+            <>
+              {groups.map((group) => (
+                <section key={group.title} style={{ marginBottom: 18 }}>
+                  <h3 style={{ margin: "0 0 8px", fontSize: 14, color: "#0f172a" }}>{group.title}</h3>
+                  <div>{group.rows.map(([label, value]) => <DetailRow key={label} label={label} value={value} />)}</div>
+                </section>
+              ))}
+              <section style={{ marginBottom: 18 }}>
+                <h3 style={{ margin: "0 0 8px", fontSize: 14, color: "#0f172a" }}>Referral Upline Path (Sponsorship)</h3>
+                <UplinePathViewer user={user} />
               </section>
-            ))
+            </>
           )}
         </div>
       </aside>

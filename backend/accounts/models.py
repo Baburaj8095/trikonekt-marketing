@@ -732,140 +732,139 @@ class Wallet(models.Model):
             except Exception:
                 return None
 
-        # Strong lock on wallet row to serialize pack application
+        # Reentrancy Guard: Prevent recursive execution on the same wallet instance
+        if getattr(w, "_applying_self_rule", False):
+            return
+        w._applying_self_rule = True
+
         try:
-            w = Wallet.objects.select_for_update().get(pk=w.pk)
-        except Exception:
-            pass
+            sponsor = getattr(self.user, "registered_by", None)
+            company_user = _get_company_user()
 
-        sponsor = getattr(self.user, "registered_by", None)
-        company_user = _get_company_user()
+            loops = 0
+            while True:
+                loops += 1
+                if loops > 50:
+                    break  # hard safety
 
-        # While we have at least one ₹250 pack, attempt to apply; bail if no coupon available
-        # Lock already held by caller (credit); proceed with safe loop bound
-        loops = 0
-        while True:
-            loops += 1
-            if loops > 50:
-                break  # hard safety
-            try:
-                cur_self = D(str(getattr(w, "self_account_balance", "0") or "0"))
-            except Exception:
-                cur_self = D("0")
-            if cur_self < D("250.00"):
-                break
+                # Re-fetch the wallet row from database at the start of each iteration to get
+                # the absolute latest balance (accounting for recursive/nested credits)
+                try:
+                    w = Wallet.objects.select_for_update().get(pk=w.pk)
+                    cur_self = D(str(getattr(w, "self_account_balance", "0") or "0"))
+                except Exception:
+                    cur_self = D("0")
 
-            # Use self-reserve ₹150 for PRIME 150 activation instead of allocating an e‑coupon.
-            # Do not attempt to allocate a CouponCode here; activation will be handled by the Prime engine.
-            coupon_applied = False
-            coupon_code_val = None
+                if cur_self < D("250.00"):
+                    break
 
-            # Deduct the pack from self-reserve and overall balance
-            w.self_account_balance = (w.self_account_balance or D("0")) - D("250.00")
-            if w.self_account_balance < D("0"):
-                w.self_account_balance = D("0")
-            w.balance = (w.balance or D("0")) - D("250.00")
-            if w.balance < D("0"):
-                w.balance = D("0")
-            w.save(update_fields=["balance", "self_account_balance", "updated_at"])
+                # Balance safety check before deduction
+                if cur_self < D("250.00") or (w.balance or D("0")) < D("250.00"):
+                    break
 
-            # Record SELF_ACCOUNT_DEBIT marker with breakdown and pack index
-            try:
-                existing = WalletTransaction.objects.filter(user=self.user, type="SELF_ACCOUNT_DEBIT", source_type="SELF_250_PACK").count()
-                pack_index = int(existing) + 1
-            except Exception:
-                pack_index = None
+                # Deduct the pack from self-reserve and overall balance
+                w.self_account_balance = cur_self - D("250.00")
+                w.balance = (w.balance or D("0")) - D("250.00")
+                w.save(update_fields=["balance", "self_account_balance", "updated_at"])
 
-            WalletTransaction.objects.create(
-                user=self.user,
-                amount=D("-250.00"),
-                balance_after=w.balance,
-                type="SELF_ACCOUNT_DEBIT",
-                source_type="SELF_250_PACK",
-                source_id="",
-                meta={
-                    "source_type": "SELF_250_PACK",
-                    "breakdown": {"coupon": 150, "sponsor": 50, "company": 50},
-                    "coupon_code": coupon_code_val,
-                    "sponsor_user_id": getattr(sponsor, "id", None) if sponsor else getattr(company_user, "id", None),
-                    "company_user_id": getattr(company_user, "id", None),
-                    "pack_index": pack_index,
-                }
-            )
+                # Record SELF_ACCOUNT_DEBIT marker with breakdown and pack index
+                try:
+                    existing = WalletTransaction.objects.filter(user=self.user, type="SELF_ACCOUNT_DEBIT", source_type="SELF_250_PACK").count()
+                    pack_index = int(existing) + 1
+                except Exception:
+                    pack_index = None
 
-            # Record prime purchase marker (₹150 used for Prime 150 activation)
-            try:
                 WalletTransaction.objects.create(
                     user=self.user,
-                    amount=D("-150.00"),
+                    amount=D("-250.00"),
                     balance_after=w.balance,
-                    type="AUTO_PURCHASE_DEBIT",
+                    type="SELF_ACCOUNT_DEBIT",
                     source_type="SELF_250_PACK",
-                    source_id=str(pack_index) if pack_index is not None else "",
-                    meta={"source_type": "SELF_250_PACK", "purchase": "PRIME_150", "pack_index": pack_index},
-                )
-            except Exception:
-                pass
-
-            # Trigger Prime 150 payout engine (idempotent by source_type + source_id)
-            try:
-                from business.services.prime import distribute_prime_150_payouts
-                distribute_prime_150_payouts(
-                    self.user,
-                    source={"type": "SELF_250_PACK", "id": str(pack_index) if pack_index is not None else ""}
-                )
-            except Exception:
-                # best-effort; do not roll back pack application
-                pass
-
-            # Sponsor and company portions (₹50 each). If no sponsor, route sponsor portion to company.
-            sponsor_bonus = D("50.00")
-            company_share = D("50.00")
-            sponsor_recipient = sponsor if sponsor else company_user
-
-
-            # Credit sponsor/company wallets (no withholding)
-            if sponsor_recipient and sponsor_bonus > 0:
-                try:
-                    sw = Wallet.get_or_create_for_user(sponsor_recipient)
-                    sw.credit(
-                        sponsor_bonus,
-                        tx_type="DIRECT_REF_BONUS",
-                        meta={"from_user_id": self.user.id, "from_user": getattr(self.user, "username", None), "no_withhold": True, "auto_rule": "SELF_250_PACK"},
-                        source_type="SELF_250_PACK",
-                        source_id="",
-                    )
-                except Exception:
-                    pass
-
-            if company_user and company_share > 0:
-                try:
-                    cw = Wallet.get_or_create_for_user(company_user)
-                    cw.credit(
-                        company_share,
-                        tx_type="TAX_POOL_CREDIT",
-                        meta={"from_user_id": self.user.id, "from_user": getattr(self.user, "username", None), "no_withhold": True, "auto_rule": "SELF_250_PACK"},
-                        source_type="SELF_250_PACK",
-                        source_id="",
-                    )
-                except Exception:
-                    pass
-
-            # Audit pack application
-            try:
-                AuditTrail.objects.create(
-                    action="auto_250_self_pack_applied",
-                    actor=self.user,
-                    notes="Applied SELF_250_PACK",
-                    metadata={
-                        "prime_used": True,
+                    source_id="",
+                    meta={
+                        "source_type": "SELF_250_PACK",
+                        "breakdown": {"coupon": 150, "sponsor": 50, "company": 50},
+                        "coupon_code": None,
+                        "sponsor_user_id": getattr(sponsor, "id", None) if sponsor else getattr(company_user, "id", None),
+                        "company_user_id": getattr(company_user, "id", None),
                         "pack_index": pack_index,
-                        "sponsor_id": getattr(sponsor_recipient, "id", None),
-                        "company_id": getattr(company_user, "id", None),
-                    },
+                    }
                 )
-            except Exception:
-                pass
+
+                # Record prime purchase marker (₹150 used for Prime 150 activation)
+                try:
+                    WalletTransaction.objects.create(
+                        user=self.user,
+                        amount=D("-150.00"),
+                        balance_after=w.balance,
+                        type="AUTO_PURCHASE_DEBIT",
+                        source_type="SELF_250_PACK",
+                        source_id=str(pack_index) if pack_index is not None else "",
+                        meta={"source_type": "SELF_250_PACK", "purchase": "PRIME_150", "pack_index": pack_index},
+                    )
+                except Exception:
+                    pass
+
+                # Trigger Prime 150 payout engine (idempotent by source_type + source_id)
+                try:
+                    from business.services.prime import distribute_prime_150_payouts
+                    distribute_prime_150_payouts(
+                        self.user,
+                        source={"type": "SELF_250_PACK", "id": str(pack_index) if pack_index is not None else ""}
+                    )
+                except Exception:
+                    # best-effort; do not roll back pack application
+                    pass
+
+                # Sponsor and company portions (₹50 each). If no sponsor, route sponsor portion to company.
+                sponsor_bonus = D("50.00")
+                company_share = D("50.00")
+                sponsor_recipient = sponsor if sponsor else company_user
+
+                # Credit sponsor/company wallets (no withholding)
+                if sponsor_recipient and sponsor_bonus > 0:
+                    try:
+                        sw = Wallet.get_or_create_for_user(sponsor_recipient)
+                        sw.credit(
+                            sponsor_bonus,
+                            tx_type="DIRECT_REF_BONUS",
+                            meta={"from_user_id": self.user.id, "from_user": getattr(self.user, "username", None), "no_withhold": True, "auto_rule": "SELF_250_PACK"},
+                            source_type="SELF_250_PACK",
+                            source_id="",
+                        )
+                    except Exception:
+                        pass
+
+                if company_user and company_share > 0:
+                    try:
+                        cw = Wallet.get_or_create_for_user(company_user)
+                        cw.credit(
+                            company_share,
+                            tx_type="TAX_POOL_CREDIT",
+                            meta={"from_user_id": self.user.id, "from_user": getattr(self.user, "username", None), "no_withhold": True, "auto_rule": "SELF_250_PACK"},
+                            source_type="SELF_250_PACK",
+                            source_id="",
+                        )
+                    except Exception:
+                        pass
+
+                # Audit pack application
+                try:
+                    AuditTrail.objects.create(
+                        action="auto_250_self_pack_applied",
+                        actor=self.user,
+                        notes="Applied SELF_250_PACK",
+                        metadata={
+                            "prime_used": True,
+                            "pack_index": pack_index,
+                            "sponsor_id": getattr(sponsor_recipient, "id", None),
+                            "company_id": getattr(company_user, "id", None),
+                        },
+                    )
+                except Exception:
+                    pass
+        finally:
+            w._applying_self_rule = False
 
 
 class FranchiseWalletSettings(models.Model):
