@@ -406,7 +406,10 @@ export default function TeamWallet() {
   const totalEarningBonus = useMemo(() => {
     return (Array.isArray(historyData?.incoming) ? historyData.incoming : []).reduce(
       (sum, tx) => {
-        const g = Number(tx?.meta?.gross ?? 0);
+        const grossVal = (tx?.meta?.gross !== undefined && tx?.meta?.gross !== null && tx?.meta?.gross !== "") 
+          ? tx.meta.gross 
+          : (tx?.amount ?? 0);
+        const g = Number(grossVal);
         return sum + (isNaN(g) ? 0 : g);
       },
       0
