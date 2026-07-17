@@ -868,6 +868,200 @@ class PromoPurchaseAdmin(admin.ModelAdmin):
         self.message_user(request, f"Rejected {updated} promo purchase(s).")
     reject_selected.short_description = "Reject selected PENDING purchases"
 
+    def get_urls(self):
+        urls = super().get_urls()
+        from django.urls import path
+        custom_urls = [
+            path('sales-analytics/', self.admin_site.admin_view(self.sales_analytics_view), name='business_promopurchase_analytics'),
+        ]
+        return custom_urls + urls
+
+    def sales_analytics_view(self, request):
+        from django.shortcuts import render
+        from django.utils import timezone
+        from decimal import Decimal
+        from django.db.models import Sum, Count, Q
+        import datetime
+        from mlm_ranks.models import RankUpgrade
+
+        # Parse date range from request
+        start_date_str = request.GET.get('start_date')
+        end_date_str = request.GET.get('end_date')
+
+        # Get local timezone
+        local_tz = timezone.get_current_timezone()
+
+        # Dates today and yesterday
+        today = timezone.localdate()
+        yesterday = today - datetime.timedelta(days=1)
+
+        # Parse inputs
+        try:
+            start_date = datetime.datetime.strptime(start_date_str, "%Y-%m-%d").date() if start_date_str else today
+        except Exception:
+            start_date = today
+
+        try:
+            end_date = datetime.datetime.strptime(end_date_str, "%Y-%m-%d").date() if end_date_str else today
+        except Exception:
+            end_date = today
+
+        # Make aware datetimes for query
+        start_datetime = timezone.make_aware(datetime.datetime.combine(start_date, datetime.time.min), local_tz)
+        end_datetime = timezone.make_aware(datetime.datetime.combine(end_date, datetime.time.max), local_tz)
+
+        # Query helper function for a specific datetime range
+        def get_metrics_for_range(start_dt, end_dt):
+            # 1. 750 Packages
+            pkg750_qs = PromoPurchase.objects.filter(
+                status="APPROVED",
+                approved_at__range=(start_dt, end_dt)
+            ).filter(
+                Q(package__type="PRIME") & (
+                    Q(package__price__gte=Decimal("749.00"), package__price__lte=Decimal("761.00"))
+                    | Q(package__code__icontains="750")
+                    | Q(package__name__icontains="750")
+                    | Q(package__code__icontains="759")
+                    | Q(package__name__icontains="759")
+                )
+            )
+            pkg750_agg = pkg750_qs.aggregate(
+                count=Count("id"),
+                total=Sum("amount_paid"),
+                self_pocket=Sum("amount_paid", filter=Q(
+                    payment_mode="WALLET",
+                    wallet_debit_tx__type="INTERNAL_WALLET_DEBIT",
+                    wallet_debit_tx__source_type="PROMO_PURCHASE"
+                )),
+                add_money=Sum("amount_paid", filter=Q(
+                    payment_mode="WALLET",
+                    wallet_debit_tx__type="INTERNAL_WALLET_DEBIT",
+                    wallet_debit_tx__source_type="WALLET_UPLOAD"
+                )),
+                coupon_pocket=Sum("amount_paid", filter=Q(
+                    payment_mode="WALLET",
+                    wallet_debit_tx__type="PACKAGE_COUPON_WALLET_DEBIT"
+                )),
+                manual=Sum("amount_paid", filter=Q(payment_mode="MANUAL"))
+            )
+
+            # 2. SPP Packages (MONTHLY)
+            spp_qs = PromoPurchase.objects.filter(
+                status="APPROVED",
+                approved_at__range=(start_dt, end_dt)
+            ).filter(
+                Q(package__type="MONTHLY") |
+                Q(package__price__gte=Decimal("999.50"), package__price__lte=Decimal("1000.50"))
+            )
+            spp_agg = spp_qs.aggregate(
+                count=Count("id"),
+                total=Sum("amount_paid"),
+                self_pocket=Sum("amount_paid", filter=Q(
+                    payment_mode="WALLET",
+                    wallet_debit_tx__type="INTERNAL_WALLET_DEBIT",
+                    wallet_debit_tx__source_type="PROMO_PURCHASE"
+                )),
+                add_money=Sum("amount_paid", filter=Q(
+                    payment_mode="WALLET",
+                    wallet_debit_tx__type="INTERNAL_WALLET_DEBIT",
+                    wallet_debit_tx__source_type="WALLET_UPLOAD"
+                )),
+                coupon_pocket=Sum("amount_paid", filter=Q(
+                    payment_mode="WALLET",
+                    wallet_debit_tx__type="PACKAGE_COUPON_WALLET_DEBIT"
+                )),
+                manual=Sum("amount_paid", filter=Q(payment_mode="MANUAL"))
+            )
+
+            # 3. Rank Upgrades (Digital Education)
+            rank_qs = RankUpgrade.objects.filter(
+                payment_status="SUCCESS",
+                upgraded_at__range=(start_dt, end_dt)
+            )
+            
+            rank_ids = list(rank_qs.values_list("id", flat=True))
+            
+            from accounts.models import WalletTransaction
+            rank_txs = WalletTransaction.objects.filter(
+                source_type="RANK_UPGRADE",
+                source_id__in=[str(rid) for rid in rank_ids]
+            )
+            
+            rank_by_wallet = {
+                "self_pocket": 0.0,
+                "add_money": 0.0,
+                "coupon_pocket": 0.0,
+                "manual": 0.0
+            }
+            
+            for up in rank_qs:
+                up_amt = float(up.upgrade_amount or 0)
+                wtx = rank_txs.filter(source_id=str(up.id)).first()
+                if wtx:
+                    if wtx.type == "PACKAGE_COUPON_WALLET_DEBIT":
+                        rank_by_wallet["coupon_pocket"] += up_amt
+                    elif wtx.type == "INTERNAL_WALLET_DEBIT":
+                        if wtx.source_type == "WALLET_UPLOAD":
+                            rank_by_wallet["add_money"] += up_amt
+                        else:
+                            rank_by_wallet["self_pocket"] += up_amt
+                else:
+                    rank_by_wallet["manual"] += up_amt
+
+            rank_total = float(rank_qs.aggregate(total=Sum("upgrade_amount"))["total"] or 0)
+
+            return {
+                "pkg750": {
+                    "count": int(pkg750_agg["count"] or 0),
+                    "total": float(pkg750_agg["total"] or 0),
+                    "self_pocket": float(pkg750_agg["self_pocket"] or 0),
+                    "add_money": float(pkg750_agg["add_money"] or 0),
+                    "coupon_pocket": float(pkg750_agg["coupon_pocket"] or 0),
+                    "manual": float(pkg750_agg["manual"] or 0)
+                },
+                "spp": {
+                    "count": int(spp_agg["count"] or 0),
+                    "total": float(spp_agg["total"] or 0),
+                    "self_pocket": float(spp_agg["self_pocket"] or 0),
+                    "add_money": float(spp_agg["add_money"] or 0),
+                    "coupon_pocket": float(spp_agg["coupon_pocket"] or 0),
+                    "manual": float(spp_agg["manual"] or 0)
+                },
+                "rank": {
+                    "count": rank_qs.count(),
+                    "total": rank_total,
+                    "self_pocket": rank_by_wallet["self_pocket"],
+                    "add_money": rank_by_wallet["add_money"],
+                    "coupon_pocket": rank_by_wallet["coupon_pocket"],
+                    "manual": rank_by_wallet["manual"]
+                }
+            }
+
+        today_start = timezone.make_aware(datetime.datetime.combine(today, datetime.time.min), local_tz)
+        today_end = timezone.make_aware(datetime.datetime.combine(today, datetime.time.max), local_tz)
+
+        yesterday_start = timezone.make_aware(datetime.datetime.combine(yesterday, datetime.time.min), local_tz)
+        yesterday_end = timezone.make_aware(datetime.datetime.combine(yesterday, datetime.time.max), local_tz)
+
+        today_metrics = get_metrics_for_range(today_start, today_end)
+        today_metrics["today_date"] = today.strftime("%Y-%m-%d")
+        
+        yesterday_metrics = get_metrics_for_range(yesterday_start, yesterday_end)
+        yesterday_metrics["yesterday_date"] = yesterday.strftime("%Y-%m-%d")
+        
+        custom_metrics = get_metrics_for_range(start_datetime, end_datetime)
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": "Sales & Purchase Analytics",
+            "start_date": start_date.strftime("%Y-%m-%d"),
+            "end_date": end_date.strftime("%Y-%m-%d"),
+            "today_metrics": today_metrics,
+            "yesterday_metrics": yesterday_metrics,
+            "custom_metrics": custom_metrics
+        }
+        return render(request, 'admin/sales_analytics.html', context)
+
 
 # ==============================
 # TRI Apps (Admin)
