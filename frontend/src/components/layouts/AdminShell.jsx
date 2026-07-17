@@ -475,6 +475,14 @@ export default function AdminShell({ children }) {
           { to: "/admin/franchise/wishing-banners", label: "Wishing Banners", icon: "box" },
         ],
       },
+      {
+        key: "analytics",
+        label: "Analytics",
+        items: [
+          { to: "/admin/analytics/debugger", label: "Wallet Debugger", icon: "shield" },
+          { to: "/admin/analytics/sales", label: "Daily Sales Report", icon: "chart" },
+        ],
+      },
 
       // {
       //   key: "dev",

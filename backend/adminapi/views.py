@@ -4777,3 +4777,249 @@ class AdminRewardPointsConfig(APIView):
         except Exception:
             cfg.save()
         return Response(self._serialize(cfg), status=200)
+
+
+class AdminWalletDebugView(APIView):
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
+
+    def get(self, request):
+        from decimal import Decimal
+        from django.db.models import Q, Sum
+        from accounts.models import Wallet, WalletTransaction, CustomUser
+
+        username = (request.query_params.get("username") or "").strip()
+        if not username:
+            return Response({"detail": "Username is required"}, status=400)
+            
+        user = CustomUser.objects.filter(Q(username=username) | Q(prefixed_id=username) | Q(phone=username)).first()
+        if not user:
+            return Response({"detail": "User not found"}, status=400)
+            
+        try:
+            w = user.wallet
+        except Exception:
+            w = Wallet.objects.create(user=user)
+            
+        txs = WalletTransaction.objects.filter(user=user)
+        calc_main = Decimal(str(txs.exclude(type='SELF_ACCOUNT_CREDIT').aggregate(total=Sum('amount'))['total'] or '0.00')).quantize(Decimal('0.01'))
+        calc_self = Decimal(str(txs.filter(type='SELF_ACCOUNT_CREDIT').aggregate(total=Sum('amount'))['total'] or '0.00')).quantize(Decimal('0.01'))
+        
+        cached_main = Decimal(str(w.main_balance or '0.00')).quantize(Decimal('0.01'))
+        cached_self = Decimal(str(w.self_account_balance or '0.00')).quantize(Decimal('0.01'))
+        cached_total = Decimal(str(w.balance or '0.00')).quantize(Decimal('0.01'))
+        
+        diff = cached_total - (calc_main + calc_self)
+        
+        recent_txs = txs.order_by('-created_at', '-id')[:50]
+        tx_list = []
+        for tx in recent_txs:
+            tx_list.append({
+                "id": tx.id,
+                "amount": str(tx.amount),
+                "balance_after": str(tx.balance_after),
+                "type": tx.type,
+                "created_at": tx.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                "meta": tx.meta
+            })
+            
+        return Response({
+            "user": {
+                "id": user.id,
+                "full_name": user.full_name,
+                "username": user.username,
+                "phone": user.phone
+            },
+            "cached": {
+                "main": str(cached_main),
+                "self": str(cached_self),
+                "total": str(cached_total)
+            },
+            "calculated": {
+                "main": str(calc_main),
+                "self": str(calc_self),
+                "total": str(calc_main + calc_self)
+            },
+            "status": "OK" if diff == Decimal('0.00') else "MISMATCH",
+            "diff": str(diff),
+            "transactions": tx_list
+        })
+
+    def post(self, request):
+        from decimal import Decimal
+        from django.db import transaction as db_transaction
+        from django.db.models import Q, Sum
+        from accounts.models import WalletTransaction, CustomUser
+
+        action = request.data.get("action")
+        username = (request.data.get("username") or "").strip()
+        if not username:
+            return Response({"detail": "Username is required"}, status=400)
+            
+        user = CustomUser.objects.filter(Q(username=username) | Q(prefixed_id=username) | Q(phone=username)).first()
+        if not user:
+            return Response({"detail": "User not found"}, status=400)
+            
+        w = user.wallet
+        
+        if action == "sync":
+            with db_transaction.atomic():
+                txs = WalletTransaction.objects.filter(user=user)
+                calc_main = Decimal(str(txs.exclude(type='SELF_ACCOUNT_CREDIT').aggregate(total=Sum('amount'))['total'] or '0.00')).quantize(Decimal('0.01'))
+                calc_self = Decimal(str(txs.filter(type='SELF_ACCOUNT_CREDIT').aggregate(total=Sum('amount'))['total'] or '0.00')).quantize(Decimal('0.01'))
+                
+                if calc_main < 0:
+                    calc_main = Decimal("0.00")
+                if calc_self < 0:
+                    calc_self = Decimal("0.00")
+                    
+                w.main_balance = calc_main
+                w.self_account_balance = calc_self
+                w.balance = calc_main + calc_self
+                w.save(update_fields=["main_balance", "self_account_balance", "balance", "updated_at"])
+                
+            return Response({"detail": "Wallet balance successfully synced with ledger."})
+            
+        elif action == "adjust":
+            amount = request.data.get("amount")
+            pocket = request.data.get("pocket")
+            adj_type = request.data.get("type")
+            reason = (request.data.get("reason") or "").strip()
+            
+            if not amount:
+                return Response({"detail": "Amount is required"}, status=400)
+            if pocket not in ("main", "self"):
+                return Response({"detail": "Pocket must be main or self"}, status=400)
+            if not adj_type:
+                return Response({"detail": "Adjustment type is required"}, status=400)
+            if not reason:
+                return Response({"detail": "Reason/comment is required"}, status=400)
+                
+            try:
+                amt_dec = Decimal(str(amount))
+            except Exception:
+                return Response({"detail": "Invalid amount format"}, status=400)
+                
+            with db_transaction.atomic():
+                if pocket == "main":
+                    w.main_balance = (w.main_balance or Decimal("0")) + amt_dec
+                else:
+                    w.self_account_balance = (w.self_account_balance or Decimal("0")) + amt_dec
+                    
+                w.balance = (w.balance or Decimal("0")) + amt_dec
+                w.save(update_fields=["main_balance", "self_account_balance", "balance", "updated_at"])
+                
+                meta = {
+                    "reason": reason,
+                    "ledger": "MAIN" if pocket == "main" else "SELF_ACCOUNT",
+                    "admin_adjusted": True
+                }
+                WalletTransaction.objects.create(
+                    user=user,
+                    amount=amt_dec,
+                    balance_after=w.balance,
+                    type=adj_type,
+                    meta=meta
+                )
+                
+            return Response({"detail": "Manual adjustment applied successfully."})
+            
+        else:
+            return Response({"detail": "Invalid action"}, status=400)
+
+
+class AdminDailySalesReportView(APIView):
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
+
+    def get(self, request):
+        from decimal import Decimal
+        from django.db.models import Sum, Count
+        from django.utils import timezone
+        from mlm_ranks.models import RankUpgrade
+        from business.models import SubscriptionActivation
+
+        from_date_str = request.query_params.get("from")
+        to_date_str = request.query_params.get("to")
+        
+        if not from_date_str or not to_date_str:
+            return Response({"detail": "Both from and to dates are required"}, status=400)
+            
+        try:
+            from_date = timezone.datetime.strptime(from_date_str, "%Y-%m-%d").date()
+            to_date = timezone.datetime.strptime(to_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            return Response({"detail": "Dates must be in YYYY-MM-DD format"}, status=400)
+            
+        upgrades = RankUpgrade.objects.filter(
+            payment_status='SUCCESS',
+            upgraded_at__date__range=(from_date, to_date)
+        ).values('upgraded_at__date').annotate(
+            count=Count('id'),
+            total=Sum('upgrade_amount')
+        )
+        
+        packages = SubscriptionActivation.objects.filter(
+            created_at__date__range=(from_date, to_date)
+        ).values('created_at__date').annotate(
+            count=Count('id'),
+            total=Sum('amount')
+        )
+        
+        daily_sales = {}
+        curr = from_date
+        while curr <= to_date:
+            date_key = curr.strftime("%Y-%m-%d")
+            daily_sales[date_key] = {
+                "date": date_key,
+                "packages_count": 0,
+                "packages_amount": "0.00",
+                "upgrades_count": 0,
+                "upgrades_amount": "0.00",
+                "total_amount": "0.00"
+            }
+            curr += timezone.timedelta(days=1)
+            
+        for up in upgrades:
+            dt = up['upgraded_at__date']
+            if dt:
+                date_key = dt.strftime("%Y-%m-%d")
+                if date_key in daily_sales:
+                    daily_sales[date_key]["upgrades_count"] = up['count'] or 0
+                    daily_sales[date_key]["upgrades_amount"] = str(up['total'] or Decimal("0.00"))
+                    
+        for pkg in packages:
+            dt = pkg['created_at__date']
+            if dt:
+                date_key = dt.strftime("%Y-%m-%d")
+                if date_key in daily_sales:
+                    daily_sales[date_key]["packages_count"] = pkg['count'] or 0
+                    daily_sales[date_key]["packages_amount"] = str(pkg['total'] or Decimal("0.00"))
+                    
+        grand_total = Decimal("0.00")
+        total_pkg_count = 0
+        total_pkg_amt = Decimal("0.00")
+        total_upg_count = 0
+        total_upg_amt = Decimal("0.00")
+        
+        for date_key, data in daily_sales.items():
+            pkg_amt = Decimal(data["packages_amount"])
+            upg_amt = Decimal(data["upgrades_amount"])
+            tot = pkg_amt + upg_amt
+            data["total_amount"] = f"{tot:.2f}"
+            grand_total += tot
+            total_pkg_count += data["packages_count"]
+            total_pkg_amt += pkg_amt
+            total_upg_count += data["upgrades_count"]
+            total_upg_amt += upg_amt
+            
+        results = sorted(daily_sales.values(), key=lambda x: x["date"], reverse=True)
+        
+        return Response({
+            "results": results,
+            "summary": {
+                "total_revenue": f"{grand_total:.2f}",
+                "packages_count": total_pkg_count,
+                "packages_amount": f"{total_pkg_amt:.2f}",
+                "upgrades_count": total_upg_count,
+                "upgrades_amount": f"{total_upg_amt:.2f}"
+            }
+        })

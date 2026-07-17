@@ -1,4 +1,4 @@
-﻿import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Login from "./pages/Auth/Login";
 import LuckyDraw from "./pages/LuckyDraw";
 import UserDashboard from "./pages/UserDashboard";
@@ -98,6 +98,8 @@ import AdminLevelCommission from "./pages/admin/AdminLevelCommission";
 import AdminMatrixCommission from "./pages/admin/AdminMatrixCommission";
 import AdminCommissionHistory from "./pages/admin/AdminCommissionHistory";
 import AdminCommissionDistribute from "./pages/admin/AdminCommissionDistribute";
+import AdminWalletDebugger from "./pages/admin/AdminWalletDebugger";
+import AdminDailySalesReport from "./pages/admin/AdminDailySalesReport";
 import Profile from "./pages/Profile";
 import RoleSelect from "./pages/Auth/RoleSelect";
 import ReferAndEarnPage from "./pages/ReferAndEarn";
@@ -1744,6 +1746,26 @@ function App() {
             <AdminProtectedRoute>
               <AdminShell>
                 <AdminWalletReconcile />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/analytics/debugger"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminWalletDebugger />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/analytics/sales"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminDailySalesReport />
               </AdminShell>
             </AdminProtectedRoute>
           }
