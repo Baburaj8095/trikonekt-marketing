@@ -421,6 +421,8 @@ export default function InteractiveTree({
   const pinch    = useRef(null);
   const inFlight = useRef(new Set());
   const tapTime  = useRef({});  // { nodeId: lastTapTime }
+  const dragStart = useRef({ x: 0, y: 0 });
+  const hasDragged = useRef(false);
 
   // ── Computed flat graph ──
   const { nodes, edges, viewBox } = useMemo(() => {
@@ -444,6 +446,10 @@ export default function InteractiveTree({
 
   // ── Tap: click child → drill down; click root → expand/collapse ──
   const handleTap = useCallback((nodeId) => {
+    if (hasDragged.current) {
+      hasDragged.current = false;
+      return;
+    }
     // Helper to find a node in the tree
     function findNodeById(nd, id) {
       if (!nd) return null;
@@ -530,10 +536,17 @@ export default function InteractiveTree({
     if (e.pointerType === "touch") return;
     e.currentTarget.setPointerCapture(e.pointerId);
     drag.current = { sx: e.clientX, sy: e.clientY, itx: tx, ity: ty };
+    dragStart.current = { x: e.clientX, y: e.clientY };
+    hasDragged.current = false;
   }, [tx, ty]);
 
   const onPM = useCallback((e) => {
     if (!drag.current || e.pointerType === "touch") return;
+    const dx = e.clientX - dragStart.current.x;
+    const dy = e.clientY - dragStart.current.y;
+    if (Math.hypot(dx, dy) > 4) {
+      hasDragged.current = true;
+    }
     setTx(drag.current.itx + e.clientX - drag.current.sx);
     setTy(drag.current.ity + e.clientY - drag.current.sy);
   }, []);
@@ -544,6 +557,8 @@ export default function InteractiveTree({
   const onTS = useCallback((e) => {
     if (e.touches.length === 1) {
       drag.current = { sx: e.touches[0].clientX, sy: e.touches[0].clientY, itx: tx, ity: ty };
+      dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      hasDragged.current = false;
     } else if (e.touches.length === 2) {
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
@@ -555,6 +570,11 @@ export default function InteractiveTree({
   const onTM = useCallback((e) => {
     e.preventDefault();
     if (e.touches.length === 1 && drag.current) {
+      const dx = e.touches[0].clientX - dragStart.current.x;
+      const dy = e.touches[0].clientY - dragStart.current.y;
+      if (Math.hypot(dx, dy) > 4) {
+        hasDragged.current = true;
+      }
       setTx(drag.current.itx + e.touches[0].clientX - drag.current.sx);
       setTy(drag.current.ity + e.touches[0].clientY - drag.current.sy);
     } else if (e.touches.length === 2 && pinch.current) {
@@ -613,9 +633,6 @@ export default function InteractiveTree({
         viewBox={viewBox} width="100%" height="100%"
         style={{
           display: "block",
-          transform: `translate(${tx}px,${ty}px) scale(${scale})`,
-          transformOrigin: "50% 22%",
-          transition: drag.current || pinch.current ? "none" : "transform .16s ease",
           userSelect: "none",
           cursor: drag.current ? "grabbing" : "grab",
         }}
@@ -625,11 +642,19 @@ export default function InteractiveTree({
             <circle cx="11" cy="11" r=".8" fill={BOR} />
           </pattern>
         </defs>
-        <rect x="-6000" y="-6000" width="12000" height="12000" fill="url(#igrid)" />
-        {edges.map(e => <SvgEdge key={e.id} e={e} />)}
-        {nodes.map(n => (
-          <SvgNode key={n.id} n={n} onTap={handleTap} isRoot={tree && String(tree.id) === n.id} />
-        ))}
+        <g
+          style={{
+            transform: `translate(${tx}px,${ty}px) scale(${scale})`,
+            transformOrigin: "50% 22%",
+            transition: drag.current || pinch.current ? "none" : "transform .16s ease",
+          }}
+        >
+          <rect x="-6000" y="-6000" width="12000" height="12000" fill="url(#igrid)" />
+          {edges.map(e => <SvgEdge key={e.id} e={e} />)}
+          {nodes.map(n => (
+            <SvgNode key={n.id} n={n} onTap={handleTap} isRoot={tree && String(tree.id) === n.id} />
+          ))}
+        </g>
       </svg>
 
       {/* Hint */}
