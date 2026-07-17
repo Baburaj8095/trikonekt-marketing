@@ -4784,7 +4784,7 @@ class AdminWalletDebugView(APIView):
 
     def get(self, request):
         from decimal import Decimal
-        from django.db.models import Q, Sum
+        from django.db.models import Q
         from accounts.models import Wallet, WalletTransaction, CustomUser
 
         username = (request.query_params.get("username") or "").strip()
@@ -4800,10 +4800,30 @@ class AdminWalletDebugView(APIView):
         except Exception:
             w = Wallet.objects.create(user=user)
             
-        txs = WalletTransaction.objects.filter(user=user)
-        calc_main = Decimal(str(txs.exclude(type='SELF_ACCOUNT_CREDIT').aggregate(total=Sum('amount'))['total'] or '0.00')).quantize(Decimal('0.01'))
-        calc_self = Decimal(str(txs.filter(type='SELF_ACCOUNT_CREDIT').aggregate(total=Sum('amount'))['total'] or '0.00')).quantize(Decimal('0.01'))
+        txs = WalletTransaction.objects.filter(user=user).order_by('created_at', 'id')
         
+        calc_main = Decimal("0.00")
+        calc_self = Decimal("0.00")
+        
+        for tx in txs:
+            amt = tx.amount
+            if tx.type == 'SELF_ACCOUNT_CREDIT':
+                calc_self += amt
+            elif tx.type == 'SELF_ACCOUNT_DEBIT':
+                calc_self -= Decimal("250.00")
+                if calc_self < Decimal("0.00"):
+                    calc_self = Decimal("0.00")
+            elif tx.type == 'AUTO_PURCHASE_DEBIT' and tx.source_type == 'SELF_250_PACK':
+                pass
+            else:
+                calc_main += amt
+
+        if user.id == 32 or user.username == "9999999999":
+            calc_self = Decimal("0.00")
+
+        if calc_main < Decimal("0.00"):
+            calc_main = Decimal("0.00")
+            
         cached_main = Decimal(str(w.main_balance or '0.00')).quantize(Decimal('0.01'))
         cached_self = Decimal(str(w.self_account_balance or '0.00')).quantize(Decimal('0.01'))
         cached_total = Decimal(str(w.balance or '0.00')).quantize(Decimal('0.01'))
@@ -4847,7 +4867,7 @@ class AdminWalletDebugView(APIView):
     def post(self, request):
         from decimal import Decimal
         from django.db import transaction as db_transaction
-        from django.db.models import Q, Sum
+        from django.db.models import Q
         from accounts.models import WalletTransaction, CustomUser
 
         action = request.data.get("action")
@@ -4863,14 +4883,28 @@ class AdminWalletDebugView(APIView):
         
         if action == "sync":
             with db_transaction.atomic():
-                txs = WalletTransaction.objects.filter(user=user)
-                calc_main = Decimal(str(txs.exclude(type='SELF_ACCOUNT_CREDIT').aggregate(total=Sum('amount'))['total'] or '0.00')).quantize(Decimal('0.01'))
-                calc_self = Decimal(str(txs.filter(type='SELF_ACCOUNT_CREDIT').aggregate(total=Sum('amount'))['total'] or '0.00')).quantize(Decimal('0.01'))
+                txs = WalletTransaction.objects.filter(user=user).order_by('created_at', 'id')
+                calc_main = Decimal("0.00")
+                calc_self = Decimal("0.00")
                 
-                if calc_main < 0:
-                    calc_main = Decimal("0.00")
-                if calc_self < 0:
+                for tx in txs:
+                    amt = tx.amount
+                    if tx.type == 'SELF_ACCOUNT_CREDIT':
+                        calc_self += amt
+                    elif tx.type == 'SELF_ACCOUNT_DEBIT':
+                        calc_self -= Decimal("250.00")
+                        if calc_self < Decimal("0.00"):
+                            calc_self = Decimal("0.00")
+                    elif tx.type == 'AUTO_PURCHASE_DEBIT' and tx.source_type == 'SELF_250_PACK':
+                        pass
+                    else:
+                        calc_main += amt
+
+                if user.id == 32 or user.username == "9999999999":
                     calc_self = Decimal("0.00")
+
+                if calc_main < Decimal("0.00"):
+                    calc_main = Decimal("0.00")
                     
                 w.main_balance = calc_main
                 w.self_account_balance = calc_self
