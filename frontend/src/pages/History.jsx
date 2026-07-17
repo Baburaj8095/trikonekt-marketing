@@ -529,18 +529,53 @@ export default function History() {
     };
   }, []);
 
+  const [filterDays, setFilterDays] = useState("all");
+
+  const cutoffDate = useMemo(() => {
+    if (filterDays === "all") return null;
+    const date = new Date();
+    date.setDate(date.getDate() - Number(filterDays));
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }, [filterDays]);
+
   const incomingGross = useMemo(
     () =>
       (incoming || []).map((tx) => {
-        const g = Number(tx?.meta?.gross);
+        const grossVal = (tx?.meta?.gross !== undefined && tx?.meta?.gross !== null && tx?.meta?.gross !== "") 
+          ? tx.meta.gross 
+          : (tx?.amount ?? 0);
+        const g = Number(grossVal);
         return isNaN(g) ? tx : { ...tx, amount: g };
       }),
     [incoming]
   );
-  const sectionsIncoming = useMemo(() => groupByDay(incomingGross), [incomingGross]);
-  const sectionsSelf = useMemo(() => groupByDay(selfAccount), [selfAccount]);
-  const sectionsRewards = useMemo(() => groupByDay(cashback), [cashback]);
-  const sectionsRedeem = useMemo(() => groupByDay(redeem), [redeem]);
+
+  const filteredIncoming = useMemo(() => {
+    if (!cutoffDate) return incomingGross;
+    return incomingGross.filter(tx => new Date(tx.created_at) >= cutoffDate);
+  }, [incomingGross, cutoffDate]);
+
+  const filteredSelf = useMemo(() => {
+    if (!cutoffDate) return selfAccount;
+    return selfAccount.filter(tx => new Date(tx.created_at) >= cutoffDate);
+  }, [selfAccount, cutoffDate]);
+
+  const filteredRewards = useMemo(() => {
+    if (!cutoffDate) return cashback;
+    return cashback.filter(tx => new Date(tx.created_at) >= cutoffDate);
+  }, [cashback, cutoffDate]);
+
+  const filteredRedeem = useMemo(() => {
+    if (!cutoffDate) return redeem;
+    return redeem.filter(tx => new Date(tx.created_at) >= cutoffDate);
+  }, [redeem, cutoffDate]);
+
+  const sectionsIncoming = useMemo(() => groupByDay(filteredIncoming), [filteredIncoming]);
+  const sectionsSelf = useMemo(() => groupByDay(filteredSelf), [filteredSelf]);
+  const sectionsRewards = useMemo(() => groupByDay(filteredRewards), [filteredRewards]);
+  const sectionsRedeem = useMemo(() => groupByDay(filteredRedeem), [filteredRedeem]);
+
   const totalGross = useMemo(
     () =>
       (incoming || []).reduce((sum, tx) => {
@@ -553,11 +588,36 @@ export default function History() {
     [incoming]
   );
 
+  const todaysEarnings = useMemo(() => {
+    const activeList = tab === 0 ? incomingGross : (tab === 1 ? selfAccount : (tab === 2 ? cashback : redeem));
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    return activeList
+      .filter(tx => new Date(tx.created_at) >= startOfToday && Number(tx.amount) > 0)
+      .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+  }, [tab, incomingGross, selfAccount, cashback, redeem]);
+
+  const yesterdaysEarnings = useMemo(() => {
+    const activeList = tab === 0 ? incomingGross : (tab === 1 ? selfAccount : (tab === 2 ? cashback : redeem));
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const startOfYesterday = new Date(startOfToday);
+    startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+    const endOfYesterday = new Date(startOfToday);
+    endOfYesterday.setMilliseconds(-1);
+    return activeList
+      .filter(tx => {
+        const txDate = new Date(tx.created_at);
+        return txDate >= startOfYesterday && txDate <= endOfYesterday && Number(tx.amount) > 0;
+      })
+      .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+  }, [tab, incomingGross, selfAccount, cashback, redeem]);
+
   const tabs = [
-    { label: `Bonus History (${incoming.length})`, key: "incoming" },
-    { label: `Self Account (${selfAccount.length})`, key: "self" },
-    { label: `Rewards (${cashback.length})`, key: "rewards" },
-    { label: `Redeem (${redeem.length})`, key: "redeem" },
+    { label: `Bonus History (${filteredIncoming.length})`, key: "incoming" },
+    { label: `Self Account (${filteredSelf.length})`, key: "self" },
+    { label: `Rewards (${filteredRewards.length})`, key: "rewards" },
+    { label: `Redeem (${filteredRedeem.length})`, key: "redeem" },
   ];
 
   return (
@@ -626,6 +686,56 @@ export default function History() {
         </Stack>
       </Paper>
 
+      {/* Today & Yesterday Earnings Stats */}
+      <Box sx={{ display: "flex", gap: 1.2, mb: 1.2 }}>
+        <Paper
+          elevation={0}
+          sx={{
+            flex: 1,
+            p: 1.2,
+            borderRadius: 2.2,
+            border: "1px solid",
+            borderColor: "#EEF2F6",
+            bgcolor: "#EDFDF5", // Light green tint
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center",
+            minHeight: 64,
+          }}
+        >
+          <Typography variant="caption" sx={{ color: "success.dark", fontWeight: 800 }}>
+            Today's Earnings
+          </Typography>
+          <Typography sx={{ fontSize: 16, fontWeight: 900, color: "success.main", mt: 0.2 }}>
+            +₹ {fmtAmount(todaysEarnings)}
+          </Typography>
+        </Paper>
+        <Paper
+          elevation={0}
+          sx={{
+            flex: 1,
+            p: 1.2,
+            borderRadius: 2.2,
+            border: "1px solid",
+            borderColor: "#EEF2F6",
+            bgcolor: "#F8FAFC", // Light gray tint
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center",
+            minHeight: 64,
+          }}
+        >
+          <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 800 }}>
+            Yesterday's Earnings
+          </Typography>
+          <Typography sx={{ fontSize: 16, fontWeight: 900, color: "text.primary", mt: 0.2 }}>
+            +₹ {fmtAmount(yesterdaysEarnings)}
+          </Typography>
+        </Paper>
+      </Box>
+
       {/* Mini Cards (Horizontal scroll) */}
       <Box
         sx={{
@@ -634,7 +744,7 @@ export default function History() {
           overflowX: "auto",
           pb: 1,
           mb: 1.2,
-          px: 0.5, // âœ… prevents cut off on left/right
+          px: 0.5, // ✅ prevents cut off on left/right
           scrollSnapType: "x mandatory",
           "&::-webkit-scrollbar": { display: "none" },
         }}
@@ -657,6 +767,47 @@ export default function History() {
           icon={<RedeemIcon fontSize="small" />}
           color="secondary"
         />
+      </Box>
+
+      {/* Date Filter Pills Row */}
+      <Box
+        sx={{
+          display: "flex",
+          gap: 1,
+          overflowX: "auto",
+          pb: 1,
+          mb: 1.2,
+          "&::-webkit-scrollbar": { display: "none" },
+        }}
+      >
+        {[
+          { label: "All Time", value: "all" },
+          { label: "7 Days", value: "7" },
+          { label: "10 Days", value: "10" },
+          { label: "15 Days", value: "15" },
+          { label: "30 Days", value: "30" },
+        ].map((p) => {
+          const selected = filterDays === p.value;
+          return (
+            <Chip
+              key={p.value}
+              label={p.label}
+              onClick={() => setFilterDays(p.value)}
+              sx={{
+                fontWeight: 800,
+                fontSize: 12,
+                borderRadius: 999,
+                bgcolor: selected ? "primary.main" : "#fff",
+                color: selected ? "#fff" : "text.secondary",
+                border: "1px solid",
+                borderColor: selected ? "primary.main" : "#E2E8F0",
+                "&:hover": {
+                  bgcolor: selected ? "primary.dark" : "#F1F5F9",
+                },
+              }}
+            />
+          );
+        })}
       </Box>
 
       {/* Tabs */}
@@ -711,10 +862,10 @@ export default function History() {
             </Typography>
           ) : (
             <>
-              {tab === 0 && <SectionList sections={sectionsIncoming} fallbackRows={incomingGross} />}
-              {tab === 1 && <SectionList sections={sectionsSelf} fallbackRows={selfAccount} />}
-              {tab === 2 && <SectionList sections={sectionsRewards} fallbackRows={cashback} />}
-              {tab === 3 && <SectionList sections={sectionsRedeem} fallbackRows={redeem} />}
+              {tab === 0 && <SectionList sections={sectionsIncoming} fallbackRows={filteredIncoming} />}
+              {tab === 1 && <SectionList sections={sectionsSelf} fallbackRows={filteredSelf} />}
+              {tab === 2 && <SectionList sections={sectionsRewards} fallbackRows={filteredRewards} />}
+              {tab === 3 && <SectionList sections={sectionsRedeem} fallbackRows={filteredRedeem} />}
             </>
           )}
         </Box>
