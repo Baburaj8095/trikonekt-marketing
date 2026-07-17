@@ -352,10 +352,10 @@ class FiveMatrixService:
                 status=UpgradeCommission.STATUS_CREDITED,
             )
 
-        # 2) LEVEL 50% -> placement parent split 25% released + 25% held
+        # 2) LEVEL 50% -> placement parent (100% released immediately, no holds per user request)
         if level_pool > 0 and parent_for_level and getattr(parent_for_level, "id", None):
-            release_amt = q2(level_pool * Decimal("0.50"))
-            hold_amt = q2(level_pool - release_amt)
+            release_amt = level_pool
+            hold_amt = Decimal("0.00")
 
             # Released portion
             if release_amt > 0:
@@ -368,25 +368,6 @@ class FiveMatrixService:
                     commission_amount=release_amt,
                     commission_type=UpgradeCommission.TYPE_LEVEL,
                     status=UpgradeCommission.STATUS_CREDITED,
-                )
-
-            # Held portion
-            if hold_amt > 0:
-                uc = UpgradeCommission.objects.create(
-                    upgrade=upgrade,
-                    from_user=payer,
-                    to_user=parent_for_level,
-                    level=1,
-                    commission_amount=hold_amt,
-                    commission_type=UpgradeCommission.TYPE_LEVEL,
-                    status=UpgradeCommission.STATUS_HELD,
-                )
-                rel_date = (getattr(upgrade, "upgraded_at", None) or timezone.now()).date() + timedelta(days=7)
-                CommissionHold.objects.create(
-                    commission=uc,
-                    hold_amount=hold_amt,
-                    release_date=rel_date,
-                    status=CommissionHold.STATUS_PENDING,
                 )
 
             # After creating holds, reevaluate this recipient's holds (early release or expiry)

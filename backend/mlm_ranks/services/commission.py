@@ -113,9 +113,9 @@ class CommissionDistributor:
         # Hold applies ONLY to LEVEL income and is based on recipient's count of directs
         # who have completed the SAME rank upgrade (rank_level == `level` here).
         if tx_type == "LEVEL":
-            # Prerequisite: recipient must have >= HOLD_REQUIRE_DIRECTS_GTE directs who completed Rank 1
-            directs = count_directs_upgraded_to_rank1(to_user)
-            needs_hold = directs < int(HOLD_REQUIRE_DIRECTS_GTE or 0)
+            # Hold rule disabled per user request
+            needs_hold = False
+            directs = None
         else:
             # Direct sponsor commission: no hold as per business rule
             needs_hold = False
