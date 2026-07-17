@@ -1088,6 +1088,7 @@ class WalletAdmin(admin.ModelAdmin):
     diagnostics_link.short_description = "Diagnostics"
 
     def get_urls(self):
+        from django.urls import path
         urls = super().get_urls()
         custom_urls = [
             path('<int:object_id>/debug/', self.admin_site.admin_view(self.debug_wallet_view), name='wallet-debug'),
