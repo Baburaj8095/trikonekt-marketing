@@ -298,12 +298,12 @@ const SvgNode = React.memo(function SvgNode({ n, onTap, isRoot }) {
 
   return (
     <g
+      data-node-id={n.id}
       transform={`translate(${n.cx},${n.cy})`}
       style={{
         cursor: canTap ? "pointer" : "default",
         animation: "itPop .22s ease",
       }}
-      onClick={canTap ? () => onTap(n.id) : undefined}
       title={!n.isRoot ? "Tap to view this member's tree" : n.hasKids ? "Tap to expand/collapse" : ""}
     >
       <circle r={NR} cx={0} cy={0}
@@ -423,6 +423,7 @@ export default function InteractiveTree({
   const tapTime  = useRef({});  // { nodeId: lastTapTime }
   const dragStart = useRef({ x: 0, y: 0 });
   const hasDragged = useRef(false);
+  const containerRef = useRef(null);
 
   // ── Computed flat graph ──
   const { nodes, edges, viewBox } = useMemo(() => {
@@ -531,6 +532,80 @@ export default function InteractiveTree({
     return () => { alive = false; };
   }, [entryRootId, useEntriesTree, pool, slots, useRankMatrix, rankStartUserId, rankRootUserId]); // eslint-disable-line
 
+  const handleSvgClick = useCallback((e) => {
+    if (hasDragged.current) {
+      hasDragged.current = false;
+      return;
+    }
+    const nodeEl = e.target.closest("[data-node-id]");
+    if (nodeEl) {
+      const nodeId = nodeEl.getAttribute("data-node-id");
+      handleTap(nodeId);
+    }
+  }, [handleTap]);
+
+  const stateRef = useRef({ tx, ty, scale });
+  useEffect(() => {
+    stateRef.current = { tx, ty, scale };
+  }, [tx, ty, scale]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const handleTouchStart = (e) => {
+      if (e.touches.length === 1) {
+        drag.current = { 
+          sx: e.touches[0].clientX, 
+          sy: e.touches[0].clientY, 
+          itx: stateRef.current.tx, 
+          ity: stateRef.current.ty 
+        };
+        dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        hasDragged.current = false;
+      } else if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        pinch.current = { dist: Math.hypot(dx, dy), is: stateRef.current.scale };
+        drag.current = null;
+      }
+    };
+
+    const handleTouchMove = (e) => {
+      if (e.touches.length === 1 && drag.current) {
+        e.preventDefault();
+        const dx = e.touches[0].clientX - dragStart.current.x;
+        const dy = e.touches[0].clientY - dragStart.current.y;
+        if (Math.hypot(dx, dy) > 4) {
+          hasDragged.current = true;
+        }
+        setTx(drag.current.itx + e.touches[0].clientX - drag.current.sx);
+        setTy(drag.current.ity + e.touches[0].clientY - drag.current.sy);
+      } else if (e.touches.length === 2 && pinch.current) {
+        e.preventDefault();
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const d  = Math.hypot(dx, dy);
+        setScale(s => Math.max(0.15, Math.min(3, pinch.current.is * d / pinch.current.dist)));
+      }
+    };
+
+    const handleTouchEnd = () => {
+      drag.current = null;
+      pinch.current = null;
+    };
+
+    el.addEventListener("touchstart", handleTouchStart, { passive: false });
+    el.addEventListener("touchmove", handleTouchMove, { passive: false });
+    el.addEventListener("touchend", handleTouchEnd);
+
+    return () => {
+      el.removeEventListener("touchstart", handleTouchStart);
+      el.removeEventListener("touchmove", handleTouchMove);
+      el.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, []);
+
   // ── Pointer pan (mouse) ──
   const onPD = useCallback((e) => {
     if (e.pointerType === "touch") return;
@@ -553,40 +628,6 @@ export default function InteractiveTree({
 
   const onPU = useCallback(() => { drag.current = null; }, []);
 
-  // ── Touch pan + pinch ──
-  const onTS = useCallback((e) => {
-    if (e.touches.length === 1) {
-      drag.current = { sx: e.touches[0].clientX, sy: e.touches[0].clientY, itx: tx, ity: ty };
-      dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      hasDragged.current = false;
-    } else if (e.touches.length === 2) {
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      pinch.current = { dist: Math.hypot(dx, dy), is: scale };
-      drag.current = null;
-    }
-  }, [tx, ty, scale]);
-
-  const onTM = useCallback((e) => {
-    e.preventDefault();
-    if (e.touches.length === 1 && drag.current) {
-      const dx = e.touches[0].clientX - dragStart.current.x;
-      const dy = e.touches[0].clientY - dragStart.current.y;
-      if (Math.hypot(dx, dy) > 4) {
-        hasDragged.current = true;
-      }
-      setTx(drag.current.itx + e.touches[0].clientX - drag.current.sx);
-      setTy(drag.current.ity + e.touches[0].clientY - drag.current.sy);
-    } else if (e.touches.length === 2 && pinch.current) {
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      const d  = Math.hypot(dx, dy);
-      setScale(s => Math.max(0.15, Math.min(3, pinch.current.is * d / pinch.current.dist)));
-    }
-  }, []);
-
-  const onTE = useCallback(() => { drag.current = null; pinch.current = null; }, []);
-
   const onWheel = useCallback((e) => {
     if (!e.ctrlKey) return;
     e.preventDefault();
@@ -598,6 +639,7 @@ export default function InteractiveTree({
   // ─────────────────────────────────────────────────────────────────────────────
   return (
     <div
+      ref={containerRef}
       style={{
         width: "100%", height: 520, background: BG,
         borderRadius: 20, overflow: "hidden", position: "relative",
@@ -606,7 +648,6 @@ export default function InteractiveTree({
       }}
       onPointerDown={onPD} onPointerMove={onPM}
       onPointerUp={onPU} onPointerLeave={onPU}
-      onTouchStart={onTS} onTouchMove={onTM} onTouchEnd={onTE}
       onWheel={onWheel}
     >
       {/* Loading overlay */}
@@ -631,6 +672,7 @@ export default function InteractiveTree({
       {/* SVG tree */}
       <svg
         viewBox={viewBox} width="100%" height="100%"
+        onClick={handleSvgClick}
         style={{
           display: "block",
           userSelect: "none",
