@@ -41,6 +41,7 @@ import AdminFranchiseUsers from "./pages/admin/AdminFranchiseUsers";
 import AdminFranchiseWalletControls from "./pages/admin/AdminFranchiseWalletControls";
 import AdminFranchisePlaceholder from "./pages/admin/AdminFranchisePlaceholder";
 import AdminUserTree from "./pages/admin/AdminUserTree";
+import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminMerchants from "./pages/admin/AdminMerchants";
 import AdminLogin from "./pages/admin/AdminLogin";
@@ -1411,6 +1412,16 @@ function App() {
             <AdminProtectedRoute>
               <AdminShell>
                 <AdminUserTree />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/analytics"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminAnalytics />
               </AdminShell>
             </AdminProtectedRoute>
           }
