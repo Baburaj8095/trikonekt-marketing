@@ -64,12 +64,17 @@ class Prime750StatusAdapter:
             from django.db.models import Q
 
             prime750_filter = (
-                Q(package__type="PRIME")
-                & (
-                    Q(package__price__gte=Decimal("749.00"), package__price__lte=Decimal("751.00"))
-                    | Q(package__code__icontains="750")
-                    | Q(package__name__icontains="750")
+                (
+                    Q(package__type="PRIME")
+                    & (
+                        Q(package__price__gte=Decimal("749.00"), package__price__lte=Decimal("761.00"))
+                        | Q(package__code__icontains="750")
+                        | Q(package__name__icontains="750")
+                        | Q(package__code__icontains="759")
+                        | Q(package__name__icontains="759")
+                    )
                 )
+                | Q(package__type="MONTHLY")
             )
             chunk_size = 1000
             for start in range(0, len(ids), chunk_size):
