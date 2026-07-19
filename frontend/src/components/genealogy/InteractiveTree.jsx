@@ -447,53 +447,77 @@ export default function InteractiveTree({
 
   // ── Tap: click child → drill down; click root → expand/collapse ──
   const handleTap = useCallback((nodeId) => {
-    if (hasDragged.current) {
-      hasDragged.current = false;
-      return;
-    }
-    // Helper to find a node in the tree
+    // Helper to find a node in the tree recursively
     function findNodeById(nd, id) {
       if (!nd) return null;
-      if (String(nd.id) === id) return nd;
-      if (!nd._kids) return null;
-      for (const kid of nd._kids) {
+      if (String(nd.id) === String(id)) return nd;
+      const kids = Array.isArray(nd._kids) ? nd._kids : Array.isArray(nd.children) ? nd.children : [];
+      for (const kid of kids) {
+        if (!kid) continue;
         const found = findNodeById(kid, id);
         if (found) return found;
       }
       return null;
     }
 
+    // Helper to recursively update a node in the tree state
+    function updateNodeInTree(nd, targetId, updateFn) {
+      if (!nd) return nd;
+      if (String(nd.id) === String(targetId)) {
+        return updateFn(nd);
+      }
+      if (Array.isArray(nd._kids)) {
+        const newKids = nd._kids.map(k => k ? updateNodeInTree(k, targetId, updateFn) : null);
+        return { ...nd, _kids: newKids };
+      }
+      if (Array.isArray(nd.children)) {
+        const newKids = nd.children.map(k => k ? updateNodeInTree(k, targetId, updateFn) : null);
+        return { ...nd, children: newKids };
+      }
+      return nd;
+    }
+
     if (!tree) return;
     const node = findNodeById(tree, nodeId);
     if (!node) return;
 
-    // Non-root node: single click drills down into it
-    if (String(node.id) !== String(tree.id) && onNodeSelect) {
-      onNodeSelect(String(nodeId));
-      return;
+    if (onNodeSelect) {
+      onNodeSelect(String(nodeId), node);
     }
 
-    // Root node: toggle expand/collapse
+    // Toggle expand/collapse or fetch children for any node in the tree
     setTree(prev => {
       if (!prev) return prev;
-      if (String(prev.id) !== nodeId) return prev;
-      if (prev._expanded) return { ...prev, _expanded: false };
-      if (prev._kids) return { ...prev, _expanded: true };
+      const target = findNodeById(prev, nodeId);
+      if (!target) return prev;
 
-      // Fetch children for root if not yet loaded
+      if (target._expanded) {
+        return updateNodeInTree(prev, nodeId, n => ({ ...n, _expanded: false }));
+      }
+
+      if (Array.isArray(target._kids) && target._kids.length > 0) {
+        return updateNodeInTree(prev, nodeId, n => ({ ...n, _expanded: true }));
+      }
+
+      // Fetch children if hasKids or team_count > 0 or not yet loaded
       if (!inFlight.current.has(nodeId)) {
         inFlight.current.add(nodeId);
         const opts = { useEntries: useEntriesTree, pool, useRankMatrix, rankRootUserId };
         apiFetchKids(nodeId, opts).then(apiKids => {
-          const kids = apiKids || [];
           inFlight.current.delete(nodeId);
+          const kids = apiKids || [];
           setTree(p2 => {
             if (!p2) return p2;
-            return { ...p2, _kids: kids, _loading: false, _expanded: true };
+            return updateNodeInTree(p2, nodeId, n => ({
+              ...n,
+              _kids: kids,
+              _loading: false,
+              _expanded: true,
+            }));
           });
         });
       }
-      return { ...prev, _loading: true };
+      return updateNodeInTree(prev, nodeId, n => ({ ...n, _loading: true }));
     });
   }, [useEntriesTree, pool, slots, tree, onNodeSelect, useRankMatrix, rankRootUserId]);
 
