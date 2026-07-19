@@ -216,6 +216,28 @@ export default function AdminUserTree() {
           <Button variant="contained" onClick={runAudit} startIcon={<SearchIcon />}>
             Audit
           </Button>
+          <Button 
+            variant="outlined" 
+            color="secondary" 
+            onClick={async () => {
+              const targetUser = prompt("Enter User ID or Username to Re-Anchor:");
+              if (!targetUser) return;
+              const sponsorUser = prompt("Enter Target Sponsor ID or Username:");
+              if (!sponsorUser) return;
+              try {
+                const res = await API.post("/admin/matrix/reanchor-user/", {
+                  user_id: targetUser,
+                  target_sponsor_id: sponsorUser,
+                  pool_type: tab === 0 ? "FIVE_150" : "THREE_150"
+                });
+                alert(res?.data?.message || "Successfully re-anchored user under target sponsor!");
+              } catch (err) {
+                alert(err?.response?.data?.detail || "Failed to re-anchor user.");
+              }
+            }}
+          >
+            🔗 Re-Anchor Node
+          </Button>
         </Stack>
 
         {auditLoading && (

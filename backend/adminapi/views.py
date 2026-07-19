@@ -1062,9 +1062,18 @@ class AdminUserDetail(APIView):
                     return Response({"detail": "Forbidden"}, status=403)
         except Exception:
             return Response({"detail": "Forbidden"}, status=403)
+        old_sponsor = getattr(user, "registered_by", None)
         serializer = AdminUserEditSerializer(user, data=request.data, partial=True, context={"request": request})
         if serializer.is_valid():
             obj = serializer.save()
+            new_sponsor = getattr(obj, "registered_by", None)
+            if new_sponsor and (not old_sponsor or old_sponsor.id != new_sponsor.id):
+                try:
+                    from business.models import AutoPoolAccount
+                    AutoPoolAccount.reanchor_user_to_sponsor(obj, new_sponsor, "FIVE_150")
+                    AutoPoolAccount.reanchor_user_to_sponsor(obj, new_sponsor, "THREE_150")
+                except Exception:
+                    pass
             return Response(AdminUserEditSerializer(obj).data, status=200)
         return Response(serializer.errors, status=400)
 
