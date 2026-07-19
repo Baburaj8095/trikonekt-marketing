@@ -1036,6 +1036,7 @@ class AdminApproveRankUpgradeView(APIView):
                 FiveMatrixService.on_rank1_approval(upg)
             else:
                 CommissionDistributor.distribute(upg)
+            FiveMatrixService.reevaluate_user_holds(upg.user.id)
         except Exception:
             # Keep upgrade SUCCESS; ops can re-run distribution via management command if needed
             pass

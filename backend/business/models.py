@@ -920,7 +920,7 @@ class AutoPoolAccount(models.Model):
         if start_id is None:
             root = cls.objects.filter(parent_account__isnull=True, pool_type="FIVE_150").first()
             start_id = root.id if root else None
-        return GenericPlacement.place_account(
+        res = GenericPlacement.place_account(
             owner=user,
             pool_type="FIVE_150",
             amount=amt,
@@ -928,6 +928,12 @@ class AutoPoolAccount(models.Model):
             source_id=source_id or "",
             start_entry_id=start_id,
         )
+        if res and getattr(res, "user_entry_index", 0) == 1:
+            try:
+                cls.reanchor_sponsored_downlines(user, "FIVE_150")
+            except Exception:
+                pass
+        return res
 
     @classmethod
     def create_three_150_for_user(
