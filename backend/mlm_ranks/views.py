@@ -1,3 +1,4 @@
+# Trikonekt MLM Ranks Module - Backend Views & Workflows
 from __future__ import annotations
 
 from decimal import Decimal
