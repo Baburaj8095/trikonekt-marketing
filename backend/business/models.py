@@ -1110,6 +1110,65 @@ class AutoPoolAccount(models.Model):
             return None
 
     @classmethod
+    def reanchor_user_to_sponsor(cls, user, target_sponsor, pool_type: str = "FIVE_150"):
+        """
+        Re-parents user's primary matrix account (user_entry_index = 1) under target_sponsor's
+        primary matrix account. Because downlines reference user's account_id, the entire downline
+        subtree automatically shifts under target_sponsor.
+        """
+        try:
+            if not user or not target_sponsor:
+                return False
+            sponsor_ap = cls.objects.filter(owner=target_sponsor, pool_type=pool_type, user_entry_index=1, status="ACTIVE").first()
+            if not sponsor_ap:
+                return False
+
+            user_ap = cls.objects.filter(owner=user, pool_type=pool_type, user_entry_index=1).first()
+            if not user_ap:
+                return False
+
+            from business.services.placement import find_next_placement_slot
+            max_children = 3 if str(pool_type).startswith("THREE") else 5
+            target_parent_id, pos = find_next_placement_slot(start_entry_id=sponsor_ap.id, pool_type=pool_type, max_children=max_children)
+            target_parent = cls.objects.filter(id=target_parent_id).first()
+            if target_parent:
+                user_ap.parent_account = target_parent
+                user_ap.level = target_parent.level + 1
+                user_ap.position = pos
+                user_ap.save(update_fields=["parent_account", "level", "position"])
+                return True
+            return False
+        except Exception:
+            return False
+
+    @classmethod
+    def reanchor_sponsored_downlines(cls, sponsor, pool_type: str = "FIVE_150"):
+        """
+        Scans for direct downlines of sponsor who entered matrix early and were placed under
+        Company Root (sentinel). Automatically re-anchors them beneath sponsor's primary account.
+        """
+        try:
+            from accounts.models import CustomUser
+            sponsor_ap = cls.objects.filter(owner=sponsor, pool_type=pool_type, user_entry_index=1, status="ACTIVE").first()
+            if not sponsor_ap:
+                return 0
+
+            root = cls.objects.filter(parent_account__isnull=True, pool_type=pool_type).first()
+            if not root:
+                return 0
+
+            downline_users = CustomUser.objects.filter(registered_by=sponsor)
+            orphaned_aps = cls.objects.filter(owner__in=downline_users, pool_type=pool_type, parent_account=root, user_entry_index=1)
+
+            reanchored_count = 0
+            for ap in orphaned_aps:
+                if cls.reanchor_user_to_sponsor(ap.owner, sponsor, pool_type):
+                    reanchored_count += 1
+            return reanchored_count
+        except Exception:
+            return 0
+
+    @classmethod
     def place_in_three_pool(cls, user, pool_type: str, amount: Decimal, source_type: str = "", source_id: str = ""):
         """
         3×N placement engine.

@@ -1906,6 +1906,43 @@ class AdminTeamRewardValidateConsumerView(APIView):
         return Response({"consumer": _admin_reward_consumer_payload(user)}, status=200)
 
 
+class AdminMatrixReanchorUserView(APIView):
+    permission_classes = [IsAdminOrStaff]
+
+    def post(self, request):
+        data = request.data or {}
+        username = data.get("username") or data.get("user_id") or data.get("q")
+        target_sponsor_input = data.get("target_sponsor_id") or data.get("sponsor_id") or data.get("target_sponsor")
+        pool_type = str(data.get("pool_type") or "FIVE_150").upper()
+
+        if not username:
+            return Response({"detail": "username or user_id is required."}, status=400)
+
+        user = CustomUser.objects.filter(Q(username=username) | Q(id=str(username) if str(username).isdigit() else 0) | Q(phone=username)).first()
+        if not user:
+            return Response({"detail": "User not found."}, status=404)
+
+        if target_sponsor_input:
+            target_sponsor = CustomUser.objects.filter(Q(username=target_sponsor_input) | Q(id=str(target_sponsor_input) if str(target_sponsor_input).isdigit() else 0) | Q(phone=target_sponsor_input)).first()
+        else:
+            target_sponsor = getattr(user, "registered_by", None)
+
+        if not target_sponsor:
+            return Response({"detail": "Target sponsor not found."}, status=404)
+
+        from business.models import AutoPoolAccount
+        success = AutoPoolAccount.reanchor_user_to_sponsor(user, target_sponsor, pool_type)
+        if success:
+            return Response({
+                "message": f"Successfully re-anchored user {user.username} under sponsor {target_sponsor.username} in {pool_type} matrix.",
+                "user": user.username,
+                "target_sponsor": target_sponsor.username,
+                "pool_type": pool_type
+            }, status=200)
+        else:
+            return Response({"detail": "Failed to re-anchor user. Ensure target sponsor has an active matrix account."}, status=400)
+
+
 class AdminTeamRewardCreditView(APIView):
     permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
 
