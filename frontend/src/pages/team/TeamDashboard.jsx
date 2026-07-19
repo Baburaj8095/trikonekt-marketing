@@ -422,9 +422,6 @@ function VideoScroller({ videos = [], loading = false, onOpenFallback, onBuyPrim
     </Box>
   );
 }
-    </Box>
-  );
-}
 
 function TourScroller({ onTour, onShop, onCoupons }) {
   const items = [
