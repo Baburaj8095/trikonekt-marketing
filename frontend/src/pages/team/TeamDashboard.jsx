@@ -259,19 +259,16 @@ function HorizontalScroller({ children }) {
 function VideoScroller({ videos = [], loading = false, onOpenFallback, onBuyPrime }) {
   const MEDIA_BASE = useMemo(() => String(API?.defaults?.baseURL || "").replace(/\/api\/?$/, ""), []);
   const resolveRaw = (raw) => resolveApiMediaUrl({ image_url: raw }, MEDIA_BASE);
+  const [activeVideo, setActiveVideo] = useState(null);
 
   const rows = Array.isArray(videos) ? videos : [];
 
-  const downloadFile = (url, title) => {
-    if (!url) return;
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${String(title || "educational-video").replace(/[^\w.-]+/g, "-")}.mp4`;
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+  const getYouTubeEmbedId = (v) => {
+    if (v?.youtube_video_id) return v.youtube_video_id;
+    const url = v?.youtube_url || v?.video_url || v?.video;
+    if (!url) return "";
+    const match = String(url).match(/(?:v=|\/embed\/|\/v\/|https:\/\/youtu\.be\/|\/watch\?v=|\&v=)([^#\&\?]{11})/);
+    return match ? match[1] : "";
   };
 
   return (
@@ -283,17 +280,20 @@ function VideoScroller({ videos = [], loading = false, onOpenFallback, onBuyPrim
       <HorizontalScroller>
         {rows.map((v) => {
           const videoUrl = resolveRaw(v.video_url || v.video);
-          const thumb = resolveRaw(v.thumbnail_url || v.thumbnail);
+          const ytEmbedId = getYouTubeEmbedId(v);
+          const ytThumb = ytEmbedId ? `https://img.youtube.com/vi/${ytEmbedId}/hqdefault.jpg` : "";
+          const thumb = ytThumb || resolveRaw(v.thumbnail_url || v.thumbnail);
           const isPurchased = !!v.is_purchased || !!v.can_access;
-          const canWatch = isPurchased && !!videoUrl;
+          const canWatch = isPurchased && (!!ytEmbedId || !!videoUrl);
           const rankLabel = v.required_rank_name || (v.required_rank_level ? `Prime L${v.required_rank_level}` : "Digital Education Prime");
-          const actionLabel = isPurchased ? (videoUrl ? "View" : "Purchased") : "Buy";
+          const actionLabel = isPurchased ? (canWatch ? "Watch Video" : "Purchased") : "Buy";
+
           return (
             <Paper
-              key={v.id}
+              key={v.id || v.required_rank}
               elevation={0}
               onClick={() => {
-                if (canWatch) window.open(videoUrl, "_blank", "noopener,noreferrer");
+                if (canWatch) setActiveVideo({ title: v.title || rankLabel, ytEmbedId, videoUrl });
                 else if (!isPurchased) onBuyPrime?.(v);
               }}
               sx={{
@@ -318,6 +318,7 @@ function VideoScroller({ videos = [], loading = false, onOpenFallback, onBuyPrim
                   placeItems: "center",
                   bgcolor: "rgba(37,99,235,0.1)",
                   color: C.primary,
+                  position: "relative",
                 }}
               >
                 {thumb ? (
@@ -325,59 +326,102 @@ function VideoScroller({ videos = [], loading = false, onOpenFallback, onBuyPrim
                 ) : (
                   <PlayCircleRoundedIcon sx={{ fontSize: 38 }} />
                 )}
+                {canWatch && (
+                  <Box sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,0.25)", display: "grid", placeItems: "center" }}>
+                    <PlayCircleRoundedIcon sx={{ fontSize: 36, color: "#ffffff", filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.5))" }} />
+                  </Box>
+                )}
               </Box>
               <Typography sx={{ mt: 0.9, fontSize: 13, fontWeight: 1000 }} noWrap>
-                {v.title || "Educational Video"}
+                {v.title || rankLabel}
               </Typography>
               <Typography sx={{ mt: 0.2, fontSize: 11.5, color: C.textSec, fontWeight: 700 }} noWrap>
-                {canWatch ? "Ready to watch" : isPurchased ? "Video upload pending" : rankLabel}
+                {canWatch ? "Ready to watch" : isPurchased ? "Video pending" : rankLabel}
               </Typography>
               <Stack direction="row" spacing={0.75} sx={{ mt: 1 }}>
-                {canWatch ? (
-                  <>
-                    <Button
-                      size="small"
-                      variant="contained"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        window.open(videoUrl, "_blank", "noopener,noreferrer");
-                      }}
-                      sx={{ minWidth: 0, flex: 1, fontSize: 11, fontWeight: 900, textTransform: "none" }}
-                    >
-                      View
-                    </Button>
-                    <IconButton
-                      size="small"
-                      aria-label="download video"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        downloadFile(videoUrl, v.title);
-                      }}
-                      sx={{ border: `1px solid ${C.border}`, borderRadius: 1 }}
-                    >
-                      <FileDownloadRoundedIcon fontSize="small" />
-                    </IconButton>
-                  </>
-                ) : (
-                  <Button
-                    size="small"
-                    variant="contained"
-                    fullWidth
-                    disabled={isPurchased}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!isPurchased) onBuyPrime?.(v);
-                    }}
-                    sx={{ fontSize: 11, fontWeight: 900, textTransform: "none" }}
-                  >
-                    {actionLabel}
-                  </Button>
-                )}
+                <Button
+                  size="small"
+                  variant="contained"
+                  fullWidth
+                  disabled={!canWatch && isPurchased}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (canWatch) setActiveVideo({ title: v.title || rankLabel, ytEmbedId, videoUrl });
+                    else if (!isPurchased) onBuyPrime?.(v);
+                  }}
+                  sx={{ fontSize: 11, fontWeight: 900, textTransform: "none" }}
+                >
+                  {actionLabel}
+                </Button>
               </Stack>
             </Paper>
           );
         })}
       </HorizontalScroller>
+
+      {/* YouTube / Video Popup Player Modal */}
+      <Dialog
+        open={Boolean(activeVideo)}
+        onClose={() => setActiveVideo(null)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            bgcolor: "#0f172a",
+            color: "#ffffff",
+            overflow: "hidden",
+            boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
+          },
+        }}
+      >
+        <DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 2.5, py: 1.5, borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+          <Typography sx={{ fontWeight: 900, fontSize: 16, color: "#ffffff" }} noWrap>
+            {activeVideo?.title || "Educational Video"}
+          </Typography>
+          <IconButton 
+            aria-label="close video" 
+            onClick={() => setActiveVideo(null)} 
+            sx={{ color: "#ffffff", bgcolor: "rgba(255,255,255,0.1)", "&:hover": { bgcolor: "rgba(255,255,255,0.2)" } }}
+          >
+            ✕
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0, bgcolor: "#000000", position: "relative", pt: "56.25%" /* 16:9 Aspect Ratio */ }}>
+          {activeVideo?.ytEmbedId ? (
+            <iframe
+              src={`https://www.youtube.com/embed/${activeVideo.ytEmbedId}?autoplay=1&rel=0&modestbranding=1`}
+              title={activeVideo?.title || "Educational Video"}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+                border: 0,
+              }}
+            />
+          ) : activeVideo?.videoUrl ? (
+            <video
+              src={activeVideo.videoUrl}
+              controls
+              autoPlay
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+              }}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </Box>
+  );
+}
     </Box>
   );
 }

@@ -1989,6 +1989,7 @@ class TeamConsumerEducationalVideo(models.Model):
     )
     sort_order = models.IntegerField(default=0, db_index=True)
     is_active = models.BooleanField(default=True, db_index=True)
+    youtube_url = models.URLField(blank=True, null=True, max_length=500)
     video = models.FileField(
         upload_to="team_consumer/educational_videos/",
         null=True,
@@ -2005,6 +2006,14 @@ class TeamConsumerEducationalVideo(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def youtube_video_id(self):
+        if not self.youtube_url:
+            return ""
+        import re
+        match = re.search(r"(?:v=|\/embed\/|\/v\/|https:\/\/youtu\.be\/|\/watch\?v=|\&v=)([^#\&\?]{11})", str(self.youtube_url))
+        return match.group(1) if match else ""
 
     class Meta:
         ordering = ["sort_order", "-created_at", "id"]

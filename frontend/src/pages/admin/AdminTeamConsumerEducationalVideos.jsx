@@ -146,8 +146,8 @@ export default function AdminTeamConsumerEducationalVideos() {
       setErr("Select Digital Education Prime rank.");
       return;
     }
-    if (!form.id && !form.video) {
-      setErr("Select a video file before saving.");
+    if (!form.id && !form.video && !form.youtube_url) {
+      setErr("Provide a YouTube Video Link or select a video file before saving.");
       return;
     }
     try {
@@ -157,6 +157,7 @@ export default function AdminTeamConsumerEducationalVideos() {
       fd.append("required_rank", String(form.required_rank));
       fd.append("sort_order", String(Number(form.sort_order || 0)));
       fd.append("is_active", form.is_active ? "true" : "false");
+      if (form.youtube_url) fd.append("youtube_url", String(form.youtube_url || "").trim());
       if (form.video) fd.append("video", form.video);
       if (form.thumbnail) fd.append("thumbnail", form.thumbnail);
 
@@ -328,10 +329,32 @@ export default function AdminTeamConsumerEducationalVideos() {
               </Select>
             </FormControl>
             <TextField label="Sort Order" type="number" value={form.sort_order} onChange={(e) => setForm((f) => ({ ...f, sort_order: e.target.value }))} fullWidth />
+            <TextField 
+              label="YouTube Video Link (Recommended)" 
+              value={form.youtube_url || ""} 
+              onChange={(e) => setForm((f) => ({ ...f, youtube_url: e.target.value }))} 
+              fullWidth 
+              placeholder="e.g. https://www.youtube.com/watch?v=... or https://youtu.be/..." 
+              helperText="Paste an Unlisted or Public YouTube video link for ultra-fast zero-buffering playback."
+            />
+            {form.youtube_url && (
+              <Box sx={{ mt: 1, p: 1, border: "1px solid #e2e8f0", borderRadius: 2, bgcolor: "#f8fafc" }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5, fontWeight: 700 }}>
+                  YouTube Thumbnail Preview:
+                </Typography>
+                <Box 
+                  component="img" 
+                  src={`https://img.youtube.com/vi/${(String(form.youtube_url).match(/(?:v=|\/embed\/|\/v\/|https:\/\/youtu\.be\/|\/watch\?v=|\&v=)([^#\&\?]{11})/) || [])[1] || ""}/hqdefault.jpg`} 
+                  alt="YouTube Preview" 
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                  sx={{ width: "100%", height: 150, objectFit: "cover", borderRadius: 1.5 }} 
+                />
+              </Box>
+            )}
             <Box>
-              <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>Video File</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>Or Upload MP4 File (Optional)</Typography>
               <input type="file" accept="video/*" onChange={(e) => setForm((f) => ({ ...f, video: e.target.files?.[0] || null }))} />
-              {form.video_url ? <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>Current: {form.video_url}</Typography> : null}
+              {form.video_url ? <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>Current File: {form.video_url}</Typography> : null}
             </Box>
             <Box>
               <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>Thumbnail Image</Typography>

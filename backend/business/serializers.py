@@ -122,6 +122,7 @@ class TeamConsumerTopAchieverSerializer(serializers.ModelSerializer):
 class TeamConsumerEducationalVideoSerializer(serializers.ModelSerializer):
     video_url = serializers.SerializerMethodField()
     thumbnail_url = serializers.SerializerMethodField()
+    youtube_video_id = serializers.ReadOnlyField()
     required_rank_name = serializers.CharField(source="required_rank.rank_name", read_only=True)
     required_rank_level = serializers.IntegerField(source="required_rank.level_number", read_only=True)
     required_rank_amount = serializers.DecimalField(source="required_rank.upgrade_amount", max_digits=12, decimal_places=2, read_only=True)
@@ -140,6 +141,8 @@ class TeamConsumerEducationalVideoSerializer(serializers.ModelSerializer):
             "can_access",
             "sort_order",
             "is_active",
+            "youtube_url",
+            "youtube_video_id",
             "video",
             "video_url",
             "thumbnail",
@@ -153,6 +156,7 @@ class TeamConsumerEducationalVideoSerializer(serializers.ModelSerializer):
             "updated_at",
             "video_url",
             "thumbnail_url",
+            "youtube_video_id",
             "required_rank_name",
             "required_rank_level",
             "required_rank_amount",
@@ -172,8 +176,8 @@ class TeamConsumerEducationalVideoSerializer(serializers.ModelSerializer):
         if qs.exists():
             raise serializers.ValidationError({"required_rank": "This Prime rank already has an educational video. Edit that video instead."})
 
-        if self.instance is None and not attrs.get("video"):
-            raise serializers.ValidationError({"video": "Video file is required."})
+        if self.instance is None and not attrs.get("video") and not attrs.get("youtube_url"):
+            raise serializers.ValidationError({"youtube_url": "YouTube URL or Video file is required."})
         return attrs
 
     def _is_admin_request(self):
@@ -212,6 +216,8 @@ class TeamConsumerEducationalVideoSerializer(serializers.ModelSerializer):
     def get_video_url(self, obj):
         if not self._user_can_access(obj):
             return None
+        if getattr(obj, "youtube_url", None):
+            return obj.youtube_url
         try:
             f = getattr(obj, "video", None)
             return f.url if f else None
