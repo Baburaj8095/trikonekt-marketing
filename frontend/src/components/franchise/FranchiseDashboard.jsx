@@ -228,49 +228,52 @@ function AchieverCard({ name, subtitle, achieved, photoUrl }) {
 
 function OverviewMetricCard({ title, value, icon, accent }) {
   return (
-    <motion.div whileHover={{ y: -4 }} whileTap={{ scale: 0.985 }} transition={{ duration: 0.2 }}>
+    <motion.div whileHover={{ y: -5, scale: 1.01 }} whileTap={{ scale: 0.985 }} transition={{ duration: 0.2 }}>
       <Box
         sx={{
           height: "100%",
           minHeight: { xs: 132, sm: 150, md: 180 },
-          p: { xs: 1.7, sm: 2, md: 3 },
-          borderRadius: { xs: 2, sm: 3, md: 4 },
+          p: { xs: 2, sm: 2.5, md: 3 },
+          borderRadius: { xs: 3, sm: 4 },
           bgcolor: COLORS.surface,
           border: `1px solid ${COLORS.border}`,
-          boxShadow: { xs: "0 10px 22px rgba(15,23,42,0.07)", md: COLORS.shadow },
-          transition: "box-shadow 180ms ease, border-color 180ms ease",
-          "&:hover": { borderColor: "rgba(14,165,233,0.22)", boxShadow: "0 18px 48px rgba(15,23,42,0.12)" },
+          borderTop: `4px solid ${accent}`,
+          boxShadow: { xs: "0 10px 24px rgba(15,23,42,0.06)", md: "0 16px 36px rgba(15,23,42,0.08)" },
+          transition: "all 200ms ease",
+          position: "relative",
+          overflow: "hidden",
+          "&:hover": { borderColor: `${accent}44`, boxShadow: `0 20px 44px ${accent}18` },
         }}
       >
-        <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 2, mb: { xs: 1.25, md: 2 } }}>
+        <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 2, mb: { xs: 1.5, md: 2 } }}>
           <Box
             sx={{
-              width: { xs: 38, md: 52 },
-              height: { xs: 38, md: 52 },
-              borderRadius: { xs: 2, md: 3 },
+              width: { xs: 40, md: 52 },
+              height: { xs: 40, md: 52 },
+              borderRadius: { xs: 2.5, md: 3 },
               display: "grid",
               placeItems: "center",
-              bgcolor: `${accent}14`,
+              bgcolor: `${accent}12`,
               color: accent,
-              border: `1px solid ${accent}22`,
-              boxShadow: `0 10px 24px ${accent}18`,
-              "& svg": { fontSize: { xs: 21, md: 26 } },
+              border: `1px solid ${accent}24`,
+              boxShadow: `0 8px 20px ${accent}18`,
+              "& svg": { fontSize: { xs: 22, md: 28 } },
             }}
           >
             {icon}
           </Box>
         </Box>
 
-        <Typography variant="body1" sx={{ fontWeight: 800, color: COLORS.text, mb: 0.75, fontSize: { xs: 12.5, md: 16 }, lineHeight: 1.25 }}>
+        <Typography variant="body1" sx={{ fontWeight: 800, color: COLORS.textSecondary, mb: 0.75, fontSize: { xs: 12.5, md: 15 }, lineHeight: 1.25 }}>
           {title}
         </Typography>
 
         <Typography
           sx={{
             fontWeight: 900,
-            color: accent,
-            fontSize: { xs: "1.22rem", sm: "1.38rem", md: "1.55rem" },
-            lineHeight: 1.12,
+            color: COLORS.text,
+            fontSize: { xs: "1.3rem", sm: "1.5rem", md: "1.75rem" },
+            lineHeight: 1.1,
             wordBreak: "break-word",
           }}
         >
@@ -718,16 +721,72 @@ export default function FranchiseDashboard() {
     return pins.length ? pins.join(", ") : storedUser?.pincode || "-";
   }, [selectedState, selectedDistrict, selectedPincode, scope, stateFallback, districtFallback, storedUser?.pincode]);
 
+  const activeCounts = useMemo(() => {
+    const defaultCounts = metrics?.overall?.counts || {};
+
+    if (selectedPincode) {
+      const perPin = metrics?.per_pincode || {};
+      const findPinCount = (arr) => {
+        if (!Array.isArray(arr)) return 0;
+        const match = arr.find((item) => String(item.pincode) === String(selectedPincode));
+        return match ? Number(match.count) || 0 : 0;
+      };
+      return {
+        consumers: findPinCount(perPin.consumers),
+        captain_office: findPinCount(perPin.captain_office),
+        sarathi: findPinCount(perPin.sarathi),
+        merchants: findPinCount(perPin.merchants),
+        self_rebirth_ids: findPinCount(perPin.self_rebirth_ids),
+      };
+    }
+
+    if (selectedDistrict) {
+      const perDist = metrics?.per_district;
+      if (perDist) {
+        const findDistCount = (arr) => {
+          if (!Array.isArray(arr)) return 0;
+          const match = arr.find((item) => String(item.district || item.city || item.name).toLowerCase() === String(selectedDistrict).toLowerCase());
+          return match ? Number(match.count) || 0 : 0;
+        };
+        const res = {
+          consumers: findDistCount(perDist.consumers),
+          captain_office: findDistCount(perDist.captain_office),
+          sarathi: findDistCount(perDist.sarathi),
+          merchants: findDistCount(perDist.merchants),
+          self_rebirth_ids: findDistCount(perDist.self_rebirth_ids),
+        };
+        if (Object.values(res).some((v) => v > 0)) return res;
+      }
+
+      // Fallback: aggregate per_pincode matching selected district
+      const perPin = metrics?.per_pincode || {};
+      const sumPinCount = (arr) => {
+        if (!Array.isArray(arr)) return 0;
+        return arr
+          .filter((item) => String(item.district || item.city).toLowerCase() === String(selectedDistrict).toLowerCase())
+          .reduce((sum, item) => sum + (Number(item.count) || 0), 0);
+      };
+      return {
+        consumers: sumPinCount(perPin.consumers),
+        captain_office: sumPinCount(perPin.captain_office),
+        sarathi: sumPinCount(perPin.sarathi),
+        merchants: sumPinCount(perPin.merchants),
+        self_rebirth_ids: sumPinCount(perPin.self_rebirth_ids),
+      };
+    }
+
+    return defaultCounts;
+  }, [metrics, selectedDistrict, selectedPincode]);
+
   const pincodeOverviewMetrics = useMemo(() => {
-    const counts = metrics?.overall?.counts || {};
     return [
-      { title: `${scopeEntityLabel} Total Consumer Count`, value: String(counts.consumers ?? 0), icon: <GroupsOutlinedIcon />, accent: COLORS.primary },
-      { title: `${scopeEntityLabel} Captain Office Count`, value: String(counts.captain_office ?? 0), icon: <ApartmentOutlinedIcon />, accent: COLORS.success },
-      { title: `${scopeEntityLabel} Sarathi Count`, value: String(counts.sarathi ?? 0), icon: <WorkOutlineOutlinedIcon />, accent: COLORS.secondary },
-      { title: `${scopeEntityLabel} Merchant Count`, value: String(counts.merchants ?? 0), icon: <StoreOutlinedIcon />, accent: COLORS.primaryDark },
-      { title: `${scopeEntityLabel} Total Self Rebirth ID`, value: String(counts.self_rebirth_ids ?? 0), icon: <TrendingUpOutlinedIcon />, accent: COLORS.success },
+      { title: `${scopeEntityLabel} Total Consumer Count`, value: String(activeCounts.consumers ?? 0), icon: <GroupsOutlinedIcon />, accent: COLORS.primary },
+      { title: `${scopeEntityLabel} Captain Office Count`, value: String(activeCounts.captain_office ?? 0), icon: <ApartmentOutlinedIcon />, accent: COLORS.success },
+      { title: `${scopeEntityLabel} Sarathi Count`, value: String(activeCounts.sarathi ?? 0), icon: <WorkOutlineOutlinedIcon />, accent: COLORS.secondary },
+      { title: `${scopeEntityLabel} Merchant Count`, value: String(activeCounts.merchants ?? 0), icon: <StoreOutlinedIcon />, accent: COLORS.primaryDark },
+      { title: `${scopeEntityLabel} Total Self Rebirth ID`, value: String(activeCounts.self_rebirth_ids ?? 0), icon: <TrendingUpOutlinedIcon />, accent: COLORS.success },
     ];
-  }, [metrics, scopeEntityLabel]);
+  }, [activeCounts, scopeEntityLabel]);
 
   const consumerStatsCards = useMemo(() => {
     const cs = metrics?.consumer_stats || {};
@@ -793,97 +852,128 @@ export default function FranchiseDashboard() {
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
             <Card
               sx={{
-                background: `linear-gradient(135deg, ${COLORS.success} 0%, ${COLORS.primary} 58%, ${COLORS.primaryDark} 100%)`,
-                borderRadius: { xs: 2, md: 4 },
-                boxShadow: { xs: "0 14px 34px rgba(14, 165, 233, 0.2)", md: "0 22px 54px rgba(14, 165, 233, 0.22)" },
-                border: "none",
+                background: "linear-gradient(135deg, #0f172a 0%, #0369a1 52%, #0ea5e9 100%)",
+                borderRadius: { xs: 3, md: 5 },
+                boxShadow: "0 24px 56px rgba(15, 23, 42, 0.22), 0 4px 12px rgba(14, 165, 233, 0.15)",
+                border: "1px solid rgba(255,255,255,0.15)",
                 overflow: "hidden",
+                position: "relative",
+                "&::before": {
+                  content: '""',
+                  position: "absolute",
+                  top: -80,
+                  right: -80,
+                  width: 260,
+                  height: 260,
+                  borderRadius: "50%",
+                  background: "radial-gradient(circle, rgba(14,165,233,0.3) 0%, rgba(255,255,255,0) 70%)",
+                  pointerEvents: "none",
+                },
               }}
             >
-              <CardContent sx={{ p: { xs: 2, md: 4 }, color: "white" }}>
+              <CardContent sx={{ p: { xs: 2.5, md: 4.5 }, color: "white", position: "relative", zIndex: 1 }}>
                 <Box sx={{ display: "flex", alignItems: { xs: "flex-start", sm: "center" }, justifyContent: "space-between", gap: { xs: 1.5, md: 2 } }}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: { xs: 1.25, md: 2 }, minWidth: 0 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: { xs: 1.5, md: 2.5 }, minWidth: 0 }}>
                     <Box
                       sx={{
-                        width: { xs: 42, md: 48 },
-                        height: { xs: 42, md: 48 },
-                        borderRadius: 2,
-                        bgcolor: "rgba(255,255,255,0.2)",
-                        boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.22)",
+                        width: { xs: 46, md: 56 },
+                        height: { xs: 46, md: 56 },
+                        borderRadius: { xs: 2.5, md: 3 },
+                        bgcolor: "rgba(255,255,255,0.18)",
+                        backdropFilter: "blur(12px)",
+                        border: "1px solid rgba(255,255,255,0.28)",
+                        boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                       }}
                     >
-                      <TrendingUpOutlinedIcon sx={{ fontSize: { xs: 24, md: 28 }, color: "white" }} />
+                      <TrendingUpOutlinedIcon sx={{ fontSize: { xs: 26, md: 32 }, color: "white" }} />
                     </Box>
                     <Box sx={{ minWidth: 0 }}>
-                      <Typography variant="h4" sx={{ fontWeight: 900, fontSize: { xs: "1.25rem", sm: "1.5rem", md: "2rem" }, mb: 0.35, lineHeight: 1.12 }}>
+                      <Typography variant="h4" sx={{ fontWeight: 900, fontSize: { xs: "1.35rem", sm: "1.65rem", md: "2.15rem" }, mb: 0.35, lineHeight: 1.1 }}>
                         Franchise Dashboard
                       </Typography>
-                      <Typography variant="subtitle1" sx={{ opacity: 0.9, fontSize: { xs: "0.8rem", md: "1rem" }, lineHeight: 1.2 }}>
-                        {scopeLabel} overview
+                      <Typography variant="subtitle1" sx={{ opacity: 0.9, fontSize: { xs: "0.85rem", md: "1.05rem" }, lineHeight: 1.2, fontWeight: 700 }}>
+                        {scopeLabel} Overview
                       </Typography>
                     </Box>
                   </Box>
 
-                  <Stack direction="row" spacing={0.75} sx={{ flexShrink: 0 }}>
-                    <IconButton sx={{ width: { xs: 38, md: 40 }, height: { xs: 38, md: 40 }, bgcolor: "rgba(255,255,255,0.2)", color: "white", border: "1px solid rgba(255,255,255,0.22)", transition: "transform 140ms ease", "&:active": { transform: "scale(0.94)" } }}>
+                  <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
+                    <IconButton sx={{ width: { xs: 40, md: 44 }, height: { xs: 40, md: 44 }, bgcolor: "rgba(255,255,255,0.16)", backdropFilter: "blur(10px)", color: "white", border: "1px solid rgba(255,255,255,0.22)", transition: "all 140ms ease", "&:hover": { bgcolor: "rgba(255,255,255,0.26)", transform: "translateY(-2px)" }, "&:active": { transform: "scale(0.94)" } }}>
                       <NotificationsNoneRoundedIcon />
                     </IconButton>
                     <IconButton
                       onClick={() => navigate("/agency/franchise-wallet")}
-                      sx={{ width: { xs: 38, md: 40 }, height: { xs: 38, md: 40 }, bgcolor: "rgba(255,255,255,0.2)", color: "white", border: "1px solid rgba(255,255,255,0.22)", transition: "transform 140ms ease", "&:active": { transform: "scale(0.94)" } }}
+                      sx={{ width: { xs: 40, md: 44 }, height: { xs: 40, md: 44 }, bgcolor: "rgba(255,255,255,0.16)", backdropFilter: "blur(10px)", color: "white", border: "1px solid rgba(255,255,255,0.22)", transition: "all 140ms ease", "&:hover": { bgcolor: "rgba(255,255,255,0.26)", transform: "translateY(-2px)" }, "&:active": { transform: "scale(0.94)" } }}
                     >
                       <CurrencyRupeeRoundedIcon />
                     </IconButton>
-                    <IconButton sx={{ width: { xs: 38, md: 40 }, height: { xs: 38, md: 40 }, bgcolor: "rgba(255,255,255,0.2)", color: "white", border: "1px solid rgba(255,255,255,0.22)", transition: "transform 140ms ease", "&:active": { transform: "scale(0.94)" } }}>
+                    <IconButton sx={{ width: { xs: 40, md: 44 }, height: { xs: 40, md: 44 }, bgcolor: "rgba(255,255,255,0.16)", backdropFilter: "blur(10px)", color: "white", border: "1px solid rgba(255,255,255,0.22)", transition: "all 140ms ease", "&:hover": { bgcolor: "rgba(255,255,255,0.26)", transform: "translateY(-2px)" }, "&:active": { transform: "scale(0.94)" } }}>
                       <PublicRoundedIcon />
                     </IconButton>
                   </Stack>
                 </Box>
 
-                <Box sx={{ mt: { xs: 2, md: 3 } }}>
-                  <Typography variant="h5" sx={{ fontWeight: 900, color: "white", mb: 0.35, fontSize: { xs: "1.05rem", md: "1.5rem" }, lineHeight: 1.18 }}>
-                    {storedUser?.full_name || storedUser?.username || "Franchise Partner"}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.85)", mb: { xs: 1.25, md: 1 }, fontSize: { xs: 12.5, md: 14 }, textTransform: "capitalize" }}>
-                    {storedUser?.category ? String(storedUser.category).replaceAll("_", " ") : "Agency"}
-                  </Typography>
+                <Box sx={{ mt: { xs: 2.5, md: 3.5 } }}>
+                  <Stack direction="row" alignItems="center" spacing={1.5} flexWrap="wrap" sx={{ mb: 1.5 }}>
+                    <Typography variant="h5" sx={{ fontWeight: 900, color: "white", fontSize: { xs: "1.15rem", md: "1.6rem" }, lineHeight: 1.15 }}>
+                      {storedUser?.full_name || storedUser?.username || "Franchise Partner"}
+                    </Typography>
+
+                    <Chip
+                      label={storedUser?.category ? String(storedUser.category).replaceAll("_", " ") : "Agency Partner"}
+                      sx={{
+                        bgcolor: "rgba(255,255,255,0.22)",
+                        backdropFilter: "blur(10px)",
+                        color: "white",
+                        fontWeight: 800,
+                        fontSize: { xs: 11, md: 12 },
+                        textTransform: "capitalize",
+                        height: 26,
+                        border: "1px solid rgba(255,255,255,0.3)",
+                      }}
+                    />
+                  </Stack>
 
                   <Paper
                     sx={{
-                      p: { xs: 1.5, md: 3 },
-                      borderRadius: { xs: 2, md: 3 },
-                      bgcolor: "rgba(255,255,255,0.15)",
-                      backdropFilter: "blur(10px)",
-                      border: "1px solid rgba(255,255,255,0.2)",
-                      boxShadow: "inset 0 1px 0 rgba(255,255,255,0.16)",
+                      p: { xs: 2, md: 3 },
+                      borderRadius: { xs: 2.5, md: 3.5 },
+                      bgcolor: "rgba(255,255,255,0.12)",
+                      backdropFilter: "blur(16px)",
+                      border: "1px solid rgba(255,255,255,0.22)",
+                      boxShadow: "inset 0 1px 0 rgba(255,255,255,0.2)",
                     }}
                   >
-                    <Grid container spacing={{ xs: 1.25, md: 3 }}>
+                    <Grid container spacing={{ xs: 2, md: 3 }}>
                       <Grid item xs={12} sm={4}>
-                        <Stack direction="row" alignItems="center" spacing={1.25}>
-                          <BadgeOutlinedIcon sx={{ color: "white", opacity: 0.9, fontSize: 20 }} />
+                        <Stack direction="row" alignItems="center" spacing={1.5}>
+                          <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "rgba(255,255,255,0.18)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <BadgeOutlinedIcon sx={{ color: "white", fontSize: 20 }} />
+                          </Box>
                           <Box sx={{ minWidth: 0 }}>
                             <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)", display: "block", fontWeight: 700, lineHeight: 1.15 }}>
                               Username
                             </Typography>
-                            <Typography variant="body2" sx={{ color: "white", fontWeight: 900, overflowWrap: "anywhere", lineHeight: 1.2 }}>
-                              {storedUser?.username || "â€”"}
+                            <Typography variant="body2" sx={{ color: "white", fontWeight: 900, overflowWrap: "anywhere", lineHeight: 1.2, fontSize: { xs: 13, md: 14 } }}>
+                              {storedUser?.username || "—"}
                             </Typography>
                           </Box>
                         </Stack>
                       </Grid>
 
                       <Grid item xs={12} sm={4}>
-                        <Stack direction="row" alignItems="center" spacing={1.25}>
-                          <LocationOnOutlinedIcon sx={{ color: "white", opacity: 0.9, fontSize: 20 }} />
+                        <Stack direction="row" alignItems="center" spacing={1.5}>
+                          <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "rgba(255,255,255,0.18)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <LocationOnOutlinedIcon sx={{ color: "white", fontSize: 20 }} />
+                          </Box>
                           <Box sx={{ minWidth: 0 }}>
                             <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)", display: "block", fontWeight: 700, lineHeight: 1.15 }}>
                               Assigned {scopeEntityLabel}
                             </Typography>
-                            <Typography variant="body2" sx={{ color: "white", fontWeight: 900, overflowWrap: "anywhere", lineHeight: 1.2 }}>
+                            <Typography variant="body2" sx={{ color: "white", fontWeight: 900, overflowWrap: "anywhere", lineHeight: 1.2, fontSize: { xs: 13, md: 14 } }}>
                               {assignedScopeText}
                             </Typography>
                           </Box>
@@ -891,13 +981,15 @@ export default function FranchiseDashboard() {
                       </Grid>
 
                       <Grid item xs={12} sm={4}>
-                        <Stack direction="row" alignItems="center" spacing={1.25}>
-                          <TrendingUpOutlinedIcon sx={{ color: "white", opacity: 0.9, fontSize: 20 }} />
+                        <Stack direction="row" alignItems="center" spacing={1.5}>
+                          <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "rgba(255,255,255,0.18)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <TrendingUpOutlinedIcon sx={{ color: "white", fontSize: 20 }} />
+                          </Box>
                           <Box sx={{ minWidth: 0 }}>
                             <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)", display: "block", fontWeight: 700, lineHeight: 1.15 }}>
-                              Resolved pincodes
+                              Resolved Pincodes
                             </Typography>
-                            <Typography variant="body2" sx={{ color: "white", fontWeight: 900, lineHeight: 1.2 }}>
+                            <Typography variant="body2" sx={{ color: "white", fontWeight: 900, lineHeight: 1.2, fontSize: { xs: 13, md: 14 } }}>
                               {Number(scope?.pincode_count ?? (Array.isArray(metrics?.overall?.pincodes) ? metrics.overall.pincodes.length : 0))}
                             </Typography>
                           </Box>
@@ -931,9 +1023,12 @@ export default function FranchiseDashboard() {
                         value={selectedState}
                         label="State"
                         onChange={(e) => {
-                          setSelectedState(e.target.value);
-                          setSelectedDistrict("");
-                          setSelectedPincode("");
+                          const val = e.target.value;
+                          React.startTransition(() => {
+                            setSelectedState(val);
+                            setSelectedDistrict("");
+                            setSelectedPincode("");
+                          });
                         }}
                       >
                         <MenuItem value="">All Assigned States ({assignedStates.length})</MenuItem>
@@ -944,20 +1039,26 @@ export default function FranchiseDashboard() {
                     </FormControl>
                   )}
 
-                  {/* District Filter (for District Coordinator / Multi-district level) */}
+                  {/* District Filter (Disabled for State Coordinator / State Agency) */}
                   {assignedDistricts.length > 0 && (
-                    <FormControl size="small" sx={{ minWidth: 170 }}>
+                    <FormControl size="small" sx={{ minWidth: 170 }} disabled={isStateRole}>
                       <InputLabel id="district-select-label">District</InputLabel>
                       <Select
                         labelId="district-select-label"
                         value={selectedDistrict}
                         label="District"
+                        disabled={isStateRole}
                         onChange={(e) => {
-                          setSelectedDistrict(e.target.value);
-                          setSelectedPincode("");
+                          const val = e.target.value;
+                          React.startTransition(() => {
+                            setSelectedDistrict(val);
+                            setSelectedPincode("");
+                          });
                         }}
                       >
-                        <MenuItem value="">All Assigned Districts ({assignedDistricts.length})</MenuItem>
+                        <MenuItem value="">
+                          {isStateRole ? "District (State Scope)" : `All Assigned Districts (${assignedDistricts.length})`}
+                        </MenuItem>
                         {assignedDistricts.map((dist) => (
                           <MenuItem key={dist} value={dist}>{dist}</MenuItem>
                         ))}
@@ -965,17 +1066,25 @@ export default function FranchiseDashboard() {
                     </FormControl>
                   )}
 
-                  {/* Pincode Filter (for Pincode Coordinator / Multi-pincode level) */}
+                  {/* Pincode Filter (Disabled for State Coordinator / State Agency) */}
                   {assignedPincodes.length > 0 && (
-                    <FormControl size="small" sx={{ minWidth: 160 }}>
+                    <FormControl size="small" sx={{ minWidth: 160 }} disabled={isStateRole}>
                       <InputLabel id="pincode-select-label">Pincode</InputLabel>
                       <Select
                         labelId="pincode-select-label"
                         value={selectedPincode}
                         label="Pincode"
-                        onChange={(e) => setSelectedPincode(e.target.value)}
+                        disabled={isStateRole}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          React.startTransition(() => {
+                            setSelectedPincode(val);
+                          });
+                        }}
                       >
-                        <MenuItem value="">All Pincodes ({assignedPincodes.length})</MenuItem>
+                        <MenuItem value="">
+                          {isStateRole ? "Pincode (State Scope)" : `All Pincodes (${assignedPincodes.length})`}
+                        </MenuItem>
                         {assignedPincodes.map((pin) => (
                           <MenuItem key={pin} value={pin}>{pin}</MenuItem>
                         ))}
