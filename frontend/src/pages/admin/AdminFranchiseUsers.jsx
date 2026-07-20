@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   Box,
@@ -43,6 +43,11 @@ export default function AdminFranchiseUsers() {
   const [selected, setSelected] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search || "");
+    setCategory(searchParams.get("category") || "");
+  }, [location.search]);
 
   const openView = useCallback(async (row) => {
     if (!row?.id) return;
@@ -159,6 +164,33 @@ export default function AdminFranchiseUsers() {
       { field: "full_name", headerName: "Name", minWidth: 180, flex: 1 },
       { field: "username", headerName: "Username", minWidth: 160, flex: 1 },
       { field: "phone", headerName: "Phone", minWidth: 130 },
+      {
+        field: "__login",
+        headerName: "Login",
+        width: 96,
+        align: "center",
+        headerAlign: "center",
+        sortable: false,
+        filterable: false,
+        renderCell: (params) => {
+          const row = params?.row || {};
+          const canLogin = row.is_active !== false;
+          return (
+            <Button
+              size="small"
+              variant="contained"
+              disabled={!canLogin}
+              onClick={(e) => {
+                e?.stopPropagation?.();
+                impersonate(row);
+              }}
+              sx={{ minWidth: 64, bgcolor: canLogin ? "#2563eb" : "#94a3b8", textTransform: "none", fontWeight: 700 }}
+            >
+              Login
+            </Button>
+          );
+        },
+      },
       {
         field: "category",
         headerName: "Franchise Level",
