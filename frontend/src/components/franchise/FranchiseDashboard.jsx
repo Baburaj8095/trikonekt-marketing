@@ -7,18 +7,24 @@ import {
   Alert,
   Avatar,
   Box,
+  Button,
   Card,
   CardContent,
   Chip,
   Container,
+  FormControl,
   Grid,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
   Skeleton,
   Stack,
   Typography,
   IconButton,
 } from "@mui/material";
 
+import FilterAltOutlinedIcon from "@mui/icons-material/FilterAltOutlined";
 import TrendingUpOutlinedIcon from "@mui/icons-material/TrendingUpOutlined";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
@@ -461,6 +467,11 @@ export default function FranchiseDashboard() {
   const location = useLocation();
   const [selectedTab, setSelectedTab] = useState("Daily");
 
+  // Region Filter States
+  const [selectedState, setSelectedState] = useState("");
+  const [selectedDistrict, setSelectedDistrict] = useState("");
+  const [selectedPincode, setSelectedPincode] = useState("");
+
   const storedUser = useMemo(() => {
     try {
       const raw = localStorage.getItem("user_agency") || sessionStorage.getItem("user_agency");
@@ -481,27 +492,43 @@ export default function FranchiseDashboard() {
     (async () => {
       setLoading(true);
       setErr("");
-      try {
-        const [mRes, aRes, bRes] = await Promise.all([
-          API.get("/business/franchise/dashboard-metrics/"),
-          API.get("/business/franchise/achievers/"),
-          API.get("/business/franchise/wishing-banners/"),
-        ]);
-        if (!alive) return;
-        setMetrics(mRes?.data || null);
-        setAchievers(Array.isArray(aRes?.data?.results) ? aRes.data.results : []);
-        setBanners(Array.isArray(bRes?.data?.results) ? bRes.data.results : []);
-      } catch (e) {
-        if (!alive) return;
-        setErr(e?.response?.data?.detail || "Failed to load franchise dashboard data.");
-      } finally {
-        if (alive) setLoading(false);
-      }
+
+      const params = {};
+      if (selectedState) params.state = selectedState;
+      if (selectedDistrict) params.district = selectedDistrict;
+      if (selectedPincode) params.pincode = selectedPincode;
+
+      // 1. Fetch main dashboard metrics first for fast rendering
+      const fetchMetrics = API.get("/business/franchise/dashboard-metrics/", { params, timeout: 15000 })
+        .then((mRes) => {
+          if (alive) setMetrics(mRes?.data || null);
+        })
+        .catch((e) => {
+          if (alive) setErr(e?.response?.data?.detail || "Failed to load franchise dashboard data.");
+        })
+        .finally(() => {
+          if (alive) setLoading(false);
+        });
+
+      // 2. Concurrently fetch optional achievers & banners in background
+      const fetchAchievers = API.get("/business/franchise/achievers/", { params, timeout: 15000 })
+        .then((aRes) => {
+          if (alive) setAchievers(Array.isArray(aRes?.data?.results) ? aRes.data.results : []);
+        })
+        .catch(() => {});
+
+      const fetchBanners = API.get("/business/franchise/wishing-banners/", { params, timeout: 15000 })
+        .then((bRes) => {
+          if (alive) setBanners(Array.isArray(bRes?.data?.results) ? bRes.data.results : []);
+        })
+        .catch(() => {});
+
+      await Promise.allSettled([fetchMetrics, fetchAchievers, fetchBanners]);
     })();
     return () => {
       alive = false;
     };
-  }, []);
+  }, [selectedState, selectedDistrict, selectedPincode]);
 
   const fmtMoney = (v) => {
     try {
@@ -514,10 +541,52 @@ export default function FranchiseDashboard() {
 
   const scope = metrics?.scope || {};
   const scopeLabel = scope?.label || "Franchise";
-  const scopeEntityLabel = scope?.level === "state" ? "State" : scope?.level === "district" ? "District" : "Pincode";
+  const scopeEntityLabel = selectedPincode
+    ? "Pincode"
+    : selectedDistrict
+      ? "District"
+      : selectedState
+        ? "State"
+        : scope?.level === "state"
+          ? "State"
+          : scope?.level === "district"
+            ? "District"
+            : "Pincode";
+
   const stateFallback = storedUser?.state?.name || (typeof storedUser?.state === "string" ? storedUser.state : "");
   const districtFallback = storedUser?.city?.name || (typeof storedUser?.city === "string" ? storedUser.city : "");
+
+  const assignedStates = useMemo(() => {
+    if (Array.isArray(scope?.states) && scope.states.length) {
+      return scope.states.map((s) => (typeof s === "string" ? s : s?.name)).filter(Boolean);
+    }
+    if (stateFallback) return [stateFallback];
+    return [];
+  }, [scope?.states, stateFallback]);
+
+  const assignedDistricts = useMemo(() => {
+    if (Array.isArray(scope?.districts) && scope.districts.length) {
+      return scope.districts.map((d) => (typeof d === "string" ? d : d?.district || d?.name)).filter(Boolean);
+    }
+    if (districtFallback) return [districtFallback];
+    return [];
+  }, [scope?.districts, districtFallback]);
+
+  const assignedPincodes = useMemo(() => {
+    const raw = Array.isArray(scope?.assigned_pincodes) && scope.assigned_pincodes.length
+      ? scope.assigned_pincodes
+      : Array.isArray(scope?.pincodes)
+        ? scope.pincodes
+        : [];
+    if (raw.length) return raw.map(String);
+    if (storedUser?.pincode) return [String(storedUser.pincode)];
+    return [];
+  }, [scope?.assigned_pincodes, scope?.pincodes, storedUser?.pincode]);
+
   const assignedScopeText = useMemo(() => {
+    if (selectedPincode) return `Pincode ${selectedPincode}`;
+    if (selectedDistrict) return `District ${selectedDistrict}`;
+    if (selectedState) return `State ${selectedState}`;
     if (scope?.level === "state") {
       const names = Array.isArray(scope?.states) ? scope.states.map((s) => s?.name).filter(Boolean) : [];
       return names.length ? names.join(", ") : stateFallback || "-";
@@ -534,7 +603,7 @@ export default function FranchiseDashboard() {
         ? scope.pincodes
         : [];
     return pins.length ? pins.join(", ") : storedUser?.pincode || "-";
-  }, [scope, stateFallback, districtFallback, storedUser?.pincode]);
+  }, [selectedState, selectedDistrict, selectedPincode, scope, stateFallback, districtFallback, storedUser?.pincode]);
 
   const pincodeOverviewMetrics = useMemo(() => {
     const counts = metrics?.overall?.counts || {};
@@ -727,6 +796,98 @@ export default function FranchiseDashboard() {
               </CardContent>
             </Card>
           </motion.div>
+
+          {/* Interactive Region Filter Bar */}
+          <Card sx={sectionCardSx}>
+            <CardContent sx={{ p: { xs: 2, md: 3 } }}>
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 2 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <FilterAltOutlinedIcon sx={{ color: COLORS.primary }} />
+                  <Typography variant="h6" sx={{ fontWeight: 900, color: COLORS.text, fontSize: { xs: "0.95rem", md: "1.15rem" } }}>
+                    Filter By Assigned Region
+                  </Typography>
+                </Box>
+
+                <Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="center">
+                  {/* State Filter (for State Coordinator / Multi-state level) */}
+                  {assignedStates.length > 0 && (
+                    <FormControl size="small" sx={{ minWidth: 160 }}>
+                      <InputLabel id="state-select-label">State</InputLabel>
+                      <Select
+                        labelId="state-select-label"
+                        value={selectedState}
+                        label="State"
+                        onChange={(e) => {
+                          setSelectedState(e.target.value);
+                          setSelectedDistrict("");
+                          setSelectedPincode("");
+                        }}
+                      >
+                        <MenuItem value="">All Assigned States ({assignedStates.length})</MenuItem>
+                        {assignedStates.map((st) => (
+                          <MenuItem key={st} value={st}>{st}</MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  )}
+
+                  {/* District Filter (for District Coordinator / Multi-district level) */}
+                  {assignedDistricts.length > 0 && (
+                    <FormControl size="small" sx={{ minWidth: 170 }}>
+                      <InputLabel id="district-select-label">District</InputLabel>
+                      <Select
+                        labelId="district-select-label"
+                        value={selectedDistrict}
+                        label="District"
+                        onChange={(e) => {
+                          setSelectedDistrict(e.target.value);
+                          setSelectedPincode("");
+                        }}
+                      >
+                        <MenuItem value="">All Assigned Districts ({assignedDistricts.length})</MenuItem>
+                        {assignedDistricts.map((dist) => (
+                          <MenuItem key={dist} value={dist}>{dist}</MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  )}
+
+                  {/* Pincode Filter (for Pincode Coordinator / Multi-pincode level) */}
+                  {assignedPincodes.length > 0 && (
+                    <FormControl size="small" sx={{ minWidth: 160 }}>
+                      <InputLabel id="pincode-select-label">Pincode</InputLabel>
+                      <Select
+                        labelId="pincode-select-label"
+                        value={selectedPincode}
+                        label="Pincode"
+                        onChange={(e) => setSelectedPincode(e.target.value)}
+                      >
+                        <MenuItem value="">All Pincodes ({assignedPincodes.length})</MenuItem>
+                        {assignedPincodes.map((pin) => (
+                          <MenuItem key={pin} value={pin}>{pin}</MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  )}
+
+                  {(selectedState || selectedDistrict || selectedPincode) && (
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={() => {
+                        setSelectedState("");
+                        setSelectedDistrict("");
+                        setSelectedPincode("");
+                      }}
+                      sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                    >
+                      Reset Filter
+                    </Button>
+                  )}
+                </Stack>
+              </Box>
+            </CardContent>
+          </Card>
 
           {/* Achievers */}
           <Card sx={sectionCardSx}>

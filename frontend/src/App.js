@@ -1,3 +1,4 @@
+import React, { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Login from "./pages/Auth/Login";
 import LuckyDraw from "./pages/LuckyDraw";
@@ -179,8 +180,8 @@ import AdminRankUpgrades from "./pages/admin/AdminRankUpgrades";
 import UploadToWallet from "./pages/UploadToWallet";
 import TeamWallet from "./screens/TeamWallet";
 import TeamDashboard from "./pages/team/TeamDashboard";
-import FranchiseDashboard from "./components/franchise/FranchiseDashboard";
-import FranchiseWalletPlaceholder from "./components/franchise/FranchiseWalletPlaceholder";
+const FranchiseDashboard = lazy(() => import("./components/franchise/FranchiseDashboard"));
+const FranchiseWalletPlaceholder = lazy(() => import("./components/franchise/FranchiseWalletPlaceholder"));
 import TransactionHistory from "./components/franchise/pages/TransactionHistory";
 import WithdrawalHistory from "./components/franchise/pages/WithdrawalHistory";
 import FranchiseMonthlyReport from "./components/franchise/pages/FranchiseMonthlyReport";
@@ -354,7 +355,9 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["agency"]}>
               <AgencyShell>
-                <FranchiseDashboard />
+                <Suspense fallback={<LoadingOverlay />}>
+                  <FranchiseDashboard />
+                </Suspense>
               </AgencyShell>
             </ProtectedRoute>
           }
@@ -366,7 +369,9 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["agency"]}>
               <AgencyShell>
-                <FranchiseDashboard />
+                <Suspense fallback={<LoadingOverlay />}>
+                  <FranchiseDashboard />
+                </Suspense>
               </AgencyShell>
             </ProtectedRoute>
           }
@@ -376,7 +381,9 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["agency"]}>
               <AgencyShell>
-                <FranchiseWalletPlaceholder />
+                <Suspense fallback={<LoadingOverlay />}>
+                  <FranchiseWalletPlaceholder />
+                </Suspense>
               </AgencyShell>
             </ProtectedRoute>
           }

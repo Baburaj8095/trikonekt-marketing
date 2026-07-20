@@ -451,12 +451,8 @@ API.interceptors.request.use(async (config) => {
     return config;
   }
 
-  // Track loading unless explicitly skipped (e.g., retried request)
-  if (config._skipLoadingTrack) {
-    try {
-      delete config._skipLoadingTrack;
-    } catch (_) {}
-  } else {
+  // Track loading unless explicitly skipped or already tracked
+  if (!config._trackLoading && !config._skipLoadingTrack) {
     config._trackLoading = true;
     try {
       incrementLoading();
@@ -544,7 +540,10 @@ API.interceptors.request.use(
 API.interceptors.response.use(
   (res) => {
     try {
-      if (res?.config?._trackLoading) decrementLoading();
+      if (res?.config?._trackLoading) {
+        res.config._trackLoading = false;
+        decrementLoading();
+      }
     } catch (_) {}
     // Attempt to repair mojibake in response payloads (strings and JSON objects)
     try {
@@ -617,7 +616,10 @@ API.interceptors.response.use(
       (typeof error?.message === "string" && /aborted|abort|canceled|cancelled/i.test(error.message));
     if (isCanceled) {
       try {
-        if (originalRequest?._trackLoading) decrementLoading();
+        if (originalRequest?._trackLoading) {
+          originalRequest._trackLoading = false;
+          decrementLoading();
+        }
       } catch (_) {}
       try { error.__canceled = true; } catch (_) {}
       return Promise.reject(error);
@@ -671,14 +673,20 @@ API.interceptors.response.use(
       clearAllAuthForNamespace();
 
       try {
-        if (originalRequest?._trackLoading) decrementLoading();
+        if (originalRequest?._trackLoading) {
+          originalRequest._trackLoading = false;
+          decrementLoading();
+        }
       } catch (_) {}
       return Promise.reject(error);
     }
 
     // Non-refreshable error: ensure we decrement loading if we tracked it
     try {
-      if (originalRequest?._trackLoading) decrementLoading();
+      if (originalRequest?._trackLoading) {
+        originalRequest._trackLoading = false;
+        decrementLoading();
+      }
     } catch (_) {}
 
     return Promise.reject(error);
