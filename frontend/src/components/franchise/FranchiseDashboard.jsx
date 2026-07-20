@@ -388,6 +388,52 @@ function PincodeWiseScroller({ title, icon, rows }) {
   );
 }
 
+function DistrictWiseScroller({ title, icon, rows }) {
+  if (!Array.isArray(rows) || !rows.length) return null;
+  return (
+    <Card sx={sectionCardSx}>
+      <CardContent sx={{ p: { xs: 2, md: 4 } }}>
+        <SectionTitle title={title} />
+        <Box sx={scrollRowSx}>
+          <Stack direction="row" spacing={{ xs: 1.25, md: 2 }} sx={{ minWidth: "max-content" }}>
+            {rows.map((r) => (
+              <Card key={r.district} sx={{ minWidth: { xs: 190, sm: 230 }, borderRadius: { xs: 2, sm: 3 }, border: `1px solid ${COLORS.border}`, boxShadow: "0 8px 20px rgba(15,23,42,0.06)", scrollSnapAlign: "start" }}>
+                <CardContent sx={{ p: { xs: 1.5, md: 2.5 } }}>
+                  <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Box
+                      sx={{
+                        width: { xs: 36, md: 40 },
+                        height: { xs: 36, md: 40 },
+                        borderRadius: 2,
+                        bgcolor: "rgba(14,165,233,0.1)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: COLORS.primaryDark,
+                        "& svg": { fontSize: { xs: 20, md: 24 } },
+                      }}
+                    >
+                      {icon}
+                    </Box>
+                    <Box>
+                      <Typography variant="body2" sx={{ color: COLORS.textSecondary, fontWeight: 800, fontSize: { xs: 12, md: 14 } }}>
+                        {r.district}
+                      </Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 900, color: COLORS.text, lineHeight: 1.1, fontSize: { xs: "1.15rem", md: "1.25rem" } }}>
+                        {r.count}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </CardContent>
+              </Card>
+            ))}
+          </Stack>
+        </Box>
+      </CardContent>
+    </Card>
+  );
+}
+
 const growthData = {
   Daily: [
     { name: "Mon", value: 420 },
@@ -487,43 +533,64 @@ export default function FranchiseDashboard() {
   const [achievers, setAchievers] = useState([]);
   const [metrics, setMetrics] = useState(null);
 
+  // Dynamic Districts map for selected State
+  const [stateDistrictsMap, setStateDistrictsMap] = useState({});
+
+  useEffect(() => {
+    if (!selectedState) return;
+    if (stateDistrictsMap[selectedState]) return;
+    let alive = true;
+    (async () => {
+      try {
+        const resp = await API.get("/location/cities/", { params: { state: selectedState, page_size: 500 }, _skipLoadingTrack: true, timeout: 10000 });
+        const results = Array.isArray(resp?.data?.results) ? resp.data.results : Array.isArray(resp?.data) ? resp.data : [];
+        const names = results.map((c) => c?.name || c?.city).filter(Boolean);
+        if (alive && names.length) {
+          setStateDistrictsMap((prev) => ({ ...prev, [selectedState]: names }));
+        }
+      } catch (_) {}
+    })();
+    return () => { alive = false; };
+  }, [selectedState, stateDistrictsMap]);
+
   useEffect(() => {
     let alive = true;
     (async () => {
-      setLoading(true);
+      // Only set loading on initial mount if metrics is null
+      if (!metrics) {
+        setLoading(true);
+      }
       setErr("");
 
-      const params = {};
+      const params = { _skipLoadingTrack: true };
       if (selectedState) params.state = selectedState;
       if (selectedDistrict) params.district = selectedDistrict;
       if (selectedPincode) params.pincode = selectedPincode;
 
-      // 1. Fetch main dashboard metrics first for fast rendering
-      const fetchMetrics = API.get("/business/franchise/dashboard-metrics/", { params, timeout: 15000 })
-        .then((mRes) => {
-          if (alive) setMetrics(mRes?.data || null);
-        })
-        .catch((e) => {
-          if (alive) setErr(e?.response?.data?.detail || "Failed to load franchise dashboard data.");
-        })
-        .finally(() => {
-          if (alive) setLoading(false);
-        });
+      try {
+        const [mRes, aRes, bRes] = await Promise.allSettled([
+          API.get("/business/franchise/dashboard-metrics/", { params, timeout: 15000 }),
+          API.get("/business/franchise/achievers/", { params, timeout: 15000 }),
+          API.get("/business/franchise/wishing-banners/", { params, timeout: 15000 }),
+        ]);
 
-      // 2. Concurrently fetch optional achievers & banners in background
-      const fetchAchievers = API.get("/business/franchise/achievers/", { params, timeout: 15000 })
-        .then((aRes) => {
-          if (alive) setAchievers(Array.isArray(aRes?.data?.results) ? aRes.data.results : []);
-        })
-        .catch(() => {});
+        if (!alive) return;
 
-      const fetchBanners = API.get("/business/franchise/wishing-banners/", { params, timeout: 15000 })
-        .then((bRes) => {
-          if (alive) setBanners(Array.isArray(bRes?.data?.results) ? bRes.data.results : []);
-        })
-        .catch(() => {});
-
-      await Promise.allSettled([fetchMetrics, fetchAchievers, fetchBanners]);
+        if (mRes.status === "fulfilled" && mRes.value?.data) {
+          setMetrics(mRes.value.data);
+        }
+        if (aRes.status === "fulfilled" && Array.isArray(aRes.value?.data?.results)) {
+          setAchievers(aRes.value.data.results);
+        }
+        if (bRes.status === "fulfilled" && Array.isArray(bRes.value?.data?.results)) {
+          setBanners(bRes.value.data.results);
+        }
+      } catch (e) {
+        if (!alive) return;
+        setErr(e?.response?.data?.detail || "Failed to load franchise dashboard data.");
+      } finally {
+        if (alive) setLoading(false);
+      }
     })();
     return () => {
       alive = false;
@@ -540,6 +607,15 @@ export default function FranchiseDashboard() {
   };
 
   const scope = metrics?.scope || {};
+  const category = (storedUser?.category || "").toLowerCase();
+  const level = (scope?.level || "").toLowerCase();
+
+  const isStateRole = level === "state" || category.includes("state");
+  const isDistrictRole = level === "district" || category.includes("district");
+  const isPincodeOnlyRole = (level === "pincode" || category.includes("pincode")) && !isStateRole && !isDistrictRole;
+
+  const showDistrictCards = !isPincodeOnlyRole;
+
   const scopeLabel = scope?.label || "Franchise";
   const scopeEntityLabel = selectedPincode
     ? "Pincode"
@@ -565,12 +641,28 @@ export default function FranchiseDashboard() {
   }, [scope?.states, stateFallback]);
 
   const assignedDistricts = useMemo(() => {
+    if (selectedState && stateDistrictsMap[selectedState]?.length) {
+      return stateDistrictsMap[selectedState];
+    }
     if (Array.isArray(scope?.districts) && scope.districts.length) {
       return scope.districts.map((d) => (typeof d === "string" ? d : d?.district || d?.name)).filter(Boolean);
     }
+    if (Array.isArray(metrics?.districts) && metrics.districts.length) {
+      return metrics.districts.map((d) => (typeof d === "string" ? d : d?.district || d?.name)).filter(Boolean);
+    }
+    const pDistricts = new Set();
+    const rawPin = metrics?.per_pincode || {};
+    Object.values(rawPin).forEach((arr) => {
+      if (Array.isArray(arr)) {
+        arr.forEach((item) => {
+          if (item?.district) pDistricts.add(item.district);
+        });
+      }
+    });
+    if (pDistricts.size > 0) return Array.from(pDistricts);
     if (districtFallback) return [districtFallback];
     return [];
-  }, [scope?.districts, districtFallback]);
+  }, [selectedState, stateDistrictsMap, scope?.districts, metrics, districtFallback]);
 
   const assignedPincodes = useMemo(() => {
     const raw = Array.isArray(scope?.assigned_pincodes) && scope.assigned_pincodes.length
@@ -582,6 +674,27 @@ export default function FranchiseDashboard() {
     if (storedUser?.pincode) return [String(storedUser.pincode)];
     return [];
   }, [scope?.assigned_pincodes, scope?.pincodes, storedUser?.pincode]);
+
+  const perDistrict = useMemo(() => {
+    if (metrics?.per_district) return metrics.per_district;
+    const rawPin = metrics?.per_pincode || {};
+    const aggregateByDistrict = (rows) => {
+      if (!Array.isArray(rows)) return [];
+      const distMap = {};
+      rows.forEach((r) => {
+        const dKey = r.district || r.city || "District Scope";
+        distMap[dKey] = (distMap[dKey] || 0) + (Number(r.count) || 0);
+      });
+      return Object.entries(distMap).map(([district, count]) => ({ district, count }));
+    };
+    return {
+      consumers: aggregateByDistrict(rawPin.consumers),
+      captain_office: aggregateByDistrict(rawPin.captain_office),
+      sarathi: aggregateByDistrict(rawPin.sarathi),
+      merchants: aggregateByDistrict(rawPin.merchants),
+      self_rebirth_ids: aggregateByDistrict(rawPin.self_rebirth_ids),
+    };
+  }, [metrics]);
 
   const assignedScopeText = useMemo(() => {
     if (selectedPincode) return `Pincode ${selectedPincode}`;
@@ -925,6 +1038,17 @@ export default function FranchiseDashboard() {
             <OverviewSection title={`${scopeEntityLabel} Overview Counts`} metrics={pincodeOverviewMetrics} horizontalSwipe />
             <OverviewSection title="Consumer Stats (Overall + Month)" metrics={consumerStatsCards} />
           </Stack>
+
+          {/* District-wise scrollers (For State & District roles only) */}
+          {showDistrictCards && (
+            <>
+              <DistrictWiseScroller title="District Total Consumer (district-wise)" icon={<GroupsOutlinedIcon />} rows={perDistrict?.consumers} />
+              <DistrictWiseScroller title="District Captain Office (district-wise)" icon={<ApartmentOutlinedIcon />} rows={perDistrict?.captain_office} />
+              <DistrictWiseScroller title="District Sarathi (district-wise)" icon={<WorkOutlineOutlinedIcon />} rows={perDistrict?.sarathi} />
+              <DistrictWiseScroller title="District Merchant (district-wise)" icon={<StoreOutlinedIcon />} rows={perDistrict?.merchants} />
+              <DistrictWiseScroller title="District Self Rebirth ID (district-wise)" icon={<TrendingUpOutlinedIcon />} rows={perDistrict?.self_rebirth_ids} />
+            </>
+          )}
 
           {/* Pincode-wise scrollers */}
           <PincodeWiseScroller title="Pincode Total Consumer (pincode-wise)" icon={<GroupsOutlinedIcon />} rows={perPin?.consumers} />
