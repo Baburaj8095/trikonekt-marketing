@@ -1,6 +1,7 @@
-﻿import React from "react";
+import React from "react";
 import API, { adminListAgencyPackagePaymentRequests, adminApproveAgencyPackagePaymentRequest, adminRejectAgencyPackagePaymentRequest } from "../../api/api";
 import ModelListSimple from "../../admin-panel/dynamic/ModelListSimple";
+import normalizeMediaUrl from "../../utils/media";
 
 function Section({ title, children, right }) {
   return (
@@ -403,7 +404,7 @@ export default function AdminPackages() {
                     r?.package?.name ||
                     r?.package?.code ||
                     `#${r?.package?.id || ""}`;
-                  const proofUrl = r?.payment_proof_url || "";
+                  const proofUrl = r?.payment_proof_url ? normalizeMediaUrl(r.payment_proof_url) : "";
                   return (
                     <div
                       key={r.id}

@@ -4,6 +4,7 @@ import {
   adminApproveWalletUploadRequest,
   adminRejectWalletUploadRequest,
 } from "../../api/api";
+import normalizeMediaUrl from "../../utils/media";
 
 function Select({ label, value, onChange, options }) {
   return (
@@ -46,17 +47,6 @@ function Badge({ children, color = "#1f2937", bg = "#e5e7eb" }) {
       {children}
     </span>
   );
-}
-
-function absUrl(url = "") {
-  const s = String(url || "");
-  if (!s) return s;
-  if (/^https?:\/\//i.test(s)) return s;
-  try {
-    return new URL(s, window.location.origin).toString();
-  } catch {
-    return s;
-  }
 }
 
 function renderStatusBadge(s) {
@@ -180,7 +170,7 @@ export default function AdminWalletUploadApprovals() {
           <div style={{ padding: 14, color: "#64748b" }}>No requests.</div>
         ) : (
           rows.map((r) => {
-            const proofUrl = absUrl(r?.proof);
+            const proofUrl = normalizeMediaUrl(r?.proof);
             return (
               <div
                 key={r.id}

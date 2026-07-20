@@ -18,6 +18,7 @@ import {
   LinearProgress,
 } from "@mui/material";
 import useMediaQuery from "@mui/material/useMediaQuery";
+import normalizeMediaUrl from "../../utils/media";
 import { useTheme } from "@mui/material/styles";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
@@ -255,7 +256,7 @@ function UpgradeRow({ u, onViewCommissions, onApprove, onReject, readOnly = fals
 
         <Typography textAlign="right">
           {u.latest_payment_utr ? `UTR ${u.latest_payment_utr}` : "-"}
-          {u.latest_payment_proof ? <> · <a href={u.latest_payment_proof} target="_blank" rel="noreferrer">Proof</a></> : null}
+          {u.latest_payment_proof ? <> · <a href={normalizeMediaUrl(u.latest_payment_proof)} target="_blank" rel="noreferrer">Proof</a></> : null}
         </Typography>
 
         <Stack

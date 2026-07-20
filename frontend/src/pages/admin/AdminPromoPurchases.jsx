@@ -1,10 +1,11 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import {
   adminListPromoPurchases,
   adminApprovePromoPurchase,
   adminRejectPromoPurchase,
 } from "../../api/api";
+import normalizeMediaUrl from "../../utils/media";
 
 /**
  * Small UI helpers
@@ -80,25 +81,6 @@ function sppMonthsLabel(row) {
   const boxes = getMonthlyBoxes(row);
   return boxes.length ? boxes.join(", ") : "-";
 }
-
-/**
- * Media helpers for payment proof and UTR display
- */
-function isImageUrl(url = "") {
-  const u = String(url || "").toLowerCase();
-  return /\.(png|jpe?g|gif|webp|bmp|svg)$/.test(u);
-}
-function absUrl(url = "") {
-  const s = String(url || "");
-  if (!s) return s;
-  if (/^https?:\/\//i.test(s)) return s;
-  try {
-    return new URL(s, window.location.origin).toString();
-  } catch {
-    return s;
-  }
-}
-// Best-effort: extract UTR-like token from remarks when explicit UTR not present
 function extractUTR(remarks = "") {
   const s = String(remarks || "");
   // UTRs are typically 10-16 alphanumeric (often 12). Pick first good candidate.
@@ -294,7 +276,7 @@ export default function AdminPromoPurchases({
   }
 
   function PaymentCell({ proofUrl, utr, remarks }) {
-    const url = absUrl(proofUrl || "");
+    const url = normalizeMediaUrl(proofUrl || "");
     const guessedUtr = utr || extractUTR(remarks || "");
     const isImg = isImageUrl(url);
 

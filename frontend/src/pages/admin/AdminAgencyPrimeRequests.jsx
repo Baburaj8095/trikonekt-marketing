@@ -1,9 +1,10 @@
-﻿import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   adminListAgencyPackagePaymentRequests,
   adminApproveAgencyPackagePaymentRequest,
   adminRejectAgencyPackagePaymentRequest,
 } from "../../api/api";
+import normalizeMediaUrl from "../../utils/media";
 
 /**
  * AdminAgencyPrimeRequests
@@ -225,7 +226,7 @@ export default function AdminAgencyPrimeRequests() {
               r?.package?.code ||
               `#${r?.package?.id || ""}` ||
               "Prime Package";
-            const proofUrl = r?.payment_proof_url || "";
+            const proofUrl = r?.payment_proof_url ? normalizeMediaUrl(r.payment_proof_url) : "";
             return (
               <div
                 key={r.id}
