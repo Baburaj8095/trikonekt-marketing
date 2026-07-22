@@ -387,36 +387,39 @@ function VideoScroller({ videos = [], loading = false, onOpenFallback, onBuyPrim
             ✕
           </IconButton>
         </DialogTitle>
-        <DialogContent sx={{ p: 0, bgcolor: "#000000", position: "relative", pt: "56.25%" /* 16:9 Aspect Ratio */ }}>
-          {activeVideo?.ytEmbedId ? (
-            <iframe
-              src={`https://www.youtube.com/embed/${activeVideo.ytEmbedId}?autoplay=1&rel=0&modestbranding=1`}
-              title={activeVideo?.title || "Educational Video"}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                height: "100%",
-                border: 0,
-              }}
-            />
-          ) : activeVideo?.videoUrl ? (
-            <video
-              src={activeVideo.videoUrl}
-              controls
-              autoPlay
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                height: "100%",
-              }}
-            />
-          ) : null}
+        <DialogContent sx={{ p: 0, bgcolor: "#000000", overflow: "hidden" }}>
+          <Box sx={{ position: "relative", width: "100%", pt: "56.25%" /* 16:9 Aspect Ratio */ }}>
+            {activeVideo?.ytEmbedId ? (
+              <iframe
+                src={`https://www.youtube.com/embed/${activeVideo.ytEmbedId}?autoplay=1&rel=0&modestbranding=1`}
+                title={activeVideo?.title || "Educational Video"}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  height: "100%",
+                  border: 0,
+                }}
+              />
+            ) : activeVideo?.videoUrl ? (
+              <video
+                src={activeVideo.videoUrl}
+                controls
+                autoPlay
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  height: "100%",
+                  border: 0,
+                }}
+              />
+            ) : null}
+          </Box>
         </DialogContent>
       </Dialog>
     </Box>
