@@ -2121,8 +2121,9 @@ def _normalize_directs_and_labels_after_rename(sender, instance: CustomUser, cre
             # best-effort
             pass
 
-    # Execute after outer transaction commits, else run immediately
     try:
         transaction.on_commit(_apply)
     except Exception:
         _apply()
+
+# End of file - withdrawal double-entry trigger
