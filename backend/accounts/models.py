@@ -493,7 +493,7 @@ class Wallet(models.Model):
             meta_main = {**(meta or {}), "ledger": "MAIN", "split": "STREAM_75_25", "gross": str(amt), "income_75": str(income), "self_25": str(self_part), "orig_type": str(tx_type)}
             if inactive:
                 meta_main["pending_due_to_inactive"] = True
-            WalletTransaction.objects.create(
+            tx_main = WalletTransaction.objects.create(
                 user=self.user,
                 amount=income,
                 balance_after=w.balance,
@@ -517,6 +517,34 @@ class Wallet(models.Model):
                     meta={**(meta or {}), "ledger": "SELF_ACCOUNT", "split": "STREAM_75_25", "orig_type": str(tx_type)},
                     matrix_account_id=matrix_account_id,
                 )
+
+            # Post to new double-entry wallet engine
+            try:
+                from accounts.finance_constants import WalletTypes, FinanceCategories, LedgerDirections
+                from accounts.wallet_engine import WalletEngine, LedgerPosting
+                
+                system_user = WalletEngine.get_system_user()
+                WalletEngine.post_transaction(
+                    category=FinanceCategories.COMMISSION_PAYOUT,
+                    user=self.user,
+                    source_module=WalletTypes.SYSTEM,
+                    source_id=str(source_id or ""),
+                    destination_module=WalletTypes.MAIN_WALLET,
+                    gross_amount=amt,
+                    net_amount=amt,
+                    idempotency_key=f"commission_credit:{tx_type}:{source_type}:{source_id}:{self.user.id}",
+                    legacy_wallet_transaction=tx_main,
+                    created_by=system_user,
+                    approved_by=system_user,
+                    remarks=f"Double-entry payout stream: {tx_type}",
+                    postings=[
+                        LedgerPosting(system_user, WalletTypes.SYSTEM, LedgerDirections.DEBIT, amt),
+                        LedgerPosting(self.user, WalletTypes.MAIN_WALLET, LedgerDirections.CREDIT, income),
+                        LedgerPosting(self.user, WalletTypes.SELF_PACKAGE_POCKET, LedgerDirections.CREDIT, self_part),
+                    ]
+                )
+            except Exception:
+                pass
 
             # Apply micro-packs (₹250) from self reserve for active users
             if not inactive:

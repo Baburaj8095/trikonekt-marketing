@@ -1129,7 +1129,10 @@ class AutoPoolAccount(models.Model):
 
             from business.services.placement import find_next_placement_slot
             max_children = 3 if str(pool_type).startswith("THREE") else 5
-            target_parent_id, pos = find_next_placement_slot(start_entry_id=sponsor_ap.id, pool_type=pool_type, max_children=max_children)
+            from business.services.placement import GenericPlacement
+            width, max_depth = GenericPlacement.configured_width_and_depth(pool_type)
+            target_parent, pos, _ = find_next_placement_slot(width, max_depth, pool_type, sponsor_ap.id)
+            target_parent_id = target_parent.id if target_parent else None
             target_parent = cls.objects.filter(id=target_parent_id).first()
             if target_parent:
                 user_ap.parent_account = target_parent
