@@ -1196,7 +1196,7 @@ class WalletAdmin(admin.ModelAdmin):
                         
                     w.save()
                     
-                    WalletTransaction.objects.create(
+                    tx = WalletTransaction.objects.create(
                         user=user,
                         amount=signed,
                         balance_after=w.balance,
@@ -1205,6 +1205,48 @@ class WalletAdmin(admin.ModelAdmin):
                         source_id=str(request.user.id),
                         meta={"pocket": pocket, "note": note, "by_admin": request.user.username}
                     )
+
+                    # Post manual adjustment to new double-entry wallet engine
+                    try:
+                        from accounts.finance_constants import WalletTypes, FinanceCategories, LedgerDirections
+                        from accounts.wallet_engine import WalletEngine, LedgerPosting
+                        
+                        system_user = WalletEngine.get_system_user()
+                        pocket_type_map = {
+                            "main": WalletTypes.MAIN,
+                            "self_account": WalletTypes.SELF_PACKAGE_POCKET,
+                            "withdrawable": WalletTypes.WITHDRAWAL_WALLET,
+                        }
+                        wallet_type = pocket_type_map[pocket]
+                        
+                        if adjust_action == "credit":
+                            postings = [
+                                LedgerPosting(system_user, WalletTypes.SYSTEM, LedgerDirections.DEBIT, amount),
+                                LedgerPosting(user, wallet_type, LedgerDirections.CREDIT, amount),
+                            ]
+                        else:
+                            postings = [
+                                LedgerPosting(user, wallet_type, LedgerDirections.DEBIT, amount),
+                                LedgerPosting(system_user, WalletTypes.SYSTEM, LedgerDirections.CREDIT, amount),
+                            ]
+                            
+                        WalletEngine.post_transaction(
+                            category=FinanceCategories.MANUAL_ADJUSTMENT,
+                            user=user,
+                            source_module=WalletTypes.SYSTEM,
+                            source_id=str(request.user.id),
+                            destination_module=wallet_type,
+                            gross_amount=amount,
+                            net_amount=amount,
+                            idempotency_key=f"admin_adjust:{tx.id}",
+                            legacy_wallet_transaction=tx,
+                            created_by=request.user,
+                            approved_by=request.user,
+                            remarks=note or f"Admin manual adjustment: {adjust_action} to {pocket}",
+                            postings=postings,
+                        )
+                    except Exception:
+                        pass
                     
                 self.message_user(request, f"Manual adjustment of ₹{amount} successfully applied to {pocket}!")
                 return HttpResponseRedirect(request.path_info)
