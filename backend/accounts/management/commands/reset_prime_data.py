@@ -80,8 +80,17 @@ class Command(BaseCommand):
         # 2) Zero all wallets
         w_qs = Wallet.objects.all()
         w_count = w_qs.count()
-        self.stdout.write(f"Zeroing {w_count} Wallet rows (balance/main/withdrawable/self_account)")
-        w_qs.update(balance=0, main_balance=0, withdrawable_balance=0, self_account_balance=0)
+        self.stdout.write(f"Zeroing {w_count} Wallet rows")
+        
+        # Zero new double-entry wallet accounts and delete ledger records
+        try:
+            from accounts.models import FinancialTransaction, LedgerEntry, WalletAccount
+            LedgerEntry.objects.all().delete()
+            FinancialTransaction.objects.all().delete()
+            WalletAccount.objects.all().update(current_balance=0, available_balance=0)
+            self.stdout.write("Cleared new double-entry pocket accounts and histories.")
+        except Exception:
+            pass
 
         # 3) Reset Reward Points
         rph_qs = RewardPointsHold.objects.all()

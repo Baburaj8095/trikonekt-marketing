@@ -358,11 +358,6 @@ from django.dispatch import receiver
 
 class Wallet(models.Model):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='wallet')
-    balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    # New dual-balance model
-    main_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)         # Gross earnings (e.g., commissions)
-    withdrawable_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0) # Net withdrawable after tax withholding
-    self_account_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)  # Streamed 25% reserve for auto-activation packs
     franchise_total_earning = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     franchise_active_work = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     franchise_inactive_work = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -373,8 +368,68 @@ class Wallet(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    @property
+    def main_balance(self):
+        from accounts.wallet_engine import WalletEngine
+        from accounts.finance_constants import WalletTypes
+        return WalletEngine.get_account(self.user, WalletTypes.MAIN_WALLET, lock=False).current_balance
+
+    @main_balance.setter
+    def main_balance(self, value):
+        from accounts.wallet_engine import WalletEngine
+        from accounts.finance_constants import WalletTypes
+        acc = WalletEngine.get_account(self.user, WalletTypes.MAIN_WALLET, lock=True)
+        acc.current_balance = value
+        acc.available_balance = value
+        acc.save(update_fields=["current_balance", "available_balance", "updated_at"])
+
+    @property
+    def withdrawable_balance(self):
+        from accounts.wallet_engine import WalletEngine
+        from accounts.finance_constants import WalletTypes
+        return WalletEngine.get_account(self.user, WalletTypes.WITHDRAWAL_WALLET, lock=False).current_balance
+
+    @withdrawable_balance.setter
+    def withdrawable_balance(self, value):
+        from accounts.wallet_engine import WalletEngine
+        from accounts.finance_constants import WalletTypes
+        acc = WalletEngine.get_account(self.user, WalletTypes.WITHDRAWAL_WALLET, lock=True)
+        acc.current_balance = value
+        acc.available_balance = value
+        acc.save(update_fields=["current_balance", "available_balance", "updated_at"])
+
+    @property
+    def self_account_balance(self):
+        from accounts.wallet_engine import WalletEngine
+        from accounts.finance_constants import WalletTypes
+        return WalletEngine.get_account(self.user, WalletTypes.SELF_PACKAGE_POCKET, lock=False).current_balance
+
+    @self_account_balance.setter
+    def self_account_balance(self, value):
+        from accounts.wallet_engine import WalletEngine
+        from accounts.finance_constants import WalletTypes
+        acc = WalletEngine.get_account(self.user, WalletTypes.SELF_PACKAGE_POCKET, lock=True)
+        acc.current_balance = value
+        acc.available_balance = value
+        acc.save(update_fields=["current_balance", "available_balance", "updated_at"])
+
+    @property
+    def balance(self):
+        return self.main_balance + self.self_account_balance
+
+    @balance.setter
+    def balance(self, value):
+        self.main_balance = value
+
+    def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            legacy_fields = {"balance", "main_balance", "withdrawable_balance", "self_account_balance"}
+            kwargs["update_fields"] = [f for f in update_fields if f not in legacy_fields]
+        super().save(*args, **kwargs)
+
     def __str__(self) -> str:
-        return f"Wallet<{self.user.username}> ₹{self.balance}"
+        return f"Wallet<{self.user.username}>"
 
     @transaction.atomic
     def credit(
