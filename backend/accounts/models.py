@@ -1666,6 +1666,40 @@ class WithdrawalRequest(models.Model):
             source_type="WITHDRAWAL",
             source_id=str(self.id),
         )
+        # Post to new double-entry wallet engine
+        try:
+            tx = WalletTransaction.objects.filter(
+                user=self.user,
+                type="WITHDRAWAL_DEBIT",
+                source_type="WITHDRAWAL",
+                source_id=str(self.id),
+            ).first()
+            
+            from accounts.finance_constants import WalletTypes, FinanceCategories, LedgerDirections
+            from accounts.wallet_engine import WalletEngine, LedgerPosting
+            
+            system_user = WalletEngine.get_system_user()
+            WalletEngine.post_transaction(
+                category=FinanceCategories.WITHDRAWAL,
+                user=self.user,
+                source_module=WalletTypes.WITHDRAWAL_WALLET,
+                source_id=str(self.id),
+                destination_module=WalletTypes.SYSTEM,
+                gross_amount=self.amount,
+                net_amount=self.amount,
+                idempotency_key=f"withdrawal_approve_debit:{self.id}",
+                legacy_wallet_transaction=tx,
+                created_by=actor,
+                approved_by=actor,
+                remarks=f"Withdrawal request approved: {payout_ref or ''}",
+                metadata={"withdrawal_id": self.id, "payout_ref": payout_ref or ""},
+                postings=[
+                    LedgerPosting(self.user, WalletTypes.WITHDRAWAL_WALLET, LedgerDirections.DEBIT, self.amount, metadata={"withdrawal_id": self.id}),
+                    LedgerPosting(system_user, WalletTypes.SYSTEM, LedgerDirections.CREDIT, self.amount, metadata={"counterparty_user_id": self.user.id}),
+                ],
+            )
+        except Exception:
+            pass
         # Lifetime 3% referral withdrawal bonus to direct sponsor (if exists)
         sponsor = getattr(self.user, "registered_by", None)
         try:
