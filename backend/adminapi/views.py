@@ -2167,8 +2167,8 @@ class AdminWalletReconcileView(APIView):
                 w = user.wallet
             except Exception:
                 w = None
-            ledger_total = ledger_map.get(user.id, Decimal("0.00"))
-            wallet_balance = Decimal(str(getattr(w, "balance", 0) or 0))
+            ledger_total = legacy_main_map.get(user.id, Decimal("0.00"))
+            wallet_balance = Decimal(str(getattr(w, "main_balance", 0) or 0))
             diff = (wallet_balance - Decimal(str(ledger_total))).quantize(Decimal("0.01"))
             rows.append({
                 **_wallet_summary_payload(
@@ -2201,29 +2201,30 @@ class AdminWalletReconcileView(APIView):
         for account in finance_accounts:
             ledger_balance = ledger_totals.get(account.id, Decimal("0.00"))
             
-            # If no LedgerEntry records exist, use computed legacy history as starting point
-            if ledger_balance == Decimal("0.00") and not LedgerEntry.objects.filter(wallet_account_id=account.id).exists():
-                from accounts.finance_constants import WalletTypes
-                if account.wallet_type == WalletTypes.MAIN:
-                    ledger_balance = legacy_main_map.get(account.user_id, Decimal("0.00"))
-                elif account.wallet_type == WalletTypes.SELF_PACKAGE_POCKET:
-                    ledger_balance = legacy_self_map.get(account.user_id, Decimal("0.00"))
-                elif account.wallet_type == WalletTypes.WITHDRAWAL_WALLET:
-                    try:
-                        w = account.user.wallet
-                        ledger_balance = Decimal(str(w.withdrawable_balance or "0.00"))
-                    except Exception:
-                        ledger_balance = Decimal("0.00")
+            # Add the legacy starting balance to double-entry ledger balance
+            legacy_start = Decimal("0.00")
+            from accounts.finance_constants import WalletTypes
+            if account.wallet_type == WalletTypes.MAIN:
+                legacy_start = legacy_main_map.get(account.user_id, Decimal("0.00"))
+            elif account.wallet_type == WalletTypes.SELF_PACKAGE_POCKET:
+                legacy_start = legacy_self_map.get(account.user_id, Decimal("0.00"))
+            elif account.wallet_type == WalletTypes.WITHDRAWAL_WALLET:
+                try:
+                    w = account.user.wallet
+                    legacy_start = Decimal(str(w.withdrawable_balance or "0.00"))
+                except Exception:
+                    legacy_start = Decimal("0.00")
             
+            total_derived = ledger_balance + legacy_start
             stored_balance = Decimal(str(account.current_balance or "0.00")).quantize(Decimal("0.01"))
-            diff = (stored_balance - ledger_balance).quantize(Decimal("0.01"))
+            diff = (stored_balance - total_derived).quantize(Decimal("0.01"))
             finance_rows.append({
                 "wallet_account_id": account.id,
                 "user_id": account.user_id,
                 "username": getattr(account.user, "username", "") if account.user_id else "",
                 "wallet_type": account.wallet_type,
                 "stored_balance": str(stored_balance),
-                "ledger_balance": str(ledger_balance.quantize(Decimal("0.01"))),
+                "ledger_balance": str(total_derived.quantize(Decimal("0.01"))),
                 "diff": str(diff),
                 "status": "OK" if abs(diff) <= Decimal("1.00") else "MISMATCH",
             })
