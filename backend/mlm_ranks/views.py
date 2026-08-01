@@ -1077,3 +1077,5 @@ class AdminRejectRankUpgradeView(APIView):
         upg.save(update_fields=["payment_status"])
 
         return Response(RankUpgradeSerializer(upg).data, status=status.HTTP_200_OK)
+
+# End of file - wallet balance fix update
