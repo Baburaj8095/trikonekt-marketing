@@ -538,6 +538,8 @@ class AdminUsersList(ListAPIView):
             "city__id", "city__name",
             # Registered by (for sponsor display)
             "registered_by__username", "registered_by__prefixed_id", "registered_by__full_name",
+            # Wallet relation placeholder for select_related traversal
+            "wallet__id",
             # KYC status in list grid
             "kyc__verified", "kyc__verified_at",
             # Merchant profile fields used in Admin grids
