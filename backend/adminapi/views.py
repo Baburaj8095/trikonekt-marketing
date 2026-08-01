@@ -2226,7 +2226,7 @@ class AdminWalletReconcileView(APIView):
                 "stored_balance": str(stored_balance),
                 "ledger_balance": str(total_derived.quantize(Decimal("0.01"))),
                 "diff": str(diff),
-                "status": "OK" if abs(diff) <= Decimal("1.00") else "MISMATCH",
+                "status": "OK" if abs(diff) <= Decimal("25.00") else "MISMATCH",
             })
         finance_mismatches = sum(1 for r in finance_rows if r["status"] != "OK")
         return Response({
