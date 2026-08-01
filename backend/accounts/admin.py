@@ -1116,14 +1116,31 @@ class WalletAdmin(admin.ModelAdmin):
                     txs = WalletTransaction.objects.filter(user=user).order_by('created_at', 'id')
                     for tx in txs:
                         amt = float(tx.amount or 0)
-                        if tx.type == 'SELF_ACCOUNT_CREDIT':
-                            calc_self += amt
-                        elif tx.type == 'SELF_ACCOUNT_DEBIT':
-                            calc_self -= 250.0
-                            if calc_self < 0:
-                                calc_self = 0.0
-                        else:
+                        tx_type = tx.type
+                        
+                        # Main Pocket logic
+                        if tx_type in [
+                            'INCOME_CREDIT_75', 'DIRECT_REF_BONUS', 'WELCOME_BONUS', 'LEVEL_BONUS',
+                            'AUTOPOOL_BONUS_FIVE', 'AUTOPOOL_BONUS_THREE', 'GLOBAL_ROYALTY',
+                            'LIFETIME_WITHDRAWAL_BONUS', 'REWARD_CREDIT', 'FRANCHISE_INCOME',
+                            'COMMISSION_CREDIT', 'ADJUSTMENT_CREDIT'
+                        ] and amt > 0:
                             calc_main += amt
+                        elif tx_type in [
+                            'WITHDRAWAL_WALLET_TRANSFER_OUT', 'COUPON_WALLET_TRANSFER_OUT',
+                            'ADJUSTMENT_DEBIT', 'INTERNAL_WALLET_TRANSFER_OUT'
+                        ]:
+                            calc_main = max(0.0, calc_main - abs(amt))
+                        elif tx_type == 'INTERNAL_WALLET_DEBIT':
+                            wallet_source = (tx.meta or {}).get('wallet_source') or ''
+                            if wallet_source == 'internal':
+                                calc_main = max(0.0, calc_main - abs(amt))
+                                
+                        # Self Pocket logic
+                        elif tx_type == 'SELF_ACCOUNT_CREDIT':
+                            calc_self += amt
+                        elif tx_type in ['SELF_ACCOUNT_DEBIT', 'AUTO_PURCHASE_DEBIT']:
+                            calc_self = max(0.0, calc_self - abs(amt))
                             
                     if user.id == 32 or user.username == "9999999999":
                         calc_self = 0.0
@@ -1261,14 +1278,31 @@ class WalletAdmin(admin.ModelAdmin):
         formatted_txs = []
         for tx in chrono_txs:
             amt = float(tx.amount or 0)
-            if tx.type == 'SELF_ACCOUNT_CREDIT':
-                calc_self += amt
-            elif tx.type == 'SELF_ACCOUNT_DEBIT':
-                calc_self -= 250.0
-                if calc_self < 0:
-                    calc_self = 0.0
-            else:
+            tx_type = tx.type
+            
+            # Main Pocket logic
+            if tx_type in [
+                'INCOME_CREDIT_75', 'DIRECT_REF_BONUS', 'WELCOME_BONUS', 'LEVEL_BONUS',
+                'AUTOPOOL_BONUS_FIVE', 'AUTOPOOL_BONUS_THREE', 'GLOBAL_ROYALTY',
+                'LIFETIME_WITHDRAWAL_BONUS', 'REWARD_CREDIT', 'FRANCHISE_INCOME',
+                'COMMISSION_CREDIT', 'ADJUSTMENT_CREDIT'
+            ] and amt > 0:
                 calc_main += amt
+            elif tx_type in [
+                'WITHDRAWAL_WALLET_TRANSFER_OUT', 'COUPON_WALLET_TRANSFER_OUT',
+                'ADJUSTMENT_DEBIT', 'INTERNAL_WALLET_TRANSFER_OUT'
+            ]:
+                calc_main = max(0.0, calc_main - abs(amt))
+            elif tx_type == 'INTERNAL_WALLET_DEBIT':
+                wallet_source = (tx.meta or {}).get('wallet_source') or ''
+                if wallet_source == 'internal':
+                    calc_main = max(0.0, calc_main - abs(amt))
+                    
+            # Self Pocket logic
+            elif tx_type == 'SELF_ACCOUNT_CREDIT':
+                calc_self += amt
+            elif tx_type in ['SELF_ACCOUNT_DEBIT', 'AUTO_PURCHASE_DEBIT']:
+                calc_self = max(0.0, calc_self - abs(amt))
                 
             formatted_txs.append({
                 'created_at': tx.created_at,

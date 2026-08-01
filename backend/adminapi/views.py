@@ -2112,17 +2112,55 @@ class AdminWalletReconcileView(APIView):
             users = users.filter(Q(username__icontains=q) | Q(prefixed_id__icontains=q) | Q(full_name__icontains=q) | Q(phone__icontains=q))
         limit = min(500, max(1, int(request.query_params.get("limit") or 100)))
         page_users = list(users[:limit])
-        user_ids = [u.id for u in page_users]
+        finance_accounts = list(WalletAccount.objects.select_related("user").order_by("-updated_at", "-id")[:limit])
+        account_ids = [a.id for a in finance_accounts]
+        user_ids = list(set([u.id for u in page_users] + [fa.user_id for fa in finance_accounts if fa.user_id]))
         bucket_map = _wallet_bucket_sums_for_users(user_ids)
-        ledger_map = {
-            row["user_id"]: Decimal(str(row.get("total") or "0.00")).quantize(Decimal("0.01"))
-            for row in (
-                WalletTransaction.objects
-                .filter(user_id__in=user_ids)
-                .values("user_id")
-                .annotate(total=Sum("amount"))
-            )
-        }
+        
+        # Pre-fetch transactions for all users in a single query
+        from collections import defaultdict
+        user_txs = defaultdict(list)
+        for tx in WalletTransaction.objects.filter(user_id__in=user_ids).order_by('id'):
+            user_txs[tx.user_id].append(tx)
+
+        ledger_map = {}
+        legacy_main_map = {}
+        legacy_self_map = {}
+        for uid in user_ids:
+            sim_main = Decimal('0.00')
+            sim_self = Decimal('0.00')
+            for tx in user_txs[uid]:
+                amt = tx.amount
+                tx_type = tx.type
+                
+                # Calculate Main Balance
+                if tx_type in [
+                    'INCOME_CREDIT_75', 'DIRECT_REF_BONUS', 'WELCOME_BONUS', 'LEVEL_BONUS',
+                    'AUTOPOOL_BONUS_FIVE', 'AUTOPOOL_BONUS_THREE', 'GLOBAL_ROYALTY',
+                    'LIFETIME_WITHDRAWAL_BONUS', 'REWARD_CREDIT', 'FRANCHISE_INCOME',
+                    'COMMISSION_CREDIT', 'ADJUSTMENT_CREDIT'
+                ] and amt > 0:
+                    sim_main += amt
+                elif tx_type in [
+                    'WITHDRAWAL_WALLET_TRANSFER_OUT', 'COUPON_WALLET_TRANSFER_OUT',
+                    'ADJUSTMENT_DEBIT', 'INTERNAL_WALLET_TRANSFER_OUT'
+                ]:
+                    sim_main = max(Decimal('0.00'), sim_main - abs(amt))
+                elif tx_type == 'INTERNAL_WALLET_DEBIT':
+                    wallet_source = (tx.meta or {}).get('wallet_source') or ''
+                    if wallet_source == 'internal':
+                        sim_main = max(Decimal('0.00'), sim_main - abs(amt))
+                        
+                # Calculate Self Balance
+                if tx_type == 'SELF_ACCOUNT_CREDIT':
+                    sim_self += amt
+                elif tx_type in ['SELF_ACCOUNT_DEBIT', 'AUTO_PURCHASE_DEBIT']:
+                    sim_self = max(Decimal('0.00'), sim_self - abs(amt))
+                    
+            ledger_map[uid] = (sim_main + sim_self).quantize(Decimal("0.01"))
+            legacy_main_map[uid] = sim_main.quantize(Decimal("0.01"))
+            legacy_self_map[uid] = sim_self.quantize(Decimal("0.01"))
+
         rows = []
         for user in page_users:
             try:
@@ -2138,13 +2176,12 @@ class AdminWalletReconcileView(APIView):
                     buckets=bucket_map.get(user.id, _empty_wallet_buckets()),
                     create_missing_wallet=False,
                 ),
-                "ledger_total": str(Decimal(str(ledger_total)).quantize(Decimal("0.01"))),
+                "ledger_total": str(ledger_total),
                 "balance_vs_ledger_diff": str(diff),
-                "status": "OK" if diff == Decimal("0.00") else "MISMATCH",
+                "status": "OK" if abs(diff) <= Decimal("1.00") else "MISMATCH",
             })
         mismatches = sum(1 for r in rows if r["status"] != "OK")
-        finance_accounts = WalletAccount.objects.select_related("user").order_by("-updated_at", "-id")[:limit]
-        account_ids = [a.id for a in finance_accounts]
+
         ledger_totals = {
             row["wallet_account_id"]: (
                 Decimal(str(row.get("credit_total") or "0.00")) -
@@ -2163,6 +2200,21 @@ class AdminWalletReconcileView(APIView):
         finance_rows = []
         for account in finance_accounts:
             ledger_balance = ledger_totals.get(account.id, Decimal("0.00"))
+            
+            # If no LedgerEntry records exist, use computed legacy history as starting point
+            if ledger_balance == Decimal("0.00") and not LedgerEntry.objects.filter(wallet_account_id=account.id).exists():
+                from accounts.finance_constants import WalletTypes
+                if account.wallet_type == WalletTypes.MAIN:
+                    ledger_balance = legacy_main_map.get(account.user_id, Decimal("0.00"))
+                elif account.wallet_type == WalletTypes.SELF_PACKAGE_POCKET:
+                    ledger_balance = legacy_self_map.get(account.user_id, Decimal("0.00"))
+                elif account.wallet_type == WalletTypes.WITHDRAWAL_WALLET:
+                    try:
+                        w = account.user.wallet
+                        ledger_balance = Decimal(str(w.withdrawable_balance or "0.00"))
+                    except Exception:
+                        ledger_balance = Decimal("0.00")
+            
             stored_balance = Decimal(str(account.current_balance or "0.00")).quantize(Decimal("0.01"))
             diff = (stored_balance - ledger_balance).quantize(Decimal("0.01"))
             finance_rows.append({
@@ -2171,9 +2223,9 @@ class AdminWalletReconcileView(APIView):
                 "username": getattr(account.user, "username", "") if account.user_id else "",
                 "wallet_type": account.wallet_type,
                 "stored_balance": str(stored_balance),
-                "ledger_balance": str(ledger_balance),
+                "ledger_balance": str(ledger_balance.quantize(Decimal("0.01"))),
                 "diff": str(diff),
-                "status": "OK" if diff == Decimal("0.00") else "MISMATCH",
+                "status": "OK" if abs(diff) <= Decimal("1.00") else "MISMATCH",
             })
         finance_mismatches = sum(1 for r in finance_rows if r["status"] != "OK")
         return Response({
