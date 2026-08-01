@@ -93,12 +93,16 @@ class AdminMetricsView(APIView):
         }
 
         # Wallets (aggregate total balance and count together)
-        wagg = Wallet.objects.aggregate(s=Sum("balance"), c=Count("id"))
-        total_balance = wagg.get("s") or Decimal("0.00")
+        from accounts.models import WalletAccount
+        from accounts.finance_constants import WalletTypes
+        total_balance = WalletAccount.objects.filter(
+            wallet_type__in=[WalletTypes.MAIN, WalletTypes.SELF_PACKAGE_POCKET]
+        ).aggregate(s=Sum("current_balance"))["s"] or Decimal("0.00")
+        total_wallets_count = Wallet.objects.count()
         wallets_block = {
             "totalBalance": float(total_balance),
             "transactionsToday": WalletTransaction.objects.filter(created_at__date=today).count(),
-            "count": wagg.get("c") or 0,
+            "count": total_wallets_count,
         }
 
         # Withdrawals (single aggregate for count and amount)
@@ -534,9 +538,6 @@ class AdminUsersList(ListAPIView):
             "city__id", "city__name",
             # Registered by (for sponsor display)
             "registered_by__username", "registered_by__prefixed_id", "registered_by__full_name",
-            # Wallet summary used in list grid
-            "wallet__main_balance", "wallet__balance",
-            "wallet__self_account_balance", "wallet__withdrawable_balance",
             # KYC status in list grid
             "kyc__verified", "kyc__verified_at",
             # Merchant profile fields used in Admin grids
