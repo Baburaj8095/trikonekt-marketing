@@ -372,13 +372,13 @@ class Wallet(models.Model):
     def main_balance(self):
         from accounts.wallet_engine import WalletEngine
         from accounts.finance_constants import WalletTypes
-        return WalletEngine.get_account(self.user, WalletTypes.MAIN_WALLET, lock=False).current_balance
+        return WalletEngine.get_account(self.user, WalletTypes.MAIN, lock=False).current_balance
 
     @main_balance.setter
     def main_balance(self, value):
         from accounts.wallet_engine import WalletEngine
         from accounts.finance_constants import WalletTypes
-        acc = WalletEngine.get_account(self.user, WalletTypes.MAIN_WALLET, lock=True)
+        acc = WalletEngine.get_account(self.user, WalletTypes.MAIN, lock=True)
         acc.current_balance = value
         acc.available_balance = value
         acc.save(update_fields=["current_balance", "available_balance", "updated_at"])
@@ -584,7 +584,7 @@ class Wallet(models.Model):
                     user=self.user,
                     source_module=WalletTypes.SYSTEM,
                     source_id=str(source_id or ""),
-                    destination_module=WalletTypes.MAIN_WALLET,
+                    destination_module=WalletTypes.MAIN,
                     gross_amount=amt,
                     net_amount=amt,
                     idempotency_key=f"commission_credit:{tx_type}:{source_type}:{source_id}:{self.user.id}",
@@ -594,7 +594,7 @@ class Wallet(models.Model):
                     remarks=f"Double-entry payout stream: {tx_type}",
                     postings=[
                         LedgerPosting(system_user, WalletTypes.SYSTEM, LedgerDirections.DEBIT, amt),
-                        LedgerPosting(self.user, WalletTypes.MAIN_WALLET, LedgerDirections.CREDIT, income),
+                        LedgerPosting(self.user, WalletTypes.MAIN, LedgerDirections.CREDIT, income),
                         LedgerPosting(self.user, WalletTypes.SELF_PACKAGE_POCKET, LedgerDirections.CREDIT, self_part),
                     ]
                 )
