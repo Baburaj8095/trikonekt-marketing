@@ -384,10 +384,9 @@ class UpgradePayFromWalletView(APIView):
                 return Response({"detail": "Insufficient Package Purchase Coupon Wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
 
             w.balance = max(D("0"), (w.balance or D("0")) - amount)
-            w.main_balance = max(D("0"), (w.main_balance or D("0")) - amount)
             if w.balance < D("0"):
                 return Response({"detail": "Insufficient wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
-            w.save(update_fields=["balance", "main_balance", "updated_at"])
+            w.save(update_fields=["balance", "updated_at"])
 
             tx = WalletTransaction.objects.create(
                 user=request.user,
@@ -442,10 +441,9 @@ class UpgradePayFromWalletView(APIView):
 
             w = Wallet.objects.select_for_update().get(pk=w.pk)
             w.balance = max(D("0"), (w.balance or D("0")) - amount)
-            w.main_balance = max(D("0"), (w.main_balance or D("0")) - amount)
             if w.balance < D("0"):
                 return Response({"detail": "Insufficient wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
-            w.save(update_fields=["balance", "main_balance", "updated_at"])
+            w.save(update_fields=["balance", "updated_at"])
 
             tx = WalletTransaction.objects.create(
                 user=request.user,
