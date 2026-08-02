@@ -380,7 +380,6 @@ export default function AdminShell({ children }) {
           { to: "/admin/package-management", label: "Package Management", icon: "box" },
           { to: "/admin/reward-distribution", label: "Reward Distribution", icon: "wallet" },
           { to: "/admin/wallet-reconcile", label: "Wallet Reconcile", icon: "chart" },
-          { to: "/admin/ledger-statement", label: "Ledger Statement", icon: "receipt_long" },
           { to: "/admin/analytics", label: "Demographic & Cash Flow", icon: "chart" },
           { to: "/admin/wallet-settlements", label: "Settlement Reports", icon: "chart" },
           { to: "/admin/wallet-monitoring", label: "Risk & OTP Monitoring", icon: "shield" },
@@ -484,6 +483,7 @@ export default function AdminShell({ children }) {
         label: "Analytics",
         items: [
           { to: "/admin/analytics/debugger", label: "Wallet Debugger", icon: "shield" },
+          { to: "/admin/ledger-statement", label: "Ledger Statement", icon: "receipt_long" },
           { to: "/admin/analytics/sales", label: "Daily Sales Report", icon: "chart" },
         ],
       },
