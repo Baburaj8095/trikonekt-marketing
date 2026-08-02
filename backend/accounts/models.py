@@ -828,9 +828,16 @@ class Wallet(models.Model):
             except Exception:
                 return None
 
-        # Reentrancy Guard: Prevent recursive execution on the same wallet instance
-        if getattr(w, "_applying_self_rule", False):
+        # Reentrancy Guard: Prevent recursive execution for the same user ID in the same thread
+        import threading
+        if not hasattr(threading.local(), "_active_self_rules"):
+            threading.local()._active_self_rules = set()
+        
+        active_set = threading.local()._active_self_rules
+        if self.user.id in active_set:
             return
+        
+        active_set.add(self.user.id)
         w._applying_self_rule = True
 
         try:
@@ -961,6 +968,10 @@ class Wallet(models.Model):
                     pass
         finally:
             w._applying_self_rule = False
+            try:
+                active_set.discard(self.user.id)
+            except Exception:
+                pass
 
 
 class FranchiseWalletSettings(models.Model):
