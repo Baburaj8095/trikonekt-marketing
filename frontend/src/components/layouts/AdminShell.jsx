@@ -483,7 +483,7 @@ export default function AdminShell({ children }) {
         label: "Analytics",
         items: [
           { to: "/admin/analytics/debugger", label: "Wallet Debugger", icon: "shield" },
-          { to: "/admin/ledger-statement", label: "Ledger Statement", icon: "receipt_long" },
+          { to: "/admin/ledger-statement", label: "Ledger Statement", icon: "file" },
           { to: "/admin/analytics/sales", label: "Daily Sales Report", icon: "chart" },
         ],
       },
