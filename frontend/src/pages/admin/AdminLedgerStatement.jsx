@@ -163,7 +163,7 @@ export default function AdminLedgerStatement() {
                         <AccountBalanceWalletRoundedIcon sx={{ color: "#2563eb", fontSize: 20 }} />
                       </Stack>
                       <Typography sx={{ fontSize: 22, fontWeight: 900, color: "#1e293b" }}>
-                        {money(data.pockets.main?.current_balance)}
+                        {money(data.pockets.MAIN?.current_balance)}
                       </Typography>
                       <Typography sx={{ fontSize: 11, color: "#64748b" }}>Earning pocket</Typography>
                     </CardContent>
@@ -179,7 +179,7 @@ export default function AdminLedgerStatement() {
                         <HistoryRoundedIcon sx={{ color: "#059669", fontSize: 20 }} />
                       </Stack>
                       <Typography sx={{ fontSize: 22, fontWeight: 900, color: "#1e293b" }}>
-                        {money(data.pockets.self_account?.current_balance)}
+                        {money(data.pockets.SELF_PACKAGE_POCKET?.current_balance)}
                       </Typography>
                       <Typography sx={{ fontSize: 11, color: "#64748b" }}>25% auto-accrual</Typography>
                     </CardContent>
@@ -195,7 +195,7 @@ export default function AdminLedgerStatement() {
                         <ReceiptLongRoundedIcon sx={{ color: "#d97706", fontSize: 20 }} />
                       </Stack>
                       <Typography sx={{ fontSize: 22, fontWeight: 900, color: "#1e293b" }}>
-                        {money(data.pockets.coupon?.current_balance)}
+                        {money(data.pockets.COUPON_POCKET?.current_balance)}
                       </Typography>
                       <Typography sx={{ fontSize: 11, color: "#64748b" }}>Conversion pool</Typography>
                     </CardContent>
@@ -208,7 +208,7 @@ export default function AdminLedgerStatement() {
                     <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 }, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#475569" }}>Add Money Pocket:</Typography>
                       <Typography sx={{ fontSize: 16, fontWeight: 900, color: "#1e293b" }}>
-                        {money(data.pockets.add_money?.current_balance)}
+                        {money(data.pockets.ADD_MONEY_POCKET?.current_balance)}
                       </Typography>
                     </CardContent>
                   </Card>
@@ -220,7 +220,7 @@ export default function AdminLedgerStatement() {
                     <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 }, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#475569" }}>Withdrawal Pocket:</Typography>
                       <Typography sx={{ fontSize: 16, fontWeight: 900, color: "#1e293b" }}>
-                        {money(data.pockets.withdrawal?.current_balance)}
+                        {money(data.pockets.WITHDRAWAL_WALLET?.current_balance)}
                       </Typography>
                     </CardContent>
                   </Card>
