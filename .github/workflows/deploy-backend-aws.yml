@@ -1,13 +1,6 @@
 name: Deploy Backend to AWS EC2
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "backend/**"
-      - "deploy/aws/**"
-      - ".github/workflows/deploy-backend-aws.yml"
   workflow_dispatch:
 
 concurrency:
