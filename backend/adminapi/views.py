@@ -5159,3 +5159,156 @@ class AdminDailySalesReportView(APIView):
                 "upgrades_amount": f"{total_upg_amt:.2f}"
             }
         })
+
+
+class AdminUserLedgerStatementView(APIView):
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
+
+    def get(self, request):
+        from decimal import Decimal
+        from django.db.models import Q
+        from accounts.models import Wallet, WalletTransaction, LedgerEntry, CustomUser, WalletAccount
+
+        username = (request.query_params.get("username") or "").strip()
+        if not username:
+            return Response({"detail": "Username is required"}, status=400)
+            
+        user = CustomUser.objects.filter(Q(username=username) | Q(prefixed_id=username) | Q(phone=username)).first()
+        if not user:
+            return Response({"detail": "User not found"}, status=400)
+            
+        # 1. Fetch current pocket balances
+        accounts_qs = WalletAccount.objects.filter(user=user)
+        accounts_data = {}
+        for acc in accounts_qs:
+            accounts_data[acc.wallet_type] = {
+                "id": acc.id,
+                "current_balance": str(acc.current_balance),
+                "available_balance": str(acc.available_balance)
+            }
+            
+        # Ensure all types exist in accounts_data to prevent frontend errors
+        from accounts.finance_constants import WalletTypes
+        all_types = [WalletTypes.MAIN, WalletTypes.SELF_PACKAGE_POCKET, WalletTypes.COUPON_POCKET, WalletTypes.ADD_MONEY_POCKET, WalletTypes.WITHDRAWAL_WALLET]
+        for t in all_types:
+            if t not in accounts_data:
+                accounts_data[t] = {
+                    "id": None,
+                    "current_balance": "0.00",
+                    "available_balance": "0.00"
+                }
+
+        # 2. Fetch all WalletTransactions in chronological order
+        txs = WalletTransaction.objects.filter(user=user).order_by('id')
+        
+        # 3. Trace running balances
+        statement_txs = []
+        running_main = Decimal("40.00") # Start with registration welcome bonus
+        running_self = Decimal("0.00")
+        
+        # Virtual Welcome Bonus entry
+        statement_txs.append({
+            "id": "V-START",
+            "created_at": user.date_joined.strftime("%Y-%m-%d %H:%M:%S") if user.date_joined else "",
+            "type": "WELCOME_BONUS",
+            "amount": "40.00",
+            "main_balance": "40.00",
+            "self_balance": "0.00",
+            "from_user": "-",
+            "level": "-",
+            "source": "WELCOME",
+            "remarks": "Initial welcome/registration bonus"
+        })
+        
+        for tx in txs:
+            amt = tx.amount
+            tt = tx.type
+            meta = tx.meta or {}
+            
+            from_user = meta.get("from_user") or meta.get("from_user_id") or "-"
+            level = meta.get("level_index")
+            level_str = f"L{level}" if level is not None else "-"
+            
+            source = meta.get("source") or meta.get("trigger") or meta.get("reason") or "-"
+            
+            main_impact = "-"
+            self_impact = "-"
+            remarks = ""
+            
+            if tt in ['INCOME_CREDIT_75', 'DIRECT_REF_BONUS', 'WELCOME_BONUS', 'LEVEL_BONUS', 'AUTOPOOL_BONUS_FIVE', 'AUTOPOOL_BONUS_THREE', 'GLOBAL_ROYALTY', 'ADJUSTMENT_CREDIT']:
+                running_main += amt
+                main_impact = f"{running_main:.2f}"
+                remarks = f"Credit from {source}"
+            elif tt in ['COUPON_WALLET_TRANSFER_OUT', 'INTERNAL_WALLET_TRANSFER_OUT']:
+                running_main -= abs(amt)
+                main_impact = f"{running_main:.2f}"
+                remarks = f"Transfer out to {meta.get('target_wallet', 'other')}"
+            elif tt == 'SELF_ACCOUNT_CREDIT':
+                running_self += amt
+                self_impact = f"{running_self:.2f}"
+                remarks = f"Auto-accrual from {source}"
+            elif tt in ['SELF_ACCOUNT_DEBIT', 'AUTO_PURCHASE_DEBIT']:
+                running_self = max(Decimal("0.00"), running_self - abs(amt))
+                self_impact = f"{running_self:.2f}"
+                remarks = f"Debit for package activation"
+            elif tt == 'COUPON_WALLET_CREDIT':
+                remarks = f"Credit to Coupon Pocket"
+            elif tt == 'VOUCHER_CREATE_DEBIT':
+                remarks = f"Debit from Coupon Pocket (Voucher create)"
+            elif tt == 'INTERNAL_WALLET_CREDIT':
+                dest = meta.get("destination_wallet", "wallet")
+                if dest == 'SELF_PACKAGE_POCKET':
+                    running_self += amt
+                    self_impact = f"{running_self:.2f}"
+                remarks = f"Credit to {dest}"
+            elif tt == 'INTERNAL_WALLET_DEBIT':
+                src = meta.get("wallet_source", "wallet")
+                if src == 'internal':
+                    running_self = max(Decimal("0.00"), running_self - abs(amt))
+                    self_impact = f"{running_self:.2f}"
+                remarks = f"Debit upgrade from {src}"
+            elif tt == 'ADJUSTMENT_DEBIT':
+                remarks = f"Admin fee (7% on conversion)"
+                
+            statement_txs.append({
+                "id": tx.id,
+                "created_at": tx.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                "type": tt,
+                "amount": str(amt),
+                "main_balance": main_impact,
+                "self_balance": self_impact,
+                "from_user": str(from_user),
+                "level": level_str,
+                "source": str(source),
+                "remarks": remarks
+            })
+
+        # 4. Fetch Ledger Entries
+        ledgers = LedgerEntry.objects.filter(wallet_account__user=user).order_by('id')
+        statement_ledgers = []
+        for le in ledgers:
+            statement_ledgers.append({
+                "id": le.id,
+                "created_at": le.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                "pocket": le.wallet_account.wallet_type,
+                "direction": le.direction,
+                "amount": str(le.amount),
+                "balance_before": str(le.balance_before),
+                "balance_after": str(le.balance_after),
+                "entry_ref": le.entry_ref,
+                "remarks": le.remarks or ""
+            })
+            
+        return Response({
+            "user": {
+                "id": user.id,
+                "full_name": user.full_name,
+                "username": user.username,
+                "phone": user.phone,
+                "is_active": user.is_active,
+                "date_joined": user.date_joined.strftime("%Y-%m-%d %H:%M:%S") if user.date_joined else ""
+            },
+            "pockets": accounts_data,
+            "transactions": statement_txs,
+            "ledgers": statement_ledgers
+        })

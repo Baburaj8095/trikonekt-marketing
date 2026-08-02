@@ -225,6 +225,7 @@ export default function AdminShell({ children }) {
       to.startsWith("/admin/wallets") ||
       to.startsWith("/admin/wallet-vouchers") ||
       to.startsWith("/admin/wallet-reconcile") ||
+      to.startsWith("/admin/ledger-statement") ||
       to.startsWith("/admin/analytics")
     )
       return "reports_finance";
@@ -379,6 +380,7 @@ export default function AdminShell({ children }) {
           { to: "/admin/package-management", label: "Package Management", icon: "box" },
           { to: "/admin/reward-distribution", label: "Reward Distribution", icon: "wallet" },
           { to: "/admin/wallet-reconcile", label: "Wallet Reconcile", icon: "chart" },
+          { to: "/admin/ledger-statement", label: "Ledger Statement", icon: "receipt_long" },
           { to: "/admin/analytics", label: "Demographic & Cash Flow", icon: "chart" },
           { to: "/admin/wallet-settlements", label: "Settlement Reports", icon: "chart" },
           { to: "/admin/wallet-monitoring", label: "Risk & OTP Monitoring", icon: "shield" },

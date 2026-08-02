@@ -57,6 +57,7 @@ from .views import (
     AdminWithdrawalDistributionPreviewView,
     AdminWalletDebugView,
     AdminDailySalesReportView,
+    AdminUserLedgerStatementView,
 )
 from .dynamic import router as dynamic_router, admin_meta as dynamic_admin_meta, admin_meta_summary, admin_meta_fields
 # RBAC endpoints
@@ -107,6 +108,7 @@ urlpatterns = [
     path("wallets/reconcile/", AdminWalletReconcileView.as_view()),
     path("wallets/ledger/", AdminWalletLedgerView.as_view()),
     path("wallets/debug/", AdminWalletDebugView.as_view()),
+    path("wallets/statement/", AdminUserLedgerStatementView.as_view()),
     path("analytics/sales/", AdminDailySalesReportView.as_view()),
     path("finance/overview/", AdminFinanceOverviewView.as_view()),
     path("finance/tax-service-charges/", AdminFinanceTaxDashboardView.as_view()),

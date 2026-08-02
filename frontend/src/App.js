@@ -102,6 +102,7 @@ import AdminCommissionHistory from "./pages/admin/AdminCommissionHistory";
 import AdminCommissionDistribute from "./pages/admin/AdminCommissionDistribute";
 import AdminWalletDebugger from "./pages/admin/AdminWalletDebugger";
 import AdminDailySalesReport from "./pages/admin/AdminDailySalesReport";
+import AdminLedgerStatement from "./pages/admin/AdminLedgerStatement";
 import Profile from "./pages/Profile";
 import RoleSelect from "./pages/Auth/RoleSelect";
 import ReferAndEarnPage from "./pages/ReferAndEarn";
@@ -1774,6 +1775,16 @@ function App() {
             <AdminProtectedRoute>
               <AdminShell>
                 <AdminWalletDebugger />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/ledger-statement"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminLedgerStatement />
               </AdminShell>
             </AdminProtectedRoute>
           }
