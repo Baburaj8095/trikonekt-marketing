@@ -379,8 +379,9 @@ class Wallet(models.Model):
         from accounts.wallet_engine import WalletEngine
         from accounts.finance_constants import WalletTypes
         acc = WalletEngine.get_account(self.user, WalletTypes.MAIN, lock=True)
-        acc.current_balance = value
-        acc.available_balance = value
+        capped_val = max(Decimal("0.00"), value)
+        acc.current_balance = capped_val
+        acc.available_balance = capped_val
         acc.save(update_fields=["current_balance", "available_balance", "updated_at"])
 
     @property
@@ -394,8 +395,9 @@ class Wallet(models.Model):
         from accounts.wallet_engine import WalletEngine
         from accounts.finance_constants import WalletTypes
         acc = WalletEngine.get_account(self.user, WalletTypes.WITHDRAWAL_WALLET, lock=True)
-        acc.current_balance = value
-        acc.available_balance = value
+        capped_val = max(Decimal("0.00"), value)
+        acc.current_balance = capped_val
+        acc.available_balance = capped_val
         acc.save(update_fields=["current_balance", "available_balance", "updated_at"])
 
     @property
@@ -409,8 +411,9 @@ class Wallet(models.Model):
         from accounts.wallet_engine import WalletEngine
         from accounts.finance_constants import WalletTypes
         acc = WalletEngine.get_account(self.user, WalletTypes.SELF_PACKAGE_POCKET, lock=True)
-        acc.current_balance = value
-        acc.available_balance = value
+        capped_val = max(Decimal("0.00"), value)
+        acc.current_balance = capped_val
+        acc.available_balance = capped_val
         acc.save(update_fields=["current_balance", "available_balance", "updated_at"])
 
     @property
