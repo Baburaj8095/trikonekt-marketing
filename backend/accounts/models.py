@@ -419,7 +419,20 @@ class Wallet(models.Model):
 
     @balance.setter
     def balance(self, value):
-        self.main_balance = value
+        current_total = self.main_balance + self.self_account_balance
+        diff = value - current_total  # Negative if debiting
+        
+        if diff < 0:
+            debit_amt = abs(diff)
+            # Try to debit from main first
+            if self.main_balance >= debit_amt:
+                self.main_balance -= debit_amt
+            else:
+                remaining = debit_amt - self.main_balance
+                self.main_balance = Decimal("0.00")
+                self.self_account_balance = max(Decimal("0.00"), self.self_account_balance - remaining)
+        else:
+            self.main_balance += diff
 
     def save(self, *args, **kwargs):
         update_fields = kwargs.get("update_fields")

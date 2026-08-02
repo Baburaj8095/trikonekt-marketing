@@ -439,11 +439,12 @@ class UpgradePayFromWalletView(APIView):
             if available < amount:
                 return Response({"detail": "Insufficient Add Money Pocket balance."}, status=status.HTTP_400_BAD_REQUEST)
 
-            w = Wallet.objects.select_for_update().get(pk=w.pk)
-            w.balance = max(D("0"), (w.balance or D("0")) - amount)
-            if w.balance < D("0"):
-                return Response({"detail": "Insufficient wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
-            w.save(update_fields=["balance", "updated_at"])
+            add_money_acc = WalletEngine.get_account(request.user, WalletTypes.ADD_MONEY_POCKET, lock=True)
+            add_money_acc.current_balance = max(D("0.00"), add_money_acc.current_balance - amount)
+            add_money_acc.available_balance = max(D("0.00"), add_money_acc.available_balance - amount)
+            add_money_acc.save(update_fields=["current_balance", "available_balance", "updated_at"])
+
+            w = Wallet.objects.get(pk=w.pk)
 
             tx = WalletTransaction.objects.create(
                 user=request.user,

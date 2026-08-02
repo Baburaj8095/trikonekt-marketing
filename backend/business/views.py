@@ -1306,10 +1306,12 @@ class PromoPurchasePayFromWalletView(APIView):
                 available = D(str(credit)) + D(str(debit))
                 if available < total:
                     return Response({"detail": "Insufficient Add Money Pocket balance."}, status=status.HTTP_400_BAD_REQUEST)
-                w.balance = max(D("0"), (w.balance or D("0")) - total)
-                if w.balance < D("0"):
-                    return Response({"detail": "Insufficient wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
-                w.save(update_fields=["balance", "updated_at"])
+                add_money_acc = WalletEngine.get_account(request.user, WalletTypes.ADD_MONEY_POCKET, lock=True)
+                add_money_acc.current_balance = max(D("0.00"), add_money_acc.current_balance - total)
+                add_money_acc.available_balance = max(D("0.00"), add_money_acc.available_balance - total)
+                add_money_acc.save(update_fields=["current_balance", "available_balance", "updated_at"])
+
+                w = Wallet.objects.get(pk=w.pk)
                 WalletTransaction.objects.create(
                     user=request.user,
                     amount=total * D("-1"),
