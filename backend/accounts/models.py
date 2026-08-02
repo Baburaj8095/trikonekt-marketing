@@ -1,6 +1,10 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models, transaction
 from locations.models import State
+import threading
+
+_active_self_rules_local = threading.local()
+
 
 
 class CustomUser(AbstractUser):
@@ -832,11 +836,10 @@ class Wallet(models.Model):
                 return None
 
         # Reentrancy Guard: Prevent recursive execution for the same user ID in the same thread
-        import threading
-        if not hasattr(threading.local(), "_active_self_rules"):
-            threading.local()._active_self_rules = set()
+        if not hasattr(_active_self_rules_local, "active_set"):
+            _active_self_rules_local.active_set = set()
         
-        active_set = threading.local()._active_self_rules
+        active_set = _active_self_rules_local.active_set
         if self.user.id in active_set:
             return
         
@@ -972,7 +975,8 @@ class Wallet(models.Model):
         finally:
             w._applying_self_rule = False
             try:
-                active_set.discard(self.user.id)
+                if hasattr(_active_self_rules_local, "active_set"):
+                    _active_self_rules_local.active_set.discard(self.user.id)
             except Exception:
                 pass
 
