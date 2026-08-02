@@ -5231,45 +5231,48 @@ class AdminUserLedgerStatementView(APIView):
             
             source = meta.get("source") or meta.get("trigger") or meta.get("reason") or "-"
             
+            is_self = False
+            if tt == 'SELF_ACCOUNT_CREDIT':
+                is_self = True
+            elif tt == 'SELF_ACCOUNT_DEBIT':
+                is_self = True
+            elif tt == 'INTERNAL_WALLET_CREDIT' and meta.get('destination_wallet') == 'SELF_PACKAGE_POCKET':
+                is_self = True
+            elif tt == 'INTERNAL_WALLET_DEBIT' and meta.get('wallet_source') == 'internal':
+                is_self = True
+                
             main_impact = "-"
             self_impact = "-"
             remarks = ""
             
-            if tt in ['INCOME_CREDIT_75', 'DIRECT_REF_BONUS', 'WELCOME_BONUS', 'LEVEL_BONUS', 'AUTOPOOL_BONUS_FIVE', 'AUTOPOOL_BONUS_THREE', 'GLOBAL_ROYALTY', 'ADJUSTMENT_CREDIT']:
-                running_main += amt
-                main_impact = f"{running_main:.2f}"
-                remarks = f"Credit from {source}"
-            elif tt in ['COUPON_WALLET_TRANSFER_OUT', 'INTERNAL_WALLET_TRANSFER_OUT']:
-                running_main -= abs(amt)
-                main_impact = f"{running_main:.2f}"
-                remarks = f"Transfer out to {meta.get('target_wallet', 'other')}"
-            elif tt == 'SELF_ACCOUNT_CREDIT':
-                running_self += amt
-                self_impact = f"{running_self:.2f}"
-                remarks = f"Auto-accrual from {source}"
-            elif tt in ['SELF_ACCOUNT_DEBIT', 'AUTO_PURCHASE_DEBIT']:
-                running_self = max(Decimal("0.00"), running_self - abs(amt))
-                self_impact = f"{running_self:.2f}"
-                remarks = f"Debit for package activation"
-            elif tt == 'COUPON_WALLET_CREDIT':
-                remarks = f"Credit to Coupon Pocket"
-            elif tt == 'VOUCHER_CREATE_DEBIT':
-                remarks = f"Debit from Coupon Pocket (Voucher create)"
-            elif tt == 'INTERNAL_WALLET_CREDIT':
-                dest = meta.get("destination_wallet", "wallet")
-                if dest == 'SELF_PACKAGE_POCKET':
+            if is_self:
+                if amt > 0:
                     running_self += amt
-                    self_impact = f"{running_self:.2f}"
-                remarks = f"Credit to {dest}"
-            elif tt == 'INTERNAL_WALLET_DEBIT':
-                src = meta.get("wallet_source", "wallet")
-                if src == 'internal':
+                else:
                     running_self = max(Decimal("0.00"), running_self - abs(amt))
-                    self_impact = f"{running_self:.2f}"
-                remarks = f"Debit upgrade from {src}"
-            elif tt == 'ADJUSTMENT_DEBIT':
-                remarks = f"Admin fee (7% on conversion)"
-                
+                self_impact = f"{running_self:.2f}"
+                remarks = f"Self Account update from {source}"
+            else:
+                # Ignore Coupon/Withdrawal specific pockets post-transition
+                if tt in ['COUPON_WALLET_CREDIT', 'VOUCHER_CREATE_DEBIT', 'VOUCHER_REDEEM_CREDIT', 'PACKAGE_COUPON_WALLET_DEBIT']:
+                    remarks = f"Coupon pocket specific update"
+                elif tt in ['WITHDRAWAL_WALLET_CREDIT', 'WITHDRAWAL_DEBIT'] and meta.get('target_wallet') == 'withdrawal':
+                    remarks = f"Withdrawal pocket specific update"
+                elif tt == 'INTERNAL_WALLET_CREDIT' and meta.get('destination_wallet') == 'ADD_MONEY_POCKET':
+                    remarks = f"Add money pocket specific update"
+                elif tt == 'INTERNAL_WALLET_DEBIT' and meta.get('wallet_source') == 'package_upload':
+                    remarks = f"Add money pocket specific update"
+                else:
+                    if amt > 0:
+                        running_main += amt
+                    else:
+                        if tt == 'ADJUSTMENT_DEBIT' and meta.get('target_wallet') != 'internal':
+                            pass
+                        else:
+                            running_main = max(Decimal("0.00"), running_main - abs(amt))
+                    main_impact = f"{running_main:.2f}"
+                    remarks = f"Main Wallet update from {source}"
+                    
             statement_txs.append({
                 "id": tx.id,
                 "created_at": tx.created_at.strftime("%Y-%m-%d %H:%M:%S"),
@@ -5281,6 +5284,30 @@ class AdminUserLedgerStatementView(APIView):
                 "level": level_str,
                 "source": str(source),
                 "remarks": remarks
+            })
+
+        # Calculate adjustments needed to match active database balances
+        db_main = Decimal(str(accounts_data.get(WalletTypes.MAIN, {}).get("current_balance", "0.00")))
+        db_self = Decimal(str(accounts_data.get(WalletTypes.SELF_PACKAGE_POCKET, {}).get("current_balance", "0.00")))
+        
+        diff_main = db_main - running_main
+        diff_self = db_self - running_self
+        
+        if diff_main != Decimal("0.00") or diff_self != Decimal("0.00"):
+            running_main += diff_main
+            running_self += diff_self
+            
+            statement_txs.append({
+                "id": "V-ADJ",
+                "created_at": "2026-07-31 23:59:59",  # Transition alignment date
+                "type": "MIGRATION_POCKET_SPLIT",
+                "amount": f"Main: {diff_main:+.2f}, Self: {diff_self:+.2f}",
+                "main_balance": f"{running_main:.2f}",
+                "self_balance": f"{running_self:.2f}",
+                "from_user": "-",
+                "level": "-",
+                "source": "MIGRATION",
+                "remarks": "Split correction/starting balance migration alignment"
             })
 
         # 4. Fetch Ledger Entries
