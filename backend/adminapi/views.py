@@ -2055,8 +2055,8 @@ class AdminWalletVoucherListView(APIView):
                 return
             w = Wallet.get_or_create_for_user(voucher.creator)
             w = Wallet.objects.select_for_update().get(pk=w.pk)
-            w.balance = (w.balance or Decimal("0")) + voucher.amount
-            w.save(update_fields=["balance", "updated_at"])
+            # Remove direct legacy balance credit to prevent double-crediting to MAIN pocket.
+            # Double-entry posting is handled below via post_system_credit to the COUPON_POCKET.
             tx = WalletTransaction.objects.create(
                 user=voucher.creator,
                 amount=voucher.amount,
@@ -2066,6 +2066,24 @@ class AdminWalletVoucherListView(APIView):
                 source_id=str(voucher.id),
                 meta={"voucher_code": voucher.code, "voucher_type": voucher.voucher_type, "by_admin_job": True},
             )
+            try:
+                from accounts.finance_constants import WalletTypes, FinanceCategories
+                from accounts.wallet_engine import WalletEngine
+                WalletEngine.post_system_credit(
+                    user=voucher.creator,
+                    wallet_type=WalletTypes.COUPON_POCKET,
+                    amount=voucher.amount,
+                    category=FinanceCategories.REFUND,
+                    source_module="CONSUMER_VOUCHER",
+                    source_id=str(voucher.id),
+                    idempotency_key=f"voucher_expire_refund:{voucher.id}",
+                    legacy_wallet_transaction=tx,
+                    actor=None,
+                    remarks="Voucher expired, refunded to coupon pocket",
+                    metadata={"voucher_code": voucher.code, "voucher_type": voucher.voucher_type},
+                )
+            except Exception:
+                pass
             voucher.status = ConsumerVoucher.STATUS_EXPIRED
             voucher.expired_at = timezone.now()
             voucher.refund_transaction = tx
@@ -2085,8 +2103,8 @@ class AdminWalletVoucherCancelRefundView(APIView):
             voucher = ConsumerVoucher.objects.select_for_update().get(pk=pk)
             w = Wallet.get_or_create_for_user(voucher.creator)
             w = Wallet.objects.select_for_update().get(pk=w.pk)
-            w.balance = (w.balance or Decimal("0")) + voucher.amount
-            w.save(update_fields=["balance", "updated_at"])
+            # Remove direct legacy balance credit to prevent double-crediting to MAIN pocket.
+            # Double-entry posting is handled below via post_system_credit to the COUPON_POCKET.
             tx = WalletTransaction.objects.create(
                 user=voucher.creator,
                 amount=voucher.amount,
@@ -2096,6 +2114,24 @@ class AdminWalletVoucherCancelRefundView(APIView):
                 source_id=str(voucher.id),
                 meta={"voucher_code": voucher.code, "by_admin": getattr(request.user, "username", ""), "reason": str(request.data.get("reason") or "")},
             )
+            try:
+                from accounts.finance_constants import WalletTypes, FinanceCategories
+                from accounts.wallet_engine import WalletEngine
+                WalletEngine.post_system_credit(
+                    user=voucher.creator,
+                    wallet_type=WalletTypes.COUPON_POCKET,
+                    amount=voucher.amount,
+                    category=FinanceCategories.REFUND,
+                    source_module="CONSUMER_VOUCHER",
+                    source_id=str(voucher.id),
+                    idempotency_key=f"voucher_cancel_refund:{voucher.id}",
+                    legacy_wallet_transaction=tx,
+                    actor=request.user,
+                    remarks=f"Voucher cancelled/refunded by admin: {getattr(request.user, 'username', '')}",
+                    metadata={"voucher_code": voucher.code, "reason": str(request.data.get("reason") or "")},
+                )
+            except Exception:
+                pass
             voucher.status = ConsumerVoucher.STATUS_CANCELLED
             voucher.refund_transaction = tx
             voucher.save(update_fields=["status", "refund_transaction"])

@@ -3558,8 +3558,9 @@ def _expire_consumer_voucher(voucher):
     wallet = Wallet.get_or_create_for_user(voucher.creator)
     wallet = Wallet.objects.select_for_update().get(pk=wallet.pk)
     amount = D(str(voucher.amount or "0"))
-    wallet.balance = (wallet.balance or D("0")) + amount
-    wallet.save(update_fields=["balance", "updated_at"])
+    
+    # Remove direct legacy balance addition to prevent double-crediting to MAIN pocket.
+    # Double-entry posting is handled below via post_system_credit to the COUPON_POCKET.
     refund_tx = WalletTransaction.objects.create(
         user=voucher.creator,
         amount=amount,
@@ -3569,6 +3570,24 @@ def _expire_consumer_voucher(voucher):
         source_id=str(voucher.id),
         meta={"voucher_code": voucher.code, "voucher_type": voucher.voucher_type},
     )
+    try:
+        from accounts.finance_constants import WalletTypes, FinanceCategories
+        from accounts.wallet_engine import WalletEngine
+        WalletEngine.post_system_credit(
+            user=voucher.creator,
+            wallet_type=WalletTypes.COUPON_POCKET,
+            amount=amount,
+            category=FinanceCategories.REFUND,
+            source_module="CONSUMER_VOUCHER",
+            source_id=str(voucher.id),
+            idempotency_key=f"voucher_expire_refund:{voucher.id}",
+            legacy_wallet_transaction=refund_tx,
+            actor=None,
+            remarks="Voucher expired, refunded to coupon pocket",
+            metadata={"voucher_code": voucher.code, "voucher_type": voucher.voucher_type},
+        )
+    except Exception:
+        pass
     voucher.status = ConsumerVoucher.STATUS_EXPIRED
     voucher.expired_at = now
     voucher.refund_transaction = refund_tx
@@ -3668,10 +3687,8 @@ class ConsumerVoucherListCreate(APIView):
 
             wallet = Wallet.get_or_create_for_user(request.user)
             wallet = Wallet.objects.select_for_update().get(pk=wallet.pk)
-            wallet.balance = (wallet.balance or D("0")) - amount
-            if wallet.balance < D("0"):
-                return Response({"detail": "Insufficient wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
-            wallet.save(update_fields=["balance", "updated_at"])
+            # Remove direct legacy balance subtraction to prevent double-deduction from MAIN pocket.
+            # Balance check is already performed above on the Coupon Pocket via _coupon_wallet_balance().
 
             voucher = ConsumerVoucher.objects.create(
                 creator=request.user,
@@ -3776,8 +3793,8 @@ class ConsumerVoucherRedeem(APIView):
 
                 receiver_wallet = Wallet.get_or_create_for_user(request.user)
                 receiver_wallet = Wallet.objects.select_for_update().get(pk=receiver_wallet.pk)
-                receiver_wallet.balance = (receiver_wallet.balance or D("0.00")) + amount
-                receiver_wallet.save(update_fields=["balance", "updated_at"])
+                # Remove direct legacy balance credit to prevent double-crediting to MAIN pocket.
+                # Double-entry posting is handled below via post_system_credit to the PACKAGE_PURCHASE_COUPON pocket.
                 tx = WalletTransaction.objects.create(
                     user=request.user,
                     amount=amount,
