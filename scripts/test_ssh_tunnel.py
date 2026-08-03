@@ -4,10 +4,16 @@ import socket
 
 # Check sshtunnel or paramiko
 try:
+    import paramiko
+    if not hasattr(paramiko, 'DSSKey'):
+        paramiko.DSSKey = None
     from sshtunnel import SSHTunnelForwarder
 except ImportError:
     print("Installing sshtunnel...")
     os.system(f"{sys.executable} -m pip install sshtunnel paramiko")
+    import paramiko
+    if not hasattr(paramiko, 'DSSKey'):
+        paramiko.DSSKey = None
     from sshtunnel import SSHTunnelForwarder
 
 import psycopg2
