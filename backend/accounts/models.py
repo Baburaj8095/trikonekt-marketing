@@ -790,7 +790,7 @@ class Wallet(models.Model):
 
     @classmethod
     def get_or_create_for_user(cls, user: CustomUser) -> "Wallet":
-        w, _ = cls.objects.get_or_create(user=user, defaults={'balance': Decimal('0.00')})
+        w, _ = cls.objects.get_or_create(user=user)
         return w
 
 
@@ -1858,7 +1858,7 @@ def create_wallet_for_new_user(sender, instance: CustomUser, created: bool, **kw
     if created:
         def _create_wallet():
             try:
-                Wallet.objects.get_or_create(user=instance, defaults={'balance': Decimal('0.00')})
+                Wallet.objects.get_or_create(user=instance)
             except Exception:
                 # Avoid blocking user creation if wallet init fails
                 pass
