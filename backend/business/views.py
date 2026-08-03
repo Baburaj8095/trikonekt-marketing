@@ -1214,6 +1214,8 @@ class PromoPurchasePayFromWalletView(APIView):
     def post(self, request):
         from decimal import Decimal as D
         from accounts.models import Wallet, WalletTransaction
+        from accounts.finance_constants import WalletTypes
+        from accounts.wallet_engine import WalletEngine
 
         # Validate payload with the existing serializer (but without requiring payment_proof)
         ser = PromoPurchaseSerializer(data=request.data, context={"request": request})

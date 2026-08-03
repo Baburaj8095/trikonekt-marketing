@@ -340,6 +340,8 @@ class UpgradePayFromWalletView(APIView):
     def post(self, request):
         from decimal import Decimal as D
         from accounts.models import Wallet, WalletTransaction
+        from accounts.finance_constants import WalletTypes
+        from accounts.wallet_engine import WalletEngine
 
         upgrade_id = request.data.get("upgrade_id")
         if not upgrade_id:
