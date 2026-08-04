@@ -260,6 +260,31 @@ class CustomUserAdmin(UserAdmin):
         self.message_user(request, f"Marked {updated} user(s) as Inactive.", level=messages.SUCCESS)
     mark_inactive.short_description = "Mark account Inactive"
 
+    def save_model(self, request, obj, form, change):
+        old_sponsor = None
+        if change:
+            try:
+                old_sponsor = CustomUser.objects.get(pk=obj.pk).registered_by
+            except Exception:
+                old_sponsor = None
+
+        super().save_model(request, obj, form, change)
+
+        if change:
+            new_sponsor = obj.registered_by
+            if new_sponsor and (not old_sponsor or old_sponsor.id != new_sponsor.id):
+                try:
+                    from business.models import AutoPoolAccount
+                    AutoPoolAccount.reanchor_user_to_sponsor(obj, new_sponsor, "FIVE_150")
+                    AutoPoolAccount.reanchor_user_to_sponsor(obj, new_sponsor, "THREE_150")
+                except Exception:
+                    pass
+                try:
+                    from mlm_ranks.services.five_matrix import FiveMatrixService
+                    FiveMatrixService.reparent_rank_matrix_node(obj, new_sponsor)
+                except Exception:
+                    pass
+
     # Append bulk region fields section on change form
     def get_fieldsets(self, request, obj=None):
         fs = list(super().get_fieldsets(request, obj))

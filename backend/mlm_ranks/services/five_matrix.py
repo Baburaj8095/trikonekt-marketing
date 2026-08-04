@@ -824,3 +824,98 @@ class FiveMatrixService:
             },
         }
         return payload
+
+    @classmethod
+    @transaction.atomic
+    def reparent_rank_matrix_node(cls, user, new_sponsor) -> bool:
+        """
+        Move a user's RankMatrixNode (and their entire subtree) under the new sponsor's Rank-1 matrix.
+        We also update all descendants' root_user keys recursively.
+        """
+        from mlm_ranks.models import RankMatrixNode, RankMatrixRoot
+        from django.db.models import Max
+
+        # 1. Get the user's Node in the RankMatrix
+        node = RankMatrixNode.objects.filter(placed_user=user).first()
+        if not node:
+            return False  # Nothing to reparent
+
+        old_root_user_id = node.root_user_id
+
+        # 2. Ensure new sponsor has a Rank-1 matrix root
+        sponsor_root = cls.ensure_root_for_rank1(new_sponsor)
+        if not sponsor_root:
+            return False
+
+        rid = int(sponsor_root.root_user_id)
+
+        # Helper: count children for a parent in this root
+        def sibling_count(parent_uid: int) -> int:
+            return int(RankMatrixNode.objects.filter(root_user_id=rid, parent_user_id=int(parent_uid)).count())
+
+        # 3. Find the next available slot in new sponsor's root tree (BFS)
+        total_so_far = int(RankMatrixNode.objects.filter(root_user_id=rid).count())
+        if total_so_far < 5:
+            new_parent_id = rid
+            new_level = 1
+            new_pos = sibling_count(rid) + 1
+        else:
+            try:
+                max_depth = int(
+                    RankMatrixNode.objects.filter(root_user_id=rid).aggregate(m=Max("level_depth")).get("m") or 1
+                )
+            except Exception:
+                max_depth = 1
+            if max_depth < 1:
+                max_depth = 1
+
+            placed_parent_info = None
+            for lvl in range(1, max_depth + 5):
+                parents_qs = (
+                    RankMatrixNode.objects
+                    .filter(root_user_id=rid, level_depth=lvl)
+                    .order_by("approved_at", "position", "id")
+                    .values_list("placed_user_id", flat=True)
+                )
+                parent_ids = [int(x) for x in parents_qs]
+                if not parent_ids:
+                    continue
+                found_parent = None
+                for pid in parent_ids:
+                    used = sibling_count(pid)
+                    if used < 5:
+                        found_parent = (pid, used + 1, lvl + 1)
+                        break
+                if found_parent:
+                    placed_parent_info = found_parent
+                    break
+
+            if placed_parent_info:
+                new_parent_id, new_pos, new_level = placed_parent_info
+            else:
+                new_parent_id = rid
+                new_level = 1
+                new_pos = sibling_count(rid) + 1
+
+        # 4. Save User A's new node details
+        node.root_user_id = rid
+        node.parent_user_id = new_parent_id
+        node.level_depth = new_level
+        node.position = new_pos
+        node.save(update_fields=["root_user", "parent_user", "level_depth", "position"])
+
+        # 5. Recursively find and update descendants' root_user and level_depth
+        # We shift descendants' depths based on User A's depth delta.
+        from collections import deque
+        q = deque([(user.id, new_level)])
+        while q:
+            curr_parent_id, curr_parent_level = q.popleft()
+            children = RankMatrixNode.objects.filter(parent_user_id=curr_parent_id, root_user_id=old_root_user_id)
+            for child in children:
+                child.root_user_id = rid
+                child.level_depth = curr_parent_level + 1
+                child.save(update_fields=["root_user", "level_depth"])
+                q.append((child.placed_user_id, child.level_depth))
+
+        return True
+

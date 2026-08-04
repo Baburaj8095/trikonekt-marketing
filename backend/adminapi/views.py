@@ -1077,6 +1077,11 @@ class AdminUserDetail(APIView):
                     AutoPoolAccount.reanchor_user_to_sponsor(obj, new_sponsor, "THREE_150")
                 except Exception:
                     pass
+                try:
+                    from mlm_ranks.services.five_matrix import FiveMatrixService
+                    FiveMatrixService.reparent_rank_matrix_node(obj, new_sponsor)
+                except Exception:
+                    pass
             return Response(AdminUserEditSerializer(obj).data, status=200)
         return Response(serializer.errors, status=400)
 
