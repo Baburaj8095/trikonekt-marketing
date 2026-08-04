@@ -558,11 +558,7 @@ class Wallet(models.Model):
             if self_part < D("0.00"):
                 self_part = D("0.00")
 
-            # Update balances (streaming does NOT touch withdrawable_balance)
-            w.main_balance = (w.main_balance or D("0")) + income
-            w.self_account_balance = (w.self_account_balance or D("0")) + self_part
-            w.balance = (w.balance or D("0")) + amt
-            w.save(update_fields=["balance", "main_balance", "self_account_balance", "updated_at"])
+            expected_balance_after = w.balance + amt
 
             # Record 75% income credit (for visibility)
             meta_main = {**(meta or {}), "ledger": "MAIN", "split": "STREAM_75_25", "gross": str(amt), "income_75": str(income), "self_25": str(self_part), "orig_type": str(tx_type)}
@@ -571,7 +567,7 @@ class Wallet(models.Model):
             tx_main = WalletTransaction.objects.create(
                 user=self.user,
                 amount=income,
-                balance_after=w.balance,
+                balance_after=expected_balance_after,
                 type="INCOME_CREDIT_75",
                 source_type=source_type or '',
                 source_id=str(source_id) if source_id is not None else '',
@@ -585,7 +581,7 @@ class Wallet(models.Model):
                 WalletTransaction.objects.create(
                     user=self.user,
                     amount=self_part,
-                    balance_after=w.balance,
+                    balance_after=expected_balance_after,
                     type="SELF_ACCOUNT_CREDIT",
                     source_type=source_type or '',
                     source_id=str(source_id) if source_id is not None else '',
@@ -600,7 +596,7 @@ class Wallet(models.Model):
                 
                 system_user = WalletEngine.get_system_user()
                 WalletEngine.post_transaction(
-                    category=FinanceCategories.COMMISSION_PAYOUT,
+                    category=FinanceCategories.MLM_INCOME,
                     user=self.user,
                     source_module=WalletTypes.SYSTEM,
                     source_id=str(source_id or ""),
