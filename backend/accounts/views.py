@@ -4109,6 +4109,8 @@ def wallet_me_history(request):
                 amt = tx.amount
             except Exception:
                 amt = 0
+            if tx.source_type in ["WALLET_UPLOAD", "UPLOAD_TO_WALLET", "PACKAGE_UPLOAD", "PACKAGE_BUY_UPLOAD"]:
+                continue
             if tx.type in self_types:
                 self_list.append(txmap(tx))
             elif tx.type in redeem_extra_types or (amt is not None and amt < 0):
