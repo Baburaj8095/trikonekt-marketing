@@ -18,8 +18,12 @@ if [ ! -f "$ENV_FILE" ]; then
   echo "Missing env file at $ENV_FILE" >&2
   exit 1
 fi
-
-sudo -u trikonekt git -C "$APP_DIR" fetch origin "$BRANCH"
+echo "Fetching latest changes from branch: $BRANCH"
+if ! sudo -u trikonekt git -C "$APP_DIR" fetch --prune origin "$BRANCH"; then
+  echo "Fetch failed. Attempting to prune remote tracking refs and retry..."
+  sudo -u trikonekt git -C "$APP_DIR" remote prune origin
+  sudo -u trikonekt git -C "$APP_DIR" fetch --prune origin "$BRANCH"
+fi
 sudo -u trikonekt git -C "$APP_DIR" checkout "$BRANCH"
 sudo -u trikonekt git -C "$APP_DIR" reset --hard "origin/$BRANCH"
 
