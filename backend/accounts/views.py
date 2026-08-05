@@ -3189,12 +3189,7 @@ def _move_main_to_derived_wallet(user, amount, target_type, extra_meta=None):
 
         if target_type == "withdrawal":
             wallet.main_balance = (wallet.main_balance or D("0")) - amount
-            wallet.withdrawable_balance = (wallet.withdrawable_balance or D("0")) + net_amount
-            if charge_amount > D("0"):
-                wallet.balance = (wallet.balance or D("0")) - charge_amount
-                if wallet.balance < D("0"):
-                    wallet.balance = D("0")
-            wallet.save(update_fields=["balance", "main_balance", "withdrawable_balance", "updated_at"])
+            wallet.save(update_fields=["main_balance", "updated_at"])
             WalletTransaction.objects.create(
                 user=user,
                 amount=amount * D("-1"),
@@ -3272,11 +3267,7 @@ def _move_main_to_derived_wallet(user, amount, target_type, extra_meta=None):
             raise serializers.ValidationError({"detail": "Unsupported wallet transfer type."})
 
         wallet.main_balance = (wallet.main_balance or D("0")) - amount
-        if charge_amount > D("0"):
-            wallet.balance = (wallet.balance or D("0")) - charge_amount
-            if wallet.balance < D("0"):
-                wallet.balance = D("0")
-        wallet.save(update_fields=["balance", "main_balance", "updated_at"])
+        wallet.save(update_fields=["main_balance", "updated_at"])
         WalletTransaction.objects.create(
             user=user,
             amount=amount * D("-1"),

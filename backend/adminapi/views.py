@@ -1811,26 +1811,22 @@ class AdminWalletAdjustPocketView(APIView):
             w = Wallet.get_or_create_for_user(user)
             w = Wallet.objects.select_for_update().get(pk=w.pk)
             if pocket == "main":
-                if action == "credit":
-                    w.main_balance = (w.main_balance or Decimal("0")) + amount
-                    w.balance = (w.balance or Decimal("0")) + amount
-                else:
-                    if (w.main_balance or Decimal("0")) < amount:
-                        return Response({"detail": "Insufficient main wallet balance."}, status=400)
-                    w.main_balance = (w.main_balance or Decimal("0")) - amount
-                    w.balance = max(Decimal("0"), (w.balance or Decimal("0")) - amount)
+                if action == "debit" and (w.main_balance or Decimal("0")) < amount:
+                    return Response({"detail": "Insufficient main wallet balance."}, status=400)
+                w.main_balance = (w.main_balance or Decimal("0")) + signed
             elif pocket == "withdrawal":
                 if action == "debit" and (w.withdrawable_balance or Decimal("0")) < amount:
                     return Response({"detail": "Insufficient withdrawal pocket balance."}, status=400)
                 w.withdrawable_balance = (w.withdrawable_balance or Decimal("0")) + signed
-                w.balance = (w.balance or Decimal("0")) + signed
+            elif pocket == "self_package":
+                if action == "debit" and (w.self_account_balance or Decimal("0")) < amount:
+                    return Response({"detail": "Insufficient self package pocket balance."}, status=400)
+                w.self_account_balance = (w.self_account_balance or Decimal("0")) + signed
             else:
                 if action == "debit" and _wallet_bucket_sums(user).get(pocket, Decimal("0")) < amount:
                     return Response({"detail": f"Insufficient {pocket} balance."}, status=400)
-                w.balance = (w.balance or Decimal("0")) + signed
-            if w.balance < 0:
-                return Response({"detail": "Insufficient wallet balance."}, status=400)
-            w.save(update_fields=["balance", "main_balance", "withdrawable_balance", "updated_at"])
+
+            w.save(update_fields=["main_balance", "withdrawable_balance", "self_account_balance", "updated_at"])
             tx = WalletTransaction.objects.create(
                 user=user,
                 amount=signed,
@@ -5051,8 +5047,7 @@ class AdminWalletDebugView(APIView):
                     
                 w.main_balance = calc_main
                 w.self_account_balance = calc_self
-                w.balance = calc_main + calc_self
-                w.save(update_fields=["main_balance", "self_account_balance", "balance", "updated_at"])
+                w.save(update_fields=["main_balance", "self_account_balance", "updated_at"])
                 
             return Response({"detail": "Wallet balance successfully synced with ledger."})
             
@@ -5082,8 +5077,7 @@ class AdminWalletDebugView(APIView):
                 else:
                     w.self_account_balance = (w.self_account_balance or Decimal("0")) + amt_dec
                     
-                w.balance = (w.balance or Decimal("0")) + amt_dec
-                w.save(update_fields=["main_balance", "self_account_balance", "balance", "updated_at"])
+                w.save(update_fields=["main_balance", "self_account_balance", "updated_at"])
                 
                 meta = {
                     "reason": reason,

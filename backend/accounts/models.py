@@ -628,8 +628,7 @@ class Wallet(models.Model):
 
         # Default: non-commission or withholding disabled
         w.main_balance = (w.main_balance or D("0")) + amt
-        w.balance = (w.balance or D("0")) + amt
-        w.save(update_fields=['balance', 'main_balance', 'updated_at'])
+        w.save(update_fields=['main_balance', 'updated_at'])
         meta2 = dict(meta or {})
         if inactive:
             meta2["pending_due_to_inactive"] = True
@@ -687,10 +686,7 @@ class Wallet(models.Model):
             if new_wd < 0:
                 raise ValueError("Insufficient withdrawal wallet balance.")
             w.withdrawable_balance = new_wd
-            w.balance = (w.balance or D("0")) - amt
-            if w.balance < 0:
-                w.balance = D("0")
-            w.save(update_fields=['balance', 'withdrawable_balance', 'updated_at'])
+            w.save(update_fields=['withdrawable_balance', 'updated_at'])
         else:
             # Generic debit from total; reduce main first
             new_main = (w.main_balance or D("0"))
@@ -704,10 +700,7 @@ class Wallet(models.Model):
                 new_wd = new_wd - rem
             w.main_balance = new_main
             w.withdrawable_balance = new_wd
-            w.balance = (w.balance or D("0")) - amt
-            if w.balance < 0:
-                raise ValueError("Insufficient wallet balance.")
-            w.save(update_fields=['balance', 'main_balance', 'withdrawable_balance', 'updated_at'])
+            w.save(update_fields=['main_balance', 'withdrawable_balance', 'updated_at'])
 
         WalletTransaction.objects.create(
             user=self.user,

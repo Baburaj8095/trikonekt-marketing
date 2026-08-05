@@ -1176,7 +1176,6 @@ class WalletAdmin(admin.ModelAdmin):
                     w = Wallet.objects.select_for_update().get(pk=wallet.pk)
                     w.main_balance = Decimal(str(calc_main))
                     w.self_account_balance = Decimal(str(calc_self))
-                    w.balance = Decimal(str(calc_main + calc_self))
                     w.save()
                     
                 self.message_user(request, "Wallet balances successfully recalculated and synchronized to ledger!")
@@ -1222,19 +1221,16 @@ class WalletAdmin(admin.ModelAdmin):
                             self.message_user(request, "Error: Insufficient main wallet balance.", level="error")
                             return HttpResponseRedirect(request.path_info)
                         w.main_balance += signed
-                        w.balance = max(Decimal("0.00"), w.balance + signed)
                     elif pocket == "self_account":
                         if adjust_action == "debit" and w.self_account_balance < amount:
                             self.message_user(request, "Error: Insufficient self account balance.", level="error")
                             return HttpResponseRedirect(request.path_info)
                         w.self_account_balance += signed
-                        w.balance = max(Decimal("0.00"), w.balance + signed)
                     elif pocket == "withdrawable":
                         if adjust_action == "debit" and w.withdrawable_balance < amount:
                             self.message_user(request, "Error: Insufficient withdrawable balance.", level="error")
                             return HttpResponseRedirect(request.path_info)
                         w.withdrawable_balance += signed
-                        w.balance = max(Decimal("0.00"), w.balance + signed)
                         
                     w.save()
                     
