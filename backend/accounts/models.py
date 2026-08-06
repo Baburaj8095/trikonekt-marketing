@@ -860,10 +860,9 @@ class Wallet(models.Model):
                 if cur_self < D("250.00") or (w.balance or D("0")) < D("250.00"):
                     break
 
-                # Deduct the pack from self-reserve and overall balance
+                # Deduct the pack from self-reserve
                 w.self_account_balance = cur_self - D("250.00")
-                w.balance = (w.balance or D("0")) - D("250.00")
-                w.save(update_fields=["balance", "self_account_balance", "updated_at"])
+                w.save(update_fields=["updated_at"])
 
                 # Record SELF_ACCOUNT_DEBIT marker with breakdown and pack index
                 try:
