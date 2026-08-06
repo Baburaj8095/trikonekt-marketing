@@ -4944,15 +4944,37 @@ class AdminWalletDebugView(APIView):
         calc_main = Decimal("0.00")
         calc_self = Decimal("0.00")
         
+        upload_sources = ["WALLET_UPLOAD", "UPLOAD_TO_WALLET", "PACKAGE_UPLOAD", "PACKAGE_BUY_UPLOAD"]
+        withdrawal_types = ["WITHDRAWABLE_CREDIT", "WITHDRAWAL_DEBIT", "WITHDRAWAL_WALLET_TRANSFER_OUT"]
+        shopping_types = ["SHOPPING_WALLET_CREDIT", "SHOPPING_WALLET_DEBIT", "SHOPPING_WALLET_TRANSFER_OUT"]
+        coupon_redeem_types = [
+            "AUTO_ECOUPON_ISSUED", "ECOUPON_WALLET_DEBIT", "COUPON_PURCHASE_CREDIT",
+            "REDEEM_ECOUPON_CREDIT", "PRODUCT_WALLET_CREDIT", "PRODUCT_PURCHASE_DEBIT"
+        ]
+        
         for tx in txs:
             amt = tx.amount
-            if tx.type == 'SELF_ACCOUNT_CREDIT':
+            t = tx.type
+            m = tx.meta or {}
+            if t == 'SELF_ACCOUNT_CREDIT':
                 calc_self += amt
-            elif tx.type == 'SELF_ACCOUNT_DEBIT':
+            elif t == 'SELF_ACCOUNT_DEBIT':
                 calc_self -= Decimal("250.00")
                 if calc_self < Decimal("0.00"):
                     calc_self = Decimal("0.00")
-            elif tx.type == 'AUTO_PURCHASE_DEBIT' and tx.source_type == 'SELF_250_PACK':
+            elif t == 'AUTO_PURCHASE_DEBIT' and tx.source_type == 'SELF_250_PACK':
+                pass
+            elif t in ['INTERNAL_WALLET_CREDIT', 'INTERNAL_WALLET_DEBIT']:
+                is_add_money = (
+                    tx.source_type in upload_sources
+                    or m.get("wallet") == "ADD_MONEY"
+                    or m.get("destination_wallet") == "ADD_MONEY_POCKET"
+                    or m.get("legacy_wallet_type") == "ADD_MONEY_POCKET"
+                    or m.get("wallet_source") == "package_upload"
+                )
+                if not is_add_money:
+                    calc_main += amt
+            elif t in withdrawal_types or t in shopping_types or t in coupon_redeem_types:
                 pass
             else:
                 calc_main += amt
@@ -5026,15 +5048,37 @@ class AdminWalletDebugView(APIView):
                 calc_main = Decimal("0.00")
                 calc_self = Decimal("0.00")
                 
+                upload_sources = ["WALLET_UPLOAD", "UPLOAD_TO_WALLET", "PACKAGE_UPLOAD", "PACKAGE_BUY_UPLOAD"]
+                withdrawal_types = ["WITHDRAWABLE_CREDIT", "WITHDRAWAL_DEBIT", "WITHDRAWAL_WALLET_TRANSFER_OUT"]
+                shopping_types = ["SHOPPING_WALLET_CREDIT", "SHOPPING_WALLET_DEBIT", "SHOPPING_WALLET_TRANSFER_OUT"]
+                coupon_redeem_types = [
+                    "AUTO_ECOUPON_ISSUED", "ECOUPON_WALLET_DEBIT", "COUPON_PURCHASE_CREDIT",
+                    "REDEEM_ECOUPON_CREDIT", "PRODUCT_WALLET_CREDIT", "PRODUCT_PURCHASE_DEBIT"
+                ]
+                
                 for tx in txs:
                     amt = tx.amount
-                    if tx.type == 'SELF_ACCOUNT_CREDIT':
+                    t = tx.type
+                    m = tx.meta or {}
+                    if t == 'SELF_ACCOUNT_CREDIT':
                         calc_self += amt
-                    elif tx.type == 'SELF_ACCOUNT_DEBIT':
+                    elif t == 'SELF_ACCOUNT_DEBIT':
                         calc_self -= Decimal("250.00")
                         if calc_self < Decimal("0.00"):
                             calc_self = Decimal("0.00")
-                    elif tx.type == 'AUTO_PURCHASE_DEBIT' and tx.source_type == 'SELF_250_PACK':
+                    elif t == 'AUTO_PURCHASE_DEBIT' and tx.source_type == 'SELF_250_PACK':
+                        pass
+                    elif t in ['INTERNAL_WALLET_CREDIT', 'INTERNAL_WALLET_DEBIT']:
+                        is_add_money = (
+                            tx.source_type in upload_sources
+                            or m.get("wallet") == "ADD_MONEY"
+                            or m.get("destination_wallet") == "ADD_MONEY_POCKET"
+                            or m.get("legacy_wallet_type") == "ADD_MONEY_POCKET"
+                            or m.get("wallet_source") == "package_upload"
+                        )
+                        if not is_add_money:
+                            calc_main += amt
+                    elif t in withdrawal_types or t in shopping_types or t in coupon_redeem_types:
                         pass
                     else:
                         calc_main += amt
