@@ -151,6 +151,23 @@ function describeSource(tx = {}) {
     return `5 Matrix ${t || ""} Prime`.trim();
   }
 
+  // Main Wallet Specific Transactions
+  if (type === "MAIN_TO_COUPON" || type === "COUPON_WALLET_TRANSFER_OUT") return "Transfer to Coupon Wallet";
+  if (type === "VOUCHER_CREATE_DEBIT") return "Package Voucher Created";
+  if (type === "WITHDRAWAL_DEBIT") return "Withdrawal Payout";
+  if (type === "ADJUSTMENT_DEBIT") {
+    if (st === "ADMIN_SERVICE_CHARGE" || src.includes("SERVICE_CHARGE")) return "7% Service Charge";
+    return "Service / Transfer Charge";
+  }
+  if (type === "ADJUSTMENT_CREDIT") return "System Balance Adjustment";
+  if (type === "INCOME_CREDIT_75") {
+    if (ot) {
+      const parentLabel = describeSource({ ...tx, type: ot });
+      return `${parentLabel} (75%)`;
+    }
+    return "Income Credited (75%)";
+  }
+
   // Prime direct/self
   if (src === "PRIME_150" || st === "PRIME_150" || tier === 150) return "Prime 150";
   if (src === "PRIME_750" || st === "PRIME_750" || tier === 750) return "Prime 750";
@@ -480,6 +497,7 @@ export default function History() {
     redeem_points: "0.00",
   });
 
+  const [mainWallet, setMainWallet] = useState([]);
   const [incoming, setIncoming] = useState([]);
   const [selfAccount, setSelfAccount] = useState([]);
   const [cashback, setCashback] = useState([]);
@@ -509,12 +527,14 @@ export default function History() {
           redeem_points: data?.top?.redeem_points ?? "0.00",
         });
 
+        setMainWallet(Array.isArray(data?.main_wallet) ? data.main_wallet : (Array.isArray(data?.recent) ? data.recent : []));
         setIncoming(Array.isArray(data?.incoming) ? data.incoming : []);
         setSelfAccount(Array.isArray(data?.self_account) ? data.self_account : []);
         setCashback(Array.isArray(data?.cashback) ? data.cashback : []);
         setRedeem(Array.isArray(data?.redeem) ? data.redeem : []);
       } catch (e) {
         setErr("Failed to load history.");
+        setMainWallet([]);
         setIncoming([]);
         setSelfAccount([]);
         setCashback([]);
@@ -538,6 +558,11 @@ export default function History() {
     date.setHours(0, 0, 0, 0);
     return date;
   }, [filterDays]);
+
+  const filteredMainWallet = useMemo(() => {
+    if (!cutoffDate) return mainWallet;
+    return mainWallet.filter(tx => new Date(tx.created_at) >= cutoffDate);
+  }, [mainWallet, cutoffDate]);
 
   const incomingGross = useMemo(
     () =>
@@ -571,6 +596,7 @@ export default function History() {
     return redeem.filter(tx => new Date(tx.created_at) >= cutoffDate);
   }, [redeem, cutoffDate]);
 
+  const sectionsMainWallet = useMemo(() => groupByDay(filteredMainWallet), [filteredMainWallet]);
   const sectionsIncoming = useMemo(() => groupByDay(filteredIncoming), [filteredIncoming]);
   const sectionsSelf = useMemo(() => groupByDay(filteredSelf), [filteredSelf]);
   const sectionsRewards = useMemo(() => groupByDay(filteredRewards), [filteredRewards]);
@@ -589,16 +615,16 @@ export default function History() {
   );
 
   const todaysEarnings = useMemo(() => {
-    const activeList = tab === 0 ? incomingGross : (tab === 1 ? selfAccount : (tab === 2 ? cashback : redeem));
+    const activeList = tab === 0 ? filteredMainWallet : (tab === 1 ? incomingGross : (tab === 2 ? selfAccount : (tab === 3 ? cashback : redeem)));
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
     return activeList
       .filter(tx => new Date(tx.created_at) >= startOfToday && Number(tx.amount) > 0)
       .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
-  }, [tab, incomingGross, selfAccount, cashback, redeem]);
+  }, [tab, filteredMainWallet, incomingGross, selfAccount, cashback, redeem]);
 
   const yesterdaysEarnings = useMemo(() => {
-    const activeList = tab === 0 ? incomingGross : (tab === 1 ? selfAccount : (tab === 2 ? cashback : redeem));
+    const activeList = tab === 0 ? filteredMainWallet : (tab === 1 ? incomingGross : (tab === 2 ? selfAccount : (tab === 3 ? cashback : redeem)));
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
     const startOfYesterday = new Date(startOfToday);
@@ -611,9 +637,10 @@ export default function History() {
         return txDate >= startOfYesterday && txDate <= endOfYesterday && Number(tx.amount) > 0;
       })
       .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
-  }, [tab, incomingGross, selfAccount, cashback, redeem]);
+  }, [tab, filteredMainWallet, incomingGross, selfAccount, cashback, redeem]);
 
   const tabs = [
+    { label: `Main Wallet (${filteredMainWallet.length})`, key: "main" },
     { label: `Bonus History (${filteredIncoming.length})`, key: "incoming" },
     { label: `Self Account (${filteredSelf.length})`, key: "self" },
     { label: `Rewards (${filteredRewards.length})`, key: "rewards" },
@@ -642,16 +669,28 @@ export default function History() {
         History
       </Typography>
 
-      {/* Main Wallet Summary */}
+      {/* Main Wallet Summary Card (Clickable to switch tab) */}
       <Paper
         elevation={0}
+        onClick={() => setTab(0)}
         sx={{
           p: 1.6,
           borderRadius: 2.5,
           mb: 1.2,
           border: "1px solid",
-          borderColor: "#EEF2F6",
+          borderColor: tab === 0 ? "primary.main" : "#EEF2F6",
           bgcolor: "#fff",
+          cursor: "pointer",
+          transition: "all 0.2s ease",
+          boxShadow: tab === 0 ? "0 4px 12px rgba(12, 45, 72, 0.12)" : "none",
+          "&:hover": {
+            borderColor: "primary.main",
+            boxShadow: "0 4px 12px rgba(12, 45, 72, 0.08)",
+            transform: "translateY(-1px)",
+          },
+          "&:active": {
+            transform: "scale(0.99)",
+          },
         }}
       >
         <Stack direction="row" spacing={1.2} alignItems="center">
@@ -668,7 +707,7 @@ export default function History() {
 
           <Box>
             <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 800 }}>
-              Main Wallet
+              Main Wallet (Tap for History)
             </Typography>
 
             <Typography
@@ -862,10 +901,11 @@ export default function History() {
             </Typography>
           ) : (
             <>
-              {tab === 0 && <SectionList sections={sectionsIncoming} fallbackRows={filteredIncoming} />}
-              {tab === 1 && <SectionList sections={sectionsSelf} fallbackRows={filteredSelf} />}
-              {tab === 2 && <SectionList sections={sectionsRewards} fallbackRows={filteredRewards} />}
-              {tab === 3 && <SectionList sections={sectionsRedeem} fallbackRows={filteredRedeem} />}
+              {tab === 0 && <SectionList sections={sectionsMainWallet} fallbackRows={filteredMainWallet} />}
+              {tab === 1 && <SectionList sections={sectionsIncoming} fallbackRows={filteredIncoming} />}
+              {tab === 2 && <SectionList sections={sectionsSelf} fallbackRows={filteredSelf} />}
+              {tab === 3 && <SectionList sections={sectionsRewards} fallbackRows={filteredRewards} />}
+              {tab === 4 && <SectionList sections={sectionsRedeem} fallbackRows={filteredRedeem} />}
             </>
           )}
         </Box>

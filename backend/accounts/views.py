@@ -4119,8 +4119,25 @@ def wallet_me_history(request):
                 # Any positive or neutral credits go to Incoming
                 incoming_list.append(txmap(tx))
 
+    # Main Wallet history bucket
+    main_types = [
+        "INCOME_CREDIT_75",
+        "MAIN_TO_COUPON",
+        "COUPON_WALLET_TRANSFER_OUT",
+        "VOUCHER_CREATE_DEBIT",
+        "WITHDRAWAL_DEBIT",
+        "INTERNAL_WALLET_DEBIT",
+        "ADJUSTMENT_CREDIT",
+        "ADJUSTMENT_DEBIT",
+        "COMMISSION_CREDIT",
+        "DIRECT_REF_BONUS",
+    ]
+    main_qs = WalletTransaction.objects.filter(user=user, type__in=main_types).order_by("-created_at")[:500]
+    main_list = [txmap(x) for x in main_qs]
+
     data = {
         "top": top,
+        "main_wallet": main_list,
         "incoming": incoming_list,
         "self_account": self_list,
         "cashback": cashback,
