@@ -15,7 +15,7 @@ services:
       elif [ "$SEED_LOCATIONS_ON_DEPLOY" = "True" ]; then
         python manage.py load_location_data
       fi
-    startCommand: gunicorn core.wsgi:application --bind 0.0.0.0:$PORT --workers=1 --threads=1 --timeout=30 --max-requests=200 --max-requests-jitter=50
+    startCommand: gunicorn core.wsgi:application --bind 0.0.0.0:$PORT --workers=2 --threads=4 --timeout=60 --max-requests=2000 --max-requests-jitter=200
     healthCheckPath: /healthz
     envVars:
       - key: SECRET_KEY
@@ -79,13 +79,13 @@ services:
       - key: PYTHONUNBUFFERED
         value: "1"
       - key: DB_CONN_MAX_AGE
-        value: "0"
+        value: "60"
       - key: DRF_PAGE_SIZE
         value: "25"
       - key: DRF_THROTTLE_ANON
-        value: "60/min"
+        value: "120/min"
       - key: DRF_THROTTLE_USER
-        value: "300/min"
+        value: "2000/min"
       - key: DATA_UPLOAD_MAX_MEMORY_SIZE
         value: "5242880"
       - key: FILE_UPLOAD_MAX_MEMORY_SIZE
