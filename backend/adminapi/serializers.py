@@ -217,10 +217,6 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
 
     def _region_assignments(self, obj):
         try:
-            role = str(getattr(obj, "role", "") or "").lower()
-            category = str(getattr(obj, "category", "") or "").lower()
-            if role != "agency" and not category.startswith("agency_"):
-                return []
             pref = getattr(obj, "prefetched_agency_assignments", None)
             if pref is not None:
                 return list(pref or [])
@@ -702,6 +698,90 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
 
     def get_withdrawal_to_pocket(self, obj):
         return self.get_withdrawal_pocket(obj)
+
+    def get_avatar_url(self, obj):
+        try:
+            f = getattr(obj, "avatar", None)
+            if not f:
+                return ""
+            # If the stored name is already an absolute URL (Cloudinary), return it verbatim
+            try:
+                name = getattr(f, "name", "") or ""
+                if isinstance(name, str) and (name.startswith("http://") or name.startswith("https://")):
+                    return name
+            except Exception:
+                pass
+
+            # Best-effort migrate local avatar to Cloudinary on read if configured
+            try:
+                import os
+                if os.environ.get("CLOUDINARY_URL"):
+                    file_obj = None
+                    try:
+                        f.open("rb")
+                        file_obj = getattr(f, "file", None) or f
+                    except Exception:
+                        file_obj = None
+                    if file_obj is not None:
+                        try:
+                            from cloudinary import uploader as _clduploader  # type: ignore
+                            try:
+                                file_obj.seek(0)
+                            except Exception:
+                                pass
+                            res = _clduploader.upload(
+                                file_obj,
+                                folder="uploads/profile",
+                                resource_type="image",
+                                invalidate=True,
+                            )
+                            url2 = (res or {}).get("secure_url") or (res or {}).get("url")
+                            if url2:
+                                obj.avatar.name = url2
+                                obj.save(update_fields=["avatar"])
+                                return url2
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+
+            # Else, fall back to storage-provided URL (relative under MEDIA_URL)
+            url = getattr(f, "url", "") or ""
+            if not url:
+                return ""
+            # Fix corrupted MEDIA URL that percent-encodes a remote absolute URL (e.g., /media/https%3A/...)
+            # Also handle single-slash forms like "https:/res.cloudinary.com" and normalize to "https://..."
+            try:
+                from urllib.parse import unquote
+                import re
+                decoded = unquote(url)
+                m = re.search(r"(https?:/{1,2}[^\"\\s]+)", decoded)
+                if m:
+                    remote = m.group(1)
+                    # Normalize single slash to double slash
+                    remote = remote.replace("https:/", "https://").replace("http:/", "http://")
+                    # Persist cleaned remote URL for future requests
+                    try:
+                        obj.avatar.name = remote
+                        obj.save(update_fields=["avatar"])
+                    except Exception:
+                        pass
+                    return remote
+            except Exception:
+                pass
+            req = getattr(self, "context", {}).get("request", None)
+            if req:
+                try:
+                    return req.build_absolute_uri(url)
+                except Exception:
+                    pass
+            return url
+        except Exception:
+            return ""
+
+    def get_has_children(self, obj):
+        try:
+            dc = getattr(obj, "direct_count", 0) or 0
             return dc > 0
         except Exception:
             return False
