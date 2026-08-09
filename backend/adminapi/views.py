@@ -570,7 +570,6 @@ class AdminUsersList(ListAPIView):
         qs = (
             CustomUser.objects
             .select_related(*select_related)
-            .only(*only_fields)
         )
         if prefetches:
             qs = qs.prefetch_related(*prefetches)
