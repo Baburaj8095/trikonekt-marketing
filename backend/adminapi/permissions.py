@@ -98,7 +98,11 @@ class IsAdminOrStaff(BasePermission):
         # Non-negotiable: inactive users cannot access any admin API
         if not bool(getattr(user, "is_active", False)):
             return False
-        return bool(getattr(user, "is_superuser", False) or getattr(user, "is_staff", False))
+        if bool(getattr(user, "is_superuser", False) or getattr(user, "is_staff", False)):
+            return True
+        role = str(getattr(user, "role", "") or "").lower()
+        category = str(getattr(user, "category", "") or "").lower()
+        return role in ("admin", "agency", "employee") or category.startswith("agency_") or category == "employee"
 
 
 class IsSuperAdmin(BasePermission):

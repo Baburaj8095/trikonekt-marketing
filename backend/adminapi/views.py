@@ -948,7 +948,7 @@ class AdminUserEditMetaView(APIView):
     """
     Return dynamic field metadata for Admin user edit dialog based on AdminUserEditSerializer.
     """
-    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("users"), HasAnyPermission("manage_users", "show_users", "edit_users")]
+    permission_classes = [IsAdminOrStaff]
 
     def get(self, request):
         from .serializers import AdminUserEditSerializer
