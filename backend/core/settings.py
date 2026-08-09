@@ -85,7 +85,7 @@ DATABASES = {
     'default': dj_database_url.config(
         default=DEFAULT_DB_URL,
         conn_max_age=int(os.environ.get('DB_CONN_MAX_AGE', '60')),
-        ssl_require=bool(os.environ.get("DB_SSL_REQUIRE", "True").lower() in ("1", "true", "yes")),
+        ssl_require=bool(os.environ.get("DB_SSL_REQUIRE", "False").lower() in ("1", "true", "yes")),
     )
 }
 
@@ -99,7 +99,10 @@ except Exception:
 try:
     DATABASES['default'].setdefault('OPTIONS', {})
     if 'postgresql' in str(DATABASES['default'].get('ENGINE', '')).lower():
-        DATABASES['default']['OPTIONS'].setdefault('sslmode', 'require')
+        if bool(os.environ.get("DB_SSL_REQUIRE", "False").lower() in ("1", "true", "yes")):
+            DATABASES['default']['OPTIONS'].setdefault('sslmode', 'require')
+        else:
+            DATABASES['default']['OPTIONS'].pop('sslmode', None)
         DATABASES['default']['OPTIONS'].setdefault('connect_timeout', int(os.environ.get('DB_CONNECT_TIMEOUT', '10')))
         DATABASES['default']['OPTIONS'].setdefault('keepalives', 1)
         DATABASES['default']['OPTIONS'].setdefault('keepalives_idle', int(os.environ.get('DB_KEEPALIVES_IDLE', '30')))
