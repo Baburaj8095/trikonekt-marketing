@@ -779,8 +779,11 @@ class Wallet(models.Model):
 
     @classmethod
     def get_or_create_for_user(cls, user: CustomUser) -> "Wallet":
-        w, _ = cls.objects.get_or_create(user=user)
-        return w
+        try:
+            w, _ = cls.objects.get_or_create(user=user)
+            return w
+        except Exception:
+            return cls.objects.get(user=user)
 
 
     def _apply_self_account_rule(self, w: "Wallet"):
