@@ -39,7 +39,7 @@ sudo systemctl --no-pager --full status trikonekt-worker
 
 echo "Waiting for health check: $HEALTH_URL"
 for attempt in $(seq 1 30); do
-  if curl --fail --silent --show-error --location --head "$HEALTH_URL"; then
+  if curl --fail --silent --show-error --location "$HEALTH_URL"; then
     echo "Health check passed on attempt $attempt."
     echo "Backend deploy completed successfully."
     exit 0

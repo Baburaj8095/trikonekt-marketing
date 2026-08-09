@@ -87,3 +87,6 @@ class HealthzView(APIView):
         except Exception as e:
             return Response({"status": "error", "db": False, "error": str(e)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         return Response({"status": "ok", "db": True}, status=status.HTTP_200_OK)
+
+    def head(self, request):
+        return self.get(request)
