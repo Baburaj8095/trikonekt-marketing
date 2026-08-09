@@ -925,7 +925,7 @@ class Wallet(models.Model):
                         sw.credit(
                             sponsor_bonus,
                             tx_type="DIRECT_REF_BONUS",
-                            meta={"from_user_id": self.user.id, "from_user": getattr(self.user, "username", None), "no_withhold": True, "auto_rule": "SELF_250_PACK"},
+                            meta={"from_user_id": self.user.id, "from_user": getattr(self.user, "username", None), "auto_rule": "SELF_250_PACK"},
                             source_type="SELF_250_PACK",
                             source_id="",
                         )
