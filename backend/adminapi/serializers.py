@@ -216,17 +216,10 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
         ]
 
     def _region_assignments(self, obj):
-        cat = str(getattr(obj, "category", "") or "").lower()
-        role = str(getattr(obj, "role", "") or "").lower()
-        if "agency" not in cat and "agency" not in role and "franchise" not in cat and "franchise" not in role:
-            return []
         try:
             pref = getattr(obj, "prefetched_agency_assignments", None)
             if pref is not None:
                 return list(pref or [])
-            ctx = getattr(self, "context", {}) or {}
-            if ctx.get("purpose") == "list":
-                return []
             return list(
                 AgencyRegionAssignment.objects.select_related("state")
                 .filter(user_id=getattr(obj, "id", None))
@@ -1064,9 +1057,6 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
                 return pre
         except Exception:
             pass
-        ctx = getattr(self, "context", {}) or {}
-        if ctx.get("purpose") == "list":
-            return []
         # Fallback: fetch minimal fields if not prefetched (e.g., export path)
         try:
             from business.models import PromoPurchase
