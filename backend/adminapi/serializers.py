@@ -217,6 +217,10 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
 
     def _region_assignments(self, obj):
         try:
+            role = str(getattr(obj, "role", "") or "").lower()
+            category = str(getattr(obj, "category", "") or "").lower()
+            if role != "agency" and not category.startswith("agency_"):
+                return []
             pref = getattr(obj, "prefetched_agency_assignments", None)
             if pref is not None:
                 return list(pref or [])
