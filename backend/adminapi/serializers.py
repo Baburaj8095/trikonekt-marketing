@@ -811,13 +811,13 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
 
     def get_commission_level(self, obj):
         try:
-            # Prefer prefetched related manager 'matrix_progress'
-            mp = getattr(obj, "matrix_progress", None)
-            items = None
-            try:
-                items = list(mp.all()) if mp is not None else None
-            except Exception:
-                items = None
+            items = getattr(obj, "matrix_progress_list", None)
+            if items is None:
+                mp = getattr(obj, "matrix_progress", None)
+                try:
+                    items = list(mp.all()) if mp is not None else None
+                except Exception:
+                    items = None
             if items is None:
                 items = list(UserMatrixProgress.objects.filter(user_id=getattr(obj, "id", None)))
             lvl = 0
@@ -975,8 +975,11 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
             pp = None
             try:
                 pre = getattr(obj, "approved_promo_purchases", None)
-                if isinstance(pre, list) and pre:
-                    pp = pre[0]
+                if isinstance(pre, list):
+                    if pre:
+                        pp = pre[0]
+                    else:
+                        return ""
             except Exception:
                 pp = None
             if pp is None:

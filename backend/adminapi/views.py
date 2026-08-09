@@ -552,19 +552,18 @@ class AdminUsersList(ListAPIView):
             # Password metadata (status/algo only)
             "password", "last_password_encrypted",
         ]
-        prefetches = []
-        if self._needs_wallet_summary():
-            select_related.append("reward_points_account")
-            only_fields.append("reward_points_account__balance_points")
-            prefetches.append(Prefetch("wallet_accounts", queryset=WalletAccount.objects.only("user_id", "wallet_type", "current_balance"), to_attr="prefetched_wallet_accounts"))
-        prefetches.append(Prefetch("promo_purchases", queryset=PromoPurchase.objects.select_related("package").filter(status="APPROVED").only("id", "user_id", "package_id", "status", "approved_at", "requested_at", "tri_app_slug", "package__id", "package__code", "package__name", "package__type", "package__price").order_by("-approved_at", "-id"), to_attr="approved_promo_purchases"))
-        prefetches.append(
+        select_related.append("reward_points_account")
+        only_fields.append("reward_points_account__balance_points")
+        prefetches = [
+            Prefetch("wallet_accounts", queryset=WalletAccount.objects.only("user_id", "wallet_type", "current_balance"), to_attr="prefetched_wallet_accounts"),
+            Prefetch("promo_purchases", queryset=PromoPurchase.objects.select_related("package").filter(status="APPROVED").only("id", "user_id", "package_id", "status", "approved_at", "requested_at", "tri_app_slug", "package__id", "package__code", "package__name", "package__type", "package__price").order_by("-approved_at", "-id"), to_attr="approved_promo_purchases"),
             Prefetch(
                 "region_assignments",
                 queryset=AgencyRegionAssignment.objects.select_related("state").order_by("level", "state__name", "district", "pincode"),
                 to_attr="prefetched_agency_assignments",
-            )
-        )
+            ),
+            Prefetch("matrix_progress", queryset=UserMatrixProgress.objects.only("id", "user_id", "level_reached"), to_attr="matrix_progress_list"),
+        ]
 
         qs = (
             CustomUser.objects
