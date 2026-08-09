@@ -32,8 +32,20 @@ jobs:
           EC2_USER: ${{ secrets.AWS_EC2_USER }}
           DEPLOY_BRANCH: ${{ github.ref_name }}
         run: |
-          ssh -i ~/.ssh/trikonekt-prod-key.pem \
-            -o StrictHostKeyChecking=accept-new \
-            -o ConnectTimeout=30 \
-            "${EC2_USER}@${EC2_HOST}" \
-            "sudo env DEPLOY_BRANCH='${DEPLOY_BRANCH}' bash /srv/trikonekt/app/deploy/aws/deploy-backend.sh"
+          for i in 1 2 3; do
+            echo "Attempt $i: Connecting to EC2 via SSH..."
+            if ssh -i ~/.ssh/trikonekt-prod-key.pem \
+              -o StrictHostKeyChecking=accept-new \
+              -o ConnectTimeout=15 \
+              -o ServerAliveInterval=15 \
+              -o ServerAliveCountMax=3 \
+              "${EC2_USER}@${EC2_HOST}" \
+              "sudo env DEPLOY_BRANCH='${DEPLOY_BRANCH}' bash /srv/trikonekt/app/deploy/aws/deploy-backend.sh"; then
+              echo "Deployment succeeded!"
+              exit 0
+            fi
+            echo "SSH attempt $i failed. Retrying in 5 seconds..."
+            sleep 5
+          done
+          echo "Error: All SSH deployment attempts failed."
+          exit 1
