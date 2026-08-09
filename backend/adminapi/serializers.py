@@ -1132,12 +1132,19 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
         Returns tuple:
           (current_number, boxes_paid_current, total_boxes_current, remaining_current)
         Defaults: (None, 0, 12, 12)
+        Cached on obj to prevent duplicate query execution.
         """
         try:
+            cached = getattr(obj, "_cached_monthly_summary", None)
+            if cached is not None:
+                return cached
+
             purchases = [p for p in self._approved_promo_purchases(obj)
                          if str(getattr(getattr(p, "package", None), "type", "") or "") == "MONTHLY"]
             if not purchases:
-                return (None, 0, 12, 12)
+                res = (None, 0, 12, 12)
+                setattr(obj, "_cached_monthly_summary", res)
+                return res
 
             # Pick a monthly package (most recent approved)
             try:
@@ -1145,20 +1152,29 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
             except Exception:
                 pkg = None
 
-            # Seed totals per number (optional)
-            totals = {}
-            try:
-                from business.models import PromoMonthlyPackage
-                for s in PromoMonthlyPackage.objects.filter(package=pkg, is_active=True).order_by("number"):
-                    try:
-                        tb = int(getattr(s, "total_boxes", 12) or 12)
-                        if tb <= 0:
-                            tb = 12
-                        totals[int(getattr(s, "number", 0) or 0)] = tb
-                    except Exception:
-                        continue
-            except Exception:
+            pkg_id = getattr(pkg, "id", None) if pkg else None
+
+            # Seed totals per number (cached on serializer instance)
+            if not hasattr(self, "_pmp_totals_cache"):
+                self._pmp_totals_cache = {}
+
+            if pkg_id not in self._pmp_totals_cache:
                 totals = {}
+                try:
+                    from business.models import PromoMonthlyPackage
+                    for s in PromoMonthlyPackage.objects.filter(package=pkg, is_active=True).order_by("number"):
+                        try:
+                            tb = int(getattr(s, "total_boxes", 12) or 12)
+                            if tb <= 0:
+                                tb = 12
+                            totals[int(getattr(s, "number", 0) or 0)] = tb
+                        except Exception:
+                            continue
+                except Exception:
+                    totals = {}
+                self._pmp_totals_cache[pkg_id] = totals
+
+            totals = self._pmp_totals_cache.get(pkg_id, {})
 
             def total_for(n: int) -> int:
                 try:
@@ -1197,7 +1213,9 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
             paid = int(paid_map.get(current, 0))
             total = int(total_for(current))
             remaining = max(0, total - paid)
-            return (current, paid, total, remaining)
+            res = (current, paid, total, remaining)
+            setattr(obj, "_cached_monthly_summary", res)
+            return res
         except Exception:
             return (None, 0, 12, 12)
 
