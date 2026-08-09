@@ -27,7 +27,12 @@ fi
 sudo -u trikonekt git -C "$APP_DIR" checkout "$BRANCH"
 sudo -u trikonekt git -C "$APP_DIR" reset --hard "origin/$BRANCH"
 
-sudo -u trikonekt bash -lc "cd '$BACKEND_DIR' && .venv/bin/pip install -r requirements.txt"
+if sudo -u trikonekt git -C "$APP_DIR" diff HEAD@{1} HEAD --name-only 2>/dev/null | grep -q "requirements.txt"; then
+  echo "requirements.txt changed; installing dependencies..."
+  sudo -u trikonekt bash -lc "cd '$BACKEND_DIR' && .venv/bin/pip install --no-cache-dir -r requirements.txt"
+else
+  echo "requirements.txt unchanged; skipping pip install."
+fi
 sudo -u trikonekt bash -lc "set -a; source '$ENV_FILE'; set +a; cd '$BACKEND_DIR' && .venv/bin/python manage.py migrate --noinput"
 sudo -u trikonekt bash -lc "set -a; source '$ENV_FILE'; set +a; cd '$BACKEND_DIR' && .venv/bin/python manage.py collectstatic --noinput"
 sudo -u trikonekt bash -lc "set -a; source '$ENV_FILE'; set +a; cd '$BACKEND_DIR' && .venv/bin/python manage.py check"
