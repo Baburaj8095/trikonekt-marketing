@@ -84,15 +84,10 @@ if not DEFAULT_DB_URL:
 DATABASES = {
     'default': dj_database_url.config(
         default=DEFAULT_DB_URL,
-        conn_max_age=int(os.environ.get('DB_CONN_MAX_AGE', '0')),
+        conn_max_age=int(os.environ.get('DB_CONN_MAX_AGE', '60')),
         ssl_require=bool(os.environ.get("DB_SSL_REQUIRE", "True").lower() in ("1", "true", "yes")),
     )
 }
-# Force Starter-plan safety: always disable persistent DB connections
-try:
-    DATABASES['default']['CONN_MAX_AGE'] = 0
-except Exception:
-    pass
 
 # Enable persistent connection health checks (Django 4.2+; harmless if ignored on older versions)
 try:
@@ -154,8 +149,8 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.UserRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': os.environ.get('DRF_THROTTLE_ANON', '60/min'),
-        'user': os.environ.get('DRF_THROTTLE_USER', '300/min'),
+        'anon': os.environ.get('DRF_THROTTLE_ANON', '120/min'),
+        'user': os.environ.get('DRF_THROTTLE_USER', '2000/min'),
         # Dedicated webhook throttle (default high enough to avoid breaking real traffic).
         'hubble_webhook': os.environ.get('DRF_THROTTLE_HUBBLE_WEBHOOK', '600/min'),
     },
