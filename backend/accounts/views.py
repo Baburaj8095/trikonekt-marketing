@@ -158,10 +158,6 @@ class AdminWalletUploadRequestApproveView(APIView):
             if amt <= 0:
                 return Response({"detail": "Invalid amount."}, status=status.HTTP_400_BAD_REQUEST)
 
-            add_money_acc = WalletEngine.get_account(obj.user, WalletTypes.ADD_MONEY_POCKET, lock=True)
-            add_money_acc.current_balance = (add_money_acc.current_balance or Decimal("0")) + amt
-            add_money_acc.available_balance = (add_money_acc.available_balance or Decimal("0")) + amt
-            add_money_acc.save(update_fields=["current_balance", "available_balance", "updated_at"])
 
             w = Wallet.get_or_create_for_user(obj.user)
             tx = WalletTransaction.objects.create(

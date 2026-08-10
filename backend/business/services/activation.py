@@ -625,8 +625,11 @@ def redeem_150(user: CustomUser, source: Dict[str, Any]) -> bool:
       - Idempotent via SubscriptionActivation(PRIME_150_REDEEM)
     """
     cfg = CommissionConfig.get_solo()
-    src_type = str(source.get("type") or "")
-    src_id = str(source.get("id") or source.get("code") or "")
+    src_type = str(source.get("type") or "coupon_150_redeem")
+    src_id = str(source.get("id") or source.get("code") or "").strip()
+    if not src_id:
+        import uuid
+        src_id = f"redeem_{int(time.time()*1000)}_{uuid.uuid4().hex[:6]}"
     try:
         SubscriptionActivation.objects.create(
             user=user,
