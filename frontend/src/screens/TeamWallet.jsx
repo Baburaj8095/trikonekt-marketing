@@ -359,13 +359,11 @@ export default function TeamWallet() {
   const kycVerified = Boolean(kycData?.verified);
 
   const addMoneyPocketBalance = useMemo(() => {
-    const summaryBalance = Number(
-      transferWallets?.packageUpload ??
-        transferWallets?.addMoney ??
-        walletData?.add_money_pocket_balance ??
-        0
-    );
-    if (summaryBalance) return summaryBalance;
+    const rawBal = walletData?.pockets?.add_money ?? walletData?.add_money_pocket ?? walletData?.add_money_pocket_balance ?? transferWallets?.packageUpload ?? transferWallets?.addMoney;
+    if (rawBal !== undefined && rawBal !== null && rawBal !== "") {
+      const b = Number(rawBal);
+      if (!isNaN(b)) return Math.max(0, b);
+    }
 
     const seen = new Set();
     const historyRows = [
@@ -381,6 +379,8 @@ export default function TeamWallet() {
     return historyRows.reduce((sum, row) => {
       const meta = row?.meta || {};
       const isAddMoney =
+        String(row?.type || "").toUpperCase().includes("ADD_MONEY") ||
+        String(meta?.pocket || "").toLowerCase() === "add_money" ||
         String(row?.source_type || "").toUpperCase() === "WALLET_UPLOAD" ||
         String(meta?.wallet || "").toUpperCase() === "ADD_MONEY" ||
         String(meta?.destination_wallet || "").toUpperCase() === "ADD_MONEY_POCKET" ||

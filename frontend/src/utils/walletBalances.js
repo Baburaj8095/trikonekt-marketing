@@ -32,6 +32,8 @@ function addMoneyHistoryBalance(history) {
     const meta = row?.meta || {};
     const sourceType = String(row?.source_type || "").toUpperCase();
     const isAddMoney =
+      String(row?.type || "").toUpperCase().includes("ADD_MONEY") ||
+      String(meta?.pocket || "").toLowerCase() === "add_money" ||
       ["WALLET_UPLOAD", "UPLOAD_TO_WALLET", "PACKAGE_UPLOAD", "PACKAGE_BUY_UPLOAD"].includes(sourceType) ||
       String(meta?.wallet || "").toUpperCase() === "ADD_MONEY" ||
       String(meta?.destination_wallet || "").toUpperCase() === "ADD_MONEY_POCKET" ||
@@ -64,11 +66,14 @@ export function getPackagePurchaseCouponBalance(wallet) {
 }
 
 export function getAddMoneyPocketBalance(wallet, history = null) {
+  const directBal = wallet?.pockets?.add_money ?? wallet?.add_money_pocket ?? wallet?.add_money_pocket_balance ?? wallet?.package_upload_balance;
+  if (directBal !== undefined && directBal !== null && directBal !== "") {
+    const num = Number(directBal);
+    if (!isNaN(num)) return Math.max(0, num);
+  }
   const summaryBalance = firstPositiveNumber(
-    pickTransferWallet(wallet, ["packageUpload", "package_upload", "addMoney", "add_money"]),
-    wallet?.add_money_pocket_balance,
-    wallet?.package_upload_balance
+    pickTransferWallet(wallet, ["packageUpload", "package_upload", "addMoney", "add_money"])
   );
   if (summaryBalance > 0) return summaryBalance;
-  return addMoneyHistoryBalance(history);
+  return Math.max(0, addMoneyHistoryBalance(history));
 }
