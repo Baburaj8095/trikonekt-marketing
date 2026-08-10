@@ -257,9 +257,10 @@ class AdminUsersListCreate(APIView):
         if staff_only in ("1", "true", "yes"):
             return self._list_staff_admins(request)
 
-        # Delegate to existing list view using DRF's as_view to ensure proper initialization
+        # Delegate to existing list view using DRF's as_view ensuring authenticated user and query_params are preserved
         from .views import AdminUsersList
         django_request = getattr(request, "_request", request)
+        django_request.user = request.user
         return AdminUsersList.as_view()(django_request)
 
     def post(self, request):
