@@ -257,22 +257,14 @@ class AdminUsersListCreate(APIView):
         if staff_only in ("1", "true", "yes"):
             return self._list_staff_admins(request)
 
-        # Delegate safely using existing AdminUsersList methods directly on authenticated request
+        # Delegate to AdminUsersList.list() which contains optimized fast counting and serialization
         from .views import AdminUsersList
         v = AdminUsersList()
         v.request = request
         v.args = getattr(request, "parser_context", {}).get("args", ()) if hasattr(request, "parser_context") else ()
         v.kwargs = getattr(request, "parser_context", {}).get("kwargs", {}) if hasattr(request, "parser_context") else {}
         v.format_kwarg = None
-
-        qs = v.filter_queryset(v.get_queryset())
-        page = v.paginate_queryset(qs)
-        if page is not None:
-            serializer = v.get_serializer(page, many=True)
-            return v.get_paginated_response(serializer.data)
-
-        serializer = v.get_serializer(qs, many=True)
-        return Response(serializer.data)
+        return v.list(request)
 
     def post(self, request):
         # RBAC create protection
