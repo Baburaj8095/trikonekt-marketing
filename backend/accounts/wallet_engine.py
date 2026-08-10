@@ -69,13 +69,6 @@ class WalletEngine:
                 account.legacy_wallet = legacy_wallet
                 dirty = True
 
-            # Guard: Sync uninitialized MAIN account balance from legacy_wallet main_balance if needed
-            if wallet_type == WalletTypes.MAIN and account.current_balance == Decimal("0.00"):
-                legacy_main = getattr(legacy_wallet, "main_balance", None)
-                if legacy_main and legacy_main > Decimal("0.00"):
-                    account.current_balance = legacy_main
-                    account.available_balance = legacy_main
-                    dirty = True
 
             if dirty:
                 account.save(update_fields=["legacy_wallet", "current_balance", "available_balance", "updated_at"])
