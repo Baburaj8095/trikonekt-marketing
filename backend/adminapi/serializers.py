@@ -466,10 +466,12 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
 
     def get_wallet_balance(self, obj):
         try:
+            val = self._wallet_account_balance(obj, "MAIN")
+            if val != "":
+                return val
             w = getattr(obj, "wallet", None)
             if not w:
                 return ""
-            # Prefer main_balance if present, fall back to balance
             bal = getattr(w, "main_balance", None)
             if bal is None:
                 bal = getattr(w, "balance", None)
