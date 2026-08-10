@@ -1,7 +1,11 @@
 import csv
 import time
+import logging
 from datetime import date, timedelta
 from decimal import Decimal
+
+logger = logging.getLogger(__name__)
+log = logger
 
 from django.db.models import Count, Prefetch, Q, Sum
 from django.db import transaction
