@@ -104,7 +104,8 @@ export default function AdminWalletUploadApprovals() {
       await fetchRows();
       alert("Approved. Amount is now visible in Add Money Pocket.");
     } catch (e) {
-      alert(e?.response?.data?.detail || "Failed to approve");
+      const msg = e?.response?.data?.detail || e?.response?.data?.error || (typeof e?.response?.data === 'string' ? e.response.data : "Failed to approve");
+      alert(msg);
     }
   }
 
@@ -115,7 +116,8 @@ export default function AdminWalletUploadApprovals() {
       await adminRejectWalletUploadRequest(r.id, reason || "");
       await fetchRows();
     } catch (e) {
-      alert(e?.response?.data?.detail || "Failed to reject");
+      const msg = e?.response?.data?.detail || e?.response?.data?.error || (typeof e?.response?.data === 'string' ? e.response.data : "Failed to reject");
+      alert(msg);
     }
   }
 

@@ -138,7 +138,7 @@ class AdminWalletUploadRequestApproveView(APIView):
     POST /api/accounts/admin/wallet/upload-requests/<id>/approve/
     """
 
-    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
+    permission_classes = [IsAdminOrStaff]
 
     def post(self, request, pk: int):
         from decimal import Decimal
@@ -213,7 +213,7 @@ class AdminWalletUploadRequestRejectView(APIView):
     POST /api/accounts/admin/wallet/upload-requests/<id>/reject/ { reason?: string }
     """
 
-    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
+    permission_classes = [IsAdminOrStaff]
 
     def post(self, request, pk: int):
         from django.utils import timezone as _tz

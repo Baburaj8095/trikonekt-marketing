@@ -678,13 +678,29 @@ class AdminUsersList(ListAPIView):
         # Fast mode: skip COUNT(*) and compute has_next via one extra row
         fast_param = str(request.query_params.get("fast") or "").strip().lower()
         if fast_param in ("1", "true", "yes"):
+            t0 = time.perf_counter()
             start = (page - 1) * page_size
             limit = page_size + 1
+            t1 = time.perf_counter()
             items = list(qs[start:start + limit])
+            t2 = time.perf_counter()
             has_next = len(items) > page_size
             if has_next:
                 items = items[:page_size]
             serializer = self.get_serializer(items, many=True)
+            t3 = time.perf_counter()
+            res_data = serializer.data
+            t4 = time.perf_counter()
+            
+            logger.info(
+                f"[PERF_TRACE_ADMIN_USERS] GET /admin/users/?fast=1 | "
+                f"Total: {(t4 - t0)*1000:.2f}ms | "
+                f"DB Slice Fetch: {(t2 - t1)*1000:.2f}ms | "
+                f"Serializer Init: {(t3 - t2)*1000:.2f}ms | "
+                f"Serializer Data: {(t4 - t3)*1000:.2f}ms | "
+                f"Item Count: {len(items)}"
+            )
+            
             return Response(
                 {
                     "count": None,
@@ -692,7 +708,7 @@ class AdminUsersList(ListAPIView):
                     "page_size": page_size,
                     "has_next": bool(has_next),
                     "has_prev": start > 0,
-                    "results": serializer.data,
+                    "results": res_data,
                 },
                 status=200,
             )
