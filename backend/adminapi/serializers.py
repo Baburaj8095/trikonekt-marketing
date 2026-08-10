@@ -544,10 +544,10 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
         try:
             acc = self._wallet_accounts_map(obj).get(wallet_type)
             if not acc:
-                return ""
+                return 0.0
             return float(getattr(acc, "current_balance", 0) or 0)
         except Exception:
-            return ""
+            return 0.0
 
     def get_main_wallet(self, obj):
         return self.get_wallet_balance(obj)
