@@ -15,6 +15,7 @@ import {
 import API from "../../api/api";
 
 const pockets = [
+  ["add_money", "Add Money Pocket"],
   ["coupon", "Coupon Pocket"],
   ["self_package", "Self Package Pocket"],
   ["withdrawal", "Withdrawal Pocket"],
@@ -119,6 +120,7 @@ export default function AdminWallets() {
               </Box>
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                 <Chip label={`Main Rs. ${money(r.main_balance)}`} />
+                <Chip label={`Add Money Rs. ${money(r.pockets?.add_money)}`} />
                 <Chip label={`Withdrawal Rs. ${money(r.withdrawable_balance)}`} />
                 <Chip label={`Coupon Rs. ${money(r.pockets?.coupon)}`} />
                 <Chip label={`Self Pkg Rs. ${money(r.pockets?.self_package)}`} />

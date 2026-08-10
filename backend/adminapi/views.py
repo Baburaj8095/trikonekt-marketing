@@ -1275,6 +1275,7 @@ def _wallet_bucket_sums_from_qs(tx):
     service_charge = tx.filter(source_type="ADMIN_SERVICE_CHARGE", amount__lt=0).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
 
     return {
+        "add_money": sum_types(["ADD_MONEY_CREDIT", "INTERNAL_WALLET_CREDIT"], ["ADD_MONEY_DEBIT", "INTERNAL_WALLET_DEBIT"]),
         "coupon": sum_types(["COUPON_WALLET_CREDIT", "COUPON_WALLET_REFUND"], ["COUPON_WALLET_DEBIT", "VOUCHER_CREATE_DEBIT"]),
         "shopping": sum_types(["SHOPPING_WALLET_CREDIT"], ["SHOPPING_WALLET_DEBIT"]),
         "self_package": sum_types(["INTERNAL_WALLET_CREDIT"], ["INTERNAL_WALLET_DEBIT"]),
@@ -1288,6 +1289,7 @@ def _wallet_bucket_sums_from_qs(tx):
 
 def _empty_wallet_buckets():
     return {
+        "add_money": Decimal("0.00"),
         "coupon": Decimal("0.00"),
         "shopping": Decimal("0.00"),
         "self_package": Decimal("0.00"),
@@ -1806,6 +1808,7 @@ class AdminWalletAdjustPocketView(APIView):
 
         credit_types = {
             "main": "ADJUSTMENT_CREDIT",
+            "add_money": "ADD_MONEY_CREDIT",
             "coupon": "COUPON_WALLET_CREDIT",
             "shopping": "SHOPPING_WALLET_CREDIT",
             "self_package": "INTERNAL_WALLET_CREDIT",
@@ -1814,6 +1817,7 @@ class AdminWalletAdjustPocketView(APIView):
         }
         debit_types = {
             "main": "ADJUSTMENT_DEBIT",
+            "add_money": "ADD_MONEY_DEBIT",
             "coupon": "COUPON_WALLET_DEBIT",
             "shopping": "SHOPPING_WALLET_DEBIT",
             "self_package": "INTERNAL_WALLET_DEBIT",
@@ -1856,12 +1860,13 @@ class AdminWalletAdjustPocketView(APIView):
             )
 
             # Sync to WalletAccount via WalletEngine
-            if pocket in {"coupon", "shopping", "self_package", "package_purchase_coupon"}:
+            if pocket in {"add_money", "coupon", "shopping", "self_package", "package_purchase_coupon"}:
                 try:
                     from accounts.finance_constants import WalletTypes, FinanceCategories, LedgerDirections
                     from accounts.wallet_engine import WalletEngine, LedgerPosting
 
                     pocket_wallet_map = {
+                        "add_money": WalletTypes.ADD_MONEY_POCKET,
                         "coupon": WalletTypes.COUPON_POCKET,
                         "shopping": WalletTypes.SHOPPING_REBIRTH,
                         "self_package": WalletTypes.SELF_PACKAGE_POCKET,
