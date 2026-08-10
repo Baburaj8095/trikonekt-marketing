@@ -2082,7 +2082,9 @@ class WalletMe(APIView):
             )
             try:
                 add_money_filter = (
-                    Q(source_type__in=upload_sources)
+                    Q(type__in=["ADD_MONEY_CREDIT", "ADD_MONEY_DEBIT"])
+                    | Q(meta__pocket="add_money")
+                    | Q(source_type__in=upload_sources)
                     | Q(meta__wallet="ADD_MONEY")
                     | Q(meta__destination_wallet=WalletTypes.ADD_MONEY_POCKET)
                     | Q(meta__legacy_wallet_type=WalletTypes.ADD_MONEY_POCKET)
@@ -2374,7 +2376,9 @@ class WalletMe(APIView):
             )
             try:
                 add_money_filter = (
-                    Q(source_type__in=upload_sources)
+                    Q(type__in=["ADD_MONEY_CREDIT", "ADD_MONEY_DEBIT"])
+                    | Q(meta__pocket="add_money")
+                    | Q(source_type__in=upload_sources)
                     | Q(meta__wallet="ADD_MONEY")
                     | Q(meta__destination_wallet=WalletTypes.ADD_MONEY_POCKET)
                     | Q(meta__legacy_wallet_type=WalletTypes.ADD_MONEY_POCKET)
