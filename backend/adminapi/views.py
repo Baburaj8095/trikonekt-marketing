@@ -693,7 +693,7 @@ class AdminUsersList(ListAPIView):
             res_data = serializer.data
             t4 = time.perf_counter()
             
-            logger.info(
+            log.info(
                 f"[PERF_TRACE_ADMIN_USERS] GET /admin/users/?fast=1 | "
                 f"Total: {(t4 - t0)*1000:.2f}ms | "
                 f"DB Slice Fetch: {(t2 - t1)*1000:.2f}ms | "
