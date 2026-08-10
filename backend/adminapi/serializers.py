@@ -1135,6 +1135,10 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
         Cached on obj to prevent duplicate query execution.
         """
         try:
+            ctx = getattr(self, "context", {}) or {}
+            if ctx.get("purpose") == "list":
+                return (None, 0, 12, 12)
+
             cached = getattr(obj, "_cached_monthly_summary", None)
             if cached is not None:
                 return cached
