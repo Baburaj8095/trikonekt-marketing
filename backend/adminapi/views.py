@@ -591,7 +591,7 @@ class AdminUsersList(ListAPIView):
                 r_norm = role_keys.get(r_key) or role_labels.get(r_key.replace(" ", "_").replace("-", "_")) or r
             except Exception:
                 r_norm = r
-            qs = qs.filter(Q(role=r_norm) | Q(role__iexact=r_norm))
+            qs = qs.filter(role=r_norm)
         if category:
             c = str(category).strip()
             c_key = c.lower().replace(" ", "_").replace("-", "_")
@@ -611,7 +611,7 @@ class AdminUsersList(ListAPIView):
                 c_norm = cat_values.get(c_key) or cat_labels.get(c_key) or c_key
             except Exception:
                 c_norm = c_key
-            qs = qs.filter(Q(category=c_norm) | Q(category__iexact=c_norm))
+            qs = qs.filter(category=c_norm)
         if phone:
             qs = qs.filter(phone__icontains=phone)
         if pincode:
@@ -734,7 +734,7 @@ class AdminUsersList(ListAPIView):
                 r_norm = role_keys.get(r_key) or role_labels.get(r_key.replace(" ", "_").replace("-", "_")) or r
             except Exception:
                 r_norm = r
-            base = base.filter(Q(role=r_norm) | Q(role__iexact=r_norm))
+            base = base.filter(role=r_norm)
 
         if category:
             c = str(category).strip()
@@ -752,7 +752,7 @@ class AdminUsersList(ListAPIView):
                 c_norm = cat_values.get(c_key) or cat_labels.get(c_key) or c_key
             except Exception:
                 c_norm = c_key
-            base = base.filter(Q(category=c_norm) | Q(category__iexact=c_norm))
+            base = base.filter(category=c_norm)
 
         if phone:
             base = base.filter(phone__icontains=phone)
