@@ -1762,49 +1762,61 @@ class WithdrawalRequest(models.Model):
     def approve(self, actor: CustomUser, payout_ref: str | None = None):
         if self.status != "pending":
             raise ValueError("Only pending withdrawals can be approved.")
-        # Debit user wallet
+
         w = Wallet.get_or_create_for_user(self.user)
-        w.debit(
-            self.amount,
-            tx_type="WITHDRAWAL_DEBIT",
-            meta={"withdrawal_id": self.id, "method": self.method, "payout_ref": payout_ref or ""},
+        # Check if funds were already debited/held at request creation time
+        tx_hold = WalletTransaction.objects.filter(
+            user=self.user,
+            type="WITHDRAWAL_DEBIT",
             source_type="WITHDRAWAL",
             source_id=str(self.id),
-        )
-        # Post to new double-entry wallet engine
-        try:
-            tx = WalletTransaction.objects.filter(
-                user=self.user,
-                type="WITHDRAWAL_DEBIT",
+        ).first()
+
+        if not tx_hold:
+            # Legacy request created before instant-hold logic: enforce balance check before debiting
+            wb = Decimal(str(getattr(w, "withdrawable_balance", 0) or 0))
+            if wb < Decimal(str(self.amount or 0)):
+                raise ValueError(f"Insufficient withdrawal wallet balance (Rs. {wb}) to approve request of Rs. {self.amount}.")
+            w.debit(
+                self.amount,
+                tx_type="WITHDRAWAL_DEBIT",
+                meta={"withdrawal_id": self.id, "method": self.method, "payout_ref": payout_ref or ""},
                 source_type="WITHDRAWAL",
                 source_id=str(self.id),
-            ).first()
-            
-            from accounts.finance_constants import WalletTypes, FinanceCategories, LedgerDirections
-            from accounts.wallet_engine import WalletEngine, LedgerPosting
-            
-            system_user = WalletEngine.get_system_user()
-            WalletEngine.post_transaction(
-                category=FinanceCategories.WITHDRAWAL,
-                user=self.user,
-                source_module=WalletTypes.WITHDRAWAL_WALLET,
-                source_id=str(self.id),
-                destination_module=WalletTypes.SYSTEM,
-                gross_amount=self.amount,
-                net_amount=self.amount,
-                idempotency_key=f"withdrawal_approve_debit:{self.id}",
-                legacy_wallet_transaction=tx,
-                created_by=actor,
-                approved_by=actor,
-                remarks=f"Withdrawal request approved: {payout_ref or ''}",
-                metadata={"withdrawal_id": self.id, "payout_ref": payout_ref or ""},
-                postings=[
-                    LedgerPosting(self.user, WalletTypes.WITHDRAWAL_WALLET, LedgerDirections.DEBIT, self.amount, metadata={"withdrawal_id": self.id}),
-                    LedgerPosting(system_user, WalletTypes.SYSTEM, LedgerDirections.CREDIT, self.amount, metadata={"counterparty_user_id": self.user.id}),
-                ],
             )
-        except Exception:
-            pass
+            # Post to double-entry wallet engine
+            try:
+                tx = WalletTransaction.objects.filter(
+                    user=self.user,
+                    type="WITHDRAWAL_DEBIT",
+                    source_type="WITHDRAWAL",
+                    source_id=str(self.id),
+                ).first()
+                from accounts.finance_constants import WalletTypes, FinanceCategories, LedgerDirections
+                from accounts.wallet_engine import WalletEngine, LedgerPosting
+                system_user = WalletEngine.get_system_user()
+                WalletEngine.post_transaction(
+                    category=FinanceCategories.WITHDRAWAL,
+                    user=self.user,
+                    source_module=WalletTypes.WITHDRAWAL_WALLET,
+                    source_id=str(self.id),
+                    destination_module=WalletTypes.SYSTEM,
+                    gross_amount=self.amount,
+                    net_amount=self.amount,
+                    idempotency_key=f"withdrawal_approve_debit:{self.id}",
+                    legacy_wallet_transaction=tx,
+                    created_by=actor,
+                    approved_by=actor,
+                    remarks=f"Withdrawal request approved: {payout_ref or ''}",
+                    metadata={"withdrawal_id": self.id, "payout_ref": payout_ref or ""},
+                    postings=[
+                        LedgerPosting(self.user, WalletTypes.WITHDRAWAL_WALLET, LedgerDirections.DEBIT, self.amount, metadata={"withdrawal_id": self.id}),
+                        LedgerPosting(system_user, WalletTypes.SYSTEM, LedgerDirections.CREDIT, self.amount, metadata={"counterparty_user_id": self.user.id}),
+                    ],
+                )
+            except Exception:
+                pass
+
         # Lifetime 3% referral withdrawal bonus to direct sponsor (if exists)
         sponsor = getattr(self.user, "registered_by", None)
         try:
@@ -1820,8 +1832,8 @@ class WithdrawalRequest(models.Model):
                         source_id=str(self.id),
                     )
         except Exception:
-            # best-effort
             pass
+
         # Persist status
         from django.utils import timezone as _tz
         self.status = "approved"
@@ -1835,6 +1847,50 @@ class WithdrawalRequest(models.Model):
     def reject(self, actor: CustomUser, reason: str | None = None):
         if self.status != "pending":
             raise ValueError("Only pending withdrawals can be rejected.")
+
+        # Check if funds were held/debited at request creation time
+        tx_hold = WalletTransaction.objects.filter(
+            user=self.user,
+            type="WITHDRAWAL_DEBIT",
+            source_type="WITHDRAWAL",
+            source_id=str(self.id),
+        ).first()
+
+        if tx_hold:
+            # Refund the held amount back to WITHDRAWAL_WALLET
+            w = Wallet.get_or_create_for_user(self.user)
+            w.credit(
+                self.amount,
+                tx_type="WITHDRAWAL_REFUND",
+                meta={"withdrawal_id": self.id, "reason": reason or ""},
+                source_type="WITHDRAWAL",
+                source_id=str(self.id),
+            )
+            try:
+                from accounts.finance_constants import WalletTypes, FinanceCategories
+                from accounts.wallet_engine import WalletEngine
+                tx_refund = WalletTransaction.objects.filter(
+                    user=self.user,
+                    type="WITHDRAWAL_REFUND",
+                    source_type="WITHDRAWAL",
+                    source_id=str(self.id),
+                ).first()
+                WalletEngine.post_system_credit(
+                    user=self.user,
+                    wallet_type=WalletTypes.WITHDRAWAL_WALLET,
+                    amount=self.amount,
+                    category=FinanceCategories.WITHDRAWAL,
+                    source_module="WITHDRAWAL_REQUEST",
+                    source_id=str(self.id),
+                    idempotency_key=f"withdrawal_reject_refund:{self.id}",
+                    legacy_wallet_transaction=tx_refund,
+                    actor=actor,
+                    remarks=f"Withdrawal request rejected refund: #{self.id}",
+                    metadata={"withdrawal_id": self.id, "reason": reason or ""},
+                )
+            except Exception:
+                pass
+
         from django.utils import timezone as _tz
         self.status = "rejected"
         self.decided_by = actor

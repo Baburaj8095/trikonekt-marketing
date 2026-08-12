@@ -1690,7 +1690,7 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
             if not bank_acc or not ifsc:
                 raise serializers.ValidationError({"detail": "Bank account number and IFSC are required for bank withdrawals."})
 
-        # Create pending withdrawal request (no immediate debit; debit on admin approval)
+        # Create pending withdrawal request and immediately hold/debit funds from WITHDRAWAL_WALLET
         wr = WithdrawalRequest.objects.create(
             user=user,
             amount=amount,
@@ -1701,6 +1701,40 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
             ifsc_code=ifsc,
             note=(validated_data.get("note") or ""),
         )
+
+        try:
+            # Lock funds immediately from WITHDRAWAL_WALLET
+            w.debit(
+                amount,
+                tx_type="WITHDRAWAL_DEBIT",
+                meta={"withdrawal_id": wr.id, "method": "bank", "status": "HOLD_PENDING"},
+                source_type="WITHDRAWAL",
+                source_id=str(wr.id),
+            )
+            from accounts.finance_constants import WalletTypes, FinanceCategories
+            from accounts.wallet_engine import WalletEngine
+            tx_hold = WalletTransaction.objects.filter(
+                user=user,
+                type="WITHDRAWAL_DEBIT",
+                source_type="WITHDRAWAL",
+                source_id=str(wr.id),
+            ).first()
+            WalletEngine.post_system_debit(
+                user=user,
+                wallet_type=WalletTypes.WITHDRAWAL_WALLET,
+                amount=amount,
+                category=FinanceCategories.WITHDRAWAL,
+                source_module="WITHDRAWAL_REQUEST",
+                source_id=str(wr.id),
+                idempotency_key=f"withdrawal_request_hold:{wr.id}",
+                legacy_wallet_transaction=tx_hold,
+                actor=user,
+                remarks=f"Bank withdrawal request submitted (held): #{wr.id}",
+                metadata={"withdrawal_id": wr.id},
+            )
+        except Exception:
+            pass
+
         return wr
 
 
