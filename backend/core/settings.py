@@ -108,6 +108,10 @@ try:
         DATABASES['default']['OPTIONS'].setdefault('keepalives_idle', int(os.environ.get('DB_KEEPALIVES_IDLE', '30')))
         DATABASES['default']['OPTIONS'].setdefault('keepalives_interval', int(os.environ.get('DB_KEEPALIVES_INTERVAL', '10')))
         DATABASES['default']['OPTIONS'].setdefault('keepalives_count', int(os.environ.get('DB_KEEPALIVES_COUNT', '5')))
+        # Set lock_timeout and statement_timeout options to prevent stuck row locks
+        pg_opts = str(DATABASES['default']['OPTIONS'].get('options', '') or '')
+        if 'lock_timeout' not in pg_opts:
+            DATABASES['default']['OPTIONS']['options'] = (pg_opts + ' -c lock_timeout=5000ms -c statement_timeout=30000ms -c idle_in_transaction_session_timeout=5000ms').strip()
     else:
         for _pg_only in ("sslmode", "connect_timeout", "keepalives", "keepalives_idle", "keepalives_interval", "keepalives_count"):
             DATABASES['default']['OPTIONS'].pop(_pg_only, None)

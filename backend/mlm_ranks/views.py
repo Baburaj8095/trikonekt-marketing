@@ -1027,19 +1027,20 @@ class AdminApproveRankUpgradeView(APIView):
         ur.achieved_at = now
         ur.save(update_fields=["current_rank", "achieved_at"])
 
-        try:
-            to_lvl = int(getattr(getattr(upg, "to_rank", None), "level_number", 0) or 0)
-            is_rank1_purchase = to_lvl == 1
-            if is_rank1_purchase:
-                FiveMatrixService.distribute_rank1_commissions(upg)
-                FiveMatrixService.on_rank1_approval(upg)
-            else:
-                CommissionDistributor.distribute(upg)
-            FiveMatrixService.reevaluate_user_holds(upg.user.id)
-        except Exception:
-            # Keep upgrade SUCCESS; ops can re-run distribution via management command if needed
-            pass
+        def _do_distribute():
+            try:
+                to_lvl = int(getattr(getattr(upg, "to_rank", None), "level_number", 0) or 0)
+                is_rank1_purchase = to_lvl == 1
+                if is_rank1_purchase:
+                    FiveMatrixService.distribute_rank1_commissions(upg)
+                    FiveMatrixService.on_rank1_approval(upg)
+                else:
+                    CommissionDistributor.distribute(upg)
+                FiveMatrixService.reevaluate_user_holds(upg.user.id)
+            except Exception:
+                pass
 
+        transaction.on_commit(_do_distribute)
         return Response(RankUpgradeSerializer(upg).data, status=status.HTTP_200_OK)
 
 

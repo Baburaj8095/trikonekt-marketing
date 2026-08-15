@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Any, Iterable
 from uuid import uuid4
 
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 
 from .finance_constants import ApprovalStatuses, FinanceStatuses, LedgerDirections, WalletTypes
@@ -57,12 +57,14 @@ class WalletEngine:
         except Exception:
             legacy_wallet = None
 
-        qs = WalletAccount.objects.select_for_update() if lock else WalletAccount.objects
-        account, created = qs.get_or_create(
+        account, created = WalletAccount.objects.get_or_create(
             user=user,
             wallet_type=wallet_type,
             defaults={"legacy_wallet": legacy_wallet},
         )
+        is_sys = (str(wallet_type or "").upper() == "SYSTEM") or getattr(user, "id", None) in (1, 32) or getattr(user, "category", "") == "company"
+        if lock and not is_sys and not created and transaction.get_connection().in_atomic_block:
+            account = WalletAccount.objects.select_for_update().get(pk=account.pk)
         if legacy_wallet:
             dirty = False
             if created and not account.legacy_wallet_id:
@@ -155,8 +157,17 @@ class WalletEngine:
                         return existing
                 raise
 
+            sys_user = cls.get_system_user()
+            sys_user_id = getattr(sys_user, "id", 1)
             for index, posting in enumerate(posting_list, start=1):
-                account = cls.get_account(posting.user, posting.wallet_type, lock=True)
+                p_user_id = getattr(posting.user, "id", None)
+                p_user_cat = getattr(posting.user, "category", "")
+                is_system_acc = (
+                    (str(posting.wallet_type or "").upper() == "SYSTEM")
+                    or p_user_id in (1, 32, sys_user_id)
+                    or p_user_cat == "company"
+                )
+                account = cls.get_account(posting.user, posting.wallet_type, lock=not is_system_acc)
                 amount = _money(posting.amount)
                 before = _money(account.current_balance)
                 if posting.direction == LedgerDirections.CREDIT:
@@ -166,9 +177,22 @@ class WalletEngine:
                 else:
                     raise ValueError(f"Invalid ledger direction: {posting.direction}")
 
-                account.current_balance = after
-                account.available_balance = after
-                account.save(update_fields=["current_balance", "available_balance", "updated_at"])
+                if is_system_acc:
+                    try:
+                        with transaction.atomic(savepoint=True):
+                            delta = amount if posting.direction == LedgerDirections.CREDIT else -amount
+                            WalletAccount.objects.filter(id=account.id).update(
+                                current_balance=models.F("current_balance") + delta,
+                                available_balance=models.F("available_balance") + delta,
+                                updated_at=timezone.now(),
+                            )
+                            account.refresh_from_db(fields=["current_balance", "available_balance"])
+                    except Exception:
+                        pass
+                else:
+                    account.current_balance = after
+                    account.available_balance = after
+                    account.save(update_fields=["current_balance", "available_balance", "updated_at"])
 
                 LedgerEntry.objects.create(
                     financial_transaction=ft,

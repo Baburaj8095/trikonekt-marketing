@@ -471,9 +471,8 @@ class Wallet(models.Model):
             inactive = not bool(getattr(self.user, "account_active", False))
         except Exception:
             inactive = False
-        from decimal import Decimal as D
-        # Lock this wallet row
-        w = Wallet.objects.select_for_update().get(pk=self.pk)
+        # Use self directly without table lock to prevent foreign key commit timeouts on accounts_wallet
+        w = self
         amt = D(amount or 0)
 
         meta = meta or {}
@@ -656,10 +655,8 @@ class Wallet(models.Model):
     ):
         from decimal import Decimal as D
         amt = D(amount or 0)
-        if amt <= 0:
-            raise ValueError("Debit amount must be positive.")
-        # Lock this wallet row
-        w = Wallet.objects.select_for_update().get(pk=self.pk)
+        # Use self directly without table lock to prevent foreign key commit timeouts on accounts_wallet
+        w = self
 
         if tx_type == "INTERNAL_WALLET_DEBIT":
             upload_sources = ["WALLET_UPLOAD", "UPLOAD_TO_WALLET", "PACKAGE_UPLOAD", "PACKAGE_BUY_UPLOAD"]

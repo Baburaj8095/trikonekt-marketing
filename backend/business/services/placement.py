@@ -195,9 +195,10 @@ def find_next_placement_slot(width: int, max_depth: int, pool_type: str, start_a
 
         if target_parent is not None:
             child_level = int(getattr(target_parent, "level", 0) or 0) + 1
-            if child_level > int(max_depth):
+            rel_depth = child_level - int(getattr(root, "level", 0) or 0)
+            if start_account_id and rel_depth > int(max_depth):
                 raise MaxDepthError(
-                    f"Max depth reached for pool={pool_type}: next={child_level}, configured={max_depth}"
+                    f"Max relative depth reached under start_account={start_account_id} for pool={pool_type}: rel={rel_depth}, configured={max_depth}"
                 )
 
             # Fetch positions for this one parent only (fast) and pick first missing.
@@ -288,7 +289,25 @@ class GenericPlacement:
             parent, position, child_level = find_next_placement_slot(
                 int(width), int(max_depth), pool_type, start_account_id=int(start_entry_id) if start_entry_id else None
             )
-        except MaxDepthError as mde:
+        except (MaxDepthError, NoCapacityError) as mde:
+            if start_entry_id:
+                try:
+                    if AuditTrail is not None:
+                        AuditTrail.objects.create(
+                            action="placement_fallback_global",
+                            actor=None,
+                            notes=f"Fallback to global sentinel root after sponsor subtree reached depth: {mde}",
+                            metadata={
+                                "pool_type": pool_type,
+                                "owner_id": getattr(owner, "id", None),
+                                "start_entry_id": int(start_entry_id),
+                                "configured_max_depth": int(max_depth),
+                            },
+                        )
+                except Exception:
+                    pass
+                return cls.place_account(owner, pool_type, width, max_depth, start_entry_id=None)
+
             # Record an audit trail entry for operational visibility before re-raising
             try:
                 if AuditTrail is not None:

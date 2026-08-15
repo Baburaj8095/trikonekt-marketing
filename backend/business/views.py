@@ -1265,21 +1265,27 @@ class PromoPurchasePayFromWalletView(APIView):
 
         with transaction.atomic():
             w = Wallet.get_or_create_for_user(request.user)
-            w = Wallet.objects.select_for_update().get(pk=w.pk)
             if wallet_source == "package_coupon":
-                credit = WalletTransaction.objects.filter(
-                    user=request.user,
-                    type__in=["PACKAGE_COUPON_WALLET_CREDIT", "VOUCHER_REDEEM_CREDIT"],
-                    amount__gt=0,
-                ).aggregate(total=Sum("amount"))["total"] or D("0.00")
-                debit = WalletTransaction.objects.filter(
-                    user=request.user,
-                    type="PACKAGE_COUPON_WALLET_DEBIT",
-                    amount__lt=0,
-                ).aggregate(total=Sum("amount"))["total"] or D("0.00")
-                available = D(str(credit)) + D(str(debit))
+                coupon_acc = WalletEngine.get_account(request.user, WalletTypes.PACKAGE_PURCHASE_COUPON, lock=True)
+                available = D(str(coupon_acc.available_balance or 0)).quantize(D("0.01"))
+                if available < total:
+                    credit = WalletTransaction.objects.filter(
+                        user=request.user,
+                        type__in=["PACKAGE_COUPON_WALLET_CREDIT", "VOUCHER_REDEEM_CREDIT"],
+                        amount__gt=0,
+                    ).aggregate(total=Sum("amount"))["total"] or D("0.00")
+                    debit = WalletTransaction.objects.filter(
+                        user=request.user,
+                        type="PACKAGE_COUPON_WALLET_DEBIT",
+                        amount__lt=0,
+                    ).aggregate(total=Sum("amount"))["total"] or D("0.00")
+                    available = D(str(credit)) + D(str(debit))
                 if available < total:
                     return Response({"detail": "Insufficient Package Purchase Coupon Wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
+
+                coupon_acc.current_balance = max(D("0.00"), coupon_acc.current_balance - total)
+                coupon_acc.available_balance = max(D("0.00"), coupon_acc.available_balance - total)
+                coupon_acc.save(update_fields=["current_balance", "available_balance", "updated_at"])
 
                 WalletTransaction.objects.create(
                     user=request.user,
@@ -1291,21 +1297,11 @@ class PromoPurchasePayFromWalletView(APIView):
                     source_id="",
                 )
             elif wallet_source == "package_upload":
-                upload_sources = ["WALLET_UPLOAD", "UPLOAD_TO_WALLET", "PACKAGE_UPLOAD", "PACKAGE_BUY_UPLOAD"]
-                credit = WalletTransaction.objects.filter(
-                    user=request.user,
-                    source_type__in=upload_sources,
-                    amount__gt=0,
-                ).aggregate(total=Sum("amount"))["total"] or D("0.00")
-                debit = WalletTransaction.objects.filter(
-                    user=request.user,
-                    source_type__in=upload_sources,
-                    amount__lt=0,
-                ).aggregate(total=Sum("amount"))["total"] or D("0.00")
-                available = D(str(credit)) + D(str(debit))
+                add_money_acc = WalletEngine.get_account(request.user, WalletTypes.ADD_MONEY_POCKET, lock=True)
+                available = D(str(add_money_acc.available_balance or 0)).quantize(D("0.01"))
                 if available < total:
                     return Response({"detail": "Insufficient Add Money Pocket balance."}, status=status.HTTP_400_BAD_REQUEST)
-                add_money_acc = WalletEngine.get_account(request.user, WalletTypes.ADD_MONEY_POCKET, lock=True)
+
                 add_money_acc.current_balance = max(D("0.00"), add_money_acc.current_balance - total)
                 add_money_acc.available_balance = max(D("0.00"), add_money_acc.available_balance - total)
                 add_money_acc.save(update_fields=["current_balance", "available_balance", "updated_at"])
@@ -1321,16 +1317,25 @@ class PromoPurchasePayFromWalletView(APIView):
                     source_id="",
                 )
             else:
+                self_pkg_acc = WalletEngine.get_account(request.user, WalletTypes.SELF_PACKAGE_POCKET, lock=True)
+                available = D(str(self_pkg_acc.available_balance or 0)).quantize(D("0.01"))
+                if available < total:
+                    return Response({"detail": "Insufficient wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
+
+                self_pkg_acc.current_balance = max(D("0.00"), self_pkg_acc.current_balance - total)
+                self_pkg_acc.available_balance = max(D("0.00"), self_pkg_acc.available_balance - total)
+                self_pkg_acc.save(update_fields=["current_balance", "available_balance", "updated_at"])
+
                 try:
                     w.debit(
                         total,
                         tx_type="INTERNAL_WALLET_DEBIT",
                         meta={"reason": "PROMO_PURCHASE", "package_id": getattr(pkg, "id", None), "wallet_source": "internal"},
                         source_type="PROMO_PURCHASE",
-                        source_id="",  # filled after promo purchase is created
+                        source_id="",
                     )
                 except Exception:
-                    return Response({"detail": "Insufficient wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
+                    pass
 
             # Create the purchase record
             try:
@@ -1338,7 +1343,12 @@ class PromoPurchasePayFromWalletView(APIView):
             except Exception:
                 data = ser.validated_data
             # Ensure clean fields (serializer uses write-only helpers)
-            data.pop("boxes", None)
+            boxes_val = data.pop("boxes", None)
+            if boxes_val is not None and "boxes_json" not in data:
+                data["boxes_json"] = boxes_val
+            data.pop("wallet_source", None)
+            data.pop("walletSource", None)
+
             pp = PromoPurchase.objects.create(
                 user=request.user,
                 amount_paid=total,

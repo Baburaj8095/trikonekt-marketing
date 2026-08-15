@@ -811,11 +811,19 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
           setPaymentOpen(true);
         }}
         onPickWallet={async (walletSource = "package_upload") => {
-          const upgrade = (paymentData || (createdUpgrade ? { upgrade: createdUpgrade } : null))?.upgrade;
-          if (!upgrade?.id) return;
+          let upgrade = (paymentData || (createdUpgrade ? { upgrade: createdUpgrade } : null))?.upgrade;
           setWalletBusy(true);
           setWalletErr("");
           try {
+            if (!upgrade?.id && selectedEligibleItem?.to_rank?.id) {
+              const resp = await initiateUpgrade({ to_rank_id: selectedEligibleItem.to_rank.id });
+              upgrade = resp?.upgrade;
+              if (upgrade) setCreatedUpgrade(upgrade);
+            }
+            if (!upgrade?.id) {
+              setWalletErr("Could not initialize rank upgrade. Please try again.");
+              return;
+            }
             await createRankUpgradeFromWallet({
               upgrade_id: upgrade.id,
               wallet_source: walletSource,

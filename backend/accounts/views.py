@@ -144,9 +144,11 @@ class AdminWalletUploadRequestApproveView(APIView):
         from decimal import Decimal
         from django.utils import timezone as _tz
         from django.db import transaction as _tx
+        from accounts.finance_constants import WalletTypes, FinanceCategories
+        from accounts.wallet_engine import WalletEngine
 
         with _tx.atomic():
-            obj = WalletUploadRequest.objects.select_for_update().select_related("user").filter(pk=pk).first()
+            obj = WalletUploadRequest.objects.select_for_update().filter(pk=pk).first()
             if not obj:
                 return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
             if obj.status == "APPROVED":
@@ -4051,8 +4053,8 @@ def wallet_me_history(request):
         "MONTHLY_759_DIRECT",
         "MONTHLY_759_SELF",
     ]
-    incoming_qs = WalletTransaction.objects.filter(user=user, type__in=incoming_types, amount__gt=0).order_by("-created_at")[:500]
-    self_qs = WalletTransaction.objects.filter(user=user, type__in=["SELF_ACCOUNT_CREDIT", "SELF_ACCOUNT_DEBIT"]).order_by("-created_at")[:500]
+    incoming_qs = WalletTransaction.objects.filter(user=user, type__in=incoming_types, amount__gt=0).order_by("-created_at")[:50]
+    self_qs = WalletTransaction.objects.filter(user=user, type__in=["SELF_ACCOUNT_CREDIT", "SELF_ACCOUNT_DEBIT"]).order_by("-created_at")[:50]
     redeem_types = [
         "AUTO_ECOUPON_ISSUED",
         "AUTO_PURCHASE_DEBIT",
@@ -4063,14 +4065,14 @@ def wallet_me_history(request):
         "PRODUCT_PURCHASE_DEBIT",
         "ADJUSTMENT_DEBIT",
     ]
-    redeem_qs = WalletTransaction.objects.filter(user=user, type__in=redeem_types).order_by("-created_at")[:500]
+    redeem_qs = WalletTransaction.objects.filter(user=user, type__in=redeem_types).order_by("-created_at")[:50]
 
     # Reward points
     cashback = []
     redeem_points = []
     try:
         from .models import RewardPointsTransaction
-        rtx = RewardPointsTransaction.objects.filter(user=user).order_by("-created_at")[:500]
+        rtx = RewardPointsTransaction.objects.filter(user=user).order_by("-created_at")[:50]
         for x in rtx:
             xtype = (x.type or "").upper()
             row = {
