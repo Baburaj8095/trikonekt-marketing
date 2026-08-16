@@ -247,6 +247,31 @@ function DomainRedirects() {
 }
 
 function App() {
+  const UNDER_MAINTENANCE = true;
+
+  if (UNDER_MAINTENANCE) {
+    const path = window.location.pathname;
+    if (!path.startsWith("/admin") && !path.startsWith("/admin-panel")) {
+      return (
+        <div style={{
+          textAlign: "center",
+          padding: "100px 20px",
+          fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+          color: "#333",
+          backgroundColor: "#f7f9fa",
+          minHeight: "100vh",
+          boxSizing: "border-box"
+        }}>
+          <div style={{ fontWeight: "bold", fontSize: "24px", color: "#0066cc", marginBottom: "40px" }}>Trikonekt</div>
+          <h1 style={{ fontSize: "40px", marginBottom: "20px", color: "#1a1a1a" }}>Scheduled Maintenance</h1>
+          <p style={{ fontSize: "18px", lineHeight: "1.6", color: "#555", maxWidth: "600px", margin: "0 auto 30px auto" }}>
+            We are currently performing scheduled system updates to improve performance and reliability. We will be back online shortly. Thank you for your patience!
+          </p>
+        </div>
+      );
+    }
+  }
+
   return (
     <BrowserRouter>
       <LoadingOverlay />
