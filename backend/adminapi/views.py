@@ -1860,12 +1860,14 @@ class AdminWalletAdjustPocketView(APIView):
             )
 
             # Sync to WalletAccount via WalletEngine
-            if pocket in {"add_money", "coupon", "shopping", "self_package", "package_purchase_coupon"}:
+            if pocket in {"main", "withdrawal", "add_money", "coupon", "shopping", "self_package", "package_purchase_coupon"}:
                 try:
                     from accounts.finance_constants import WalletTypes, FinanceCategories, LedgerDirections
                     from accounts.wallet_engine import WalletEngine, LedgerPosting
 
                     pocket_wallet_map = {
+                        "main": WalletTypes.MAIN,
+                        "withdrawal": WalletTypes.WITHDRAWAL_WALLET,
                         "add_money": WalletTypes.ADD_MONEY_POCKET,
                         "coupon": WalletTypes.COUPON_POCKET,
                         "shopping": WalletTypes.SHOPPING_REBIRTH,
