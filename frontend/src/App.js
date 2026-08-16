@@ -247,7 +247,7 @@ function DomainRedirects() {
 }
 
 function App() {
-  const UNDER_MAINTENANCE = true;
+  const UNDER_MAINTENANCE = false;
 
   if (UNDER_MAINTENANCE) {
     const path = window.location.pathname;
