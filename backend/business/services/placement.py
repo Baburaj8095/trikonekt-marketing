@@ -279,6 +279,14 @@ class GenericPlacement:
         Strict width-before-depth and round-robin at the same level.
         Fails with MaxDepthError/NoCapacityError instead of falling back to sponsor/self.
         """
+        # Lock sentinel root to serialize concurrent placements for the pool
+        try:
+            sentinel = _ensure_sentinel_root(pool_type)
+            if sentinel:
+                AutoPoolAccount.objects.select_for_update().get(id=sentinel.id)
+        except Exception:
+            pass
+
         if width is None or max_depth is None:
             w, d = GenericPlacement.configured_width_and_depth(pool_type)
             width = w if width is None else width
