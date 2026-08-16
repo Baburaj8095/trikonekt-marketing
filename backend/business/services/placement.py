@@ -73,7 +73,7 @@ def _ensure_sentinel_root(pool_type: str) -> AutoPoolAccount:
                 raise PlacementError("No eligible owner user found for sentinel root")
 
     # Try fetch fast path
-    root = AutoPoolAccount.objects.filter(pool_type=pool_type, parent_account__isnull=True, level=0).order_by("id").first()
+    root = AutoPoolAccount.objects.filter(pool_type=pool_type, parent_account__isnull=True).order_by("id").first()
     if root:
         return root
 
@@ -81,7 +81,7 @@ def _ensure_sentinel_root(pool_type: str) -> AutoPoolAccount:
     with transaction.atomic():
         root = (
             AutoPoolAccount.objects.select_for_update()
-            .filter(pool_type=pool_type, parent_account__isnull=True, level=0)
+            .filter(pool_type=pool_type, parent_account__isnull=True)
             .first()
         )
         if root:
