@@ -354,7 +354,7 @@ class PrefixSequence(models.Model):
 # ======================
 # Wallet & Ledger Models
 # ======================
-from decimal import Decimal
+from decimal import Decimal, Decimal as D
 from django.db import transaction
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
