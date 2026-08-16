@@ -180,8 +180,14 @@ def _matrix_ancestor_accounts(acc: AutoPoolAccount, depth: int) -> list[AutoPool
     chain: list[AutoPoolAccount] = []
     try:
         seen = set()
+        seen_node_ids = set()
         node = getattr(acc, "parent_account", None)
         while node and len(chain) < max(0, depth):
+            node_id = getattr(node, "id", None)
+            if node_id in seen_node_ids:
+                break
+            seen_node_ids.add(node_id)
+
             owner = getattr(node, "owner", None)
             oid = getattr(owner, "id", None) if owner else None
             if owner and oid and oid not in seen:
