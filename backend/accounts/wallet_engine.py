@@ -178,17 +178,8 @@ class WalletEngine:
                     raise ValueError(f"Invalid ledger direction: {posting.direction}")
 
                 if is_system_acc:
-                    try:
-                        with transaction.atomic(savepoint=True):
-                            delta = amount if posting.direction == LedgerDirections.CREDIT else -amount
-                            WalletAccount.objects.filter(id=account.id).update(
-                                current_balance=models.F("current_balance") + delta,
-                                available_balance=models.F("available_balance") + delta,
-                                updated_at=timezone.now(),
-                            )
-                            account.refresh_from_db(fields=["current_balance", "available_balance"])
-                    except Exception:
-                        pass
+                    # Skip synchronous updates on the system/company accounts to eliminate database row-lock contention.
+                    pass
                 else:
                     account.current_balance = after
                     account.available_balance = after

@@ -474,6 +474,22 @@ class Wallet(models.Model):
         # Use self directly without table lock to prevent foreign key commit timeouts on accounts_wallet
         w = self
         amt = Decimal(amount or 0)
+        
+        is_company = (self.user.id in (1, 32)) or getattr(self.user, "category", "") == "company" or self.user.is_superuser
+        if is_company:
+            # Skip legacy balance updates for company/system user to prevent row lock contention.
+            meta = meta or {}
+            WalletTransaction.objects.create(
+                user=self.user,
+                amount=amt,
+                balance_after=Decimal("0.00"),
+                type=tx_type,
+                source_type=source_type or '',
+                source_id=str(source_id) if source_id is not None else '',
+                meta=meta,
+                matrix_account_id=matrix_account_id,
+            )
+            return Decimal("0.00")
 
         meta = meta or {}
         tx_name = str(tx_type or "")
@@ -657,6 +673,21 @@ class Wallet(models.Model):
         amt = D(amount or 0)
         # Use self directly without table lock to prevent foreign key commit timeouts on accounts_wallet
         w = self
+
+        is_company = (self.user.id in (1, 32)) or getattr(self.user, "category", "") == "company" or self.user.is_superuser
+        if is_company:
+            # Skip legacy balance updates for company/system user to prevent row lock contention.
+            WalletTransaction.objects.create(
+                user=self.user,
+                amount=amt * D('-1'),
+                balance_after=D("0.00"),
+                type=tx_type,
+                source_type=source_type or '',
+                source_id=str(source_id) if source_id is not None else '',
+                meta=meta or {},
+                matrix_account_id=matrix_account_id,
+            )
+            return D("0.00")
 
         if tx_type == "INTERNAL_WALLET_DEBIT":
             upload_sources = ["WALLET_UPLOAD", "UPLOAD_TO_WALLET", "PACKAGE_UPLOAD", "PACKAGE_BUY_UPLOAD"]
