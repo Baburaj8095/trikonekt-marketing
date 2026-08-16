@@ -63,8 +63,10 @@ class MaintenanceMiddleware:
         
         # Check environment variable
         is_maintenance = os.environ.get("MAINTENANCE_MODE", "False").lower() in ("true", "1", "yes")
+        host = request.get_host().lower() if hasattr(request, "get_host") else ""
+        is_admin_request = path.startswith("/admin/") or host.startswith("admin.")
         
-        if is_maintenance and not path.startswith("/admin/"):
+        if is_maintenance and not is_admin_request:
             if path.startswith("/api/"):
                 return JsonResponse(
                     {"detail": "The server is currently undergoing scheduled maintenance. Please try again later."},

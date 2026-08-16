@@ -247,7 +247,8 @@ function DomainRedirects() {
 }
 
 function App() {
-  const UNDER_MAINTENANCE = false;
+  const hostname = window.location.hostname;
+  const UNDER_MAINTENANCE = hostname === "growth.vin" || hostname === "www.growth.vin";
 
   if (UNDER_MAINTENANCE) {
     const path = window.location.pathname;
