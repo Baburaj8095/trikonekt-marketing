@@ -64,7 +64,7 @@ class MaintenanceMiddleware:
         # Check environment variable
         is_maintenance = os.environ.get("MAINTENANCE_MODE", "False").lower() in ("true", "1", "yes")
         host = request.get_host().lower() if hasattr(request, "get_host") else ""
-        is_admin_request = path.startswith("/admin/") or host.startswith("admin.")
+        is_admin_request = path.startswith("/admin/") or path.startswith("/healthz") or host.startswith("admin.")
         
         if is_maintenance and not is_admin_request:
             if path.startswith("/api/"):
