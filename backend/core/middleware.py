@@ -44,3 +44,53 @@ class CharsetUTF8Middleware:
             # Don't break responses if header probing fails
             pass
         return response
+
+
+class MaintenanceMiddleware:
+    """
+    Globally intercept requests and return a 503 Service Unavailable response
+    when MAINTENANCE_MODE is set to True in settings or environment variables.
+    Exempts admin console so administrative functions remain accessible.
+    """
+    def __init__(self, get_response: Callable):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        import os
+        from django.http import JsonResponse, HttpResponse
+        
+        path = getattr(request, "path", "") or ""
+        
+        # Check environment variable
+        is_maintenance = os.environ.get("MAINTENANCE_MODE", "False").lower() in ("true", "1", "yes")
+        
+        if is_maintenance and not path.startswith("/admin/"):
+            if path.startswith("/api/"):
+                return JsonResponse(
+                    {"detail": "The server is currently undergoing scheduled maintenance. Please try again later."},
+                    status=503
+                )
+            else:
+                html_content = """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>System Maintenance</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1">
+                    <style>
+                        body { text-align: center; padding: 100px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #333; background-color: #f7f9fa; }
+                        h1 { font-size: 40px; margin-bottom: 20px; color: #1a1a1a; }
+                        p { font-size: 18px; line-height: 1.6; color: #555; max-width: 600px; margin: 0 auto 30px auto; }
+                        .logo { font-weight: bold; font-size: 24px; color: #0066cc; margin-bottom: 40px; display: inline-block; text-decoration: none; }
+                    </style>
+                </head>
+                <body>
+                    <div class="logo">Trikonekt</div>
+                    <h1>Scheduled Maintenance</h1>
+                    <p>We are currently performing scheduled system updates to improve performance and reliability. We will be back online shortly. Thank you for your patience!</p>
+                </body>
+                </html>
+                """
+                return HttpResponse(html_content, status=503)
+                
+        return self.get_response(request)
