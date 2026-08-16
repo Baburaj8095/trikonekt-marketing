@@ -473,7 +473,7 @@ class Wallet(models.Model):
             inactive = False
         # Use self directly without table lock to prevent foreign key commit timeouts on accounts_wallet
         w = self
-        amt = D(amount or 0)
+        amt = Decimal(amount or 0)
 
         meta = meta or {}
         tx_name = str(tx_type or "")
