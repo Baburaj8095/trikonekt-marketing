@@ -1283,10 +1283,6 @@ class PromoPurchasePayFromWalletView(APIView):
                 if available < total:
                     return Response({"detail": "Insufficient Package Purchase Coupon Wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
 
-                coupon_acc.current_balance = max(D("0.00"), coupon_acc.current_balance - total)
-                coupon_acc.available_balance = max(D("0.00"), coupon_acc.available_balance - total)
-                coupon_acc.save(update_fields=["current_balance", "available_balance", "updated_at"])
-
                 WalletTransaction.objects.create(
                     user=request.user,
                     amount=total * D("-1"),
@@ -1301,10 +1297,6 @@ class PromoPurchasePayFromWalletView(APIView):
                 available = D(str(add_money_acc.available_balance or 0)).quantize(D("0.01"))
                 if available < total:
                     return Response({"detail": "Insufficient Add Money Pocket balance."}, status=status.HTTP_400_BAD_REQUEST)
-
-                add_money_acc.current_balance = max(D("0.00"), add_money_acc.current_balance - total)
-                add_money_acc.available_balance = max(D("0.00"), add_money_acc.available_balance - total)
-                add_money_acc.save(update_fields=["current_balance", "available_balance", "updated_at"])
 
                 w = Wallet.objects.get(pk=w.pk)
                 WalletTransaction.objects.create(
@@ -1321,10 +1313,6 @@ class PromoPurchasePayFromWalletView(APIView):
                 available = D(str(self_pkg_acc.available_balance or 0)).quantize(D("0.01"))
                 if available < total:
                     return Response({"detail": "Insufficient wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
-
-                self_pkg_acc.current_balance = max(D("0.00"), self_pkg_acc.current_balance - total)
-                self_pkg_acc.available_balance = max(D("0.00"), self_pkg_acc.available_balance - total)
-                self_pkg_acc.save(update_fields=["current_balance", "available_balance", "updated_at"])
 
                 try:
                     w.debit(

@@ -423,25 +423,10 @@ class UpgradePayFromWalletView(APIView):
             except Exception:
                 pass
         elif wallet_source == "package_upload":
-            upload_sources = ["WALLET_UPLOAD", "UPLOAD_TO_WALLET", "PACKAGE_UPLOAD", "PACKAGE_BUY_UPLOAD"]
-            credit = WalletTransaction.objects.filter(
-                user=request.user,
-                source_type__in=upload_sources,
-                amount__gt=0,
-            ).aggregate(total=Sum("amount"))["total"] or D("0.00")
-            debit = WalletTransaction.objects.filter(
-                user=request.user,
-                source_type__in=upload_sources,
-                amount__lt=0,
-            ).aggregate(total=Sum("amount"))["total"] or D("0.00")
-            available = D(str(credit)) + D(str(debit))
+            add_money_acc = WalletEngine.get_account(request.user, WalletTypes.ADD_MONEY_POCKET, lock=True)
+            available = D(str(add_money_acc.available_balance or 0)).quantize(D("0.01"))
             if available < amount:
                 return Response({"detail": "Insufficient Add Money Pocket balance."}, status=status.HTTP_400_BAD_REQUEST)
-
-            add_money_acc = WalletEngine.get_account(request.user, WalletTypes.ADD_MONEY_POCKET, lock=True)
-            add_money_acc.current_balance = max(D("0.00"), add_money_acc.current_balance - amount)
-            add_money_acc.available_balance = max(D("0.00"), add_money_acc.available_balance - amount)
-            add_money_acc.save(update_fields=["current_balance", "available_balance", "updated_at"])
 
             w = Wallet.objects.get(pk=w.pk)
 
