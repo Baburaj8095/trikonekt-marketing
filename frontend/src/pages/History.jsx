@@ -495,6 +495,7 @@ export default function History() {
     withdrawable_balance: "0.00",
     shopping_rewards_points: "0.00",
     redeem_points: "0.00",
+    all_earnings_total: "0.00",
   });
 
   const [mainWallet, setMainWallet] = useState([]);
@@ -525,6 +526,7 @@ export default function History() {
           withdrawable_balance: data?.top?.withdrawable_balance ?? "0.00",
           shopping_rewards_points: data?.top?.shopping_rewards_points ?? "0.00",
           redeem_points: data?.top?.redeem_points ?? "0.00",
+          all_earnings_total: data?.top?.all_earnings_total ?? "0.00",
         });
 
         setMainWallet(Array.isArray(data?.main_wallet) ? data.main_wallet : (Array.isArray(data?.recent) ? data.recent : []));
@@ -790,7 +792,7 @@ export default function History() {
       >
           <MiniCard
           title="Bonus Wallet"
-          value={`₹ ${fmtAmount(totalGross)}`}
+          value={`₹ ${fmtAmount(top.all_earnings_total)}`}
           icon={<SavingsIcon fontSize="small" />}
           color="success"
         />

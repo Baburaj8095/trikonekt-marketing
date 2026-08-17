@@ -4034,6 +4034,28 @@ def wallet_me_history(request):
             "source_id": tx.source_id or "",
         }
 
+    try:
+        from django.db.models import Sum
+        earn_types = [
+            "DIRECT_REF_BONUS",
+            "LEVEL_BONUS",
+            "AUTOPOOL_BONUS_FIVE",
+            "AUTOPOOL_BONUS_THREE",
+            "GLOBAL_ROYALTY",
+            "GLOBAL_ACTIVATION_CREDIT",
+            "COMMISSION_CREDIT",
+            "FRANCHISE_INCOME",
+            "LIFETIME_WITHDRAWAL_BONUS",
+            "REWARD_CREDIT",
+            "REDEEM_ECOUPON_CREDIT",
+            "SELF_BONUS_ACTIVE",
+            "INCOME_CREDIT_75",
+            "SELF_ACCOUNT_CREDIT",
+        ]
+        all_earnings_total = str(WalletTransaction.objects.filter(user=user, amount__gt=0, type__in=earn_types).aggregate(total=Sum("amount"))["total"] or D("0.00"))
+    except Exception:
+        all_earnings_total = "0.00"
+
     # Top summary
     top = {
         "main_income_balance": str(getattr(w, "main_balance", 0) or 0),
@@ -4041,6 +4063,7 @@ def wallet_me_history(request):
         "withdrawable_balance": str(getattr(w, "withdrawable_balance", 0) or 0),
         "shopping_rewards_points": rp_balance,
         "redeem_points": rp_balance,
+        "all_earnings_total": all_earnings_total,
     }
 
     # Buckets
