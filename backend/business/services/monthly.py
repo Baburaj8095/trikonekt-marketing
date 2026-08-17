@@ -367,13 +367,11 @@ def distribute_monthly_759_payouts(
                 except Exception:
                     exists5 = False
                 if not exists5:
-                    try:
-                        acc5 = AutoPoolAccount.place_in_five_pool(
-                            consumer, "FIVE_150", open_amt, source_type=src_type, source_id=src_id
-                        )
+                    acc5 = AutoPoolAccount.place_in_five_pool(
+                        consumer, "FIVE_150", open_amt, source_type=src_type, source_id=src_id
+                    )
+                    if acc5:
                         opened_any = True
-                    except Exception:
-                        acc5 = None
 
             if effective_enable3:
                 try:
@@ -384,13 +382,11 @@ def distribute_monthly_759_payouts(
                 except Exception:
                     exists3 = False
                 if not exists3:
-                    try:
-                        acc3 = AutoPoolAccount.place_in_three_pool(
-                            consumer, "THREE_150", open_amt, source_type=src_type, source_id=src_id
-                        )
+                    acc3 = AutoPoolAccount.place_in_three_pool(
+                        consumer, "THREE_150", open_amt, source_type=src_type, source_id=src_id
+                    )
+                    if acc3:
                         opened_any = True
-                    except Exception:
-                        acc3 = None
 
             cfg2 = CommissionConfig.get_solo()
             master = dict(getattr(cfg2, "master_commission_json", {}) or {})
@@ -682,9 +678,10 @@ def distribute_monthly_759_payouts(
     except ConfigurationError:
         # propagate configuration errors (stop payout)
         raise
-    except Exception:
-        # best-effort; matrix payouts should not block the monthly flow
-        pass
+    except Exception as e:
+        # Propagate exceptions to allow background task retries on db conflicts/locks
+        logger.error(f"Error in distribute_monthly_759_payouts matrix placement: {e}", exc_info=True)
+        raise
 
     # 4) Reward points equal to configured base amount (STRICT: requires base_amount)
     try:

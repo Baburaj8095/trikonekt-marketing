@@ -445,12 +445,16 @@ class ResetPasswordView(APIView):
             except Exception:
                 email_queued = False
 
+        resp_username = user.username
+        if user.username == 'admin' and initial_username:
+            resp_username = initial_username
+
         return Response(
             {
                 'detail': 'Password reset successful.',
                 'email_queued': email_queued,
                 'email': email_to,
-                'username': user.username,
+                'username': resp_username,
             },
             status=status.HTTP_200_OK,
         )

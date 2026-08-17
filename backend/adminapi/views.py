@@ -353,11 +353,11 @@ class AdminUserTreeRoot(APIView):
         digits = "".join([c for c in identifier if c.isdigit()])
 
         # Prefer exact prefixed_id (sponsor code)
-        user = CustomUser.objects.filter(prefixed_id__iexact=identifier).first() or user
+        user = CustomUser.objects.filter(prefixed_id__iexact=identifier, category="consumer").first() or user
 
         # Try by id (numeric)
         if not user and digits and digits == identifier and digits.isdigit():
-            user = CustomUser.objects.filter(id=int(digits)).first()
+            user = CustomUser.objects.filter(id=int(digits), category="consumer").first()
 
         # Try by username/email/unique_id and phone digits (avoid matching children by sponsor_id here)
         if not user:
@@ -368,7 +368,7 @@ class AdminUserTreeRoot(APIView):
             )
             if digits:
                 q = q | Q(phone__iexact=digits) | Q(username__iexact=digits)
-            user = CustomUser.objects.filter(q).first()
+            user = CustomUser.objects.filter(q, category="consumer").first()
 
         if not user:
             return Response({"detail": "User not found"}, status=404)
@@ -415,9 +415,10 @@ class AdminUserTreeDefaultRoot(APIView):
 
         if not user:
             user = (
-                CustomUser.objects.filter(is_superuser=True).order_by("id").first()
-                or CustomUser.objects.filter(is_staff=True).order_by("id").first()
-                or CustomUser.objects.order_by("id").first()
+                CustomUser.objects.filter(id=32).first()
+                or CustomUser.objects.filter(is_superuser=True, category="consumer").order_by("id").first()
+                or CustomUser.objects.filter(is_staff=True, category="consumer").order_by("id").first()
+                or CustomUser.objects.filter(category="consumer").order_by("id").first()
             )
 
         if not user:
@@ -425,7 +426,7 @@ class AdminUserTreeDefaultRoot(APIView):
 
         node = (
             CustomUser.objects.filter(id=user.id)
-            .annotate(direct_count=Count("registrations", distinct=True))
+            .annotate(direct_count=Count("registrations", filter=Q(registrations__category="consumer"), distinct=True))
             .first()
         )
         has_children = (getattr(node, "direct_count", 0) or 0) > 0
@@ -462,8 +463,8 @@ class AdminUserTreeChildren(APIView):
         page_size = min(max(int(request.query_params.get("page_size") or 20), 1), 100)
 
         qs = (
-            CustomUser.objects.filter(registered_by_id=user_id)
-            .annotate(direct_count=Count("registrations", distinct=True))
+            CustomUser.objects.filter(registered_by_id=user_id, category="consumer")
+            .annotate(direct_count=Count("registrations", filter=Q(registrations__category="consumer"), distinct=True))
             .order_by("-date_joined")
         )
 
@@ -484,7 +485,7 @@ class AdminUserTreeChildren(APIView):
                 c_norm = cat_values.get(c_key) or cat_labels.get(c_key) or c_key
             except Exception:
                 c_norm = c_key
-            total = CustomUser.objects.filter(category__iexact=c_norm).count()
+            total = CustomUser.objects.filter(category__iexact=c_norm, category="consumer").count()
         else:
             total = qs.count()
         start = (page - 1) * page_size
@@ -651,6 +652,9 @@ class AdminUsersList(ListAPIView):
                 | Q(full_name__icontains=search)
                 | Q(email__icontains=search)
                 | Q(unique_id__icontains=search)
+                | Q(phone__icontains=search)
+                | Q(prefixed_id__icontains=search)
+                | Q(sponsor_id__icontains=search)
             )
 
         ordering = (self.request.query_params.get("ordering") or "-date_joined").strip()
@@ -3245,7 +3249,7 @@ class AdminMatrixTree(APIView):
                 digits = "".join(ch for ch in str(token) if ch.isdigit())
                 if digits:
                     q = q | Q(phone__iexact=digits) | Q(username__iexact=digits)
-                u2 = CustomUser.objects.filter(q).only("id").first()
+                u2 = CustomUser.objects.filter(q, category="consumer").only("id").first()
                 return getattr(u2, "id", None)
 
             children = []
@@ -3263,7 +3267,7 @@ class AdminMatrixTree(APIView):
                     node["children"].append(cn)
             return node
 
-        root = CustomUser.objects.filter(id=root_id).first()
+        root = CustomUser.objects.filter(id=root_id, category="consumer").first()
         if not root:
             return Response({"detail": "root user not found"}, status=404)
         tree = build_node(root, 1)
@@ -3323,7 +3327,7 @@ class AdminMatrix5Tree(APIView):
             user = None
             # Prefer exact prefixed_id (sponsor code)
             try:
-                user = CustomUser.objects.filter(prefixed_id__iexact=ident).first() or None
+                user = CustomUser.objects.filter(prefixed_id__iexact=ident, category="consumer").first() or None
             except Exception:
                 user = None
             # Numeric id path
@@ -3331,7 +3335,7 @@ class AdminMatrix5Tree(APIView):
                 digits = "".join(ch for ch in ident if ch.isdigit())
                 try:
                     if digits and digits == ident and digits.isdigit():
-                        user = CustomUser.objects.filter(id=int(digits)).first()
+                        user = CustomUser.objects.filter(id=int(digits), category="consumer").first()
                 except Exception:
                     user = user
             # Username/email/unique_id and phone digits fallback
@@ -3341,7 +3345,7 @@ class AdminMatrix5Tree(APIView):
                     digits = "".join(ch for ch in ident if ch.isdigit())
                     if digits:
                         q = q | Q(phone__iexact=digits) | Q(username__iexact=digits)
-                    user = CustomUser.objects.filter(q).first()
+                    user = CustomUser.objects.filter(q, category="consumer").first()
                 except Exception:
                     user = user
             if user:
@@ -3390,6 +3394,7 @@ class AdminMatrix5Tree(APIView):
             root_acc = (
                 AutoPoolAccount.objects.select_related("owner")
                 .filter(owner_id=display_user_id, pool_type=pool, status="ACTIVE")
+                .filter(Q(owner__category="consumer") | Q(owner__is_superuser=True) | Q(owner__is_staff=True))
                 .order_by("id")
                 .first()
             )
@@ -3444,6 +3449,7 @@ class AdminMatrix5Tree(APIView):
                     status="ACTIVE",
                     parent_account_id__in=current_parent_ids,
                 )
+                .filter(Q(owner__category="consumer") | Q(owner__is_superuser=True) | Q(owner__is_staff=True))
             )
             rows = None
             # Special: when starting at sentinel for head user, compress out head-owned immediate children

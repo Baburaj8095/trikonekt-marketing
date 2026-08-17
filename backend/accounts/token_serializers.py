@@ -53,6 +53,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             cond = Q()
             for c in candidates:
                 cond |= Q(username__iexact=c)
+            if digits:
+                cond |= Q(phone__iexact=digits)
             matches = list(User.objects.filter(cond).only("id", "username", "role", "category"))
 
             if len(matches) == 1:

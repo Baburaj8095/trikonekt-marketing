@@ -207,11 +207,7 @@ def handle_coupon_dist(task: BackgroundTask) -> None:
         return
 
     for cid in coupon_ids:
-        try:
-            open_matrix_accounts_for_coupon(user, cid, amount_150=amount_150, distribute=True, trigger=trigger)
-        except Exception:
-            # continue best-effort
-            continue
+        open_matrix_accounts_for_coupon(user, cid, amount_150=amount_150, distribute=True, trigger=trigger)
 
     # Optional audit for visibility (best-effort)
     try:
@@ -257,23 +253,20 @@ def handle_monthly_759(task: BackgroundTask) -> None:
         except Exception:
             continue
         is_first = bool(item.get("is_first"))
-        try:
-            # IMPORTANT: Smart SSP matrix roots must be season-specific and only for the FIRST month
-            # of each season. The UI expects Smart SSP roots to be identifiable by season.
-            #
-            # Convention:
-            #   source_type = "MONTHLY_FIRST_SEASON-{season_number}"
-            #   source_id   = "{purchase_id}:{season_number}:{box_number}"
-            #
-            # For non-first boxes, we keep legacy "MONTHLY_759" source_type (payouts-only).
-            src_type = f"MONTHLY_FIRST_SEASON-{int(pkg_no)}" if (is_first and int(box_no) == 1) else "MONTHLY_759"
-            distribute_monthly_759_payouts(
-                user,
-                is_first_month=is_first,
-                source={"type": src_type, "id": f"{purchase_id}:{pkg_no}:{box_no}"},
-            )
-        except Exception:
-            continue
+        # IMPORTANT: Smart SSP matrix roots must be season-specific and only for the FIRST month
+        # of each season. The UI expects Smart SSP roots to be identifiable by season.
+        #
+        # Convention:
+        #   source_type = "MONTHLY_FIRST_SEASON-{season_number}"
+        #   source_id   = "{purchase_id}:{season_number}:{box_number}"
+        #
+        # For non-first boxes, we keep legacy "MONTHLY_759" source_type (payouts-only).
+        src_type = f"MONTHLY_FIRST_SEASON-{int(pkg_no)}" if (is_first and int(box_no) == 1) else "MONTHLY_759"
+        distribute_monthly_759_payouts(
+            user,
+            is_first_month=is_first,
+            source={"type": src_type, "id": f"{purchase_id}:{pkg_no}:{box_no}"},
+        )
 
     # Optional audit for visibility
     try:
@@ -318,11 +311,7 @@ def handle_prime_150_units(task: BackgroundTask) -> None:
         return
 
     for i in range(1, units + 1):
-        try:
-            activate_150_active(user, {"type": trigger, "id": f"{purchase_id}:{i}"})
-        except Exception:
-            # continue best-effort
-            continue
+        activate_150_active(user, {"type": trigger, "id": f"{purchase_id}:{i}"})
 
     # Optional audit for visibility (best-effort)
     try:
@@ -542,13 +531,13 @@ def handle_coupon_activate(task: BackgroundTask) -> None:
                     actor=user,
                     coupon_code__value=D("759")
                 ).exclude(coupon_code_id=code_obj.id).exists()
+                from business.services.monthly import distribute_monthly_759_payouts
+                distribute_monthly_759_payouts(
+                    user,
+                    is_first_month=(not prev_exists),
+                    source={"type": "ECOUPON_759", "id": code_obj.id, "code": code_obj.code},
+                )
                 try:
-                    from business.services.monthly import distribute_monthly_759_payouts
-                    distribute_monthly_759_payouts(
-                        user,
-                        is_first_month=(not prev_exists),
-                        source={"type": "ECOUPON_759", "id": code_obj.id, "code": code_obj.code},
-                    )
                     AuditTrail.objects.create(
                         action="monthly_759_distributed",
                         actor=user,
@@ -575,18 +564,12 @@ def handle_coupon_activate(task: BackgroundTask) -> None:
                         pass
             else:
                 if not AuditTrail.objects.filter(action="prime_150_distributed", coupon_code=code_obj).exists():
+                    from business.services.prime import distribute_prime_150_payouts
+                    distribute_prime_150_payouts(
+                        user,
+                        source={"type": "ECOUPON_150", "id": code_obj.id, "code": code_obj.code},
+                    )
                     try:
-                        from business.services.prime import distribute_prime_150_payouts
-                        distribute_prime_150_payouts(
-                            user,
-                            source={"type": "ECOUPON_150", "id": code_obj.id, "code": code_obj.code},
-                        )
-                        # NOTE:
-                        # Do NOT call open_matrix_accounts_for_coupon() here.
-                        # The Prime 150 engine already opens the required FIVE_150 + THREE_150 entries
-                        # and pays matrix bonuses. Calling open_matrix_accounts_for_coupon() again uses
-                        # source_type="ECOUPON" (vs Prime engine's "ECOUPON_150") and creates a second set
-                        # of matrix entries, which is what caused the observed double-entry + inflated self counts.
                         AuditTrail.objects.create(
                             action="prime_150_distributed",
                             actor=user,
@@ -595,25 +578,15 @@ def handle_coupon_activate(task: BackgroundTask) -> None:
                             metadata={"denomination": "150"},
                         )
                     except Exception:
-                        # stamp failure audit for observability
-                        try:
-                            AuditTrail.objects.create(
-                                action="prime_150_distribution_failed",
-                                actor=user,
-                                coupon_code=code_obj,
-                                notes="Prime 150 engine failed during e-coupon activation",
-                                metadata={"denomination": "150"},
-                            )
-                        except Exception:
-                            pass
+                        pass
         elif val == D("750"):
             if not AuditTrail.objects.filter(action="prime_750_distributed", coupon_code=code_obj).exists():
+                from business.services.prime import distribute_prime_750_payouts
+                distribute_prime_750_payouts(
+                    user,
+                    source={"type": "ECOUPON_750", "id": code_obj.id, "code": code_obj.code}
+                )
                 try:
-                    from business.services.prime import distribute_prime_750_payouts
-                    distribute_prime_750_payouts(
-                        user,
-                        source={"type": "ECOUPON_750", "id": code_obj.id, "code": code_obj.code}
-                    )
                     AuditTrail.objects.create(
                         action="prime_750_distributed",
                         actor=user,
@@ -1385,104 +1358,83 @@ def handle_promo_approve_payouts(task: BackgroundTask) -> None:
     # PRIME 150: payouts and matrix openings are handled by the Prime payout engine.
     # IMPORTANT: Do NOT pre-create structural matrix entries here; doing so duplicates entries
     # because distribute_prime_150_payouts() also opens matrix accounts.
-    # Keep this handler focused on invoking the payout engine + stamping audits.
+    # Keep this handler focused on invoking the payout engine + stamping audit
     if is_prime_150:
-        try:
-            from business.models import CommissionConfig
-            from business.services.prime import distribute_prime_150_payouts
+        from business.models import CommissionConfig
+        from business.services.prime import distribute_prime_150_payouts
 
-            # Financial event: call payout engine (this will also open matrix accounts if enabled)
-            distribute_prime_150_payouts(
-                obj.user,
-                source={"type": "PROMO_PURCHASE_APPROVAL", "id": obj.id},
-            )
+        # Financial event: call payout engine (this will also open matrix accounts if enabled)
+        distribute_prime_150_payouts(
+            obj.user,
+            source={"type": "PROMO_PURCHASE_APPROVAL", "id": obj.id},
+        )
 
-            # Idempotent success marker + audit
-            try:
-                AuditTrail.objects.create(
-                    action="promo_purchase_distributed",
-                    actor=getattr(obj, "approved_by", None),
-                    notes=f"Promo purchase #{obj.id} payouts done",
-                    metadata={
-                        "purchase_id": obj.id,
-                        "package": getattr(obj.package, "code", None),
-                        "pools": ["FIVE_150", "THREE_150"],
-                    },
-                )
-            except Exception:
-                pass
+        # Idempotent success marker + audit
+        AuditTrail.objects.create(
+            action="promo_purchase_distributed",
+            actor=getattr(obj, "approved_by", None),
+            notes=f"Promo purchase #{obj.id} payouts done",
+            metadata={
+                "purchase_id": obj.id,
+                "package": getattr(obj.package, "code", None),
+                "pools": ["FIVE_150", "THREE_150"],
+            },
+        )
 
-            success = True
-        except Exception:
-            # Ensure no partial commit (entry is rolled back by atomic if payout failed)
-            success = False
+        success = True
 
     # PRIME 750: payouts and matrix openings are handled by the Prime payout engine.
     # IMPORTANT: Do NOT pre-create structural matrix entries here; doing so duplicates entries
     # because distribute_prime_750_payouts() also opens matrix accounts.
+    # Keep this handler focused on invoking the payout engine + stamping audits.
     elif is_prime_750:
-        try:
-            from business.models import CommissionConfig
-            from business.services.prime import distribute_prime_750_payouts
+        from business.models import CommissionConfig
+        from business.services.prime import distribute_prime_750_payouts
 
-            # Payouts for PRIME 750 (this will also open matrix accounts if enabled)
-            distribute_prime_750_payouts(
-                obj.user,
-                source={"type": "PROMO_PURCHASE_APPROVAL", "id": obj.id},
-            )
-            # Audit success
-            try:
-                AuditTrail.objects.create(
-                    action="promo_purchase_distributed",
-                    actor=getattr(obj, "approved_by", None),
-                    notes=f"Promo purchase #{obj.id} payouts done",
-                    metadata={
-                        "purchase_id": obj.id,
-                        "package": getattr(obj.package, "code", None),
-                        "pools": ["FIVE_150", "THREE_150"],
-                    },
-                )
-            except Exception:
-                pass
-            success = True
-        except Exception:
-            success = False
+        # Payouts for PRIME 750 (this will also open matrix accounts if enabled)
+        distribute_prime_750_payouts(
+            obj.user,
+            source={"type": "PROMO_PURCHASE_APPROVAL", "id": obj.id},
+        )
+        # Audit success
+        AuditTrail.objects.create(
+            action="promo_purchase_distributed",
+            actor=getattr(obj, "approved_by", None),
+            notes=f"Promo purchase #{obj.id} payouts done",
+            metadata={
+                "purchase_id": obj.id,
+                "package": getattr(obj.package, "code", None),
+                "pools": ["FIVE_150", "THREE_150"],
+            },
+        )
+        success = True
 
     # PRIME 759 monthly: reuse existing engine (first-month flag preserved)
     elif is_prime_759:
-        try:
-            from business.models import Promo759Subscription
-            from business.services.monthly import distribute_monthly_759_payouts
+        from business.models import Promo759Subscription
+        from business.services.monthly import distribute_monthly_759_payouts
 
-            is_first_flag = False
-            try:
-                prev_exists = Promo759Subscription.objects.filter(user=obj.user).exists()
-                Promo759Subscription.objects.get_or_create(
-                    promo_purchase=obj,
-                    defaults={"user": obj.user, "metadata": {"source": "PROMO_PURCHASE_APPROVAL"}},
-                )
-                is_first_flag = not prev_exists
-            except Exception:
-                is_first_flag = False
+        is_first_flag = False
+        prev_exists = Promo759Subscription.objects.filter(user=obj.user).exists()
+        Promo759Subscription.objects.get_or_create(
+            promo_purchase=obj,
+            defaults={"user": obj.user, "metadata": {"source": "PROMO_PURCHASE_APPROVAL"}},
+        )
+        is_first_flag = not prev_exists
 
-            distribute_monthly_759_payouts(
-                obj.user,
-                is_first_month=bool(is_first_flag),
-                source={"type": "PROMO_PURCHASE_APPROVAL", "id": obj.id},
-            )
+        distribute_monthly_759_payouts(
+            obj.user,
+            is_first_month=bool(is_first_flag),
+            source={"type": "PROMO_PURCHASE_APPROVAL", "id": obj.id},
+        )
 
-            try:
-                AuditTrail.objects.create(
-                    action="promo_purchase_distributed",
-                    actor=getattr(obj, "approved_by", None),
-                    notes=f"Promo purchase #{obj.id} payouts done",
-                    metadata={"purchase_id": obj.id, "package": getattr(obj.package, "code", None)},
-                )
-            except Exception:
-                pass
-            success = True
-        except Exception:
-            success = False
+        AuditTrail.objects.create(
+            action="promo_purchase_distributed",
+            actor=getattr(obj, "approved_by", None),
+            notes=f"Promo purchase #{obj.id} payouts done",
+            metadata={"purchase_id": obj.id, "package": getattr(obj.package, "code", None)},
+        )
+        success = True
 
     # Others: no-op
     else:

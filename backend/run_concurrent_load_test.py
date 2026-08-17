@@ -24,7 +24,7 @@ User = get_user_model()
 
 # Step 1: Cleanup old test users matching prefix "99"
 print("=== CLEANING UP OLD TEST USERS ===")
-test_users = User.objects.filter(username__startswith="99")
+test_users = User.objects.filter(username__startswith="99").exclude(username="9999999999")
 if test_users.exists():
     from accounts.models import LedgerEntry, ConsumerVoucher, WalletTransaction, WalletAccount
     from business.models import PromoPurchase, SubscriptionActivation, AutoPoolAccount
