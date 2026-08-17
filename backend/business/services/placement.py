@@ -279,11 +279,11 @@ class GenericPlacement:
         Strict width-before-depth and round-robin at the same level.
         Fails with MaxDepthError/NoCapacityError instead of falling back to sponsor/self.
         """
-        # Lock sentinel root to serialize concurrent placements for the pool
+        # Acquire a transaction-level advisory lock on the pool type to serialize concurrent placements
         try:
-            sentinel = _ensure_sentinel_root(pool_type)
-            if sentinel:
-                AutoPoolAccount.objects.select_for_update().get(id=sentinel.id)
+            from django.db import connection
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", [pool_type])
         except Exception:
             pass
 
