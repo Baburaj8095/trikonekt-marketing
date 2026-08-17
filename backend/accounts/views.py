@@ -2259,7 +2259,6 @@ class WalletMe(APIView):
                     ],
                 )
             )
-            # All earnings (gross without TDS): sum of positive credits across all earning types
             earn_types = [
                 "DIRECT_REF_BONUS",
                 "LEVEL_BONUS",
@@ -2273,6 +2272,8 @@ class WalletMe(APIView):
                 "REWARD_CREDIT",
                 "REDEEM_ECOUPON_CREDIT",
                 "SELF_BONUS_ACTIVE",
+                "INCOME_CREDIT_75",
+                "SELF_ACCOUNT_CREDIT",
             ]
             all_earnings_total = _sum_t(tx_all.filter(amount__gt=0, type__in=earn_types))
         except Exception:

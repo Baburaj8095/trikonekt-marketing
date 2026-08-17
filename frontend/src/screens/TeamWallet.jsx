@@ -438,7 +438,7 @@ export default function TeamWallet() {
 
       switch (def.slNo) {
         case 1:
-          amount = totalEarningBonus;
+          amount = Number(walletData?.totals?.allEarnings || 0);
           icon = <AccountBalanceWalletIcon />;
           label = "Incl. withdrawn amount";
           break;
