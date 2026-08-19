@@ -307,3 +307,44 @@ class WalletEngine:
                 LedgerPosting(user, wallet_type, LedgerDirections.CREDIT, amt, metadata=metadata or {}),
             ],
         )
+
+    @classmethod
+    def post_system_debit(
+        cls,
+        *,
+        user: CustomUser,
+        wallet_type: str,
+        amount: Any,
+        category: str,
+        source_module: str,
+        source_id: str = "",
+        idempotency_key: str | None = None,
+        legacy_wallet_transaction: WalletTransaction | None = None,
+        actor: CustomUser | None = None,
+        remarks: str = "",
+        metadata: dict[str, Any] | None = None,
+    ) -> FinancialTransaction | None:
+        system_user = cls.get_system_user()
+        if not system_user:
+            return None
+        amt = _money(amount)
+        return cls.post_transaction(
+            category=category,
+            user=user,
+            source_module=source_module,
+            source_id=source_id,
+            destination_module=WalletTypes.SYSTEM,
+            gross_amount=amt,
+            net_amount=amt,
+            idempotency_key=idempotency_key,
+            legacy_wallet_transaction=legacy_wallet_transaction,
+            created_by=actor,
+            approved_by=actor,
+            remarks=remarks,
+            metadata=metadata,
+            postings=[
+                LedgerPosting(user, wallet_type, LedgerDirections.DEBIT, amt, metadata=metadata or {}),
+                LedgerPosting(system_user, WalletTypes.SYSTEM, LedgerDirections.CREDIT, amt, metadata={"counterparty_user_id": user.id}),
+            ],
+        )
+
