@@ -364,7 +364,8 @@ function HorizontalScroller({ children }) {
         display: "flex",
         gap: 1.25,
         overflowX: "auto",
-        pb: 0.5,
+        pt: 0.5,
+        pb: 1.5,
         scrollSnapType: "x mandatory",
         WebkitOverflowScrolling: "touch",
         "&::-webkit-scrollbar": { display: "none" },
@@ -556,7 +557,7 @@ function TourScroller({ onTour, onShop, onCoupons }) {
   ];
 
   return (
-    <Box>
+    <Box sx={{ mb: { xs: 4, sm: 2 } }}>
       <SectionTitle title="E-Commerce and TRI Tour" />
       <HorizontalScroller>
         {items.map((d) => (
@@ -578,8 +579,8 @@ function TourScroller({ onTour, onShop, onCoupons }) {
             }}
           >
             <Box component="img" src={d.image} alt={d.name} sx={{ width: "100%", height: 94, objectFit: "cover", display: "block" }} />
-            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 1, py: 1 }}>
-              <Typography sx={{ fontSize: 13, fontWeight: 1000 }} noWrap>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 1.25, py: 1 }}>
+              <Typography sx={{ fontSize: 13, fontWeight: 800 }} noWrap>
                 {d.name}
               </Typography>
               {d.name === "E-Commerce" ? <StorefrontRoundedIcon sx={{ fontSize: 17, color: C.primary }} /> : <FlightTakeoffRoundedIcon sx={{ fontSize: 17, color: C.primary }} />}

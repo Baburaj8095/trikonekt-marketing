@@ -94,7 +94,7 @@ export default function AppShell({
           maxWidth: 1200,
           mx: "auto",
           p: { xs: 1.5, sm: 2, md: 2.5 },
-          pb: isMobile ? "calc(88px + env(safe-area-inset-bottom))" : 3,
+          pb: isMobile ? "calc(110px + env(safe-area-inset-bottom))" : 4,
         }}
       >
         {children}
