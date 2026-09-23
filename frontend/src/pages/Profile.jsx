@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Paper,
@@ -323,14 +323,27 @@ export default function Profile() {
         Profile
       </Typography>
 
-      <Paper elevation={0} className="consumer-fintech-card" sx={{ p: { xs: 0.75, sm: 1 }, mb: 2, borderRadius: 3 }}>
+      <Paper elevation={0} className="consumer-fintech-card" sx={{ p: { xs: 0.5, sm: 1 }, mb: 2, borderRadius: 3, overflow: "hidden" }}>
         <Tabs
           value={tab}
           onChange={(_, v) => setTab(v)}
           variant="scrollable"
+          scrollButtons="auto"
           allowScrollButtonsMobile
           textColor="primary"
           indicatorColor="primary"
+          sx={{
+            minHeight: 42,
+            "& .MuiTab-root": {
+              minHeight: 42,
+              minWidth: "auto",
+              px: { xs: 1.5, sm: 2 },
+              py: 0.75,
+              fontSize: { xs: 12.5, sm: 13.5 },
+              fontWeight: 700,
+              textTransform: "none",
+            },
+          }}
         >
           <Tab value="personal" label="Personal details" />
           <Tab value="bank" label="KYC" />
@@ -443,9 +456,14 @@ export default function Profile() {
                 size="small"
               />
 
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                <Button variant="contained" disabled={busy} onClick={onSavePersonal}>
-                  {busy ? "Saving..." : "Save"}
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ pt: 1 }}>
+                <Button
+                  variant="contained"
+                  disabled={busy}
+                  onClick={onSavePersonal}
+                  sx={{ width: { xs: "100%", sm: "auto" }, py: 1.25, fontWeight: 800, borderRadius: "10px" }}
+                >
+                  {busy ? "Saving..." : "Save Changes"}
                 </Button>
               </Stack>
             </Stack>

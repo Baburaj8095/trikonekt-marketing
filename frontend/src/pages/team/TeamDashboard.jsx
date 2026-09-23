@@ -92,7 +92,15 @@ function SectionTitle({ title, action, onAction }) {
   );
 }
 
-function DynamicHeroWishingBanner({ banners = [], loading = false, error = "", user = {}, walletData = {}, directTeamCount = 0 }) {
+function DynamicHeroWishingBanner({
+  banners = [],
+  loading = false,
+  error = "",
+  user = {},
+  directTeamCount = 0,
+  totalTeamCount = 0,
+  currentRank = "Prime 1",
+}) {
   const bannerList = Array.isArray(banners) ? banners : [];
   const [idx, setIdx] = useState(0);
   const MEDIA_BASE = useMemo(() => String(API?.defaults?.baseURL || "").replace(/\/api\/?$/, ""), []);
@@ -100,7 +108,6 @@ function DynamicHeroWishingBanner({ banners = [], loading = false, error = "", u
   const activeSrc = useMemo(() => resolveApiMediaUrl(active, MEDIA_BASE), [active, MEDIA_BASE]);
 
   const fullName = user?.full_name || user?.name || user?.username || "Team User";
-  const balance = Number(walletData?.main_wallet ?? walletData?.main_balance ?? 0);
 
   useEffect(() => {
     if (!bannerList.length) return undefined;
@@ -212,7 +219,7 @@ function DynamicHeroWishingBanner({ banners = [], loading = false, error = "", u
           </Typography>
         </Box>
 
-        {/* 2 Quick Mini Metrics */}
+        {/* 2 Quick Dynamic Team & Rank Metrics (No duplicate wallet balance) */}
         <Stack direction="row" spacing={1.5}>
           <Box
             sx={{
@@ -223,11 +230,11 @@ function DynamicHeroWishingBanner({ banners = [], loading = false, error = "", u
               border: "1px solid rgba(255, 255, 255, 0.08)",
             }}
           >
-            <Typography sx={{ fontSize: 16, fontWeight: 800, color: "#ffffff" }}>
-              ₹{balance.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+            <Typography sx={{ fontSize: 17, fontWeight: 800, color: "#ffffff" }}>
+              {directTeamCount}
             </Typography>
             <Typography sx={{ fontSize: 11, color: "#94A3B8", fontWeight: 500, mt: 0.2 }}>
-              Balance
+              Direct Referrals
             </Typography>
           </Box>
 
@@ -240,11 +247,11 @@ function DynamicHeroWishingBanner({ banners = [], loading = false, error = "", u
               border: "1px solid rgba(255, 255, 255, 0.08)",
             }}
           >
-            <Typography sx={{ fontSize: 16, fontWeight: 800, color: "#ffffff" }}>
-              {directTeamCount || 12}
+            <Typography sx={{ fontSize: 17, fontWeight: 800, color: "#ffffff" }} noWrap>
+              {totalTeamCount > 0 ? totalTeamCount : currentRank}
             </Typography>
             <Typography sx={{ fontSize: 11, color: "#94A3B8", fontWeight: 500, mt: 0.2 }}>
-              Team Members
+              {totalTeamCount > 0 ? "Total Team" : "Current Rank"}
             </Typography>
           </Box>
         </Stack>
@@ -742,6 +749,11 @@ export default function TeamDashboard() {
   const [videosLoading, setVideosLoading] = useState(false);
   const [primeRanks, setPrimeRanks] = useState([]);
   const [achievedPrimeLevel, setAchievedPrimeLevel] = useState(0);
+  const [teamStats, setTeamStats] = useState({
+    direct_count: 0,
+    current_team_size: 0,
+    current_rank: "Prime 1",
+  });
 
   const educationVideoSlots = useMemo(() => {
     const ranks =
@@ -838,9 +850,16 @@ export default function TeamDashboard() {
           setPrimeRanks([]);
         }
         if (eligRes.status === "fulfilled") {
-          setAchievedPrimeLevel(Number(eligRes.value?.data?.achieved_level || 0));
+          const eligData = eligRes.value?.data || {};
+          setAchievedPrimeLevel(Number(eligData?.achieved_level || 0));
+          setTeamStats({
+            direct_count: Number(eligData?.direct_count || 0),
+            current_team_size: Number(eligData?.current_team_size || 0),
+            current_rank: eligData?.current_rank || (eligData?.achieved_level ? `Prime ${eligData.achieved_level}` : "Prime 1"),
+          });
         } else {
           setAchievedPrimeLevel(0);
+          setTeamStats({ direct_count: 0, current_team_size: 0, current_rank: "Prime 1" });
         }
       } catch {
         if (alive) {
@@ -943,19 +962,6 @@ export default function TeamDashboard() {
     <Box sx={{ minHeight: "100dvh", bgcolor: C.appBg, pb: 4 }}>
       <Box className="consumer-fintech-page" sx={{ width: "100%", maxWidth: 1180, mx: "auto", px: { xs: 1, sm: 2 }, py: { xs: 1, sm: 2 } }}>
         <Stack spacing={2}>
-          {/* GREETING HEADER */}
-          <Box sx={{ px: 0.5 }}>
-            <Typography sx={{ fontSize: 13, color: "#64748b", fontWeight: 500 }}>
-              Good Morning
-            </Typography>
-            <Typography variant="h5" sx={{ fontSize: { xs: 20, sm: 22 }, fontWeight: 700, color: "#0f172a", lineHeight: 1.2 }}>
-              {profileUser?.full_name || fullName} 👋
-            </Typography>
-            <Typography sx={{ fontSize: 13, color: "#64748b", fontWeight: 400, mt: 0.25 }}>
-              Let's grow together!
-            </Typography>
-          </Box>
-
           {/* 1) MAIN WALLET HERO CARD */}
           <BalanceCard
             title="Main Wallet Balance"
@@ -1021,8 +1027,9 @@ export default function TeamDashboard() {
             loading={bannersLoading}
             error={bannersErr}
             user={profileUser}
-            walletData={walletData}
-            directTeamCount={profileUser?.direct_count || profileUser?.total_directs || profileUser?.direct_members || 12}
+            directTeamCount={teamStats.direct_count || profileUser?.direct_count || profileUser?.total_directs || 0}
+            totalTeamCount={teamStats.current_team_size || 0}
+            currentRank={teamStats.current_rank || (achievedPrimeLevel ? `Prime ${achievedPrimeLevel}` : "Prime 1")}
           />
           <TopAchieversRow items={achievers} loading={achieversLoading} error={achieversErr} />
           <VideoScroller
