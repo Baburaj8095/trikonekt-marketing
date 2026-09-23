@@ -526,6 +526,19 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
     }
   }, []);
 
+  const royaltyShopping = useMemo(() => {
+    let total = 0;
+    const tier1 = Number(savedRoyaltyConfig?.tier1_cap ?? 10000);
+    const tier2 = Number(savedRoyaltyConfig?.tier2_cap ?? 40000);
+    if (currentLevel >= 7) {
+      total += tier1;
+    }
+    if (currentLevel >= 10) {
+      total += tier2;
+    }
+    return total;
+  }, [currentLevel, savedRoyaltyConfig]);
+
   const upgradeWindowInfo = useMemo(() => {
     const isL8Plus = currentLevel >= 8;
     const adminConfiguredDays = isL8Plus
