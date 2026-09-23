@@ -122,6 +122,7 @@ import ImpersonateLanding from "./pages/Auth/ImpersonateLanding";
 import ECouponStore from "./pages/ECouponStore";
 import CouponPocket from "./pages/CouponPocket";
 import PackageCouponPocket from "./pages/PackageCouponPocket";
+import RedeemCoupon from "./pages/RedeemCoupon";
 import PromoPackages from "./pages/PromoPackages";
 import PackageSummary from "./pages/PackageSummary";
 import JoinSubscription from "./pages/packages/JoinSubscription";
@@ -520,6 +521,26 @@ function App() {
             <ProtectedRoute allowedRoles={["user"]}>
               <ConsumerShell>
                 <CouponPocket />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/package-coupon-pocket"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <PackageCouponPocket />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/redeem-coupon"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <RedeemCoupon />
               </ConsumerShell>
             </ProtectedRoute>
           }

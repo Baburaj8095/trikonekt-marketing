@@ -26,6 +26,9 @@ import HelpOutlineOutlinedIcon from "@mui/icons-material/HelpOutlineOutlined";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
+import ConfirmationNumberOutlinedIcon from "@mui/icons-material/ConfirmationNumberOutlined";
+import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
+import RedeemOutlinedIcon from "@mui/icons-material/RedeemOutlined";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import { C, R, S } from "../../theme/tokens";
 
@@ -53,8 +56,17 @@ export default function AppDrawer({
       title: "CORE",
       items: [
         { label: "Dashboard", to: isTeam ? "/user/team-dashboard" : "/user/dashboard", icon: SpaceDashboardOutlinedIcon },
-        { label: "Add Money", to: "/user/upload-wallet", icon: AddCardOutlinedIcon },
         { label: "Team Wallet", to: "/user/team-wallet", icon: AccountBalanceWalletOutlinedIcon },
+        { label: "Wallet History", to: "/user/team-history", icon: HistoryOutlinedIcon },
+        { label: "Add Money", to: "/user/upload-wallet", icon: AddCardOutlinedIcon },
+      ],
+    },
+    {
+      title: "COUPONS & VOUCHERS",
+      items: [
+        { label: "Coupon Pocket", to: "/user/coupon-pocket", icon: ConfirmationNumberOutlinedIcon },
+        { label: "Redeem Coupon", to: "/user/redeem-coupon", icon: RedeemOutlinedIcon },
+        { label: "Package Coupon Pocket", to: "/user/package-coupon-pocket", icon: ConfirmationNumberOutlinedIcon },
       ],
     },
     {
