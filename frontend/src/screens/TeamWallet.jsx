@@ -788,12 +788,10 @@ export default function TeamWallet() {
   const [activeTab, setActiveTab] = useState(0);
 
   const totalCalculatedBalance = useMemo(() => {
+    // Exclude Add Money pocket as it is dedicated deposit solely for buying packages
     const main = Number(walletData?.main_wallet ?? walletData?.main_balance ?? 0);
-    const add = Number(addMoneyPocketBalance || 0);
-    const selfPkg = Number(walletByNo[7]?.amount || 0);
-    const coup = Number(walletByNo[6]?.amount || 0);
-    return main + add + selfPkg + coup;
-  }, [walletData, addMoneyPocketBalance, walletByNo]);
+    return main;
+  }, [walletData]);
 
   const recentTxns = useMemo(() => {
     const arr = [

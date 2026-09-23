@@ -93,11 +93,18 @@ export default function AppShell({
           width: "100%",
           maxWidth: 1200,
           mx: "auto",
-          p: { xs: 1.5, sm: 2, md: 2.5 },
-          pb: isMobile ? "calc(110px + env(safe-area-inset-bottom))" : 4,
+          px: { xs: 1.5, sm: 2, md: 2.5 },
+          pt: { xs: 1.5, sm: 2, md: 2.5 },
+          pb: {
+            xs: "calc(130px + env(safe-area-inset-bottom))",
+            sm: "calc(130px + env(safe-area-inset-bottom))",
+            md: 5,
+          },
         }}
       >
         {children}
+        {/* Mobile bottom nav clearance spacer */}
+        <Box sx={{ display: { xs: "block", md: "none" }, height: "calc(64px + env(safe-area-inset-bottom))", pointerEvents: "none" }} />
       </Box>
 
       {/* Bottom Navigation Dock (Mobile only) */}
