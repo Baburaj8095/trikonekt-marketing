@@ -28,7 +28,6 @@ import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import ConfirmationNumberOutlinedIcon from "@mui/icons-material/ConfirmationNumberOutlined";
 import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
-import RedeemOutlinedIcon from "@mui/icons-material/RedeemOutlined";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import { C, R, S } from "../../theme/tokens";
 
@@ -65,7 +64,6 @@ export default function AppDrawer({
       title: "COUPONS & VOUCHERS",
       items: [
         { label: "Coupon Pocket", to: "/user/coupon-pocket", icon: ConfirmationNumberOutlinedIcon },
-        { label: "Redeem Coupon", to: "/user/redeem-coupon", icon: RedeemOutlinedIcon },
         { label: "Package Coupon Pocket", to: "/user/package-coupon-pocket", icon: ConfirmationNumberOutlinedIcon },
       ],
     },
