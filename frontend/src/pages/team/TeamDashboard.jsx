@@ -393,87 +393,213 @@ function VideoScroller({ videos = [], loading = false, onOpenFallback, onBuyPrim
 
   return (
     <Box>
-      <SectionTitle title="Digital Education Videos" action="Open" onAction={onOpenFallback} />
+      <SectionTitle title="DIGITAL EDUCATION VIDEOS" action="Open all →" onAction={onOpenFallback} />
       {loading ? (
-        <Typography sx={{ fontSize: 12, color: C.textSec, fontWeight: 700, mb: 1 }}>Loading videos...</Typography>
+        <Typography sx={{ fontSize: 12, color: C.textSec, fontWeight: 700, mb: 1 }}>Loading educational videos...</Typography>
       ) : null}
       <HorizontalScroller>
-        {rows.map((v) => {
+        {rows.map((v, i) => {
           const videoUrl = resolveRaw(v.video_url || v.video);
           const ytEmbedId = getYouTubeEmbedId(v);
           const ytThumb = ytEmbedId ? `https://img.youtube.com/vi/${ytEmbedId}/hqdefault.jpg` : "";
           const thumb = ytThumb || resolveRaw(v.thumbnail_url || v.thumbnail);
           const isPurchased = !!v.is_purchased || !!v.can_access;
           const canWatch = isPurchased && (!!ytEmbedId || !!videoUrl);
-          const rankLabel = v.required_rank_name || (v.required_rank_level ? `Prime L${v.required_rank_level}` : "Digital Education Prime");
-          const actionLabel = isPurchased ? (canWatch ? "Watch Video" : "Purchased") : "Buy";
+          const levelNum = v.required_rank_level || i + 1;
+          const rankLabel = v.required_rank_name || `Prime L${levelNum}`;
+          const badgeText = `PRIME L${levelNum}`;
 
           return (
             <Paper
-              key={v.id || v.required_rank}
+              key={v.id || v.required_rank || i}
               elevation={0}
               onClick={() => {
                 if (canWatch) setActiveVideo({ title: v.title || rankLabel, ytEmbedId, videoUrl });
                 else if (!isPurchased) onBuyPrime?.(v);
               }}
               sx={{
-                flex: "0 0 184px",
+                flex: "0 0 196px",
                 scrollSnapAlign: "start",
-                p: 1,
-                borderRadius: 3,
-                border: `1px solid ${C.border}`,
+                p: 1.25,
+                borderRadius: "18px",
+                border: "1px solid #e2e8f0",
                 cursor: "pointer",
-                bgcolor: C.surface,
-                boxShadow: "0 8px 22px rgba(15, 23, 42, 0.06)",
-                transition: "transform 160ms ease, box-shadow 160ms ease",
+                bgcolor: "#ffffff",
+                boxShadow: "0 4px 14px rgba(15, 23, 42, 0.05)",
+                transition: "all 160ms ease",
+                "&:hover": { transform: "translateY(-2px)", boxShadow: "0 8px 22px rgba(15, 23, 42, 0.09)" },
                 "&:active": { transform: "scale(0.985)" },
               }}
             >
+              {/* Stylish Video Poster Container */}
               <Box
                 sx={{
-                  height: 86,
-                  borderRadius: 1.5,
+                  height: 106,
+                  borderRadius: "13px",
                   overflow: "hidden",
-                  display: "grid",
-                  placeItems: "center",
-                  bgcolor: "rgba(37,99,235,0.1)",
-                  color: C.primary,
                   position: "relative",
+                  background: "linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #0f172a 100%)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                 }}
               >
                 {thumb ? (
-                  <Box component="img" src={thumb} alt={v.title || "Video"} sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  <Box
+                    component="img"
+                    src={thumb}
+                    alt={v.title || "Video"}
+                    sx={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                  />
+                ) : null}
+
+                {/* Subtle dark gradient overlay */}
+                <Box
+                  sx={{
+                    position: "absolute",
+                    inset: 0,
+                    background: thumb
+                      ? "linear-gradient(to top, rgba(15, 23, 42, 0.7) 0%, transparent 60%)"
+                      : "transparent",
+                  }}
+                />
+
+                {/* Level Pill Badge (Top-Left) */}
+                <Box
+                  sx={{
+                    position: "absolute",
+                    top: 8,
+                    left: 8,
+                    zIndex: 2,
+                    px: 0.9,
+                    py: 0.25,
+                    borderRadius: "6px",
+                    bgcolor: "rgba(15, 23, 42, 0.78)",
+                    backdropFilter: "blur(6px)",
+                    border: "1px solid rgba(255, 255, 255, 0.15)",
+                    color: "#38bdf8",
+                    fontSize: 10,
+                    fontWeight: 800,
+                    letterSpacing: "0.5px",
+                  }}
+                >
+                  {badgeText}
+                </Box>
+
+                {/* Status Pill Tag (Bottom-Right) */}
+                <Box
+                  sx={{
+                    position: "absolute",
+                    bottom: 8,
+                    right: 8,
+                    zIndex: 2,
+                    px: 0.8,
+                    py: 0.2,
+                    borderRadius: "5px",
+                    bgcolor: canWatch ? "rgba(22, 163, 74, 0.9)" : isPurchased ? "rgba(15, 23, 42, 0.8)" : "rgba(0,0,0,0.65)",
+                    backdropFilter: "blur(4px)",
+                    color: "#ffffff",
+                    fontSize: 9.5,
+                    fontWeight: 700,
+                  }}
+                >
+                  {canWatch ? "▶ STREAM" : isPurchased ? "UNLOCKED" : "LOCKED"}
+                </Box>
+
+                {/* Translucent Glassmorphic Center Play Button */}
+                <Box
+                  sx={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: "50%",
+                    bgcolor: "rgba(255, 255, 255, 0.22)",
+                    backdropFilter: "blur(8px)",
+                    border: "1px solid rgba(255, 255, 255, 0.45)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow: "0 4px 14px rgba(0, 0, 0, 0.3)",
+                    transition: "transform 140ms ease",
+                    "&:hover": { transform: "scale(1.08)" },
+                  }}
+                >
+                  <PlayCircleRoundedIcon sx={{ fontSize: 24, color: "#ffffff" }} />
+                </Box>
+              </Box>
+
+              {/* Title & Info */}
+              <Typography sx={{ mt: 1.1, fontSize: 13.5, fontWeight: 700, color: "#0f172a" }} noWrap>
+                {v.title || `Video ${levelNum}`}
+              </Typography>
+              <Typography sx={{ mt: 0.2, fontSize: 11.5, color: "#64748b", fontWeight: 500 }} noWrap>
+                {canWatch ? "Ready to watch" : isPurchased ? "Video stream coming" : rankLabel}
+              </Typography>
+
+              {/* Action Button */}
+              <Box sx={{ mt: 1.1 }}>
+                {canWatch ? (
+                  <Button
+                    size="small"
+                    variant="contained"
+                    fullWidth
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveVideo({ title: v.title || rankLabel, ytEmbedId, videoUrl });
+                    }}
+                    sx={{
+                      fontSize: 11.5,
+                      fontWeight: 800,
+                      textTransform: "none",
+                      py: 0.65,
+                      borderRadius: "9px",
+                      background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+                      boxShadow: "0 3px 10px rgba(37,99,235,0.22)",
+                    }}
+                  >
+                    Watch Now ▷
+                  </Button>
+                ) : isPurchased ? (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    fullWidth
+                    disabled
+                    sx={{
+                      fontSize: 11.5,
+                      fontWeight: 700,
+                      textTransform: "none",
+                      py: 0.65,
+                      borderRadius: "9px",
+                      color: "#64748b",
+                      borderColor: "#e2e8f0",
+                      bgcolor: "#f8fafc",
+                    }}
+                  >
+                    ✓ Purchased
+                  </Button>
                 ) : (
-                  <PlayCircleRoundedIcon sx={{ fontSize: 38 }} />
-                )}
-                {canWatch && (
-                  <Box sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,0.25)", display: "grid", placeItems: "center" }}>
-                    <PlayCircleRoundedIcon sx={{ fontSize: 36, color: "#ffffff", filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.5))" }} />
-                  </Box>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    fullWidth
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onBuyPrime?.(v);
+                    }}
+                    sx={{
+                      fontSize: 11.5,
+                      fontWeight: 800,
+                      textTransform: "none",
+                      py: 0.65,
+                      borderRadius: "9px",
+                      bgcolor: "#2563eb",
+                      "&:hover": { bgcolor: "#1d4ed8" },
+                    }}
+                  >
+                    Buy Prime →
+                  </Button>
                 )}
               </Box>
-              <Typography sx={{ mt: 0.9, fontSize: 13, fontWeight: 1000 }} noWrap>
-                {v.title || rankLabel}
-              </Typography>
-              <Typography sx={{ mt: 0.2, fontSize: 11.5, color: C.textSec, fontWeight: 700 }} noWrap>
-                {canWatch ? "Ready to watch" : isPurchased ? "Video pending" : rankLabel}
-              </Typography>
-              <Stack direction="row" spacing={0.75} sx={{ mt: 1 }}>
-                <Button
-                  size="small"
-                  variant="contained"
-                  fullWidth
-                  disabled={!canWatch && isPurchased}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (canWatch) setActiveVideo({ title: v.title || rankLabel, ytEmbedId, videoUrl });
-                    else if (!isPurchased) onBuyPrime?.(v);
-                  }}
-                  sx={{ fontSize: 11, fontWeight: 900, textTransform: "none" }}
-                >
-                  {actionLabel}
-                </Button>
-              </Stack>
             </Paper>
           );
         })}
