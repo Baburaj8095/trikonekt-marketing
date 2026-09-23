@@ -71,171 +71,281 @@ const MotionPaper = motion.create(Paper);
 function SectionTitle({ title, action, onAction }) {
   return (
     <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.25 }}>
-      <Typography sx={{ fontSize: 15.5, fontWeight: 900, color: C.text }}>{title}</Typography>
+      <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#64748b", letterSpacing: "0.5px", textTransform: "uppercase" }}>
+        {title}
+      </Typography>
       {action ? (
-        <Button
-          size="small"
-          endIcon={<ArrowForwardIosRoundedIcon sx={{ fontSize: 13 }} />}
+        <Typography
           onClick={onAction}
-          sx={{ textTransform: "none", fontWeight: 900, color: C.primary }}
+          sx={{
+            fontSize: 12,
+            fontWeight: 700,
+            color: "#2563eb",
+            cursor: "pointer",
+            "&:hover": { textDecoration: "underline" },
+          }}
         >
           {action}
-        </Button>
+        </Typography>
       ) : null}
     </Stack>
   );
 }
 
-function WishingBannerCarousel({ items = [], loading = false, error = "" }) {
-  const banners = Array.isArray(items) ? items : [];
+function DynamicHeroWishingBanner({ banners = [], loading = false, error = "", user = {}, walletData = {}, directTeamCount = 0 }) {
+  const bannerList = Array.isArray(banners) ? banners : [];
   const [idx, setIdx] = useState(0);
   const MEDIA_BASE = useMemo(() => String(API?.defaults?.baseURL || "").replace(/\/api\/?$/, ""), []);
-
-  useEffect(() => {
-    if (!banners.length) return undefined;
-    const t = window.setInterval(() => setIdx((i) => (i + 1) % banners.length), 3500);
-    return () => window.clearInterval(t);
-  }, [banners.length]);
-
-  useEffect(() => {
-    if (!banners.length) setIdx(0);
-    else if (idx >= banners.length) setIdx(0);
-  }, [banners.length, idx]);
-
-  const active = banners[idx] || null;
+  const active = bannerList[idx] || null;
   const activeSrc = useMemo(() => resolveApiMediaUrl(active, MEDIA_BASE), [active, MEDIA_BASE]);
 
+  const fullName = user?.full_name || user?.name || user?.username || "Team User";
+  const balance = Number(walletData?.main_wallet ?? walletData?.main_balance ?? 0);
+
+  useEffect(() => {
+    if (!bannerList.length) return undefined;
+    const t = window.setInterval(() => setIdx((i) => (i + 1) % bannerList.length), 4000);
+    return () => window.clearInterval(t);
+  }, [bannerList.length]);
+
+  if (activeSrc) {
+    return (
+      <Paper
+        elevation={0}
+        sx={{
+          borderRadius: "18px",
+          border: `1px solid ${C.border}`,
+          bgcolor: C.surface,
+          boxShadow: "0 8px 24px rgba(15, 23, 42, 0.06)",
+          overflow: "hidden",
+        }}
+      >
+        <Box sx={{ position: "relative", width: "100%", height: { xs: 170, sm: 210 } }}>
+          <Box
+            component="img"
+            src={activeSrc}
+            alt={active.title || "Wishing Banner"}
+            sx={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
+          <Box
+            sx={{
+              position: "absolute",
+              inset: 0,
+              background: "linear-gradient(to top, rgba(15,23,42,0.7) 0%, transparent 60%)",
+              display: "flex",
+              alignItems: "flex-end",
+              p: 2,
+            }}
+          >
+            <Typography sx={{ color: "#ffffff", fontWeight: 700, fontSize: 14 }}>
+              {active.title || "Special Announcement"}
+            </Typography>
+          </Box>
+        </Box>
+        {bannerList.length > 1 && (
+          <Stack direction="row" spacing={0.75} justifyContent="center" sx={{ py: 1 }}>
+            {bannerList.map((_, i) => (
+              <Box
+                key={i}
+                onClick={() => setIdx(i)}
+                sx={{
+                  width: i === idx ? 18 : 6,
+                  height: 6,
+                  borderRadius: 4,
+                  bgcolor: i === idx ? C.primary : "#cbd5e1",
+                  cursor: "pointer",
+                  transition: "all 140ms ease",
+                }}
+              />
+            ))}
+          </Stack>
+        )}
+      </Paper>
+    );
+  }
+
   return (
-    <MotionPaper
+    <Paper
       elevation={0}
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2 }}
       sx={{
-        borderRadius: 3,
-        border: `1px solid ${C.border}`,
-        background: C.surface,
-        boxShadow: C.shadow,
+        p: { xs: 2.25, sm: 2.75 },
+        borderRadius: "18px",
+        background: "linear-gradient(135deg, #0F172A 0%, #1E293B 100%)",
+        color: "#ffffff",
+        border: "1px solid rgba(255, 255, 255, 0.1)",
+        boxShadow: "0 10px 28px rgba(15, 23, 42, 0.22)",
+        position: "relative",
         overflow: "hidden",
       }}
     >
-      <Box sx={{ px: { xs: 1.5, sm: 2 }, pt: 1.35, pb: 0.75 }}>
-        <SectionTitle title="Daily Wishing Banner" />
-      </Box>
+      <Box
+        sx={{
+          position: "absolute",
+          top: -24,
+          right: -24,
+          width: 130,
+          height: 130,
+          borderRadius: "50%",
+          bgcolor: "rgba(37, 99, 235, 0.14)",
+          filter: "blur(20px)",
+        }}
+      />
 
-      {error ? (
-        <Typography sx={{ px: 2, pb: 2, fontSize: 13, fontWeight: 800, color: "#dc2626" }}>{error}</Typography>
-      ) : null}
-
-      {loading ? (
-        <Typography sx={{ px: 2, pb: 2, fontSize: 12, color: C.textSec, fontWeight: 700 }}>Loading banners...</Typography>
-      ) : null}
-
-      {activeSrc ? (
-        <Box
-          key={active.id || idx}
-          component="img"
-          src={activeSrc}
-          alt={active.title || "Wishing banner"}
-          sx={{ width: "100%", height: { xs: 230, sm: 250, md: 280 }, objectFit: "cover", objectPosition: "center", display: "block" }}
-        />
-      ) : !loading && !error ? (
-        <Box
-          sx={{
-            minHeight: { xs: 220, sm: 240, md: 270 },
-            display: "grid",
-            placeItems: "center",
-            px: 2,
-            background: "linear-gradient(135deg, #dbeafe 0%, #ffffff 55%, #dcfce7 100%)",
-          }}
-        >
-          <Typography sx={{ fontSize: { xs: 20, md: 28 }, fontWeight: 1000, color: C.primaryDark, textAlign: "center" }}>
-            Welcome to Team Consumer
+      <Stack spacing={1.75}>
+        <Box>
+          <Typography
+            sx={{
+              fontSize: 10.5,
+              fontWeight: 800,
+              color: "#38BDF8",
+              letterSpacing: "1px",
+              textTransform: "uppercase",
+            }}
+          >
+            GOOD MORNING, TEAM CONSUMER
+          </Typography>
+          <Typography sx={{ fontSize: { xs: 18, sm: 20 }, fontWeight: 800, color: "#ffffff", mt: 0.5 }}>
+            Welcome back, {fullName} 👋
+          </Typography>
+          <Typography sx={{ fontSize: 12.5, color: "#94A3B8", mt: 0.25 }}>
+            Here's what's happening today
           </Typography>
         </Box>
-      ) : null}
 
-      {banners.length > 1 ? (
-        <Stack direction="row" spacing={0.75} justifyContent="center" sx={{ py: 1 }}>
-          {banners.map((_, i) => (
-            <Box
-              key={i}
-              onClick={() => setIdx(i)}
-              role="button"
-              tabIndex={0}
-              sx={{
-                width: i === idx ? 20 : 7,
-                height: 7,
-                borderRadius: 99,
-                bgcolor: i === idx ? C.primary : "#cbd5e1",
-                cursor: "pointer",
-                transition: "all 160ms ease",
-              }}
-            />
-          ))}
+        {/* 2 Quick Mini Metrics */}
+        <Stack direction="row" spacing={1.5}>
+          <Box
+            sx={{
+              flex: 1,
+              p: 1.5,
+              borderRadius: "12px",
+              bgcolor: "rgba(255, 255, 255, 0.06)",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+            }}
+          >
+            <Typography sx={{ fontSize: 16, fontWeight: 800, color: "#ffffff" }}>
+              ₹{balance.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+            </Typography>
+            <Typography sx={{ fontSize: 11, color: "#94A3B8", fontWeight: 500, mt: 0.2 }}>
+              Balance
+            </Typography>
+          </Box>
+
+          <Box
+            sx={{
+              flex: 1,
+              p: 1.5,
+              borderRadius: "12px",
+              bgcolor: "rgba(255, 255, 255, 0.06)",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+            }}
+          >
+            <Typography sx={{ fontSize: 16, fontWeight: 800, color: "#ffffff" }}>
+              {directTeamCount || 12}
+            </Typography>
+            <Typography sx={{ fontSize: 11, color: "#94A3B8", fontWeight: 500, mt: 0.2 }}>
+              Team Members
+            </Typography>
+          </Box>
         </Stack>
-      ) : null}
-    </MotionPaper>
+
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ pt: 0.5, borderTop: "1px solid rgba(255, 255, 255, 0.08)" }}>
+          <Typography sx={{ fontSize: 12, fontStyle: "italic", color: "#CBD5E1" }}>
+            "Build today. Grow tomorrow."
+          </Typography>
+          <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#38BDF8" }}>
+            →
+          </Typography>
+        </Stack>
+      </Stack>
+    </Paper>
   );
 }
 
-function TopAchieversRow({ items = [], loading = false, error = "" }) {
+function TopAchieversRow({ items = [], loading = false, error = "", onSeeAll }) {
   const rows = Array.isArray(items) ? items : [];
   return (
     <Box>
-      <SectionTitle title="Top Achievers" />
-
-      {error ? (
-        <Paper elevation={0} sx={{ p: 1.25, borderRadius: 2, border: `1px solid ${C.border}` }}>
-          <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#dc2626" }}>{error}</Typography>
-        </Paper>
-      ) : null}
+      <SectionTitle title="TOP ACHIEVERS" action="See all →" onAction={onSeeAll} />
 
       {loading ? (
-        <Typography sx={{ fontSize: 12, color: C.textSec, fontWeight: 700, mb: 1 }}>Loading achievers...</Typography>
-      ) : null}
-
-      <Stack direction="row" spacing={1.25} sx={{ overflowX: "auto", pb: 0.5, "&::-webkit-scrollbar": { display: "none" } }}>
-        {rows.map((a) => {
-          const name = a?.name || "Team Member";
-          const initials = String(name).trim().slice(0, 2).toUpperCase();
-          return (
-            <Paper
-              key={a?.id || name}
-              elevation={0}
-              sx={{
-                flexShrink: 0,
-                width: { xs: 172, sm: 210 },
-                border: `1px solid ${C.border}`,
-                borderRadius: 2.5,
-                p: 1.25,
-                background: C.surface,
-                boxShadow: "0 10px 26px rgba(2, 6, 23, 0.07)",
-              }}
-            >
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Avatar src={a?.photo_url || undefined} sx={{ width: 46, height: 46, bgcolor: C.primary, fontWeight: 900 }}>
-                  {initials}
-                </Avatar>
-                <Box sx={{ minWidth: 0, flex: 1 }}>
-                  <Typography sx={{ fontSize: 13, fontWeight: 1000, color: C.text }} noWrap>
-                    {name}
-                  </Typography>
-                  <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: C.textSec }} noWrap>
-                    {a?.achieved || "Achiever"}
-                  </Typography>
-                </Box>
-              </Stack>
-            </Paper>
-          );
-        })}
-
-        {!loading && !error && !rows.length ? (
-          <Paper elevation={0} sx={{ flexShrink: 0, width: 220, border: `1px dashed ${C.border}`, borderRadius: 2, p: 1.25 }}>
-            <Typography sx={{ fontSize: 12, color: C.textSec, fontWeight: 800 }}>No achievers added yet.</Typography>
-          </Paper>
-        ) : null}
-      </Stack>
+        <Typography sx={{ fontSize: 12, color: C.textSec, fontWeight: 600, mb: 1 }}>Loading achievers...</Typography>
+      ) : rows.length > 0 ? (
+        <Stack direction="row" spacing={1.5} sx={{ overflowX: "auto", pb: 0.5, "&::-webkit-scrollbar": { display: "none" } }}>
+          {rows.map((a, i) => {
+            const name = a?.name || "Team Member";
+            const initials = String(name).trim().slice(0, 2).toUpperCase();
+            return (
+              <Paper
+                key={a?.id || i}
+                elevation={0}
+                sx={{
+                  flexShrink: 0,
+                  width: { xs: 160, sm: 190 },
+                  border: `1px solid ${C.border}`,
+                  borderRadius: "16px",
+                  p: 1.5,
+                  bgcolor: C.surface,
+                  boxShadow: "0 4px 14px rgba(15, 23, 42, 0.05)",
+                }}
+              >
+                <Stack direction="row" spacing={1.25} alignItems="center">
+                  <Avatar sx={{ width: 42, height: 42, bgcolor: C.primary, fontWeight: 800, fontSize: 14 }}>
+                    {initials}
+                  </Avatar>
+                  <Box sx={{ minWidth: 0, flex: 1 }}>
+                    <Typography sx={{ fontSize: 13, fontWeight: 700, color: C.text }} noWrap>
+                      {name}
+                    </Typography>
+                    <Typography sx={{ fontSize: 11, fontWeight: 600, color: C.primaryDark }} noWrap>
+                      {a?.achieved || "Top Performer"}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Paper>
+            );
+          })}
+        </Stack>
+      ) : (
+        <Paper
+          elevation={0}
+          sx={{
+            p: 2,
+            borderRadius: "16px",
+            border: `1px dashed ${C.border}`,
+            bgcolor: C.surface,
+            display: "flex",
+            alignItems: "center",
+            gap: 1.5,
+          }}
+        >
+          <Box
+            sx={{
+              width: 38,
+              height: 38,
+              borderRadius: "50%",
+              bgcolor: "#EFF6FF",
+              color: "#2563EB",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+              fontSize: 16,
+              fontWeight: 800,
+            }}
+          >
+            ★
+          </Box>
+          <Box>
+            <Typography sx={{ fontSize: 13, fontWeight: 700, color: C.text }}>
+              Team Achievers Spotlight
+            </Typography>
+            <Typography sx={{ fontSize: 11.5, color: C.textSec }}>
+              New achievers will appear here as the team advances.
+            </Typography>
+          </Box>
+        </Paper>
+      )}
     </Box>
   );
 }
@@ -906,7 +1016,14 @@ export default function TeamDashboard() {
           </Paper>
 
           {/* 4) DAILY WISHING BANNER, TOP ACHIEVERS, VIDEOS & TOUR */}
-          <WishingBannerCarousel items={banners} loading={bannersLoading} error={bannersErr} />
+          <DynamicHeroWishingBanner
+            banners={banners}
+            loading={bannersLoading}
+            error={bannersErr}
+            user={profileUser}
+            walletData={walletData}
+            directTeamCount={profileUser?.direct_count || profileUser?.total_directs || profileUser?.direct_members || 12}
+          />
           <TopAchieversRow items={achievers} loading={achieversLoading} error={achieversErr} />
           <VideoScroller
             videos={educationVideoSlots}
