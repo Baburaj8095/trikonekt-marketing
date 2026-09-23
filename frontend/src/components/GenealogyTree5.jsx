@@ -12,13 +12,13 @@ import API from "../api/api";
  * - initialPool: "FIVE_150" | "THREE_150" | "THREE_50" (default "FIVE_150")
  * - maxDepth: number (default 6)
  * - showPlaceholders: boolean (default false) – if true, renders empty slots to complete 5
- * - title: string (default "Genealogy")
+ * - title: string (default "Layer Blocks")
  */
 export default function GenealogyTree5({
   initialPool = "FIVE_150",
   maxDepth = 10,
   showPlaceholders = false,
-  title = "Genealogy",
+  title = "Layer Blocks",
   useEntriesTree = false,
   entryRootId = null,
   pollIntervalMs = 0,
@@ -75,7 +75,18 @@ export default function GenealogyTree5({
   const renderPrimeBadges = (u) => {
     try {
       const p150 = !!(u?.prime150 || u?.prime_150 || u?.prime_150_active || u?.prime150_active);
-      const p750 = !!(u?.prime750 || u?.prime_750 || u?.prime_750_active || u?.prime750_active);
+      const p750 = !!(
+        u?.prime750 ||
+        u?.prime_750 ||
+        u?.prime_750_active ||
+        u?.prime750_active ||
+        u?.prime1000 ||
+        u?.prime_1000 ||
+        u?.prime_1000_active ||
+        u?.prime1000_active ||
+        u?.prime_active ||
+        u?.is_prime
+      );
       const paid = Number(u?.monthly759 ?? u?.monthly_759_count ?? u?.monthly_boxes_paid_current ?? 0) || 0;
       const total = Number(u?.monthlyTotal759 ?? u?.monthly_total_boxes_current ?? 0) || 0;
       const any759 = paid > 0 || total > 0;
@@ -104,40 +115,50 @@ export default function GenealogyTree5({
       );
 
       return (
-        <>
-          {p150 ? pill("#16a34a", "150") : null}
-          {p750 ? pill("#2563eb", "750") : null}
-          {any759 ? pill("#7c3aed", label759) : null}
-        </>
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "center", marginTop: 4 }}>
+          {p150 ? pill("#4f46e5", "P150") : null}
+          {p750 ? pill("#16a34a", "P750") : null}
+          {label759 ? pill("#d97706", label759) : null}
+        </div>
       );
-    } catch {
+    } catch (_) {
       return null;
     }
   };
 
-  const fetchRoot = useCallback(async ({ root_user_id = null, spill_from_owner_id = null, start_entry_id = null } = {}) => {
-    setLoading(true);
-    setErr("");
-    try {
-      if (entriesMode) {
-        // Enforce start_entry_id to avoid accidental requests without it
-        const effectiveId = (start_entry_id ?? entryRootId ?? null);
-        if (!effectiveId) {
-          setLoading(false);
+  const loadTree = useCallback(
+    async (root_user_id = null) => {
+      setLoading(true);
+      setErr("");
+
+      try {
+        if (entriesMode) {
+          const params = { root_id: root_user_id || entryRootId || undefined, pool };
+          const res = await API.get("/accounts/my/matrix/tree5/entries/", { params, cacheTTL: 0, dedupe: "cancelPrevious" });
+          const raw = res?.data || null;
+
+          if (!raw) {
+            setRoot(null);
+            return;
+          }
+
+          const normalizeNode = (n) => {
+            if (!n) return null;
+            return {
+              id: n.id,
+              user_id: n.user_id,
+              matrix_account_id: n.matrix_account_id || n.id,
+              matrix_position: Number(n.position || n.matrix_position) || 0,
+              full_name: n.full_name || n.display_name || n.username || `Acc #${n.id}`,
+              username: n.username || `Acc #${n.id}`,
+              team_count: Number(n.team_count ?? n.sub_count ?? 0) || 0,
+              children: Array.isArray(n.children) ? n.children.map(normalizeNode).filter(Boolean) : [],
+            };
+          };
+
+          setRoot(normalizeNode(raw));
           return;
         }
-        const params = { max_depth: maxDepth, pool, start_entry_id: effectiveId };
-        const res = await API.get("/accounts/my/matrix/tree5/entries/", { params, cacheTTL: 0, dedupe: "cancelPrevious" });
-        const data = res?.data || res;
-
-        const normalize = (n) => {
-          if (!n) return null;
-          const kids = Array.isArray(n.children) ? n.children.map(normalize) : [];
-          return {
-            ...n,
-            id: n.account_id,
-            account_active: String(n.status || "") === "ACTIVE",
-            pincode: n.pincode || n.owner_pincode || null,
             // Prime flags (if backend provides; safe no-ops when absent)
             prime150: !!(n.prime150 || n.prime_150 || n.prime_150_active || n.prime150_active),
             prime750: !!(n.prime750 || n.prime_750 || n.prime_750_active || n.prime750_active),
@@ -278,8 +299,8 @@ export default function GenealogyTree5({
             <button onClick={goBackOne} style={styles.backBtn}>Back</button>
           ) : null}
           <select value={pool} onChange={(e) => setPool(e.target.value)} style={styles.sel}>
-            <option value="FIVE_150">5-Matrix</option>
-            <option value="THREE_150">3-Matrix</option>
+            <option value="FIVE_150">5-Blocks</option>
+            <option value="THREE_150">3-Blocks</option>
           </select>
         </div>
       </div>

@@ -62,13 +62,13 @@ const WORKFLOWS = {
   },
   "tree-toggle": {
     title: "Tree",
-    description: "On/off control placeholder for tree visibility. Existing genealogy and matrix screens are linked below.",
+    description: "On/off control placeholder for tree visibility. Existing layer blocks screens are linked below.",
     status: "Toggle shell",
     toggle: true,
     links: [
-      { to: "/admin/user-tree", label: "Genealogy" },
-      { to: "/admin/matrix/five", label: "Five Matrix" },
-      { to: "/admin/matrix/three", label: "Three Matrix" },
+      { to: "/admin/user-tree", label: "Layer Blocks" },
+      { to: "/admin/matrix/five", label: "Five Blocks" },
+      { to: "/admin/matrix/three", label: "Three Blocks" },
     ],
   },
   "team-admin-board": {

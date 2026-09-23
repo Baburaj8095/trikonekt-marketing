@@ -16,6 +16,10 @@ import {
   Typography,
 } from "@mui/material";
 import API from "../api/api";
+import WalletDashboardV2 from "../pages/consumer/WalletDashboardV2";
+import QuickActionGrid from "../components/common/QuickActionGrid";
+import StatusBadge from "../components/common/StatusBadge";
+import ArrowForwardIosRoundedIcon from "@mui/icons-material/ArrowForwardIosRounded";
 
 import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import PaymentsIcon from "@mui/icons-material/Payments";
@@ -602,7 +606,6 @@ export default function TeamWallet() {
     () => [
       { title: "Bonus Wallet", wallet: walletByNo[1] },
       { title: "Team Consumer Self Re-birth", wallet: walletByNo[2], idCount: selfRebirthStats.count || 0 },
-      { title: "Redeem Points", wallet: walletByNo[4] },
     ],
     [selfRebirthStats, walletByNo]
   );
@@ -781,6 +784,24 @@ export default function TeamWallet() {
     }
   };
 
+  const [activeTab, setActiveTab] = useState(0);
+
+  const totalCalculatedBalance = useMemo(() => {
+    const main = Number(walletData?.main_wallet ?? walletData?.main_balance ?? 0);
+    const add = Number(addMoneyPocketBalance || 0);
+    const selfPkg = Number(walletByNo[7]?.amount || 0);
+    const coup = Number(walletByNo[6]?.amount || 0);
+    return main + add + selfPkg + coup;
+  }, [walletData, addMoneyPocketBalance, walletByNo]);
+
+  const recentTxns = useMemo(() => {
+    const arr = [
+      ...(Array.isArray(historyData?.recent) ? historyData.recent : []),
+      ...(Array.isArray(historyData?.incoming) ? historyData.incoming : []),
+    ];
+    return arr.slice(0, 5);
+  }, [historyData]);
+
   if (loading) {
     return (
       <Box sx={{ px: 2, pt: 3 }}>
@@ -798,146 +819,375 @@ export default function TeamWallet() {
       sx={{
         maxWidth: 840,
         mx: "auto",
-        px: { xs: "2px", sm: "16px" },
-        py: { xs: "6px", sm: "18px" },
+        px: { xs: 1, sm: 2 },
+        py: { xs: 1, sm: 2 },
       }}
     >
-      {/* ── Header ── */}
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.6 }}>
-        <Stack direction="row" alignItems="center" spacing="8px">
-          <Box sx={{ width: 38, height: 38, borderRadius: 2.5, display: "grid", placeItems: "center", bgcolor: "#eff6ff", color: "#2563eb" }}>
-            <AccountBalanceWalletIcon sx={{ fontSize: 22 }} />
-          </Box>
-          <Typography sx={{ fontSize: { xs: 19, sm: 23 }, fontWeight: 950, color: "#0f172a" }}>
-            Team Wallet
-          </Typography>
-        </Stack>
-        <Chip
-          size="small"
-          color={kycVerified ? "success" : "warning"}
-          label={kycVerified ? "KYC ✓" : "KYC Pending"}
-          sx={{ fontSize: 11, height: 26 }}
-        />
-      </Stack>
+      {/* ── Segmented Control: Overview | All Wallets (Screen 2) ── */}
+      <Box sx={{ display: "flex", bgcolor: "#f1f5f9", p: 0.5, borderRadius: "12px", mb: 2 }}>
+        <Button
+          fullWidth
+          onClick={() => setActiveTab(0)}
+          sx={{
+            bgcolor: activeTab === 0 ? "#ffffff" : "transparent",
+            color: activeTab === 0 ? "#0f172a" : "#64748b",
+            fontWeight: 700,
+            fontSize: 13,
+            py: 0.9,
+            borderRadius: "9px",
+            boxShadow: activeTab === 0 ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+            "&:hover": { bgcolor: activeTab === 0 ? "#ffffff" : "rgba(255,255,255,0.4)" },
+          }}
+        >
+          Overview
+        </Button>
+        <Button
+          fullWidth
+          onClick={() => setActiveTab(1)}
+          sx={{
+            bgcolor: activeTab === 1 ? "#ffffff" : "transparent",
+            color: activeTab === 1 ? "#0f172a" : "#64748b",
+            fontWeight: 700,
+            fontSize: 13,
+            py: 0.9,
+            borderRadius: "9px",
+            boxShadow: activeTab === 1 ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+            "&:hover": { bgcolor: activeTab === 1 ? "#ffffff" : "rgba(255,255,255,0.4)" },
+          }}
+        >
+          All Wallets
+        </Button>
+      </Box>
 
       {/* ── Alerts ── */}
       {error && (
-        <Alert severity="error" sx={{ mb: "8px", py: "2px", fontSize: 12 }}>
+        <Alert severity="error" sx={{ mb: 1.5, py: 0.5, fontSize: 12 }}>
           {error}
         </Alert>
       )}
       {success && (
-        <Alert severity="success" sx={{ mb: "8px", py: "2px", fontSize: 12 }}>
+        <Alert severity="success" sx={{ mb: 1.5, py: 0.5, fontSize: 12 }}>
           {success}
         </Alert>
       )}
 
-      <Paper
-        elevation={0}
-        className="consumer-fintech-card"
-        sx={{
-          p: { xs: 1.15, sm: 1.5 },
-          mb: 2,
-          borderRadius: 3,
-          bgcolor: "#fff",
-        }}
-      >
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", sm: "1fr 260px" },
-            gap: 1.2,
-            alignItems: "start",
-          }}
-        >
-          <Stack direction="row" spacing={0.8} alignItems="center">
-            <AccountBalanceWalletIcon sx={{ fontSize: 20, color: "#64748b" }} />
-            <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#475569" }}>
-              Growth Wallet
-            </Typography>
-          </Stack>
-          <WalletPanel
-            title="Main Wallet"
-            amount={walletByNo[5]?.amount}
-            icon={walletByNo[5]?.icon}
-            caption="Choose a pocket after click"
-            highlight
-            tone={5}
-            onClick={() => openTransferType("coupon")}
-          />
-        </Box>
+      {/* ════════ TAB 0: OVERVIEW (Screen 2 Target) ════════ */}
+      {activeTab === 0 && (
+        <Stack spacing={2}>
+          {/* 1. Total Balance Card */}
+          <Paper
+            elevation={0}
+            sx={{
+              p: { xs: 2, sm: 2.5 },
+              borderRadius: "16px",
+              bgcolor: "#ffffff",
+              border: "1px solid #e2e8f0",
+              boxShadow: "0 4px 16px rgba(15,23,42,0.06)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Box
+                sx={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: "12px",
+                  bgcolor: "#dcfce7",
+                  color: "#16a34a",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <AccountBalanceWalletIcon sx={{ fontSize: 24 }} />
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: 12.5, color: "#64748b", fontWeight: 500 }}>
+                  Total Balance
+                </Typography>
+                <Typography sx={{ fontSize: { xs: 22, sm: 26 }, fontWeight: 700, color: "#0f172a", lineHeight: 1.2 }}>
+                  ₹ {totalCalculatedBalance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </Typography>
+                <Typography
+                  onClick={() => setActiveTab(1)}
+                  sx={{ fontSize: 12, color: "#2563eb", fontWeight: 600, mt: 0.5, cursor: "pointer", display: "inline-block" }}
+                >
+                  View all wallets →
+                </Typography>
+              </Box>
+            </Stack>
+            <IconButton onClick={() => setActiveTab(1)} size="small" sx={{ color: "#94a3b8" }}>
+              <ArrowForwardIosRoundedIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Paper>
 
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", sm: "repeat(3, minmax(0, 1fr))" },
-            gap: { xs: 1, sm: 1.2 },
-            mt: 1.2,
-          }}
-        >
-          {summaryWallets.map((item, index) => (
-            <WalletPanel
-              key={item.title}
-              title={item.title}
-              amount={item.wallet?.amount}
-              icon={item.wallet?.icon}
-              caption={item.wallet?.label}
-              idCount={item.idCount}
-              tone={index}
-            />
-          ))}
-        </Box>
-      </Paper>
+          {/* 2. 4 Quick Actions Row */}
+          <QuickActionGrid variant="wallet" />
 
-      <Box sx={{ mb: "14px" }}>
-        <SectionHeader title="Pockets" />
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-            gap: { xs: 1, sm: 1.2 },
-          }}
-        >
-          {transferPockets.map((pocket) => {
-            const wallet = pocket.wallet;
-            return (
+          {/* 3. Primary Wallet Pockets 2-Column Grid */}
+          <Box>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.25, px: 0.5 }}>
+              <Typography sx={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>
+                Wallet Pockets
+              </Typography>
+              <Typography
+                onClick={() => setActiveTab(1)}
+                sx={{ fontSize: 12.5, fontWeight: 600, color: "#2563eb", cursor: "pointer" }}
+              >
+                See All
+              </Typography>
+            </Stack>
+
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                gap: 1.5,
+              }}
+            >
+              {[
+                { title: "Main Wallet", amount: walletByNo[5]?.amount || 0, color: "#2563eb", bg: "#eff6ff", icon: AccountBalanceWalletIcon, onClick: () => openTransferType("coupon") },
+                { title: "Add Money Pocket", amount: addMoneyPocketBalance || 0, color: "#16a34a", bg: "#dcfce7", icon: PaymentsIcon, onClick: () => (window.location.href = "/user/upload-wallet") },
+                { title: "Self Package", amount: walletByNo[7]?.amount || 0, color: "#ea580c", bg: "#fff7ed", icon: ShoppingCartIcon, onClick: () => openTransferType("internal") },
+                { title: "Coupon Pocket", amount: walletByNo[6]?.amount || 0, color: "#7c3aed", bg: "#f5f3ff", icon: CardGiftcardIcon, onClick: () => (window.location.href = "/user/coupon-pocket") },
+              ].map((p) => {
+                const IconComp = p.icon;
+                return (
+                  <Paper
+                    key={p.title}
+                    elevation={0}
+                    onClick={p.onClick}
+                    sx={{
+                      p: 1.5,
+                      borderRadius: "14px",
+                      bgcolor: "#ffffff",
+                      border: "1px solid #e2e8f0",
+                      boxShadow: "0 2px 8px rgba(15,23,42,0.04)",
+                      cursor: "pointer",
+                      transition: "transform 140ms ease, box-shadow 140ms ease",
+                      "&:active": { transform: "scale(0.98)" },
+                    }}
+                  >
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                      <Box
+                        sx={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: "8px",
+                          bgcolor: p.bg,
+                          color: p.color,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <IconComp sx={{ fontSize: 18 }} />
+                      </Box>
+                      <Typography sx={{ fontSize: 12, fontWeight: 600, color: "#64748b" }} noWrap>
+                        {p.title}
+                      </Typography>
+                    </Stack>
+                    <Typography sx={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>
+                      ₹ {Number(p.amount || 0).toFixed(2)}
+                    </Typography>
+                  </Paper>
+                );
+              })}
+            </Box>
+          </Box>
+
+          {/* 4. Recent Transactions */}
+          <Box>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.25, px: 0.5 }}>
+              <Typography sx={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>
+                Recent Transactions
+              </Typography>
+              <Typography
+                onClick={() => (window.location.href = "/user/history")}
+                sx={{ fontSize: 12.5, fontWeight: 600, color: "#2563eb", cursor: "pointer" }}
+              >
+                See All
+              </Typography>
+            </Stack>
+
+            <Stack spacing={1}>
+              {recentTxns.length > 0 ? (
+                recentTxns.map((tx, idx) => {
+                  const isCredit = Number(tx.amount || 0) >= 0;
+                  return (
+                    <Paper
+                      key={tx.id || idx}
+                      elevation={0}
+                      sx={{
+                        p: 1.5,
+                        borderRadius: "14px",
+                        bgcolor: "#ffffff",
+                        border: "1px solid #e2e8f0",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <Stack direction="row" spacing={1.25} alignItems="center">
+                        <Box
+                          sx={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: "10px",
+                            bgcolor: isCredit ? "#dcfce7" : "#fee2e2",
+                            color: isCredit ? "#16a34a" : "#ef4444",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <AccountBalanceWalletIcon sx={{ fontSize: 18 }} />
+                        </Box>
+                        <Box>
+                          <Typography sx={{ fontSize: 13.5, fontWeight: 600, color: "#0f172a" }} noWrap>
+                            {tx.description || tx.title || tx.source_type || "Transaction"}
+                          </Typography>
+                          <Typography sx={{ fontSize: 11.5, color: "#94a3b8" }}>
+                            {tx.created_at ? new Date(tx.created_at).toLocaleString() : "-"}
+                          </Typography>
+                        </Box>
+                      </Stack>
+                      <Stack direction="column" alignItems="flex-end" spacing={0.5}>
+                        <Typography sx={{ fontSize: 14, fontWeight: 700, color: isCredit ? "#16a34a" : "#0f172a" }}>
+                          {isCredit ? `+ ₹${Math.abs(Number(tx.amount || 0)).toFixed(2)}` : `- ₹${Math.abs(Number(tx.amount || 0)).toFixed(2)}`}
+                        </Typography>
+                        <StatusBadge status={tx.status || "SUCCESS"} />
+                      </Stack>
+                    </Paper>
+                  );
+                })
+              ) : (
+                <Paper elevation={0} sx={{ p: 2, borderRadius: "14px", textAlign: "center", bgcolor: "#ffffff", border: "1px dashed #e2e8f0" }}>
+                  <Typography sx={{ fontSize: 13, color: "#94a3b8" }}>No recent transactions found.</Typography>
+                </Paper>
+              )}
+            </Stack>
+          </Box>
+        </Stack>
+      )}
+
+      {/* ════════ TAB 1: ALL WALLETS (Detailed View) ════════ */}
+      {activeTab === 1 && (
+        <Box sx={{ mt: 1 }}>
+          <Paper
+            elevation={0}
+            className="consumer-fintech-card"
+            sx={{
+              p: { xs: 1.15, sm: 1.5 },
+              mb: 2,
+              borderRadius: 3,
+              bgcolor: "#fff",
+            }}
+          >
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", sm: "1fr 260px" },
+                gap: 1.2,
+                alignItems: "start",
+              }}
+            >
+              <Stack direction="row" spacing={0.8} alignItems="center">
+                <AccountBalanceWalletIcon sx={{ fontSize: 20, color: "#64748b" }} />
+                <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#475569" }}>
+                  Growth Wallet
+                </Typography>
+              </Stack>
               <WalletPanel
-                key={pocket.no}
-                title={`${pocket.no}. ${pocket.title}`}
-                amount={wallet?.amount}
-                icon={wallet?.icon}
-                caption={wallet?.label}
-                actions={pocket.disabled || pocket.transferType === "withdrawal" ? [] : wallet?.actions}
-                tone={pocket.no + 1}
-                onClick={pocket.disabled ? undefined : pocket.onClick || (pocket.transferType ? () => openTransferType(pocket.transferType) : undefined)}
+                title="Main Wallet"
+                amount={walletByNo[5]?.amount}
+                icon={walletByNo[5]?.icon}
+                caption="Choose a pocket after click"
+                highlight
+                tone={5}
+                onClick={() => openTransferType("coupon")}
               />
-            );
-          })}
-        </Box>
-      </Box>
+            </Box>
 
-      <Box sx={{ mb: "14px" }}>
-        <SectionHeader title="Purchase Coupon Entry & Buy Package" accentColor="success.main" />
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-            gap: { xs: 1, sm: 1.2 },
-          }}
-        >
-          {manualWallets.map((wallet) => (
-            <WalletPanel
-              key={wallet.title}
-              title={wallet.title}
-              amount={wallet.amount}
-              icon={wallet.icon}
-              caption={wallet.caption}
-              idCount={wallet.idCount}
-              tone={wallet.tone}
-            />
-          ))}
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", sm: "repeat(3, minmax(0, 1fr))" },
+                gap: { xs: 1, sm: 1.2 },
+                mt: 1.2,
+              }}
+            >
+              {summaryWallets.map((item, index) => (
+                <WalletPanel
+                  key={item.title}
+                  title={item.title}
+                  amount={item.wallet?.amount}
+                  icon={item.wallet?.icon}
+                  caption={item.wallet?.label}
+                  idCount={item.idCount}
+                  tone={index}
+                />
+              ))}
+            </Box>
+          </Paper>
+
+          <Box sx={{ mb: "14px" }}>
+            <SectionHeader title="Pockets" />
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                gap: { xs: 1, sm: 1.2 },
+              }}
+            >
+              {transferPockets.map((pocket) => {
+                const wallet = pocket.wallet;
+                return (
+                  <WalletPanel
+                    key={pocket.no}
+                    title={`${pocket.no}. ${pocket.title}`}
+                    amount={wallet?.amount}
+                    icon={wallet?.icon}
+                    caption={wallet?.label}
+                    actions={pocket.disabled || pocket.transferType === "withdrawal" ? [] : wallet?.actions}
+                    tone={pocket.no + 1}
+                    onClick={pocket.disabled ? undefined : pocket.onClick || (pocket.transferType ? () => openTransferType(pocket.transferType) : undefined)}
+                  />
+                );
+              })}
+            </Box>
+          </Box>
+
+          <Box sx={{ mb: "14px" }}>
+            <SectionHeader title="Purchase Coupon Entry & Buy Package" accentColor="success.main" />
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                gap: { xs: 1, sm: 1.2 },
+              }}
+            >
+              {manualWallets.map((wallet) => (
+                <WalletPanel
+                  key={wallet.title}
+                  title={wallet.title}
+                  amount={wallet.amount}
+                  icon={wallet.icon}
+                  caption={wallet.caption}
+                  idCount={wallet.idCount}
+                  tone={wallet.tone}
+                />
+              ))}
+            </Box>
+          </Box>
+
+          {/* ── Dashboard (Layer Matrix, Royalty, Earnings & Limit) ── */}
+          <WalletDashboardV2 showTable={false} />
         </Box>
-      </Box>
+      )}
 
       {/* ── Transfer Dialog ── */}
       <Dialog

@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import API from "../api/api";
 
 /**
@@ -558,7 +558,7 @@ export default function TreeReferralGalaxy({
 
   return (
     <div style={styles.container}>
-      <div style={styles.header}>Genealogy</div>
+      <div style={styles.header}>Layer Blocks</div>
 
       {/* Breadcrumbs and optional admin search bar */}
       <div style={styles.bar}>

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import API from "../../api/api";
 
@@ -161,6 +161,8 @@ export default function AdminWithdrawals() {
   const [err, setErr] = useState("");
   const [rows, setRows] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   // Withdrawal tax percent (TDS) configured by admin
   const [withdrawTaxPercent, setWithdrawTaxPercent] = useState(0);
@@ -262,12 +264,16 @@ export default function AdminWithdrawals() {
       const res = await API.patch("/admin/commission/master/", payload);
       const wwin = res?.data?.withdrawals_window;
       if (wwin) {
-        setWindowCfg({
+        const cfg = {
           enabled: Boolean(wwin?.enabled ?? true),
           weekday: Number(wwin?.weekday ?? 2),
           start_time: String(wwin?.start_time ?? "00:00").slice(0, 5),
           end_time: String(wwin?.end_time ?? "23:59").slice(0, 5),
-        });
+        };
+        setWindowCfg(cfg);
+        try {
+          localStorage.setItem("tk_withdrawals_window", JSON.stringify(cfg));
+        } catch (_) {}
       }
       setWindowOk("Saved");
       // auto-hide
@@ -304,6 +310,71 @@ export default function AdminWithdrawals() {
     } catch (e) {
       alert(e?.response?.data?.detail || "Failed to reject");
     }
+  }
+
+  // Bulk Approve Selected
+  async function handleBulkApprove() {
+    if (!selectedIds.length) return;
+    const ok = window.confirm(`Approve all ${selectedIds.length} selected withdrawals?`);
+    if (!ok) return;
+    setBulkLoading(true);
+    try {
+      for (const id of selectedIds) {
+        await API.patch(`/admin/withdrawals/${id}/approve/`, { payout_ref: "BULK_DISBURSED" });
+      }
+      setSelectedIds([]);
+      await fetchWithdrawals();
+      alert(`Successfully approved ${selectedIds.length} withdrawals.`);
+    } catch (e) {
+      alert(e?.response?.data?.detail || "Bulk approval completed with some errors.");
+    } finally {
+      setBulkLoading(false);
+    }
+  }
+
+  // Export Bank Batch CSV (Standard HDFC / ICICI / SBI format)
+  function handleExportBankBatch() {
+    const targetRows = selectedIds.length
+      ? rows.filter((r) => selectedIds.includes(r.id))
+      : rows.filter((r) => r.status === "pending");
+
+    if (!targetRows.length) {
+      alert("No withdrawals available to export.");
+      return;
+    }
+
+    const headers = [
+      "Payment Type",
+      "Beneficiary Name",
+      "Beneficiary Account No",
+      "IFSC Code",
+      "Net Amount (INR)",
+      "Remarks / User ID",
+      "Debit Account No",
+    ];
+
+    const csvRows = targetRows.map((r) => {
+      const gross = Number(r.amount || 0);
+      const taxAmt = gross * Number(taxLabel || 0) / 100;
+      const net = (gross - taxAmt).toFixed(2);
+      return [
+        "NEFT",
+        `"${(r.full_name || r.username || "User").replace(/"/g, '""')}"`,
+        `"${r.bank_account_number || r.account_number || ""}"`,
+        r.ifsc_code || r.ifsc || "",
+        net,
+        `"TR-${r.username || r.id}"`,
+        "COMPANY_MAIN_ACCOUNT",
+      ];
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...csvRows.map((e) => e.join(","))].join("\n");
+    const link = document.createElement("a");
+    link.setAttribute("href", encodeURI(csvContent));
+    link.setAttribute("download", `bank_batch_payout_${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
   const summary = useMemo(() => {
@@ -418,6 +489,46 @@ export default function AdminWithdrawals() {
           >
             Withdrawal Tax: <b>{Number(taxLabel).toFixed(2)}%</b>
           </div>
+
+          <button
+            type="button"
+            onClick={handleExportBankBatch}
+            disabled={loading || rows.length === 0}
+            style={{
+              padding: "10px 14px",
+              background: "#0284c7",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              fontWeight: 700,
+              fontSize: 13,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            📥 Bank Batch CSV {selectedIds.length ? `(${selectedIds.length})` : ""}
+          </button>
+
+          {selectedIds.length > 0 && (
+            <button
+              type="button"
+              onClick={handleBulkApprove}
+              disabled={bulkLoading}
+              style={{
+                padding: "10px 14px",
+                background: "#16a34a",
+                color: "#fff",
+                border: "none",
+                borderRadius: 8,
+                fontWeight: 800,
+                fontSize: 13,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {bulkLoading ? "Disbursing..." : `⚡ Bulk Approve (${selectedIds.length})`}
+            </button>
+          )}
           </div>
         </div>
       </div>
@@ -617,8 +728,23 @@ export default function AdminWithdrawals() {
               >
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: "#0f172a" }}>
-                      {r.full_name || r.username || "User"}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: "#0f172a" }}>
+                        {r.full_name || r.username || "User"}
+                      </div>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: "2px 8px",
+                          borderRadius: 999,
+                          background: "#e0e7ff",
+                          color: "#3730a3",
+                          border: "1px solid #c7d2fe",
+                        }}
+                      >
+                        {r.rank_name || (r.rank_level ? `Level ${r.rank_level}` : "Free Tier")}
+                      </span>
                     </div>
                     <div style={{ fontSize: 12, color: "#64748b", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {r.username ? `@${r.username}` : ""}
@@ -725,7 +851,7 @@ export default function AdminWithdrawals() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "80px 160px 1.2fr 140px 120px 120px 160px 110px 130px 180px 220px",
+                  gridTemplateColumns: "40px 60px 130px 1.1fr 120px 120px 110px 110px 150px 90px 80px 100px 100px 140px 170px",
                   gap: 8,
                   padding: 12,
                   background: "#f8fafc",
@@ -733,11 +859,25 @@ export default function AdminWithdrawals() {
                   fontWeight: 800,
                   color: "#0f172a",
                   fontSize: 13,
+                  alignItems: "center",
                 }}
               >
+                <div>
+                  <input
+                    type="checkbox"
+                    checked={rows.length > 0 && selectedIds.length === rows.length}
+                    onChange={(e) => {
+                      if (e.target.checked) setSelectedIds(rows.map((r) => r.id));
+                      else setSelectedIds([]);
+                    }}
+                    style={{ cursor: "pointer", width: 16, height: 16 }}
+                  />
+                </div>
                 <div>ID</div>
                 <div>User</div>
                 <div>Name</div>
+                <div>Digital Rank</div>
+                <div>Solvency</div>
                 <div>Phone</div>
                 <div>Amount</div>
                 <div>Method</div>
@@ -756,22 +896,68 @@ export default function AdminWithdrawals() {
                   const gross = Number(r.amount || 0);
                   const taxAmt = q2(gross * Number(taxLabel || 0) / 100);
                   const net = q2(gross - taxAmt);
+                  const isChecked = selectedIds.includes(r.id);
+                  const isSolvent = Number(r.user_wallet_balance || gross) >= gross;
                   return (
                     <div
                       key={r.id}
                       style={{
                         display: "grid",
-                        gridTemplateColumns: "80px 160px 1.2fr 140px 120px 120px 160px 110px 130px 180px 220px",
+                        gridTemplateColumns: "40px 60px 130px 1.1fr 120px 120px 110px 110px 150px 90px 80px 100px 100px 140px 170px",
                         gap: 8,
                         padding: 12,
                         borderBottom: "1px solid #e2e8f0",
                         alignItems: "center",
                         fontSize: 13,
+                        backgroundColor: isChecked ? "#f0f9ff" : "#fff",
                       }}
                     >
+                      <div>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedIds((s) => [...s, r.id]);
+                            else setSelectedIds((s) => s.filter((id) => id !== r.id));
+                          }}
+                          style={{ cursor: "pointer", width: 16, height: 16 }}
+                        />
+                      </div>
                       <div style={{ color: "#0f172a", fontWeight: 700 }}>{r.id}</div>
                       <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.username}</div>
                       <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.full_name || ""}</div>
+                      <div>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            padding: "2px 8px",
+                            borderRadius: 999,
+                            background: "#e0e7ff",
+                            color: "#3730a3",
+                            border: "1px solid #c7d2fe",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {r.rank_name || (r.rank_level ? `Level ${r.rank_level}` : "Free Tier")}
+                        </span>
+                      </div>
+                      <div>
+                        <span
+                          title={isSolvent ? "Verified against wallet balance" : "Risk: check wallet audit"}
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 800,
+                            padding: "2px 8px",
+                            borderRadius: 6,
+                            background: isSolvent ? "#dcfce7" : "#fee2e2",
+                            color: isSolvent ? "#15803d" : "#991b1b",
+                            border: `1px solid ${isSolvent ? "#86efac" : "#fca5a5"}`,
+                          }}
+                        >
+                          {isSolvent ? "🟢 Clean" : "🔴 Review"}
+                        </span>
+                      </div>
                       <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.phone || ""}</div>
                       <div style={{ fontWeight: 700 }}>₹{Number(r.amount || 0).toFixed(2)}</div>
                       <div>{r.method?.toUpperCase?.() || ""}</div>

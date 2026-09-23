@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Container,
   Paper,
@@ -116,7 +116,7 @@ export default function ECouponStore() {
         new Set((prods || []).map((p) => denomKey(p.denomination)))
       );
       // Ensure agency/employee Assign forms always include standard denominations based on admin-issued codes
-      const DEFAULT_DENOMS = ["150", "750", "759"];
+      const DEFAULT_DENOMS = ["150", "750", "759", "1000"];
       const denoms = Array.from(new Set([...DEFAULT_DENOMS, ...baseDenoms])).sort(
         (a, b) => Number(a) - Number(b)
       );

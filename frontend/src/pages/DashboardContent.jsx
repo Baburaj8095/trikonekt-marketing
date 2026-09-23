@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   AppBar,
   Toolbar,
@@ -78,7 +78,7 @@ export default function DashboardContent() {
             hasMonthly = true;
           } else if (type === "PRIME") {
             if (Math.abs(price - 150) < 0.5 || name.includes("150") || code.includes("150")) has150 = true;
-            if (Math.abs(price - 750) < 0.5 || name.includes("750") || code.includes("750")) has750 = true;
+            if (Math.abs(price - 750) < 0.5 || Math.abs(price - 1000) < 0.5 || name.includes("750") || name.includes("1000") || code.includes("750") || code.includes("1000")) has750 = true;
           }
         }
         if (!alive) return;

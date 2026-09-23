@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Paper,
@@ -13,9 +14,9 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Tooltip,
   Grid,
   Table,
+  TableContainer,
   TableHead,
   TableBody,
   TableRow,
@@ -25,7 +26,24 @@ import {
   IconButton,
   InputAdornment,
   Snackbar,
+  Card,
+  CardContent,
 } from "@mui/material";
+import ShieldRoundedIcon from "@mui/icons-material/ShieldRounded";
+import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
+import TrendingUpRoundedIcon from "@mui/icons-material/TrendingUpRounded";
+import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceWalletRounded";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import CancelRoundedIcon from "@mui/icons-material/CancelRounded";
+import ShoppingBagRoundedIcon from "@mui/icons-material/ShoppingBagRounded";
+import LayersRoundedIcon from "@mui/icons-material/LayersRounded";
+import HourglassEmptyRoundedIcon from "@mui/icons-material/HourglassEmptyRounded";
+import GroupRoundedIcon from "@mui/icons-material/GroupRounded";
+import TouchAppRoundedIcon from "@mui/icons-material/TouchAppRounded";
+import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
+import NotificationsActiveRoundedIcon from "@mui/icons-material/NotificationsActiveRounded";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+
 import {
   getRanks,
   getUpgradeEligibility,
@@ -40,7 +58,6 @@ import {
   getMyRankCommissionHolds,
   listMyPromoPurchases,
 } from "../api/api";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import normalizeMediaUrl from "../utils/media";
 import {
   getAddMoneyPocketBalance,
@@ -48,81 +65,23 @@ import {
   getSelfPackageWalletBalance,
 } from "../utils/walletBalances";
 
-/**
- * Rank Upgrade Screen
- * Route: /user/dashboard/upgrade
- *
- * Sections:
- * 1) Current Rank Card
- * 2) Next Rank Card
- * 3) Eligibility Status
- * 4) Upgrade Benefits (static hints)
- * 5) Payment Summary (GST breakdown, net to commission)
- * 6) Upgrade Button
- *
- * Commission logic reminder (UI-only):
- *  - GST 18% on payable amount
- *  - Net = amount - GST
- *  - 50% Direct (sponsor), 50% Level (up to 10 with pass-up)
- */
-
-function ValueRow({ label, value, hint }) {
-  return (
-    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ py: 0.5 }}>
-      <Typography color="text.secondary">{label}</Typography>
-      <Stack direction="row" alignItems="center" spacing={1}>
-        {hint ? (
-          <Tooltip title={hint}>
-            <Typography fontWeight={700}>{value}</Typography>
-          </Tooltip>
-        ) : (
-          <Typography fontWeight={700}>{value}</Typography>
-        )}
-      </Stack>
-    </Stack>
-  );
+function fmt(val) {
+  const num = Number(val || 0);
+  return Number.isFinite(num) ? num.toLocaleString("en-IN") : "0";
 }
 
-function CommissionSplitView({ amount = 0, targetLevel = null }) {
-  // amount = net (after GST)
-  const direct = Math.max(0, Number(amount) * 0.5);
-  const levelBonus = Math.max(0, Number(amount) * 0.5);
-  return (
-    <Box sx={{ p: 2, borderRadius: 1.5, border: "1px solid", borderColor: "divider", bgcolor: "grey.50" }}>
-      <Typography fontWeight={800} fontSize={14} sx={{ mb: 1 }}>
-        Commission Split (on Net)
-      </Typography>
-      <ValueRow label="Net to Commission" value={`₹${Number(amount).toFixed(2)}`} />
-      <ValueRow label="Direct Sponsor (50%)" value={`₹${direct.toFixed(2)}`} />
-      <Divider sx={{ my: 1 }} />
-      <ValueRow label={`Level ${targetLevel ? `L${targetLevel}` : "-" } (50%)`} value={`₹${levelBonus.toFixed(2)}`} />
-    </Box>
-  );
-}
-
-function RankProgressStepper({ currentLevel = 1, nextLevel = null }) {
-  const maxLevel = 10;
-  const items = Array.from({ length: maxLevel }).map((_, i) => i + 1);
-  return (
-    <Box sx={{ display: "grid", gridTemplateColumns: "repeat(10, 1fr)", gap: 0.5 }}>
-      {items.map((lvl) => {
-        const active = lvl <= Number(currentLevel || 0);
-        const upcoming = nextLevel != null && lvl === Number(nextLevel || 0);
-        return (
-          <Box
-            key={lvl}
-            sx={{
-              height: 8,
-              borderRadius: 999,
-              bgcolor: active ? "success.main" : upcoming ? "warning.main" : "divider",
-            }}
-            title={`L${lvl}`}
-          />
-        );
-      })}
-    </Box>
-  );
-}
+const RANK_TIERS = [
+  { level: 1, name: "Level 1", upgradeAmt: 250, limit: 1750, teamCount: 5 },
+  { level: 2, name: "Level 2", upgradeAmt: 500, limit: 2000, teamCount: 25 },
+  { level: 3, name: "Level 3", upgradeAmt: 1000, limit: 4000, teamCount: 50 },
+  { level: 4, name: "Level 4", upgradeAmt: 1250, limit: 6000, teamCount: 100 },
+  { level: 5, name: "Level 5", upgradeAmt: 1500, limit: 7500, teamCount: 150 },
+  { level: 6, name: "Level 6", upgradeAmt: 1750, limit: 8750, teamCount: 175 },
+  { level: 7, name: "Level 7", upgradeAmt: 2000, limit: 10000, teamCount: 200 },
+  { level: 8, name: "Level 8", upgradeAmt: 5000, limit: 15000, teamCount: "-" },
+  { level: 9, name: "Level 9", upgradeAmt: 10000, limit: 20000, teamCount: "-" },
+  { level: 10, name: "Level 10", upgradeAmt: 25000, limit: 100000, teamCount: "-" },
+];
 
 function RankPaymentMethodDialog({ open, onClose, data, walletMe, walletHistory, busy, onPickManual, onPickWallet }) {
   if (!open || !data?.upgrade) return null;
@@ -188,7 +147,7 @@ function RankPaymentSheet({ open, onClose, data, onSuccess }) {
   const [txnId, setTxnId] = useState("");
   const [file, setFile] = useState(null);
   const [copied, setCopied] = useState(false);
-  const [payment, setPayment] = useState(null); // admin-configured UPI info
+  const [payment, setPayment] = useState(null);
   const [zoomOpen, setZoomOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorOpen, setErrorOpen] = useState(false);
@@ -235,7 +194,6 @@ function RankPaymentSheet({ open, onClose, data, onSuccess }) {
           Complete Payment
         </Typography>
 
-        {/* Summary */}
         <Box sx={{ p: 2, mt: 2, bgcolor: "grey.50", borderRadius: 1.5, border: "1px solid", borderColor: "divider" }}>
           <Typography fontWeight={700}>
             Upgrade to {data?.upgrade?.to_rank_name || "Rank"}
@@ -250,7 +208,6 @@ function RankPaymentSheet({ open, onClose, data, onSuccess }) {
 
         <Divider sx={{ my: 1.5 }} />
 
-        {/* UPI Section */}
         <Box sx={{ p: 2, mt: 2 }}>
           <Typography fontWeight={700} mb={1}>
             UPI Payment
@@ -384,20 +341,11 @@ function RankPaymentSheet({ open, onClose, data, onSuccess }) {
 }
 
 export default function RankUpgrade({ defaultToRankId = null } = {}) {
-  // Optional UI-only label override (used by Digital Education Prime package wrapper)
-  const labelOverride = (() => {
-    try {
-      return window.__tk_rank_upgrade_label_override || null;
-    } catch {
-      return null;
-    }
-  })();
-
-  const screenTitle = labelOverride?.title || "Rank Upgrade";
-  const rankWord = labelOverride?.rankWord || "Rank";
+  const navigate = useNavigate();
 
   const [ranks, setRanks] = useState([]);
   const [elig, setElig] = useState(null);
+  const [walletHistory, setWalletHistory] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [initDialog, setInitDialog] = useState(false);
@@ -406,7 +354,6 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [paymentData, setPaymentData] = useState(null);
   const [walletMe, setWalletMe] = useState(null);
-  const [walletHistory, setWalletHistory] = useState(null);
   const [walletBusy, setWalletBusy] = useState(false);
   const [walletErr, setWalletErr] = useState("");
   const [successOpen, setSuccessOpen] = useState(false);
@@ -416,34 +363,10 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
   const [selectedToRankId, setSelectedToRankId] = useState(null);
   const [selectedToRankName, setSelectedToRankName] = useState("");
 
-  // Level Bonus progress + holds (consumer visibility)
   const [lbProgress, setLbProgress] = useState(null);
   const [lbHolds, setLbHolds] = useState([]);
   const [lbLoading, setLbLoading] = useState(false);
-  // Approved base purchase gate (to hide Rank-1 "Achieved" unless approved)
   const [hasApprovedBase, setHasApprovedBase] = useState(false);
-
-  const amount = useMemo(() => Number(elig?.upgrade_amount || 0), [elig]);
-  const gst = useMemo(() => Number((amount * 0.15).toFixed(2)), [amount]); // UI hint (backend computes authoritative)
-  const net = useMemo(() => Math.max(0, amount - gst), [amount, gst]);
-
-  // If user clicks Upgrade from the table, compute cumulative payable up to the selected rank
-  const selectedRank = useMemo(() => {
-    const r = (ranks || []).find((rr) => rr.id === selectedToRankId);
-    return r || null;
-  }, [ranks, selectedToRankId]);
-
-  const selAmount = useMemo(() => {
-    if (!selectedRank) return Number(amount || 0);
-    const curLevel = Number(elig?.achieved_level || 0);
-    const targetLevel = Number(selectedRank?.level_number || 0);
-    if (!targetLevel || targetLevel <= curLevel) return 0;
-    return (ranks || [])
-      .filter((rr) => Number(rr.level_number || 0) > curLevel && Number(rr.level_number || 0) <= targetLevel)
-      .reduce((sum, rr) => sum + Number(rr.upgrade_amount || 0), 0);
-  }, [selectedRank, ranks, elig?.achieved_level, amount]);
-  const selGst = useMemo(() => Number((selAmount * 0.15).toFixed(2)), [selAmount]);
-  const selNet = useMemo(() => Math.max(0, selAmount - selGst), [selAmount, selGst]);
 
   useEffect(() => {
     let alive = true;
@@ -451,105 +374,230 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
       setLoading(true);
       setError("");
       try {
-        const results = await Promise.allSettled([getRanks(), getUpgradeEligibility()]);
+        const results = await Promise.allSettled([
+          getRanks(),
+          getUpgradeEligibility(),
+          getWalletMeHistory(),
+          getMyLevelBonusProgress(),
+          getMyRankCommissionHolds(),
+          listMyPromoPurchases(),
+        ]);
         if (!alive) return;
-        const rkRes = results[0];
-        const egRes = results[1];
 
-        if (rkRes.status === "fulfilled") {
-          setRanks(Array.isArray(rkRes.value) ? rkRes.value : []);
-        } else if (!rkRes.reason?.__canceled) {
-          setError(rkRes.reason?.response?.data?.detail || rkRes.reason?.message || "Failed to load rank data");
-        }
-
-        if (egRes.status === "fulfilled") {
-          setElig(egRes.value || null);
-        } else if (!egRes.reason?.__canceled) {
-          setError(egRes.reason?.response?.data?.detail || egRes.reason?.message || "Failed to load rank data");
+        if (results[0].status === "fulfilled") setRanks(Array.isArray(results[0].value) ? results[0].value : []);
+        if (results[1].status === "fulfilled") setElig(results[1].value || null);
+        if (results[2].status === "fulfilled") setWalletHistory(results[2].value || null);
+        if (results[3].status === "fulfilled") setLbProgress(results[3].value || null);
+        if (results[4].status === "fulfilled") setLbHolds(Array.isArray(results[4].value) ? results[4].value : []);
+        if (results[5].status === "fulfilled") {
+          const hist = results[5].value;
+          const ok = Array.isArray(hist) && hist.some((h) => {
+            const status = String(h?.status || "").toUpperCase();
+            const type = String(h?.package?.type || "").toUpperCase();
+            return status === "APPROVED" && type !== "MONTHLY";
+          });
+          setHasApprovedBase(!!ok);
         }
       } catch (e) {
-        // Safety net; with allSettled we generally won't reach here.
         if (!alive) return;
-        if (!e?.__canceled) {
-          setError(e?.response?.data?.detail || e?.message || "Failed to load rank data");
-        }
+        setError(e?.response?.data?.detail || e?.message || "Failed to load rank data");
       } finally {
         if (alive) setLoading(false);
       }
     })();
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  // Load Level Bonus progress + holds
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      setLbLoading(true);
-      try {
-        const [p, h] = await Promise.allSettled([getMyLevelBonusProgress(), getMyRankCommissionHolds()]);
-        if (!alive) return;
-        if (p.status === "fulfilled") setLbProgress(p.value || null);
-        if (h.status === "fulfilled") setLbHolds(Array.isArray(h.value) ? h.value : []);
-      } catch {}
-      finally {
-        if (alive) setLbLoading(false);
-      }
-    })();
     return () => { alive = false; };
   }, []);
 
-  // Load approved purchases to gate Rank-1 "Achieved"
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const hist = await listMyPromoPurchases();
-        if (!alive) return;
-        const ok = Array.isArray(hist) && hist.some((h) => {
-          const status = String(h?.status || "").toUpperCase();
-          const type = String(h?.package?.type || "").toUpperCase();
-          // Consider base "membership" purchases only (exclude MONTHLY promo boxes)
-          return status === "APPROVED" && type !== "MONTHLY";
-        });
-        setHasApprovedBase(!!ok);
-      } catch {
-        if (alive) setHasApprovedBase(false);
-      }
-    })();
-    return () => { alive = false; };
-  }, []);
-
-  const nextRankMeta = useMemo(() => {
-    if (!elig?.next_rank) return null;
-    const match = (ranks || []).find((r) => String(r.rank_name) === String(elig.next_rank));
-    return match || null;
-  }, [ranks, elig?.next_rank]);
-
-  useEffect(() => {
-    if (!defaultToRankId || !Array.isArray(ranks) || !ranks.length) return;
-    const target = ranks.find((r) => String(r.id) === String(defaultToRankId));
-    if (!target) return;
-    setSelectedToRankId(target.id);
-    setSelectedToRankName(target.rank_name || "");
-  }, [defaultToRankId, ranks]);
-
-  // Effective achieved level for UI gating:
-  // If base purchase is not approved yet, keep user at level 0 so L1 stays buyable.
-  const effectiveAchievedLevel = useMemo(() => {
+  const achievedLevel = useMemo(() => {
     const apiLevel = Number(elig?.achieved_level || 0);
     if (!hasApprovedBase) return 0;
     return Math.max(0, apiLevel);
   }, [elig?.achieved_level, hasApprovedBase]);
 
-  const canUpgrade = !!elig?.eligible && !!elig?.next_rank && Number(amount) > 0;
+  const effectiveAchievedLevel = achievedLevel;
+
+  const currentLevel = Math.max(1, achievedLevel);
+  const nextLevel = currentLevel < 10 ? currentLevel + 1 : 10;
+
+  const currentLimit = useMemo(() => {
+    const tier = RANK_TIERS.find((t) => t.level === currentLevel);
+    return Number(walletHistory?.current_limit || tier?.limit || 1750);
+  }, [currentLevel, walletHistory]);
+
+  const layerMatrixEarned = useMemo(() => {
+    const fromApi = Number(
+      walletHistory?.layer_matrix_earned ||
+        walletHistory?.income?.matrixLevel ||
+        walletHistory?.income?.matrixFive ||
+        walletHistory?.top?.level_earnings_total ||
+        0
+    );
+    if (fromApi > 0) return fromApi;
+
+    // Fallback: scan walletHistory main_wallet and incoming for level and matrix bonuses
+    const allTx = [
+      ...(walletHistory?.main_wallet || []),
+      ...(walletHistory?.incoming || []),
+    ];
+    let sum = 0;
+    const seen = new Set();
+    for (const t of allTx) {
+      if (!t?.id || seen.has(t.id)) continue;
+      seen.add(t.id);
+      const isLevel =
+        t.type === "LEVEL_BONUS" ||
+        t.type === "AUTOPOOL_BONUS_FIVE" ||
+        t.type === "AUTOPOOL_BONUS_THREE" ||
+        t.meta?.orig_type === "AUTOPOOL_BONUS_FIVE" ||
+        t.meta?.orig_type === "AUTOPOOL_BONUS_THREE" ||
+        t.meta?.orig_type === "LEVEL_BONUS" ||
+        (t.meta?.source && String(t.meta.source).toLowerCase().includes("matrix"));
+      if (isLevel) {
+        sum += Math.abs(Number(t.amount || 0));
+      }
+    }
+    return sum;
+  }, [walletHistory]);
+
+  const totalEarnings = useMemo(() => {
+    const val = Number(
+      walletHistory?.top?.level_earnings_total ||
+        walletHistory?.totals?.levelEarnings ||
+        walletHistory?.totals?.level_earnings ||
+        walletHistory?.level_earnings ||
+        0
+    );
+    if (val > 0) return val;
+    return layerMatrixEarned;
+  }, [walletHistory, layerMatrixEarned]);
+
+  const isLimitReached =
+    walletHistory?.is_limit_reached ?? (totalEarnings >= currentLimit);
+
+  const percentUsed =
+    currentLimit > 0
+      ? Math.min(100, Math.max(0, (totalEarnings / currentLimit) * 100))
+      : 0;
+
+  const layerMatrixEligible = useMemo(() => {
+    return Number(
+      walletHistory?.layer_matrix_eligible || Math.max(100000, currentLevel * 10000)
+    );
+  }, [walletHistory, currentLevel]);
+
+  const missingIncome = useMemo(() => {
+    return Number(
+      walletHistory?.missing_income ||
+        (isLimitReached ? Math.max(0, totalEarnings - currentLimit) : 0)
+    );
+  }, [walletHistory, isLimitReached, totalEarnings, currentLimit]);
+
+  const layerMatrixPercent = useMemo(() => {
+    return layerMatrixEligible > 0
+      ? Math.min(100, (layerMatrixEarned / layerMatrixEligible) * 100)
+      : 0;
+  }, [layerMatrixEarned, layerMatrixEligible]);
+
+  const savedRankConfig = useMemo(() => {
+    try {
+      const raw = localStorage.getItem("tri_rank_upgrade_config");
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (parsed?.levels?.[2]?.team_count === "50") {
+        parsed.levels[2].team_count = "125";
+        parsed.levels[3].team_count = "625";
+        parsed.levels[4].team_count = "3125";
+        parsed.levels[5].team_count = "15625";
+        parsed.levels[6].team_count = "78125";
+      }
+      return parsed;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const savedRoyaltyConfig = useMemo(() => {
+    try {
+      const raw = localStorage.getItem("tri_royalty_config");
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const upgradeWindowInfo = useMemo(() => {
+    const isL8Plus = currentLevel >= 8;
+    const adminConfiguredDays = isL8Plus
+      ? Number(
+          elig?.upgrade_window_l8_l10 ||
+          elig?.upgrade_window_days_l8_l10 ||
+          savedRankConfig?.upgrade_window_l8_l10 ||
+          15
+        )
+      : Number(
+          elig?.upgrade_window_l1_l7 ||
+          elig?.upgrade_window_days_l1_l7 ||
+          savedRankConfig?.upgrade_window_l1_l7 ||
+          7
+        );
+
+    if (!hasApprovedBase) {
+      return {
+        started: false,
+        daysLeft: adminConfiguredDays,
+        totalDays: adminConfiguredDays,
+        levelRange: isL8Plus ? "L8 to L10" : "L1 to L7",
+      };
+    }
+
+    let daysRemaining = elig?.days_left ?? elig?.remaining_days ?? elig?.upgrade_days_left ?? walletHistory?.days_left;
+    if (daysRemaining === undefined || daysRemaining === null) {
+      if (elig?.first_upgrade_date || elig?.base_purchase_date) {
+        const firstDate = new Date(elig.first_upgrade_date || elig.base_purchase_date);
+        const diffMs = Date.now() - firstDate.getTime();
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        daysRemaining = Math.max(0, adminConfiguredDays - diffDays);
+      } else {
+        daysRemaining = adminConfiguredDays;
+      }
+    }
+
+    return {
+      started: true,
+      daysLeft: Number(daysRemaining),
+      totalDays: adminConfiguredDays,
+      levelRange: isL8Plus ? "L8 to L10" : "L1 to L7",
+    };
+  }, [currentLevel, elig, walletHistory, savedRankConfig, hasApprovedBase]);
+
+  const handleUpgradeClick = (rankTarget) => {
+    const targetId = rankTarget?.id || (ranks.find((r) => Number(r.level_number || 0) === nextLevel)?.id);
+    const targetName = rankTarget?.rank_name || `Level ${nextLevel}`;
+    setSelectedToRankId(targetId);
+    setSelectedToRankName(targetName);
+    setInitDialog(true);
+  };
+
+  const selAmount = useMemo(() => {
+    const selectedRank = (ranks || []).find((rr) => rr.id === selectedToRankId);
+    const targetLevel = Number(selectedRank?.level_number || nextLevel);
+    const curLevel = effectiveAchievedLevel;
+    if (!targetLevel || targetLevel <= curLevel) return Number(savedRankConfig?.levels?.[0]?.upgrade_amount || elig?.upgrade_amount || 250);
+    let total = 0;
+    for (let l = curLevel + 1; l <= targetLevel; l++) {
+      const cfgLvl = savedRankConfig?.levels?.[l - 1];
+      const apiLvl = (ranks || []).find((rr) => Number(rr.level_number || 0) === l);
+      total += Number(cfgLvl?.upgrade_amount != null ? cfgLvl.upgrade_amount : (apiLvl?.upgrade_amount || 250));
+    }
+    return total;
+  }, [selectedToRankId, ranks, elig, effectiveAchievedLevel, nextLevel, savedRankConfig]);
 
   if (loading) {
     return (
-      <Box sx={{ p: 2 }}>
+      <Box sx={{ p: 2, maxWidth: 840, mx: "auto" }}>
         <Typography fontSize={18} fontWeight={900} sx={{ mb: 1 }}>
-          {screenTitle}
+          Rank Upgrade
         </Typography>
         <LinearProgress />
       </Box>
@@ -557,13 +605,460 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
   }
 
   return (
-    <Box sx={{ p: 2 }}>
-      <Typography fontSize={18} fontWeight={900} sx={{ mb: 1 }}>
-        {screenTitle}
-      </Typography>
+    <Box sx={{ maxWidth: 840, mx: "auto", px: { xs: 1, sm: 2 }, py: 2 }}>
+      {/* ── Title ── */}
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+        <Typography fontSize={22} fontWeight={950} color="#0f172a">
+          My Wallet / Rank Upgrade
+        </Typography>
+      </Stack>
 
-      
-      {/* Level Bonus Progress */}
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+      {/* ── Top Bar Indicators ── */}
+      <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 3, mb: 2, bgcolor: "#fafafa" }}>
+        <Grid container spacing={1.5} alignItems="center">
+          <Grid item xs={4}>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "#eff6ff", color: "#2563eb", display: "grid", placeItems: "center" }}>
+                <ShieldRoundedIcon sx={{ fontSize: 22 }} />
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>Current Level</Typography>
+                <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#1e1b4b" }}>
+                  Level {currentLevel} <Chip label="Eligible" size="small" color="primary" sx={{ height: 18, fontSize: 10, fontWeight: 800 }} />
+                </Typography>
+              </Box>
+            </Stack>
+          </Grid>
+
+          <Grid item xs={4}>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "#fff7ed", color: "#d97706", display: "grid", placeItems: "center" }}>
+                <AccessTimeRoundedIcon sx={{ fontSize: 22 }} />
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>Upgrade Window ({upgradeWindowInfo.levelRange})</Typography>
+                <Typography sx={{ fontSize: 13, fontWeight: 900, color: upgradeWindowInfo.started ? "#d97706" : "#2563eb" }}>
+                  {upgradeWindowInfo.started ? (
+                    <>
+                      {`${upgradeWindowInfo.daysLeft} Days Left `}
+                      <Typography component="span" sx={{ fontSize: 10, color: "#92400e" }}>
+                        {`(Within ${upgradeWindowInfo.totalDays} Days)`}
+                      </Typography>
+                    </>
+                  ) : (
+                    <>
+                      {`Starts on First Upgrade `}
+                      <Typography component="span" sx={{ fontSize: 10, color: "#1d4ed8" }}>
+                        {`(${upgradeWindowInfo.totalDays} Days Window)`}
+                      </Typography>
+                    </>
+                  )}
+                </Typography>
+              </Box>
+            </Stack>
+          </Grid>
+
+          <Grid item xs={4}>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "#f0fdf4", color: "#16a34a", display: "grid", placeItems: "center" }}>
+                <TrendingUpRoundedIcon sx={{ fontSize: 22 }} />
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>Next Level</Typography>
+                <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#15803d" }}>
+                  Level {nextLevel} <Typography component="span" sx={{ fontSize: 10, color: "#166534" }}>(Upgrade to Continue)</Typography>
+                </Typography>
+              </Box>
+            </Stack>
+          </Grid>
+        </Grid>
+      </Paper>
+
+      {/* ── Total Earnings & Wallet Status (Dark Blue Banner) ── */}
+      <Card sx={{ bgcolor: "#1e1b4b", color: "#fff", borderRadius: 3, mb: 2, boxShadow: "0 14px 28px rgba(30,27,75,0.25)" }}>
+        <CardContent sx={{ p: 2.5 }}>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} sm={7}>
+              <Typography sx={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.8, opacity: 0.8, mb: 0.5 }}>
+                TOTAL EARNINGS ⓘ
+              </Typography>
+              <Typography variant="h3" sx={{ fontWeight: 900, mb: 1 }}>
+                ₹{fmt(totalEarnings)} <Typography component="span" sx={{ fontSize: 16, opacity: 0.7 }}>/ ₹{fmt(currentLimit)}</Typography>
+              </Typography>
+              <LinearProgress
+                variant="determinate"
+                value={percentUsed}
+                sx={{
+                  height: 8,
+                  borderRadius: 4,
+                  bgcolor: "rgba(255,255,255,0.2)",
+                  "& .MuiLinearProgress-bar": { bgcolor: isLimitReached ? "#ef4444" : "#f59e0b" },
+                }}
+              />
+              <Typography sx={{ fontSize: 12, mt: 0.8, opacity: 0.85 }}>
+                {isLimitReached ? `Earning Limit Reached for Level ${currentLevel} ⓘ` : `Earning Limit Progress (${percentUsed.toFixed(0)}%) ⓘ`}
+              </Typography>
+            </Grid>
+
+            <Grid item xs={12} sm={5}>
+              <Paper sx={{ p: 1.8, bgcolor: "rgba(255,255,255,0.1)", backdropFilter: "blur(6px)", borderRadius: 2.5, color: "#fff" }}>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                  <AccountBalanceWalletRoundedIcon sx={{ color: isLimitReached ? "#ef4444" : "#22c55e" }} />
+                  <Box>
+                    <Typography sx={{ fontSize: 10, opacity: 0.8, fontWeight: 700 }}>WALLET STATUS</Typography>
+                    <Typography sx={{ fontSize: 14, fontWeight: 900, color: isLimitReached ? "#ef4444" : "#22c55e" }}>
+                      {isLimitReached ? "INCOME STOPPED" : "ACTIVE"}
+                    </Typography>
+                  </Box>
+                </Stack>
+                <Typography sx={{ fontSize: 11, opacity: 0.9, mb: 1.5 }}>
+                  {isLimitReached
+                    ? `Limit reached for Level ${currentLevel}. Upgrade to next level to continue income.`
+                    : `Level ${currentLevel} earning limit is ₹${fmt(currentLimit)}.`}
+                </Typography>
+                <Button
+                  fullWidth
+                  variant="contained"
+                  sx={{ bgcolor: "#ffffff", color: "#1e1b4b", fontWeight: 900, "&:hover": { bgcolor: "#f3f4f6" } }}
+                  onClick={() => handleUpgradeClick()}
+                >
+                  Upgrade Now
+                </Button>
+              </Paper>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
+      {/* ── Earning Limit Level Cards ── */}
+      <Grid container spacing={1.5} sx={{ mb: 2 }}>
+        <Grid item xs={12} sm={4}>
+          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#fff" }}>
+            <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>EARNING LIMIT (LEVEL {currentLevel})</Typography>
+            <Typography sx={{ fontSize: 20, fontWeight: 900, color: "#0f172a", my: 0.5 }}>₹{fmt(currentLimit)}</Typography>
+            {isLimitReached ? (
+              <Chip icon={<CheckCircleRoundedIcon />} label="Completed" color="success" size="small" sx={{ fontWeight: 800 }} />
+            ) : (
+              <Chip label="In Progress" color="info" size="small" sx={{ fontWeight: 800 }} />
+            )}
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12} sm={4}>
+          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#fff" }}>
+            <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>EARNING LIMIT (LEVEL 10)</Typography>
+            <Typography sx={{ fontSize: 20, fontWeight: 900, color: "#0f172a", my: 0.5 }}>₹1,50,000</Typography>
+            {currentLevel >= 10 && isLimitReached ? (
+              <Chip icon={<CheckCircleRoundedIcon />} label="Completed" color="success" size="small" sx={{ fontWeight: 800 }} />
+            ) : (
+              <Chip icon={<CancelRoundedIcon />} label="Not Completed" color="error" size="small" sx={{ fontWeight: 800 }} />
+            )}
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12} sm={4}>
+          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#fff" }}>
+            <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>NEXT CYCLE</Typography>
+            <Typography sx={{ fontSize: 14, fontWeight: 900, color: isLimitReached ? "#d97706" : "#15803d", my: 0.5 }}>
+              {isLimitReached ? "Re-Top Up Required" : "Active"}
+            </Typography>
+            <Typography sx={{ fontSize: 11, color: "#94a3b8" }}>(Same Benefits Continue)</Typography>
+          </Paper>
+        </Grid>
+      </Grid>
+
+      {/* ── Royalty Income, Layer Matrix & Missing Income Grid ── */}
+      <Grid container spacing={2} sx={{ mb: 2 }}>
+        <Grid item xs={12} sm={4}>
+          <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5, borderColor: "#bbf7d0", bgcolor: "#fff" }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+              <Stack direction="row" spacing={0.8} alignItems="center">
+                <ShoppingBagRoundedIcon color="success" sx={{ fontSize: 18 }} />
+                <Typography sx={{ fontWeight: 900, fontSize: 12, color: "#15803d" }}>ROYALTY INCOME (SHOPPING) ⓘ</Typography>
+              </Stack>
+              <Chip label={`₹${fmt(royaltyShopping)}`} color="success" size="small" sx={{ fontWeight: 900, fontSize: 11 }} />
+            </Stack>
+            <Divider sx={{ my: 1 }} />
+            <Stack spacing={1}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center">
+                <Box>
+                  <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700 }}>
+                    {savedRoyaltyConfig?.tier1_levels || "LEVEL 1 TO LEVEL 7"}
+                  </Typography>
+                  <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#15803d" }}>
+                    {savedRoyaltyConfig?.tier1_percent ?? 3}% ₹{fmt(savedRoyaltyConfig?.tier1_cap ?? 10000)}
+                  </Typography>
+                </Box>
+                {currentLevel >= 7 ? (
+                  <Chip icon={<CheckCircleRoundedIcon />} label="Completed" color="success" variant="outlined" size="small" />
+                ) : (
+                  <Chip label="Pending" color="default" variant="outlined" size="small" />
+                )}
+              </Stack>
+              <Stack direction="row" justifyContent="space-between" alignItems="center">
+                <Box>
+                  <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700 }}>
+                    {savedRoyaltyConfig?.tier2_levels || "LEVEL 10 TO LEVEL 10"}
+                  </Typography>
+                  <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#15803d" }}>
+                    {savedRoyaltyConfig?.tier2_percent ?? 7}% ₹{fmt(savedRoyaltyConfig?.tier2_cap ?? 40000)}
+                  </Typography>
+                </Box>
+                {currentLevel >= 10 ? (
+                  <Chip icon={<CheckCircleRoundedIcon />} label="Completed" color="success" variant="outlined" size="small" />
+                ) : (
+                  <Chip label="Pending" color="default" variant="outlined" size="small" />
+                )}
+              </Stack>
+            </Stack>
+            <Divider sx={{ my: 1 }} />
+            <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#15803d" }}>
+              TOTAL ELIGIBLE ROYALTY INCOME (SHOPPING) ₹{fmt(royaltyShopping)}
+            </Typography>
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12} sm={4}>
+          <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5, borderColor: "#bfdbfe", bgcolor: "#fff" }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+              <Stack direction="row" spacing={0.8} alignItems="center">
+                <LayersRoundedIcon color="primary" sx={{ fontSize: 18 }} />
+                <Typography sx={{ fontWeight: 900, fontSize: 12, color: "#0369a1" }}>LAYER MATRIX EARNINGS ⓘ</Typography>
+              </Stack>
+              <Chip label={`Eligible ₹${fmt(layerMatrixEligible)}`} color="primary" size="small" sx={{ fontWeight: 900, fontSize: 11 }} />
+            </Stack>
+            <Divider sx={{ my: 1 }} />
+            <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700, mb: 0.5 }}>FROM LAYER MATRIX (All Slabs)</Typography>
+            <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#0f172a", mb: 0.5 }}>₹{fmt(layerMatrixEarned)}</Typography>
+            <LinearProgress variant="determinate" value={layerMatrixPercent} sx={{ height: 6, borderRadius: 3, mb: 1 }} />
+            <Divider sx={{ my: 1 }} />
+            <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#0369a1" }}>
+              TOTAL ELIGIBLE LAYER INCOME ₹{fmt(layerMatrixEligible)}
+            </Typography>
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12} sm={4}>
+          <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5, borderColor: "#fdba74", bgcolor: "#fff" }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+              <Stack direction="row" spacing={0.8} alignItems="center">
+                <HourglassEmptyRoundedIcon color="warning" sx={{ fontSize: 18 }} />
+                <Typography sx={{ fontWeight: 900, fontSize: 12, color: "#c2410c" }}>MISSING INCOME ⓘ</Typography>
+              </Stack>
+            </Stack>
+            <Divider sx={{ my: 1 }} />
+            <Typography sx={{ fontSize: 24, fontWeight: 900, color: "#c2410c", my: 0.5 }}>₹{fmt(missingIncome)}</Typography>
+            <Typography sx={{ fontSize: 11, color: "#9a3412", mb: 1.5 }}>
+              Income generated after limit reached will be shown here.
+            </Typography>
+            <Button size="small" sx={{ textTransform: "none", color: "#c2410c", fontWeight: 800, p: 0 }}>
+              View Missing Income &gt;
+            </Button>
+          </Paper>
+        </Grid>
+      </Grid>
+
+      {/* ── Rank Upgrade Level Table (Dark Blue Header) ── */}
+      <Paper variant="outlined" sx={{ p: 0, mb: 2, borderRadius: 3, overflow: "hidden" }}>
+        <TableContainer>
+          <Table size="small">
+            <TableHead sx={{ bgcolor: "#1e1b4b" }}>
+              <TableRow sx={{ bgcolor: "#1e1b4b" }}>
+                <TableCell sx={{ color: "#ffffff", bgcolor: "#1e1b4b", fontWeight: 800, py: 1.5 }}>Level</TableCell>
+                <TableCell sx={{ color: "#ffffff", bgcolor: "#1e1b4b", fontWeight: 800, py: 1.5 }}>Upgrade Amount (₹)</TableCell>
+                <TableCell sx={{ color: "#ffffff", bgcolor: "#1e1b4b", fontWeight: 800, py: 1.5 }}>Earning Limit (₹)</TableCell>
+                <TableCell sx={{ color: "#ffffff", bgcolor: "#1e1b4b", fontWeight: 800, py: 1.5 }}>Team Count ⓘ</TableCell>
+                <TableCell sx={{ color: "#ffffff", bgcolor: "#1e1b4b", fontWeight: 800, py: 1.5, textAlign: "right" }}>Next Rank Upgrade</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {(() => {
+                const DEFAULT_LIMITS = [1750, 2000, 4000, 6000, 7500, 8750, 10000, 15000, 20000, 100000];
+                const DEFAULT_TEAM_COUNTS = ["5", "25", "125", "625", "3125", "15625", "78125", "-", "-", "-"];
+                return (ranks || []).map((r, idx) => {
+                  const level = Number(r.level_number || idx + 1);
+                  const achieved = effectiveAchievedLevel >= level;
+                  const isCurrentActive = level === effectiveAchievedLevel;
+                  const canBuy = level === effectiveAchievedLevel + 1;
+
+                  const cfgLvl = savedRankConfig?.levels?.[idx];
+                  const limitVal = cfgLvl?.earning_limit ? Number(cfgLvl.earning_limit) : (DEFAULT_LIMITS[idx] || (r.earning_limit ? Number(r.earning_limit) : 0));
+                  const userTeamCount = Number(
+                    r.current_team_count ??
+                    r.team_size_achieved ??
+                    r.current_team_size ??
+                    elig?.level_team_counts?.[level] ??
+                    elig?.team_counts_by_level?.[level] ??
+                    elig?.team_by_level?.[level] ??
+                    0
+                  );
+
+                  const teamVal = cfgLvl?.team_count != null ? String(cfgLvl.team_count) : (DEFAULT_TEAM_COUNTS[idx] || (r.team_size_required ? String(r.team_size_required) : "-"));
+                  const amtVal = cfgLvl?.upgrade_amount ? Number(cfgLvl.upgrade_amount) : Number(r.upgrade_amount || 0);
+                  const rankTitle = cfgLvl?.name || `Level ${level}`;
+
+                  let teamDisplay = "-";
+                  if (teamVal !== "-") {
+                    teamDisplay = userTeamCount > 0 ? `👥 ${userTeamCount} / ${teamVal}` : `👥 ${teamVal}`;
+                  } else {
+                    teamDisplay = userTeamCount > 0 ? `👥 ${userTeamCount}` : "-";
+                  }
+
+                  return (
+                    <TableRow
+                      key={r.id || idx}
+                      sx={{
+                        bgcolor: isCurrentActive ? "#f3e8ff" : achieved ? "#f8fafc" : "inherit",
+                        "&:hover": { bgcolor: "#f1f5f9" },
+                      }}
+                    >
+                      <TableCell sx={{ fontWeight: isCurrentActive ? 900 : 700, color: isCurrentActive ? "#6b21a8" : "inherit" }}>
+                        {rankTitle}
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>{amtVal.toLocaleString("en-IN")}</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>{limitVal.toLocaleString("en-IN")}</TableCell>
+                      <TableCell sx={{ color: teamDisplay !== "-" ? "#4c1d95" : "text.secondary", fontWeight: teamDisplay !== "-" ? 700 : 400 }}>
+                        {teamDisplay}
+                      </TableCell>
+                      <TableCell align="right">
+                        {isCurrentActive && isLimitReached ? (
+                          <Typography sx={{ color: "#ef4444", fontWeight: 900, fontSize: 13 }}>Limit Reached</Typography>
+                        ) : achieved ? (
+                          <Chip size="small" label="Purchased" color="success" variant="outlined" sx={{ fontWeight: 700 }} />
+                        ) : canBuy ? (
+                          <Button
+                            size="small"
+                            variant="contained"
+                            color="primary"
+                            sx={{ fontWeight: 800, borderRadius: 1.5 }}
+                            onClick={() => {
+                              setSelectedToRankId(r.id);
+                              setSelectedToRankName(r.rank_name);
+                              setInitDialog(true);
+                            }}
+                          >
+                            Upgrade
+                          </Button>
+                        ) : (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            disabled
+                            sx={{ fontWeight: 700, borderRadius: 1.5 }}
+                          >
+                            Upgrade
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                });
+              })()}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        <Box sx={{ p: 1.25, bgcolor: "#f8fafc", borderTop: "1px solid #e2e8f0", textAlign: "center" }}>
+          <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>
+            ⓘ Total Cycle Limit: ₹1,50,000 for Level 10
+          </Typography>
+        </Box>
+      </Paper>
+
+      {/* ── HOW TEAM COUNT WORKS Banner ── */}
+      <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 3, bgcolor: "#fff" }}>
+        <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#4338ca", mb: 1.5, textAlign: "center", letterSpacing: 0.5 }}>
+          HOW TEAM COUNT WORKS?
+        </Typography>
+        <Grid container spacing={2} alignItems="center" justifyContent="center">
+          <Grid item xs={12} sm={5}>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Box sx={{ width: 40, height: 40, borderRadius: 2, bgcolor: "#e0e7ff", color: "#4338ca", display: "grid", placeItems: "center", flexShrink: 0 }}>
+                <GroupRoundedIcon />
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#0f172a" }}>Team Count</Typography>
+                <Typography sx={{ fontSize: 11, color: "#64748b" }}>Total direct members in your team at each level.</Typography>
+              </Box>
+            </Stack>
+          </Grid>
+          <Grid item xs={12} sm={1} sx={{ textAlign: "center", display: { xs: "none", sm: "block" } }}>
+            <ArrowForwardRoundedIcon sx={{ color: "#94a3b8" }} />
+          </Grid>
+          <Grid item xs={12} sm={5}>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Box sx={{ width: 40, height: 40, borderRadius: 2, bgcolor: "#f3e8ff", color: "#7e22ce", display: "grid", placeItems: "center", flexShrink: 0 }}>
+                <TouchAppRoundedIcon />
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#0f172a" }}>Tap on Team Count</Typography>
+                <Typography sx={{ fontSize: 11, color: "#64748b" }}>Tap on any team count number to view member list.</Typography>
+              </Box>
+            </Stack>
+          </Grid>
+        </Grid>
+      </Paper>
+
+      {/* ── Bottom Call-to-Action Cards ── */}
+      <Grid container spacing={2} sx={{ mb: 2 }}>
+        <Grid item xs={12} sm={6}>
+          <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, bgcolor: "#f0fdf4", borderColor: "#bbf7d0" }}>
+            <Stack direction="row" spacing={1.5} alignItems="flex-start">
+              <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "#16a34a", color: "#fff", display: "grid", placeItems: "center", flexShrink: 0 }}>
+                <TrendingUpRoundedIcon sx={{ fontSize: 20 }} />
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#166534", mb: 0.5 }}>NEXT RANK UPGRADE</Typography>
+                <Typography sx={{ fontSize: 11, color: "#15803d", mb: 1 }}>
+                  Upgrade to Level {nextLevel} to start new earning cycle and continue income. Re-Top Up or Upgrade to continue.
+                </Typography>
+                <Button
+                  size="small"
+                  variant="contained"
+                  color="success"
+                  sx={{ textTransform: "none", fontWeight: 800, borderRadius: 1.5 }}
+                  onClick={() => handleUpgradeClick()}
+                >
+                  Upgrade Now
+                </Button>
+              </Box>
+            </Stack>
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12} sm={6}>
+          <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, bgcolor: "#fff7ed", borderColor: "#fed7aa" }}>
+            <Stack direction="row" spacing={1.5} alignItems="flex-start">
+              <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "#ea580c", color: "#fff", display: "grid", placeItems: "center", flexShrink: 0 }}>
+                <NotificationsActiveRoundedIcon sx={{ fontSize: 20 }} />
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#c2410c", mb: 0.5 }}>NOTIFICATIONS</Typography>
+                <Typography sx={{ fontSize: 11, color: "#ea580c", mb: 1 }}>
+                  You will be notified for next rank upgrade and missing income.
+                </Typography>
+                <Button
+                  size="small"
+                  variant="contained"
+                  sx={{ textTransform: "none", fontWeight: 800, borderRadius: 1.5, bgcolor: "#ea580c", "&:hover": { bgcolor: "#c2410c" } }}
+                >
+                  View Notifications
+                </Button>
+              </Box>
+            </Stack>
+          </Paper>
+        </Grid>
+      </Grid>
+
+      {/* ── Footer Hint ── */}
+      <Box sx={{ textAlign: "center", py: 1, px: 2, bgcolor: "#f8fafc", borderRadius: 2, border: "1px dashed #cbd5e1", mb: 2 }}>
+        <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>
+          ⓘ Upgrade within {upgradeWindowInfo.totalDays} days ({upgradeWindowInfo.levelRange}) to remain eligible for income.
+        </Typography>
+      </Box>
+
+      {/* ── Level Bonus Progress (Collapsible/Detailed) ── */}
       <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2 }}>
         <Typography fontWeight={800} sx={{ mb: 1 }}>
           Level Bonus Progress
@@ -571,24 +1066,18 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
         {lbLoading ? <LinearProgress sx={{ mb: 1 }} /> : null}
         {lbProgress ? (
           <Box>
-            <ValueRow
-              label="Rank-1 Directs Completed"
-              value={`${Number(lbProgress?.completed_rank1_directs || 0)} / ${Number(lbProgress?.threshold || 5)}`}
-            />
-            <ValueRow
-              label="Eligible Now"
-              value={lbProgress?.eligible_now ? "Yes" : "No"}
-            />
-            <ValueRow
-              label="Pending Holds Total"
-              value={`₹${Number(lbProgress?.holds_summary?.pending_total_amount || 0).toFixed(2)}`}
-            />
-            {lbProgress?.holds_summary?.earliest_pending_release_date ? (
-              <ValueRow
-                label="Earliest Pending Release"
-                value={`${lbProgress.holds_summary.earliest_pending_release_date} (${lbProgress.holds_summary.days_left_for_earliest ?? "-"} days)`}
-              />
-            ) : null}
+            <Stack direction="row" justifyContent="space-between" sx={{ py: 0.5 }}>
+              <Typography color="text.secondary">Rank-1 Directs Completed</Typography>
+              <Typography fontWeight={700}>{`${Number(lbProgress?.completed_rank1_directs || 0)} / ${Number(lbProgress?.threshold || 5)}`}</Typography>
+            </Stack>
+            <Stack direction="row" justifyContent="space-between" sx={{ py: 0.5 }}>
+              <Typography color="text.secondary">Eligible Now</Typography>
+              <Typography fontWeight={700}>{lbProgress?.eligible_now ? "Yes" : "No"}</Typography>
+            </Stack>
+            <Stack direction="row" justifyContent="space-between" sx={{ py: 0.5 }}>
+              <Typography color="text.secondary">Pending Holds Total</Typography>
+              <Typography fontWeight={700}>{`₹${Number(lbProgress?.holds_summary?.pending_total_amount || 0).toFixed(2)}`}</Typography>
+            </Stack>
           </Box>
         ) : (
           <Typography color="text.secondary">
@@ -597,156 +1086,7 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
         )}
       </Paper>
 
-      {/* Rank Table (choose and buy) */}
-      <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2 }}>
-        <Typography fontWeight={800} sx={{ mb: 1 }}>
-          {rankWord} Upgrade Table
-        </Typography>
-        {/* Desktop/Tablet table */}
-        <Box sx={{ display: { xs: "none", sm: "block" } }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Level</TableCell>
-                <TableCell>Rank</TableCell>
-                <TableCell align="right">Team</TableCell>
-                <TableCell align="right">Upgrade Amount</TableCell>
-                <TableCell align="center">Distribution</TableCell>
-                <TableCell align="right">Status</TableCell>
-                <TableCell align="right">Action</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {(ranks || []).map((r) => {
-                const level = Number(r.level_number || 0);
-                const achieved = effectiveAchievedLevel >= level;
-                // Sequential unlock only: allow buying only the immediate next level
-                const canBuy = level === effectiveAchievedLevel + 1;
-                const statusLabel = achieved ? "Purchased" : canBuy ? "Available" : "Locked";
-                const statusColor = achieved ? "success" : canBuy ? "info" : "default";
-                return (
-                  <TableRow key={r.id}>
-                    <TableCell>{`L${r.level_number}`}</TableCell>
-                    <TableCell>{r.rank_name}</TableCell>
-                    <TableCell align="right">{Number(r.team_size_required || 0)}</TableCell>
-                    <TableCell align="right">₹{Number(r.upgrade_amount || 0).toFixed(2)}</TableCell>
-                    <TableCell align="center">50% Direct / 50% Level</TableCell>
-                    <TableCell align="right">
-                      <Chip size="small" label={statusLabel} color={statusColor} />
-                    </TableCell>
-                    <TableCell align="right">
-                      <Button
-                        size="small"
-                        variant="contained"
-                        disabled={!canBuy}
-                        onClick={() => {
-                          setSelectedToRankId(r.id);
-                          setSelectedToRankName(r.rank_name);
-                          setInitDialog(true);
-                        }}
-                      >
-                        {achieved ? "Purchased" : canBuy ? "BUY" : "Locked"}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </Box>
-
-        {/* Mobile cards */}
-        <Box sx={{ display: { xs: "block", sm: "none" } }}>
-          {(ranks || []).map((r) => {
-            const level = Number(r.level_number || 0);
-            const achieved = effectiveAchievedLevel >= level;
-            // Sequential unlock only: allow buying only the immediate next level
-            const canBuy = level === effectiveAchievedLevel + 1;
-            const statusLabel = achieved ? "Purchased" : canBuy ? "Available" : "Locked";
-            const statusColor = achieved ? "success" : canBuy ? "info" : "default";
-            return (
-              <Paper key={r.id} variant="outlined" sx={{ p: 1.25, mb: 1, borderRadius: 1.5 }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-                  <Typography fontWeight={800}>
-                    L{r.level_number} • {r.rank_name}
-                  </Typography>
-                  <Chip size="small" label={statusLabel} color={statusColor} />
-                </Stack>
-                <Stack spacing={0.25} sx={{ fontSize: 13 }}>
-                  <Typography color="text.secondary">
-                    Team: <b>{Number(r.team_size_required || 0)}</b>
-                  </Typography>
-                  <Typography color="text.secondary">
-                    Upgrade: <b>₹{Number(r.upgrade_amount || 0).toFixed(2)}</b>
-                  </Typography>
-                  <Typography color="text.secondary">50% Direct / 50% Level</Typography>
-                </Stack>
-                <Stack direction="row" justifyContent="flex-end" sx={{ mt: 1 }}>
-                  <Button
-                    size="small"
-                    variant="contained"
-                    disabled={!canBuy}
-                    onClick={() => {
-                      setSelectedToRankId(r.id);
-                      setSelectedToRankName(r.rank_name);
-                      setInitDialog(true);
-                    }}
-                  >
-                    {achieved ? "Purchased" : canBuy ? "BUY" : "Locked"}
-                  </Button>
-                </Stack>
-              </Paper>
-            );
-          })}
-        </Box>
-        <Alert severity="info" sx={{ mt: 1 }}>
-          Rank upgrades are sequential. First buy L1, then L2, and so on. Only your immediate next level is enabled.
-        </Alert>
-      </Paper>
-
-      {/* Upgrade Benefits */}
-      <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2 }}>
-        <Typography fontWeight={800} sx={{ mb: 1 }}>
-          Upgrade Benefits
-        </Typography>
-        <Box component="ul" sx={{ pl: 3, m: 0 }}>
-          <li>
-            <Typography fontSize={13}>Unlock commission distribution for higher levels.</Typography>
-          </li>
-          <li>
-            <Typography fontSize={13}>Progress towards leadership ranks and rewards.</Typography>
-          </li>
-        </Box>
-      </Paper>
-
-      {/* Payment Summary */}
-      {elig?.next_rank ? (
-        <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2 }}>
-          <Typography fontWeight={800} sx={{ mb: 1 }}>
-            Payment Summary
-          </Typography>
-          <Stack spacing={0.5}>
-            <ValueRow label="Upgrade Amount (incl. GST)" value={`₹${Number(amount).toFixed(2)}`} />
-            {/* <ValueRow label="GST (15%)" value={`₹${gst.toFixed(2)}`} />
-            <ValueRow label="Net for Commission" value={`₹${net.toFixed(2)}`} hint="Used for 50/50 commission split" /> */}
-          </Stack>
-
-          <Divider sx={{ my: 1.5 }} />
-          {/* <CommissionSplitView amount={net} targetLevel={elig?.level_number || null} /> */}
-
-          <Button
-            fullWidth
-            variant="contained"
-            sx={{ mt: 2, height: 48, fontWeight: 800, textTransform: "none" }}
-            disabled={!canUpgrade || busy}
-            onClick={() => setInitDialog(true)}
-          >
-            {busy ? "Processing..." : `BUY ${elig?.next_rank}`}
-          </Button>
-        </Paper>
-      ) : null}
-
-      {/* Initiate confirmation (initiates upgrade and then shows success action) */}
+      {/* ── Dialogs & Modals ── */}
       <Dialog open={initDialog} onClose={() => !busy && setInitDialog(false)}>
         <DialogTitle>Confirm Upgrade</DialogTitle>
         <DialogContent dividers>
@@ -815,9 +1155,9 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
           setWalletBusy(true);
           setWalletErr("");
           try {
-            if (!upgrade?.id && selectedEligibleItem?.to_rank?.id) {
-              const resp = await initiateUpgrade({ to_rank_id: selectedEligibleItem.to_rank.id });
-              upgrade = resp?.upgrade;
+            if (!upgrade?.id && selectedToRankId) {
+              const resp = await initiateUpgrade({ to_rank_id: selectedToRankId });
+              upgrade = resp;
               if (upgrade) setCreatedUpgrade(upgrade);
             }
             if (!upgrade?.id) {
@@ -830,10 +1170,8 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
             });
             setMethodOpen(false);
             setSuccessTitle("Payment Successful");
-            setSuccessMessage(`${rankWord} purchased successfully.`);
+            setSuccessMessage("Rank purchased successfully.");
             setSuccessOpen(true);
-            // Re-fetch fresh wallet balance (no cache) so next purchase shows
-            // the correctly deducted Add Money / internal balance.
             const [eg, p, h, freshWallet, freshHistory] = await Promise.allSettled([
               getUpgradeEligibility(),
               getMyLevelBonusProgress(),
@@ -854,7 +1192,6 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
         }}
       />
 
-      {/* Payment Sheet for UPI/scanner flow */}
       <RankPaymentSheet
         open={paymentOpen}
         onClose={() => setPaymentOpen(false)}
@@ -864,7 +1201,6 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
           setSuccessTitle("Payment Request Submitted");
           setSuccessMessage("We will review it shortly.");
           setSuccessOpen(true);
-          // Refresh eligibility + Level Bonus progress/holds
           try {
             const [eg, p, h] = await Promise.allSettled([
               getUpgradeEligibility(),
@@ -892,12 +1228,7 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
         </DialogActions>
       </Dialog>
 
-      {error ? (
-        <Alert severity="error" sx={{ mt: 1 }}>
-          {error}
-        </Alert>
-      ) : null}
-      {walletErr ? (
+      {walletErr && (
         <Snackbar
           open={!!walletErr}
           autoHideDuration={4000}
@@ -908,7 +1239,7 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
             {walletErr}
           </Alert>
         </Snackbar>
-      ) : null}
+      )}
     </Box>
   );
 }

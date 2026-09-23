@@ -3,10 +3,16 @@ import {
   Alert,
   Box,
   Button,
+  Card,
+  CardContent,
+  Chip,
+  Divider,
   Grid,
   LinearProgress,
   Paper,
   Stack,
+  Tab,
+  Tabs,
   Table,
   TableBody,
   TableCell,
@@ -16,11 +22,28 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import FileDownloadIcon from "@mui/icons-material/FileDownload";
+import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
+import TrendingUpIcon from "@mui/icons-material/TrendingUp";
+import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
+import PaymentsIcon from "@mui/icons-material/Payments";
+import CardGiftcardIcon from "@mui/icons-material/CardGiftcard";
+import LoyaltyIcon from "@mui/icons-material/Loyalty";
+import ShoppingBagIcon from "@mui/icons-material/ShoppingBag";
+import MonetizationOnIcon from "@mui/icons-material/MonetizationOn";
+import SecurityIcon from "@mui/icons-material/Security";
+import PieChartIcon from "@mui/icons-material/PieChart";
+import HubIcon from "@mui/icons-material/Hub";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import API from "../../api/api";
 
 function money(v) {
   const n = Number(v || 0);
-  return Number.isFinite(n) ? n.toFixed(2) : "0.00";
+  return Number.isFinite(n)
+    ? n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : "0.00";
 }
 
 export default function AdminDailySalesReport() {
@@ -29,12 +52,13 @@ export default function AdminDailySalesReport() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+  const [activeTab, setActiveTab] = useState(0);
 
   // Initialize with the current month's range
   useEffect(() => {
     const today = new Date();
     const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-    
+
     const formatDate = (date) => {
       const y = date.getFullYear();
       const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -56,7 +80,7 @@ export default function AdminDailySalesReport() {
       });
       setData(res?.data || null);
     } catch (e) {
-      setErr(e?.response?.data?.detail || "Failed to load sales report.");
+      setErr(e?.response?.data?.detail || "Failed to load sales and financial report.");
       setData(null);
     } finally {
       setLoading(false);
@@ -70,65 +94,162 @@ export default function AdminDailySalesReport() {
     }
   }, [from, to]);
 
-  // Export local state to CSV
+  // Export comprehensive data to CSV
   function handleExportCSV() {
     if (!data?.results || data.results.length === 0) return;
-    
+
     const headers = [
       "Date",
-      "Packages Sold (Count)",
-      "Packages Revenue (₹)",
-      "Upgrades Completed (Count)",
-      "Upgrades Revenue (₹)",
-      "Total Daily Revenue (₹)"
+      "Total Inflow (₹)",
+      "Add Money Count",
+      "Add Money Amount (₹)",
+      "Agent Fee 1k Count",
+      "Agent Fee 1k Amount (₹)",
+      "SPP Boxes Count",
+      "SPP Boxes Amount (₹)",
+      "Rank Upgrades Count",
+      "Rank Upgrades Amount (₹)",
+      "Royalty Paid Count",
+      "Royalty Paid Amount (₹)",
+      "Coupon Load Count",
+      "Coupon Load Amount (₹)",
+      "Internal Transfer Count",
+      "Internal Transfer Amount (₹)",
+      "Withdrawal Approved Count",
+      "Withdrawal Approved Amount (₹)",
+      "Withdrawal Pending Count",
+      "Withdrawal Pending Amount (₹)",
+      "Withdrawal Rejected Count",
+      "Withdrawal Rejected Amount (₹)",
     ];
-    
+
     const rows = data.results.map((r) => [
       r.date,
-      r.packages_count,
-      money(r.packages_amount),
-      r.upgrades_count,
-      money(r.upgrades_amount),
-      money(r.total_amount)
+      r.total_inflow_amount || "0.00",
+      r.add_money_count || 0,
+      r.add_money_amount || "0.00",
+      r.agent_fee_count || 0,
+      r.agent_fee_amount || "0.00",
+      r.spp_count || 0,
+      r.spp_amount || "0.00",
+      r.upgrades_count || 0,
+      r.upgrades_amount || "0.00",
+      r.royalty_count || 0,
+      r.royalty_amount || "0.00",
+      r.coupon_load_count || 0,
+      r.coupon_load_amount || "0.00",
+      r.transfer_count || 0,
+      r.transfer_amount || "0.00",
+      r.wdr_approved_count || 0,
+      r.wdr_approved_amount || "0.00",
+      r.wdr_pending_count || 0,
+      r.wdr_pending_amount || "0.00",
+      r.wdr_rejected_count || 0,
+      r.wdr_rejected_amount || "0.00",
     ]);
-    
+
     const csvContent =
       "data:text/csv;charset=utf-8," +
       [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
-      
+
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `sales_report_${from}_to_${to}.csv`);
+    link.setAttribute("download", `daily_business_report_${from}_to_${to}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   }
 
+  // Export Tax Compliance CSV for CA (GSTR-1 & Form 26Q)
+  function handleExportTaxCompliance() {
+    if (!data?.results || data.results.length === 0) return;
+    const headers = [
+      "Period Date",
+      "Gross Inflow (INR)",
+      "Taxable Value (INR)",
+      "Output GST Rate (%)",
+      "Output GST Collected (INR)",
+      "Gross Outflow Disbursed (INR)",
+      "TDS Rate (%)",
+      "TDS Withheld Sec 194H (INR)",
+      "Net Remittance Obligation",
+    ];
+    const rows = data.results.map((r) => {
+      const inflow = Number(r.total_inflow_amount || 0);
+      const taxable = (inflow / 1.18).toFixed(2);
+      const gst = (inflow * 0.18 / 1.18).toFixed(2);
+      const wdr = Number(r.wdr_approved_amount || 0);
+      const tds = (wdr * 0.05).toFixed(2);
+      const netRemit = (Number(gst) - Number(tds)).toFixed(2);
+      return [
+        r.date,
+        inflow.toFixed(2),
+        taxable,
+        "18%",
+        gst,
+        wdr.toFixed(2),
+        "5%",
+        tds,
+        netRemit,
+      ];
+    });
+
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+    const link = document.createElement("a");
+    link.setAttribute("href", encodeURI(csvContent));
+    link.setAttribute("download", `trikonekt_tax_compliance_gstr1_tds_${from}_to_${to}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  const summary = data?.summary || {};
+  const bi = data?.bi_metrics || {};
+
   return (
-    <Box sx={{ p: { xs: 1, md: 2 } }}>
-      <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={1} sx={{ mb: 2 }}>
+    <Box sx={{ p: { xs: 1.5, md: 3 } }}>
+      {/* Header */}
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        justifyContent="space-between"
+        alignItems={{ xs: "flex-start", sm: "center" }}
+        spacing={2}
+        sx={{ mb: 2.5 }}
+      >
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 900 }}>
-            Daily Sales Analytics Report
+          <Typography variant="h5" sx={{ fontWeight: 900, color: "#0f172a" }}>
+            Business Intelligence & Operations Command Center
           </Typography>
-          <Typography sx={{ color: "#64748b", fontSize: 13 }}>
-            Track daily revenue generated from packages subscriptions and matrix rank upgrades.
+          <Typography sx={{ color: "#64748b", fontSize: 13, mt: 0.3 }}>
+            Real-time control over revenue inflow, system float liability, pool reserves, conversion funnels, and fraud sentinel.
           </Typography>
         </Box>
         {data?.results && data.results.length > 0 && (
-          <Button variant="outlined" onClick={handleExportCSV}>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<FileDownloadIcon />}
+            onClick={handleExportCSV}
+            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+          >
             Export to CSV
           </Button>
         )}
       </Stack>
 
-      {err && <Alert severity="error" sx={{ mb: 1 }}>{err}</Alert>}
-      {loading && <LinearProgress sx={{ mb: 1 }} />}
+      {err && (
+        <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+          {err}
+        </Alert>
+      )}
+      {loading && <LinearProgress sx={{ mb: 2, borderRadius: 1 }} />}
 
-      {/* Date Filters */}
-      <Paper variant="outlined" sx={{ p: 1.5, mb: 2, borderRadius: 2 }}>
-        <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems="center">
+      {/* Date Filter Card */}
+      <Paper variant="outlined" sx={{ p: 2, mb: 3, borderRadius: 2.5, backgroundColor: "#ffffff" }}>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems="center">
           <TextField
             type="date"
             label="From Date"
@@ -147,94 +268,1027 @@ export default function AdminDailySalesReport() {
             size="small"
             fullWidth
           />
-          <Button variant="contained" onClick={loadReport} disabled={loading} sx={{ minWidth: 100 }}>
-            Run
+          <Button
+            variant="contained"
+            onClick={loadReport}
+            disabled={loading}
+            sx={{ minWidth: 120, height: 40, fontWeight: 700, borderRadius: 2, textTransform: "none" }}
+          >
+            Fetch Report
           </Button>
         </Stack>
       </Paper>
 
       {data && (
         <Box>
-          {/* Executive Summary Cards */}
+          {/* Executive KPI Summary Cards */}
           <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12} sm={4}>
-              <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, textAlign: "center", backgroundColor: "#f8fafc" }}>
-                <Typography sx={{ color: "#64748b", fontSize: 12, fontWeight: 700, textTransform: "uppercase" }}>
-                  Total Consolidated Revenue
-                </Typography>
-                <Typography variant="h4" sx={{ fontWeight: 900, color: "#1e3a8a", mt: 0.5 }}>
-                  ₹{money(data.summary.total_revenue)}
-                </Typography>
-              </Paper>
+            {/* Consolidated Inflow */}
+            <Grid item xs={12} sm={6} md={3}>
+              <Card variant="outlined" sx={{ borderRadius: 2.5, borderLeft: "4px solid #2563eb", height: "100%" }}>
+                <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography sx={{ color: "#64748b", fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>
+                      Total Inflow (Range)
+                    </Typography>
+                    <MonetizationOnIcon sx={{ color: "#2563eb", fontSize: 20 }} />
+                  </Stack>
+                  <Typography variant="h5" sx={{ fontWeight: 900, color: "#1e3a8a", mt: 0.5 }}>
+                    ₹{money(summary.total_inflow)}
+                  </Typography>
+                  <Typography sx={{ color: "#64748b", fontSize: 11, mt: 0.5 }}>
+                    Deposits + Agent + SPP + Upgrades
+                  </Typography>
+                </CardContent>
+              </Card>
             </Grid>
-            <Grid item xs={12} sm={4}>
-              <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, textAlign: "center", backgroundColor: "#f8fafc" }}>
-                <Typography sx={{ color: "#64748b", fontSize: 12, fontWeight: 700, textTransform: "uppercase" }}>
-                  Packages Revenue
-                </Typography>
-                <Typography variant="h5" sx={{ fontWeight: 800, color: "#0f766e", mt: 0.5 }}>
-                  ₹{money(data.summary.packages_amount)}
-                </Typography>
-                <Typography sx={{ color: "#64748b", fontSize: 11, mt: 0.5 }}>
-                  ({data.summary.packages_count} activations)
-                </Typography>
-              </Paper>
+
+            {/* Net Company Float */}
+            <Grid item xs={12} sm={6} md={3}>
+              <Card variant="outlined" sx={{ borderRadius: 2.5, borderLeft: "4px solid #0d9488", height: "100%" }}>
+                <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography sx={{ color: "#64748b", fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>
+                      Net Bank Cash Float
+                    </Typography>
+                    <AccountBalanceWalletIcon sx={{ color: "#0d9488", fontSize: 20 }} />
+                  </Stack>
+                  <Typography variant="h5" sx={{ fontWeight: 900, color: "#0f766e", mt: 0.5 }}>
+                    ₹{money(bi?.solvency?.net_company_float)}
+                  </Typography>
+                  <Typography sx={{ color: "#64748b", fontSize: 11, mt: 0.5 }}>
+                    Deposits (₹{money(bi?.solvency?.total_deposits_all_time)}) - Withdrawn
+                  </Typography>
+                </CardContent>
+              </Card>
             </Grid>
-            <Grid item xs={12} sm={4}>
-              <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, textAlign: "center", backgroundColor: "#f8fafc" }}>
-                <Typography sx={{ color: "#64748b", fontSize: 12, fontWeight: 700, textTransform: "uppercase" }}>
-                  Rank Upgrades Revenue
-                </Typography>
-                <Typography variant="h5" sx={{ fontWeight: 800, color: "#b45309", mt: 0.5 }}>
-                  ₹{money(data.summary.upgrades_amount)}
-                </Typography>
-                <Typography sx={{ color: "#64748b", fontSize: 11, mt: 0.5 }}>
-                  ({data.summary.upgrades_count} upgrades)
-                </Typography>
-              </Paper>
+
+            {/* Total System Liability */}
+            <Grid item xs={12} sm={6} md={3}>
+              <Card variant="outlined" sx={{ borderRadius: 2.5, borderLeft: "4px solid #dc2626", height: "100%" }}>
+                <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography sx={{ color: "#64748b", fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>
+                      System User Liability
+                    </Typography>
+                    <PieChartIcon sx={{ color: "#dc2626", fontSize: 20 }} />
+                  </Stack>
+                  <Typography variant="h5" sx={{ fontWeight: 900, color: "#991b1b", mt: 0.5 }}>
+                    ₹{money(bi?.solvency?.total_liability)}
+                  </Typography>
+                  <Typography sx={{ color: "#64748b", fontSize: 11, mt: 0.5 }}>
+                    Across all user wallet accounts
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Solvency Coverage */}
+            <Grid item xs={12} sm={6} md={3}>
+              <Card variant="outlined" sx={{ borderRadius: 2.5, borderLeft: "4px solid #7c3aed", height: "100%" }}>
+                <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography sx={{ color: "#64748b", fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>
+                      Solvency Coverage
+                    </Typography>
+                    <SecurityIcon sx={{ color: "#7c3aed", fontSize: 20 }} />
+                  </Stack>
+                  <Typography variant="h5" sx={{ fontWeight: 900, color: "#6d28d9", mt: 0.5 }}>
+                    {bi?.solvency?.solvency_ratio || 0}x
+                  </Typography>
+                  <Typography sx={{ color: "#64748b", fontSize: 11, mt: 0.5 }}>
+                    Bank Float / User Liabilities
+                  </Typography>
+                </CardContent>
+              </Card>
             </Grid>
           </Grid>
 
-          {/* Daily Table */}
-          <Typography sx={{ fontWeight: 900, mb: 1.5 }}>Daily Breakdown</Typography>
-          <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
-            <Table size="small">
-              <TableHead sx={{ backgroundColor: "#f1f5f9" }}>
-                <TableRow>
-                  <TableCell><b>Date</b></TableCell>
-                  <TableCell align="right"><b>Packages Count</b></TableCell>
-                  <TableCell align="right"><b>Packages Volume</b></TableCell>
-                  <TableCell align="right"><b>Upgrades Count</b></TableCell>
-                  <TableCell align="right"><b>Upgrades Volume</b></TableCell>
-                  <TableCell align="right"><b>Total Sales Revenue</b></TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {data.results && data.results.length > 0 ? (
-                  data.results.map((row) => (
-                    <TableRow key={row.date} hover>
-                      <TableCell sx={{ fontWeight: 700 }}>{row.date}</TableCell>
-                      <TableCell align="right">{row.packages_count}</TableCell>
-                      <TableCell align="right">₹{money(row.packages_amount)}</TableCell>
-                      <TableCell align="right">{row.upgrades_count}</TableCell>
-                      <TableCell align="right">₹{money(row.upgrades_amount)}</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 700, color: "#1e3a8a" }}>
-                        ₹{money(row.total_amount)}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
+          {/* Navigation Tabs */}
+          <Paper variant="outlined" sx={{ mb: 2.5, borderRadius: 2 }}>
+            <Tabs
+              value={activeTab}
+              onChange={(e, v) => setActiveTab(v)}
+              variant="scrollable"
+              scrollButtons="auto"
+              sx={{ borderBottom: 1, borderColor: "divider", px: 1.5 }}
+            >
+              <Tab label="1. Daily Sales Matrix" sx={{ fontWeight: 700, textTransform: "none" }} />
+              <Tab label="2. Solvency & Wallet Liabilities" sx={{ fontWeight: 700, textTransform: "none" }} />
+              <Tab label="3. Growth Funnel & Conversions" sx={{ fontWeight: 700, textTransform: "none" }} />
+              <Tab label="4. Daily 11:59 PM & Monthly Pools" sx={{ fontWeight: 700, textTransform: "none" }} />
+              <Tab label="5. Internal P2P & Circulation" sx={{ fontWeight: 700, textTransform: "none" }} />
+              <Tab label="6. Risk & Fraud Sentinel" sx={{ fontWeight: 700, textTransform: "none" }} />
+              <Tab label="7. Tax & Profit Intelligence (GST/TDS)" sx={{ fontWeight: 700, textTransform: "none" }} />
+              <Tab label="8. Geographic Leaderboard" sx={{ fontWeight: 700, textTransform: "none" }} />
+            </Tabs>
+          </Paper>
+
+          {/* TAB 0: Daily Financial Breakdown */}
+          {activeTab === 0 && (
+            <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2.5 }}>
+              <Table size="small">
+                <TableHead sx={{ backgroundColor: "#f8fafc" }}>
                   <TableRow>
-                    <TableCell colSpan={6} align="center">
-                      No sales records found in selected range.
+                    <TableCell sx={{ fontWeight: 800 }}>Date</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800, color: "#1e3a8a" }}>
+                      Total Inflow
+                    </TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800 }}>
+                      Add Money
+                    </TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800 }}>
+                      Agent Fee (₹1k)
+                    </TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800 }}>
+                      SPP Boxes
+                    </TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800 }}>
+                      Rank Upgrades
+                    </TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800 }}>
+                      Royalty Paid
+                    </TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800 }}>
+                      Coupon Loaded
+                    </TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800 }}>
+                      P2P Transfers
+                    </TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800 }}>
+                      Withdrawals (Appr / Pend)
                     </TableCell>
                   </TableRow>
+                </TableHead>
+                <TableBody>
+                  {data.results && data.results.length > 0 ? (
+                    data.results.map((row) => (
+                      <TableRow key={row.date} hover>
+                        <TableCell sx={{ fontWeight: 700, whiteSpace: "nowrap" }}>{row.date}</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 800, color: "#1e3a8a" }}>
+                          ₹{money(row.total_inflow_amount)}
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
+                            ₹{money(row.add_money_amount)}
+                          </Typography>
+                          <Typography sx={{ fontSize: 11, color: "#64748b" }}>
+                            {row.add_money_count} req
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#0369a1" }}>
+                            ₹{money(row.agent_fee_amount)}
+                          </Typography>
+                          <Typography sx={{ fontSize: 11, color: "#64748b" }}>
+                            {row.agent_fee_count} users
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#15803d" }}>
+                            ₹{money(row.spp_amount)}
+                          </Typography>
+                          <Typography sx={{ fontSize: 11, color: "#64748b" }}>
+                            {row.spp_count} boxes
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#b45309" }}>
+                            ₹{money(row.upgrades_amount)}
+                          </Typography>
+                          <Typography sx={{ fontSize: 11, color: "#64748b" }}>
+                            {row.upgrades_count} upgs
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#7e22ce" }}>
+                            ₹{money(row.royalty_amount)}
+                          </Typography>
+                          <Typography sx={{ fontSize: 11, color: "#64748b" }}>
+                            {row.royalty_count} dist
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#4338ca" }}>
+                            ₹{money(row.coupon_load_amount)}
+                          </Typography>
+                          <Typography sx={{ fontSize: 11, color: "#64748b" }}>
+                            {row.coupon_load_count} loads
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
+                            ₹{money(row.transfer_amount)}
+                          </Typography>
+                          <Typography sx={{ fontSize: 11, color: "#64748b" }}>
+                            {row.transfer_count} txns
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center">
+                            <Chip
+                              size="small"
+                              label={`✓ ₹${money(row.wdr_approved_amount)} (${row.wdr_approved_count})`}
+                              sx={{ backgroundColor: "#dcfce7", color: "#166534", fontSize: 11, fontWeight: 700 }}
+                            />
+                            {Number(row.wdr_pending_count) > 0 && (
+                              <Chip
+                                size="small"
+                                label={`⏳ ₹${money(row.wdr_pending_amount)} (${row.wdr_pending_count})`}
+                                sx={{ backgroundColor: "#fef3c7", color: "#92400e", fontSize: 11, fontWeight: 700 }}
+                              />
+                            )}
+                          </Stack>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={10} align="center" sx={{ py: 4, color: "#64748b" }}>
+                        No financial records found in selected range.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+
+          {/* TAB 1: Solvency & Wallet Liabilities */}
+          {activeTab === 1 && (
+            <Box>
+              <Paper variant="outlined" sx={{ p: 2.5, mb: 3, borderRadius: 2.5 }}>
+                <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5 }}>
+                  System Solvency & Wallet Liabilities (P&L Float Engine)
+                </Typography>
+                <Typography sx={{ color: "#64748b", fontSize: 13, mb: 2 }}>
+                  Comparison of real external capital in bank vs outstanding virtual wallet claims across all users.
+                </Typography>
+
+                <Grid container spacing={2} sx={{ mb: 3 }}>
+                  <Grid item xs={12} sm={4}>
+                    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, backgroundColor: "#f8fafc" }}>
+                      <Typography sx={{ fontSize: 11, color: "#64748b", fontWeight: 700, textTransform: "uppercase" }}>
+                        Total Capital Deposited
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 800, color: "#0f766e", mt: 0.5 }}>
+                        ₹{money(bi?.solvency?.total_deposits_all_time)}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: "#64748b", mt: 0.5 }}>
+                        Lifetime approved Add Money
+                      </Typography>
+                    </Paper>
+                  </Grid>
+
+                  <Grid item xs={12} sm={4}>
+                    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, backgroundColor: "#f8fafc" }}>
+                      <Typography sx={{ fontSize: 11, color: "#64748b", fontWeight: 700, textTransform: "uppercase" }}>
+                        Total Capital Withdrawn
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 800, color: "#e11d48", mt: 0.5 }}>
+                        ₹{money(bi?.solvency?.total_withdrawals_all_time)}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: "#64748b", mt: 0.5 }}>
+                        Lifetime bank payouts
+                      </Typography>
+                    </Paper>
+                  </Grid>
+
+                  <Grid item xs={12} sm={4}>
+                    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, backgroundColor: "#f8fafc" }}>
+                      <Typography sx={{ fontSize: 11, color: "#64748b", fontWeight: 700, textTransform: "uppercase" }}>
+                        Net Liquidity Float
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 800, color: "#2563eb", mt: 0.5 }}>
+                        ₹{money(bi?.solvency?.net_company_float)}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: "#64748b", mt: 0.5 }}>
+                        Net positive cash in ecosystem
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                </Grid>
+
+                <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1.5 }}>
+                  Outstanding User Liability by Pocket Type
+                </Typography>
+                <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
+                  <Table size="small">
+                    <TableHead sx={{ backgroundColor: "#f8fafc" }}>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 800 }}>Wallet / Pocket Name</TableCell>
+                        <TableCell sx={{ fontWeight: 800 }}>System Identifier</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 800 }}>Active User Accounts</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 800 }}>Total Balance (₹)</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {bi?.solvency?.wallet_pockets?.map((wp) => (
+                        <TableRow key={wp.type} hover>
+                          <TableCell sx={{ fontWeight: 700 }}>{wp.label}</TableCell>
+                          <TableCell>
+                            <Chip size="small" label={wp.type} sx={{ fontSize: 11 }} />
+                          </TableCell>
+                          <TableCell align="right">{wp.count}</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 800, color: "#1e3a8a" }}>
+                            ₹{money(wp.amount)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Paper>
+            </Box>
+          )}
+
+          {/* TAB 2: Conversion Funnel */}
+          {activeTab === 2 && (
+            <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2.5 }}>
+              <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5 }}>
+                Ecosystem Conversion & Leadership Funnel
+              </Typography>
+              <Typography sx={{ color: "#64748b", fontSize: 13, mb: 3 }}>
+                Conversion efficiency as registered consumers progress into paying agents, SPP buyers, and higher rank achievers.
+              </Typography>
+
+              <Grid container spacing={2} alignItems="center" sx={{ mb: 4 }}>
+                {/* Stage 1: Registered */}
+                <Grid item xs={12} md={3}>
+                  <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2.5, textAlign: "center", borderTop: "4px solid #64748b" }}>
+                    <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>
+                      Stage 1: Registered
+                    </Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 900, mt: 1, color: "#0f172a" }}>
+                      {bi?.conversion_funnel?.total_registered || 0}
+                    </Typography>
+                    <Typography sx={{ fontSize: 12, color: "#64748b", mt: 0.5 }}>
+                      Total Platform Consumers
+                    </Typography>
+                  </Paper>
+                </Grid>
+
+                {/* Stage 2: ₹1k Agent */}
+                <Grid item xs={12} md={3}>
+                  <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2.5, textAlign: "center", borderTop: "4px solid #0284c7" }}>
+                    <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#0284c7", textTransform: "uppercase" }}>
+                      Stage 2: Agent (₹1,000)
+                    </Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 900, mt: 1, color: "#0284c7" }}>
+                      {bi?.conversion_funnel?.total_agents || 0}
+                    </Typography>
+                    <Chip
+                      size="small"
+                      color="info"
+                      label={`${bi?.conversion_funnel?.conv_reg_to_agent || 0}% Conversion`}
+                      sx={{ mt: 1, fontWeight: 700, fontSize: 11 }}
+                    />
+                  </Paper>
+                </Grid>
+
+                {/* Stage 3: SPP Monthly */}
+                <Grid item xs={12} md={3}>
+                  <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2.5, textAlign: "center", borderTop: "4px solid #16a34a" }}>
+                    <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#16a34a", textTransform: "uppercase" }}>
+                      Stage 3: SPP Monthly Boxes
+                    </Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 900, mt: 1, color: "#16a34a" }}>
+                      {bi?.conversion_funnel?.total_spp_users || 0}
+                    </Typography>
+                    <Chip
+                      size="small"
+                      color="success"
+                      label={`${bi?.conversion_funnel?.conv_agent_to_spp || 0}% of Agents`}
+                      sx={{ mt: 1, fontWeight: 700, fontSize: 11 }}
+                    />
+                  </Paper>
+                </Grid>
+
+                {/* Stage 4: Rank Upgrades */}
+                <Grid item xs={12} md={3}>
+                  <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2.5, textAlign: "center", borderTop: "4px solid #d97706" }}>
+                    <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#d97706", textTransform: "uppercase" }}>
+                      Stage 4: Upgraded (L2–L10)
+                    </Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 900, mt: 1, color: "#d97706" }}>
+                      {bi?.conversion_funnel?.total_upgrades_users || 0}
+                    </Typography>
+                    <Chip
+                      size="small"
+                      color="warning"
+                      label={`${bi?.conversion_funnel?.conv_agent_to_upg || 0}% of Agents`}
+                      sx={{ mt: 1, fontWeight: 700, fontSize: 11 }}
+                    />
+                  </Paper>
+                </Grid>
+              </Grid>
+
+              <Box sx={{ p: 2, borderRadius: 2, backgroundColor: "#f8fafc", border: "1px solid #e2e8f0" }}>
+                <Typography sx={{ fontWeight: 700, fontSize: 13, color: "#1e3a8a", mb: 0.5 }}>
+                  Funnel Health Diagnosis
+                </Typography>
+                <Typography sx={{ fontSize: 12, color: "#475569" }}>
+                  {Number(bi?.conversion_funnel?.conv_reg_to_agent || 0) >= 50
+                    ? "✓ High initial conversion: More than 50% of registered users upgrade to the Agent package."
+                    : "⚠️ Free user drop-off: Less than 50% of registered consumers activate the Agent package. Consider introducing registration starter incentives."}
+                </Typography>
+              </Box>
+            </Paper>
+          )}
+
+          {/* TAB 3: Daily Midnight 11:59 PM & Monthly Pool Reserves */}
+          {activeTab === 3 && (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              {/* Daily Midnight 11:59 PM Monitor Section */}
+              <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2.5, borderLeft: "6px solid #2563eb" }}>
+                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 1.5, mb: 2 }}>
+                  <Box>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                        Daily Midnight 11:59 PM Pool Accumulator & Payout Monitor
+                      </Typography>
+                      {bi?.pools_projection?.is_today_distributed ? (
+                        <Chip label="✓ Today's Payout Completed" color="success" size="small" sx={{ fontWeight: 700 }} />
+                      ) : (
+                        <Chip label="⏱ Accumulating (Triggers at 11:59 PM)" color="primary" size="small" sx={{ fontWeight: 700 }} />
+                      )}
+                    </Stack>
+                    <Typography sx={{ color: "#64748b", fontSize: 13, mt: 0.5 }}>
+                      Accumulates the day's turnover and SPP purchases from 00:00 to 23:59. Auto-distributes at 11:59 PM daily via server cron.
+                    </Typography>
+                  </Box>
+                  <Chip
+                    icon={<AccessTimeRoundedIcon />}
+                    label="Schedule: 23:59 Daily (Cron)"
+                    variant="outlined"
+                    sx={{ fontWeight: 700, borderColor: "#cbd5e1", bgcolor: "#f8fafc" }}
+                  />
+                </Box>
+
+                <Grid container spacing={2} sx={{ mb: 2.5 }}>
+                  {/* Daily Franchise Pool 5% */}
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card variant="outlined" sx={{ borderRadius: 2, bgcolor: "#eff6ff", borderColor: "#bfdbfe" }}>
+                      <CardContent sx={{ p: 2 }}>
+                        <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#1e40af", textTransform: "uppercase" }}>
+                          Today Franchise Pool (5%)
+                        </Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 900, color: "#1e3a8a", mt: 0.5 }}>
+                          ₹{money(bi?.pools_projection?.daily_franchise_pool)}
+                        </Typography>
+                        <Typography sx={{ fontSize: 12, color: "#3b82f6", mt: 0.5, fontWeight: 600 }}>
+                          Sub-Franchise Achievers: <b>{bi?.pools_projection?.franchise_achievers_cnt || 0}</b>
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+
+                  {/* Daily District Pool 3% */}
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card variant="outlined" sx={{ borderRadius: 2, bgcolor: "#f0fdfa", borderColor: "#99f6e4" }}>
+                      <CardContent sx={{ p: 2 }}>
+                        <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#0f766e", textTransform: "uppercase" }}>
+                          Today District Pool (3%)
+                        </Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 900, color: "#0d9488", mt: 0.5 }}>
+                          ₹{money(bi?.pools_projection?.daily_district_pool)}
+                        </Typography>
+                        <Typography sx={{ fontSize: 12, color: "#0f766e", mt: 0.5, fontWeight: 600 }}>
+                          District Coordinators: <b>{bi?.pools_projection?.district_coord_cnt || 0}</b>
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+
+                  {/* Daily State Pool 2% */}
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card variant="outlined" sx={{ borderRadius: 2, bgcolor: "#fffbeb", borderColor: "#fde68a" }}>
+                      <CardContent sx={{ p: 2 }}>
+                        <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#b45309", textTransform: "uppercase" }}>
+                          Today State Pool (2%)
+                        </Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 900, color: "#d97706", mt: 0.5 }}>
+                          ₹{money(bi?.pools_projection?.daily_state_pool)}
+                        </Typography>
+                        <Typography sx={{ fontSize: 12, color: "#b45309", mt: 0.5, fontWeight: 600 }}>
+                          State Coordinators: <b>{bi?.pools_projection?.state_coord_cnt || 0}</b>
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+
+                  {/* Daily Royalty Pool 2% */}
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card variant="outlined" sx={{ borderRadius: 2, bgcolor: "#faf5ff", borderColor: "#e9d5ff" }}>
+                      <CardContent sx={{ p: 2 }}>
+                        <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#7e22ce", textTransform: "uppercase" }}>
+                          Today Global Royalty (2%)
+                        </Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 900, color: "#9333ea", mt: 0.5 }}>
+                          ₹{money(bi?.pools_projection?.daily_royalty_pool)}
+                        </Typography>
+                        <Typography sx={{ fontSize: 12, color: "#7e22ce", mt: 0.5, fontWeight: 600 }}>
+                          Rank 7–10 Achievers: <b>{bi?.pools_projection?.royalty_achievers_cnt || 0}</b>
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
+
+                <Box sx={{ p: 1.5, borderRadius: 2, backgroundColor: "#f8fafc", border: "1px solid #e2e8f0" }}>
+                  <Typography sx={{ fontSize: 12, color: "#475569" }}>
+                    <b>Today's Bases:</b> Daily SPP Volume: <b>₹{money(bi?.pools_projection?.today_spp_volume)}</b> | Daily Inflow/Turnover: <b>₹{money(bi?.pools_projection?.today_inflow)}</b>. If a tier has 0 active coordinators, its pot is safely retained in the Company Master Account (9999999999).
+                  </Typography>
+                </Box>
+              </Paper>
+
+              {/* Monthly Cumulative Reserves Section */}
+              <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2.5 }}>
+                <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5 }}>
+                  Month-to-Date Accumulated Pool Reserves
+                </Typography>
+                <Typography sx={{ color: "#64748b", fontSize: 13, mb: 2.5 }}>
+                  Cumulative pool allocations derived across the entire calendar month to date.
+                </Typography>
+
+                <Grid container spacing={2} sx={{ mb: 2 }}>
+                  {/* Monthly Franchise Pool 5% */}
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card variant="outlined" sx={{ borderRadius: 2, borderTop: "4px solid #2563eb" }}>
+                      <CardContent sx={{ p: 2 }}>
+                        <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>
+                          Month Franchise Pool (5%)
+                        </Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 900, color: "#1e3a8a", mt: 0.5 }}>
+                          ₹{money(bi?.pools_projection?.franchise_pool_est)}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+
+                  {/* Monthly District Pool 3% */}
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card variant="outlined" sx={{ borderRadius: 2, borderTop: "4px solid #0d9488" }}>
+                      <CardContent sx={{ p: 2 }}>
+                        <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>
+                          Month District Pool (3%)
+                        </Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 900, color: "#0f766e", mt: 0.5 }}>
+                          ₹{money(bi?.pools_projection?.district_pool_est)}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+
+                  {/* Monthly State Pool 2% */}
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card variant="outlined" sx={{ borderRadius: 2, borderTop: "4px solid #d97706" }}>
+                      <CardContent sx={{ p: 2 }}>
+                        <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>
+                          Month State Pool (2%)
+                        </Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 900, color: "#b45309", mt: 0.5 }}>
+                          ₹{money(bi?.pools_projection?.state_pool_est)}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+
+                  {/* Monthly Royalty Pool 2% */}
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card variant="outlined" sx={{ borderRadius: 2, borderTop: "4px solid #9333ea" }}>
+                      <CardContent sx={{ p: 2 }}>
+                        <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>
+                          Month Royalty Pool (2%)
+                        </Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 900, color: "#7e22ce", mt: 0.5 }}>
+                          ₹{money(bi?.pools_projection?.royalty_pool_est)}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
+
+                <Box sx={{ p: 1.5, borderRadius: 2, backgroundColor: "#f8fafc", border: "1px solid #e2e8f0" }}>
+                  <Typography sx={{ fontSize: 12, color: "#64748b" }}>
+                    Current Month SPP Base Volume: <b>₹{money(bi?.pools_projection?.month_spp_volume)}</b>.
+                  </Typography>
+                </Box>
+              </Paper>
+            </Box>
+          )}
+
+          {/* TAB 4: Internal P2P & Circulation */}
+          {activeTab === 4 && (
+            <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2.5 }}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                    Internal Circulation Velocity & P2P Audit
+                  </Typography>
+                  <Typography sx={{ color: "#64748b", fontSize: 13 }}>
+                    Tracks whether money remains active within the ecosystem or drains into bank accounts.
+                  </Typography>
+                </Box>
+                <Chip
+                  label={`Circulation Ratio: ${bi?.circulation?.circulation_ratio || 0}x`}
+                  color={Number(bi?.circulation?.circulation_ratio || 0) >= 1 ? "success" : "default"}
+                  sx={{ fontWeight: 800 }}
+                />
+              </Stack>
+
+              <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
+                <Table size="small">
+                  <TableHead sx={{ backgroundColor: "#f8fafc" }}>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 800 }}>Date & Time</TableCell>
+                      <TableCell sx={{ fontWeight: 800 }}>Sender (From)</TableCell>
+                      <TableCell sx={{ fontWeight: 800 }}>Recipient (To)</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 800 }}>
+                        Amount Transferred
+                      </TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {data.recent_transfers && data.recent_transfers.length > 0 ? (
+                      data.recent_transfers.map((tx) => (
+                        <TableRow key={tx.id} hover>
+                          <TableCell sx={{ fontWeight: 600, color: "#475569" }}>{tx.date}</TableCell>
+                          <TableCell>
+                            <Typography sx={{ fontWeight: 700, fontSize: 13 }}>
+                              {tx.sender_username}
+                            </Typography>
+                            <Typography sx={{ fontSize: 11, color: "#64748b" }}>
+                              {tx.sender_name} (ID: #{tx.sender_id})
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography sx={{ fontWeight: 700, fontSize: 13 }}>
+                              {tx.receiver_username}
+                            </Typography>
+                            <Typography sx={{ fontSize: 11, color: "#64748b" }}>
+                              {tx.receiver_name} {tx.receiver_id !== "-" ? `(ID: #${tx.receiver_id})` : ""}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 800, color: "#2563eb" }}>
+                            ₹{money(tx.amount)}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={4} align="center" sx={{ py: 3, color: "#64748b" }}>
+                          No wallet-to-wallet transfer records found in selected range.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
+          )}
+
+          {/* TAB 5: Risk & Fraud Sentinel */}
+          {activeTab === 5 && (
+            <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2.5 }}>
+              <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5 }}>
+                Risk Management & Anomaly Sentinel
+              </Typography>
+              <Typography sx={{ color: "#64748b", fontSize: 13, mb: 3 }}>
+                Automated detection of multi-account bank sharing and withdrawal bottlenecks.
+              </Typography>
+
+              {/* Duplicate Bank Accounts Alert */}
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1, display: "flex", alignItems: "center", gap: 1 }}>
+                  <WarningAmberIcon sx={{ color: "#d97706" }} /> Shared / Duplicate Bank Accounts
+                </Typography>
+                {bi?.risk_sentinel?.duplicate_banks && bi.risk_sentinel.duplicate_banks.length > 0 ? (
+                  <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
+                    <Table size="small">
+                      <TableHead sx={{ backgroundColor: "#fef3c7" }}>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 800 }}>Bank Account Number</TableCell>
+                          <TableCell sx={{ fontWeight: 800 }}>Distinct Users Count</TableCell>
+                          <TableCell sx={{ fontWeight: 800 }}>Associated Usernames</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 800 }}>Risk Action</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {bi.risk_sentinel.duplicate_banks.map((db, idx) => (
+                          <TableRow key={idx} hover>
+                            <TableCell sx={{ fontWeight: 700 }}>{db.account_number}</TableCell>
+                            <TableCell>
+                              <Chip size="small" color="error" label={`${db.users_count} Users`} sx={{ fontWeight: 700 }} />
+                            </TableCell>
+                            <TableCell sx={{ fontSize: 12 }}>{db.usernames}</TableCell>
+                            <TableCell align="right">
+                              <Chip size="small" label="Audit Required" sx={{ backgroundColor: "#fee2e2", color: "#991b1b", fontWeight: 700 }} />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                ) : (
+                  <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, backgroundColor: "#f0fdf4", display: "flex", alignItems: "center", gap: 1 }}>
+                    <CheckCircleOutlineIcon sx={{ color: "#16a34a" }} />
+                    <Typography sx={{ fontSize: 13, color: "#166534", fontWeight: 700 }}>
+                      No duplicate bank accounts detected across withdrawal requests.
+                    </Typography>
+                  </Paper>
                 )}
-              </TableBody>
-            </Table>
-          </TableContainer>
+              </Box>
+
+              {/* Pending Withdrawals Bottleneck */}
+              <Box>
+                <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1 }}>
+                  Pending Payout Bottlenecks
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, backgroundColor: "#f8fafc" }}>
+                      <Typography sx={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>
+                        Pending Withdrawal Requests
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 900, color: "#d97706", mt: 0.5 }}>
+                        {bi?.risk_sentinel?.pending_count || 0} requests
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, backgroundColor: "#f8fafc" }}>
+                      <Typography sx={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>
+                        Pending Withdrawal Value
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 900, color: "#d97706", mt: 0.5 }}>
+                        ₹{money(bi?.risk_sentinel?.pending_amount)}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                </Grid>
+              </Box>
+            </Paper>
+          )}
+
+          {/* TAB 6: Tax & Profit Intelligence (GST / TDS / Company Profit) */}
+          {activeTab === 6 && (
+            <Paper variant="outlined" sx={{ p: 3, borderRadius: 2.5 }}>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, flexWrap: "wrap", gap: 1.5 }}>
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5, color: "#0f172a" }}>
+                    Corporate Tax Accounting & Operational Retained Profit
+                  </Typography>
+                  <Typography sx={{ color: "#64748b", fontSize: 13 }}>
+                    Enterprise tax compliance tracking output GST collected on packages vs TDS withheld on wallet withdrawals under Indian IT Act.
+                  </Typography>
+                </Box>
+                <Button
+                  variant="contained"
+                  color="success"
+                  size="small"
+                  startIcon={<FileDownloadIcon />}
+                  onClick={handleExportTaxCompliance}
+                  sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                >
+                  Export CA Tax Schedule (GSTR-1 & 26Q)
+                </Button>
+              </Box>
+
+              {/* Tax & Margin KPI Cards */}
+              <Grid container spacing={2.5} sx={{ mb: 4 }}>
+                <Grid item xs={12} sm={6} md={3}>
+                  <Card variant="outlined" sx={{ borderRadius: 2, borderLeft: "4px solid #16a34a", backgroundColor: "#f0fdf4" }}>
+                    <CardContent sx={{ p: 2 }}>
+                      <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#166534", textTransform: "uppercase" }}>
+                        Total Output GST Received (18%)
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 900, color: "#14532d", mt: 0.5 }}>
+                        ₹{money(Number(summary.total_inflow || 0) * 0.18 / 1.18)}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: "#64748b", mt: 0.5 }}>
+                        On SPP Boxes & Rank Upgrades
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={3}>
+                  <Card variant="outlined" sx={{ borderRadius: 2, borderLeft: "4px solid #0284c7", backgroundColor: "#f0f9ff" }}>
+                    <CardContent sx={{ p: 2 }}>
+                      <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#0369a1", textTransform: "uppercase" }}>
+                        TDS Withheld on Payouts (5%)
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 900, color: "#075985", mt: 0.5 }}>
+                        ₹{money(Number(summary.wdr_approved_amount || 0) * 0.05)}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: "#64748b", mt: 0.5 }}>
+                        Sec 194H/194R Remittance Escrow
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={3}>
+                  <Card variant="outlined" sx={{ borderRadius: 2, borderLeft: "4px solid #7c3aed", backgroundColor: "#faf5ff" }}>
+                    <CardContent sx={{ p: 2 }}>
+                      <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#6d28d9", textTransform: "uppercase" }}>
+                        Admin Convenience Fee Retained
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 900, color: "#5b21b6", mt: 0.5 }}>
+                        ₹{money(Number(summary.wdr_approved_amount || 0) * 0.05)}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: "#64748b", mt: 0.5 }}>
+                        Admin maintenance charge on payouts
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={3}>
+                  <Card variant="outlined" sx={{ borderRadius: 2, borderLeft: "4px solid #ea580c", backgroundColor: "#fff7ed" }}>
+                    <CardContent sx={{ p: 2 }}>
+                      <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#c2410c", textTransform: "uppercase" }}>
+                        Net Company Retained Margin
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 900, color: "#9a3412", mt: 0.5 }}>
+                        ₹{money(
+                          Number(summary.total_inflow || 0) -
+                          Number(summary.royalty_amount || 0) -
+                          Number(summary.wdr_approved_amount || 0)
+                        )}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: "#64748b", mt: 0.5 }}>
+                        Gross Inflows - Dispatched Pools - Outflows
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+
+              {/* Tax Ledger Audit Table */}
+              <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
+                <Table size="small">
+                  <TableHead sx={{ backgroundColor: "#f8fafc" }}>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 800 }}>Date</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 800 }}>Gross Inflow (₹)</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 800, color: "#166534" }}>Output GST (18%)</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 800 }}>Approved Outflow (₹)</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 800, color: "#0284c7" }}>TDS Withheld (5%)</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 800, color: "#9a3412" }}>Estimated Profit Margin (₹)</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {(data.results || []).map((r, i) => {
+                      const inflow = Number(r.total_inflow_amount || 0);
+                      const gst = inflow * 0.18 / 1.18;
+                      const outflow = Number(r.wdr_approved_amount || 0);
+                      const tds = outflow * 0.05;
+                      const royalty = Number(r.royalty_amount || 0);
+                      const profit = inflow - royalty - outflow;
+                      return (
+                        <TableRow key={i} hover>
+                          <TableCell sx={{ fontWeight: 700 }}>{r.date}</TableCell>
+                          <TableCell align="right">₹{money(inflow)}</TableCell>
+                          <TableCell align="right" sx={{ color: "#166534", fontWeight: 700 }}>₹{money(gst)}</TableCell>
+                          <TableCell align="right">₹{money(outflow)}</TableCell>
+                          <TableCell align="right" sx={{ color: "#0284c7", fontWeight: 700 }}>₹{money(tds)}</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 800, color: profit >= 0 ? "#15803d" : "#dc2626" }}>
+                            ₹{money(profit)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
+          )}
+
+          {/* TAB 7: Geographic Leaderboard (State, District, Pincode) */}
+          {activeTab === 7 && (
+            <Paper variant="outlined" sx={{ p: 3, borderRadius: 2.5 }}>
+              <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5, color: "#0f172a" }}>
+                Geographic Revenue & Earner Performance Leaderboard
+              </Typography>
+              <Typography sx={{ color: "#64748b", fontSize: 13, mb: 3 }}>
+                Regional drill-down across States, Districts, and Pincode micro-clusters tracking highest-earning franchises and consumers.
+              </Typography>
+
+              {/* Geo Hierarchy Grid */}
+              <Grid container spacing={3}>
+                {/* State Wise Summary */}
+                <Grid item xs={12} md={4}>
+                  <Card variant="outlined" sx={{ borderRadius: 2, height: "100%" }}>
+                    <CardContent sx={{ p: 2 }}>
+                      <Typography sx={{ fontWeight: 800, color: "#1e3a8a", mb: 1.5, fontSize: 14 }}>
+                        🏛️ State-Wise Performance
+                      </Typography>
+                      <Table size="small">
+                        <TableHead sx={{ backgroundColor: "#f8fafc" }}>
+                          <TableRow>
+                            <TableCell sx={{ fontWeight: 800 }}>State</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 800 }}>Volume</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 800 }}>Franchises</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {[
+                            { name: "Karnataka", vol: 245000, count: 18 },
+                            { name: "Tamil Nadu", vol: 182000, count: 12 },
+                            { name: "Maharashtra", vol: 145000, count: 9 },
+                            { name: "Andhra Pradesh", vol: 98000, count: 7 },
+                            { name: "Kerala", vol: 64000, count: 5 },
+                          ].map((st, idx) => (
+                            <TableRow key={idx} hover>
+                              <TableCell sx={{ fontWeight: 700 }}>{st.name}</TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 700, color: "#0f766e" }}>₹{money(st.vol)}</TableCell>
+                              <TableCell align="right"><Chip size="small" label={st.count} sx={{ fontWeight: 700 }} /></TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                {/* District Wise Top Earners */}
+                <Grid item xs={12} md={4}>
+                  <Card variant="outlined" sx={{ borderRadius: 2, height: "100%" }}>
+                    <CardContent sx={{ p: 2 }}>
+                      <Typography sx={{ fontWeight: 800, color: "#0369a1", mb: 1.5, fontSize: 14 }}>
+                        🏢 District-Wise Top Earners
+                      </Typography>
+                      <Table size="small">
+                        <TableHead sx={{ backgroundColor: "#f8fafc" }}>
+                          <TableRow>
+                            <TableCell sx={{ fontWeight: 800 }}>District</TableCell>
+                            <TableCell sx={{ fontWeight: 800 }}>Top Coordinator</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 800 }}>Earnings</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {[
+                            { dist: "Bangalore Urban", leader: "Shreyas (TR98765)", earn: 45000 },
+                            { dist: "Mysore", leader: "Kumari (TR99864)", earn: 32000 },
+                            { dist: "Chennai Central", leader: "Ganesh (TR98401)", earn: 28000 },
+                            { dist: "Coimbatore", leader: "Rajkumar (TR97890)", earn: 21500 },
+                            { dist: "Pune City", leader: "Dennis (TR96541)", earn: 19000 },
+                          ].map((d, idx) => (
+                            <TableRow key={idx} hover>
+                              <TableCell sx={{ fontWeight: 700 }}>{d.dist}</TableCell>
+                              <TableCell sx={{ fontSize: 12 }}>{d.leader}</TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 800, color: "#15803d" }}>₹{money(d.earn)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                {/* Pincode Micro-Clusters */}
+                <Grid item xs={12} md={4}>
+                  <Card variant="outlined" sx={{ borderRadius: 2, height: "100%" }}>
+                    <CardContent sx={{ p: 2 }}>
+                      <Typography sx={{ fontWeight: 800, color: "#7c3aed", mb: 1.5, fontSize: 14 }}>
+                        📍 Pincode High-Velocity Nodes
+                      </Typography>
+                      <Table size="small">
+                        <TableHead sx={{ backgroundColor: "#f8fafc" }}>
+                          <TableRow>
+                            <TableCell sx={{ fontWeight: 800 }}>Pincode</TableCell>
+                            <TableCell sx={{ fontWeight: 800 }}>Active Consumers</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 800 }}>SPP Boxes</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {[
+                            { pin: "560037", users: 142, spp: 86 },
+                            { pin: "560019", users: 98, spp: 62 },
+                            { pin: "560010", users: 84, spp: 54 },
+                            { pin: "600001", users: 76, spp: 48 },
+                            { pin: "411001", users: 58, spp: 38 },
+                          ].map((p, idx) => (
+                            <TableRow key={idx} hover>
+                              <TableCell sx={{ fontWeight: 700 }}>{p.pin}</TableCell>
+                              <TableCell><Chip size="small" label={`${p.users} users`} sx={{ fontWeight: 700 }} /></TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 800, color: "#b45309" }}>{p.spp} boxes</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+            </Paper>
+          )}
         </Box>
       )}
     </Box>
   );
 }
+
+

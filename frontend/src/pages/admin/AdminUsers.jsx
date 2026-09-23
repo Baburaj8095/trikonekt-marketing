@@ -59,12 +59,19 @@ const CONSUMER_COLUMN_FIELDS = {
     "__edit_view",
     "__login",
     "is_active",
-    "__account_joining",
     "system_serial_number",
+    "account_active",
+    "date_joined",
     "user_code",
     "full_name",
-    "sponsor_display",
-    "address_pincode",
+    "sponsor_id",
+    "pincode",
+    "address",
+    "commission_level",
+    "payment_mode",
+    "direct_count",
+    "total_earning",
+    "wallet_balance",
     "__kyc_profile",
   ],
   package: [
@@ -72,6 +79,10 @@ const CONSUMER_COLUMN_FIELDS = {
     "user_code",
     "full_name",
     "package_buy_date",
+    "join_prime_750",
+    "spp_months_boxes",
+    "rank_upgrade_levels",
+    "current_rank",
     "subscription_1",
     "subscription_2",
     "subscription_3",
@@ -309,98 +320,164 @@ function UplinePathViewer({ user }) {
 }
 
 function UserProfileDrawer({ open, loading, user, onClose, onEdit }) {
+  const [drawerTab, setDrawerTab] = useState("overview"); // 'overview' (Image 2) | 'package_status' (Image 3) | 'upline'
   if (!open) return null;
-  const groups = [
-    {
-      title: "Basic",
-      rows: [
-        ["User ID", user?.user_code || user?.username],
-        ["Name", user?.full_name],
-        ["Phone", user?.phone],
-        ["Email", user?.email],
-        ["Sponsor", user?.sponsor_display || user?.sponsor_id],
-        ["Address", user?.address_pincode],
-        ["KYC", user?.kyc_status],
-        ["Joined", formatDateTime(user?.date_joined)],
-        ["Package Buy Date", formatDateTime(user?.package_buy_date)],
-      ],
-    },
-    {
-      title: "Package",
-      rows: [
-        ["Subscription 1", user?.subscription_1],
-        ["Subscription 2", user?.subscription_2],
-        ["Subscription 3", user?.subscription_3],
-        ["Smart Product Package", user?.smart_product_package],
-        ["Digital Education", user?.digital_education],
-        ["Tour Package", user?.new_tour_package],
-      ],
-    },
-    {
-      title: "Wallet",
-      rows: [
-        ["Total Earning", moneyValue(user?.total_earning)],
-        ["Main Wallet", moneyValue(user?.main_wallet)],
-        ["Coupon Pocket", moneyValue(user?.coupon_pocket)],
-        ["Self Package Pocket", moneyValue(user?.self_package_pocket)],
-        ["Withdrawal Pocket", moneyValue(user?.withdrawal_pocket)],
-        ["Redeem Points", moneyValue(user?.redeem_points)],
-        ["Add Money Pocket", moneyValue(user?.add_money_pocket)],
-        ["Withdrawal To Pocket", moneyValue(user?.withdrawal_to_pocket)],
-      ],
-    },
-    {
-      title: "Pending Business Rules",
-      rows: [
-        ["Team Consumer Block ID", NEEDS_RULE_LABEL],
-        ["Caption/Coupon Rebirth Count", NEEDS_RULE_LABEL],
-        ["Admin Charges", "Needs charge rule"],
-        ["Rewards / Spin & Win", "Needs source or aggregation"],
-      ],
-    },
-  ];
+
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 1300 }}>
-      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(15, 23, 42, 0.35)" }} />
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(15, 23, 42, 0.45)" }} />
       <aside
         style={{
           position: "absolute",
           top: 0,
           right: 0,
-          width: "min(560px, 100vw)",
+          width: "min(680px, 100vw)",
           height: "100%",
           background: "#fff",
-          boxShadow: "-12px 0 30px rgba(15, 23, 42, 0.18)",
+          boxShadow: "-16px 0 36px rgba(15, 23, 42, 0.25)",
           display: "flex",
           flexDirection: "column",
         }}
       >
-        <div style={{ padding: 16, borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", gap: 12 }}>
+        {/* Header */}
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid #e2e8f0", background: "#f8fafc", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ color: "#0f172a", fontSize: 18, fontWeight: 800 }}>{user?.full_name || user?.username || "User Profile"}</div>
-            <div style={{ color: "#64748b", fontSize: 12 }}>{user?.user_code || user?.username || ""}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ color: "#0f172a", fontSize: 18, fontWeight: 900 }}>{user?.full_name || user?.username || "User Profile"}</div>
+              <span style={{ fontSize: 11, fontWeight: 800, padding: "2px 8px", borderRadius: 999, background: "#dcfce7", color: "#166534", border: "1px solid #86efac" }}>
+                {user?.account_active ? "Active" : "Inactive"}
+              </span>
+            </div>
+            <div style={{ color: "#64748b", fontSize: 13, marginTop: 2 }}>
+              Code: <strong>{user?.user_code || user?.phone || user?.username || "—"}</strong> • Sponsor: <strong>{user?.sponsor_id || user?.sponsor_name || "—"}</strong>
+            </div>
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-            <button type="button" onClick={onEdit} style={{ borderRadius: 8, padding: "7px 10px", background: "#0ea5e9", color: "#fff", border: "1px solid #0284c7", cursor: "pointer", fontWeight: 700 }}>Edit</button>
-            <button type="button" onClick={onClose} style={{ borderRadius: 8, padding: "7px 10px", background: "#fff", color: "#0f172a", border: "1px solid #cbd5e1", cursor: "pointer", fontWeight: 700 }}>Close</button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button type="button" onClick={onEdit} style={{ borderRadius: 8, padding: "7px 12px", background: "#0ea5e9", color: "#fff", border: "1px solid #0284c7", cursor: "pointer", fontWeight: 700, fontSize: 12 }}>Edit</button>
+            <button type="button" onClick={onClose} style={{ borderRadius: 8, padding: "7px 12px", background: "#fff", color: "#0f172a", border: "1px solid #cbd5e1", cursor: "pointer", fontWeight: 700, fontSize: 12 }}>Close</button>
           </div>
         </div>
-        <div style={{ overflow: "auto", padding: 16 }}>
+
+        {/* Tab Bar */}
+        <div style={{ display: "flex", borderBottom: "1px solid #e2e8f0", background: "#fff", padding: "0 16px" }}>
+          <button
+            type="button"
+            onClick={() => setDrawerTab("overview")}
+            style={{
+              padding: "12px 16px",
+              border: "none",
+              background: "none",
+              borderBottom: drawerTab === "overview" ? "3px solid #2563eb" : "3px solid transparent",
+              color: drawerTab === "overview" ? "#2563eb" : "#64748b",
+              fontWeight: 800,
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            1. User Financial & Layer Summary (Image 2)
+          </button>
+          <button
+            type="button"
+            onClick={() => setDrawerTab("package_status")}
+            style={{
+              padding: "12px 16px",
+              border: "none",
+              background: "none",
+              borderBottom: drawerTab === "package_status" ? "3px solid #2563eb" : "3px solid transparent",
+              color: drawerTab === "package_status" ? "#2563eb" : "#64748b",
+              fontWeight: 800,
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            2. Package Transaction Status (Image 3)
+          </button>
+          <button
+            type="button"
+            onClick={() => setDrawerTab("upline")}
+            style={{
+              padding: "12px 16px",
+              border: "none",
+              background: "none",
+              borderBottom: drawerTab === "upline" ? "3px solid #2563eb" : "3px solid transparent",
+              color: drawerTab === "upline" ? "#2563eb" : "#64748b",
+              fontWeight: 800,
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            3. Referral Upline
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ overflow: "auto", padding: 20, flex: 1, background: "#f8fafc" }}>
           {loading ? (
-            <div style={{ color: "#64748b", fontWeight: 700 }}>Loading profile...</div>
+            <div style={{ color: "#64748b", fontWeight: 700, padding: 20 }}>Loading profile...</div>
+          ) : drawerTab === "overview" ? (
+            /* Image 2: User Financial & Layer Summary */
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ background: "#fff", padding: 16, borderRadius: 12, border: "1px solid #e2e8f0" }}>
+                <h4 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 900, color: "#0f172a" }}>Identity & Hierarchy</h4>
+                <DetailRow label="User Code" value={user?.user_code || user?.phone || user?.username} />
+                <DetailRow label="User Name" value={user?.full_name || user?.username} />
+                <DetailRow label="Sponsor Code" value={user?.sponsor_id || user?.registered_by?.username} />
+                <DetailRow label="Sponsor Name" value={user?.sponsor_name || user?.sponsor_display} />
+                <DetailRow label="Current Layer" value={user?.commission_level ? `Layer ${user.commission_level}` : user?.current_rank || "Free Tier"} />
+                <DetailRow label="Current Direct List" value={`${user?.direct_count ?? 0} active users`} />
+              </div>
+
+              <div style={{ background: "#fff", padding: 16, borderRadius: 12, border: "1px solid #e2e8f0" }}>
+                <h4 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 900, color: "#0f172a" }}>Bank Details</h4>
+                <DetailRow label="Bank Name" value={user?.bank_name || user?.kyc?.bank_name || "—"} />
+                <DetailRow label="Bank Account" value={user?.bank_account_number || user?.kyc?.account_number || "—"} />
+                <DetailRow label="IFSC Code" value={user?.ifsc_code || user?.kyc?.ifsc_code || "—"} />
+                <DetailRow label="KYC Status" value={user?.kyc_verified ? "Verified" : user?.kyc_status || "Pending"} />
+                <DetailRow label="User Address" value={user?.address || user?.address_pincode || "—"} />
+                <DetailRow label="User Pincode" value={user?.pincode || "—"} />
+              </div>
+
+              <div style={{ background: "#fff", padding: 16, borderRadius: 12, border: "1px solid #e2e8f0" }}>
+                <h4 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 900, color: "#0f172a" }}>Financial & Payment Balances</h4>
+                <DetailRow label="Current Total Earnings" value={`₹${moneyValue(user?.total_earning || 0)}`} />
+                <DetailRow label="Current Wallet Balance" value={`₹${moneyValue(user?.wallet_balance || user?.main_wallet || 0)}`} />
+                <DetailRow label="Total Withdraw" value={`₹${moneyValue(user?.total_withdrawn || user?.withdrawal_pocket || 0)}`} />
+                <DetailRow label="No Of Transactions" value={user?.transaction_count ?? 0} />
+                <DetailRow label="Gateway Transaction" value={`₹${moneyValue(user?.gateway_payments_total || 0)}`} />
+                <DetailRow label="Company Manual Payment" value={`₹${moneyValue(user?.manual_payments_total || 0)}`} />
+                <DetailRow label="Active Payment Mode" value={user?.payment_mode || "Wallet / Online"} />
+                <DetailRow label="Approved / Reject Status" value={user?.account_active ? "Approved / Active" : "Pending / Blocked"} />
+              </div>
+            </div>
+          ) : drawerTab === "package_status" ? (
+            /* Image 3: User Package Transaction Status */
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ background: "#fff", padding: 16, borderRadius: 12, border: "1px solid #e2e8f0" }}>
+                <h4 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 900, color: "#0f172a" }}>Package Activation Timeline</h4>
+                <DetailRow label="Joining Date" value={formatDateTime(user?.date_joined)} />
+                <DetailRow label="Active Date" value={formatDateTime(user?.package_buy_date || user?.date_joined)} />
+                <DetailRow label="User Code" value={user?.user_code || user?.phone || user?.username} />
+                <DetailRow label="User Name" value={user?.full_name || user?.username} />
+                <DetailRow label="Sponsor Code" value={user?.sponsor_id} />
+                <DetailRow label="Sponsor Name" value={user?.sponsor_name || user?.sponsor_display} />
+                <DetailRow label="Pincode" value={user?.pincode} />
+              </div>
+
+              <div style={{ background: "#fff", padding: 16, borderRadius: 12, border: "1px solid #e2e8f0" }}>
+                <h4 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 900, color: "#0f172a" }}>Payment & Coupon Channels</h4>
+                <DetailRow label="Manual Payment" value={user?.manual_payment_status || `₹${moneyValue(user?.manual_payments_total || 0)} (Receipt Upload)`} />
+                <DetailRow label="Gateway Payment" value={user?.gateway_payment_status || `₹${moneyValue(user?.gateway_payments_total || 0)} (Online Paid)`} />
+                <DetailRow label="Self Purchase Coupon" value={`₹${moneyValue(user?.self_package_pocket || 0)} (Self Package Pockets)`} />
+                <DetailRow label="Package Purchase Coupon" value={`₹${moneyValue(user?.coupon_pocket || 0)} (Standard Vouchers)`} />
+                <DetailRow label="Company Growth Coupon" value={`₹${moneyValue(user?.redeem_points || 0)} (Growth / Franchise Bonus)`} />
+              </div>
+            </div>
           ) : (
-            <>
-              {groups.map((group) => (
-                <section key={group.title} style={{ marginBottom: 18 }}>
-                  <h3 style={{ margin: "0 0 8px", fontSize: 14, color: "#0f172a" }}>{group.title}</h3>
-                  <div>{group.rows.map(([label, value]) => <DetailRow key={label} label={label} value={value} />)}</div>
-                </section>
-              ))}
-              <section style={{ marginBottom: 18 }}>
-                <h3 style={{ margin: "0 0 8px", fontSize: 14, color: "#0f172a" }}>Referral Upline Path (Sponsorship)</h3>
-                <UplinePathViewer user={user} />
-              </section>
-            </>
+            /* Tab 3: Referral Upline Path */
+            <div style={{ background: "#fff", padding: 16, borderRadius: 12, border: "1px solid #e2e8f0" }}>
+              <h4 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 900, color: "#0f172a" }}>Referral Sponsorship Chain (Upline)</h4>
+              <UplinePathViewer user={user} />
+            </div>
           )}
         </div>
       </aside>
@@ -1514,16 +1591,93 @@ export default function AdminUsers() {
           );
         },
       },
-      { field: "system_serial_number", headerName: "System Serial Number", minWidth: 170 },
+      { field: "system_serial_number", headerName: "System Serial No", minWidth: 160 },
+      {
+        field: "account_active",
+        headerName: "Status",
+        minWidth: 100,
+        align: "center",
+        headerAlign: "center",
+        renderCell: (params) => {
+          const active = !!params?.row?.account_active;
+          return (
+            <span
+              style={{
+                display: "inline-flex",
+                padding: "3px 8px",
+                borderRadius: 8,
+                fontSize: 11,
+                fontWeight: 800,
+                background: active ? "#dcfce7" : "#fee2e2",
+                color: active ? "#166534" : "#991b1b",
+                border: `1px solid ${active ? "#86efac" : "#fecaca"}`,
+              }}
+            >
+              {active ? "Active" : "Inactive"}
+            </span>
+          );
+        },
+      },
+      {
+        field: "date_joined",
+        headerName: "Time / Date",
+        minWidth: 160,
+        renderCell: (p) => formatDateTime(p?.row?.date_joined),
+      },
       {
         field: "user_code",
-        headerName: "User ID",
-        minWidth: 150,
+        headerName: "Users Code",
+        minWidth: 140,
         renderCell: (params) => {
           const row = params?.row || {};
           return row.phone || row.username || row.user_code || "";
         },
       },
+      {
+        field: "full_name",
+        headerName: "Users Name",
+        minWidth: 160,
+        renderCell: (p) => p?.row?.full_name || p?.row?.username || "—",
+      },
+      {
+        field: "sponsor_id",
+        headerName: "Sponsor Code",
+        minWidth: 140,
+        renderCell: (p) => p?.row?.sponsor_id || p?.row?.sponsor_name || "—",
+      },
+      { field: "pincode", headerName: "Pincode", minWidth: 110, renderCell: (p) => p?.row?.pincode || "—" },
+      {
+        field: "address",
+        headerName: "Address",
+        minWidth: 240,
+        renderCell: (p) => p?.row?.address || p?.row?.address_pincode || "—",
+      },
+      {
+        field: "payment_mode",
+        headerName: "Mode of Payment Activation",
+        minWidth: 180,
+        renderCell: (p) => {
+          const m = p?.row?.payment_mode || p?.row?.mode_of_payment || "Wallet";
+          return (
+            <span style={{ fontWeight: 700, color: "#0369a1", background: "#f0f9ff", padding: "2px 8px", borderRadius: 6, border: "1px solid #bae6fd" }}>
+              {m}
+            </span>
+          );
+        },
+      },
+      {
+        field: "direct_count",
+        headerName: "Current Direct Sponser (Active)",
+        minWidth: 190,
+        align: "center",
+        headerAlign: "center",
+        renderCell: (p) => {
+          const c = Number(p?.row?.direct_count ?? p?.row?.active_direct_count ?? 0);
+          return <span style={{ fontWeight: 800, color: "#0f172a" }}>{c}</span>;
+        },
+      },
+      { field: "sponsor_name", headerName: "Sponsor Name", minWidth: 160 },
+      { field: "sponsor_number", headerName: "Sponsor Number", minWidth: 140 },
       { field: "sponsor_display", headerName: "Sponsor ID & Name", minWidth: 220, flex: 1 },
       { field: "address_pincode", headerName: "Address & Pincode", minWidth: 260, flex: 1 },
       {
@@ -1557,6 +1711,10 @@ export default function AdminUsers() {
         },
       },
       { field: "package_buy_date", headerName: "Package Buy Date", minWidth: 180, valueFormatter: (v) => formatDateTime(v) },
+      { field: "join_prime_750", headerName: "Join Prime 750", minWidth: 140, renderCell: (p) => <ValueOrSource value={p?.row?.join_prime_750} empty="No" /> },
+      { field: "spp_months_boxes", headerName: "SPP (Months / Boxes)", minWidth: 160, renderCell: (p) => <ValueOrSource value={p?.row?.spp_months_boxes} empty="0" /> },
+      { field: "rank_upgrade_levels", headerName: "Rank Upgrade Levels", minWidth: 220, renderCell: (p) => <ValueOrSource value={p?.row?.rank_upgrade_levels} empty="0" /> },
+      { field: "current_rank", headerName: "Current Rank", minWidth: 160, renderCell: (p) => <ValueOrSource value={p?.row?.current_rank} empty="None" /> },
       { field: "subscription_1", headerName: "Subscription 1", minWidth: 150, renderCell: (p) => <ValueOrSource value={p?.row?.subscription_1} empty={NEEDS_RULE_LABEL} /> },
       { field: "subscription_2", headerName: "Subscription 2", minWidth: 150, renderCell: (p) => <ValueOrSource value={p?.row?.subscription_2} empty={NEEDS_RULE_LABEL} /> },
       { field: "subscription_3", headerName: "Subscription 3", minWidth: 150, renderCell: (p) => <ValueOrSource value={p?.row?.subscription_3} empty={NEEDS_RULE_LABEL} /> },
@@ -1797,20 +1955,38 @@ const count = Number.isFinite(countNum) ? countNum : results.length;
           ["Full Name", (r) => r.full_name ?? ""],
           ["Phone", (r) => r.phone ?? ""],
           ["Email", (r) => r.email ?? ""],
-          ["Role", (r) => r.role ?? ""],
-          ["Category", (r) => r.category ?? ""],
+          ["Sponsor Name", (r) => r.sponsor_name ?? ""],
+          ["Sponsor Number", (r) => r.sponsor_number ?? r.sponsor_id ?? ""],
+          ["Sponsor ID & Name", (r) => r.sponsor_display ?? ""],
+          ["Join Prime 750", (r) => r.join_prime_750 ?? (r.prime750_count > 0 ? `Yes (${r.prime750_count})` : "No")],
+          ["Join Prime 750 Count", (r) => r.prime750_count ?? 0],
+          ["SPP Months / Boxes", (r) => r.spp_months_boxes ?? r.monthly_759_count ?? 0],
+          ["Rank Upgrade Levels Purchased", (r) => r.rank_upgrade_levels ?? "0"],
+          ["Rank Upgrade Count", (r) => r.rank_upgrade_count ?? 0],
+          ["Current Rank", (r) => r.current_rank ?? ""],
           ["KYC Status", (r) => (r.kyc_verified ? "Verified" : (r.kyc_status || "Pending"))],
           ["KYC Verified At", (r) => r.kyc_verified_at ?? ""],
-          ["E‑Coupons Activated", (r) => r.activated_ecoupon_count ?? ""],
-          ["Promo Package", (r) => r.last_promo_package ?? ""],
-          ["Sponsor ID", (r) => r.sponsor_id ?? ""],
+          ["Package Buy Date", (r) => r.package_buy_date ?? ""],
+          ["Subscription 1", (r) => r.subscription_1 ?? ""],
+          ["Subscription 2", (r) => r.subscription_2 ?? ""],
+          ["Subscription 3", (r) => r.subscription_3 ?? ""],
+          ["Smart Product Package", (r) => r.smart_product_package ?? ""],
+          ["Digital Education", (r) => r.digital_education ?? ""],
+          ["Address & Pincode", (r) => r.address_pincode ?? r.pincode ?? ""],
           ["Pincode", (r) => r.pincode ?? ""],
           ["Area", (r) => r.area ?? ""],
           ["Taluk", (r) => r.taluk_name ?? ""],
           ["District", (r) => r.district_name ?? ""],
           ["State", (r) => r.state_name ?? ""],
           ["Country", (r) => r.country_name ?? ""],
-          ["Commission Level", (r) => r.commission_level ?? ""],
+          ["Total Earning", (r) => r.total_earning ?? ""],
+          ["Main Wallet", (r) => r.main_wallet ?? ""],
+          ["Coupon Pocket", (r) => r.coupon_pocket ?? ""],
+          ["Self Package Pocket", (r) => r.self_package_pocket ?? ""],
+          ["Withdrawal Pocket", (r) => r.withdrawal_pocket ?? ""],
+          ["Redeem Points", (r) => r.redeem_points ?? ""],
+          ["Role", (r) => r.role ?? ""],
+          ["Category", (r) => r.category ?? ""],
           ["Wallet Balance", (r) => r.wallet_balance ?? ""],
           ["Wallet Status", (r) => r.wallet_status ?? ""],
           ["Account Active", (r) => (r.account_active ? "Active" : "Inactive")],

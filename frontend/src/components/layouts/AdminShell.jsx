@@ -226,6 +226,7 @@ export default function AdminShell({ children }) {
       to.startsWith("/admin/wallet-vouchers") ||
       to.startsWith("/admin/wallet-reconcile") ||
       to.startsWith("/admin/ledger-statement") ||
+      to.startsWith("/admin/reports/daily-report") ||
       to.startsWith("/admin/analytics")
     )
       return "reports_finance";
@@ -270,8 +271,7 @@ export default function AdminShell({ children }) {
         key: "user",
         label: "User Management",
         items: [
-          { to: "/admin/users", label: "Team Consumers", icon: "users" },
-          { to: "/admin/user-tree", label: "Genealogy", icon: "tree" },
+          { to: "/admin/user-tree", label: "Layer Blocks", icon: "tree" },
         ],
       },
       {
@@ -314,7 +314,7 @@ export default function AdminShell({ children }) {
         label: "All Packages",
         items: [
           { to: "/admin/packages", label: "All Packages (Edit)", icon: "box" },
-          { to: "/admin/package-management", label: "Package Management", icon: "box" },
+          // { to: "/admin/package-management", label: "Package Management", icon: "box" },
           { to: "/admin/dashboard/models/business/promopackage", label: "Promo Package Setup", icon: "box" },
           // { to: "/admin/packages/join-subscription", label: "Join Subscription", icon: "ticket" },
           // { to: "/admin/packages/spp", label: "Smart Product Package", icon: "ticket" },
@@ -343,131 +343,82 @@ export default function AdminShell({ children }) {
         ],
       },
       {
-        key: "coupon_requested",
-        label: "Coupon",
-        items: [
-          { to: "/admin/workflows/generate-coupon", label: "Generate Coupon", icon: "ticket" },
-          { to: "/admin/wallet-vouchers", label: "Coupon Summary", icon: "ticket" },
-        ],
-      },
-      // {
-      //   key: "merchant_config",
-      //   label: "Merchant Categories",
-      //   items: [
-      //     { to: "/admin/merchant-categories", label: "Merchant Categories", icon: "box" },
-      //     { to: "/admin/merchant-subcategories", label: "Merchant Subcategories", icon: "box" },
-      //   ],
-      // },
-      {
-        key: "compliance",
-        label: "Kyc & Withdrawals",
-        items: [
-          { to: "/admin/kyc", label: "KYC", icon: "shield" },
-          { to: "/admin/support", label: "Support", icon: "ticket" },
-        ],
-      },
-      {
         key: "finance_wallet_ops",
-        label: "Finance & Wallet Operations",
+        label: "Finance & Approvals",
         items: [
-          { to: "/admin/wallet-command-center", label: "Wallet Command Center", icon: "dashboard" },
-          { to: "/admin/team-wallet-dashboard", label: "Team Wallet Dashboard", icon: "chart" },
-          { to: "/admin/wallet-ledger", label: "Central Ledger", icon: "wallet" },
-          { to: "/admin/wallets", label: "Wallet Overview", icon: "wallet" },
           { to: "/admin/wallet-upload-approvals", label: "Add Money Requests", icon: "upload" },
           { to: "/admin/withdrawals", label: "Withdrawal Requests", icon: "wallet" },
-          { to: "/admin/wallet-vouchers", label: "Voucher Maintenance", icon: "ticket" },
-          { to: "/admin/package-management", label: "Package Management", icon: "box" },
-          { to: "/admin/reward-distribution", label: "Reward Distribution", icon: "wallet" },
+          { to: "/admin/packages/join-subscription", label: "Package Approvals", icon: "ticket" },
+          { to: "/admin/rank-upgrades", label: "Rank Upgrade Approvals", icon: "wallet" },
+          { to: "/admin/wallet-ledger", label: "Central Ledger", icon: "wallet" },
+          { to: "/admin/wallets", label: "Wallet Overview", icon: "wallet" },
           { to: "/admin/wallet-reconcile", label: "Wallet Reconcile", icon: "chart" },
-          { to: "/admin/analytics", label: "Demographic & Cash Flow", icon: "chart" },
-          { to: "/admin/wallet-settlements", label: "Settlement Reports", icon: "chart" },
-          { to: "/admin/wallet-monitoring", label: "Risk & OTP Monitoring", icon: "shield" },
         ],
       },
       {
-        key: "promotions",
-        label: "Package Approval",
+        key: "package_management_requested",
+        label: "Package Configuration",
         items: [
-          { to: "/admin/lucky-draw", label: "Lucky Draw", icon: "ticket" },
-          // { to: "/admin/e-coupons", label: "E‑Coupons", icon: "ticket" },
-          // { to: "/admin/dashboard/models/business/promopackage", label: "Promo Packages", icon: "box" },
-          // { to: "/admin/promo-package-products", label: "Upload Promo Products (₹750)", icon: "upload" },
-          // { to: "/admin/dashboard/models/business/promopackageproduct", label: "Promo Products (₹750)", icon: "box" },
-          // { to: "/admin/dashboard/models/business/promomonthlypackage", label: "Season Numbers", icon: "box" },
-          // { to: "/admin/dashboard/models/business/promomonthlybox", label: "Season Boxes (Paid)", icon: "box" },
-          // { to: "/admin/promo-purchases", label: "Promo Purchases", icon: "ticket" },
-
-          // Package-specific approval screens (requested)
-          { to: "/admin/packages/join-subscription", label: "Approvals: Join Subscription", icon: "ticket" },
-          { to: "/admin/packages/spp", label: "Approvals: SPP", icon: "ticket" },
+          { to: "/admin/packages", label: "All Packages (Edit)", icon: "box" },
           { to: "/admin/packages/spp-seasons", label: "Manage SPP Seasons", icon: "box" },
-          { to: "/admin/packages/digital-education-prime", label: "Approvals: Digital Education Prime", icon: "wallet" },
-          { to: "/admin/packages/tri-tour", label: "Approvals: Tri Tour", icon: "ticket" },
-
-          { to: "/admin/rank-upgrades", label: "All Rank Upgrades", icon: "wallet" },
-          { to: "/admin/ledger/join-prime", label: "Ledger: Join Prime", icon: "ticket" },
-          { to: "/admin/ledger/spp", label: "Ledger: SPP", icon: "ticket" },
-          { to: "/admin/ledger/digital-education", label: "Ledger: Digital Education", icon: "wallet" },
-          { to: "/admin/ledger/tri-tour", label: "Ledger: Tri Tour", icon: "ticket" },
-        ],
-      },
-
-      
-      {
-        key: "team_consumer",
-        label: "Team / Consumer",
-        items: [
-          { to: "/admin/workflows/team-admin-board", label: "Team Admin Board", icon: "dashboard" },
-          { to: "/admin/users?category=consumer", label: "ID Card / Team Consumers", icon: "users" },
-          { to: "/admin/team-consumer/block-users", label: "Block Team Consumers", icon: "users" },
-          { to: "/admin/team-consumer/wishing-banners", label: "Wishing Banners", icon: "box" },
-          { to: "/admin/team-consumer/top-achievers", label: "Top Achievers", icon: "users" },
-          { to: "/admin/team-consumer/educational-videos", label: "Educational Videos", icon: "file" },
-          { to: "/admin/team-consumer/pdf-uploads", label: "Trikonekt PDF Uploads", icon: "file" },
-          { to: "/admin/team-consumer/certificate-uploads", label: "Certificate Uploads", icon: "file" },
-          // { to: "/admin/team-consumer/certificate-uploads?view=training", label: "Training Certificate", icon: "file" },
+          { to: "/admin/tri/tri-holidays", label: "Tri Tour Packages", icon: "box" },
         ],
       },
       {
-        key: "content_requested",
-        label: "Content / Front Page",
+        key: "reports_consolidated",
+        label: "Reports & Business Intelligence",
         items: [
-          { to: "/admin/team-consumer/pdf-uploads?view=business", label: "Trikonekt Business PDF", icon: "file" },
-          { to: "/admin/workflows/crm-connect", label: "CRM Connect", icon: "briefcase" },
-          { to: "/admin/workflows/ecommerce-digital-education-frontpage", label: "E-Commerce / Digital Education Front Page", icon: "box" },
-          { to: "/admin/home-cards", label: "Home Cards", icon: "box" },
-          { to: "/admin/dashboard-cards", label: "Dashboard Cards", icon: "dashboard" },
-        ],
-      },
-      {
-        key: "tri",
-        label: "TRI Apps",
-        items: [
-          { to: "/admin/tri/tri-holidays", label: "Manage TRI Holidays", icon: "box" },
-        ],
-      },
-      {
-        key: "reports",
-        label: "Reports & Business",
-        items: [
-          { to: "/admin/reports", label: "Reports", icon: "chart" },
-          // { to: "/admin/business", label: "Business", icon: "briefcase" },
+          { to: "/admin/analytics/sales", label: "Daily Sales & Cash Flow", icon: "chart" },
+          { to: "/admin/reports/users-today", label: "Users Today Report", icon: "users" },
+          { to: "/admin/reports/internal-wallet", label: "Internal Wallet Daily Report", icon: "wallet" },
+          { to: "/admin/reports", label: "General Business Reports", icon: "chart" },
+          { to: "/admin/ledger-statement", label: "Ledger Statement", icon: "file" },
         ],
       },
       {
         key: "commissions",
-        label: "Commissions & Matrix",
+        label: "Commissions & Royalties",
         items: [
-          { to: "/admin/commissions/distribute", label: "Commission Distribute", icon: "wallet" },
+          { to: "/admin/commissions/distribute", label: "Commission & Royalty Rules", icon: "wallet" },
           { to: "/admin/commissions/history", label: "Commission History", icon: "wallet" },
-          { to: "/admin/autopool", label: "Auto Commission", icon: "pool" },
+          { to: "/admin/autopool", label: "Auto Commission Pool Monitor", icon: "pool" },
         ],
       },
       {
-        key: "engagement",
-        label: "Engagement",
-        items: [{ to: "/admin/notifications", label: "Notifications", icon: "ticket" }],
+        key: "coupon_requested",
+        label: "Coupons & Rewards",
+        items: [
+          { to: "/admin/workflows/generate-coupon", label: "Generate Coupon", icon: "ticket" },
+          { to: "/admin/wallet-vouchers", label: "Coupon / Voucher Maintenance", icon: "ticket" },
+          { to: "/admin/workflows/franchise-reference-reward", label: "Franchise Reference Reward", icon: "wallet" },
+          { to: "/admin/workflows/zonal-reward", label: "Zonal Reward", icon: "wallet" },
+          { to: "/admin/lucky-draw", label: "Lucky Draw", icon: "ticket" },
+        ],
+      },
+      {
+        key: "team_consumer",
+        label: "Team Consumer",
+        items: [
+          { to: "/admin/users", label: "Team Consumers", icon: "users" },
+          { to: "/admin/user-tree", label: "Layer Blocks / Tree", icon: "tree" },
+          { to: "/admin/workflows/team-admin-board", label: "Team Admin Board", icon: "dashboard" },
+          { to: "/admin/team-consumer/block-users", label: "Block Team Consumers", icon: "users" },
+          { to: "/admin/team-consumer/top-achievers", label: "Top Achievers", icon: "users" },
+        ],
+      },
+      {
+        key: "media_content",
+        label: "Media & Content Management",
+        items: [
+          { to: "/admin/team-consumer/educational-videos", label: "Educational Videos", icon: "file" },
+          { to: "/admin/team-consumer/pdf-uploads", label: "Trikonekt PDF Uploads", icon: "file" },
+          { to: "/admin/team-consumer/pdf-uploads?view=business", label: "Trikonekt Business PDF", icon: "file" },
+          { to: "/admin/team-consumer/certificate-uploads", label: "Certificate Uploads", icon: "file" },
+          { to: "/admin/team-consumer/wishing-banners", label: "Wishing Banners", icon: "box" },
+          { to: "/admin/workflows/crm-connect", label: "CRM Connect", icon: "briefcase" },
+          { to: "/admin/ui-config", label: "UI Configuration", icon: "box" },
+          { to: "/admin/workflows/tree-toggle", label: "Tree On / Off", icon: "tree" },
+        ],
       },
       {
         key: "franchise",
@@ -479,12 +430,13 @@ export default function AdminShell({ children }) {
         ],
       },
       {
-        key: "analytics",
-        label: "Analytics",
+        key: "compliance",
+        label: "Compliance & Security",
         items: [
+          { to: "/admin/kyc", label: "KYC Verification", icon: "shield" },
+          { to: "/admin/support", label: "Support Tickets", icon: "ticket" },
+          { to: "/admin/notifications", label: "Notifications", icon: "ticket" },
           { to: "/admin/analytics/debugger", label: "Wallet Debugger", icon: "shield" },
-          { to: "/admin/ledger-statement", label: "Ledger Statement", icon: "file" },
-          { to: "/admin/analytics/sales", label: "Daily Sales Report", icon: "chart" },
         ],
       },
 
@@ -524,10 +476,6 @@ export default function AdminShell({ children }) {
     const out = [];
 
     out.push({ to: "/admin/dashboard", label: "Dashboard", icon: "dashboard" });
-
-    // AdminUsers is consumer-only. Franchise/agency admin gets a separate flow.
-    out.push({ type: "section", label: "Team Consumer", collapsible: true, groupChildren: true });
-    out.push({ to: "/admin/users", label: "Team Consumers", icon: "users" });
     // out.push({ to: "/admin/users?category=merchant", label: "Business / Merchant", icon: "briefcase" });
     // out.push({ to: "/admin/users?category=employee", label: "Sarathi / Employee", icon: "users" });
     // out.push({ to: "/admin/users?category=agency_state_coordinator", label: "Agency: State Coordinator", icon: "users" });

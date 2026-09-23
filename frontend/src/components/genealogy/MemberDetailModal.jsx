@@ -341,7 +341,7 @@ export default function MemberDetailModal({ userId, onClose }) {
                       {data.entry_package?.name || "Join Subscription"}
                     </div>
                     <div style={{ fontSize: 12, color: C.textSec, marginTop: 2 }}>
-                      ₹{data.entry_package?.amount ?? 750} one-time package
+                      ₹{data.entry_package?.amount ?? 1000} one-time package
                     </div>
                   </div>
                   <StatusBadge status={data.entry_package?.status || "Inactive"} />

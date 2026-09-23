@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Avatar,
   Badge,
@@ -55,6 +55,7 @@ import API, {
   listCategoryBanners,
   getNearbyShops,
   getPublicShops,
+  getWalletMe,
 } from "../api/api";
 
 // IMAGE IMPORTS  fallbacks
@@ -532,10 +533,23 @@ export default function UserDashboard({ embedded = false }) {
     }
   };
 
+  const [walletData, setWalletData] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const w = await getWalletMe();
+        if (alive && w) setWalletData(w);
+      } catch (_) {}
+    })();
+    return () => { alive = false; };
+  }, []);
+
   // ── RENDER ───────────────────────────────────────────────────────────────
 
   return (
-    <Box sx={{ bgcolor: T.bg, minHeight: "100vh", maxWidth: 430, mx: "auto" }}>
+    <Box sx={{ bgcolor: T.bg, minHeight: "100vh", maxWidth: 1180, mx: "auto" }}>
 
       {/* ── STICKY HEADER ─────────────────────────────────────────────── */}
       <Box
@@ -632,7 +646,7 @@ export default function UserDashboard({ embedded = false }) {
                 "&:hover": { background: "linear-gradient(90deg,#d97706,#dc2626)" },
               }}
             >
-              Join Prime
+              Agent Subscription
             </Button>
           )}
           <IconButton size="small" sx={{ p: 0.5 }}>
@@ -647,11 +661,230 @@ export default function UserDashboard({ embedded = false }) {
       {/* ── PAGE SECTIONS ─────────────────────────────────────────────── */}
       <Stack spacing={1.5} sx={{ px: 0.1, pt: 1, pb: 10 }}>
 
-        {/* 3) LOCATION BAR — commented out as in original */}
-        {/* <Paper ... /> */}
+        {/* 1) USER PROFILE CARD */}
+        <Paper
+          elevation={0}
+          sx={{
+            p: 1.5,
+            borderRadius: "20px",
+            bgcolor: "#ffffff",
+            border: "1.5px solid #e2e8f0",
+            boxShadow: "0 4px 14px rgba(15,23,42,0.05)",
+          }}
+        >
+          <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <Stack direction="row" alignItems="center" spacing={1.5}>
+              <Avatar
+                sx={{
+                  width: 48,
+                  height: 48,
+                  bgcolor: "#dbeafe",
+                  color: "#1e40af",
+                  fontWeight: 900,
+                  fontSize: 16,
+                  border: "2px solid #bfdbfe",
+                }}
+              >
+                {initials}
+              </Avatar>
+              <Box>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <Typography sx={{ fontSize: 16, fontWeight: 900, color: "#0f172a" }}>
+                    {displayName}
+                  </Typography>
+                  <Chip
+                    label="AGENT"
+                    size="small"
+                    sx={{
+                      bgcolor: "#dcfce7",
+                      color: "#166534",
+                      fontWeight: 800,
+                      fontSize: 10,
+                      height: 20,
+                    }}
+                  />
+                </Stack>
+                <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 700, mt: 0.2, display: "block" }}>
+                  Consumer ID: <strong>{storedUser?.username || storedUser?.id || "8095918105"}</strong>
+                </Typography>
+              </Box>
+            </Stack>
+          </Stack>
+        </Paper>
 
-        {/* 4) PRIME MEMBERSHIP — commented out as in original */}
-        {/* <PrimeStrip isPrime={isPrime} onJoinClick={() => navigate("/user/promo-packages")} /> */}
+        {/* 2) MAIN WALLET CARD */}
+        <Paper
+          elevation={0}
+          sx={{
+            p: 2,
+            borderRadius: "20px",
+            bgcolor: "#eff6ff",
+            border: "1.5px solid #bfdbfe",
+            cursor: "pointer",
+            "&:active": { transform: "scale(0.99)" },
+            transition: "transform 0.1s ease",
+          }}
+          onClick={() => navigate("/user/team-wallet")}
+        >
+          <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <Stack direction="row" alignItems="center" spacing={1.5}>
+              <Box
+                sx={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: "12px",
+                  bgcolor: "#2563eb",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#fff",
+                }}
+              >
+                <AccountBalanceWalletIcon sx={{ fontSize: 22 }} />
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#1e3a8a" }}>
+                  Main Wallet
+                </Typography>
+                <Typography sx={{ fontSize: 24, fontWeight: 950, color: "#0f172a", lineHeight: 1.2 }}>
+                  ₹ {Number(walletData?.main_wallet || walletData?.balance || 0).toFixed(2)}
+                </Typography>
+                <Typography variant="caption" sx={{ color: "#3b82f6", fontWeight: 700 }}>
+                  Choose a wallet pocket after click
+                </Typography>
+              </Box>
+            </Stack>
+            <ChevronRightIcon sx={{ color: "#2563eb" }} />
+          </Stack>
+        </Paper>
+
+        {/* 3) 4 CIRCULAR QUICK ACTION BUTTONS */}
+        <Paper
+          elevation={0}
+          sx={{
+            p: 1.75,
+            borderRadius: "20px",
+            bgcolor: "#ffffff",
+            border: "1px solid #e2e8f0",
+            boxShadow: "0 4px 14px rgba(15,23,42,0.04)",
+          }}
+        >
+          <Grid container spacing={1} justifyContent="space-around">
+            {[
+              { label: "Add Money", icon: "＋", bg: "#2563eb", route: "/user/upload-wallet" },
+              { label: "Buy Package", icon: "🛍️", bg: "#7c3aed", route: "/user/promo-packages" },
+              { label: "Withdraw", icon: "↑", bg: "#ea580c", route: "/user/wallet" },
+              { label: "History", icon: "🕒", bg: "#0d9488", route: "/user/history" },
+            ].map((act) => (
+              <Grid item xs={3} key={act.label} sx={{ textAlign: "center" }}>
+                <Box
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => navigate(act.route)}
+                  sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 0.8,
+                    cursor: "pointer",
+                    "&:active": { transform: "scale(0.92)" },
+                    transition: "transform 0.12s",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 52,
+                      height: 52,
+                      borderRadius: "50%",
+                      bgcolor: act.bg,
+                      color: "#ffffff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 20,
+                      fontWeight: 900,
+                      boxShadow: `0 4px 12px ${act.bg}44`,
+                    }}
+                  >
+                    {act.icon}
+                  </Box>
+                  <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#0f172a" }}>
+                    {act.label}
+                  </Typography>
+                </Box>
+              </Grid>
+            ))}
+          </Grid>
+        </Paper>
+
+        {/* 4) TOP ACHIEVERS LEADERBOARD */}
+        <Paper
+          elevation={0}
+          sx={{
+            p: 2,
+            borderRadius: "20px",
+            bgcolor: "#ffffff",
+            border: "1px solid #e2e8f0",
+          }}
+        >
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
+            <Typography sx={{ fontSize: 15, fontWeight: 900, color: "#0f172a" }}>
+              Top Achievers
+            </Typography>
+            <Button
+              size="small"
+              onClick={() => navigate("/user/my-team")}
+              sx={{ textTransform: "none", fontWeight: 800, fontSize: 12, color: "#2563eb", p: 0 }}
+            >
+              View All &gt;
+            </Button>
+          </Stack>
+
+          <Stack spacing={1}>
+            {[
+              { rank: 1, name: "Rajesh Kumar", amount: "₹ 1,25,430", color: "#f59e0b", bg: "#fef3c7" },
+              { rank: 2, name: "Priya Sharma", amount: "₹ 98,750", color: "#64748b", bg: "#f1f5f9" },
+              { rank: 3, name: "Amit Patil", amount: "₹ 87,620", color: "#b45309", bg: "#ffedd5" },
+            ].map((achiever) => (
+              <Stack
+                key={achiever.rank}
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{
+                  p: 1,
+                  borderRadius: "12px",
+                  bgcolor: "#f8fafc",
+                }}
+              >
+                <Stack direction="row" alignItems="center" spacing={1.5}>
+                  <Box
+                    sx={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: "50%",
+                      bgcolor: achiever.bg,
+                      color: achiever.color,
+                      fontWeight: 900,
+                      fontSize: 12,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {achiever.rank}
+                  </Box>
+                  <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#0f172a" }}>
+                    {achiever.name}
+                  </Typography>
+                </Stack>
+                <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#16a34a" }}>
+                  {achiever.amount}
+                </Typography>
+              </Stack>
+            ))}
+          </Stack>
+        </Paper>
 
         {/* 5) SERVICES */}
         <Paper

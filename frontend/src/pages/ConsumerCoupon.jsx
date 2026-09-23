@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Typography,
   Box,
@@ -491,7 +491,7 @@ export default function ConsumerCoupon() {
     const denom = Number(code?.value) || 150;
     let t = "150";
     if (denom <= 50) t = "50";
-    else if (Math.abs(denom - 759) < 0.01 || Math.abs(denom - 750) < 0.01) t = "759";
+    else if (Math.abs(denom - 1000) < 0.01 || Math.abs(denom - 759) < 0.01 || Math.abs(denom - 750) < 0.01) t = "1000";
     try {
       setActivateCodeBusy((m) => ({ ...m, [codeId]: true }));
       const src = {

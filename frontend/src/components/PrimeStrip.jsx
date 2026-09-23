@@ -9,7 +9,7 @@ export default function PrimeStrip({ isPrime, onJoinClick }) {
         {isPrime ? "Prime Active" : "Get Prime - Free delivery & deals"}
       </Typography>
       <Button onClick={onJoinClick} variant="contained">
-        {isPrime ? "Active" : "Join ₹750"}
+        {isPrime ? "Active" : "Join ₹1000"}
       </Button>
     </Box>
   );

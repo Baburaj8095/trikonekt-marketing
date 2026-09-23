@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Box,
   Tabs,
@@ -32,6 +32,7 @@ function money(v) {
 export default function AdminUserTree() {
   const [tab, setTab] = useState(0);
   const [viewMode, setViewMode] = useState("cards"); // "cards" or "visual"
+  const [category, setCategory] = useState("sub_750"); // "sub_750" | "smart_spp" | "p150" | "all"
   const [levels, setLevels] = useState({ five: 10, three: 15 });
   
   // Auditor States
@@ -39,6 +40,14 @@ export default function AdminUserTree() {
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditErr, setAuditErr] = useState("");
   const [auditResults, setAuditResults] = useState(null);
+
+  const activePool = useMemo(() => {
+    const isFive = tab === 0;
+    if (category === "sub_750") return isFive ? "FIVE_750" : "THREE_750";
+    if (category === "smart_spp") return isFive ? "FIVE_759" : "THREE_759";
+    if (category === "p150") return isFive ? "FIVE_150" : "THREE_150";
+    return isFive ? "FIVE_ALL" : "THREE_ALL";
+  }, [tab, category]);
 
   useEffect(() => {
     let mounted = true;
@@ -132,10 +141,10 @@ export default function AdminUserTree() {
   return (
     <Box sx={{ p: 1 }}>
       <Typography variant="h5" sx={{ fontWeight: 900, color: "#0C2D48", mb: 2 }}>
-        Genealogy Trees & Payout Auditor
+        Layer Blocks Trees & Payout Auditor
       </Typography>
 
-      {/* Main Tabs (Matrix placement choice) */}
+      {/* Main Tabs (Blocks placement choice) */}
       <Box
         sx={{
           border: "1px solid #e2e8f0",
@@ -152,42 +161,62 @@ export default function AdminUserTree() {
           textColor="primary"
           indicatorColor="primary"
         >
-          <Tab label="5 Matrix (Matrix Placement)" />
-          <Tab label="3 Matrix (Matrix Placement)" />
+          <Tab label="5 Blocks (Blocks Placement)" />
+          <Tab label="3 Blocks (Blocks Placement)" />
         </Tabs>
       </Box>
 
-      {/* View Mode Selector (Cards vs Zoomable SVG Tree) */}
-      <Box sx={{ display: "flex", gap: 1.2, mb: 2 }}>
-        <Button
-          variant={viewMode === "cards" ? "contained" : "outlined"}
-          onClick={() => setViewMode("cards")}
-          size="small"
-          sx={{ borderRadius: 99, px: 2, textTransform: "none", fontWeight: 800 }}
-        >
-          Card Explorer List
-        </Button>
-        <Button
-          variant={viewMode === "visual" ? "contained" : "outlined"}
-          onClick={() => setViewMode("visual")}
-          size="small"
-          sx={{ borderRadius: 99, px: 2, textTransform: "none", fontWeight: 800 }}
-        >
-          Interactive Zoomable SVG Tree
-        </Button>
-      </Box>
+      {/* Category & View Mode Selector */}
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+        <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 0.5 }}>
+          {[
+            { id: "sub_750", label: "Subscription Joining (750 / 1000)" },
+            { id: "smart_spp", label: "Smart SPP" },
+            { id: "p150", label: "Prime 150" },
+            { id: "all", label: "All Matrix Accounts" },
+          ].map((cat) => (
+            <Chip
+              key={cat.id}
+              label={cat.label}
+              onClick={() => setCategory(cat.id)}
+              color={category === cat.id ? "primary" : "default"}
+              variant={category === cat.id ? "filled" : "outlined"}
+              sx={{ fontWeight: 800, fontSize: 12, cursor: "pointer" }}
+            />
+          ))}
+        </Stack>
+
+        <Box sx={{ display: "flex", gap: 1 }}>
+          <Button
+            variant={viewMode === "cards" ? "contained" : "outlined"}
+            onClick={() => setViewMode("cards")}
+            size="small"
+            sx={{ borderRadius: 99, px: 2, textTransform: "none", fontWeight: 800 }}
+          >
+            Card Explorer List
+          </Button>
+          <Button
+            variant={viewMode === "visual" ? "contained" : "outlined"}
+            onClick={() => setViewMode("visual")}
+            size="small"
+            sx={{ borderRadius: 99, px: 2, textTransform: "none", fontWeight: 800 }}
+          >
+            Interactive Zoomable SVG Tree
+          </Button>
+        </Box>
+      </Stack>
 
       {/* Tree Content Render */}
       <Paper elevation={0} sx={{ p: 1.5, borderRadius: 3, border: "1px solid #e2e8f0", bgcolor: "#f8fafc", mb: 3 }}>
         {viewMode === "cards" ? (
           tab === 0 ? (
-            <TreeReferralGalaxy mode="admin" preferredSource="matrix" maxDepth={levels.five} maxChildren={5} pool="FIVE_150" />
+            <TreeReferralGalaxy mode="admin" preferredSource="auto" maxDepth={levels.five} maxChildren={5} pool={activePool} />
           ) : (
-            <TreeReferralGalaxy mode="admin" preferredSource="matrix" maxDepth={levels.three} maxChildren={3} pool="THREE_150" />
+            <TreeReferralGalaxy mode="admin" preferredSource="auto" maxDepth={levels.three} maxChildren={3} pool={activePool} />
           )
         ) : (
           <Box sx={{ height: 530, borderRadius: 2.5, overflow: "hidden" }}>
-            <InteractiveTree pool={tab === 0 ? "FIVE_150" : "THREE_150"} />
+            <InteractiveTree pool={activePool} />
           </Box>
         )}
       </Paper>

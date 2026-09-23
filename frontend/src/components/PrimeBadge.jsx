@@ -56,7 +56,7 @@ const PrimeStrip = ({ isPrime, onJoinClick }) => {
           pointerEvents: isPrime ? "none" : "auto",
         }}
       >
-        {isPrime ? "Prime Active" : "Join @ ₹750"}
+        {isPrime ? "Prime Active" : "Join @ ₹1000"}
       </Button>
     </Box>
   );

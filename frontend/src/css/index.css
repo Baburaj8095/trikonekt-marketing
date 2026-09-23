@@ -1,50 +1,84 @@
-/* Light baseline to avoid OS/browser forced dark inversion making text invisible */
+/* Trikonekt Modern UI/UX Global CSS & Design Tokens */
 :root {
-  /* Tell the browser our UI is light so it doesn&#39;t auto-invert colors on dark OS */
   color-scheme: light;
+  --color-primary: #2563EB;
+  --color-primary-dark: #1D4ED8;
+  --color-primary-light: #EFF6FF;
+  --color-secondary: #7C3AED;
+  --color-accent: #06B6D4;
+  --color-success: #16A34A;
+  --color-success-bg: #DCFCE7;
+  --color-warning: #F59E0B;
+  --color-warning-bg: #FEF3C7;
+  --color-error: #EF4444;
+  --color-error-bg: #FEE2E2;
+
+  --color-bg-app: #F8FAFC;
+  --color-surface: #FFFFFF;
+  --color-surface-subtle: #F1F5F9;
+  --color-border: #E2E8F0;
+  --color-border-subtle: #F1F5F9;
+
+  --color-text-primary: #0F172A;
+  --color-text-secondary: #64748B;
+  --color-text-muted: #94A3B8;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-card: 16px;
+  --radius-modal: 20px;
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-card: 0 4px 16px -2px rgba(15, 23, 42, 0.06), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+  --shadow-floating: 0 12px 32px -4px rgba(15, 23, 42, 0.12);
+  --shadow-dock: 0 -4px 20px 0 rgba(15, 23, 42, 0.08);
+
+  --font-family: 'Inter', 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 html, body {
-  margin: 0; /* Remove default 8px body margin */
-  background-color: #F5F7FA;
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-bg-app);
+  color: var(--color-text-primary);
   min-height: 100%;
   overscroll-behavior-y: none;
 }
 
 body {
-  font-family: Inter, Manrope, 'Segoe UI', Roboto, Helvetica, Arial, 'Noto Sans', 'Segoe UI Emoji', sans-serif;
-  color: #0f172a; /* Ensure readable default text color on light backgrounds */
+  font-family: var(--font-family);
+  color: var(--color-text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   touch-action: manipulation;
 }
 
-/* Ensure common surfaces remain light with readable text, without breaking AppBar contrast */
+/* Base Surfaces */
 .MuiCard-root {
-  background-color: #ffffff;
-  color: #0f172a;
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
 }
+
 .MuiDrawer-paper {
-  background-color: #ffffff;
-  color: #0f172a;
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
   height: 100dvh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   touch-action: pan-y;
 }
-/* AppBar text/icon color now follows each page's AppBar sx (dark or light) */
 
-/* Keep root container neutral */
 #root {
   background-color: transparent;
   color: inherit;
   min-height: 100dvh;
 }
 
-/* Optional: links inherit readable color unless explicitly styled */
 a {
   color: inherit;
+  text-decoration: none;
 }
 
 button,
@@ -56,33 +90,35 @@ a,
 }
 
 .role-shell-scope {
-  background: #F5F7FA !important;
+  background: var(--color-bg-app) !important;
 }
 
 .role-shell-scope main {
   -webkit-overflow-scrolling: touch;
 }
 
-.role-shell-scope .MuiPaper-root,
-.role-shell-scope .MuiCard-root {
-  background-clip: padding-box;
-}
-
+/* Standard Fintech Container */
 .consumer-fintech-page {
   width: 100%;
-  max-width: 1120px;
+  max-width: 1180px;
   margin: 0 auto;
-  color: #0f172a;
+  color: var(--color-text-primary);
 }
 
 .consumer-fintech-card {
-  border: 1px solid rgba(226, 232, 240, 0.94);
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.07), 0 1px 1px rgba(15, 23, 42, 0.04);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
 }
 
+/* Horizontal Scroll Container */
 .consumer-mobile-scroll {
+  display: flex;
+  gap: 12px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
   scrollbar-width: none;
 }
 
@@ -92,188 +128,7 @@ a,
 
 @media (max-width: 600px) {
   .consumer-fintech-page {
-    padding-left: 2px;
-    padding-right: 2px;
-  }
-
-  .role-shell-scope main {
-    padding-left: 10px !important;
-    padding-right: 10px !important;
+    padding-left: 8px;
+    padding-right: 8px;
   }
 }
-
-@supports (backdrop-filter: blur(16px)) {
-  .native-glass {
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-  }
-}
-
-@media (max-width: 600px) {
-  .MuiDialog-paper {
-    margin: 12px !important;
-    width: calc(100% - 24px) !important;
-  }
-
-  .MuiDrawer-paperAnchorBottom {
-    padding-bottom: max(16px, env(safe-area-inset-bottom)) !important;
-  }
-
-  .MuiButton-root {
-    min-height: 46px;
-  }
-
-  .MuiIconButton-root {
-    min-width: 40px;
-    min-height: 40px;
-  }
-}
-
-/* KPI mobile full-width enforcement removed to rely on proper MUI Grid props (xs=12) and default gutters to avoid overlap */
-
-/* =========================
-   Admin visual polish
-   ========================= */
-.admin-scope .tk-card {
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  background: #ffffff;
-  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
-}
-
-/* Buttons inside admin cards (primary, classy look) */
-.admin-scope .tk-btn {
-  appearance: none;
-  padding: 10px 14px !important;
-  border-radius: 10px !important;
-  border: 1px solid #dbe3ef !important;
-  background: linear-gradient(180deg, #2ea6ff 0%, #0ea5e9 100%) !important;
-  color: #ffffff !important;
-  font-weight: 700;
-  letter-spacing: 0.2px;
-  cursor: pointer;
-  transition: transform 120ms ease, box-shadow 160ms ease, background 160ms ease, opacity 160ms ease;
-  box-shadow: 0 4px 10px rgba(14, 165, 233, 0.25);
-}
-
-.admin-scope .tk-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 18px rgba(14, 165, 233, 0.28);
-  background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%) !important;
-}
-
-.admin-scope .tk-btn:active:not(:disabled) {
-  transform: translateY(0);
-  box-shadow: 0 3px 8px rgba(14, 165, 233, 0.22);
-}
-
-.admin-scope .tk-btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-/* Inputs/selects inside admin cards */
-.admin-scope .tk-card select,
-.admin-scope .tk-card input[type="text"],
-.admin-scope .tk-card input[type="search"],
-.admin-scope .tk-card input[type="number"],
-.admin-scope .tk-card input:not([type]) {
-  padding: 9px 12px !important;
-  border: 1px solid #dbe3ef !important;
-  border-radius: 10px !important;
-  background: #fff !important;
-  transition: border-color 160ms ease, box-shadow 160ms ease;
-  outline: none !important;
-}
-
-.admin-scope .tk-card input::placeholder {
-  color: #94a3b8;
-}
-
-.admin-scope .tk-card input:focus,
-.admin-scope .tk-card select:focus {
-  border-color: #60a5fa !important;
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
-}
-
-/* Table aesthetic inside admin cards */
-.admin-scope .tk-card table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-}
-
-.admin-scope .tk-card thead th {
-  position: sticky;
-  top: 0;
-  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
-  color: #0f172a;
-  font-weight: 800;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.admin-scope .tk-card tbody tr {
-  transition: background-color 120ms ease;
-}
-
-.admin-scope .tk-card tbody tr:hover {
-  background-color: rgba(99, 102, 241, 0.06);
-}
-
-/* DataGrid tweaks scoped to tk-grid */
-.admin-scope .tk-grid .MuiDataGrid-columnHeaders {
-  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%) !important;
-  border-bottom: 1px solid #e5e7eb !important;
-}
-
-.admin-scope .tk-grid .MuiDataGrid-row:hover {
-  background-color: rgba(99, 102, 241, 0.06) !important;
-}
-
-.admin-scope .tk-grid .MuiDataGrid-cell,
-.admin-scope .tk-grid .MuiDataGrid-columnHeader {
-  border-right: 1px solid #e5e7eb;
-}
-
-.admin-scope .tk-grid .MuiDataGrid-cell:last-of-type,
-.admin-scope .tk-grid .MuiDataGrid-columnHeader:last-of-type {
-  border-right: none;
-}
-
-/* =========================
-   Auth forms: mobile-friendly full-width
-   ========================= */
-.auth-mobile-full {
-  width: 100%;
-}
-
-.auth-mobile-full .MuiFormControl-root,
-.auth-mobile-full .MuiTextField-root,
-.auth-mobile-full .MuiButton-root {
-  width: 100%;
-}
-
-@media (max-width: 600px) {
-  .auth-mobile-full {
-    padding: 0;
-  }
-  .auth-mobile-full .MuiButton-root {
-    min-height: 48px;
-    font-size: 1rem;
-  }
-  /* Avoid iOS zoom on focus by keeping font-size >= 16px */
-  .auth-mobile-full .MuiInputBase-input,
-  .auth-mobile-full .MuiSelect-select {
-    font-size: 16px;
-  }
-  /* Force role toggle buttons to stack on small screens */
-  .auth-mobile-full .MuiToggleButtonGroup-root .MuiToggleButton-root {
-    flex: 1 1 100%;
-  }
-}
-
-/* IMPORTANT:
-   Do NOT globally force all MUI Grid items to width:100%.
-   This breaks responsive grids (e.g., dashboards with xs=6, sm=4 etc.).
-   If a specific screen needs full-width enforcement, scope the CSS to that screen.
-*/

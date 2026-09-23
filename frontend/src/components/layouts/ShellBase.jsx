@@ -1,7 +1,8 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import NotificationsBell from "../NotificationsBell";
 import { useCartStore } from "../../store/cartStore";
+import { C, R, S } from "../../theme/tokens";
 
 const shellTokens = {
   bg: "#F5F7FA",
@@ -9,10 +10,31 @@ const shellTokens = {
   text: "#0f172a",
   muted: "#64748b",
   border: "#e2e8f0",
-  primary: "#2563eb",
+  primary: C.primary || "#2563eb",
   primarySoft: "rgba(37,99,235,0.08)",
   sidebar: "#F8FAFC",
   shadow: "0 14px 34px rgba(15,23,42,0.10)",
+};
+
+const ICON_COLORS = {
+  dashboard: { main: "#2563eb", bg: "#eff6ff" },
+  users: { main: "#7c3aed", bg: "#f5f3ff" },
+  tree: { main: "#16a34a", bg: "#f0fdf4" },
+  upload: { main: "#0284c7", bg: "#f0f9ff" },
+  shield: { main: "#059669", bg: "#ecfdf5" },
+  wallet: { main: "#ea580c", bg: "#fff7ed" },
+  ticket: { main: "#e11d48", bg: "#fff1f2" },
+  briefcase: { main: "#4f46e5", bg: "#eef2ff" },
+  chart: { main: "#0d9488", bg: "#f0fdfa" },
+  matrix5: { main: "#059669", bg: "#ecfdf5" },
+  matrix3: { main: "#059669", bg: "#ecfdf5" },
+  pool: { main: "#0284c7", bg: "#f0f9ff" },
+  box: { main: "#8b5cf6", bg: "#f5f3ff" },
+  image: { main: "#ec4899", bg: "#fdf2f8" },
+  orders: { main: "#d97706", bg: "#fffbeb" },
+  file: { main: "#2563eb", bg: "#eff6ff" },
+  star: { main: "#eab308", bg: "#fefce8" },
+  logout: { main: "#ef4444", bg: "#fef2f2" },
 };
 
 export default function ShellBase({
@@ -29,6 +51,20 @@ export default function ShellBase({
 }) {
   const loc = useLocation();
   const navigate = useNavigate();
+
+  const userInitials = useMemo(() => {
+    try {
+      const raw = localStorage.getItem("user_user") || sessionStorage.getItem("user_user");
+      const user = raw ? JSON.parse(raw) : {};
+      const name = String(user?.full_name || user?.username || title || "C").trim();
+      const parts = name.split(" ").filter(Boolean);
+      const a = parts[0]?.[0] || "C";
+      const b = parts.length > 1 ? parts[parts.length - 1]?.[0] : "";
+      return (a + b).toUpperCase();
+    } catch {
+      return "C";
+    }
+  }, [title]);
 
   // Responsive flags
   const [isMobile, setIsMobile] = useState(
@@ -71,134 +107,141 @@ export default function ShellBase({
   const activeCheck = useMemo(() => isActive || defaultIsActive, [isActive]);
 
   function Icon({ name, active }) {
-    const stroke = active ? shellTokens.primary : "#64748b";
-    const size = 18;
-    switch (name) {
-      case "dashboard":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="3" y="3" width="7" height="9" />
-            <rect x="14" y="3" width="7" height="5" />
-            <rect x="14" y="10" width="7" height="11" />
-            <rect x="3" y="14" width="7" height="7" />
-          </svg>
-        );
-      case "users":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" />
-            <circle cx="9" cy="7" r="4" />
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-          </svg>
-        );
-      case "tree":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M12 2v7" />
-            <circle cx="12" cy="11" r="2" />
-            <path d="M6 22v-6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v6" />
-          </svg>
-        );
-      case "upload":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="17 8 12 3 7 8" />
-            <line x1="12" y1="3" x2="12" y2="15" />
-          </svg>
-        );
-      case "shield":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-          </svg>
-        );
-      case "wallet":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="2" y="6" width="20" height="12" rx="2" />
-            <circle cx="16" cy="12" r="1.5" />
-          </svg>
-        );
-      case "ticket":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M3 9h18v6H3z" />
-            <path d="M7 9v6M17 9v6" />
-          </svg>
-        );
-      case "briefcase":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="3" y="7" width="18" height="14" rx="2" />
-            <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-          </svg>
-        );
-      case "chart":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <line x1="3" y1="21" x2="21" y2="21" />
-            <rect x="7" y="10" width="3" height="8" />
-            <rect x="12" y="6" width="3" height="12" />
-            <rect x="17" y="13" width="3" height="5" />
-          </svg>
-        );
-      case "matrix5":
-      case "matrix3":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <circle cx="12" cy="5" r="2" />
-            <circle cx="6" cy="12" r="2" />
-            <circle cx="18" cy="12" r="2" />
-            <path d="M12 7v3M10 12h4" />
-          </svg>
-        );
-      case "pool":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M2 18c2 1.5 4 1.5 6 0s4-1.5 6 0 4 1.5 6 0" />
-            <path d="M2 14c2 1.5 4 1.5 6 0s4-1.5 6 0 4 1.5 6 0" />
-          </svg>
-        );
-      case "box":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M21 16V8a2 2 0 0 0-1.2-1.8l-6-3a2 2 0 0 0-1.6 0l-6 3A2 2 0 0 0 5 8v8a2 2 0 0 0 1.2 1.8l6 3a2 2 0 0 0 1.6 0l6-3A2 2 0 0 0 21 16z" />
-            <path d="M3.3 7L12 12l8.7-5" />
-          </svg>
-        );
-      case "image":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <circle cx="8.5" cy="8.5" r="1.5" />
-            <path d="M21 15l-5-5L5 21" />
-          </svg>
-        );
-      case "orders":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="3" y="4" width="18" height="14" rx="2" />
-            <path d="M7 8h10M7 12h6" />
-          </svg>
-        );
-      case "file":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-            <polyline points="14 2 14 8 20 8" />
-          </svg>
-        );
-      case "star":
-        return (
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <polygon points="12 2 15 8.5 22 9.5 17 14 18.5 21 12 17.5 5.5 21 7 14 2 9.5 9 8.5" />
-          </svg>
-        );
-      default:
-        return null;
-    }
+    const colorInfo = ICON_COLORS[name] || { main: "#2563eb", bg: "#eff6ff" };
+    const stroke = active ? colorInfo.main : colorInfo.main;
+    const size = 17;
+
+    const renderSvg = () => {
+      switch (name) {
+        case "dashboard":
+          return (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="9" rx="1.5" />
+              <rect x="14" y="3" width="7" height="5" rx="1.5" />
+              <rect x="14" y="10" width="7" height="11" rx="1.5" />
+              <rect x="3" y="14" width="7" height="7" rx="1.5" />
+            </svg>
+          );
+        case "users":
+          return (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+          );
+        case "tree":
+          return (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2v7" />
+              <circle cx="12" cy="11" r="2.5" />
+              <path d="M6 22v-6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v6" />
+            </svg>
+          );
+        case "upload":
+          return (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+          );
+        case "shield":
+          return (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+          );
+        case "wallet":
+          return (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="6" width="20" height="12" rx="2.5" />
+              <circle cx="16" cy="12" r="1.5" />
+            </svg>
+          );
+        case "ticket":
+          return (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 9h18v6H3z" />
+              <path d="M7 9v6M17 9v6" />
+            </svg>
+          );
+        case "briefcase":
+          return (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="7" width="18" height="14" rx="2.5" />
+              <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+          );
+        case "chart":
+          return (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="21" x2="21" y2="21" />
+              <rect x="7" y="10" width="3" height="8" rx="0.75" />
+              <rect x="12" y="6" width="3" height="12" rx="0.75" />
+              <rect x="17" y="13" width="3" height="5" rx="0.75" />
+            </svg>
+          );
+        case "box":
+          return (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 16V8a2 2 0 0 0-1.2-1.8l-6-3a2 2 0 0 0-1.6 0l-6 3A2 2 0 0 0 5 8v8a2 2 0 0 0 1.2 1.8l6 3a2 2 0 0 0 1.6 0l6-3A2 2 0 0 0 21 16z" />
+              <path d="M3.3 7L12 12l8.7-5" />
+            </svg>
+          );
+        case "orders":
+          return (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="14" rx="2.5" />
+              <path d="M7 8h10M7 12h6" />
+            </svg>
+          );
+        case "file":
+          return (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+            </svg>
+          );
+        case "star":
+          return (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="12 2 15 8.5 22 9.5 17 14 18.5 21 12 17.5 5.5 21 7 14 2 9.5 9 8.5" />
+            </svg>
+          );
+        case "logout":
+          return (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+          );
+        default:
+          return null;
+      }
+    };
+
+    return (
+      <div
+        style={{
+          width: 30,
+          height: 30,
+          borderRadius: 9,
+          background: active ? colorInfo.bg : "rgba(241, 245, 249, 0.8)",
+          border: `1px solid ${active ? colorInfo.main + "40" : "transparent"}`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+          boxShadow: active ? `0 4px 10px ${colorInfo.main}22` : "none",
+          transition: "all 160ms ease",
+        }}
+      >
+        {renderSvg()}
+      </div>
+    );
   }
 
 
@@ -369,24 +412,30 @@ export default function ShellBase({
   {/* LEFT */}
   {isRootScreen ? (
     <button
-      aria-label="Toggle sidebar"
+      aria-label="Toggle sidebar menu"
       onClick={() => setSidebarOpen((v) => !v)}
       style={{
-        width: 34,
-        height: 34,
-        borderRadius: 14,
-        border: "1px solid rgba(226,232,240,0.92)",
-        background: "#ffffff",
-        boxShadow: "0 8px 18px rgba(15,23,42,0.06)",
+        width: 36,
+        height: 36,
+        borderRadius: "50%",
+        border: "2px solid #2563eb",
+        background: "linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #2563eb 100%)",
+        color: "#ffffff",
+        boxShadow: "0 6px 16px rgba(37,99,235,0.32)",
         cursor: "pointer",
         justifySelf: "start",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontWeight: 900,
+        fontSize: 13,
         transition: "transform 140ms ease, box-shadow 160ms ease",
       }}
-      onMouseDown={(e) => { try { e.currentTarget.style.transform = "scale(0.94)"; } catch {} }}
+      onMouseDown={(e) => { try { e.currentTarget.style.transform = "scale(0.92)"; } catch {} }}
       onMouseUp={(e) => { try { e.currentTarget.style.transform = "scale(1)"; } catch {} }}
       onMouseLeave={(e) => { try { e.currentTarget.style.transform = "scale(1)"; } catch {} }}
-      >
-      ☰
+    >
+      {userInitials}
     </button>
   ) : (
     <button
@@ -647,6 +696,34 @@ export default function ShellBase({
                     />
                   );
                 }
+                if (onLogout) {
+                  nodes.push(
+                    <button
+                      key="sidebar-logout-btn"
+                      onClick={onLogout}
+                      style={{
+                        marginTop: 14,
+                        marginBottom: 6,
+                        width: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "10px 14px",
+                        borderRadius: 12,
+                        border: "1px solid #fecaca",
+                        background: "#fef2f2",
+                        color: "#ef4444",
+                        fontWeight: 800,
+                        fontSize: 13.5,
+                        cursor: "pointer",
+                        transition: "all 140ms ease",
+                      }}
+                    >
+                      <Icon name="logout" active />
+                      <span>Logout</span>
+                    </button>
+                  );
+                }
                 return nodes;
               })()}
               </div>
@@ -685,7 +762,7 @@ export default function ShellBase({
             flex: 1,
             minWidth: 0,
             padding: isMobile ? 10 : 16,
-            paddingBottom: isMobile ? "max(12px, env(safe-area-inset-bottom))" : 16,
+            paddingBottom: isMobile ? "calc(74px + env(safe-area-inset-bottom))" : 16,
             marginLeft: isMobile ? 0 : (sidebarWidth + sidebarGap),
             width: "100%",
           }}
@@ -756,6 +833,215 @@ export default function ShellBase({
           </div>
         </main>
       </div>
+
+      {/* Mobile Bottom Navigation Dock */}
+      {isMobile ? (
+        <nav
+          aria-label="Mobile Bottom Navigation"
+          style={{
+            position: "fixed",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 1060,
+            background: C.bottomNavBg || "rgba(255, 255, 255, 0.94)",
+            backdropFilter: "blur(16px)",
+            WebkitBackdropFilter: "blur(16px)",
+            borderTop: `1px solid ${shellTokens.border}`,
+            boxShadow: S.bottomNavShadow || "0 -8px 30px rgba(15, 23, 42, 0.10)",
+            paddingTop: 6,
+            paddingBottom: "max(8px, env(safe-area-inset-bottom))",
+            paddingLeft: 8,
+            paddingRight: 8,
+          }}
+        >
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(5, 1fr)",
+              alignItems: "center",
+              maxWidth: 600,
+              margin: "0 auto",
+            }}
+          >
+            {/* 1. Dashboard */}
+            {(() => {
+              const dashPath = rootPathsList[0] || defaultRootPath || "/user/dashboard";
+              const active = activeCheck(dashPath, loc);
+              const color = active ? C.addMoney : "#64748b";
+              return (
+                <Link
+                  to={dashPath}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 3,
+                    textDecoration: "none",
+                    color,
+                    padding: "4px 0",
+                    transition: "transform 140ms ease",
+                  }}
+                  onMouseDown={(e) => { try { e.currentTarget.style.transform = "scale(0.92)"; } catch {} }}
+                  onMouseUp={(e) => { try { e.currentTarget.style.transform = "scale(1)"; } catch {} }}
+                  onMouseLeave={(e) => { try { e.currentTarget.style.transform = "scale(1)"; } catch {} }}
+                >
+                  <div style={{
+                    width: 36, height: 26, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center",
+                    background: active ? `${C.addMoney}15` : "transparent"
+                  }}>
+                    <Icon name="dashboard" active={active} />
+                  </div>
+                  <span style={{ fontSize: 10.5, fontWeight: active ? 800 : 600, lineHeight: 1 }}>Home</span>
+                </Link>
+              );
+            })()}
+
+            {/* 2. Team Wallet */}
+            {(() => {
+              const walletPath = "/user/team-wallet";
+              const active = activeCheck(walletPath, loc);
+              const color = active ? C.buyPackage : "#64748b";
+              return (
+                <Link
+                  to={walletPath}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 3,
+                    textDecoration: "none",
+                    color,
+                    padding: "4px 0",
+                    transition: "transform 140ms ease",
+                  }}
+                  onMouseDown={(e) => { try { e.currentTarget.style.transform = "scale(0.92)"; } catch {} }}
+                  onMouseUp={(e) => { try { e.currentTarget.style.transform = "scale(1)"; } catch {} }}
+                  onMouseLeave={(e) => { try { e.currentTarget.style.transform = "scale(1)"; } catch {} }}
+                >
+                  <div style={{
+                    width: 36, height: 26, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center",
+                    background: active ? `${C.buyPackage}15` : "transparent"
+                  }}>
+                    <Icon name="wallet" active={active} />
+                  </div>
+                  <span style={{ fontSize: 10.5, fontWeight: active ? 800 : 600, lineHeight: 1 }}>Wallet</span>
+                </Link>
+              );
+            })()}
+
+            {/* 3. Add Money */}
+            {(() => {
+              const addPath = "/user/upload-wallet";
+              const active = activeCheck(addPath, loc);
+              const color = active ? C.addMoney : "#64748b";
+              return (
+                <Link
+                  to={addPath}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 3,
+                    textDecoration: "none",
+                    color,
+                    padding: "4px 0",
+                    transition: "transform 140ms ease",
+                  }}
+                  onMouseDown={(e) => { try { e.currentTarget.style.transform = "scale(0.92)"; } catch {} }}
+                  onMouseUp={(e) => { try { e.currentTarget.style.transform = "scale(1)"; } catch {} }}
+                  onMouseLeave={(e) => { try { e.currentTarget.style.transform = "scale(1)"; } catch {} }}
+                >
+                  <div style={{
+                    width: 36, height: 26, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center",
+                    background: active ? `${C.addMoney}15` : "transparent"
+                  }}>
+                    <Icon name="upload" active={active} />
+                  </div>
+                  <span style={{ fontSize: 10.5, fontWeight: active ? 800 : 600, lineHeight: 1 }}>+ Money</span>
+                </Link>
+              );
+            })()}
+
+            {/* 4. Layer Blocks */}
+            {(() => {
+              const treePath = "/user/genealogy-5";
+              const active = activeCheck(treePath, loc);
+              const color = active ? C.blocks : "#64748b";
+              return (
+                <Link
+                  to={treePath}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 3,
+                    textDecoration: "none",
+                    color,
+                    padding: "4px 0",
+                    transition: "transform 140ms ease",
+                  }}
+                  onMouseDown={(e) => { try { e.currentTarget.style.transform = "scale(0.92)"; } catch {} }}
+                  onMouseUp={(e) => { try { e.currentTarget.style.transform = "scale(1)"; } catch {} }}
+                  onMouseLeave={(e) => { try { e.currentTarget.style.transform = "scale(1)"; } catch {} }}
+                >
+                  <div style={{
+                    width: 36, height: 26, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center",
+                    background: active ? `${C.blocks}15` : "transparent"
+                  }}>
+                    <Icon name="tree" active={active} />
+                  </div>
+                  <span style={{ fontSize: 10.5, fontWeight: active ? 800 : 600, lineHeight: 1 }}>Blocks</span>
+                </Link>
+              );
+            })()}
+
+            {/* 5. Menu Drawer */}
+            <button
+              onClick={() => setSidebarOpen((v) => !v)}
+              aria-label="Toggle Full Menu"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 3,
+                background: "transparent",
+                border: "none",
+                color: sidebarOpen ? C.menu : "#64748b",
+                padding: "4px 0",
+                cursor: "pointer",
+                transition: "transform 140ms ease",
+              }}
+              onMouseDown={(e) => { try { e.currentTarget.style.transform = "scale(0.92)"; } catch {} }}
+              onMouseUp={(e) => { try { e.currentTarget.style.transform = "scale(1)"; } catch {} }}
+              onMouseLeave={(e) => { try { e.currentTarget.style.transform = "scale(1)"; } catch {} }}
+            >
+              <div style={{
+                width: 26,
+                height: 26,
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: sidebarOpen ? "linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #2563eb 100%)" : "#cbd5e1",
+                color: sidebarOpen ? "#ffffff" : "#334155",
+                fontWeight: 900,
+                fontSize: 10.5,
+                boxShadow: sidebarOpen ? "0 4px 10px rgba(37,99,235,0.35)" : "none",
+                transition: "all 160ms ease",
+              }}>
+                {userInitials}
+              </div>
+              <span style={{ fontSize: 10.5, fontWeight: sidebarOpen ? 800 : 600, lineHeight: 1 }}>Menu</span>
+            </button>
+          </div>
+        </nav>
+      ) : null}
     </div>
   );
 }

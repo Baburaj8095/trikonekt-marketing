@@ -595,7 +595,7 @@ export default function ProgressTab({
               margin: "0 0 10px 0",
             }}
           >
-            5-Matrix ({fivePos.length})
+            5-Blocks ({fivePos.length})
           </p>
           {fivePos.length === 0 ? (
             <div
@@ -607,7 +607,7 @@ export default function ProgressTab({
                 marginBottom: 16,
               }}
             >
-              No 5-Matrix positions.
+              No 5-Blocks positions.
             </div>
           ) : (
             <div
@@ -624,7 +624,7 @@ export default function ProgressTab({
             </div>
           )}
 
-          {/* 3-Matrix */}
+          {/* 3-Blocks */}
           <p
             style={{
               fontSize: 11,
@@ -635,7 +635,7 @@ export default function ProgressTab({
               margin: "0 0 10px 0",
             }}
           >
-            3-Matrix ({threePos.length})
+            3-Blocks ({threePos.length})
           </p>
           {threePos.length === 0 ? (
             <div
@@ -646,7 +646,7 @@ export default function ProgressTab({
                 fontSize: 13,
               }}
             >
-              No 3-Matrix positions.
+              No 3-Blocks positions.
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

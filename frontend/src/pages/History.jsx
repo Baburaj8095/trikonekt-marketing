@@ -132,7 +132,7 @@ function describeSource(tx = {}) {
 
   // Prime self activations
   if (ot === "PRIME_150_SELF" || src === "PRIME_150_SELF" || type === "PRIME_150_SELF") return "Prime 150 Self Activation";
-  if (ot === "PRIME_750_SELF" || src === "PRIME_750_SELF" || type === "PRIME_750_SELF") return "Prime 750 Self Activation";
+  if (ot === "PRIME_750_SELF" || src === "PRIME_750_SELF" || type === "PRIME_750_SELF") return "Join Subscription (₹1,000)";
   if (ot === "PRIME_759_SELF" || src === "PRIME_759_SELF" || type === "PRIME_759_SELF") return "Prime 1000 Self Activation";
 
   // Monthly 759 flows
@@ -170,7 +170,7 @@ function describeSource(tx = {}) {
 
   // Prime direct/self
   if (src === "PRIME_150" || st === "PRIME_150" || tier === 150) return "Prime 150";
-  if (src === "PRIME_750" || st === "PRIME_750" || tier === 750) return "Prime 750";
+  if (src === "PRIME_750" || st === "PRIME_750" || tier === 750) return "Join Subscription (₹1,000)";
 
   // Fallback
   return humanizeType(type);
@@ -617,36 +617,32 @@ export default function History() {
   );
 
   const todaysEarnings = useMemo(() => {
-    const activeList = tab === 0 ? filteredMainWallet : (tab === 1 ? incomingGross : (tab === 2 ? selfAccount : (tab === 3 ? cashback : redeem)));
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
-    return activeList
+    return (mainWallet || [])
       .filter(tx => new Date(tx.created_at) >= startOfToday && Number(tx.amount) > 0)
       .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
-  }, [tab, filteredMainWallet, incomingGross, selfAccount, cashback, redeem]);
+  }, [mainWallet]);
 
   const yesterdaysEarnings = useMemo(() => {
-    const activeList = tab === 0 ? filteredMainWallet : (tab === 1 ? incomingGross : (tab === 2 ? selfAccount : (tab === 3 ? cashback : redeem)));
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
     const startOfYesterday = new Date(startOfToday);
     startOfYesterday.setDate(startOfYesterday.getDate() - 1);
     const endOfYesterday = new Date(startOfToday);
     endOfYesterday.setMilliseconds(-1);
-    return activeList
+    return (mainWallet || [])
       .filter(tx => {
         const txDate = new Date(tx.created_at);
         return txDate >= startOfYesterday && txDate <= endOfYesterday && Number(tx.amount) > 0;
       })
       .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
-  }, [tab, filteredMainWallet, incomingGross, selfAccount, cashback, redeem]);
+  }, [mainWallet]);
 
   const tabs = [
     { label: `Main Wallet (${filteredMainWallet.length})`, key: "main" },
     { label: `Bonus History (${filteredIncoming.length})`, key: "incoming" },
     { label: `Self Account (${filteredSelf.length})`, key: "self" },
-    { label: `Rewards (${filteredRewards.length})`, key: "rewards" },
-    { label: `Redeem (${filteredRedeem.length})`, key: "redeem" },
   ];
 
   return (
@@ -801,12 +797,6 @@ export default function History() {
           value={`₹ ${fmtAmount(top.self_account_balance)}`}
           icon={<AccountBalanceWalletIcon fontSize="small" />}
           color="warning"
-        />
-        <MiniCard
-          title="Redeem Points"
-          value={`${fmtAmount(top.redeem_points)} pts`}
-          icon={<RedeemIcon fontSize="small" />}
-          color="secondary"
         />
       </Box>
 

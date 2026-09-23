@@ -1,61 +1,72 @@
-﻿import React from "react";
+import React from "react";
 import { ThemeProvider as MuiThemeProvider, createTheme } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
+import { C, R, S, T } from "./tokens";
 
 /**
- * Global MUI theme
- * - Unifies font
+ * Global MUI Theme
+ * - Unified typography (Inter / Poppins)
  * - Fintech-grade mobile-first surfaces and controls
- * - Keeps admin grids/dialogs on clean white surfaces
- * - Light UI background consistent with role shells
+ * - Strict adherence to the Trikonekt Modern UI Design System
  */
 const theme = createTheme({
   palette: {
     mode: "light",
     primary: {
-      main: "#2563eb",
-      dark: "#1d4ed8",
-      light: "#dbeafe",
+      main: C.primary,
+      dark: C.primaryDark,
+      light: C.primaryLight,
       contrastText: "#ffffff",
     },
     secondary: {
-      main: "#0f766e",
+      main: C.secondary,
       contrastText: "#ffffff",
     },
     success: {
-      main: "#16a34a",
+      main: C.success,
+      light: C.successBg,
     },
     warning: {
-      main: "#f59e0b",
+      main: C.warning,
+      light: C.warningBg,
     },
     error: {
-      main: "#dc2626",
+      main: C.error,
+      light: C.errorBg,
     },
     background: {
-      default: "#F5F7FA",
-      paper: "#ffffff",
+      default: C.bg,
+      paper: C.surface,
     },
     text: {
-      primary: "#0f172a",
-      secondary: "#64748b",
+      primary: C.text,
+      secondary: C.textSec,
+      disabled: C.textMuted,
     },
-    divider: "#e2e8f0",
+    divider: C.border,
+  },
+  shape: {
+    borderRadius: R.md,
   },
   typography: {
-    fontFamily:
-      'Inter, Manrope, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Noto Sans", "Segoe UI Emoji"',
+    fontFamily: T.fontFamily,
     fontSize: 14,
     allVariants: {
       letterSpacing: 0,
     },
+    h1: { fontSize: "32px", fontWeight: 700, color: C.text },
+    h2: { fontSize: "24px", fontWeight: 600, color: C.text },
+    h3: { fontSize: "20px", fontWeight: 600, color: C.text },
+    h4: { fontSize: "18px", fontWeight: 600, color: C.text },
+    h5: { fontSize: "16px", fontWeight: 600, color: C.text },
+    h6: { fontSize: "15px", fontWeight: 600, color: C.text },
+    body1: { fontSize: "15px", fontWeight: 400, color: C.text },
+    body2: { fontSize: "13.5px", fontWeight: 400, color: C.textSec },
     button: {
       textTransform: "none",
-      fontWeight: 700,
+      fontWeight: 600,
+      fontSize: "14px",
     },
-    h5: { fontWeight: 800 },
-    h6: { fontWeight: 800 },
-    subtitle1: { fontWeight: 600 },
-    subtitle2: { fontWeight: 600 },
   },
   components: {
     MuiCssBaseline: {
@@ -66,8 +77,8 @@ const theme = createTheme({
           scrollBehavior: "smooth",
         },
         body: {
-          color: "#0f172a",
-          background: "#F5F7FA",
+          color: C.text,
+          background: C.bg,
           WebkitFontSmoothing: "antialiased",
           MozOsxFontSmoothing: "grayscale",
           overscrollBehaviorY: "none",
@@ -77,8 +88,8 @@ const theme = createTheme({
           scrollbarColor: "#cbd5e1 transparent",
         },
         "*::-webkit-scrollbar": {
-          width: 8,
-          height: 8,
+          width: 6,
+          height: 6,
         },
         "*::-webkit-scrollbar-thumb": {
           background: "#cbd5e1",
@@ -87,172 +98,124 @@ const theme = createTheme({
       },
     },
 
-    // Set fullWidth by default for inputs and form controls
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          backgroundImage: "none",
+          backgroundColor: C.surface,
+        },
+        rounded: {
+          borderRadius: R.card,
+        },
+        elevation0: {
+          boxShadow: "none",
+        },
+        elevation1: {
+          boxShadow: S.cardShadow,
+        },
+      },
+    },
+
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          borderRadius: R.card,
+          border: `1px solid ${C.border}`,
+          boxShadow: S.cardShadow,
+          backgroundColor: C.surface,
+        },
+      },
+    },
+
+    MuiButton: {
+      defaultProps: {
+        disableElevation: true,
+      },
+      styleOverrides: {
+        root: {
+          borderRadius: R.button,
+          fontWeight: 600,
+          minHeight: 44,
+          padding: "8px 18px",
+          letterSpacing: 0,
+          transition: "transform 140ms ease, box-shadow 160ms ease, background-color 160ms ease",
+          "&:active": {
+            transform: "scale(0.985)",
+          },
+        },
+        containedPrimary: {
+          backgroundColor: C.primary,
+          color: "#ffffff",
+          "&:hover": {
+            backgroundColor: C.primaryDark,
+          },
+          "&.Mui-disabled": {
+            backgroundColor: "#E2E8F0",
+            color: "#94A3B8",
+          },
+        },
+        outlinedPrimary: {
+          borderColor: C.border,
+          color: C.primary,
+          "&:hover": {
+            borderColor: C.primaryBorder,
+            backgroundColor: C.primaryLight,
+          },
+        },
+        textPrimary: {
+          color: C.primary,
+          "&:hover": {
+            backgroundColor: C.primaryLight,
+          },
+        },
+      },
+    },
+
+    MuiDialog: {
+      styleOverrides: {
+        paper: {
+          backgroundColor: C.surface,
+          borderRadius: R.modal,
+          boxShadow: S.floatingShadow,
+        },
+      },
+    },
+
     MuiTextField: {
       defaultProps: {
         fullWidth: true,
       },
     },
+
     MuiFormControl: {
       defaultProps: {
         fullWidth: true,
       },
     },
 
-    // Buttons: colorful & professional primary by default
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          borderRadius: 14,
-          fontWeight: 800,
-          minHeight: 44,
-          padding: "9px 16px",
-          letterSpacing: 0,
-          transition: "transform 140ms ease, box-shadow 180ms ease, background-color 180ms ease",
-          "&:active": {
-            transform: "scale(0.985)",
-          },
-        },
-        containedPrimary: {
-          backgroundImage: "linear-gradient(135deg, #2563eb 0%, #0f766e 100%)",
-          color: "#ffffff",
-          boxShadow: "0 12px 24px rgba(37,99,235,0.22)",
-          "&:hover": {
-            backgroundImage: "linear-gradient(135deg, #1d4ed8 0%, #0f766e 100%)",
-            boxShadow: "0 16px 30px rgba(37,99,235,0.26)",
-          },
-          "&:active": {
-            boxShadow: "0 6px 10px rgba(2,132,199,0.22)",
-          },
-          "&.Mui-disabled": {
-            color: "rgba(255,255,255,0.7)",
-          },
-        },
-        outlinedPrimary: {
-          borderColor: "rgba(37,99,235,0.32)",
-          color: "#1d4ed8",
-          "&:hover": {
-            borderColor: "rgba(37,99,235,0.58)",
-            backgroundColor: "rgba(37,99,235,0.06)",
-          },
-        },
-        textPrimary: {
-          color: "#1d4ed8",
-          "&:hover": {
-            backgroundColor: "rgba(37,99,235,0.06)",
-          },
-        },
-      },
-    },
-
-    // Ensure Dialog paper (Create/Edit) is white
-    MuiDialog: {
-      styleOverrides: {
-        paper: {
-          backgroundColor: "#ffffff",
-          borderRadius: 22,
-          boxShadow: "0 24px 80px rgba(15,23,42,0.22)",
-        },
-      },
-    },
-
-    // Ensure text inputs render on white, including disabled/readonly
     MuiOutlinedInput: {
       styleOverrides: {
         root: {
-          backgroundColor: "#ffffff",
-          borderRadius: 14,
+          backgroundColor: C.surface,
+          borderRadius: R.button,
           transition: "box-shadow 160ms ease, border-color 160ms ease",
-          "&.Mui-disabled": {
-            backgroundColor: "#ffffff",
-            WebkitTextFillColor: "#0f172a",
-          },
           "& .MuiOutlinedInput-notchedOutline": {
-            borderColor: "#e2e8f0",
+            borderColor: C.border,
           },
           "&:hover .MuiOutlinedInput-notchedOutline": {
-            borderColor: "#bfdbfe",
+            borderColor: C.primaryBorder,
           },
           "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-            borderColor: "#2563eb",
+            borderColor: C.primary,
             borderWidth: 1.5,
-            boxShadow: "0 0 0 4px rgba(37,99,235,0.10)",
           },
-          "&.Mui-disabled .MuiOutlinedInput-notchedOutline": {
-            borderColor: "#e5e7eb",
+          "&.Mui-disabled": {
+            backgroundColor: C.surfaceSubtle,
           },
         },
         input: {
-          padding: "12px 14px",
-          "&.Mui-disabled": {
-            WebkitTextFillColor: "#0f172a",
-          },
-        },
-      },
-    },
-
-    // Ensure Select uses white input surface as well
-    MuiSelect: {
-      styleOverrides: {
-        select: {
-          backgroundColor: "#ffffff",
-        },
-        outlined: {
-          backgroundColor: "#ffffff",
-        },
-      },
-    },
-
-    // Cards and surfaces: rounded + soft shadows for uniform ecommerce look
-    MuiPaper: {
-      styleOverrides: {
-        root: {
-          borderRadius: 16,
-          backgroundColor: "#ffffff",
-        },
-      },
-    },
-    MuiCard: {
-      styleOverrides: {
-        root: {
-          borderRadius: 16,
-          overflow: "hidden",
-          transition: "box-shadow 200ms ease, transform 180ms ease, border-color 180ms ease",
-          boxShadow: "0 12px 28px rgba(15,23,42,0.07), 0 1px 2px rgba(15,23,42,0.04)",
-          border: "1px solid rgba(226,232,240,0.86)",
-          "&:hover": {
-            boxShadow: "0 18px 46px rgba(15,23,42,0.11), 0 3px 6px rgba(15,23,42,0.06)",
-            transform: "translateY(-1px)",
-          },
-        },
-      },
-    },
-
-    MuiDrawer: {
-      styleOverrides: {
-        paper: {
-          backgroundImage: "none",
-          WebkitOverflowScrolling: "touch",
-        },
-      },
-    },
-
-    MuiDialogTitle: {
-      styleOverrides: {
-        root: {
-          fontWeight: 900,
-          color: "#0f172a",
-          lineHeight: 1.2,
-        },
-      },
-    },
-
-    MuiDialogActions: {
-      styleOverrides: {
-        root: {
-          padding: "12px 16px 16px",
-          gap: 8,
-          flexWrap: "wrap",
+          padding: "11px 14px",
+          fontSize: "14px",
         },
       },
     },
@@ -260,87 +223,12 @@ const theme = createTheme({
     MuiChip: {
       styleOverrides: {
         root: {
-          borderRadius: 999,
-          fontWeight: 800,
+          fontWeight: 600,
+          borderRadius: R.pill,
         },
-      },
-    },
-
-    MuiTabs: {
-      styleOverrides: {
-        root: {
-          minHeight: 44,
-        },
-        indicator: {
-          height: 3,
-          borderRadius: 999,
-        },
-      },
-    },
-
-    MuiTab: {
-      styleOverrides: {
-        root: {
-          minHeight: 44,
-          textTransform: "none",
-          fontWeight: 800,
-          color: "#64748b",
-          "&.Mui-selected": {
-            color: "#1d4ed8",
-          },
-        },
-      },
-    },
-
-    MuiTableCell: {
-      styleOverrides: {
-        head: {
-          color: "#334155",
-          fontWeight: 900,
-          backgroundColor: "#f8fafc",
-          borderBottom: "1px solid #e2e8f0",
-        },
-        body: {
-          borderBottom: "1px solid #eef2f7",
-        },
-      },
-    },
-
-    MuiSkeleton: {
-      styleOverrides: {
-        root: {
-          backgroundColor: "rgba(226,232,240,0.72)",
-          "&::after": {
-            background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.58), transparent)",
-          },
-        },
-      },
-    },
-
-    // DataGrid: force clean white tables in admin
-    // (requires @mui/x-data-grid)
-    MuiDataGrid: {
-      styleOverrides: {
-        root: {
-          backgroundColor: "#ffffff",
-          // Force all internal layers to white
-          "& .MuiDataGrid-main": { backgroundColor: "#ffffff" },
-          "& .MuiDataGrid-columnHeaders": { backgroundColor: "#ffffff" },
-          "& .MuiDataGrid-virtualScroller": { backgroundColor: "#ffffff" },
-          "& .MuiDataGrid-virtualScrollerContent": { backgroundColor: "#ffffff" },
-          "& .MuiDataGrid-virtualScrollerRenderZone": { backgroundColor: "#ffffff" },
-          "& .MuiDataGrid-row": { backgroundColor: "#ffffff" },
-          "& .MuiDataGrid-cell": { backgroundColor: "#ffffff" },
-          "& .MuiDataGrid-footerContainer": { backgroundColor: "#ffffff" },
-          "& .MuiDataGrid-overlay": { backgroundColor: "#ffffff" },
-          "& .MuiDataGrid-filler": { backgroundColor: "#ffffff" },
-          // Keep hover/selected rows untinted
-          "& .MuiDataGrid-row:hover": { backgroundColor: "#ffffff" },
-          "& .MuiDataGrid-row.Mui-hover": { backgroundColor: "#ffffff" },
-          "& .MuiDataGrid-row.Mui-selected": { backgroundColor: "#ffffff" },
-          "& .MuiDataGrid-row.Mui-selected:hover": { backgroundColor: "#ffffff" },
-          // Remove any gradients that might tint layers
-          "& *": { backgroundImage: "none" },
+        sizeSmall: {
+          height: 24,
+          fontSize: "11px",
         },
       },
     },
@@ -355,3 +243,4 @@ export default function ThemeProvider({ children }) {
     </MuiThemeProvider>
   );
 }
+export { theme };

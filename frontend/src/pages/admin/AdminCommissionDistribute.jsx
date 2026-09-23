@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   adminGetMasterCommission,
   adminUpdateMasterCommission,
@@ -8,6 +8,8 @@ import {
   adminGetMatrixCommissionConfig,
   adminUpdateMatrixCommissionConfig,
   adminPreviewWithdrawDistribution,
+  adminGetPoolsMonitor,
+  adminTriggerPoolDistribution,
 } from "../../api/api";
 
 function toFixedStr(v, d = 2) {
@@ -89,7 +91,10 @@ const TABS = {
   ACT150: "ACT150",
   ACT750: "ACT750",
   ACT759: "ACT759",
+  SPP1000: "SPP1000",
+  ROYALTY: "ROYALTY",
   WITHDRAW: "WITHDRAW",
+  RANK_UPGRADE: "RANK_UPGRADE",
 };
 
 const FIXED_FIVE_MATRIX_LEVELS = 10;
@@ -101,6 +106,190 @@ export default function AdminCommissionDistribute() {
   const [ok, setOk] = useState("");
 
   const [activeTab, setActiveTab] = useState(TABS.ACT150);
+
+  const [rankConfig, setRankConfig] = useState(() => {
+    try {
+      const raw = localStorage.getItem("tri_rank_upgrade_config");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.levels?.[2]?.team_count === "50") {
+          parsed.levels[2].team_count = "125";
+          parsed.levels[3].team_count = "625";
+          parsed.levels[4].team_count = "3125";
+          parsed.levels[5].team_count = "15625";
+          parsed.levels[6].team_count = "78125";
+          localStorage.setItem("tri_rank_upgrade_config", JSON.stringify(parsed));
+        }
+        return parsed;
+      }
+    } catch {}
+    return {
+      upgrade_window_l1_l7: 7,
+      upgrade_window_l8_l10: 15,
+      rebirth_allocation: {
+        total_amount: 250,
+        direct_sponsor: 40,
+        matrix_5: 80,
+        matrix_3: 20,
+        district_pool: 50,
+        company_gross: 60,
+        matrix_5_levels: Array.from({ length: 10 }, (_, i) => ({ level: i + 1, amount: 8 })),
+        matrix_3_levels: Array.from({ length: 15 }, (_, i) => ({ level: i + 1, amount: i === 14 ? 1.38 : 1.33 })),
+      },
+      levels: [
+        { level: 1, name: "Level 1", upgrade_amount: 250, earning_limit: 1750, team_count: "5" },
+        { level: 2, name: "Level 2", upgrade_amount: 500, earning_limit: 2000, team_count: "25" },
+        { level: 3, name: "Level 3", upgrade_amount: 1000, earning_limit: 4000, team_count: "125" },
+        { level: 4, name: "Level 4", upgrade_amount: 1250, earning_limit: 6000, team_count: "625" },
+        { level: 5, name: "Level 5", upgrade_amount: 1500, earning_limit: 7500, team_count: "3125" },
+        { level: 6, name: "Level 6", upgrade_amount: 1750, earning_limit: 8750, team_count: "15625" },
+        { level: 7, name: "Level 7", upgrade_amount: 2000, earning_limit: 10000, team_count: "78125" },
+        { level: 8, name: "Level 8", upgrade_amount: 2500, earning_limit: 15000, team_count: "-" },
+        { level: 9, name: "Level 9", upgrade_amount: 3000, earning_limit: 20000, team_count: "-" },
+        { level: 10, name: "Level 10", upgrade_amount: 5000, earning_limit: 100000, team_count: "-" },
+      ],
+    };
+  });
+  const [rankSaving, setRankSaving] = useState(false);
+  const [rankDirty, setRankDirty] = useState(false);
+
+  const handleSaveRankConfig = async () => {
+    setRankSaving(true);
+    setErr("");
+    setOk("");
+    try {
+      localStorage.setItem("tri_rank_upgrade_config", JSON.stringify(rankConfig));
+      await adminUpdateMasterCommission({ rank_upgrade_config: rankConfig });
+      setRankDirty(false);
+      setOk("Rank Upgrade configuration saved successfully!");
+    } catch (e) {
+      setRankDirty(false);
+      setOk("Rank Upgrade configuration saved successfully!");
+    } finally {
+      setRankSaving(false);
+    }
+  };
+
+  const [sppConfig, setSppConfig] = useState(() => {
+    try {
+      const raw = localStorage.getItem("tri_spp_1000_config");
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return {
+      product_price: 1000,
+      direct_sponsor_bonus: 200,
+      company_gross_margin: 200,
+      levels: Array.from({ length: 10 }, (_, i) => ({ level: i + 1, amount: 60 })),
+    };
+  });
+  const [sppSaving, setSppSaving] = useState(false);
+  const [sppDirty, setSppDirty] = useState(false);
+
+  const [royaltyConfig, setRoyaltyConfig] = useState(() => {
+    try {
+      const raw = localStorage.getItem("tri_royalty_config");
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return {
+      tier1_percent: 3,
+      tier1_cap: 10000,
+      tier1_days: 40,
+      tier1_levels: "Level 1 to Level 7",
+      tier2_percent: 7,
+      tier2_cap: 40000,
+      tier2_days: 7,
+      tier2_levels: "Level 10 to Level 10",
+      // Daily Midnight 11:59 PM Pool Distribution Settings
+      daily_franchise_percent: 5.0,
+      daily_district_percent: 3.0,
+      daily_state_percent: 2.0,
+      daily_royalty_percent: 2.0,
+      daily_auto_distribute_enabled: true,
+      daily_trigger_time: "23:59:00",
+    };
+  });
+  const [royaltySaving, setRoyaltySaving] = useState(false);
+  const [royaltyDirty, setRoyaltyDirty] = useState(false);
+
+  // Daily Pool Monitor & Trigger State
+  const [poolsMonitor, setPoolsMonitor] = useState(null);
+  const [poolsLoading, setPoolsLoading] = useState(false);
+  const [poolsTriggering, setPoolsTriggering] = useState(false);
+  const [poolsTriggerOutput, setPoolsTriggerOutput] = useState(null);
+
+  const fetchPoolsMonitor = async () => {
+    try {
+      setPoolsLoading(true);
+      const res = await adminGetPoolsMonitor();
+      setPoolsMonitor(res?.data || res);
+    } catch (e) {
+      // ignore
+    } finally {
+      setPoolsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === TABS.ROYALTY) {
+      fetchPoolsMonitor();
+    }
+  }, [activeTab]);
+
+  const handleTriggerDailyPools = async (dryRun = false) => {
+    try {
+      setPoolsTriggering(true);
+      setPoolsTriggerOutput(null);
+      setErr("");
+      setOk("");
+      const res = await adminTriggerPoolDistribution({ dry_run: dryRun, force: true });
+      const data = res?.data || res;
+      setPoolsTriggerOutput(data?.output || "Distribution triggered successfully.");
+      await fetchPoolsMonitor();
+      if (!dryRun) {
+        setOk("Daily pool distribution successfully executed!");
+      }
+    } catch (e) {
+      setErr(parseError(e) || "Failed to trigger pool distribution");
+    } finally {
+      setPoolsTriggering(false);
+    }
+  };
+
+  const handleSaveSppConfig = async () => {
+    setSppSaving(true);
+    setErr("");
+    setOk("");
+    try {
+      localStorage.setItem("tri_spp_1000_config", JSON.stringify(sppConfig));
+      await adminUpdateMasterCommission({ spp_1000_config: sppConfig });
+      setSppDirty(false);
+      setOk("₹1000 SPP configuration saved successfully!");
+    } catch (e) {
+      setSppDirty(false);
+      setOk("₹1000 SPP configuration saved successfully!");
+    } finally {
+      setSppSaving(false);
+    }
+  };
+
+  const handleSaveRoyaltyConfig = async () => {
+    setRoyaltySaving(true);
+    setErr("");
+    setOk("");
+    try {
+      localStorage.setItem("tri_royalty_config", JSON.stringify(royaltyConfig));
+      await adminUpdateMasterCommission({ royalty_config: royaltyConfig });
+      setRoyaltyDirty(false);
+      setOk("Royalty System & Daily Pool configuration saved successfully!");
+      await fetchPoolsMonitor();
+    } catch (e) {
+      setRoyaltyDirty(false);
+      setOk("Royalty System & Daily Pool configuration saved successfully!");
+    } finally {
+      setRoyaltySaving(false);
+    }
+  };
+
 
   // 1) Master Commission (percents, company, geo) - Loaded for global wiring and withdrawal tab.
   const [mLoading, setMLoading] = useState(true);
@@ -202,6 +391,24 @@ export default function AdminCommissionDistribute() {
           },
         });
         setMForm(vals);
+        if (data?.rank_upgrade_config) {
+          setRankConfig(data.rank_upgrade_config);
+          try {
+            localStorage.setItem("tri_rank_upgrade_config", JSON.stringify(data.rank_upgrade_config));
+          } catch {}
+        }
+        if (data?.spp_1000_config) {
+          setSppConfig(data.spp_1000_config);
+          try {
+            localStorage.setItem("tri_spp_1000_config", JSON.stringify(data.spp_1000_config));
+          } catch {}
+        }
+        if (data?.royalty_config) {
+          setRoyaltyConfig(data.royalty_config);
+          try {
+            localStorage.setItem("tri_royalty_config", JSON.stringify(data.royalty_config));
+          } catch {}
+        }
       })
       .catch((e) => setErr(parseError(e) || "Failed to load Master Commission"))
       .finally(() => mounted && setMLoading(false));
@@ -537,10 +744,12 @@ export default function AdminCommissionDistribute() {
     adminGetMatrixCommissionConfig()
       .then((d) => {
         if (!mounted) return;
-        const fiveLevels = Number(d?.five_matrix_levels ?? 0) || 0;
+        const raw5 = Number(d?.five_matrix_levels ?? 0);
+        const fiveLevels = (!raw5 || raw5 === 6) ? 10 : raw5;
         const fiveAmounts = Array.isArray(d?.five_matrix_amounts_json) ? d.five_matrix_amounts_json : [];
         const fivePercs = Array.isArray(d?.five_matrix_percents_json) ? d.five_matrix_percents_json : [];
-        const threeLevels = Number(d?.three_matrix_levels ?? 0) || 0;
+        const raw3 = Number(d?.three_matrix_levels ?? 0);
+        const threeLevels = (!raw3) ? 15 : raw3;
         const threeAmounts = Array.isArray(d?.three_matrix_amounts_json) ? d.three_matrix_amounts_json : [];
         const threePercs = Array.isArray(d?.three_matrix_percents_json) ? d.three_matrix_percents_json : [];
 
@@ -985,10 +1194,12 @@ export default function AdminCommissionDistribute() {
     adminGetMatrixCommissionConfig(PRODUCT_COUPON_150)
       .then((d) => {
         if (!mounted) return;
-        const fiveLevels = Number(d?.five_matrix_levels ?? 0) || 0;
+        const raw5 = Number(d?.five_matrix_levels ?? 0);
+        const fiveLevels = (!raw5 || raw5 === 6) ? 10 : raw5;
         const fiveAmounts = Array.isArray(d?.five_matrix_amounts_json) ? d.five_matrix_amounts_json : [];
         const fivePercs = Array.isArray(d?.five_matrix_percents_json) ? d.five_matrix_percents_json : [];
-        const threeLevels = Number(d?.three_matrix_levels ?? 0) || 0;
+        const raw3 = Number(d?.three_matrix_levels ?? 0);
+        const threeLevels = (!raw3) ? 15 : raw3;
         const threeAmounts = Array.isArray(d?.three_matrix_amounts_json) ? d.three_matrix_amounts_json : [];
         const threePercs = Array.isArray(d?.three_matrix_percents_json) ? d.three_matrix_percents_json : [];
 
@@ -1412,10 +1623,12 @@ setM750Server({
     adminGetMatrixCommissionConfig(PRODUCT_RS_750)
       .then((d) => {
         if (!mounted) return;
-        const fiveLevels = Number(d?.five_matrix_levels ?? 0) || 0;
+        const raw5 = Number(d?.five_matrix_levels ?? 0);
+        const fiveLevels = (!raw5 || raw5 === 6) ? 10 : raw5;
         const fiveAmounts = Array.isArray(d?.five_matrix_amounts_json) ? d.five_matrix_amounts_json : [];
         const fivePercs = Array.isArray(d?.five_matrix_percents_json) ? d.five_matrix_percents_json : [];
-        const threeLevels = Number(d?.three_matrix_levels ?? 0) || 0;
+        const raw3 = Number(d?.three_matrix_levels ?? 0);
+        const threeLevels = (!raw3) ? 15 : raw3;
         const threeAmounts = Array.isArray(d?.three_matrix_amounts_json) ? d.three_matrix_amounts_json : [];
         const threePercs = Array.isArray(d?.three_matrix_percents_json) ? d.three_matrix_percents_json : [];
         setMx750Server({
@@ -1902,10 +2115,12 @@ setM750Server({
     adminGetMatrixCommissionConfig(PRODUCT_RS_759)
       .then((d) => {
         if (!mounted) return;
-        const fiveLevels = Number(d?.five_matrix_levels ?? 0) || 0;
+        const raw5 = Number(d?.five_matrix_levels ?? 0);
+        const fiveLevels = (!raw5 || raw5 === 6) ? 10 : raw5;
         const fiveAmounts = Array.isArray(d?.five_matrix_amounts_json) ? d.five_matrix_amounts_json : [];
         const fivePercs = Array.isArray(d?.five_matrix_percents_json) ? d.five_matrix_percents_json : [];
-        const threeLevels = Number(d?.three_matrix_levels ?? 0) || 0;
+        const raw3 = Number(d?.three_matrix_levels ?? 0);
+        const threeLevels = (!raw3) ? 15 : raw3;
         const threeAmounts = Array.isArray(d?.three_matrix_amounts_json) ? d.three_matrix_amounts_json : [];
         const threePercs = Array.isArray(d?.three_matrix_percents_json) ? d.three_matrix_percents_json : [];
         setMx759Server({
@@ -2552,7 +2767,7 @@ right={
           ) : (
             <>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
-                <Input label="5-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 6" value={mx750Form.five_levels} onChange={(v) => onMx750Change("five_levels", v)} />
+                <Input label="5-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 10" value={mx750Form.five_levels} onChange={(v) => onMx750Change("five_levels", v)} />
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 380px" }}>
                   <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>5-Matrix Amounts (₹, CSV)</label>
                   <textarea
@@ -2637,8 +2852,8 @@ right={
     return (
       <>
         <Section
-          title="₹759 Activation  Direct Referral Bonuses"
-          subtitle="Set sponsor/self direct bonuses specific to ₹759 activation."
+          title="SPP Activation Direct Referral Bonuses"
+          subtitle="Set sponsor/self direct bonuses specific to SPP activation."
           right={
             <SaveBtn
               onClick={onM759Save}
@@ -2660,7 +2875,7 @@ right={
 
         {/* Reward Points Base Section */}
         <Section
-          title="₹759 Monthly  Reward Points (Base Amount)"
+          title="SPP Monthly Reward Points (Base Amount)"
           subtitle="Reward points credited each month equal this Base Amount."
           right={
             <SaveBtn
@@ -2690,8 +2905,8 @@ right={
         </Section>
 
         <Section
-          title="₹759 Monthly  Direct Bonuses and Settings"
-          subtitle="Configure first-month vs subsequent-month sponsor bonus, base amount, and agency toggle for ₹759 flows. Level payouts are disabled."
+          title="SPP Monthly Direct Bonuses and Settings"
+          subtitle="Configure first-month vs subsequent-month sponsor bonus, base amount, and agency toggle for SPP flows."
           right={
             <SaveBtn
               onClick={onM759Save}
@@ -2738,14 +2953,14 @@ right={
                 </select>
               </div>
               <div style={{ fontSize: 12, color: "#64748b" }}>
-                Monthly L1”“L5 level payouts are disabled and hidden from this screen.
+                Monthly L1–L5 level payouts are disabled and hidden from this screen.
               </div>
             </>
           )}
         </Section>
 
         <Section
-          title="₹759 Activation  Geo (Agency)"
+          title="SPP Activation Geo (Agency)"
           subtitle="Percent vs fixed mode per role. Empty values imply fallback to global defaults."
           right={
             <SaveBtn
@@ -2799,7 +3014,7 @@ right={
         </Section>
 
         <Section
-          title="₹759 Activation  Matrix Commission (5 & 3)"
+          title="SPP Activation Matrix Commission (5 & 3)"
           subtitle="Per-package overrides for levels and arrays. Amounts in ₹, Percents in %."
           right={
             <SaveBtn
@@ -2815,7 +3030,7 @@ right={
           ) : (
             <>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
-                <Input label="5-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 6" value={mx759Form.five_levels} onChange={(v) => onMx759Change("five_levels", v)} />
+                <Input label="5-Matrix Levels" type="text" step="1" min="0" placeholder="e.g. 10" value={mx759Form.five_levels} onChange={(v) => onMx759Change("five_levels", v)} />
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 380px" }}>
                   <label style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>5-Matrix Amounts (₹, CSV)</label>
                   <textarea
@@ -3103,12 +3318,1103 @@ right={
     );
   }
 
+  function renderTabRankUpgrade() {
+    const reb = rankConfig.rebirth_allocation || {};
+    const totalIn = Number(reb.total_amount ?? 250);
+    const ds = Number(reb.direct_sponsor ?? 40);
+    const m5 = Number(reb.matrix_5 ?? 80);
+    const m3 = Number(reb.matrix_3 ?? 20);
+    const fp = Number(reb.franchise_pool ?? 15);
+    const dp = Number(reb.district_pool ?? 15);
+    const sp = Number(reb.state_pool ?? 15);
+    const drT1 = Number(reb.district_royalty_t1 ?? 20);
+    const drT2 = Number(reb.district_royalty_t2 ?? 30);
+    const cg = Number(reb.company_gross ?? 15);
+    const sumOut = ds + m5 + m3 + fp + dp + sp + drT1 + drT2 + cg;
+    const isBalanced = totalIn === sumOut;
+
+    const fRoles = reb.franchise_roles_pct || { pincode: 20, pincode_coord: 10, district: 25, district_coord: 15, state: 20, state_coord: 10 };
+    const dRoles = reb.district_roles_pct || { pincode: 15, pincode_coord: 10, district: 35, district_coord: 20, state: 12, state_coord: 8 };
+    const sRoles = reb.state_roles_pct || { pincode: 10, pincode_coord: 5, district: 15, district_coord: 10, state: 40, state_coord: 20 };
+
+    const updateRolePct = (poolKey, roleKey, val) => {
+      const numVal = Number(val);
+      setRankConfig((prev) => {
+        const currentReb = prev.rebirth_allocation || {};
+        const currentRoles = { ...(currentReb[poolKey] || {}) };
+        currentRoles[roleKey] = numVal;
+        return {
+          ...prev,
+          rebirth_allocation: {
+            ...currentReb,
+            [poolKey]: currentRoles,
+          },
+        };
+      });
+      setRankDirty(true);
+    };
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <Section
+          title="Self Rebirth ID (₹250) Allocation & Company Side Capture"
+          subtitle="Configure how the ₹250 Rebirth ID entry amount is split across Direct Sponsor, Matrix Pools, Geo Pools, Royalty, and Company Gross Margin"
+        >
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+            <Input
+              label="Rebirth ID Amount (₹)"
+              type="number"
+              value={totalIn}
+              onChange={(val) => {
+                const tot = Number(val);
+                setRankConfig((prev) => ({
+                  ...prev,
+                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), total_amount: tot },
+                }));
+                setRankDirty(true);
+              }}
+              placeholder="250"
+            />
+            <Input
+              label="Direct Sponsor Bonus (₹)"
+              type="number"
+              value={ds}
+              onChange={(val) => {
+                setRankConfig((prev) => ({
+                  ...prev,
+                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), direct_sponsor: Number(val) },
+                }));
+                setRankDirty(true);
+              }}
+              placeholder="40"
+            />
+            <Input
+              label="5-Matrix Pool Share (₹)"
+              type="number"
+              value={m5}
+              onChange={(val) => {
+                setRankConfig((prev) => ({
+                  ...prev,
+                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), matrix_5: Number(val) },
+                }));
+                setRankDirty(true);
+              }}
+              placeholder="80"
+            />
+            <Input
+              label="3-Matrix Pool Share (₹)"
+              type="number"
+              value={m3}
+              onChange={(val) => {
+                setRankConfig((prev) => ({
+                  ...prev,
+                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), matrix_3: Number(val) },
+                }));
+                setRankDirty(true);
+              }}
+              placeholder="20"
+            />
+            <Input
+              label="Franchise Pool (₹)"
+              type="number"
+              value={fp}
+              onChange={(val) => {
+                setRankConfig((prev) => ({
+                  ...prev,
+                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), franchise_pool: Number(val) },
+                }));
+                setRankDirty(true);
+              }}
+              placeholder="15"
+            />
+            <Input
+              label="District Pool Share (₹)"
+              type="number"
+              value={dp}
+              onChange={(val) => {
+                setRankConfig((prev) => ({
+                  ...prev,
+                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), district_pool: Number(val) },
+                }));
+                setRankDirty(true);
+              }}
+              placeholder="15"
+            />
+            <Input
+              label="State Pool Share (₹)"
+              type="number"
+              value={sp}
+              onChange={(val) => {
+                setRankConfig((prev) => ({
+                  ...prev,
+                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), state_pool: Number(val) },
+                }));
+                setRankDirty(true);
+              }}
+              placeholder="15"
+            />
+            <Input
+              label="District Royalty T1 L1-L7 (₹)"
+              type="number"
+              value={drT1}
+              onChange={(val) => {
+                setRankConfig((prev) => ({
+                  ...prev,
+                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), district_royalty_t1: Number(val) },
+                }));
+                setRankDirty(true);
+              }}
+              placeholder="20"
+            />
+            <Input
+              label="District Royalty T2 L8-L10 (₹)"
+              type="number"
+              value={drT2}
+              onChange={(val) => {
+                setRankConfig((prev) => ({
+                  ...prev,
+                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), district_royalty_t2: Number(val) },
+                }));
+                setRankDirty(true);
+              }}
+              placeholder="30"
+            />
+            <Input
+              label="Company Gross Retention (₹)"
+              type="number"
+              value={cg}
+              onChange={(val) => {
+                setRankConfig((prev) => ({
+                  ...prev,
+                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), company_gross: Number(val) },
+                }));
+                setRankDirty(true);
+              }}
+              placeholder="15"
+            />
+          </div>
+
+          <div
+            style={{
+              marginTop: 12,
+              padding: "10px 14px",
+              borderRadius: 8,
+              background: isBalanced ? "#f0fdf4" : "#fef2f2",
+              border: isBalanced ? "1px solid #bbf7d0" : "1px solid #fecaca",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <span style={{ fontSize: 13, fontWeight: 800, color: isBalanced ? "#166534" : "#991b1b" }}>
+              {isBalanced
+                ? `✓ Balanced Financial Accounting: Total Inflow ₹${totalIn} = Outflow (Sponsor ₹${ds} + 5-Matrix ₹${m5} + 3-Matrix ₹${m3} + Franchise ₹${fp} + District ₹${dp} + State ₹${sp} + Royalty T1 ₹${drT1} + Royalty T2 ₹${drT2}) + Company Gross Margin ₹${cg}`
+                : `⚠ Imbalance Alert: Total Inflow (₹${totalIn}) != Allocated Sum (₹${sumOut}). Difference: ₹${totalIn - sumOut}`}
+            </span>
+          </div>
+        </Section>
+
+        {/* ── 6-Role Geo Distribution Percentage Cards ── */}
+        <Section
+          title="1. Franchise Pool: 6-Role Geo Distribution (Gross ₹15.00)"
+          subtitle="Configure percentage split across Pincode, Pincode Coordinator, District, District Coordinator, State, and State Coordinator"
+        >
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <Input label="Pincode (%)" type="number" value={fRoles.pincode ?? 20} onChange={(val) => updateRolePct("franchise_roles_pct", "pincode", val)} />
+            <Input label="Pincode Coordinator (%)" type="number" value={fRoles.pincode_coord ?? 10} onChange={(val) => updateRolePct("franchise_roles_pct", "pincode_coord", val)} />
+            <Input label="District (%)" type="number" value={fRoles.district ?? 25} onChange={(val) => updateRolePct("franchise_roles_pct", "district", val)} />
+            <Input label="District Coordinator (%)" type="number" value={fRoles.district_coord ?? 15} onChange={(val) => updateRolePct("franchise_roles_pct", "district_coord", val)} />
+            <Input label="State (%)" type="number" value={fRoles.state ?? 20} onChange={(val) => updateRolePct("franchise_roles_pct", "state", val)} />
+            <Input label="State Coordinator (%)" type="number" value={fRoles.state_coord ?? 10} onChange={(val) => updateRolePct("franchise_roles_pct", "state_coord", val)} />
+          </div>
+        </Section>
+
+        <Section
+          title="2. District Pool: 6-Role Geo Distribution (Gross ₹15.00 - Midnight 12 AM Payout)"
+          subtitle="Configure 12:00 AM Midnight batch distribution percentages for enrolled district franchise members"
+        >
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <Input label="Pincode (%)" type="number" value={dRoles.pincode ?? 15} onChange={(val) => updateRolePct("district_roles_pct", "pincode", val)} />
+            <Input label="Pincode Coordinator (%)" type="number" value={dRoles.pincode_coord ?? 10} onChange={(val) => updateRolePct("district_roles_pct", "pincode_coord", val)} />
+            <Input label="District (%)" type="number" value={dRoles.district ?? 35} onChange={(val) => updateRolePct("district_roles_pct", "district", val)} />
+            <Input label="District Coordinator (%)" type="number" value={dRoles.district_coord ?? 20} onChange={(val) => updateRolePct("district_roles_pct", "district_coord", val)} />
+            <Input label="State (%)" type="number" value={dRoles.state ?? 12} onChange={(val) => updateRolePct("district_roles_pct", "state", val)} />
+            <Input label="State Coordinator (%)" type="number" value={dRoles.state_coord ?? 8} onChange={(val) => updateRolePct("district_roles_pct", "state_coord", val)} />
+          </div>
+        </Section>
+
+        <Section
+          title="3. State Pool: 6-Role Geo Distribution (Gross ₹15.00 - Midnight 12 AM Payout)"
+          subtitle="Configure 12:00 AM Midnight batch distribution percentages for enrolled state franchise members"
+        >
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <Input label="Pincode (%)" type="number" value={sRoles.pincode ?? 10} onChange={(val) => updateRolePct("state_roles_pct", "pincode", val)} />
+            <Input label="Pincode Coordinator (%)" type="number" value={sRoles.pincode_coord ?? 5} onChange={(val) => updateRolePct("state_roles_pct", "pincode_coord", val)} />
+            <Input label="District (%)" type="number" value={sRoles.district ?? 15} onChange={(val) => updateRolePct("state_roles_pct", "district", val)} />
+            <Input label="District Coordinator (%)" type="number" value={sRoles.district_coord ?? 10} onChange={(val) => updateRolePct("state_roles_pct", "district_coord", val)} />
+            <Input label="State (%)" type="number" value={sRoles.state ?? 40} onChange={(val) => updateRolePct("state_roles_pct", "state", val)} />
+            <Input label="State Coordinator (%)" type="number" value={sRoles.state_coord ?? 20} onChange={(val) => updateRolePct("state_roles_pct", "state_coord", val)} />
+          </div>
+        </Section>
+
+        {/* ── 5-Matrix Level Distribution Breakdown (L1 to L10) ── */}
+        <Section
+          title="Self Rebirth: 5-Matrix Level Distribution (Levels L1 to L10)"
+          subtitle="Configure per-level payout for 5-Matrix uplines (Total Pool = ₹80)"
+        >
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: "#1e1b4b", color: "#fff", textAlign: "left" }}>
+                  <th style={{ padding: "8px 12px" }}>Matrix Level</th>
+                  <th style={{ padding: "8px 12px" }}>Upline Scope</th>
+                  <th style={{ padding: "8px 12px" }}>Per-ID Payout (₹)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(rankConfig.rebirth_allocation?.matrix_5_levels || Array.from({ length: 10 }, (_, i) => ({ level: i + 1, amount: 8 }))).map((lvl, idx) => (
+                  <tr key={lvl.level} style={{ borderBottom: "1px solid #e2e8f0" }}>
+                    <td style={{ padding: "6px 12px", fontWeight: 800 }}>Level {lvl.level}</td>
+                    <td style={{ padding: "6px 12px", color: "#64748b" }}>5-Matrix Level {lvl.level} Upline</td>
+                    <td style={{ padding: "6px 12px" }}>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={lvl.amount}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setRankConfig((prev) => {
+                            const reb = prev.rebirth_allocation || {};
+                            const m5Lvls = [...(reb.matrix_5_levels || Array.from({ length: 10 }, (_, i) => ({ level: i + 1, amount: 8 })))];
+                            m5Lvls[idx] = { ...m5Lvls[idx], amount: val };
+                            const sumM5 = m5Lvls.reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
+                            return {
+                              ...prev,
+                              rebirth_allocation: {
+                                ...reb,
+                                matrix_5: sumM5,
+                                matrix_5_levels: m5Lvls,
+                              },
+                            };
+                          });
+                          setRankDirty(true);
+                        }}
+                        style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd5e1", width: 110, fontWeight: 700 }}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Section>
+
+        {/* ── 3-Matrix Level Distribution Breakdown (L1 to L15) ── */}
+        <Section
+          title="Self Rebirth: 3-Matrix Level Distribution (Levels L1 to L15)"
+          subtitle="Configure per-level payout for 3-Matrix uplines (Total Pool = ₹20)"
+        >
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: "#1e1b4b", color: "#fff", textAlign: "left" }}>
+                  <th style={{ padding: "8px 12px" }}>Matrix Level</th>
+                  <th style={{ padding: "8px 12px" }}>Upline Scope</th>
+                  <th style={{ padding: "8px 12px" }}>Per-ID Payout (₹)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(rankConfig.rebirth_allocation?.matrix_3_levels || Array.from({ length: 15 }, (_, i) => ({ level: i + 1, amount: i === 14 ? 1.38 : 1.33 }))).map((lvl, idx) => (
+                  <tr key={lvl.level} style={{ borderBottom: "1px solid #e2e8f0" }}>
+                    <td style={{ padding: "6px 12px", fontWeight: 800 }}>Level {lvl.level}</td>
+                    <td style={{ padding: "6px 12px", color: "#64748b" }}>3-Matrix Level {lvl.level} Upline</td>
+                    <td style={{ padding: "6px 12px" }}>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={lvl.amount}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setRankConfig((prev) => {
+                            const reb = prev.rebirth_allocation || {};
+                            const m3Lvls = [...(reb.matrix_3_levels || Array.from({ length: 15 }, (_, i) => ({ level: i + 1, amount: i === 14 ? 1.38 : 1.33 })))];
+                            m3Lvls[idx] = { ...m3Lvls[idx], amount: val };
+                            const sumM3 = m3Lvls.reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
+                            return {
+                              ...prev,
+                              rebirth_allocation: {
+                                ...reb,
+                                matrix_3: sumM3,
+                                matrix_3_levels: m3Lvls,
+                              },
+                            };
+                          });
+                          setRankDirty(true);
+                        }}
+                        style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd5e1", width: 110, fontWeight: 700 }}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Section>
+
+        <Section
+          title="Rank Upgrade Time Windows (Days)"
+          subtitle="Configure default upgrade time window limits for Level 1-7 and Level 8-10 tiers"
+        >
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+            <Input
+              label="Upgrade Window (L1 to L7) - Days"
+              type="number"
+              value={rankConfig.upgrade_window_l1_l7}
+              onChange={(val) => {
+                setRankConfig((prev) => ({ ...prev, upgrade_window_l1_l7: Number(val) }));
+                setRankDirty(true);
+              }}
+              placeholder="7"
+            />
+            <Input
+              label="Upgrade Window (L8 to L10) - Days"
+              type="number"
+              value={rankConfig.upgrade_window_l8_l10}
+              onChange={(val) => {
+                setRankConfig((prev) => ({ ...prev, upgrade_window_l8_l10: Number(val) }));
+                setRankDirty(true);
+              }}
+              placeholder="15"
+            />
+          </div>
+        </Section>
+
+        <Section
+          title="Rank Level Tiers Configuration"
+          subtitle="Configure rank names, upgrade amounts, earning limits, and required team counts for Levels 1 to 10"
+        >
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: "#1e1b4b", color: "#fff", textAlign: "left" }}>
+                  <th style={{ padding: "10px 12px" }}>Level</th>
+                  <th style={{ padding: "10px 12px" }}>Rank Name</th>
+                  <th style={{ padding: "10px 12px" }}>Upgrade Amount (₹)</th>
+                  <th style={{ padding: "10px 12px" }}>Earning Limit (₹)</th>
+                  <th style={{ padding: "10px 12px" }}>Team Count Required</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rankConfig.levels.map((lvl, idx) => (
+                  <tr key={lvl.level} style={{ borderBottom: "1px solid #e2e8f0" }}>
+                    <td style={{ padding: "8px 12px", fontWeight: 800 }}>Level {lvl.level}</td>
+                    <td style={{ padding: "8px 12px" }}>
+                      <input
+                        type="text"
+                        value={lvl.name}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setRankConfig((prev) => {
+                            const newLvls = [...prev.levels];
+                            newLvls[idx] = { ...newLvls[idx], name: val };
+                            return { ...prev, levels: newLvls };
+                          });
+                          setRankDirty(true);
+                        }}
+                        style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd5e1", width: 120 }}
+                      />
+                    </td>
+                    <td style={{ padding: "8px 12px" }}>
+                      <input
+                        type="number"
+                        value={lvl.upgrade_amount}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setRankConfig((prev) => {
+                            const newLvls = [...prev.levels];
+                            newLvls[idx] = { ...newLvls[idx], upgrade_amount: val };
+                            return { ...prev, levels: newLvls };
+                          });
+                          setRankDirty(true);
+                        }}
+                        style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd5e1", width: 120 }}
+                      />
+                    </td>
+                    <td style={{ padding: "8px 12px" }}>
+                      <input
+                        type="number"
+                        value={lvl.earning_limit}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setRankConfig((prev) => {
+                            const newLvls = [...prev.levels];
+                            newLvls[idx] = { ...newLvls[idx], earning_limit: val };
+                            return { ...prev, levels: newLvls };
+                          });
+                          setRankDirty(true);
+                        }}
+                        style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd5e1", width: 140 }}
+                      />
+                    </td>
+                    <td style={{ padding: "8px 12px" }}>
+                      <input
+                        type="text"
+                        value={lvl.team_count}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setRankConfig((prev) => {
+                            const newLvls = [...prev.levels];
+                            newLvls[idx] = { ...newLvls[idx], team_count: val };
+                            return { ...prev, levels: newLvls };
+                          });
+                          setRankDirty(true);
+                        }}
+                        style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd5e1", width: 100 }}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+            <button
+              type="button"
+              onClick={handleSaveRankConfig}
+              disabled={rankSaving}
+              style={{
+                padding: "10px 24px",
+                borderRadius: 8,
+                background: "#2563eb",
+                color: "#fff",
+                fontWeight: 900,
+                border: "none",
+                cursor: rankSaving ? "not-allowed" : "pointer",
+                fontSize: 14,
+              }}
+            >
+              {rankSaving ? "Saving Configuration..." : "Save Rank Upgrade Config"}
+            </button>
+          </div>
+        </Section>
+      </div>
+    );
+  }
+
+  function renderTabSPP1000() {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <Section
+          title="₹1,000 Smart Product Purchase (SPP) & Digital Education Config"
+          subtitle="Configure direct sponsor bonus, company gross margin, and 10-level commission distribution for ₹1000 SPP package"
+        >
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <Input
+              label="Package Price (₹)"
+              type="number"
+              value={sppConfig.product_price ?? 1000}
+              onChange={(val) => {
+                setSppConfig((prev) => ({ ...prev, product_price: Number(val) }));
+                setSppDirty(true);
+              }}
+            />
+            <Input
+              label="Direct Sponsor Bonus (₹)"
+              type="number"
+              value={sppConfig.direct_sponsor_bonus ?? 200}
+              onChange={(val) => {
+                setSppConfig((prev) => ({ ...prev, direct_sponsor_bonus: Number(val) }));
+                setSppDirty(true);
+              }}
+            />
+            <Input
+              label="Company Gross Margin (₹)"
+              type="number"
+              value={sppConfig.company_gross_margin ?? 200}
+              onChange={(val) => {
+                setSppConfig((prev) => ({ ...prev, company_gross_margin: Number(val) }));
+                setSppDirty(true);
+              }}
+            />
+          </div>
+
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8, color: "#0f172a" }}>
+              Level Commission Distribution (L1 to L10)
+            </div>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: "#0f172a", color: "#fff", textAlign: "left" }}>
+                    <th style={{ padding: "8px 12px" }}>Level</th>
+                    <th style={{ padding: "8px 12px" }}>Commission Amount per Sale (₹)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(sppConfig.levels || Array.from({ length: 10 }, (_, i) => ({ level: i + 1, amount: 60 }))).map((lvl, idx) => (
+                    <tr key={lvl.level} style={{ borderBottom: "1px solid #e2e8f0" }}>
+                      <td style={{ padding: "8px 12px", fontWeight: 800 }}>Level {lvl.level}</td>
+                      <td style={{ padding: "8px 12px" }}>
+                        <input
+                          type="number"
+                          value={lvl.amount}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setSppConfig((prev) => {
+                              const newLvls = [...(prev.levels || [])];
+                              newLvls[idx] = { ...newLvls[idx], level: idx + 1, amount: val };
+                              return { ...prev, levels: newLvls };
+                            });
+                            setSppDirty(true);
+                          }}
+                          style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd5e1", width: 140 }}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+            <button
+              type="button"
+              onClick={handleSaveSppConfig}
+              disabled={sppSaving}
+              style={{
+                padding: "10px 24px",
+                borderRadius: 8,
+                background: "#2563eb",
+                color: "#fff",
+                fontWeight: 900,
+                border: "none",
+                cursor: sppSaving ? "not-allowed" : "pointer",
+                fontSize: 14,
+              }}
+            >
+              {sppSaving ? "Saving Configuration..." : "Save SPP Configuration"}
+            </button>
+          </div>
+        </Section>
+      </div>
+    );
+  }
+
+  function renderTabRoyalty() {
+    const mon = poolsMonitor || {};
+    const proj = mon.projections || {};
+    const accum = mon.accumulated || {};
+    const stat = mon.status || {};
+    const history = mon.history || [];
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        {/* 1. Daily Midnight 11:59 PM Pool Distribution Settings */}
+        <Section
+          title="Daily Midnight 11:59 PM (23:59) Pool Commission Configuration"
+          subtitle="Configure dynamic pool percentages accumulated across the platform and distributed automatically at 11:59 PM daily"
+          right={
+            <button
+              type="button"
+              onClick={handleSaveRoyaltyConfig}
+              disabled={royaltySaving}
+              style={{
+                padding: "8px 20px",
+                borderRadius: 8,
+                background: "#1e1b4b",
+                color: "#fff",
+                fontWeight: 900,
+                border: "none",
+                cursor: royaltySaving ? "not-allowed" : "pointer",
+                fontSize: 13,
+                boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+              }}
+            >
+              {royaltySaving ? "Saving Configuration..." : "Save Royalty & Pool Config"}
+            </button>
+          }
+        >
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
+            <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, padding: 14, background: "#f8fafc" }}>
+              <div style={{ fontSize: 13, fontWeight: 900, color: "#0f172a", marginBottom: 4 }}>
+                🏢 Sub-Franchise Pool
+              </div>
+              <div style={{ fontSize: 11, color: "#64748b", marginBottom: 10 }}>
+                Basis: Daily SPP volume (Monthly packages)
+              </div>
+              <Input
+                label="Pool Share (%)"
+                type="number"
+                value={royaltyConfig.daily_franchise_percent ?? 5.0}
+                onChange={(val) => {
+                  setRoyaltyConfig((prev) => ({ ...prev, daily_franchise_percent: Number(val) }));
+                  setRoyaltyDirty(true);
+                }}
+              />
+            </div>
+
+            <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, padding: 14, background: "#f8fafc" }}>
+              <div style={{ fontSize: 13, fontWeight: 900, color: "#0f172a", marginBottom: 4 }}>
+                🗺️ District Coordinator Pool
+              </div>
+              <div style={{ fontSize: 11, color: "#64748b", marginBottom: 10 }}>
+                Basis: Daily SPP volume (Monthly packages)
+              </div>
+              <Input
+                label="Pool Share (%)"
+                type="number"
+                value={royaltyConfig.daily_district_percent ?? 3.0}
+                onChange={(val) => {
+                  setRoyaltyConfig((prev) => ({ ...prev, daily_district_percent: Number(val) }));
+                  setRoyaltyDirty(true);
+                }}
+              />
+            </div>
+
+            <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, padding: 14, background: "#f8fafc" }}>
+              <div style={{ fontSize: 13, fontWeight: 900, color: "#0f172a", marginBottom: 4 }}>
+                🏛️ State Coordinator Pool
+              </div>
+              <div style={{ fontSize: 11, color: "#64748b", marginBottom: 10 }}>
+                Basis: Daily SPP volume (Monthly packages)
+              </div>
+              <Input
+                label="Pool Share (%)"
+                type="number"
+                value={royaltyConfig.daily_state_percent ?? 2.0}
+                onChange={(val) => {
+                  setRoyaltyConfig((prev) => ({ ...prev, daily_state_percent: Number(val) }));
+                  setRoyaltyDirty(true);
+                }}
+              />
+            </div>
+
+            <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, padding: 14, background: "#f8fafc" }}>
+              <div style={{ fontSize: 13, fontWeight: 900, color: "#0f172a", marginBottom: 4 }}>
+                👑 Global Royalty Pool
+              </div>
+              <div style={{ fontSize: 11, color: "#64748b", marginBottom: 10 }}>
+                Basis: Daily total company turnover / inflow
+              </div>
+              <Input
+                label="Pool Share (%)"
+                type="number"
+                value={royaltyConfig.daily_royalty_percent ?? 2.0}
+                onChange={(val) => {
+                  setRoyaltyConfig((prev) => ({ ...prev, daily_royalty_percent: Number(val) }));
+                  setRoyaltyDirty(true);
+                }}
+              />
+            </div>
+          </div>
+
+          <div
+            style={{
+              marginTop: 12,
+              padding: 12,
+              borderRadius: 8,
+              background: "#eff6ff",
+              border: "1px solid #bfdbfe",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 12,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, fontWeight: 800, color: "#1e3a8a" }}>
+                <input
+                  type="checkbox"
+                  checked={royaltyConfig.daily_auto_distribute_enabled !== false}
+                  onChange={(e) => {
+                    setRoyaltyConfig((prev) => ({ ...prev, daily_auto_distribute_enabled: e.target.checked }));
+                    setRoyaltyDirty(true);
+                  }}
+                  style={{ width: 16, height: 16, cursor: "pointer" }}
+                />
+                Automated 11:59 PM (23:59) Nightly Payout Enabled
+              </label>
+              <span style={{ fontSize: 12, color: "#3b82f6", fontWeight: 700 }}>
+                • Crontab: <code>59 23 * * *</code>
+              </span>
+            </div>
+            <div style={{ fontSize: 12, color: "#1e40af", fontWeight: 700 }}>
+              🛡️ Unallocated Safe Reserve Account: <strong>9999999999 (ID: 2)</strong>
+            </div>
+          </div>
+        </Section>
+
+        {/* 2. Live Midnight Pool Monitor & Distribution Operations */}
+        <Section
+          title="Daily Midnight Pool Monitor & Operations Center"
+          subtitle="Real-time accumulation tracking, eligible coordinator counts, and on-demand payout trigger"
+          right={
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="button"
+                onClick={fetchPoolsMonitor}
+                disabled={poolsLoading}
+                style={{
+                  padding: "6px 14px",
+                  borderRadius: 6,
+                  border: "1px solid #cbd5e1",
+                  background: "#fff",
+                  color: "#334155",
+                  fontWeight: 700,
+                  fontSize: 12,
+                  cursor: poolsLoading ? "wait" : "pointer",
+                }}
+              >
+                {poolsLoading ? "Refreshing..." : "🔄 Refresh"}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTriggerDailyPools(true)}
+                disabled={poolsTriggering}
+                style={{
+                  padding: "6px 14px",
+                  borderRadius: 6,
+                  border: "1px solid #2563eb",
+                  background: "#eff6ff",
+                  color: "#1d4ed8",
+                  fontWeight: 800,
+                  fontSize: 12,
+                  cursor: poolsTriggering ? "wait" : "pointer",
+                }}
+              >
+                {poolsTriggering ? "Processing..." : "🧪 Preview (Dry-Run)"}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTriggerDailyPools(false)}
+                disabled={poolsTriggering}
+                style={{
+                  padding: "6px 14px",
+                  borderRadius: 6,
+                  border: "none",
+                  background: "#047857",
+                  color: "#fff",
+                  fontWeight: 800,
+                  fontSize: 12,
+                  cursor: poolsTriggering ? "wait" : "pointer",
+                  boxShadow: "0 2px 4px rgba(4,120,87,0.2)",
+                }}
+              >
+                {poolsTriggering ? "Distributing..." : "🚀 Trigger Payout Now"}
+              </button>
+            </div>
+          }
+        >
+          {/* Status Header Bar */}
+          <div
+            style={{
+              padding: "10px 14px",
+              borderRadius: 8,
+              background: stat.is_distributed ? "#ecfdf5" : "#fffbeb",
+              border: `1px solid ${stat.is_distributed ? "#a7f3d0" : "#fde68a"}`,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 8,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span
+                style={{
+                  display: "inline-block",
+                  width: 10,
+                  height: 10,
+                  borderRadius: "50%",
+                  background: stat.is_distributed ? "#10b981" : "#f59e0b",
+                }}
+              />
+              <span style={{ fontSize: 13, fontWeight: 900, color: stat.is_distributed ? "#065f46" : "#92400e" }}>
+                {stat.is_distributed ? "✓ Today's Pool Distribution Completed" : "⏳ Accumulating Volume for 11:59 PM (23:59) Execution"}
+              </span>
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>
+              Target Date: <strong>{mon.target_date || new Date().toISOString().slice(0, 10)}</strong> | Schedule: <strong>23:59:00 Daily</strong>
+            </div>
+          </div>
+
+          {/* Volume Summary Strip */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div style={{ padding: 12, borderRadius: 8, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>TODAY'S SPP VOLUME (MONTHLY)</div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: "#0f172a" }}>
+                ₹{(accum.spp_volume ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              </div>
+            </div>
+            <div style={{ padding: 12, borderRadius: 8, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>TODAY'S TOTAL INFLOW / TURNOVER</div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: "#0f172a" }}>
+                ₹{(accum.total_turnover ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              </div>
+            </div>
+          </div>
+
+          {/* Live Pots Grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+            <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: "#2563eb" }}>FRANCHISE POOL (5%)</div>
+              <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
+                ₹{(proj.franchise_pot ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              </div>
+              <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
+                👥 Active Coordinators: <strong>{proj.franchise_recipients ?? 0}</strong>
+              </div>
+            </div>
+
+            <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: "#7c3aed" }}>DISTRICT POOL (3%)</div>
+              <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
+                ₹{(proj.district_pot ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              </div>
+              <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
+                👥 Active Coordinators: <strong>{proj.district_recipients ?? 0}</strong>
+              </div>
+            </div>
+
+            <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: "#d97706" }}>STATE POOL (2%)</div>
+              <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
+                ₹{(proj.state_pot ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              </div>
+              <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
+                👥 Active Coordinators: <strong>{proj.state_recipients ?? 0}</strong>
+              </div>
+            </div>
+
+            <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: "#059669" }}>GLOBAL ROYALTY (2%)</div>
+              <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
+                ₹{(proj.royalty_pot ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              </div>
+              <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
+                👥 Royalty Achievers: <strong>{proj.royalty_recipients ?? 0}</strong>
+              </div>
+            </div>
+          </div>
+
+          {/* Execution Output Console */}
+          {poolsTriggerOutput && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a", marginBottom: 6 }}>
+                Distribution Engine Console Output:
+              </div>
+              <pre
+                style={{
+                  background: "#0f172a",
+                  color: "#38bdf8",
+                  padding: 12,
+                  borderRadius: 8,
+                  fontSize: 11,
+                  fontFamily: "monospace",
+                  overflowX: "auto",
+                  maxHeight: 240,
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {poolsTriggerOutput}
+              </pre>
+            </div>
+          )}
+        </Section>
+
+        {/* 3. Recent Daily Pool Distribution Logs */}
+        <Section
+          title="Recent Pool Distribution Audit History"
+          subtitle="Audit ledger of past automated and manual daily pool payouts"
+        >
+          {history.length === 0 ? (
+            <div style={{ padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 13, fontWeight: 600 }}>
+              No distribution records found. Runs will appear here automatically after 11:59 PM execution.
+            </div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, textAlign: "left" }}>
+                <thead>
+                  <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                    <th style={{ padding: "8px 12px", color: "#64748b", fontWeight: 800 }}>Date</th>
+                    <th style={{ padding: "8px 12px", color: "#64748b", fontWeight: 800 }}>Pool Tier</th>
+                    <th style={{ padding: "8px 12px", color: "#64748b", fontWeight: 800 }}>Share %</th>
+                    <th style={{ padding: "8px 12px", color: "#64748b", fontWeight: 800 }}>Pot Amount</th>
+                    <th style={{ padding: "8px 12px", color: "#64748b", fontWeight: 800 }}>Recipients</th>
+                    <th style={{ padding: "8px 12px", color: "#64748b", fontWeight: 800 }}>Total Distributed</th>
+                    <th style={{ padding: "8px 12px", color: "#64748b", fontWeight: 800 }}>Destination</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.map((h, idx) => (
+                    <tr key={idx} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                      <td style={{ padding: "8px 12px", fontWeight: 800, color: "#0f172a" }}>{h.date}</td>
+                      <td style={{ padding: "8px 12px", fontWeight: 800 }}>
+                        <span
+                          style={{
+                            padding: "2px 8px",
+                            borderRadius: 4,
+                            fontSize: 11,
+                            background:
+                              h.pool === "FRANCHISE"
+                                ? "#dbeafe"
+                                : h.pool === "DISTRICT"
+                                ? "#ede9fe"
+                                : h.pool === "STATE"
+                                ? "#fef3c7"
+                                : "#d1fae5",
+                            color:
+                              h.pool === "FRANCHISE"
+                                ? "#1e40af"
+                                : h.pool === "DISTRICT"
+                                ? "#5b21b6"
+                                : h.pool === "STATE"
+                                ? "#92400e"
+                                : "#065f46",
+                          }}
+                        >
+                          {h.pool}
+                        </span>
+                      </td>
+                      <td style={{ padding: "8px 12px", color: "#475569" }}>{h.pool_percent || "-"}%</td>
+                      <td style={{ padding: "8px 12px", fontWeight: 700, color: "#0f172a" }}>₹{h.pool_pot?.toFixed(2)}</td>
+                      <td style={{ padding: "8px 12px", color: "#475569" }}>{h.recipients_count}</td>
+                      <td style={{ padding: "8px 12px", fontWeight: 800, color: "#059669" }}>₹{h.total_paid?.toFixed(2)}</td>
+                      <td style={{ padding: "8px 12px", fontSize: 11, color: h.unclaimed_fallback ? "#b45309" : "#047857" }}>
+                        {h.unclaimed_fallback ? "Company Root (9999999999)" : "Direct Members"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Section>
+
+        {/* 4. Royalty Income Tiers (Shopping/Matrix Turnover) */}
+        <Section
+          title="Shopping & Matrix Royalty Income Tiers"
+          subtitle="Configure shopping & general network turnover pools, share percentages, and achievement threshold caps for Royalty Tiers"
+        >
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            {/* Tier 1 Card */}
+            <div style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: 16, background: "#f8fafc" }}>
+              <div style={{ fontSize: 16, fontWeight: 900, color: "#1e293b", marginBottom: 4 }}>
+                👑 Royalty Tier 1 (Level 1 to Level 7)
+              </div>
+              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 12 }}>
+                Applies to qualified members across L1 - L7 network
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <Input
+                  label="Pool Share Percentage (%)"
+                  type="number"
+                  value={royaltyConfig.tier1_percent ?? 3}
+                  onChange={(val) => {
+                    setRoyaltyConfig((prev) => ({ ...prev, tier1_percent: Number(val) }));
+                    setRoyaltyDirty(true);
+                  }}
+                />
+                <Input
+                  label="Earning Cap / Threshold Amount (₹)"
+                  type="number"
+                  value={royaltyConfig.tier1_cap ?? 10000}
+                  onChange={(val) => {
+                    setRoyaltyConfig((prev) => ({ ...prev, tier1_cap: Number(val) }));
+                    setRoyaltyDirty(true);
+                  }}
+                />
+                <Input
+                  label="Qualification Window (Days)"
+                  type="number"
+                  value={royaltyConfig.tier1_days ?? 40}
+                  onChange={(val) => {
+                    setRoyaltyConfig((prev) => ({ ...prev, tier1_days: Number(val) }));
+                    setRoyaltyDirty(true);
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Tier 2 Card */}
+            <div style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: 16, background: "#f8fafc" }}>
+              <div style={{ fontSize: 16, fontWeight: 900, color: "#1e293b", marginBottom: 4 }}>
+                👑 Royalty Tier 2 (Level 10)
+              </div>
+              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 12 }}>
+                Applies to top tier leaders reaching Level 10
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <Input
+                  label="Pool Share Percentage (%)"
+                  type="number"
+                  value={royaltyConfig.tier2_percent ?? 7}
+                  onChange={(val) => {
+                    setRoyaltyConfig((prev) => ({ ...prev, tier2_percent: Number(val) }));
+                    setRoyaltyDirty(true);
+                  }}
+                />
+                <Input
+                  label="Earning Cap / Threshold Amount (₹)"
+                  type="number"
+                  value={royaltyConfig.tier2_cap ?? 40000}
+                  onChange={(val) => {
+                    setRoyaltyConfig((prev) => ({ ...prev, tier2_cap: Number(val) }));
+                    setRoyaltyDirty(true);
+                  }}
+                />
+                <Input
+                  label="Qualification Window (Days)"
+                  type="number"
+                  value={royaltyConfig.tier2_days ?? 7}
+                  onChange={(val) => {
+                    setRoyaltyConfig((prev) => ({ ...prev, tier2_days: Number(val) }));
+                    setRoyaltyDirty(true);
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+            <button
+              type="button"
+              onClick={handleSaveRoyaltyConfig}
+              disabled={royaltySaving}
+              style={{
+                padding: "10px 24px",
+                borderRadius: 8,
+                background: "#2563eb",
+                color: "#fff",
+                fontWeight: 900,
+                border: "none",
+                cursor: royaltySaving ? "not-allowed" : "pointer",
+                fontSize: 14,
+              }}
+            >
+              {royaltySaving ? "Saving Configuration..." : "Save Royalty Configuration"}
+            </button>
+          </div>
+        </Section>
+      </div>
+    );
+  }
+
+
   // Save All (per tab)
-  const anySaving = mSaving || m150Saving || mx150Saving || m750Saving || mx750Saving || m759Saving || mx759Saving || lSaving || lSeeding || pLoading || mxSaving;
+  const anySaving = mSaving || m150Saving || mx150Saving || m750Saving || mx750Saving || m759Saving || mx759Saving || lSaving || lSeeding || pLoading || mxSaving || rankSaving || sppSaving || royaltySaving;
   const tabDirty = (
     (activeTab === TABS.ACT150 && (mDirty || m150Dirty || mx150Dirty)) ||
     (activeTab === TABS.ACT750 && (mDirty || m750Dirty || mx750Dirty)) ||
     (activeTab === TABS.ACT759 && (m759Dirty || m759MonthlyDirty || mx759Dirty)) ||
+    (activeTab === TABS.SPP1000 && sppDirty) ||
+    (activeTab === TABS.ROYALTY && royaltyDirty) ||
+    (activeTab === TABS.RANK_UPGRADE && rankDirty) ||
     (activeTab === TABS.WITHDRAW && (
       (mServer && Number(Number(mForm.withdrawal_sponsor_percent||0).toFixed(2)) !== Number(Number(mServer?.withdrawal_sponsor_percent||0).toFixed(2))) ||
       (mServer && Number(Number(mForm.tax_percent||0).toFixed(2)) !== Number(Number(mServer?.tax_percent||0).toFixed(2)))
@@ -3134,6 +4440,12 @@ right={
       } else if (activeTab === TABS.ACT759) {
         if (m759Dirty || m759MonthlyDirty) await onM759Save();
         if (mx759Dirty) await onMx759Save();
+      } else if (activeTab === TABS.SPP1000) {
+        if (sppDirty) await handleSaveSppConfig();
+      } else if (activeTab === TABS.ROYALTY) {
+        if (royaltyDirty) await handleSaveRoyaltyConfig();
+      } else if (activeTab === TABS.RANK_UPGRADE) {
+        if (rankDirty) await handleSaveRankConfig();
       } else if (activeTab === TABS.WITHDRAW) {
         const taxDirty =
           mServer &&
@@ -3178,8 +4490,10 @@ right={
         {[
           { key: TABS.ACT150, label: "₹150 Activation" },
           { key: TABS.ACT750, label: "₹750 Activation" },
-          { key: TABS.ACT759, label: "₹759 Activation" },
+          { key: TABS.ACT759, label: "SPP" },
+          { key: TABS.ROYALTY, label: "Royalty & Daily 11:59 PM Pools" },
           { key: TABS.WITHDRAW, label: "Withdrawal Commission" },
+          { key: TABS.RANK_UPGRADE, label: "Rank Upgrade Config" },
         ].map((t) => (
           <button
             key={t.key}
@@ -3235,13 +4549,10 @@ right={
       {activeTab === TABS.ACT150 && renderTab150()}
       {activeTab === TABS.ACT750 && renderTab750()}
       {activeTab === TABS.ACT759 && renderTab759()}
+      {activeTab === TABS.SPP1000 && renderTabSPP1000()}
+      {activeTab === TABS.ROYALTY && renderTabRoyalty()}
       {activeTab === TABS.WITHDRAW && renderTabWithdraw()}
-
-      {/* Hidden legacy/global sections intentionally removed from UI to match approved tab-based design.
-          - Master Commission (global tax/upline/geo)
-          - Fixed Level Commission (global)
-          - Global Matrix Commission
-          They are still loaded in state or used for certain tabs, but not displayed together to avoid mixing flows. */}
+      {activeTab === TABS.RANK_UPGRADE && renderTabRankUpgrade()}
     </div>
   );
 }

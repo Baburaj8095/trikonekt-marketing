@@ -51,30 +51,36 @@ function looksLikeSmartSspSourceId(sourceId) {
 const ACCOUNT_CATEGORIES = [
   {
     id: "SUBSCRIPTION_750",
-    label: "Subscription Joining 750",
-    hint: "5-matrix accounts from ₹750 promo package",
+    label: "Subscription Joining 1000",
+    hint: "5-matrix accounts from ₹1000 promo package",
     match: (src) => {
       const s = (src || "").toUpperCase();
       return (
         s.includes("PROMO_PURCHASE") ||
         s.includes("PROMO_PURCHASE_APPROVAL") ||
         s.includes("PRIME_750") ||
-        s.includes("SUBSCRIPTION_750")
+        s.includes("PRIME_1000") ||
+        s.includes("PRIME1000") ||
+        s.includes("PRIME750") ||
+        s.includes("JOIN_SUBSCRIPTION") ||
+        s.includes("SUBSCRIPTION_750") ||
+        s.includes("SUBSCRIPTION_1000")
       );
     },
   },
   {
     id: "SMART_SSP",
     label: "Smart SSP",
-    hint: "Monthly 759/1000 — opens matrix on 1st month of each season only",
+    hint: "Monthly 1000 — opens matrix on 1st month of each season only",
     match: (src) => {
       const s = (src || "").toUpperCase();
       return (
+        s.includes("MONTHLY") ||
+        s.includes("SPP") ||
         s.includes("MONTHLY_759") ||
         s.includes("MONTHLY_1000") ||
         s.includes("MONTHLY_FIRST_SEASON") ||
         s.includes("SMART_SSP") ||
-        // legacy tags seen in some historical rows
         s.includes("ECOUPON_759") ||
         s.includes("ECOUPON_1000")
       );
@@ -215,7 +221,7 @@ function LevelTable({ levelGrid }) {
         }}
       >
         <div>S.No</div>
-        <div>Level</div>
+        <div>Layer</div>
         <div style={{ textAlign: "center" }}>Total</div>
         <div style={{ textAlign: "center" }}>Active</div>
         <div style={{ textAlign: "right" }}>Status</div>
@@ -246,7 +252,7 @@ function LevelTable({ levelGrid }) {
           >
             <div style={{ fontSize: 12, color: C.textSec, fontWeight: 600 }}>{row.sn}</div>
             <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>
-              Level – {row.level}
+              Layer – {row.level}
             </div>
             {/* Total Count (5^level) */}
             <div style={{ fontSize: 13, fontWeight: 700, color: C.textSec, textAlign: "center" }}>
@@ -521,12 +527,12 @@ export default function FiveMatrixTab({
       {/* ── KPI grid ── */}
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
         <KpiCard label="Total Team" value={totalTeam} accent={C.primary} />
-        <KpiCard label="Active Levels Open" value={activeLevelsReached} accent={C.green} />
-        <KpiCard label="Levels Completed" value={levelsCompleted > 0 ? `L${levelsCompleted}` : "–"} accent={C.amber} />
-        <KpiCard label="5 Matrix Earning" value={`\u20b9${earning.toFixed(0)}`} accent="#7c3aed" />
+        <KpiCard label="Active Layers Open" value={activeLevelsReached} accent={C.green} />
+        <KpiCard label="Layers Completed" value={levelsCompleted > 0 ? `L${levelsCompleted}` : "–"} accent={C.amber} />
+        <KpiCard label="5 Blocks Earning" value={`\u20b9${earning.toFixed(0)}`} accent="#7c3aed" />
       </div>
 
-      {/* ── Level chart / table ── */}
+      {/* ── Layer chart / table ── */}
       <div
         style={{
           fontSize: 13,
@@ -536,7 +542,7 @@ export default function FiveMatrixTab({
           marginBottom: 10,
         }}
       >
-        Level-wise Team Count
+        Layer-wise Team Count
       </div>
       {hasPools ? (
         <LevelTable levelGrid={enrichedGrid} />
@@ -552,7 +558,7 @@ export default function FiveMatrixTab({
             marginBottom: 16,
           }}
         >
-          No active 5‑Matrix positions found.
+          No active 5‑Blocks positions found.
         </div>
       )}
 
@@ -566,7 +572,7 @@ export default function FiveMatrixTab({
           marginBottom: 8,
         }}
       >
-        5‑Matrix Tree
+        5‑Blocks Tree
       </div>
       <div
         style={{

@@ -5,6 +5,10 @@ import {
   Box,
   Button,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   LinearProgress,
   MenuItem,
   Paper,
@@ -15,6 +19,7 @@ import {
 import API from "../../api/api";
 
 const pockets = [
+  ["all_pockets", "🔥 ALL Pockets & Packages"],
   ["add_money", "Add Money Pocket"],
   ["coupon", "Coupon Pocket"],
   ["self_package", "Self Package Pocket"],
@@ -34,6 +39,11 @@ export default function AdminWallets() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [adjust, setAdjust] = useState({ user_id: "", pocket: "main", action: "credit", amount: "", note: "" });
+
+  // Dialog state for quick debit all
+  const [debitTarget, setDebitTarget] = useState(null);
+  const [debitNote, setDebitNote] = useState("");
+  const [debitBusy, setDebitBusy] = useState(false);
 
   async function load() {
     try {
@@ -55,11 +65,36 @@ export default function AdminWallets() {
   async function submitAdjust() {
     try {
       setErr("");
-      await API.post(`/admin/wallets/${adjust.user_id}/adjust/`, adjust);
+      const payload = {
+        ...adjust,
+        amount: adjust.action === "debit_all" ? "0.01" : adjust.amount,
+      };
+      await API.post(`/admin/wallets/${adjust.user_id}/adjust/`, payload);
       setAdjust((x) => ({ ...x, amount: "", note: "" }));
       await load();
     } catch (e) {
       setErr(e?.response?.data?.detail || "Adjustment failed");
+    }
+  }
+
+  async function submitDebitAll() {
+    if (!debitTarget) return;
+    try {
+      setDebitBusy(true);
+      setErr("");
+      await API.post(`/admin/wallets/${debitTarget.user_id}/adjust/`, {
+        pocket: "all_pockets",
+        action: "debit_all",
+        amount: "0.01",
+        note: debitNote || "Admin Flush All Package Balances",
+      });
+      setDebitTarget(null);
+      setDebitNote("");
+      await load();
+    } catch (e) {
+      setErr(e?.response?.data?.detail || "Debit all failed");
+    } finally {
+      setDebitBusy(false);
     }
   }
 
@@ -69,8 +104,8 @@ export default function AdminWallets() {
     <Box sx={{ p: { xs: 1, md: 2 } }}>
       <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={1.5} sx={{ mb: 2 }}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 900 }}>Wallets</Typography>
-          <Typography sx={{ color: "#64748b", fontSize: 13 }}>All user wallet pockets, balances, and manual audited entries.</Typography>
+          <Typography variant="h5" sx={{ fontWeight: 900 }}>Wallets & Package Balances</Typography>
+          <Typography sx={{ color: "#64748b", fontSize: 13 }}>All user wallet pockets, package balances, manual audited entries, and balance removal.</Typography>
         </Box>
         <Stack direction="row" spacing={1}>
           <Button component={Link} to="/admin/wallet-vouchers" variant="outlined">Vouchers</Button>
@@ -89,7 +124,7 @@ export default function AdminWallets() {
       </Paper>
 
       <Paper variant="outlined" sx={{ p: 1.5, mb: 2, borderRadius: 2 }}>
-        <Typography sx={{ fontWeight: 900, mb: 1 }}>Manual Wallet Entry</Typography>
+        <Typography sx={{ fontWeight: 900, mb: 1 }}>Manual Wallet & Package Entry</Typography>
         <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
           <TextField select size="small" label="User" value={adjust.user_id} onChange={(e) => setAdjust((x) => ({ ...x, user_id: e.target.value }))} sx={{ minWidth: 220 }}>
             <MenuItem value="">Select user</MenuItem>
@@ -99,13 +134,18 @@ export default function AdminWallets() {
             <MenuItem value="main">Main Wallet</MenuItem>
             {pockets.map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}
           </TextField>
-          <TextField select size="small" label="Action" value={adjust.action} onChange={(e) => setAdjust((x) => ({ ...x, action: e.target.value }))} sx={{ minWidth: 120 }}>
+          <TextField select size="small" label="Action" value={adjust.action} onChange={(e) => setAdjust((x) => ({ ...x, action: e.target.value }))} sx={{ minWidth: 160 }}>
             <MenuItem value="credit">Credit</MenuItem>
             <MenuItem value="debit">Debit</MenuItem>
+            <MenuItem value="debit_all">Debit / Flush ALL Pockets</MenuItem>
           </TextField>
-          <TextField size="small" label="Amount" type="number" value={adjust.amount} onChange={(e) => setAdjust((x) => ({ ...x, amount: e.target.value }))} />
+          {adjust.action !== "debit_all" && (
+            <TextField size="small" label="Amount" type="number" value={adjust.amount} onChange={(e) => setAdjust((x) => ({ ...x, amount: e.target.value }))} />
+          )}
           <TextField size="small" label="Reason" value={adjust.note} onChange={(e) => setAdjust((x) => ({ ...x, note: e.target.value }))} fullWidth />
-          <Button variant="contained" disabled={!adjust.user_id || !adjust.amount} onClick={submitAdjust}>Apply</Button>
+          <Button variant="contained" color={adjust.action === "debit_all" ? "error" : "primary"} disabled={!adjust.user_id || (adjust.action !== "debit_all" && !adjust.amount)} onClick={submitAdjust}>
+            {adjust.action === "debit_all" ? "Flush All Pockets" : "Apply"}
+          </Button>
         </Stack>
         {selected && <Typography sx={{ mt: 1, fontSize: 12, color: "#64748b" }}>Selected: {selected.full_name || selected.username}</Typography>}
       </Paper>
@@ -113,24 +153,61 @@ export default function AdminWallets() {
       <Stack spacing={1}>
         {rows.map((r) => (
           <Paper key={r.user_id} variant="outlined" sx={{ p: 1.25, borderRadius: 2 }}>
-            <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={1}>
+            <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={1} alignItems="center">
               <Box>
                 <Typography sx={{ fontWeight: 900 }}>{r.full_name || r.username}</Typography>
                 <Typography sx={{ color: "#64748b", fontSize: 12 }}>{r.username} {r.prefixed_id ? `- ${r.prefixed_id}` : ""}</Typography>
               </Box>
-              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                <Chip label={`Main Rs. ${money(r.main_balance)}`} />
-                <Chip label={`Add Money Rs. ${money(r.pockets?.add_money)}`} />
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
+                <Chip label={`Main Rs. ${money(r.main_balance)}`} color={Number(r.main_balance) > 0 ? "primary" : "default"} />
+                <Chip label={`Add Money Rs. ${money(r.pockets?.add_money)}`} color={Number(r.pockets?.add_money) > 0 ? "info" : "default"} />
                 <Chip label={`Withdrawal Rs. ${money(r.withdrawable_balance)}`} />
                 <Chip label={`Coupon Rs. ${money(r.pockets?.coupon)}`} />
                 <Chip label={`Self Pkg Rs. ${money(r.pockets?.self_package)}`} />
                 <Chip label={`Pkg Coupon Rs. ${money(r.pockets?.package_purchase_coupon)}`} />
+                <Button size="small" variant="outlined" color="error" onClick={() => setDebitTarget(r)}>
+                  Debit All Pockets
+                </Button>
                 <Button component={Link} to={`/admin/wallets/${r.user_id}`} size="small" variant="outlined">Detail</Button>
               </Stack>
             </Stack>
           </Paper>
         ))}
       </Stack>
+
+      <Dialog open={Boolean(debitTarget)} onClose={() => setDebitTarget(null)} fullWidth maxWidth="xs">
+        <DialogTitle sx={{ fontWeight: 900, color: "#b91c1c" }}>
+          Flush All Package & Wallet Balances
+        </DialogTitle>
+        <DialogContent dividers>
+          {debitTarget && (
+            <Box sx={{ mb: 1.5 }}>
+              <Typography fontWeight={700}>
+                {debitTarget.full_name || debitTarget.username} ({debitTarget.username})
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                This will debit all non-zero balances across Main Wallet, Add Money, Coupon, Self Package, and Package Coupon pockets for this user.
+              </Typography>
+            </Box>
+          )}
+          <TextField
+            fullWidth
+            size="small"
+            label="Reason for removal"
+            value={debitNote}
+            onChange={(e) => setDebitNote(e.target.value)}
+            multiline
+            minRows={2}
+            placeholder="e.g. Admin requested reset of package balances"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDebitTarget(null)} disabled={debitBusy}>Cancel</Button>
+          <Button variant="contained" color="error" onClick={submitDebitAll} disabled={debitBusy}>
+            {debitBusy ? "Processing..." : "Debit All Balances Now"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Paper,
@@ -24,9 +25,11 @@ import {
   Radio,
   Chip,
   Divider,
+  Grid,
 } from "@mui/material";
 import LockRoundedIcon from "@mui/icons-material/LockRounded";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import dayjs from "dayjs";
 import normalizeMediaUrl from "../utils/media";
 import imgKerala from "../assets/kerala.jpg";
@@ -42,6 +45,8 @@ import {
   getWalletMe,
   getWalletMeFresh,
   getWalletMeHistory,
+  initiateUpgrade,
+  createRankUpgradeFromWallet,
 } from "../api/api";
 import RankUpgrade from "./RankUpgrade";
 import {
@@ -66,20 +71,28 @@ const isTourPackage = (pkg) => {
   return code.includes("tour") || name.includes("tour") || name.includes("holiday");
 };
 
-const isJoinPrimePackage = (pkg) => {
-  const code = String(pkg?.code || "").toUpperCase();
-  const name = String(pkg?.name || "").toUpperCase();
-  const type = String(pkg?.type || "").toUpperCase();
-  if (type === "MONTHLY" || isTourPackage(pkg)) return false;
-  return code === "PRIME750" || code.includes("PRIME750") || name.includes("PRIME 750") || approx(pkg?.price, 750);
-};
-
 const isPrime150Package = (pkg) => {
   const code = String(pkg?.code || "").toUpperCase();
   const name = String(pkg?.name || "").toUpperCase();
   const type = String(pkg?.type || "").toUpperCase();
   if (type === "MONTHLY" || isTourPackage(pkg)) return false;
-  return code === "PRIME150" || code.includes("PRIME150") || name.includes("PRIME 150") || approx(pkg?.price, 150);
+  return code === "PRIME150" || code.includes("PRIME150") || name.includes("150") || approx(pkg?.price, 150);
+};
+
+const isJoinPrimePackage = (pkg) => {
+  if (isPrime150Package(pkg)) return false;
+  const code = String(pkg?.code || "").toUpperCase();
+  const name = String(pkg?.name || "").toUpperCase();
+  const type = String(pkg?.type || "").toUpperCase();
+  if (type === "MONTHLY" || isTourPackage(pkg)) return false;
+  return (
+    code.includes("PRIME750") ||
+    code.includes("PRIME1000") ||
+    name.includes("PRIME") ||
+    type === "PRIME" ||
+    approx(pkg?.price, 750) ||
+    approx(pkg?.price, 1000)
+  );
 };
 
 const getPlanOptions = (price) => {
@@ -110,15 +123,16 @@ const nativeSheetPaperSx = {
 
 const primaryPaymentButtonSx = {
   height: 52,
-  borderRadius: 3,
+  borderRadius: "14px",
   fontWeight: 900,
+  fontSize: 15,
   letterSpacing: 0,
-  boxShadow: "0 16px 32px rgba(37, 99, 235, 0.24)",
-  background: "linear-gradient(135deg, #2563eb 0%, #0f766e 100%)",
+  boxShadow: "0 10px 24px rgba(37, 99, 235, 0.28)",
+  background: "linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #2563eb 100%)",
   transition: "transform 160ms ease, box-shadow 160ms ease, filter 160ms ease",
   "&:hover": {
-    boxShadow: "0 18px 36px rgba(37, 99, 235, 0.3)",
-    filter: "brightness(1.02)",
+    boxShadow: "0 14px 30px rgba(37, 99, 235, 0.35)",
+    filter: "brightness(1.04)",
   },
   "&:active": {
     transform: "scale(0.985)",
@@ -472,112 +486,147 @@ function PaymentMethodDialog({ open, onClose, intent, walletMe, walletHistory, b
 /* ======================================================================== */
 
 /**
- * PrimeSection  membership-style UI
- * - Requires choice: Redeem | Product
- * - Bonus ₹150 info is UI-only (no backend flag; reflected in uiMeta for summary)
+ * AgentSubscriptionSection  Professional 4-Card Package Layout
+ * 1st & 2nd: Digital Education (Level 1 & Level 2)
+ * 3rd: SPP (Smart Purchase Plan 1000)
+ * 4th: Holidays (Holiday & Travel Voucher)
  */
-function Prime750Section({ pkg, prime150Active, prime750Active, onBuy, redeemOnly = false }) {
-  const [choice, setChoice] = useState(redeemOnly ? "REDEEM" : "");
-  const [selProd, setSelProd] = useState("");
-  const packageAmount = Number(pkg?.price || 0);
-  const packageName = pkg?.name || "Join Prime";
-
-  const options = redeemOnly
-    ? getPlanOptions(pkg?.price || 0).filter((opt) => !/product/i.test(String(opt || "")))
-    : getPlanOptions(pkg?.price || 0);
-
-  const canBuy =
-    !!pkg &&
-    !!choice &&
-    (!(choice === "PRODUCT") || (choice === "PRODUCT" && String(selProd).trim() !== ""));
-
+function AgentSubscriptionSection({
+  pkg,
+  seasonPkg,
+  tourPackages,
+  triHolidays,
+  prime150Active,
+  prime750Active,
+  seasonActive,
+  achievedPrimeLevel = 0,
+  onBuy,
+  navigate,
+}) {
   return (
-    <Box sx={{ p: 2 }}>
-      <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5 }}>
-        {packageName} {prime750Active ? <Chip size="small" color="success" sx={{ ml: 1 }} label="Active" /> : null}
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Price: ₹{packageAmount.toLocaleString("en-IN")} • Includes wallet bonus ₹150
-      </Typography>
-      <Box component="ul" sx={{ pl: 2, mt: 0 }}>
-        {options.map((opt, i) => (
-          <li key={i}>
-            <Typography fontSize={13}>{opt}</Typography>
-          </li>
-        ))}
+    <Box sx={{ p: { xs: 1, sm: 2 } }}>
+      <Box sx={{ mb: 3, textAlign: "center" }}>
+        <Chip
+          label="AGENT SUBSCRIPTION"
+          size="small"
+          sx={{
+            fontWeight: 800,
+            fontSize: 11,
+            bgcolor: "#e0e7ff",
+            color: "#3730a3",
+            letterSpacing: 0.8,
+            mb: 1,
+          }}
+        />
+        <Typography variant="h5" sx={{ fontWeight: 900, color: "#0f172a", mb: 0.5 }}>
+          Agent Joining Fee
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 600, mx: "auto" }}>
+          Includes ₹750 Agent Subscription + ₹250 Level 1 Rank Upgrade fee. Unlocks Digital Education Masterclasses, 5-Block & 3-Block team activations, and team commissions.
+        </Typography>
       </Box>
-      <Divider sx={{ my: 1.5 }} />
 
-      {/* <FormControlLabel
-        sx={{ mt: 0.5 }}
-        control={<Checkbox size="small" checked disabled />}
-        label={
-          <Typography fontSize={14}>
-            {prime150Active ? "Prime 150 active" : "Prime 150 will be included"}
-          </Typography>
-        }
-      /> */}
-
-      <Divider sx={{ my: 1.5 }} />
-
-      <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
-        Choose how you want to use Prime
-      </Typography>
-
-      <Box sx={{ mt: 0.5 }}>
-        <RadioGroup
-          value={choice}
-          onChange={(e) => setChoice(e.target.value)}
-        >
-          <FormControlLabel value="REDEEM" control={<Radio size="small" />} label="Redeem" />
-          {!redeemOnly ? (
-            <FormControlLabel value="PRODUCT" control={<Radio size="small" />} label="Product" />
-          ) : null}
-        </RadioGroup>
-
-        {!redeemOnly && choice === "PRODUCT" ? (
-          <TextField
-            select
-            fullWidth
-            size="small"
-            label="Select Product"
-            sx={{ mt: 1 }}
-            value={selProd}
-            onChange={(e) => setSelProd(e.target.value)}
+      <Grid container justifyContent="center">
+        {/* AGENT PACKAGE: Agent Joining Fee (₹1,000) */}
+        <Grid item xs={12} md={8} lg={6}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 3,
+              borderRadius: "20px",
+              border: "1.5px solid #cbd5e1",
+              bgcolor: "#ffffff",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+              position: "relative",
+              overflow: "hidden",
+              boxShadow: "0 10px 30px rgba(15,23,42,0.06)",
+              transition: "transform 0.2s ease, box-shadow 0.2s ease",
+              "&:hover": {
+                transform: "translateY(-4px)",
+                boxShadow: "0 16px 36px rgba(37,99,235,0.14)",
+              },
+            }}
           >
-            {(pkg?.promo_products || []).map((p) => (
-              <MenuItem key={p.id} value={p.id}>
-                {p.name}
-              </MenuItem>
-            ))}
-          </TextField>
-        ) : null}
-      </Box>
+            <Box
+              sx={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 6,
+                background: "linear-gradient(90deg, #1e1b4b 0%, #4338ca 100%)",
+              }}
+            />
+            <Box>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+                <Chip
+                  label="STARTER PACKAGE"
+                  size="small"
+                  sx={{ fontWeight: 800, fontSize: 10, bgcolor: "#e0e7ff", color: "#3730a3" }}
+                />
+                {prime750Active ? <Chip label="Active" size="small" color="success" sx={{ fontWeight: 800 }} /> : null}
+              </Stack>
+              <Typography variant="h6" sx={{ fontWeight: 900, color: "#0f172a", mb: 0.5 }}>
+                Agent Joining Fee
+              </Typography>
+              <Stack direction="row" alignItems="baseline" spacing={0.5} sx={{ mb: 2 }}>
+                <Typography sx={{ fontSize: 32, fontWeight: 950, color: "#1e1b4b" }}>
+                  ₹ 1,000
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+                  (₹750 Subscription + ₹250 Level 1 Rank Upgrade)
+                </Typography>
+              </Stack>
 
-      <Button
-        fullWidth
-        variant="contained"
-        sx={{ mt: 2, height: 48, textTransform: "none", fontWeight: 800 }}
-        disabled={!canBuy}
-        onClick={() =>
-          onBuy({
-            pkg,
-            amount: packageAmount,
-            uiMeta: {
-              bonus150: true,
-              primeChoice: choice,
-              selectedProductName:
-                (pkg?.promo_products || []).find((p) => String(p.id) === String(selProd))?.name || "",
-            },
-            purchasePayload: {
-              prime750_choice: choice,
-              selected_promo_product_id: choice === "PRODUCT" && selProd ? selProd : null,
-            },
-          })
-        }
-      >
-        BUY PRIME
-      </Button>
+              <Stack spacing={1.5} sx={{ mb: 3 }}>
+                {[
+                  "Includes ₹750 Agent Subscription + ₹250 Level 1 Rank Upgrade",
+                  "Full Access to Level 1 Digital Education Video Masterclasses",
+                  "Activates 5-Block & 3-Block Team Account Positions",
+                  "Unlocks Direct Referral & Team Commission Eligibility",
+                  "Includes ₹150 Bonus Wallet Credit",
+                ].map((item, idx) => (
+                  <Stack key={idx} direction="row" spacing={1} alignItems="center">
+                    <CheckCircleRoundedIcon sx={{ fontSize: 18, color: "#4338ca" }} />
+                    <Typography fontSize={13} color="#334155" fontWeight={600}>
+                      {item}
+                    </Typography>
+                  </Stack>
+                ))}
+              </Stack>
+            </Box>
+
+            <Button
+              fullWidth
+              variant="contained"
+              disabled={!!prime750Active}
+              onClick={() => {
+                onBuy({
+                  pkg: pkg || { id: 2, code: "PRIME750", name: "Agent Joining Fee", price: 750 },
+                  amount: 1000,
+                  uiMeta: { bonus150: true, packageName: "Agent Joining Fee (Digital Education Level 1)" },
+                  purchasePayload: { prime750_choice: "REDEEM" },
+                });
+              }}
+              sx={{
+                height: 48,
+                borderRadius: "14px",
+                fontWeight: 900,
+                fontSize: 14,
+                textTransform: "none",
+                background: prime750Active
+                  ? "#94a3b8 !important"
+                  : "linear-gradient(135deg, #1e1b4b 0%, #4338ca 100%)",
+                boxShadow: prime750Active ? "none" : "0 8px 20px rgba(67,56,202,0.3)",
+              }}
+            >
+              {prime750Active ? "PACKAGE ACTIVE" : "SUBSCRIBE LEVEL 1 • ₹1,000"}
+            </Button>
+          </Paper>
+        </Grid>
+      </Grid>
     </Box>
   );
 }
@@ -760,78 +809,119 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
   const amount = unitPrice * Math.max(0, selectedBoxes.length);
 
   return (
-    <Box sx={{ p: 2 }}>
-      <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5 }}>
-        {(rename?.seasonLabel || "Season")} {seasonActive ? <Chip size="small" color="success" sx={{ ml: 1 }} label="Active" /> : null}
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Choose a season and plan to get started.
-      </Typography>
+    <Box sx={{ p: { xs: 2, sm: 2.5 } }}>
+      {/* Sapphire Hero Banner */}
+      <Paper
+        elevation={0}
+        sx={{
+          p: { xs: 2.5, sm: 3 },
+          mb: 3,
+          borderRadius: 4,
+          background: "linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #2563eb 100%)",
+          color: "#ffffff",
+          boxShadow: "0 10px 28px rgba(15, 23, 42, 0.18)",
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        <Stack direction="row" alignItems="center" justifyContent="space-between">
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 900, color: "#ffffff", mb: 0.5, fontSize: { xs: 18, sm: 22 } }}>
+              {(rename?.seasonLabel || "Smart Product Purchase (SPP)")}
+              {seasonActive ? <Chip size="small" color="success" sx={{ ml: 1, fontWeight: 800 }} label="Active" /> : null}
+            </Typography>
+            <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.8)", fontWeight: 500 }}>
+              Choose a season and plan to get started.
+            </Typography>
+          </Box>
+        </Stack>
+      </Paper>
 
       {/* ① Season selector */}
-      <Typography variant="subtitle2" sx={{ mt: 1 }}>
-        Choose {(rename?.seasonLabel || "Season")} 
+      <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1, color: "text.primary", fontSize: 14 }}>
+        Choose {(rename?.seasonLabel || "SPP Season")}
       </Typography>
-      <Box sx={{ display: "grid", gap: 1 }}>
+      <Box sx={{ display: "grid", gap: 1.5, mb: 3 }}>
         {seasonsToShow.map((n) => {
           const enabled = enabledNumbers.includes(n);
           const active = n === defaultSeason;
+          const isSelected = selectedSeason === n;
           const locked = !enabled;
           return (
-            <Box
+            <Paper
               key={n}
+              elevation={0}
               onClick={() => enabled && setSelectedSeason(n)}
               sx={{
                 display: "flex",
                 alignItems: "center",
-                gap: 1,
-                p: 1,
-                borderRadius: 1.5,
-                border: "1px solid",
-                borderColor: selectedSeason === n ? "primary.main" : "divider",
-                bgcolor: selectedSeason === n ? "primary.50" : "background.paper",
+                gap: 1.5,
+                p: 1.75,
+                borderRadius: 3,
+                border: "1.5px solid",
+                borderColor: isSelected ? "#2563eb" : "#e2e8f0",
+                bgcolor: isSelected ? "#eff6ff" : "#ffffff",
+                boxShadow: isSelected ? "0 6px 20px rgba(37,99,235,0.14)" : "0 2px 8px rgba(15,23,42,0.03)",
                 cursor: enabled ? "pointer" : "not-allowed",
                 opacity: enabled ? 1 : 0.6,
+                transition: "all 160ms ease",
               }}
             >
-              <Radio size="small" checked={selectedSeason === n} disabled={!enabled} />
-              <Typography sx={{ flex: 1 }}>{(rename?.seasonLabel || "Season")} {n}</Typography>
+              <Radio size="small" checked={isSelected} disabled={!enabled} sx={{ color: isSelected ? "#2563eb" : undefined }} />
+              <Typography sx={{ flex: 1, fontWeight: isSelected ? 800 : 600, fontSize: 14 }}>
+                {(rename?.seasonLabel || "SPP")} {n}
+              </Typography>
               {active ? (
-                <Chip size="small" label="Next" color="success" />
+                <Chip size="small" label="Active Season" color="success" sx={{ fontWeight: 800, height: 24 }} />
               ) : locked ? (
                 <Stack direction="row" spacing={0.5} alignItems="center">
-                  <LockRoundedIcon fontSize="small" />
-                  <Typography variant="caption" color="text.secondary">
+                  <LockRoundedIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
                     locked
                   </Typography>
                 </Stack>
               ) : null}
-            </Box>
+            </Paper>
           );
         })}
       </Box>
 
-      <Divider sx={{ my: 1.5 }} />
-
       {/* ② Plan selector */}
-      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-        ② Choose Plan
+      <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1, color: "text.primary", fontSize: 14 }}>
+        Choose Plan
       </Typography>
-      <Box sx={{ mt: 1 }}>
+      <Paper
+        elevation={0}
+        sx={{
+          p: 1.75,
+          mb: 3,
+          borderRadius: 3,
+          border: "1.5px solid #2563eb",
+          bgcolor: "#eff6ff",
+          boxShadow: "0 6px 20px rgba(37,99,235,0.12)",
+        }}
+      >
         <RadioGroup value={plan} onChange={(e) => setPlan(e.target.value)}>
           <FormControlLabel
             value="MONTHLY_SPP"
-            control={<Radio size="small" />}
-            label={(rename?.seasonPlanLabel || `Monthly SPP ${unitPriceLabel}`)}
+            control={<Radio size="small" sx={{ color: "#2563eb" }} />}
+            label={
+              <Box sx={{ ml: 0.5 }}>
+                <Typography sx={{ fontWeight: 800, fontSize: 14, color: "#0f172a" }}>
+                  {(rename?.seasonPlanLabel || `SPP Prime ₹${unitPrice.toLocaleString("en-IN")}`)}
+                </Typography>
+                <Typography sx={{ fontSize: 12, color: "#64748b", fontWeight: 500 }}>
+                  1 Box = 1 Monthly Product Coupon
+                </Typography>
+              </Box>
+            }
           />
         </RadioGroup>
-      </Box>
-
-      <Divider sx={{ my: 1.5 }} />
+      </Paper>
 
       {/* ③ Month grid */}
-      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-        ③ Select Months
+      <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1, color: "text.primary", fontSize: 14 }}>
+        Select Months
       </Typography>
       {plan === "MONTHLY_SPP" ? (
         <>
@@ -839,8 +929,9 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
             sx={{
               mt: 1,
               display: "grid",
-              gridTemplateColumns: "repeat(4, 1fr)",
-              gap: 1,
+              gridTemplateColumns: { xs: "repeat(4, 1fr)", sm: "repeat(6, 1fr)" },
+              gap: 1.5,
+              mb: 2,
             }}
           >
             {Array.from({ length: totalBoxes }).map((_, i) => {
@@ -853,54 +944,63 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
                   onClick={() => !locked && toggleBox(n)}
                   sx={{
                     aspectRatio: "1 / 1",
-                    borderRadius: 1.5,
+                    borderRadius: 3,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     border: "1.5px solid",
-                    borderColor: selected ? "primary.main" : "divider",
-                    bgcolor: locked
-                      ? "success.light"
+                    borderColor: locked ? "#86efac" : selected ? "#2563eb" : "#e2e8f0",
+                    background: locked
+                      ? "#dcfce7"
                       : selected
-                      ? "primary.main"
-                      : "background.paper",
-                    color: locked ? "success.main" : selected ? "#fff" : "text.primary",
-                    fontWeight: 700,
-                    fontSize: 14,
+                      ? "linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%)"
+                      : "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+                    color: locked ? "#16a34a" : selected ? "#ffffff" : "#0f172a",
+                    fontWeight: 900,
+                    fontSize: 15,
+                    boxShadow: selected ? "0 8px 20px rgba(37,99,235,0.3)" : "0 2px 6px rgba(15,23,42,0.03)",
                     cursor: locked ? "not-allowed" : "pointer",
                     userSelect: "none",
+                    transition: "transform 140ms ease, box-shadow 140ms ease",
+                    "&:active": { transform: "scale(0.96)" },
                   }}
                 >
                   {locked ? (
-                    <Typography fontSize={12} fontWeight={800} color="success.main">
-                      PAID
+                    <Typography fontSize={11} fontWeight={900} color="#16a34a">
+                      ✓ PAID
                     </Typography>
                   ) : (monthShort[i] || n)}
                 </Box>
               );
             })}
           </Box>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Selected: <b>{selectedBoxes.length}</b> / {totalBoxes}
-          </Typography>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2, px: 0.5 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+              Selected Months: <b style={{ color: "#2563eb" }}>{selectedBoxes.length}</b> / {totalBoxes}
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 900, color: "#0f172a", fontSize: 15 }}>
+              Total: ₹{amount.toLocaleString("en-IN")}
+            </Typography>
+          </Stack>
         </>
       ) : null}
 
       <Button
         fullWidth
         variant="contained"
-        sx={{ mt: 2, height: 48, textTransform: "none", fontWeight: 800 }}
+        disableElevation
+        sx={primaryPaymentButtonSx}
         disabled={!canBuy}
         onClick={() => {
-            onBuy({
-              pkg: seasonPkg,
-              amount,
-              uiMeta: { plan: `Monthly SPP ${unitPriceLabel}`, selectedSeason, selectedBoxes },
-              purchasePayload: { package_number: selectedSeason, boxes: selectedBoxes },
-            });
+          onBuy({
+            pkg: seasonPkg,
+            amount,
+            uiMeta: { plan: `Monthly SPP ${unitPriceLabel}`, selectedSeason, selectedBoxes },
+            purchasePayload: { package_number: selectedSeason, boxes: selectedBoxes },
+          });
         }}
       >
-        {(rename?.seasonBuyCta || "BUY SEASON")}
+        BUY SPP NOW {amount > 0 ? `• ₹${amount.toLocaleString("en-IN")}` : ""}
       </Button>
     </Box>
   );
@@ -1227,7 +1327,7 @@ function TourSection({ triHolidays, tourPackages = [], onBuy }) {
 /* MAIN */
 /* ======================================================================== */
 export default function PromoPackages({
-  title = "Consumer Packages",
+  title = "Agent Subscription",
   // New: allow route wrappers to render a single section
   // prime750 | season | rank | prime150 | tour
   initialTabKey = null,
@@ -1238,6 +1338,7 @@ export default function PromoPackages({
   rename = null,
   primeRedeemOnly = false,
 } = {}) {
+  const navigate = useNavigate();
   const [packages, setPackages] = useState([]);
   const [history, setHistory] = useState([]);
   const [triHolidays, setTriHolidays] = useState(null);
@@ -1250,6 +1351,7 @@ export default function PromoPackages({
   const [walletBusy, setWalletBusy] = useState(false);
   const [walletErr, setWalletErr] = useState("");
   const [seasonsHints, setSeasonsHints] = useState([]);
+  const [achievedPrimeLevel, setAchievedPrimeLevel] = useState(0);
   const keyToTab = useMemo(() => {
     const m = { prime750: 0, season: 1, rank: 2, prime150: 3, tour: 4 };
     return m;
@@ -1293,28 +1395,53 @@ export default function PromoPackages({
         const s = await listCouponSeasons();
         setSeasonsHints(Array.isArray(s) ? s : []);
       } catch {}
+      try {
+        const eligRes = await API.get("/user/upgrade-eligibility/", { params: { summary: "achieved" }, cacheTTL: 2500, retryAttempts: 1 });
+        setAchievedPrimeLevel(Number(eligRes?.data?.achieved_level || 0));
+      } catch {}
     })();
   }, []);
 
-  // Identify packages without changing contracts
+  // Default Fallback Packages if API returns empty
+  const DEFAULT_PRIME_PKG = useMemo(() => ({
+    id: 5,
+    code: "PRIME1000",
+    name: "Agent Digital Prime Package (₹1,000)",
+    description: "Agent Digital Education Prime Package",
+    type: "PRIME",
+    price: 1000,
+    is_active: true,
+    promo_products: [{ id: 1, name: "Exclusive Starter Product Pack" }]
+  }), []);
+
+  const DEFAULT_SEASON_PKG = useMemo(() => ({
+    id: 7,
+    code: "MONTHLY1000",
+    name: "Smart Product Purchase (SPP)",
+    description: "Smart Product Purchase (1 Box = 1 Individual Coupon)",
+    type: "MONTHLY",
+    price: 1000,
+    is_active: true,
+    promo_products: []
+  }), []);
+
+  // Identify packages with robust fallback
   const primePkg = useMemo(() => {
-    return (packages || []).find(isJoinPrimePackage);
-  }, [packages]);
+    const pkgs = Array.isArray(packages) ? packages : (packages?.data || packages?.results || []);
+    return pkgs.find(isJoinPrimePackage) || DEFAULT_PRIME_PKG;
+  }, [packages, DEFAULT_PRIME_PKG]);
 
   const seasonPkg = useMemo(() => {
-    const pkgs = packages || [];
-    // Prefer explicit MONTHLY type or presence of monthly_meta
+    const pkgs = Array.isArray(packages) ? packages : (packages?.data || packages?.results || []);
     const monthlyCandidates = pkgs.filter(
-      (p) => String(p?.type || "").toUpperCase() === "MONTHLY" || !!p?.monthly_meta
+      (p) => String(p?.type || "").toUpperCase() === "MONTHLY" || !!p?.monthly_meta || String(p?.code || "").toUpperCase().includes("MONTHLY")
     );
     if (monthlyCandidates.length > 0) {
-      // If any has monthly_meta (per-user computed), pick that first
       const withMeta = monthlyCandidates.find((p) => !!p?.monthly_meta);
       return withMeta || monthlyCandidates[0];
     }
-    // Fallback for older data when type metadata is missing.
-    return pkgs.find((p) => approx(p?.price, 1000)) || null;
-  }, [packages]);
+    return pkgs.find((p) => approx(p?.price, 1000)) || DEFAULT_SEASON_PKG;
+  }, [packages, DEFAULT_SEASON_PKG]);
 
   const reg150Pkg = useMemo(() => {
     return (packages || []).find(isPrime150Package);
@@ -1434,6 +1561,10 @@ export default function PromoPackages({
               status === "APPROVED" ? "success.main" : status === "PENDING" ? "warning.main" : "text.secondary";
             const badgeBorder =
               status === "APPROVED" ? "success.main" : status === "PENDING" ? "warning.main" : "divider";
+            const isJoinPrimeHist = isJoinPrimePackage(h?.package) || approx(h?.amount, 750) || approx(h?.package?.price, 750);
+            const displayName = isJoinPrimeHist ? "Agent Digital Education Prime Package" : (h?.package?.name || "-");
+            const displayAmount = isJoinPrimeHist ? 1000 : Number(h?.amount || h?.package?.price || 0);
+
             return (
               <Box
                 key={h.id}
@@ -1449,15 +1580,15 @@ export default function PromoPackages({
                 }}
               >
                 <Box sx={{ minWidth: 0 }}>
-                  <Typography sx={{ fontWeight: 700 }} noWrap title={h?.package?.name || ""}>
-                    {h?.package?.name || "-"}
+                  <Typography sx={{ fontWeight: 700 }} noWrap title={displayName}>
+                    {displayName}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
                     {h?.requested_at ? dayjs(h.requested_at).format("DD MMM YYYY") : ""}
                   </Typography>
                 </Box>
                 <Typography sx={{ fontWeight: 600, textAlign: "right", minWidth: 90 }}>
-                  ₹{Number(h?.amount || h?.package?.price || 0).toLocaleString("en-IN")}
+                  ₹{displayAmount.toLocaleString("en-IN")}
                 </Typography>
                 <Box sx={{ justifySelf: "end" }}>
                   <Box
@@ -1533,7 +1664,7 @@ export default function PromoPackages({
               },
             }}
           >
-            <Tab label="Join Prime" />
+            <Tab label="Agent Subscription" />
             <Tab label={ren.seasonLabel} />
             <Tab label="Rank Upgrade" />
             <Tab label="Prime 150" />
@@ -1545,19 +1676,20 @@ export default function PromoPackages({
       
       <Paper elevation={0} sx={{ borderRadius: 2 }}>
         <Box sx={{ p: 2 }}>
-          {/* JOIN PRIME */}
+          {/* AGENT SUBSCRIPTION */}
           {tab === 0 ? (
-            primePkg ? (
-              <Prime750Section
-                pkg={primePkg}
-                prime150Active={prime150Active}
-                prime750Active={prime750Active}
-                onBuy={onBuy}
-                redeemOnly={primeRedeemOnly}
-              />
-            ) : (
-              <Alert severity="warning">Join Prime package not available.</Alert>
-            )
+            <AgentSubscriptionSection
+              pkg={primePkg}
+              seasonPkg={seasonPkg}
+              tourPackages={tourPackages}
+              triHolidays={triHolidays}
+              prime150Active={prime150Active}
+              prime750Active={prime750Active}
+              seasonActive={seasonActive}
+              achievedPrimeLevel={achievedPrimeLevel}
+              onBuy={onBuy}
+              navigate={navigate}
+            />
           ) : null}
 
           {/* SEASON */}
@@ -1630,7 +1762,40 @@ export default function PromoPackages({
               ...(purchaseIntent.purchasePayload || {}),
             };
             if (purchaseIntent?.pkg?.id) payload.package_id = purchaseIntent.pkg.id;
+            // Internally ensure REDEEM is set for Prime 750 / Agent 1K combo if not already set
+            const isPrimeCombo =
+              purchaseIntent?.pkg?.code === "PRIME750" ||
+              purchaseIntent?.pkg?.code === "PRIME1000" ||
+              purchaseIntent?.amount === 1000 ||
+              purchaseIntent?.amount === 750 ||
+              approx(purchaseIntent?.pkg?.price, 750) ||
+              approx(purchaseIntent?.pkg?.price, 1000);
+            if (isPrimeCombo && !payload.prime750_choice) {
+              payload.prime750_choice = "REDEEM";
+            }
             await createPromoPurchaseFromWallet(payload);
+
+            // Execute rank 1 upgrade (Digital Education 1st level - ₹250) in background if buying Agent Digital Prime
+            if (
+              purchaseIntent?.pkg?.code === "PRIME750" ||
+              purchaseIntent?.pkg?.code === "PRIME1000" ||
+              purchaseIntent?.amount === 1000 ||
+              purchaseIntent?.amount === 750
+            ) {
+              try {
+                const upgResp = await initiateUpgrade({ to_rank_id: 1 });
+                const upgId = upgResp?.id || upgResp?.upgrade?.id;
+                if (upgId) {
+                  await createRankUpgradeFromWallet({
+                    upgrade_id: upgId,
+                    wallet_source: walletSource,
+                  });
+                }
+              } catch (upgErr) {
+                console.warn("Background Rank 1 upgrade after Prime purchase:", upgErr);
+              }
+            }
+
             setMethodOpen(false);
             // Re-fetch history and wallet balance together.
             // Use getWalletMeFresh() (no cache) so the deducted balance is shown
@@ -1643,10 +1808,16 @@ export default function PromoPackages({
             if (updatedHistory.status === "fulfilled") setHistory(updatedHistory.value);
             if (freshWallet.status === "fulfilled") setWalletMe(freshWallet.value || null);
             if (freshHistory.status === "fulfilled") setWalletHistory(freshHistory.value || null);
-            setPaymentSuccessMessage("Package purchased successfully.");
+            setPaymentSuccessMessage("Agent Digital Prime Package purchased successfully.");
             setPaymentSuccessOpen(true);
           } catch (e) {
-            const msg = e?.response?.data?.detail || e?.message || "Wallet payment failed";
+            let msg = e?.response?.data?.detail;
+            if (!msg && e?.response?.data && typeof e.response.data === "object") {
+              const firstKey = Object.keys(e.response.data)[0];
+              const val = e.response.data[firstKey];
+              msg = Array.isArray(val) ? val.join(" ") : String(val);
+            }
+            msg = msg || e?.message || "Wallet payment failed";
             setWalletErr(msg);
           } finally {
             setWalletBusy(false);

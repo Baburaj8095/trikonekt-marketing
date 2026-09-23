@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import {
   AppBar,
   Toolbar,
@@ -198,8 +198,8 @@ export default function HomeV2() {
         <Box sx={{ display: "flex", gap: 2, overflowX: "auto", pb: 1, scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
           {[
             { title: "PRIME", price: "₹150", cta: "Join Prime" },
-            { title: "PROMO", price: "₹750", cta: "Join Promo" },
-            { title: "MONTHLY", price: "₹759", cta: "Subscribe" }
+            { title: "PROMO", price: "₹1000", cta: "Join Promo" },
+            { title: "MONTHLY", price: "₹1000", cta: "Subscribe" }
           ].map((pkg, i) => (
             <Card
               key={i}

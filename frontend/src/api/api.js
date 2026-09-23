@@ -902,13 +902,33 @@ export async function adminUpdateMasterCommission(payload = {}, product = null) 
   //   tax_company_user_id,
   //   withdrawal: { sponsor_percent },
   //   upline: { l1, l2, l3, l4, l5 },
-  //   geo: { sub_franchise, pincode, pincode_coord, district, district_coord, state, state_coord, employee, royalty }
+  //   geo: { sub_franchise, pincode, pincode_coord, district, district_coord, state, state_coord, employee, royalty },
+  //   royalty_config: { daily_franchise_percent, daily_district_percent, daily_state_percent, daily_royalty_percent, ... }
   // }
   const cfg = {};
   if (product) cfg.params = { product };
   const res = await API.patch("/admin/commission/master/", payload, cfg);
   return res?.data || res;
 }
+
+/**
+ * Admin: Get Daily Pool Accumulator & Distribution Monitor
+ */
+export async function adminGetPoolsMonitor(date = null) {
+  const cfg = { cacheTTL: 5000, dedupe: "cancelPrevious" };
+  if (date) cfg.params = { date };
+  const res = await API.get("/admin/commission/pools/monitor/", cfg);
+  return res?.data || res;
+}
+
+/**
+ * Admin: Trigger Daily Pool Distribution (Dry-Run or Live)
+ */
+export async function adminTriggerPoolDistribution({ date = "", force = false, dry_run = false } = {}) {
+  const res = await API.post("/admin/commission/pools/trigger/", { date, force, dry_run });
+  return res?.data || res;
+}
+
 
 /**
  * Admin: Preview Direct Refer Withdraw distribution

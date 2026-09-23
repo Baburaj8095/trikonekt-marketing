@@ -28,7 +28,9 @@ import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
 import ArrowForwardIosRoundedIcon from "@mui/icons-material/ArrowForwardIosRounded";
 import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
 import { useNavigate, useLocation } from "react-router-dom";
-import API from "../../api/api";
+import API, { getWalletMe } from "../../api/api";
+import BalanceCard from "../../components/common/BalanceCard";
+import QuickActionGrid from "../../components/common/QuickActionGrid";
 import imgEcommerce from "../../assets/ecommerce.jpg";
 import imgGifts from "../../assets/gifts.jpg";
 import imgHolidays from "../../assets/holidays.jpg";
@@ -814,47 +816,96 @@ export default function TeamDashboard() {
     if (action === "certificate") openLatestDocument("CERTIFICATE");
   }, [location.search, openLatestDocument]);
 
+  const [walletData, setWalletData] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const w = await getWalletMe();
+        if (alive && w) setWalletData(w);
+      } catch (_) {}
+    })();
+    return () => { alive = false; };
+  }, []);
+
   return (
-    <Box sx={{ minHeight: "100dvh", bgcolor: C.appBg, pb: isMobile ? "calc(84px + env(safe-area-inset-bottom))" : 3 }}>
-      <Box className="consumer-fintech-page" sx={{ width: "100%", maxWidth: 1180, mx: "auto", px: { xs: 0, sm: 1, md: 2 }, py: { xs: 0.5, md: 1.5 } }}>
-        <Paper
-          elevation={0}
-          sx={{
-            mb: { xs: 1.5, md: 2 },
-            p: { xs: 1.25, md: 2 },
-            borderRadius: 3,
-            border: `1px solid ${C.border}`,
-            background: C.surface,
-            boxShadow: C.shadow,
-          }}
-        >
-          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1.5}>
-            <Stack direction="row" alignItems="center" spacing={1.1} sx={{ minWidth: 0 }}>
-              <Avatar sx={{ width: { xs: 46, md: 52 }, height: { xs: 46, md: 52 }, bgcolor: C.primary, fontWeight: 900, boxShadow: "0 8px 18px rgba(37,99,235,0.20)" }}>{initials}</Avatar>
-              <Box sx={{ minWidth: 0 }}>
-                <Typography sx={{ fontSize: 11.5, fontWeight: 750, color: C.textSec, lineHeight: 1 }}>Team Consumer</Typography>
-                <Typography sx={{ fontSize: { xs: 17, md: 22 }, fontWeight: 900, color: C.text }} noWrap>
-                  {profileUser?.full_name || fullName}
-                </Typography>
-                <Stack direction="row" spacing={0.65} alignItems="center" sx={{ mt: 0.45, flexWrap: "wrap" }}>
-                  <Chip size="small" label={`User Id: ${consumerPhone}`} sx={{ height: 22, fontSize: 10.5, fontWeight: 750, bgcolor: "rgba(37,99,235,0.08)", color: C.primary }} />
-                  <Chip size="small" label={`Status: ${status}`} sx={{ height: 22, fontSize: 10.5, fontWeight: 750, bgcolor: "rgba(22,163,74,0.10)", color: "#047857" }} />
-                </Stack>
-              </Box>
-            </Stack>
-            <IconButton aria-label="notifications" sx={{ width: 38, height: 38, bgcolor: "#f8fafc", border: `1px solid ${C.border}` }}>
-              <NotificationsNoneRoundedIcon />
-            </IconButton>
-          </Stack>
-        </Paper>
+    <Box sx={{ minHeight: "100dvh", bgcolor: C.appBg, pb: 4 }}>
+      <Box className="consumer-fintech-page" sx={{ width: "100%", maxWidth: 1180, mx: "auto", px: { xs: 1, sm: 2 }, py: { xs: 1, sm: 2 } }}>
+        <Stack spacing={2}>
+          {/* GREETING HEADER */}
+          <Box sx={{ px: 0.5 }}>
+            <Typography sx={{ fontSize: 13, color: "#64748b", fontWeight: 500 }}>
+              Good Morning
+            </Typography>
+            <Typography variant="h5" sx={{ fontSize: { xs: 20, sm: 22 }, fontWeight: 700, color: "#0f172a", lineHeight: 1.2 }}>
+              {profileUser?.full_name || fullName} 👋
+            </Typography>
+            <Typography sx={{ fontSize: 13, color: "#64748b", fontWeight: 400, mt: 0.25 }}>
+              Let's grow together!
+            </Typography>
+          </Box>
 
-        {docErr ? (
-          <Paper elevation={0} sx={{ mb: 2, p: 1.25, borderRadius: 2, border: "1px solid #fecaca", bgcolor: "#fef2f2" }}>
-            <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#b91c1c" }}>{docErr}</Typography>
+          {/* 1) MAIN WALLET HERO CARD */}
+          <BalanceCard
+            title="Main Wallet Balance"
+            amount={walletData?.main_wallet ?? walletData?.main_balance ?? 0}
+            subtitle="View wallet details"
+            onClick={() => navigate("/user/team-wallet")}
+          />
+
+          {docErr ? (
+            <Paper elevation={0} sx={{ p: 1.25, borderRadius: 2, border: "1px solid #fecaca", bgcolor: "#fef2f2" }}>
+              <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#b91c1c" }}>{docErr}</Typography>
+            </Paper>
+          ) : null}
+
+          {/* 2) 4 QUICK ACTION BUTTONS */}
+          <QuickActionGrid variant="dashboard" />
+
+          {/* 3) EXPLORE OPPORTUNITIES BANNER (Screen 1 Target) */}
+          <Paper
+            elevation={0}
+            sx={{
+              p: { xs: 2, sm: 2.5 },
+              borderRadius: "16px",
+              background: "linear-gradient(135deg, #0284c7 0%, #0369a1 50%, #075985 100%)",
+              color: "#ffffff",
+              boxShadow: "0 8px 24px rgba(2, 132, 199, 0.25)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: 1,
+            }}
+          >
+            <Box>
+              <Typography sx={{ fontSize: { xs: 17, sm: 19 }, fontWeight: 700, color: "#ffffff", lineHeight: 1.2 }}>
+                Explore Opportunities
+              </Typography>
+              <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.9)", mt: 0.25 }}>
+                Shop • Learn • Travel • Earn
+              </Typography>
+            </Box>
+            <Button
+              variant="contained"
+              size="small"
+              onClick={() => navigate("/trikonekt-products")}
+              sx={{
+                bgcolor: "#ffffff",
+                color: "#0369a1",
+                fontWeight: 700,
+                fontSize: 12.5,
+                borderRadius: "999px",
+                px: 2,
+                mt: 0.5,
+                "&:hover": { bgcolor: "#f0f9ff" },
+              }}
+            >
+              Explore Now →
+            </Button>
           </Paper>
-        ) : null}
 
-        <Stack spacing={2.5}>
+          {/* 4) DAILY WISHING BANNER, TOP ACHIEVERS, VIDEOS & TOUR */}
           <WishingBannerCarousel items={banners} loading={bannersLoading} error={bannersErr} />
           <TopAchieversRow items={achievers} loading={achieversLoading} error={achieversErr} />
           <VideoScroller
@@ -886,7 +937,6 @@ export default function TeamDashboard() {
         user={profileUser}
         initials={initials}
       />
-      {isMobile ? <MobileBottomNav value={navIndex} onChange={handleNav} /> : null}
     </Box>
   );
 }

@@ -306,7 +306,7 @@ export default function EarningsTab({
           }}
         >
           <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>
-            Rank‑1 Matrix
+            Rank‑1 Blocks
           </div>
           <button
             onClick={onRefresh}

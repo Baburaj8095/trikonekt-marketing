@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Box,
   Paper,
@@ -271,23 +271,41 @@ export default function Wallet() {
         setMyWithdrawals(wlist || []);
         setKyc(kycRes?.data || { verified: false });
         setProfile(profileRes?.data || null);
-        // Load withdrawals window from admin master config
+        // Load withdrawals window from stored config or admin master config
+        let activeCfg = null;
+        try {
+          const stored = localStorage.getItem("tk_withdrawals_window");
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed && typeof parsed.weekday === "number") {
+              activeCfg = {
+                enabled: Boolean(parsed.enabled ?? true),
+                weekday: Number(parsed.weekday ?? 2),
+                start_time: String(parsed.start_time ?? "00:00").slice(0, 5),
+                end_time: String(parsed.end_time ?? "23:59").slice(0, 5),
+              };
+            }
+          }
+        } catch (_) {}
+
         try {
           const cfgRes = await API.get("/admin/commission/master/", { cacheTTL: 10_000, dedupe: "cancelPrevious" });
           const wwin = cfgRes?.data?.withdrawals_window;
           if (wwin) {
-            const cfg = {
+            activeCfg = {
               enabled: Boolean(wwin?.enabled ?? true),
               weekday: Number(wwin?.weekday ?? 2),
               start_time: String(wwin?.start_time ?? "00:00").slice(0, 5),
               end_time: String(wwin?.end_time ?? "23:59").slice(0, 5),
             };
-            setWithdrawalsWindowCfg(cfg);
-            setWindowInfo(computeWindowLocal(cfg));
-          } else {
-            setWindowInfo(computeWindowLocal(withdrawalsWindowCfg));
+            try { localStorage.setItem("tk_withdrawals_window", JSON.stringify(activeCfg)); } catch (_) {}
           }
-        } catch (_) {
+        } catch (_) {}
+
+        if (activeCfg) {
+          setWithdrawalsWindowCfg(activeCfg);
+          setWindowInfo(computeWindowLocal(activeCfg));
+        } else {
           setWindowInfo(computeWindowLocal(withdrawalsWindowCfg));
         }
       } catch (e) {
@@ -480,9 +498,38 @@ export default function Wallet() {
 
   return (
     <Box sx={{ maxWidth: 1000, mx: "auto", px: { xs: 2, sm: 3 }, py: { xs: 2, sm: 3 } }}>
-      <Typography variant="h5" sx={{ mb: 2, fontWeight: 700, color: "#0C2D48" }}>
-        Earning Wallet
-      </Typography>
+      <Paper
+        elevation={0}
+        sx={{
+          mb: 2.5,
+          p: { xs: 2, sm: 2.5 },
+          borderRadius: "20px",
+          background: "linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #2563eb 100%)",
+          color: "#ffffff",
+          boxShadow: "0 10px 30px rgba(15, 23, 42, 0.12)",
+        }}
+      >
+        <Stack direction="row" spacing={1.5} alignItems="center">
+          <Avatar
+            sx={{
+              width: 48,
+              height: 48,
+              bgcolor: "rgba(255,255,255,0.2)",
+              color: "#ffffff",
+              border: "2px solid rgba(255,255,255,0.4)",
+            }}
+          >
+            <AccountBalanceIcon />
+          </Avatar>
+          <Box>
+            <Typography sx={{ fontWeight: 950, fontSize: 20, color: "#ffffff" }}>
+              Withdrawal Center
+            </Typography>            <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.8)" }}>
+              Request bank withdrawal or check your weekly withdrawal window.
+            </Typography>
+          </Box>
+        </Stack>
+      </Paper>
 
     
 
@@ -687,10 +734,14 @@ export default function Wallet() {
                       variant="contained"
                       disabled={Boolean(disableReason) || wdrSubmitting}
                       sx={{
+                        height: 48,
                         fontWeight: 900,
+                        fontSize: 15,
                         textTransform: "none",
-                        borderRadius: 2,
-                        py: 1.2,
+                        borderRadius: "14px",
+                        background: "linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #2563eb 100%)",
+                        boxShadow: "0 8px 20px rgba(37,99,235,0.28)",
+                        "&:hover": { background: "linear-gradient(135deg, #0f172a 0%, #1d4ed8 100%)" },
                       }}
                     >
                       {wdrSubmitting ? "Requesting..." : "Submit Bank Withdrawal"}

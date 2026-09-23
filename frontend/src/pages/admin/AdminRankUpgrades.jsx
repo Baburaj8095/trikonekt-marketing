@@ -156,8 +156,7 @@ function UpgradeRow({ u, onViewCommissions, onApprove, onReject, readOnly = fals
           sx={{ mt: 1 }}
           flexWrap="wrap"
         >
-          {!readOnly && u.payment_status ===
-          "INITIATED" ? (
+          {!readOnly && (u.payment_status === "INITIATED" || u.payment_status === "SUCCESS") ? (
             <>
               <Button
                 size="small"
@@ -165,18 +164,20 @@ function UpgradeRow({ u, onViewCommissions, onApprove, onReject, readOnly = fals
                 color="success"
                 onClick={() => onApprove(u)}
               >
-                Approve
+                {u.payment_status === "SUCCESS" ? "Process Commissions" : "Approve"}
               </Button>
 
-              <Button
-                size="small"
-                variant="outlined"
-                color="error"
-                sx={{ m: 1 }}
-                onClick={() => onReject(u)}
-              >
-                Reject
-              </Button>
+              {u.payment_status === "INITIATED" && (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="error"
+                  sx={{ m: 1 }}
+                  onClick={() => onReject(u)}
+                >
+                  Reject
+                </Button>
+              )}
             </>
           ) : null}
 
@@ -270,8 +271,7 @@ function UpgradeRow({ u, onViewCommissions, onApprove, onReject, readOnly = fals
             label={u.payment_status}
           />
 
-          {!readOnly && u.payment_status ===
-          "INITIATED" ? (
+          {!readOnly && (u.payment_status === "INITIATED" || u.payment_status === "SUCCESS") ? (
             <>
               <Button
                 size="small"
@@ -279,17 +279,19 @@ function UpgradeRow({ u, onViewCommissions, onApprove, onReject, readOnly = fals
                 color="success"
                 onClick={() => onApprove(u)}
               >
-                Approve
+                {u.payment_status === "SUCCESS" ? "Process Commissions" : "Approve"}
               </Button>
 
-              <Button
-                size="small"
-                variant="outlined"
-                color="error"
-                onClick={() => onReject(u)}
-              >
-                Reject
-              </Button>
+              {u.payment_status === "INITIATED" && (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="error"
+                  onClick={() => onReject(u)}
+                >
+                  Reject
+                </Button>
+              )}
             </>
           ) : null}
 
@@ -620,9 +622,34 @@ export default function AdminRankUpgrades({
             Commission Rows
           </Typography>
           {commissions.length === 0 ? (
-            <Typography color="text.secondary" sx={{ mb: 1 }}>
-              No commission rows.
-            </Typography>
+            <Box sx={{ mb: 2, mt: 0.5 }}>
+              <Typography color="text.secondary" sx={{ mb: 1 }}>
+                No commission rows generated yet.
+              </Typography>
+              {!readOnly && selectedUpgrade ? (
+                <Button
+                  variant="contained"
+                  color="success"
+                  size="small"
+                  disabled={approveBusy}
+                  onClick={async () => {
+                    if (!selectedUpgrade) return;
+                    setApproveBusy(true);
+                    try {
+                      await adminApproveRankUpgrade(selectedUpgrade.id);
+                      await openCommissions(selectedUpgrade);
+                      await fetchList();
+                    } catch (e) {
+                      setErr(e?.response?.data?.detail || e?.message || "Failed to release commissions");
+                    } finally {
+                      setApproveBusy(false);
+                    }
+                  }}
+                >
+                  {approveBusy ? "Releasing..." : "Release / Distribute Commissions Now"}
+                </Button>
+              ) : null}
+            </Box>
           ) : (
             <Paper variant="outlined" sx={{ p: 1, borderRadius: 1.5, mb: 2 }}>
               {commissions.map((c) => (

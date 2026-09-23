@@ -5,11 +5,12 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Divider,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
+  IconButton,
   Paper,
   Stack,
   TextField,
@@ -20,9 +21,15 @@ import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
 import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceWalletRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
+import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
+import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import normalizeMediaUrl from "../utils/media";
 import API, { createWalletUploadRequest, getEcouponStoreBootstrap } from "../api/api";
 import { useNavigate } from "react-router-dom";
+import { C, R, S } from "../theme/tokens";
+
+const PRESET_AMOUNTS = [500, 1000, 2000, 5000, 10000];
 
 function readStoredUser() {
   try {
@@ -47,6 +54,7 @@ export default function UploadToWallet() {
   const [successOpen, setSuccessOpen] = useState(false);
   const [paymentConfig, setPaymentConfig] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [copiedUpi, setCopiedUpi] = useState(false);
 
   const [form, setForm] = useState({
     amount: "",
@@ -112,6 +120,19 @@ export default function UploadToWallet() {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
+  const setPreset = (amt) => {
+    setForm((prev) => ({ ...prev, amount: String(amt) }));
+  };
+
+  const copyUpiId = async () => {
+    if (!paymentConfig?.upi_id) return;
+    try {
+      await navigator.clipboard.writeText(paymentConfig.upi_id);
+      setCopiedUpi(true);
+      setTimeout(() => setCopiedUpi(false), 2000);
+    } catch (_) {}
+  };
+
   const onFileChange = (event) => {
     const file = event?.target?.files?.[0] || null;
     setForm((prev) => ({ ...prev, bill: file }));
@@ -145,7 +166,7 @@ export default function UploadToWallet() {
         utr: String(form.utr || "").trim(),
         proof: form.bill,
       });
-      setSuccessMsg("Payment is successfully inittated");
+      setSuccessMsg("Payment request submitted successfully");
       setSuccessOpen(true);
       setForm({ amount: "", utr: "", bill: null });
       setFileInputKey((prev) => prev + 1);
@@ -168,292 +189,331 @@ export default function UploadToWallet() {
   };
 
   return (
-    <Box className="consumer-fintech-page" sx={{ maxWidth: 900, mx: "auto", px: { xs: 0.5, sm: 2 }, py: { xs: 1, sm: 2 } }}>
+    <Box sx={{ maxWidth: 640, mx: "auto", px: { xs: 2, sm: 3 }, py: 2.5, pb: 10 }}>
+      {/* Header */}
       <Stack
-        direction={{ xs: "column", sm: "row" }}
+        direction="row"
         justifyContent="space-between"
-        alignItems={{ xs: "flex-start", sm: "center" }}
-        spacing={1.5}
-        sx={{ mb: 2 }}
+        alignItems="center"
+        sx={{ mb: 2.5 }}
       >
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 950, color: "#0f172a" }}>
-            Upload to Wallet
+          <Typography variant="h5" sx={{ fontWeight: 800, color: C.text, letterSpacing: "-0.5px" }}>
+            Add Money
           </Typography>
-          <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.5 }}>
-            Add your payment details and upload the supporting bill as shown in the sketch.
+          <Typography variant="body2" sx={{ color: C.textSecondary, mt: 0.5 }}>
+            Upload payment screenshot to deposit funds to wallet
           </Typography>
         </Box>
 
         <Button
           variant="outlined"
+          size="small"
           startIcon={<HistoryRoundedIcon />}
           onClick={() => navigate("/user/team-history?tab=add-money")}
-          sx={{ borderRadius: 2.5, width: { xs: "100%", sm: "auto" } }}
+          sx={{
+            borderRadius: `${R.md}px`,
+            borderColor: C.border,
+            color: C.text,
+            fontWeight: 700,
+            textTransform: "none",
+            "&:hover": { borderColor: C.primary, bgcolor: C.primaryLight },
+          }}
         >
           History
         </Button>
       </Stack>
 
       {screenError ? (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error" sx={{ mb: 2, borderRadius: `${R.md}px` }} onClose={() => setScreenError("")}>
           {screenError}
         </Alert>
       ) : null}
 
-      {successMsg ? (
-        <Alert severity="success" sx={{ mb: 2 }}>
-          {successMsg}
-        </Alert>
-      ) : null}
-
+      {/* Main Add Money Card */}
       <Paper
         elevation={0}
-        className="consumer-fintech-card"
         sx={{
-          borderRadius: 3,
-          overflow: "hidden",
+          p: { xs: 2.5, sm: 3 },
+          borderRadius: `${R.lg}px`,
+          bgcolor: C.surface,
+          border: `1.5px solid ${C.border}`,
+          boxShadow: S.card,
         }}
       >
-        <Box
-          sx={{
-            px: { xs: 2, sm: 3 },
-            py: 2,
-            background: "linear-gradient(135deg, #2563eb 0%, #0f766e 100%)",
-            color: "#fff",
-          }}
-        >
-          <Stack direction="row" spacing={1.25} alignItems="center">
-            <Box
+        {loading ? (
+          <Box sx={{ py: 6, display: "grid", placeItems: "center" }}>
+            <CircularProgress size={28} />
+          </Box>
+        ) : (
+          <Stack spacing={2.5}>
+            {/* Account Info Pill */}
+            <Paper
+              elevation={0}
               sx={{
-                width: 46,
-                height: 46,
-                borderRadius: 2.5,
-                bgcolor: "rgba(255,255,255,0.14)",
-                display: "grid",
-                placeItems: "center",
+                p: 2,
+                borderRadius: `${R.md}px`,
+                bgcolor: C.bg,
+                border: `1px solid ${C.border}`,
               }}
             >
-              <AccountBalanceWalletRoundedIcon />
-            </Box>
-            <Box>
-              <Typography sx={{ fontWeight: 950, fontSize: 18 }}>
-                Wallet Upload Request
-              </Typography>
-              <Typography sx={{ fontSize: 13, opacity: 0.85 }}>
-                Consumer details are auto-shown below.
-              </Typography>
-            </Box>
-          </Stack>
-        </Box>
-
-        <Box sx={{ p: { xs: 2, sm: 3 } }}>
-          {loading ? (
-            <Box sx={{ py: 6, display: "grid", placeItems: "center" }}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <Stack spacing={2.5}>
-              <Paper
-                elevation={0}
-                sx={{ p: 2, borderRadius: 3, bgcolor: "#f8fafc", border: "1px solid #e2e8f0" }}
-              >
-                <Stack spacing={1.25}>
-                  <Chip
-                    label="Auto Show"
-                    size="small"
-                    sx={{ width: "fit-content", fontWeight: 850, bgcolor: "#eff6ff", color: "#2563eb" }}
-                  />
-                  <Typography sx={{ fontWeight: 600 }}>
-                    Consumer ID: <Box component="span" sx={{ fontWeight: 400 }}>{consumerId}</Box>
+              <Stack direction="row" justifyContent="space-between" alignItems="center">
+                <Box>
+                  <Typography sx={{ fontSize: 12, color: C.textSecondary, fontWeight: 600 }}>
+                    DEPOSIT ACCOUNT
                   </Typography>
-                  <Typography sx={{ fontWeight: 600 }}>
-                    Consumer Name: <Box component="span" sx={{ fontWeight: 400 }}>{consumerName}</Box>
+                  <Typography sx={{ fontWeight: 800, fontSize: 15, color: C.text }}>
+                    {consumerName}
                   </Typography>
-                </Stack>
-              </Paper>
+                </Box>
+                <Chip
+                  label={consumerId}
+                  size="small"
+                  sx={{
+                    fontWeight: 700,
+                    bgcolor: C.primaryLight,
+                    color: C.primary,
+                    borderRadius: `${R.sm}px`,
+                  }}
+                />
+              </Stack>
+            </Paper>
 
-              <Box component="form" onSubmit={onSubmit}>
-                <Stack spacing={2.5}>
+            <Box component="form" onSubmit={onSubmit}>
+              <Stack spacing={2.5}>
+                {/* Amount Input */}
+                <Box>
+                  <Typography sx={{ fontWeight: 700, fontSize: 14, color: C.text, mb: 1 }}>
+                    Enter Amount
+                  </Typography>
                   <TextField
-                    label="Amount"
-                    placeholder="Enter amount"
-                    size="small"
+                    placeholder="₹ 0"
+                    size="medium"
                     fullWidth
                     type="number"
                     value={form.amount}
                     onChange={onChange("amount")}
-                    inputProps={{ min: 0, step: "0.01" }}
+                    inputProps={{ min: 1, step: "1" }}
+                    sx={{ mb: 1.5 }}
                   />
 
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      p: 2,
-                      borderRadius: 3,
-                      borderStyle: "dashed",
-                      borderColor: "#CBD5E1",
-                      borderWidth: 1,
-                      bgcolor: "#ffffff",
-                    }}
-                  >
-                    <Stack spacing={1.5}>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <QrCode2RoundedIcon color="primary" />
-                        <Typography sx={{ fontWeight: 700 }}>Payment Scanner</Typography>
-                      </Stack>
-
-                      {paymentConfig?.upi_qr_image_url ? (
-                        <Box
-                          component="img"
-                          src={normalizeMediaUrl(paymentConfig.upi_qr_image_url)}
-                          alt="Payment scanner"
+                  {/* Preset Amount Chips (Screen 9) */}
+                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                    {PRESET_AMOUNTS.map((amt) => {
+                      const isSelected = String(form.amount) === String(amt);
+                      return (
+                        <Chip
+                          key={amt}
+                          label={`+₹${amt.toLocaleString("en-IN")}`}
+                          onClick={() => setPreset(amt)}
                           sx={{
-                            width: { xs: "100%", sm: 178 },
-                            maxWidth: 210,
-                            height: 178,
-                            objectFit: "contain",
-                            borderRadius: 2,
-                            border: "1px solid #E2E8F0",
-                            bgcolor: "#fff",
-                            p: 1,
+                            fontWeight: 700,
+                            fontSize: 13,
+                            borderRadius: `${R.md}px`,
+                            py: 2,
+                            px: 0.5,
+                            cursor: "pointer",
+                            bgcolor: isSelected ? C.primary : C.bg,
+                            color: isSelected ? "#ffffff" : C.text,
+                            border: `1px solid ${isSelected ? C.primary : C.border}`,
+                            "&:hover": {
+                              bgcolor: isSelected ? C.primaryDark : C.primaryLight,
+                            },
                           }}
                         />
-                      ) : (
-                        <Box
-                          sx={{
-                            width: { xs: "100%", sm: 178 },
-                            maxWidth: 210,
-                            height: 178,
-                            borderRadius: 2,
-                            border: "1px solid #E2E8F0",
-                            bgcolor: "#F8FAFC",
-                            display: "grid",
-                            placeItems: "center",
-                            color: "text.secondary",
-                            textAlign: "center",
-                            px: 2,
-                          }}
-                        >
-                          QR scanner not configured yet.
-                        </Box>
-                      )}
+                      );
+                    })}
+                  </Stack>
+                </Box>
 
-                      {paymentConfig?.upi_id ? (
-                        <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                          UPI ID: <b>{paymentConfig.upi_id}</b>
-                        </Typography>
-                      ) : null}
+                {/* QR Scanner Section (Screen 9) */}
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 2.5,
+                    borderRadius: `${R.md}px`,
+                    border: `1.5px dashed ${C.border}`,
+                    bgcolor: C.bg,
+                    textAlign: "center",
+                  }}
+                >
+                  <Stack spacing={1.5} alignItems="center">
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <QrCode2RoundedIcon sx={{ color: C.primary }} />
+                      <Typography sx={{ fontWeight: 800, fontSize: 15, color: C.text }}>
+                        Scan & Pay with any UPI App
+                      </Typography>
                     </Stack>
-                  </Paper>
 
-                  <TextField
-                    label="UTR No (Optional)"
-                    placeholder="Enter UTR number if available"
-                    size="small"
-                    fullWidth
-                    value={form.utr}
-                    onChange={onChange("utr")}
-                  />
-
-                  <Paper
-                    elevation={0}
-                    sx={{ p: 2, borderRadius: 3, border: "1px solid #E2E8F0" }}
-                  >
-                    <Stack
-                      direction={{ xs: "column", sm: "row" }}
-                      spacing={1.5}
-                      justifyContent="space-between"
-                      alignItems={{ xs: "flex-start", sm: "center" }}
-                    >
-                      <Box>
-                        <Typography sx={{ fontWeight: 700, mb: 0.25 }}>
-                          Upload Bill
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                          Upload the payment screenshot, receipt, or bill.
-                        </Typography>
-                        {billName ? (
-                          <Typography variant="body2" sx={{ mt: 1, color: "#145DA0", fontWeight: 600 }}>
-                            Selected: {billName}
-                          </Typography>
-                        ) : null}
-                      </Box>
-
-                      <Button
-                        component="label"
-                        variant="outlined"
-                        startIcon={<UploadFileRoundedIcon />}
-                        sx={{ borderRadius: 2.5, width: { xs: "100%", sm: "auto" } }}
+                    {paymentConfig?.upi_qr_image_url ? (
+                      <Box
+                        component="img"
+                        src={normalizeMediaUrl(paymentConfig.upi_qr_image_url)}
+                        alt="Payment scanner"
+                        sx={{
+                          width: 180,
+                          height: 180,
+                          objectFit: "contain",
+                          borderRadius: `${R.md}px`,
+                          border: `1px solid ${C.border}`,
+                          bgcolor: "#fff",
+                          p: 1.5,
+                          boxShadow: S.sm,
+                        }}
+                      />
+                    ) : (
+                      <Box
+                        sx={{
+                          width: 180,
+                          height: 180,
+                          borderRadius: `${R.md}px`,
+                          border: `1px solid ${C.border}`,
+                          bgcolor: "#fff",
+                          display: "grid",
+                          placeItems: "center",
+                          color: C.textSecondary,
+                          fontSize: 13,
+                          fontWeight: 500,
+                          p: 2,
+                        }}
                       >
-                        Choose File
-                        <input
-                          key={fileInputKey}
-                          type="file"
-                          hidden
-                          accept="image/*,.pdf"
-                          onChange={onFileChange}
-                        />
-                      </Button>
-                    </Stack>
-                  </Paper>
+                        Official UPI QR will appear here.
+                      </Box>
+                    )}
 
-                  <Divider />
+                    {paymentConfig?.upi_id ? (
+                      <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.5 }}>
+                        <Typography variant="body2" sx={{ color: C.textSecondary, fontWeight: 600 }}>
+                          UPI ID: <b style={{ color: C.text }}>{paymentConfig.upi_id}</b>
+                        </Typography>
+                        <IconButton size="small" onClick={copyUpiId} sx={{ p: 0.5 }}>
+                          {copiedUpi ? (
+                            <CheckRoundedIcon sx={{ fontSize: 16, color: C.success }} />
+                          ) : (
+                            <ContentCopyRoundedIcon sx={{ fontSize: 16, color: C.primary }} />
+                          )}
+                        </IconButton>
+                      </Stack>
+                    ) : null}
+                  </Stack>
+                </Paper>
 
+                {/* UTR Reference Input */}
+                <TextField
+                  label="UTR / Transaction Reference (Optional)"
+                  placeholder="e.g. 329482910382"
+                  fullWidth
+                  value={form.utr}
+                  onChange={onChange("utr")}
+                />
+
+                {/* Upload Screenshot Dropzone */}
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 2.5,
+                    borderRadius: `${R.md}px`,
+                    border: `1.5px solid ${C.border}`,
+                    bgcolor: C.surface,
+                  }}
+                >
                   <Stack
                     direction={{ xs: "column", sm: "row" }}
-                    spacing={1.25}
-                    justifyContent="flex-start"
+                    spacing={1.5}
+                    justifyContent="space-between"
+                    alignItems={{ xs: "flex-start", sm: "center" }}
                   >
+                    <Box>
+                      <Typography sx={{ fontWeight: 700, fontSize: 14, color: C.text }}>
+                        Payment Proof Screenshot *
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: C.textSecondary }}>
+                        Upload clear screenshot showing UTR & Amount
+                      </Typography>
+                      {billName ? (
+                        <Typography variant="body2" sx={{ mt: 0.75, color: C.primary, fontWeight: 700 }}>
+                          ✓ Selected: {billName}
+                        </Typography>
+                      ) : null}
+                    </Box>
+
                     <Button
-                      type="submit"
-                      variant="contained"
-                      disabled={submitting || !canSubmit}
+                      component="label"
+                      variant="outlined"
+                      startIcon={<UploadFileRoundedIcon />}
                       sx={{
-                        minWidth: 160,
-                        textTransform: "none",
-                        borderRadius: 2.5,
+                        borderRadius: `${R.md}px`,
+                        borderColor: C.border,
+                        color: C.text,
                         fontWeight: 700,
+                        textTransform: "none",
+                        width: { xs: "100%", sm: "auto" },
+                        "&:hover": { borderColor: C.primary, bgcolor: C.primaryLight },
                       }}
                     >
-                      {submitting ? "Submitting..." : "Submit"}
-                    </Button>
-
-                    <Button
-                      variant="text"
-                      onClick={() => navigate("/user/team-history?tab=add-money")}
-                      sx={{ fontWeight: 850 }}
-                    >
-                      View History
+                      Browse File
+                      <input
+                        key={fileInputKey}
+                        type="file"
+                        hidden
+                        accept="image/*,.pdf"
+                        onChange={onFileChange}
+                      />
                     </Button>
                   </Stack>
-                </Stack>
-              </Box>
-            </Stack>
-          )}
-        </Box>
+                </Paper>
+
+                {/* Submit CTA */}
+                <Button
+                  type="submit"
+                  variant="contained"
+                  size="large"
+                  disabled={submitting || !canSubmit}
+                  endIcon={submitting ? <CircularProgress size={18} color="inherit" /> : <ArrowForwardRoundedIcon />}
+                  sx={{
+                    py: 1.6,
+                    fontSize: 15,
+                    fontWeight: 800,
+                    borderRadius: `${R.md}px`,
+                    background: C.primary,
+                    boxShadow: S.buttonPrimary,
+                    "&:hover": { background: C.primaryDark },
+                  }}
+                >
+                  {submitting ? "Submitting..." : "Submit Deposit Request"}
+                </Button>
+              </Stack>
+            </Box>
+          </Stack>
+        )}
       </Paper>
 
-      <Dialog open={successOpen} onClose={() => setSuccessOpen(false)} maxWidth="xs" fullWidth>
+      {/* Success Dialog */}
+      <Dialog open={successOpen} onClose={() => setSuccessOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: `${R.lg}px`, p: 1 } }}>
         <DialogTitle sx={{ textAlign: "center", pt: 3 }}>
-          <CheckCircleRoundedIcon color="success" sx={{ fontSize: 56, mb: 1 }} />
-          <Typography sx={{ fontWeight: 900, color: "#0f172a" }}>
-            {successMsg || "Payment is successfully inittated"}
+          <CheckCircleRoundedIcon sx={{ fontSize: 56, color: C.success, mb: 1 }} />
+          <Typography sx={{ fontWeight: 900, color: C.text, fontSize: 18 }}>
+            Request Submitted!
           </Typography>
         </DialogTitle>
         <DialogContent>
-          <Typography variant="body2" sx={{ textAlign: "center", color: "text.secondary" }}>
-            Your Add Money request is waiting for admin approval.
+          <Typography variant="body2" sx={{ textAlign: "center", color: C.textSecondary }}>
+            Your deposit request has been placed. Funds will be credited once verified.
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ justifyContent: "center", px: 3, pb: 3 }}>
-          <Button onClick={() => setSuccessOpen(false)} sx={{ textTransform: "none" }}>
+        <DialogActions sx={{ justifyContent: "center", px: 3, pb: 2.5 }}>
+          <Button onClick={() => setSuccessOpen(false)} sx={{ textTransform: "none", fontWeight: 600 }}>
             Close
           </Button>
           <Button
             variant="contained"
             onClick={() => navigate("/user/team-history?tab=add-money")}
-            sx={{ textTransform: "none", fontWeight: 800 }}
+            sx={{
+              textTransform: "none",
+              fontWeight: 800,
+              borderRadius: `${R.md}px`,
+              background: C.primary,
+            }}
           >
             View History
           </Button>

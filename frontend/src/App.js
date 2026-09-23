@@ -103,6 +103,8 @@ import AdminCommissionDistribute from "./pages/admin/AdminCommissionDistribute";
 import AdminWalletDebugger from "./pages/admin/AdminWalletDebugger";
 import AdminDailySalesReport from "./pages/admin/AdminDailySalesReport";
 import AdminLedgerStatement from "./pages/admin/AdminLedgerStatement";
+import AdminInternalWalletDailyReport from "./pages/admin/AdminInternalWalletDailyReport";
+import AdminUsersTodayReport from "./pages/admin/AdminUsersTodayReport";
 import Profile from "./pages/Profile";
 import RoleSelect from "./pages/Auth/RoleSelect";
 import ReferAndEarnPage from "./pages/ReferAndEarn";
@@ -125,6 +127,7 @@ import PackageSummary from "./pages/PackageSummary";
 import JoinSubscription from "./pages/packages/JoinSubscription";
 import SPP from "./pages/packages/SPP";
 import DigitalEducationPrime from "./pages/packages/DigitalEducationPrime";
+import EducationalVideoSummary from "./pages/packages/EducationalVideoSummary";
 import PromoProducts from "./pages/PromoProducts";
 import TrikonektProducts from "./pages/TrikonektProducts";
 import AgencyMarketplace from "./pages/agency/AgencyMarketplace";
@@ -175,10 +178,12 @@ import EcommerceUser from "./pages/ecommerceUser";
 import AdminEcommerceCategories from "./pages/admin/AdminEcommerceCategories";
 import CategoryPage from "./pages/CategoryPage";
 import AdminUIConfig from "./pages/admin/AdminUIConfig";
+import AdminCommissionConfig from "./pages/admin/AdminCommissionConfig";
 import AdminSeedDemoData from "./pages/admin/AdminSeedDemoData";
 import RankUpgrade from "./pages/RankUpgrade";
 import AdminRankUpgrades from "./pages/admin/AdminRankUpgrades";
 import UploadToWallet from "./pages/UploadToWallet";
+import WalletDashboardV2 from "./pages/consumer/WalletDashboardV2";
 import TeamWallet from "./screens/TeamWallet";
 import TeamDashboard from "./pages/team/TeamDashboard";
 const FranchiseDashboard = lazy(() => import("./components/franchise/FranchiseDashboard"));
@@ -350,6 +355,16 @@ function App() {
             <ProtectedRoute>
               <ConsumerShell>
                 <DigitalEducationPrime />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/educational-videos"
+          element={
+            <ProtectedRoute>
+              <ConsumerShell>
+                <EducationalVideoSummary />
               </ConsumerShell>
             </ProtectedRoute>
           }
@@ -546,6 +561,26 @@ function App() {
             <ProtectedRoute allowedRoles={["user"]}>
               <ConsumerShell>
                 <Wallet />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/withdrawal"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <Wallet />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/wallet-dashboard"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <WalletDashboardV2 />
               </ConsumerShell>
             </ProtectedRoute>
           }
@@ -1030,7 +1065,7 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["agency"]}>
               <AgencyShell>
-                <PromoPackages title="Join Prime" />
+                <PromoPackages title="Agent Subscription" />
               </AgencyShell>
             </ProtectedRoute>
           }
@@ -1294,7 +1329,7 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["employee"]}>
               <EmployeeShell>
-                <PromoPackages title="Join Prime" />
+                <PromoPackages title="Agent Subscription" />
               </EmployeeShell>
             </ProtectedRoute>
           }
@@ -1645,6 +1680,16 @@ function App() {
           }
         />
         <Route
+          path="/admin/commission-config"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminCommissionConfig />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/payments"
           element={
             <AdminProtectedRoute>
@@ -1825,6 +1870,16 @@ function App() {
             </AdminProtectedRoute>
           }
         />
+        <Route
+          path="/admin/reports/daily-report"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminDailySalesReport />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
 
         {/* Package-specific Admin screens (single screen per package) */}
         <Route
@@ -1983,6 +2038,26 @@ function App() {
             <AdminProtectedRoute>
               <AdminShell>
                 <AdminReports />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/reports/internal-wallet"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminInternalWalletDailyReport />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/reports/users-today"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminUsersTodayReport />
               </AdminShell>
             </AdminProtectedRoute>
           }
@@ -2358,7 +2433,7 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["business"]}>
               <BusinessShell>
-                <PromoPackages title="Join Prime" />
+                <PromoPackages title="Agent Subscription" />
               </BusinessShell>
             </ProtectedRoute>
           }

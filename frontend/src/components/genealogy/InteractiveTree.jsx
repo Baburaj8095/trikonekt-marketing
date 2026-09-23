@@ -688,7 +688,7 @@ export default function InteractiveTree({
             animation: "itSpin .8s linear infinite",
           }} />
           <span style={{ fontSize: 13, color: SUB, fontWeight: 600 }}>
-            Loading {slots}-Matrix…
+            Loading {slots}-Blocks…
           </span>
         </div>
       )}

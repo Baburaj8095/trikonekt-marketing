@@ -144,8 +144,8 @@ const ThreeMatrixIcon = () => (
 
 const TABS = [
   { id: "directs",      label: "Direct",     Icon: DirectsIcon },
-  { id: "five_matrix",  label: "5 Matrix",   Icon: FiveMatrixIcon },
-  { id: "three_matrix", label: "3 Matrix",   Icon: ThreeMatrixIcon },
+  { id: "five_matrix",  label: "5 Blocks",   Icon: FiveMatrixIcon },
+  { id: "three_matrix", label: "3 Blocks",   Icon: ThreeMatrixIcon },
   { id: "earnings",     label: "Rank Up",    Icon: EarningsIcon },
   // { id: "progress",     label: "Account",    Icon: ProgressIcon },
 ];
@@ -249,7 +249,7 @@ const AppHeader = React.memo(function AppHeader({ role, err }) {
               lineHeight: 1.1,
             }}
           >
-            Genealogy
+            Layer Blocks
           </h1>
           <p
             style={{
