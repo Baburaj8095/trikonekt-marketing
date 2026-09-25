@@ -3,6 +3,8 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Dict, Any, List, Optional
 
+from django.db import models
+
 from accounts.models import Wallet, CustomUser
 from business.models import CommissionConfig, AutoPoolAccount
 from .commission_policy import CommissionPolicy, ConfigurationError
@@ -78,6 +80,28 @@ def _credit_wallet(
     """
     if not user or _q2(amount) <= 0:
         return
+
+    # Background tasks are retried after transient placement/locking failures.
+    # Wallet.credit() creates the legacy transaction before the double-entry
+    # ledger applies its own idempotency key, so retrying without this guard
+    # would create another legacy credit for the same monthly event.
+    try:
+        from accounts.models import WalletTransaction
+
+        already_credited = WalletTransaction.objects.filter(
+            user=user,
+            source_type=source_type or "",
+            source_id=str(source_id or ""),
+        ).filter(
+            models.Q(type=tx_type) | models.Q(meta__orig_type=tx_type)
+        ).exists()
+        if already_credited:
+            return
+    except Exception:
+        # Do not suppress a valid payout merely because the defensive lookup
+        # cannot be evaluated; the normal wallet operation remains authoritative.
+        pass
+
     w = Wallet.get_or_create_for_user(user)
     w.credit(
         _q2(amount),
@@ -135,9 +159,7 @@ def _matrix_ancestor_accounts(acc: AutoPoolAccount, depth: int) -> List[AutoPool
 
             owner = getattr(node, "owner", None)
             oid = getattr(owner, "id", None) if owner else None
-            if owner and oid and oid not in seen:
-                chain.append(node)
-                seen.add(oid)
+            chain.append(node)
             node = getattr(node, "parent_account", None)
     except Exception:
         chain = []
@@ -290,10 +312,31 @@ def distribute_monthly_759_payouts(
         # ignore optional self if not configured
         pass
 
-    # 2) L1..L5 fixed amounts from master.monthly_759.levels_fixed (strict, no defaults)
+    # 2) L1..L5 fixed amounts from master.monthly_759.levels_fixed.
+    # These values were loaded but never distributed, which meant SPP matrix
+    # seats could be opened while the sponsor genealogy received no level bonus.
     cfg = CommissionConfig.get_solo()
     runtime = _load_monthly_759_runtime_cfg(cfg)
     levels_q: List[Decimal] = runtime["levels_fixed"]
+
+    for idx, recipient in enumerate(_resolve_upline(consumer, depth=len(levels_q))):
+        amount = _q2(levels_q[idx])
+        if amount <= 0:
+            continue
+        _credit_wallet(
+            recipient,
+            amount,
+            tx_type="MONTHLY_759_LEVEL",
+            meta={
+                "source": "MONTHLY_759",
+                "is_first_month": bool(is_first_month),
+                "level_index": idx + 1,
+                "from_user_id": getattr(consumer, "id", None),
+                "from_user": getattr(consumer, "username", None),
+            },
+            source_type=src_type,
+            source_id=src_id,
+        )
 
 
     # 3) Agency distribution via auto-pool (STRICT: must be configured)

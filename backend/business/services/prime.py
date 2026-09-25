@@ -175,28 +175,23 @@ def _as_percents(lst, length: int):
 def _matrix_ancestor_accounts(acc: AutoPoolAccount, depth: int) -> list[AutoPoolAccount]:
     """
     Walk AutoPoolAccount parent chain to collect ancestor AutoPoolAccount nodes up to `depth`.
-    Dedupe by owner id to preserve existing payout semantics.
+    Dedupe strictly by node id to avoid loops while allowing each rebirth/sub-account node to earn its layer commission.
     """
     chain: list[AutoPoolAccount] = []
     try:
-        seen = set()
         seen_node_ids = set()
         node = getattr(acc, "parent_account", None)
         while node and len(chain) < max(0, depth):
             node_id = getattr(node, "id", None)
-            if node_id in seen_node_ids:
+            if not node_id or node_id in seen_node_ids:
                 break
             seen_node_ids.add(node_id)
-
-            owner = getattr(node, "owner", None)
-            oid = getattr(owner, "id", None) if owner else None
-            if owner and oid and oid not in seen:
-                chain.append(node)
-                seen.add(oid)
+            chain.append(node)
             node = getattr(node, "parent_account", None)
     except Exception:
         chain = []
     return chain
+
 
 
 def _load_products_block(cfg: CommissionConfig) -> Dict[str, Any]:

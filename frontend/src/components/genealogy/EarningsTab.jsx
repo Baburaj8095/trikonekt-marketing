@@ -270,7 +270,7 @@ export default function EarningsTab({
           bg={C.successBg}
         />
         <EarningsCard
-          label="Level Released"
+          label="Layer Released"
           value={levelReleased}
           color={C.primary}
           bg={C.primaryLight}

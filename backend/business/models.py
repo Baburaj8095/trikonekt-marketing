@@ -2665,6 +2665,47 @@ class TriAppProduct(models.Model):
     def __str__(self):
         return f"{getattr(self.app, 'slug', 'app')} → {self.name}"
 
+class SPPGiftCard(models.Model):
+    STATUS_CHOICES = (
+        ("LOCKED", "LOCKED"),
+        ("ACTIVE", "ACTIVE"),
+        ("REDEEMED", "REDEEMED"),
+        ("MATURITY_ELIGIBLE", "MATURITY_ELIGIBLE"),
+        ("MATURED_PAID", "MATURED_PAID"),
+        ("CANCELLED", "CANCELLED"),
+    )
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="spp_gift_cards", db_index=True)
+    purchase = models.ForeignKey(PromoPurchase, on_delete=models.CASCADE, related_name="spp_gift_cards", null=True, blank=True)
+    season_number = models.PositiveIntegerField(default=1, db_index=True)
+    box_number = models.PositiveIntegerField(db_index=True, help_text="Month box 1 to 12")
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("1000.00"))
+    coupon_code = models.CharField(max_length=64, unique=True, db_index=True)
+    qr_code_data = models.TextField(blank=True)
+    status = models.CharField(max_length=24, choices=STATUS_CHOICES, default="LOCKED", db_index=True)
+
+    purchased_at = models.DateTimeField(auto_now_add=True)
+    unlock_at = models.DateTimeField(help_text="purchased_at + 60 days")
+    expires_at = models.DateTimeField(help_text="unlock_at + 30 days")
+
+    redeemed_at = models.DateTimeField(null=True, blank=True)
+    redeemed_trip_id = models.CharField(max_length=64, blank=True)
+    redeemed_trip_name = models.CharField(max_length=150, blank=True)
+
+    payout_at = models.DateTimeField(null=True, blank=True)
+    payout_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        ordering = ["season_number", "box_number", "-id"]
+        indexes = [
+            models.Index(fields=["user", "season_number", "status"]),
+            models.Index(fields=["coupon_code"]),
+        ]
+
+    def __str__(self):
+        return f"SPPGiftCard<{self.coupon_code}:{self.status}> (User {self.user_id} Season {self.season_number} Box {self.box_number})"
+
+
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -2684,3 +2725,4 @@ def activate_agency_on_any_payment(sender, instance: AgencyPackagePayment, creat
     except Exception:
         # best-effort; do not block payment save
         pass
+

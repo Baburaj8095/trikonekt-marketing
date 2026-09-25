@@ -73,6 +73,15 @@ from .views import (
     AdminTeamConsumerEducationalVideoDetailView,
     AdminTeamConsumerDocumentListCreateView,
     AdminTeamConsumerDocumentDetailView,
+
+    # SPP Gift Cards & Holiday Redemption
+    SPPGiftCardListView,
+    SPPCadenceMeView,
+    SPPGiftCardRedeemHolidayView,
+    SPPAnnualMaturityClaimView,
+    AdminSPPGiftCardsListView,
+    AdminSPPCadenceReportView,
+    AdminWalletTransactionsAllView,
 )
 
 urlpatterns = [
@@ -113,6 +122,17 @@ urlpatterns = [
     path('admin/promo/purchases/<int:pk>/approve/', AdminPromoPurchaseApproveView.as_view(), name='admin_promo_purchase_approve'),
     path('admin/promo/purchases/<int:pk>/reject/', AdminPromoPurchaseRejectView.as_view(), name='admin_promo_purchase_reject'),
     path('promo/prime750/preview/', Prime750PreviewView.as_view(), name='promo_prime750_preview'),
+
+    # ==========================
+    # SPP Gift Cards & Holiday Redemption
+    # ==========================
+    path('spp/gift-cards/', SPPGiftCardListView.as_view(), name='spp_gift_cards_list'),
+    path('spp/cadence/', SPPCadenceMeView.as_view(), name='spp_cadence_me'),
+    path('spp/gift-cards/redeem-holiday/', SPPGiftCardRedeemHolidayView.as_view(), name='spp_gift_cards_redeem_holiday'),
+    path('spp/gift-cards/claim-maturity/', SPPAnnualMaturityClaimView.as_view(), name='spp_gift_cards_claim_maturity'),
+    path('admin/spp/gift-cards/', AdminSPPGiftCardsListView.as_view(), name='admin_spp_gift_cards_list'),
+    path('admin/spp/cadence-report/', AdminSPPCadenceReportView.as_view(), name='admin_spp_cadence_report'),
+    path('admin/wallet-transactions/', AdminWalletTransactionsAllView.as_view(), name='admin_wallet_transactions_all'),
 
     # TRI Apps (Holidays, EV, etc.)
     path('tri/apps/', TriAppListView.as_view(), name='tri_apps_list'),
@@ -174,3 +194,4 @@ urlpatterns = [
     path('hubble/webhook/partner-discount/', HubbleWebhookReceiverView.as_view(), name='hubble_webhook_partner_discount'),
     path('hubble/webhook/transaction-status/', HubbleWebhookReceiverView.as_view(), name='hubble_webhook_transaction_status'),
 ]
+

@@ -133,8 +133,8 @@ export default function AdminUsersTodayReport() {
 
       {loading && <LinearProgress sx={{ mb: 2, borderRadius: 1 }} />}
 
-      <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2.5, overflow: "hidden" }}>
-        <Table size="small">
+      <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2.5, overflowX: "auto" }}>
+        <Table size="small" sx={{ minWidth: 1250 }}>
           <TableHead sx={{ backgroundColor: "#f8fafc" }}>
             <TableRow>
               <TableCell sx={{ fontWeight: 800, width: 70 }}>SLNO</TableCell>

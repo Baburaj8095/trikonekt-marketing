@@ -4056,6 +4056,68 @@ def wallet_me_history(request):
     except Exception:
         all_earnings_total = "0.00"
 
+    try:
+        from django.db.models import Sum, Q
+        level_earn_types = [
+            "LEVEL_BONUS",
+            "AUTOPOOL_BONUS_FIVE",
+            "AUTOPOOL_BONUS_THREE",
+        ]
+        q_level = Q(type__in=level_earn_types) | (
+            Q(type="INCOME_CREDIT_75") & (
+                Q(meta__orig_type__in=level_earn_types) |
+                Q(meta__source__icontains="MATRIX") |
+                Q(meta__trigger="PRIME_150")
+            )
+        )
+        level_tx_sum = WalletTransaction.objects.filter(user=user, amount__gt=0).filter(q_level).aggregate(total=Sum("amount"))["total"] or D("0.00")
+        try:
+            from mlm_ranks.models import UpgradeCommission
+            upg_level_sum = UpgradeCommission.objects.filter(to_user=user, commission_type="LEVEL").aggregate(total=Sum("commission_amount"))["total"] or D("0.00")
+        except Exception:
+            upg_level_sum = D("0.00")
+
+        level_earnings_total = str(level_tx_sum + upg_level_sum)
+    except Exception:
+        level_earnings_total = "0.00"
+
+    try:
+        from zoneinfo import ZoneInfo
+        import datetime
+        from django.utils import timezone
+        from django.db.models import Sum
+
+        ist = ZoneInfo("Asia/Kolkata")
+        now_ist = timezone.now().astimezone(ist)
+        start_today = datetime.datetime.combine(now_ist.date(), datetime.time.min, tzinfo=ist)
+        start_yesterday = start_today - datetime.timedelta(days=1)
+
+        today_main_75 = WalletTransaction.objects.filter(
+            user=user, created_at__gte=start_today, type="INCOME_CREDIT_75"
+        ).aggregate(s=Sum("amount"))["s"] or D("0.00")
+
+        yesterday_main_75 = WalletTransaction.objects.filter(
+            user=user, created_at__gte=start_yesterday, created_at__lt=start_today, type="INCOME_CREDIT_75"
+        ).aggregate(s=Sum("amount"))["s"] or D("0.00")
+
+        today_self_25 = WalletTransaction.objects.filter(
+            user=user, created_at__gte=start_today, type="SELF_ACCOUNT_CREDIT"
+        ).aggregate(s=Sum("amount"))["s"] or D("0.00")
+
+        yesterday_self_25 = WalletTransaction.objects.filter(
+            user=user, created_at__gte=start_yesterday, created_at__lt=start_today, type="SELF_ACCOUNT_CREDIT"
+        ).aggregate(s=Sum("amount"))["s"] or D("0.00")
+
+        today_bonus_100 = today_main_75 + today_self_25
+        yesterday_bonus_100 = yesterday_main_75 + yesterday_self_25
+    except Exception:
+        today_main_75 = D("0.00")
+        yesterday_main_75 = D("0.00")
+        today_self_25 = D("0.00")
+        yesterday_self_25 = D("0.00")
+        today_bonus_100 = D("0.00")
+        yesterday_bonus_100 = D("0.00")
+
     # Top summary
     top = {
         "main_income_balance": str(getattr(w, "main_balance", 0) or 0),
@@ -4064,6 +4126,13 @@ def wallet_me_history(request):
         "shopping_rewards_points": rp_balance,
         "redeem_points": rp_balance,
         "all_earnings_total": all_earnings_total,
+        "level_earnings_total": level_earnings_total,
+        "today_bonus_100": str(today_bonus_100),
+        "yesterday_bonus_100": str(yesterday_bonus_100),
+        "today_main_75": str(today_main_75),
+        "yesterday_main_75": str(yesterday_main_75),
+        "today_self_25": str(today_self_25),
+        "yesterday_self_25": str(yesterday_self_25),
     }
 
     # Buckets
@@ -4081,7 +4150,7 @@ def wallet_me_history(request):
         "MONTHLY_759_DIRECT",
         "MONTHLY_759_SELF",
     ]
-    incoming_qs = WalletTransaction.objects.filter(user=user, type__in=incoming_types, amount__gt=0).order_by("-created_at")[:50]
+    incoming_qs = WalletTransaction.objects.filter(user=user, type__in=incoming_types, amount__gt=0).order_by("-created_at")[:500]
     self_qs = WalletTransaction.objects.filter(user=user, type__in=["SELF_ACCOUNT_CREDIT", "SELF_ACCOUNT_DEBIT"]).order_by("-created_at")[:50]
     redeem_types = [
         "AUTO_ECOUPON_ISSUED",
@@ -4176,6 +4245,13 @@ def wallet_me_history(request):
         "cashback": cashback,
         "redeem": redeem_list,
         "recent": [txmap(x) for x in WalletTransaction.objects.filter(user=user).order_by("-created_at")[:50]],
+        "level_earnings": level_earnings_total,
+        "layer_matrix_earned": level_earnings_total,
+        "income": {
+            "matrixLevel": level_earnings_total,
+            "matrixFive": level_earnings_total,
+            "globalTri": str(WalletTransaction.objects.filter(user=user, type="GLOBAL_ROYALTY").aggregate(total=Sum("amount"))["total"] or D("0.00")),
+        }
     }
     return Response(data)
 

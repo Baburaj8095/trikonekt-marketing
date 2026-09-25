@@ -83,14 +83,14 @@ const WORKFLOWS = {
   },
   "generate-coupon": {
     title: "Generate Coupon",
-    description: "Coupon generation entry for Trizone, Near Store, Online, and Package Purchase coupons. Existing voucher maintenance is linked.",
-    status: "Workflow shell",
-    fields: [
-      { name: "coupon_type", label: "Coupon Type", select: ["Trizone", "Near Store", "Online", "Package Purchase"] },
-      { name: "user_id", label: "User ID / Phone", placeholder: "Enter receiver" },
-      { name: "amount", label: "Amount", type: "number", placeholder: "0.00" },
+    description: "Generate and issue Trizone, Near Store, Online, and Package Purchase vouchers directly to consumers with immediate wallet synchronization.",
+    status: "Live voucher creation",
+    isCouponWorkflow: true,
+    links: [
+      { to: "/admin/wallet-vouchers", label: "Coupon / Voucher Maintenance" },
+      { to: "/admin/wallet-command-center", label: "Wallet Command Center" },
+      { to: "/admin/wallet-ledger", label: "Wallet Ledger" },
     ],
-    links: [{ to: "/admin/wallet-vouchers", label: "Coupon Summary" }],
   },
   "crm-connect": {
     title: "CRM Connect",
@@ -148,6 +148,23 @@ export default function AdminWorkflowScreen() {
 
   const hasFields = fields.length > 0;
   const isRewardWorkflow = !!config.rewardType;
+  const isCouponWorkflow = !!config.isCouponWorkflow;
+
+  const [couponForm, setCouponForm] = useState({
+    voucher_type: "PACKAGE_PURCHASE",
+    user_id: "",
+    amount: "",
+    note: "",
+    validity_days: "90",
+  });
+  const [couponConsumer, setCouponConsumer] = useState(null);
+  const [couponError, setCouponError] = useState("");
+  const [couponSuccess, setCouponSuccess] = useState("");
+  const [createdVoucher, setCreatedVoucher] = useState(null);
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
+  const [submittingCoupon, setSubmittingCoupon] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+
   const summary = useMemo(
     () => fields.map((field) => `${field.label}: ${form[field.name] || "-"}`).join(" | "),
     [fields, form]
@@ -158,7 +175,84 @@ export default function AdminWorkflowScreen() {
     setConsumer(null);
     setRewardError("");
     setRewardSuccess("");
+    setCouponForm({
+      voucher_type: "PACKAGE_PURCHASE",
+      user_id: "",
+      amount: "",
+      note: "",
+      validity_days: "90",
+    });
+    setCouponConsumer(null);
+    setCouponError("");
+    setCouponSuccess("");
+    setCreatedVoucher(null);
   }, [slug]);
+
+  const validateCouponUser = async (overrideUser) => {
+    const rawUser = (overrideUser !== undefined ? overrideUser : couponForm.user_id).trim();
+    setCouponError("");
+    setCouponConsumer(null);
+    if (!rawUser) {
+      return;
+    }
+    setValidatingCoupon(true);
+    try {
+      let res;
+      try {
+        res = await API.get("/admin/rewards/team/validate-consumer/", { params: { username: rawUser } });
+      } catch (err1) {
+        // Fallback check on /admin/users/
+        res = await API.get("/admin/users/", { params: { q: rawUser, page_size: 1 } });
+        const matched = res?.data?.results?.[0];
+        if (matched) {
+          res = { data: { consumer: { username: matched.username, full_name: `${matched.first_name || ""} ${matched.last_name || ""}`.trim() || matched.username, phone: matched.phone || matched.phone_number } } };
+        } else {
+          throw err1;
+        }
+      }
+      setCouponConsumer(res?.data?.consumer || null);
+    } catch (err) {
+      setCouponError(err?.response?.data?.detail || "Receiver user verification failed. Please check phone/username.");
+    } finally {
+      setValidatingCoupon(false);
+    }
+  };
+
+  const submitCoupon = async () => {
+    setCouponError("");
+    setCouponSuccess("");
+    setCreatedVoucher(null);
+
+    const amt = Number(couponForm.amount || 0);
+    if (amt <= 0) {
+      setCouponError("Enter a voucher amount greater than 0.");
+      return;
+    }
+
+    if (couponForm.voucher_type === "PACKAGE_PURCHASE" && !couponForm.user_id.trim()) {
+      setCouponError("Package Purchase coupon requires a valid receiver User ID / Phone.");
+      return;
+    }
+
+    setSubmittingCoupon(true);
+    try {
+      const res = await API.post("/admin/wallet-vouchers/", {
+        voucher_type: couponForm.voucher_type,
+        assigned_to: couponForm.user_id.trim(),
+        amount: couponForm.amount,
+        note: couponForm.note,
+        validity_days: couponForm.validity_days,
+      });
+
+      const voucher = res?.data?.voucher || {};
+      setCreatedVoucher(voucher);
+      setCouponSuccess(res?.data?.message || `Voucher ${voucher.code || ""} generated successfully!`);
+    } catch (err) {
+      setCouponError(err?.response?.data?.detail || "Failed to generate voucher. Please check input details.");
+    } finally {
+      setSubmittingCoupon(false);
+    }
+  };
 
   const validateConsumer = async () => {
     const username = rewardForm.username.trim();
@@ -218,7 +312,7 @@ export default function AdminWorkflowScreen() {
             <Typography variant="h5" sx={{ fontWeight: 950, color: "#0f172a" }}>
               {config.title}
             </Typography>
-            <Chip size="small" label={config.status} />
+            <Chip size="small" label={config.status} color={isCouponWorkflow ? "success" : "default"} />
           </Stack>
           <Typography sx={{ color: "#64748b", fontSize: 13, mt: 0.75 }}>{config.description}</Typography>
         </Box>
@@ -237,7 +331,236 @@ export default function AdminWorkflowScreen() {
           </Paper>
         ) : null}
 
-        {isRewardWorkflow ? (
+        {isCouponWorkflow ? (
+          <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2 }}>
+            <Stack spacing={2.5}>
+              {couponError ? <Alert severity="error" onClose={() => setCouponError("")}>{couponError}</Alert> : null}
+              {couponSuccess ? <Alert severity="success" onClose={() => setCouponSuccess("")}>{couponSuccess}</Alert> : null}
+
+              {createdVoucher ? (
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: 2.5,
+                    borderRadius: 2,
+                    bgcolor: "#f0fdf4",
+                    borderColor: "#86efac",
+                  }}
+                >
+                  <Stack spacing={1.5}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
+                      <Typography sx={{ fontWeight: 950, color: "#166534", fontSize: 16 }}>
+                        Voucher Generated Successfully
+                      </Typography>
+                      <Chip label={createdVoucher.status || "ACTIVE"} color="success" size="small" />
+                    </Stack>
+                    <Divider sx={{ borderColor: "#bbf7d0" }} />
+                    <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", md: "repeat(4, 1fr)" }, gap: 1.5 }}>
+                      <Box>
+                        <Typography sx={{ fontSize: 12, color: "#15803d", fontWeight: 700 }}>Voucher Code</Typography>
+                        <Stack direction="row" alignItems="center" spacing={0.5}>
+                          <Typography sx={{ fontWeight: 950, fontSize: 15, fontFamily: "monospace", color: "#0f172a" }}>
+                            {createdVoucher.code}
+                          </Typography>
+                          <Button
+                            size="small"
+                            variant="text"
+                            sx={{ minWidth: "auto", p: 0.5, fontSize: 11 }}
+                            onClick={() => {
+                              navigator.clipboard.writeText(createdVoucher.code);
+                              setCopiedCode(true);
+                              setTimeout(() => setCopiedCode(false), 2000);
+                            }}
+                          >
+                            {copiedCode ? "Copied!" : "Copy"}
+                          </Button>
+                        </Stack>
+                      </Box>
+                      <Box>
+                        <Typography sx={{ fontSize: 12, color: "#15803d", fontWeight: 700 }}>Amount</Typography>
+                        <Typography sx={{ fontWeight: 950, fontSize: 15, color: "#0f172a" }}>
+                          ₹{money(createdVoucher.amount)}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography sx={{ fontSize: 12, color: "#15803d", fontWeight: 700 }}>Type</Typography>
+                        <Typography sx={{ fontWeight: 900, fontSize: 14, color: "#0f172a" }}>
+                          {createdVoucher.voucher_type}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography sx={{ fontSize: 12, color: "#15803d", fontWeight: 700 }}>Receiver</Typography>
+                        <Typography sx={{ fontWeight: 900, fontSize: 14, color: "#0f172a" }}>
+                          {createdVoucher.assigned_to_username || "Open Voucher"}
+                        </Typography>
+                      </Box>
+                    </Box>
+                    <Stack direction="row" spacing={1} sx={{ pt: 1 }}>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        color="success"
+                        sx={{ textTransform: "none", fontWeight: 800 }}
+                        onClick={() => {
+                          setCreatedVoucher(null);
+                          setCouponSuccess("");
+                          setCouponForm({
+                            voucher_type: "PACKAGE_PURCHASE",
+                            user_id: "",
+                            amount: "",
+                            note: "",
+                            validity_days: "90",
+                          });
+                          setCouponConsumer(null);
+                        }}
+                      >
+                        Create Another Voucher
+                      </Button>
+                      <Button
+                        component={Link}
+                        to="/admin/wallet-vouchers"
+                        variant="outlined"
+                        size="small"
+                        color="success"
+                        sx={{ textTransform: "none", fontWeight: 800 }}
+                      >
+                        View in Voucher Maintenance
+                      </Button>
+                    </Stack>
+                  </Stack>
+                </Paper>
+              ) : null}
+
+              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2, 1fr)" }, gap: 2 }}>
+                <TextField
+                  select
+                  label="Coupon Type"
+                  value={couponForm.voucher_type}
+                  size="small"
+                  fullWidth
+                  onChange={(e) => setCouponForm((prev) => ({ ...prev, voucher_type: e.target.value }))}
+                >
+                  <MenuItem value="PACKAGE_PURCHASE">Package Purchase (Self Package)</MenuItem>
+                  <MenuItem value="TRIZONE">Triozone Coupon</MenuItem>
+                  <MenuItem value="NEAR_STORE">Near Store Coupon</MenuItem>
+                  <MenuItem value="ONLINE">Online Coupon</MenuItem>
+                </TextField>
+
+                <Box sx={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 1, alignItems: "center" }}>
+                  <TextField
+                    label="Receiver User ID / Phone"
+                    value={couponForm.user_id}
+                    placeholder="Enter receiver mobile/username"
+                    size="small"
+                    fullWidth
+                    onChange={(e) => {
+                      setCouponForm((prev) => ({ ...prev, user_id: e.target.value }));
+                      setCouponConsumer(null);
+                    }}
+                    onBlur={() => validateCouponUser()}
+                  />
+                  <Button
+                    variant="outlined"
+                    onClick={() => validateCouponUser()}
+                    disabled={validatingCoupon || !couponForm.user_id.trim()}
+                    sx={{ textTransform: "none", fontWeight: 800, whiteSpace: "nowrap" }}
+                  >
+                    {validatingCoupon ? <CircularProgress size={16} color="inherit" /> : "Verify"}
+                  </Button>
+                </Box>
+              </Box>
+
+              {couponConsumer ? (
+                <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, bgcolor: "#f8fafc" }}>
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={2} justifyContent="space-between" alignItems="center">
+                    <Box>
+                      <Typography sx={{ fontWeight: 900, color: "#0f172a" }}>
+                        {couponConsumer.full_name || couponConsumer.username}
+                      </Typography>
+                      <Typography sx={{ color: "#64748b", fontSize: 13 }}>
+                        Username: {couponConsumer.username} {couponConsumer.phone ? `| Phone: ${couponConsumer.phone}` : ""}
+                      </Typography>
+                    </Box>
+                    <Chip label="Verified Consumer" color="success" size="small" variant="outlined" />
+                  </Stack>
+                </Paper>
+              ) : null}
+
+              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 2 }}>
+                <TextField
+                  label="Voucher Amount (₹)"
+                  type="number"
+                  value={couponForm.amount}
+                  placeholder="0.00"
+                  size="small"
+                  fullWidth
+                  inputProps={{ min: 1, step: "0.01" }}
+                  onChange={(e) => setCouponForm((prev) => ({ ...prev, amount: e.target.value }))}
+                />
+                <TextField
+                  select
+                  label="Validity Period"
+                  value={couponForm.validity_days}
+                  size="small"
+                  fullWidth
+                  onChange={(e) => setCouponForm((prev) => ({ ...prev, validity_days: e.target.value }))}
+                >
+                  <MenuItem value="30">30 Days (1 Month)</MenuItem>
+                  <MenuItem value="60">60 Days (2 Months)</MenuItem>
+                  <MenuItem value="90">90 Days (3 Months)</MenuItem>
+                  <MenuItem value="180">180 Days (6 Months)</MenuItem>
+                  <MenuItem value="365">365 Days (1 Year)</MenuItem>
+                </TextField>
+              </Box>
+
+              <TextField
+                label="Admin Note / Remarks"
+                value={couponForm.note}
+                placeholder="Optional notes regarding this voucher issuance"
+                size="small"
+                fullWidth
+                onChange={(e) => setCouponForm((prev) => ({ ...prev, note: e.target.value }))}
+              />
+
+              <Divider />
+
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ xs: "stretch", sm: "center" }}>
+                <Button
+                  variant="contained"
+                  onClick={submitCoupon}
+                  disabled={submittingCoupon || !couponForm.amount || Number(couponForm.amount) <= 0}
+                  sx={{ textTransform: "none", fontWeight: 900, minWidth: 180, py: 1 }}
+                >
+                  {submittingCoupon ? <CircularProgress size={18} color="inherit" /> : "Generate Voucher"}
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    setCouponForm({
+                      voucher_type: "PACKAGE_PURCHASE",
+                      user_id: "",
+                      amount: "",
+                      note: "",
+                      validity_days: "90",
+                    });
+                    setCouponConsumer(null);
+                    setCouponError("");
+                    setCouponSuccess("");
+                    setCreatedVoucher(null);
+                  }}
+                  sx={{ textTransform: "none", fontWeight: 800 }}
+                >
+                  Clear
+                </Button>
+                {couponForm.amount && Number(couponForm.amount) > 0 ? (
+                  <Typography sx={{ color: "#64748b", fontSize: 13, ml: { sm: 1 } }}>
+                    Amount to Issue: ₹{money(couponForm.amount)}
+                  </Typography>
+                ) : null}
+              </Stack>
+            </Stack>
+          </Paper>
+        ) : isRewardWorkflow ? (
           <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
             <Stack spacing={2}>
               {rewardError ? <Alert severity="error">{rewardError}</Alert> : null}
@@ -385,3 +708,4 @@ export default function AdminWorkflowScreen() {
     </Box>
   );
 }
+

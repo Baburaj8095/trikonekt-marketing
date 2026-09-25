@@ -203,12 +203,15 @@ export default function PackageSummary() {
         rows.tour.push(normalizePromoRow(row, "tour"));
         return;
       }
-      if (type === "MONTHLY" || code.includes("spp") || approx(price, 1000)) {
+      if (type === "MONTHLY" || code.includes("spp") || (approx(price, 1000) && !code.includes("prime") && !name.includes("prime") && !name.includes("educator"))) {
         rows.spp.push(normalizePromoRow(row, "spp"));
         return;
       }
-      if (approx(price, 750) || code.includes("750") || name.includes("join")) {
-        rows.join.push(normalizePromoRow(row, "join"));
+      if (approx(price, 750) || approx(price, 2000) || code.includes("750") || code.includes("prime") || name.includes("prime") || name.includes("educator") || name.includes("join")) {
+        const item = normalizePromoRow(row, "join");
+        item.amount = 2000;
+        item.packageName = "Agent Educator Starter Package";
+        rows.join.push(item);
       }
     });
 

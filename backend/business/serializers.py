@@ -1710,3 +1710,64 @@ class TriAppSerializer(serializers.ModelSerializer):
         except Exception:
             qs = []
         return TriAppProductSerializer(qs, many=True, context=self.context).data
+
+
+class SPPGiftCardSerializer(serializers.ModelSerializer):
+    user_username = serializers.CharField(source="user.username", read_only=True)
+    user_phone = serializers.SerializerMethodField()
+    days_until_unlock = serializers.SerializerMethodField()
+    days_until_expiry = serializers.SerializerMethodField()
+
+    class Meta:
+        from .models import SPPGiftCard
+        model = SPPGiftCard
+        fields = [
+            "id",
+            "user",
+            "user_username",
+            "user_phone",
+            "season_number",
+            "box_number",
+            "amount",
+            "coupon_code",
+            "qr_code_data",
+            "status",
+            "purchased_at",
+            "unlock_at",
+            "expires_at",
+            "days_until_unlock",
+            "days_until_expiry",
+            "redeemed_at",
+            "redeemed_trip_id",
+            "redeemed_trip_name",
+            "payout_at",
+            "payout_amount",
+        ]
+        read_only_fields = fields
+
+    def get_user_phone(self, obj):
+        try:
+            return str(getattr(obj.user, "phone", "") or getattr(obj.user, "phone_number", "") or "")
+        except Exception:
+            return ""
+
+    def get_days_until_unlock(self, obj):
+        try:
+            from django.utils import timezone
+            now = timezone.now()
+            if obj.unlock_at and obj.unlock_at > now:
+                return max(0, (obj.unlock_at - now).days)
+            return 0
+        except Exception:
+            return 0
+
+    def get_days_until_expiry(self, obj):
+        try:
+            from django.utils import timezone
+            now = timezone.now()
+            if obj.expires_at and obj.expires_at > now:
+                return max(0, (obj.expires_at - now).days)
+            return 0
+        except Exception:
+            return 0
+

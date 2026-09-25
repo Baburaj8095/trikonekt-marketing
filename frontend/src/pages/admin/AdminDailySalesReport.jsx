@@ -21,6 +21,11 @@ import {
   TableRow,
   TextField,
   Typography,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
+  InputAdornment,
 } from "@mui/material";
 import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
@@ -37,6 +42,9 @@ import HubIcon from "@mui/icons-material/Hub";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import SearchIcon from "@mui/icons-material/Search";
+import EventRepeatIcon from "@mui/icons-material/EventRepeat";
+import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import API from "../../api/api";
 
 function money(v) {
@@ -53,6 +61,13 @@ export default function AdminDailySalesReport() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [activeTab, setActiveTab] = useState(0);
+
+  // Tab 9: SPP Cadence Report State
+  const [cadenceData, setCadenceData] = useState(null);
+  const [cadenceLoading, setCadenceLoading] = useState(false);
+  const [cadenceSeason, setCadenceSeason] = useState(1);
+  const [cadenceSearch, setCadenceSearch] = useState("");
+  const [cadenceStatusFilter, setCadenceStatusFilter] = useState("ALL");
 
   // Initialize with the current month's range
   useEffect(() => {
@@ -94,6 +109,73 @@ export default function AdminDailySalesReport() {
     }
   }, [from, to]);
 
+  async function loadCadenceReport() {
+    try {
+      setCadenceLoading(true);
+      const res = await API.get("/business/admin/spp/cadence-report/", {
+        params: { season: cadenceSeason },
+      });
+      setCadenceData(res?.data || null);
+    } catch (e) {
+      console.error("Failed to load SPP cadence report:", e);
+    } finally {
+      setCadenceLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 8) {
+      loadCadenceReport();
+    }
+  }, [activeTab, cadenceSeason]);
+
+  function handleExportCadenceCSV() {
+    if (!cadenceData?.results || cadenceData.results.length === 0) return;
+
+    const headers = [
+      "User ID",
+      "Username",
+      "Full Name",
+      "Phone",
+      "Season",
+      "Boxes Completed",
+      "Total Invested (₹)",
+      "Last Purchase Date",
+      "Next Scheduled Date",
+      "Days Remaining / Overdue",
+      "Cadence Status",
+      "Status Message",
+    ];
+
+    const rows = cadenceData.results.map((r) => [
+      r.user_id,
+      r.username,
+      `"${(r.full_name || "").replace(/"/g, '""')}"`,
+      r.phone || "",
+      r.season_number,
+      `${r.boxes_completed}/12`,
+      r.total_invested || 0,
+      r.last_purchase_date || "",
+      r.next_purchase_date || "",
+      r.days_remaining != null ? r.days_remaining : "",
+      r.cadence_status,
+      `"${(r.status_message || "").replace(/"/g, '""')}"`,
+    ]);
+
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `SPP_Monthly_Cadence_Season_${cadenceSeason}_Report.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  // Export comprehensive data to CSV
   // Export comprehensive data to CSV
   function handleExportCSV() {
     if (!data?.results || data.results.length === 0) return;
@@ -111,6 +193,8 @@ export default function AdminDailySalesReport() {
       "Rank Upgrades Amount (₹)",
       "Royalty Paid Count",
       "Royalty Paid Amount (₹)",
+      "Self Rebirth Count",
+      "Self Rebirth Amount (₹)",
       "Coupon Load Count",
       "Coupon Load Amount (₹)",
       "Internal Transfer Count",
@@ -121,6 +205,9 @@ export default function AdminDailySalesReport() {
       "Withdrawal Pending Amount (₹)",
       "Withdrawal Rejected Count",
       "Withdrawal Rejected Amount (₹)",
+      "Output GST (18%) (₹)",
+      "TDS Withheld (₹)",
+      "Net Tax Remittance (₹)",
     ];
 
     const rows = data.results.map((r) => [
@@ -136,6 +223,8 @@ export default function AdminDailySalesReport() {
       r.upgrades_amount || "0.00",
       r.royalty_count || 0,
       r.royalty_amount || "0.00",
+      r.self_rebirth_count || 0,
+      r.self_rebirth_amount || "0.00",
       r.coupon_load_count || 0,
       r.coupon_load_amount || "0.00",
       r.transfer_count || 0,
@@ -146,6 +235,9 @@ export default function AdminDailySalesReport() {
       r.wdr_pending_amount || "0.00",
       r.wdr_rejected_count || 0,
       r.wdr_rejected_amount || "0.00",
+      r.tax_output_gst || "0.00",
+      r.tax_total_tds || "0.00",
+      r.tax_net_remittance || "0.00",
     ]);
 
     const csvContent =
@@ -166,31 +258,35 @@ export default function AdminDailySalesReport() {
     if (!data?.results || data.results.length === 0) return;
     const headers = [
       "Period Date",
-      "Gross Inflow (INR)",
+      "Commercial Inflow (INR)",
       "Taxable Value (INR)",
       "Output GST Rate (%)",
       "Output GST Collected (INR)",
       "Gross Outflow Disbursed (INR)",
-      "TDS Rate (%)",
-      "TDS Withheld Sec 194H (INR)",
-      "Net Remittance Obligation",
+      "TDS on Payouts Sec 194H (5%)",
+      "TDS on Auto-Blocks / Rebirth (INR)",
+      "Total TDS Withheld (INR)",
+      "Net Remittance Obligation (GST - TDS)",
     ];
     const rows = data.results.map((r) => {
-      const inflow = Number(r.total_inflow_amount || 0);
-      const taxable = (inflow / 1.18).toFixed(2);
-      const gst = (inflow * 0.18 / 1.18).toFixed(2);
+      const commercial = Number(r.agent_fee_amount || 0) + Number(r.spp_amount || 0) + Number(r.upgrades_amount || 0);
+      const taxable = (commercial / 1.18).toFixed(2);
+      const gst = r.tax_output_gst || "0.00";
       const wdr = Number(r.wdr_approved_amount || 0);
-      const tds = (wdr * 0.05).toFixed(2);
-      const netRemit = (Number(gst) - Number(tds)).toFixed(2);
+      const tdsWdr = r.tax_tds_wdr || "0.00";
+      const tdsRebirth = r.tax_tds_rebirth || "0.00";
+      const totalTds = r.tax_total_tds || "0.00";
+      const netRemit = r.tax_net_remittance || "0.00";
       return [
         r.date,
-        inflow.toFixed(2),
+        commercial.toFixed(2),
         taxable,
         "18%",
         gst,
         wdr.toFixed(2),
-        "5%",
-        tds,
+        tdsWdr,
+        tdsRebirth,
+        totalTds,
         netRemit,
       ];
     });
@@ -283,7 +379,7 @@ export default function AdminDailySalesReport() {
         <Box>
           {/* Executive KPI Summary Cards */}
           <Grid container spacing={2} sx={{ mb: 3 }}>
-            {/* Consolidated Inflow */}
+            {/* 1. Consolidated Inflow */}
             <Grid item xs={12} sm={6} md={3}>
               <Card variant="outlined" sx={{ borderRadius: 2.5, borderLeft: "4px solid #2563eb", height: "100%" }}>
                 <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
@@ -303,7 +399,67 @@ export default function AdminDailySalesReport() {
               </Card>
             </Grid>
 
-            {/* Net Company Float */}
+            {/* 2. Add Money Requests */}
+            <Grid item xs={12} sm={6} md={3}>
+              <Card variant="outlined" sx={{ borderRadius: 2.5, borderLeft: "4px solid #059669", height: "100%" }}>
+                <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography sx={{ color: "#64748b", fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>
+                      Add Money (Deposits)
+                    </Typography>
+                    <PaymentsIcon sx={{ color: "#059669", fontSize: 20 }} />
+                  </Stack>
+                  <Typography variant="h5" sx={{ fontWeight: 900, color: "#065f46", mt: 0.5 }}>
+                    ₹{money(summary.add_money_amount)}
+                  </Typography>
+                  <Typography sx={{ color: "#64748b", fontSize: 11, mt: 0.5 }}>
+                    {summary.add_money_count || 0} approved wallet uploads
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* 3. Coupon Pocket & P2P Circulation */}
+            <Grid item xs={12} sm={6} md={3}>
+              <Card variant="outlined" sx={{ borderRadius: 2.5, borderLeft: "4px solid #6366f1", height: "100%" }}>
+                <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography sx={{ color: "#64748b", fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>
+                      Coupon Pocket & P2P
+                    </Typography>
+                    <SwapHorizIcon sx={{ color: "#6366f1", fontSize: 20 }} />
+                  </Stack>
+                  <Typography variant="h5" sx={{ fontWeight: 900, color: "#3730a3", mt: 0.5 }}>
+                    ₹{money(summary.transfer_amount)}
+                  </Typography>
+                  <Typography sx={{ color: "#64748b", fontSize: 11, mt: 0.5 }}>
+                    {summary.transfer_count || 0} transfers | ₹{money(summary.coupon_load_amount)} coupon loaded
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* 4. Self Rebirth */}
+            <Grid item xs={12} sm={6} md={3}>
+              <Card variant="outlined" sx={{ borderRadius: 2.5, borderLeft: "4px solid #ea580c", height: "100%" }}>
+                <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography sx={{ color: "#64748b", fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>
+                      Self Rebirth (Blocks)
+                    </Typography>
+                    <LoyaltyIcon sx={{ color: "#ea580c", fontSize: 20 }} />
+                  </Stack>
+                  <Typography variant="h5" sx={{ fontWeight: 900, color: "#9a3412", mt: 0.5 }}>
+                    ₹{money(summary.self_rebirth_amount)}
+                  </Typography>
+                  <Typography sx={{ color: "#64748b", fontSize: 11, mt: 0.5 }}>
+                    {summary.self_rebirth_count || 0} auto-blocks / rebirth allocations
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* 5. Net Company Float */}
             <Grid item xs={12} sm={6} md={3}>
               <Card variant="outlined" sx={{ borderRadius: 2.5, borderLeft: "4px solid #0d9488", height: "100%" }}>
                 <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
@@ -323,7 +479,7 @@ export default function AdminDailySalesReport() {
               </Card>
             </Grid>
 
-            {/* Total System Liability */}
+            {/* 6. Total System Liability */}
             <Grid item xs={12} sm={6} md={3}>
               <Card variant="outlined" sx={{ borderRadius: 2.5, borderLeft: "4px solid #dc2626", height: "100%" }}>
                 <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
@@ -343,7 +499,7 @@ export default function AdminDailySalesReport() {
               </Card>
             </Grid>
 
-            {/* Solvency Coverage */}
+            {/* 7. Solvency Coverage */}
             <Grid item xs={12} sm={6} md={3}>
               <Card variant="outlined" sx={{ borderRadius: 2.5, borderLeft: "4px solid #7c3aed", height: "100%" }}>
                 <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
@@ -358,6 +514,26 @@ export default function AdminDailySalesReport() {
                   </Typography>
                   <Typography sx={{ color: "#64748b", fontSize: 11, mt: 0.5 }}>
                     Bank Float / User Liabilities
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* 8. Tax & TDS Compliance */}
+            <Grid item xs={12} sm={6} md={3}>
+              <Card variant="outlined" sx={{ borderRadius: 2.5, borderLeft: "4px solid #0891b2", height: "100%" }}>
+                <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography sx={{ color: "#64748b", fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>
+                      Tax & TDS Withheld
+                    </Typography>
+                    <TrendingUpIcon sx={{ color: "#0891b2", fontSize: 20 }} />
+                  </Stack>
+                  <Typography variant="h5" sx={{ fontWeight: 900, color: "#0e7490", mt: 0.5 }}>
+                    ₹{money(summary.tax_total_tds)}
+                  </Typography>
+                  <Typography sx={{ color: "#64748b", fontSize: 11, mt: 0.5 }}>
+                    GST: ₹{money(summary.tax_output_gst)} | TDS: ₹{money(summary.tax_total_tds)}
                   </Typography>
                 </CardContent>
               </Card>
@@ -381,13 +557,14 @@ export default function AdminDailySalesReport() {
               <Tab label="6. Risk & Fraud Sentinel" sx={{ fontWeight: 700, textTransform: "none" }} />
               <Tab label="7. Tax & Profit Intelligence (GST/TDS)" sx={{ fontWeight: 700, textTransform: "none" }} />
               <Tab label="8. Geographic Leaderboard" sx={{ fontWeight: 700, textTransform: "none" }} />
+              <Tab label="9. SPP Retention & Cadence Matrix" sx={{ fontWeight: 700, textTransform: "none" }} />
             </Tabs>
           </Paper>
 
           {/* TAB 0: Daily Financial Breakdown */}
           {activeTab === 0 && (
-            <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2.5 }}>
-              <Table size="small">
+            <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2.5, overflowX: "auto" }}>
+              <Table size="small" sx={{ minWidth: 1350 }}>
                 <TableHead sx={{ backgroundColor: "#f8fafc" }}>
                   <TableRow>
                     <TableCell sx={{ fontWeight: 800 }}>Date</TableCell>
@@ -401,13 +578,16 @@ export default function AdminDailySalesReport() {
                       Agent Fee (₹1k)
                     </TableCell>
                     <TableCell align="right" sx={{ fontWeight: 800 }}>
-                      SPP Boxes
+                      SPP Boxes (₹1k)
                     </TableCell>
                     <TableCell align="right" sx={{ fontWeight: 800 }}>
                       Rank Upgrades
                     </TableCell>
                     <TableCell align="right" sx={{ fontWeight: 800 }}>
                       Royalty Paid
+                    </TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800 }}>
+                      Self Rebirth
                     </TableCell>
                     <TableCell align="right" sx={{ fontWeight: 800 }}>
                       Coupon Loaded
@@ -417,6 +597,9 @@ export default function AdminDailySalesReport() {
                     </TableCell>
                     <TableCell align="right" sx={{ fontWeight: 800 }}>
                       Withdrawals (Appr / Pend)
+                    </TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800 }}>
+                      Daily Tax & TDS
                     </TableCell>
                   </TableRow>
                 </TableHead>
@@ -429,7 +612,7 @@ export default function AdminDailySalesReport() {
                           ₹{money(row.total_inflow_amount)}
                         </TableCell>
                         <TableCell align="right">
-                          <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
+                          <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#065f46" }}>
                             ₹{money(row.add_money_amount)}
                           </Typography>
                           <Typography sx={{ fontSize: 11, color: "#64748b" }}>
@@ -469,6 +652,14 @@ export default function AdminDailySalesReport() {
                           </Typography>
                         </TableCell>
                         <TableCell align="right">
+                          <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#ea580c" }}>
+                            ₹{money(row.self_rebirth_amount)}
+                          </Typography>
+                          <Typography sx={{ fontSize: 11, color: "#64748b" }}>
+                            {row.self_rebirth_count} blocks
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
                           <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#4338ca" }}>
                             ₹{money(row.coupon_load_amount)}
                           </Typography>
@@ -477,7 +668,7 @@ export default function AdminDailySalesReport() {
                           </Typography>
                         </TableCell>
                         <TableCell align="right">
-                          <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
+                          <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#3730a3" }}>
                             ₹{money(row.transfer_amount)}
                           </Typography>
                           <Typography sx={{ fontSize: 11, color: "#64748b" }}>
@@ -500,11 +691,19 @@ export default function AdminDailySalesReport() {
                             )}
                           </Stack>
                         </TableCell>
+                        <TableCell align="right">
+                          <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#0f766e" }}>
+                            GST: ₹{money(row.tax_output_gst)}
+                          </Typography>
+                          <Typography sx={{ fontSize: 11, color: "#0369a1", fontWeight: 600 }}>
+                            TDS: ₹{money(row.tax_total_tds)}
+                          </Typography>
+                        </TableCell>
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={10} align="center" sx={{ py: 4, color: "#64748b" }}>
+                      <TableCell colSpan={12} align="center" sx={{ py: 4, color: "#64748b" }}>
                         No financial records found in selected range.
                       </TableCell>
                     </TableRow>
@@ -1040,7 +1239,7 @@ export default function AdminDailySalesReport() {
                     Corporate Tax Accounting & Operational Retained Profit
                   </Typography>
                   <Typography sx={{ color: "#64748b", fontSize: 13 }}>
-                    Enterprise tax compliance tracking output GST collected on packages vs TDS withheld on wallet withdrawals under Indian IT Act.
+                    Enterprise tax compliance tracking output GST collected on packages vs TDS withheld on wallet withdrawals & auto-blocks under Indian IT Act.
                   </Typography>
                 </Box>
                 <Button
@@ -1061,13 +1260,13 @@ export default function AdminDailySalesReport() {
                   <Card variant="outlined" sx={{ borderRadius: 2, borderLeft: "4px solid #16a34a", backgroundColor: "#f0fdf4" }}>
                     <CardContent sx={{ p: 2 }}>
                       <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#166534", textTransform: "uppercase" }}>
-                        Total Output GST Received (18%)
+                        Total Output GST (18%)
                       </Typography>
                       <Typography variant="h5" sx={{ fontWeight: 900, color: "#14532d", mt: 0.5 }}>
-                        ₹{money(Number(summary.total_inflow || 0) * 0.18 / 1.18)}
+                        ₹{money(summary.tax_output_gst)}
                       </Typography>
                       <Typography sx={{ fontSize: 11, color: "#64748b", mt: 0.5 }}>
-                        On SPP Boxes & Rank Upgrades
+                        On Agent (₹1k), SPP (₹1k) & Upgrades
                       </Typography>
                     </CardContent>
                   </Card>
@@ -1077,13 +1276,13 @@ export default function AdminDailySalesReport() {
                   <Card variant="outlined" sx={{ borderRadius: 2, borderLeft: "4px solid #0284c7", backgroundColor: "#f0f9ff" }}>
                     <CardContent sx={{ p: 2 }}>
                       <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#0369a1", textTransform: "uppercase" }}>
-                        TDS Withheld on Payouts (5%)
+                        TDS Withheld (Total)
                       </Typography>
                       <Typography variant="h5" sx={{ fontWeight: 900, color: "#075985", mt: 0.5 }}>
-                        ₹{money(Number(summary.wdr_approved_amount || 0) * 0.05)}
+                        ₹{money(summary.tax_total_tds)}
                       </Typography>
                       <Typography sx={{ fontSize: 11, color: "#64748b", mt: 0.5 }}>
-                        Sec 194H/194R Remittance Escrow
+                        Payouts (₹{money(summary.tax_tds_wdr)}) + Auto-blocks (₹{money(summary.tax_tds_rebirth)})
                       </Typography>
                     </CardContent>
                   </Card>
@@ -1093,13 +1292,13 @@ export default function AdminDailySalesReport() {
                   <Card variant="outlined" sx={{ borderRadius: 2, borderLeft: "4px solid #7c3aed", backgroundColor: "#faf5ff" }}>
                     <CardContent sx={{ p: 2 }}>
                       <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#6d28d9", textTransform: "uppercase" }}>
-                        Admin Convenience Fee Retained
+                        Net Tax Obligation (GST - TDS)
                       </Typography>
                       <Typography variant="h5" sx={{ fontWeight: 900, color: "#5b21b6", mt: 0.5 }}>
-                        ₹{money(Number(summary.wdr_approved_amount || 0) * 0.05)}
+                        ₹{money(summary.tax_net_remittance)}
                       </Typography>
                       <Typography sx={{ fontSize: 11, color: "#64748b", mt: 0.5 }}>
-                        Admin maintenance charge on payouts
+                        Net Government remittance liability
                       </Typography>
                     </CardContent>
                   </Card>
@@ -1127,33 +1326,37 @@ export default function AdminDailySalesReport() {
               </Grid>
 
               {/* Tax Ledger Audit Table */}
-              <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
-                <Table size="small">
+              <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, overflowX: "auto" }}>
+                <Table size="small" sx={{ minWidth: 1100 }}>
                   <TableHead sx={{ backgroundColor: "#f8fafc" }}>
                     <TableRow>
                       <TableCell sx={{ fontWeight: 800 }}>Date</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 800 }}>Gross Inflow (₹)</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 800, color: "#166534" }}>Output GST (18%)</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 800 }}>Approved Outflow (₹)</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 800, color: "#0284c7" }}>TDS Withheld (5%)</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 800, color: "#9a3412" }}>Estimated Profit Margin (₹)</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 800, color: "#166534" }}>Output GST (18%) (₹)</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 800 }}>Approved Outflows (₹)</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 800, color: "#0284c7" }}>TDS on Payouts (5%) (₹)</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 800, color: "#0284c7" }}>TDS Auto-Blocks (₹)</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 800, color: "#0369a1" }}>Total TDS (₹)</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 800, color: "#5b21b6" }}>Net Remittance (₹)</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 800, color: "#9a3412" }}>Estimated Profit (₹)</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {(data.results || []).map((r, i) => {
                       const inflow = Number(r.total_inflow_amount || 0);
-                      const gst = inflow * 0.18 / 1.18;
                       const outflow = Number(r.wdr_approved_amount || 0);
-                      const tds = outflow * 0.05;
                       const royalty = Number(r.royalty_amount || 0);
                       const profit = inflow - royalty - outflow;
                       return (
                         <TableRow key={i} hover>
                           <TableCell sx={{ fontWeight: 700 }}>{r.date}</TableCell>
                           <TableCell align="right">₹{money(inflow)}</TableCell>
-                          <TableCell align="right" sx={{ color: "#166534", fontWeight: 700 }}>₹{money(gst)}</TableCell>
+                          <TableCell align="right" sx={{ color: "#166534", fontWeight: 700 }}>₹{money(r.tax_output_gst)}</TableCell>
                           <TableCell align="right">₹{money(outflow)}</TableCell>
-                          <TableCell align="right" sx={{ color: "#0284c7", fontWeight: 700 }}>₹{money(tds)}</TableCell>
+                          <TableCell align="right" sx={{ color: "#0284c7" }}>₹{money(r.tax_tds_wdr)}</TableCell>
+                          <TableCell align="right" sx={{ color: "#0284c7" }}>₹{money(r.tax_tds_rebirth)}</TableCell>
+                          <TableCell align="right" sx={{ color: "#0369a1", fontWeight: 700 }}>₹{money(r.tax_total_tds)}</TableCell>
+                          <TableCell align="right" sx={{ color: "#5b21b6", fontWeight: 700 }}>₹{money(r.tax_net_remittance)}</TableCell>
                           <TableCell align="right" sx={{ fontWeight: 800, color: profit >= 0 ? "#15803d" : "#dc2626" }}>
                             ₹{money(profit)}
                           </TableCell>
@@ -1283,6 +1486,312 @@ export default function AdminDailySalesReport() {
                   </Card>
                 </Grid>
               </Grid>
+            </Paper>
+          )}
+
+          {/* TAB 8: SPP Retention & Cadence Matrix */}
+          {activeTab === 8 && (
+            <Paper variant="outlined" sx={{ p: 3, borderRadius: 2.5, backgroundColor: "#ffffff" }}>
+              {/* Header & Season Filter */}
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                justifyContent="space-between"
+                alignItems={{ xs: "flex-start", sm: "center" }}
+                spacing={2}
+                sx={{ mb: 3 }}
+              >
+                <Box>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <EventRepeatIcon sx={{ color: "#2563eb", fontSize: 28 }} />
+                    <Typography variant="h6" sx={{ fontWeight: 800, color: "#0f172a" }}>
+                      SPP Monthly Retention & Cadence Matrix
+                    </Typography>
+                  </Stack>
+                  <Typography variant="body2" sx={{ color: "#64748b", mt: 0.25 }}>
+                    Real-time monitoring of each consumer's 30-day recurring box renewal, days remaining, and streak health.
+                  </Typography>
+                </Box>
+
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <FormControl size="small" sx={{ minWidth: 140 }}>
+                    <InputLabel>Season</InputLabel>
+                    <Select
+                      value={cadenceSeason}
+                      label="Season"
+                      onChange={(e) => setCadenceSeason(Number(e.target.value))}
+                    >
+                      <MenuItem value={1}>Season 1</MenuItem>
+                      <MenuItem value={2}>Season 2</MenuItem>
+                      <MenuItem value={3}>Season 3</MenuItem>
+                    </Select>
+                  </FormControl>
+
+                  {cadenceData?.results && cadenceData.results.length > 0 && (
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      startIcon={<FileDownloadIcon />}
+                      onClick={handleExportCadenceCSV}
+                      sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                    >
+                      Export CSV
+                    </Button>
+                  )}
+                </Stack>
+              </Stack>
+
+              {cadenceLoading && <LinearProgress sx={{ mb: 2, borderRadius: 1 }} />}
+
+              {/* 4 Summary KPI Cards */}
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={12} sm={6} md={3}>
+                  <Card variant="outlined" sx={{ borderRadius: 2, bgcolor: "#f8fafc", border: "1px solid #e2e8f0" }}>
+                    <CardContent sx={{ p: 2 }}>
+                      <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>
+                        Total Enrolled
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 800, color: "#0f172a", mt: 0.5 }}>
+                        {cadenceData?.summary?.total_users || 0} Users
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: "#64748b", mt: 0.25 }}>
+                        Season {cadenceSeason} Participants
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={3}>
+                  <Card variant="outlined" sx={{ borderRadius: 2, bgcolor: "#f0fdf4", border: "1px solid #bbf7d0" }}>
+                    <CardContent sx={{ p: 2 }}>
+                      <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#166534", textTransform: "uppercase" }}>
+                        Active & On Track
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 800, color: "#15803d", mt: 0.5 }}>
+                        {cadenceData?.summary?.on_track_count || 0}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: "#166534", mt: 0.25 }}>
+                        &gt; 5 days remaining in cycle
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={3}>
+                  <Card variant="outlined" sx={{ borderRadius: 2, bgcolor: "#fefce8", border: "1px solid #fef08a" }}>
+                    <CardContent sx={{ p: 2 }}>
+                      <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#854d0e", textTransform: "uppercase" }}>
+                        Due Soon (≤ 5 Days)
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 800, color: "#ca8a04", mt: 0.5 }}>
+                        {cadenceData?.summary?.due_soon_count || 0}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: "#854d0e", mt: 0.25 }}>
+                        Ready for notification outreach
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={3}>
+                  <Card variant="outlined" sx={{ borderRadius: 2, bgcolor: "#fff1f2", border: "1px solid #fecdd3" }}>
+                    <CardContent sx={{ p: 2 }}>
+                      <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#9f1239", textTransform: "uppercase" }}>
+                        Due Today & Overdue
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 800, color: "#e11d48", mt: 0.5 }}>
+                        {(cadenceData?.summary?.due_today_count || 0) + (cadenceData?.summary?.overdue_count || 0)}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: "#9f1239", mt: 0.25 }}>
+                        {cadenceData?.summary?.due_today_count || 0} due today • {cadenceData?.summary?.overdue_count || 0} overdue
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+
+              {/* Search & Filters */}
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2.5 }}>
+                <TextField
+                  size="small"
+                  placeholder="Search user by name, username, or phone..."
+                  value={cadenceSearch}
+                  onChange={(e) => setCadenceSearch(e.target.value)}
+                  fullWidth
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon sx={{ color: "#94a3b8", fontSize: 20 }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+
+                <FormControl size="small" sx={{ minWidth: 180 }}>
+                  <InputLabel>Status Filter</InputLabel>
+                  <Select
+                    value={cadenceStatusFilter}
+                    label="Status Filter"
+                    onChange={(e) => setCadenceStatusFilter(e.target.value)}
+                  >
+                    <MenuItem value="ALL">All Statuses</MenuItem>
+                    <MenuItem value="DUE_TODAY">Due Today</MenuItem>
+                    <MenuItem value="DUE_SOON">Due Soon (≤5 Days)</MenuItem>
+                    <MenuItem value="OVERDUE">Overdue</MenuItem>
+                    <MenuItem value="ON_TRACK">On Track</MenuItem>
+                    <MenuItem value="COMPLETED">Completed (12/12)</MenuItem>
+                  </Select>
+                </FormControl>
+              </Stack>
+
+              {/* Cadence Matrix Table */}
+              <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, overflowX: "auto" }}>
+                <Table size="small" sx={{ minWidth: 900 }}>
+                  <TableHead sx={{ backgroundColor: "#f8fafc" }}>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 800 }}>User / Member</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 800 }}>Box Streak</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 800 }}>Total Invested</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 800 }}>Last Purchase</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 800 }}>Next Scheduled Due</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 800 }}>Days Remaining</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 800 }}>Status</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {(() => {
+                      const list = (cadenceData?.results || []).filter((r) => {
+                        const matchesFilter =
+                          cadenceStatusFilter === "ALL" || r.cadence_status === cadenceStatusFilter;
+                        const q = cadenceSearch.trim().toLowerCase();
+                        const matchesSearch =
+                          !q ||
+                          (r.username && r.username.toLowerCase().includes(q)) ||
+                          (r.full_name && r.full_name.toLowerCase().includes(q)) ||
+                          (r.phone && r.phone.toLowerCase().includes(q));
+                        return matchesFilter && matchesSearch;
+                      });
+
+                      if (list.length === 0) {
+                        return (
+                          <TableRow>
+                            <TableCell colSpan={7} align="center" sx={{ py: 4, color: "#64748b" }}>
+                              No SPP cadence records found for this filter criteria.
+                            </TableCell>
+                          </TableRow>
+                        );
+                      }
+
+                      return list.map((r) => {
+                        const isOverdue = r.cadence_status === "OVERDUE";
+                        const isDueToday = r.cadence_status === "DUE_TODAY";
+                        const isDueSoon = r.cadence_status === "DUE_SOON";
+                        const isCompleted = r.cadence_status === "COMPLETED";
+
+                        return (
+                          <TableRow key={r.user_id} hover>
+                            <TableCell>
+                              <Typography sx={{ fontWeight: 700, fontSize: 13, color: "#0f172a" }}>
+                                {r.full_name || r.username}
+                              </Typography>
+                              <Typography sx={{ fontSize: 11, color: "#64748b" }}>
+                                @{r.username} {r.phone ? `• ${r.phone}` : ""}
+                              </Typography>
+                            </TableCell>
+
+                            <TableCell align="center">
+                              <Chip
+                                size="small"
+                                label={`${r.boxes_completed} / 12`}
+                                sx={{
+                                  fontWeight: 800,
+                                  bgcolor: isCompleted ? "#ede9fe" : "#f1f5f9",
+                                  color: isCompleted ? "#6d28d9" : "#334155",
+                                }}
+                              />
+                            </TableCell>
+
+                            <TableCell align="right" sx={{ fontWeight: 800, color: "#0f172a" }}>
+                              ₹{money(r.total_invested || 0)}
+                            </TableCell>
+
+                            <TableCell align="center" sx={{ fontSize: 12, color: "#475569" }}>
+                              {r.last_purchase_date || "—"}
+                            </TableCell>
+
+                            <TableCell align="center" sx={{ fontSize: 12, fontWeight: 700, color: isOverdue ? "#dc2626" : isDueToday ? "#ea580c" : "#0f172a" }}>
+                              {r.next_purchase_date || "—"}
+                            </TableCell>
+
+                            <TableCell align="center">
+                              {r.days_remaining != null ? (
+                                <Chip
+                                  size="small"
+                                  label={
+                                    r.days_remaining < 0
+                                      ? `${Math.abs(r.days_remaining)}d overdue`
+                                      : r.days_remaining === 0
+                                      ? "Due Today"
+                                      : `${r.days_remaining}d left`
+                                  }
+                                  sx={{
+                                    fontWeight: 800,
+                                    fontSize: 11,
+                                    bgcolor: isOverdue
+                                      ? "#fef2f2"
+                                      : isDueToday
+                                      ? "#fff7ed"
+                                      : isDueSoon
+                                      ? "#fefce8"
+                                      : "#f0fdf4",
+                                    color: isOverdue
+                                      ? "#dc2626"
+                                      : isDueToday
+                                      ? "#ea580c"
+                                      : isDueSoon
+                                      ? "#a16207"
+                                      : "#15803d",
+                                    border: "1px solid",
+                                    borderColor: isOverdue
+                                      ? "#fecaca"
+                                      : isDueToday
+                                      ? "#fed7aa"
+                                      : isDueSoon
+                                      ? "#fef08a"
+                                      : "#bbf7d0",
+                                  }}
+                                />
+                              ) : (
+                                "—"
+                              )}
+                            </TableCell>
+
+                            <TableCell align="center">
+                              <Chip
+                                size="small"
+                                label={r.cadence_status}
+                                sx={{
+                                  fontWeight: 800,
+                                  fontSize: 10.5,
+                                  bgcolor: isCompleted
+                                    ? "#7c3aed"
+                                    : isOverdue
+                                    ? "#dc2626"
+                                    : isDueToday
+                                    ? "#ea580c"
+                                    : isDueSoon
+                                    ? "#ca8a04"
+                                    : "#16a34a",
+                                  color: "#ffffff",
+                                }}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        );
+                      });
+                    })()}
+                  </TableBody>
+                </Table>
+              </TableContainer>
             </Paper>
           )}
         </Box>

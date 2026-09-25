@@ -70,9 +70,10 @@ export default function AppDrawer({
     {
       title: "AGENT SUBSCRIPTION",
       items: [
-        { label: "Agent Joining Fee", to: "/user/packages/join-subscription", icon: StarOutlineRoundedIcon },
+        { label: "Become Agent Educator", to: "/user/packages/join-subscription", icon: StarOutlineRoundedIcon },
         { label: "Digital Education", to: "/user/packages/digital-education-prime", icon: SchoolOutlinedIcon },
-        { label: "SPP", to: "/user/packages/spp", icon: Inventory2OutlinedIcon },
+        { label: "SPP (Monthly Boxes)", to: "/user/packages/spp", icon: Inventory2OutlinedIcon },
+        { label: "SPP Gift Cards & Maturity", to: "/user/spp-gift-cards", icon: CardGiftcardOutlinedIcon },
         { label: "Holidays", to: "/user/tri/tri-holidays", icon: FlightTakeoffOutlinedIcon },
       ],
     },

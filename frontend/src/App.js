@@ -126,6 +126,7 @@ import PromoPackages from "./pages/PromoPackages";
 import PackageSummary from "./pages/PackageSummary";
 import JoinSubscription from "./pages/packages/JoinSubscription";
 import SPP from "./pages/packages/SPP";
+import SPPGiftCards from "./pages/packages/SPPGiftCards";
 import DigitalEducationPrime from "./pages/packages/DigitalEducationPrime";
 import EducationalVideoSummary from "./pages/packages/EducationalVideoSummary";
 import PromoProducts from "./pages/PromoProducts";
@@ -345,6 +346,26 @@ function App() {
             <ProtectedRoute>
               <ConsumerShell>
                 <SPP />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/spp-gift-cards"
+          element={
+            <ProtectedRoute>
+              <ConsumerShell>
+                <SPPGiftCards />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/packages/spp-gift-cards"
+          element={
+            <ProtectedRoute>
+              <ConsumerShell>
+                <SPPGiftCards />
               </ConsumerShell>
             </ProtectedRoute>
           }
@@ -1219,16 +1240,16 @@ function App() {
             </ProtectedRoute>
           }
         />
-        {/* Trikonekt Products (Public + Consumer) */}
-        <Route path="/promo-products" element={<ConsumerShell><PromoProducts /></ConsumerShell>} />
-        <Route path="/trikonekt-products" element={<ConsumerShell><TrikonektProducts /></ConsumerShell>} />
-        <Route path="/trikonekt-products/products/:id" element={<ConsumerShell><ProductDetails /></ConsumerShell>} />
+        {/* Trikonekt Products & Marketplace Redirects */}
+        <Route path="/promo-products" element={<Navigate to="/user/packages/spp" replace />} />
+        <Route path="/trikonekt-products" element={<Navigate to="/user/packages/spp" replace />} />
+        <Route path="/trikonekt-products/products/:id" element={<Navigate to="/user/packages/spp" replace />} />
         {/* Agency Marketplace visible to consumers */}
         <Route path="/agency-marketplace" element={<ConsumerShell><AgencyMarketplace /></ConsumerShell>} />
         <Route path="/agency-marketplace/banners/:id" element={<ConsumerShell><BannerDetails /></ConsumerShell>} />
         {/* Backward compatibility redirects */}
-        <Route path="/marketplace" element={<Navigate to="/trikonekt-products" replace />} />
-        <Route path="/marketplace/products/:id" element={<Navigate to="/trikonekt-products/products/:id" replace />} />
+        <Route path="/marketplace" element={<Navigate to="/user/packages/spp" replace />} />
+        <Route path="/marketplace/products/:id" element={<Navigate to="/user/packages/spp" replace />} />
         <Route path="/marketplace/banners/:id" element={<Navigate to="/agency/marketplace/banners/:id" replace />} />
         <Route
           path="/marketplace/my-orders"

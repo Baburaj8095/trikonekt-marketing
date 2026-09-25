@@ -305,21 +305,34 @@ function RowIcon({ value }) {
   );
 }
 
-function MiniCard({ title, value, icon, color = "primary" }) {
+function MiniCard({ title, value, icon, color = "primary", onClick, selected }) {
   return (
     <Paper
       variant="outlined"
+      onClick={onClick}
       sx={{
         minWidth: 150,
         flexShrink: 0,
         p: 1.2,
         borderRadius: 2.2,
-        borderColor: "#EEF2F6",
+        borderColor: selected ? `${color}.main` : "#EEF2F6",
+        borderWidth: selected ? 2 : 1,
+        cursor: onClick ? "pointer" : "default",
+        boxShadow: selected ? `0 4px 12px rgba(12, 45, 72, 0.12)` : "none",
         display: "flex",
         alignItems: "center",
         gap: 1.1,
         bgcolor: "#fff",
-        scrollSnapAlign: "start", // âœ… for smooth horizontal snapping
+        scrollSnapAlign: "start",
+        transition: "all 0.2s ease",
+        "&:hover": onClick ? {
+          borderColor: `${color}.main`,
+          boxShadow: "0 4px 12px rgba(12, 45, 72, 0.08)",
+          transform: "translateY(-1px)",
+        } : {},
+        "&:active": onClick ? {
+          transform: "scale(0.99)",
+        } : {},
       }}
     >
       <Avatar
@@ -527,6 +540,12 @@ export default function History() {
           shopping_rewards_points: data?.top?.shopping_rewards_points ?? "0.00",
           redeem_points: data?.top?.redeem_points ?? "0.00",
           all_earnings_total: data?.top?.all_earnings_total ?? "0.00",
+          today_bonus_100: data?.top?.today_bonus_100,
+          yesterday_bonus_100: data?.top?.yesterday_bonus_100,
+          today_main_75: data?.top?.today_main_75,
+          yesterday_main_75: data?.top?.yesterday_main_75,
+          today_self_25: data?.top?.today_self_25,
+          yesterday_self_25: data?.top?.yesterday_self_25,
         });
 
         setMainWallet(Array.isArray(data?.main_wallet) ? data.main_wallet : (Array.isArray(data?.recent) ? data.recent : []));
@@ -617,31 +636,97 @@ export default function History() {
   );
 
   const todaysEarnings = useMemo(() => {
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    return (mainWallet || [])
-      .filter(tx => new Date(tx.created_at) >= startOfToday && Number(tx.amount) > 0)
-      .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
-  }, [mainWallet]);
+    if (tab === 0) {
+      if (top.today_bonus_100 !== undefined && top.today_bonus_100 !== null) {
+        return Number(top.today_bonus_100);
+      }
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      return incomingGross
+        .filter(tx => new Date(tx.created_at) >= startOfToday && Number(tx.amount) > 0)
+        .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+    }
+    if (tab === 1) {
+      if (top.today_main_75 !== undefined && top.today_main_75 !== null) {
+        return Number(top.today_main_75);
+      }
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      return filteredMainWallet
+        .filter(tx => new Date(tx.created_at) >= startOfToday && Number(tx.amount) > 0)
+        .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+    }
+    if (tab === 2) {
+      if (top.today_self_25 !== undefined && top.today_self_25 !== null) {
+        return Number(top.today_self_25);
+      }
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      return selfAccount
+        .filter(tx => new Date(tx.created_at) >= startOfToday && Number(tx.amount) > 0)
+        .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+    }
+    return 0;
+  }, [tab, top, filteredMainWallet, incomingGross, selfAccount]);
 
   const yesterdaysEarnings = useMemo(() => {
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    const startOfYesterday = new Date(startOfToday);
-    startOfYesterday.setDate(startOfYesterday.getDate() - 1);
-    const endOfYesterday = new Date(startOfToday);
-    endOfYesterday.setMilliseconds(-1);
-    return (mainWallet || [])
-      .filter(tx => {
-        const txDate = new Date(tx.created_at);
-        return txDate >= startOfYesterday && txDate <= endOfYesterday && Number(tx.amount) > 0;
-      })
-      .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
-  }, [mainWallet]);
+    if (tab === 0) {
+      if (top.yesterday_bonus_100 !== undefined && top.yesterday_bonus_100 !== null) {
+        return Number(top.yesterday_bonus_100);
+      }
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      const startOfYesterday = new Date(startOfToday);
+      startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+      const endOfYesterday = new Date(startOfToday);
+      endOfYesterday.setMilliseconds(-1);
+      return incomingGross
+        .filter(tx => {
+          const txDate = new Date(tx.created_at);
+          return txDate >= startOfYesterday && txDate <= endOfYesterday && Number(tx.amount) > 0;
+        })
+        .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+    }
+    if (tab === 1) {
+      if (top.yesterday_main_75 !== undefined && top.yesterday_main_75 !== null) {
+        return Number(top.yesterday_main_75);
+      }
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      const startOfYesterday = new Date(startOfToday);
+      startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+      const endOfYesterday = new Date(startOfToday);
+      endOfYesterday.setMilliseconds(-1);
+      return filteredMainWallet
+        .filter(tx => {
+          const txDate = new Date(tx.created_at);
+          return txDate >= startOfYesterday && txDate <= endOfYesterday && Number(tx.amount) > 0;
+        })
+        .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+    }
+    if (tab === 2) {
+      if (top.yesterday_self_25 !== undefined && top.yesterday_self_25 !== null) {
+        return Number(top.yesterday_self_25);
+      }
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      const startOfYesterday = new Date(startOfToday);
+      startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+      const endOfYesterday = new Date(startOfToday);
+      endOfYesterday.setMilliseconds(-1);
+      return selfAccount
+        .filter(tx => {
+          const txDate = new Date(tx.created_at);
+          return txDate >= startOfYesterday && txDate <= endOfYesterday && Number(tx.amount) > 0;
+        })
+        .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+    }
+    return 0;
+  }, [tab, top, filteredMainWallet, incomingGross, selfAccount]);
 
   const tabs = [
-    { label: `Main Wallet (${filteredMainWallet.length})`, key: "main" },
     { label: `Bonus History (${filteredIncoming.length})`, key: "incoming" },
+    { label: `Main Wallet (${filteredMainWallet.length})`, key: "main" },
     { label: `Self Account (${filteredSelf.length})`, key: "self" },
   ];
 
@@ -670,17 +755,18 @@ export default function History() {
       {/* Main Wallet Summary Card (Clickable to switch tab) */}
       <Paper
         elevation={0}
-        onClick={() => setTab(0)}
+        onClick={() => setTab(1)}
         sx={{
           p: 1.6,
           borderRadius: 2.5,
           mb: 1.2,
           border: "1px solid",
-          borderColor: tab === 0 ? "primary.main" : "#EEF2F6",
+          borderColor: tab === 1 ? "primary.main" : "#EEF2F6",
+          borderWidth: tab === 1 ? 2 : 1,
           bgcolor: "#fff",
           cursor: "pointer",
           transition: "all 0.2s ease",
-          boxShadow: tab === 0 ? "0 4px 12px rgba(12, 45, 72, 0.12)" : "none",
+          boxShadow: tab === 1 ? "0 4px 12px rgba(12, 45, 72, 0.12)" : "none",
           "&:hover": {
             borderColor: "primary.main",
             boxShadow: "0 4px 12px rgba(12, 45, 72, 0.08)",
@@ -742,7 +828,7 @@ export default function History() {
           }}
         >
           <Typography variant="caption" sx={{ color: "success.dark", fontWeight: 800 }}>
-            Today's Earnings
+            {tab === 0 ? "Today's Bonus (100%)" : tab === 1 ? "Today's Main Inflow (75%)" : "Today's Reserve (25%)"}
           </Typography>
           <Typography sx={{ fontSize: 16, fontWeight: 900, color: "success.main", mt: 0.2 }}>
             +₹ {fmtAmount(todaysEarnings)}
@@ -765,7 +851,7 @@ export default function History() {
           }}
         >
           <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 800 }}>
-            Yesterday's Earnings
+            {tab === 0 ? "Yesterday's Bonus (100%)" : tab === 1 ? "Yesterday's Main (75%)" : "Yesterday's Reserve (25%)"}
           </Typography>
           <Typography sx={{ fontSize: 16, fontWeight: 900, color: "text.primary", mt: 0.2 }}>
             +₹ {fmtAmount(yesterdaysEarnings)}
@@ -786,17 +872,21 @@ export default function History() {
           "&::-webkit-scrollbar": { display: "none" },
         }}
       >
-          <MiniCard
+        <MiniCard
           title="Bonus Wallet"
           value={`₹ ${fmtAmount(top.all_earnings_total)}`}
           icon={<SavingsIcon fontSize="small" />}
           color="success"
+          onClick={() => setTab(0)}
+          selected={tab === 0}
         />
         <MiniCard
           title="Self Account"
           value={`₹ ${fmtAmount(top.self_account_balance)}`}
           icon={<AccountBalanceWalletIcon fontSize="small" />}
           color="warning"
+          onClick={() => setTab(2)}
+          selected={tab === 2}
         />
       </Box>
 
@@ -893,8 +983,8 @@ export default function History() {
             </Typography>
           ) : (
             <>
-              {tab === 0 && <SectionList sections={sectionsMainWallet} fallbackRows={filteredMainWallet} />}
-              {tab === 1 && <SectionList sections={sectionsIncoming} fallbackRows={filteredIncoming} />}
+              {tab === 0 && <SectionList sections={sectionsIncoming} fallbackRows={filteredIncoming} />}
+              {tab === 1 && <SectionList sections={sectionsMainWallet} fallbackRows={filteredMainWallet} />}
               {tab === 2 && <SectionList sections={sectionsSelf} fallbackRows={filteredSelf} />}
               {tab === 3 && <SectionList sections={sectionsRewards} fallbackRows={filteredRewards} />}
               {tab === 4 && <SectionList sections={sectionsRedeem} fallbackRows={filteredRedeem} />}

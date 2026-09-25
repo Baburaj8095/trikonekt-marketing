@@ -605,10 +605,17 @@ class MyMatrix5EntriesTree(APIView):
         if not root_acc and AutoPoolAccount:
             root_acc = (
                 AutoPoolAccount.objects.select_related("owner")
-                .filter(owner=me, pool_type=pool, status="ACTIVE")
-                .order_by("id")
+                .filter(owner=me, pool_type=pool, status="ACTIVE", parent_account__isnull=True)
                 .first()
             )
+            if not root_acc:
+                root_acc = (
+                    AutoPoolAccount.objects.select_related("owner")
+                    .filter(owner=me, pool_type=pool, status="ACTIVE")
+                    .order_by("id")
+                    .first()
+                )
+
         if not root_acc:
             return Response({"detail": "No ACTIVE matrix account found for this user and pool."}, status=status.HTTP_404_NOT_FOUND)
 

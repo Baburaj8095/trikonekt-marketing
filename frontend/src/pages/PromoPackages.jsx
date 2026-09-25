@@ -89,9 +89,12 @@ const isJoinPrimePackage = (pkg) => {
     code.includes("PRIME750") ||
     code.includes("PRIME1000") ||
     name.includes("PRIME") ||
+    name.includes("EDUCATOR") ||
+    name.includes("STARTER") ||
     type === "PRIME" ||
     approx(pkg?.price, 750) ||
-    approx(pkg?.price, 1000)
+    approx(pkg?.price, 1000) ||
+    approx(pkg?.price, 2000)
   );
 };
 
@@ -507,7 +510,7 @@ function AgentSubscriptionSection({
     <Box sx={{ p: { xs: 1, sm: 2 } }}>
       <Box sx={{ mb: 3, textAlign: "center" }}>
         <Chip
-          label="AGENT SUBSCRIPTION"
+          label="AGENT EDUCATOR ENROLLMENT"
           size="small"
           sx={{
             fontWeight: 800,
@@ -519,15 +522,15 @@ function AgentSubscriptionSection({
           }}
         />
         <Typography variant="h5" sx={{ fontWeight: 900, color: "#0f172a", mb: 0.5 }}>
-          Agent Joining Fee
+          Become an Agent Educator
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 600, mx: "auto" }}>
-          Includes ₹750 Agent Subscription + ₹250 Level 1 Rank Upgrade fee. Unlocks Digital Education Masterclasses, 5-Block & 3-Block team activations, and team commissions.
+          Start your professional journey with official educator accreditation, comprehensive digital learning modules, and lifetime business growth enablement.
         </Typography>
       </Box>
 
       <Grid container justifyContent="center">
-        {/* AGENT PACKAGE: Agent Joining Fee (₹1,000) */}
+        {/* AGENT PACKAGE: Agent Educator Starter Package */}
         <Grid item xs={12} md={8} lg={6}>
           <Paper
             elevation={0}
@@ -562,31 +565,32 @@ function AgentSubscriptionSection({
             <Box>
               <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
                 <Chip
-                  label="STARTER PACKAGE"
+                  label="STARTER ENROLLMENT"
                   size="small"
                   sx={{ fontWeight: 800, fontSize: 10, bgcolor: "#e0e7ff", color: "#3730a3" }}
                 />
                 {prime750Active ? <Chip label="Active" size="small" color="success" sx={{ fontWeight: 800 }} /> : null}
               </Stack>
               <Typography variant="h6" sx={{ fontWeight: 900, color: "#0f172a", mb: 0.5 }}>
-                Agent Joining Fee
+                Agent Educator Starter Package
               </Typography>
               <Stack direction="row" alignItems="baseline" spacing={0.5} sx={{ mb: 2 }}>
                 <Typography sx={{ fontSize: 32, fontWeight: 950, color: "#1e1b4b" }}>
-                  ₹ 1,000
+                  ₹ 2,000
                 </Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
-                  (₹750 Subscription + ₹250 Level 1 Rank Upgrade)
+                  (One-Time Starter Enrollment & Activation)
                 </Typography>
               </Stack>
 
               <Stack spacing={1.5} sx={{ mb: 3 }}>
                 {[
-                  "Includes ₹750 Agent Subscription + ₹250 Level 1 Rank Upgrade",
-                  "Full Access to Level 1 Digital Education Video Masterclasses",
-                  "Activates 5-Block & 3-Block Team Account Positions",
-                  "Unlocks Direct Referral & Team Commission Eligibility",
-                  "Includes ₹150 Bonus Wallet Credit",
+                  "Official Agent Educator Certification & Accreditation",
+                  "Full Access to Digital Education & Vocational Masterclasses",
+                  "Authorized Mentorship & Team Business Commission License",
+                  "Dedicated Career Growth & Learning Dashboard Activation",
+                  "Includes SPP Month 1 Product Box / Voucher Allocation",
+                  "Includes Welcome Bonus Wallet Credit",
                 ].map((item, idx) => (
                   <Stack key={idx} direction="row" spacing={1} alignItems="center">
                     <CheckCircleRoundedIcon sx={{ fontSize: 18, color: "#4338ca" }} />
@@ -604,10 +608,11 @@ function AgentSubscriptionSection({
               disabled={!!prime750Active}
               onClick={() => {
                 onBuy({
-                  pkg: pkg || { id: 2, code: "PRIME750", name: "Agent Joining Fee", price: 750 },
-                  amount: 1000,
-                  uiMeta: { bonus150: true, packageName: "Agent Joining Fee (Digital Education Level 1)" },
-                  purchasePayload: { prime750_choice: "REDEEM" },
+                  pkg: pkg || { id: 2, code: "PRIME750", name: "Agent Educator Starter Package", price: 2000 },
+                  amount: 2000,
+                  isStarterBundle: true,
+                  uiMeta: { bonus150: true, packageName: "Agent Educator Starter Package", isStarterBundle: true },
+                  purchasePayload: { prime750_choice: "REDEEM", is_starter_bundle: true },
                 });
               }}
               sx={{
@@ -622,7 +627,7 @@ function AgentSubscriptionSection({
                 boxShadow: prime750Active ? "none" : "0 8px 20px rgba(67,56,202,0.3)",
               }}
             >
-              {prime750Active ? "PACKAGE ACTIVE" : "SUBSCRIBE LEVEL 1 • ₹1,000"}
+              {prime750Active ? "ENROLLED • ACTIVE" : "BECOME AGENT EDUCATOR • ₹2,000"}
             </Button>
           </Paper>
         </Grid>
@@ -682,6 +687,7 @@ function Prime150Section({ reg150Pkg, prime150Active, onBuy }) {
  * - Month grid lets the user select payable monthly SPP slots
  */
 function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, seasonsHints = [], seasonActive, rename = null }) {
+  const navigate = useNavigate();
   const meta = seasonPkg?.monthly_meta || {};
   const defaultSeason = Number(meta?.current_package_number || 1);
   const seasonDetails = useMemo(() => {
@@ -739,7 +745,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
     1,
     Number(seasonDetails.get(Number(selectedSeason))?.totalBoxes || meta?.total_boxes || 12)
   );
-  const unitPrice = Math.max(0, Number(seasonPkg?.price || 0));
+  const unitPrice = Number(seasonPkg?.price) > 0 && Math.abs(Number(seasonPkg?.price) - 759) > 1 ? Number(seasonPkg?.price) : 1000;
   const unitPriceLabel = `Rs. ${unitPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
   useEffect(() => {
     // Ensure selected season is in the list. Default to first enabled (fallback to 1) if disabled.
@@ -824,16 +830,43 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
           overflow: "hidden",
         }}
       >
-        <Stack direction="row" alignItems="center" justifyContent="space-between">
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          alignItems={{ xs: "flex-start", sm: "center" }}
+          justifyContent="space-between"
+          spacing={2}
+        >
           <Box>
             <Typography variant="h6" sx={{ fontWeight: 900, color: "#ffffff", mb: 0.5, fontSize: { xs: 18, sm: 22 } }}>
               {(rename?.seasonLabel || "Smart Product Purchase (SPP)")}
               {seasonActive ? <Chip size="small" color="success" sx={{ ml: 1, fontWeight: 800 }} label="Active" /> : null}
             </Typography>
             <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.8)", fontWeight: 500 }}>
-              Choose a season and plan to get started.
+              ₹1,000 per box. Generates QR Gift Cards + 12-Month ₹14,000 Maturity Vault.
             </Typography>
           </Box>
+
+          <Button
+            variant="contained"
+            onClick={() => navigate("/user/spp-gift-cards")}
+            sx={{
+              bgcolor: "rgba(255,255,255,0.18)",
+              color: "#ffffff",
+              backdropFilter: "blur(10px)",
+              border: "1px solid rgba(255,255,255,0.3)",
+              fontWeight: 800,
+              px: 2.2,
+              py: 1,
+              borderRadius: 2.5,
+              textTransform: "none",
+              whiteSpace: "nowrap",
+              "&:hover": {
+                bgcolor: "rgba(255,255,255,0.3)",
+              },
+            }}
+          >
+            🎁 View Gift Cards & Maturity
+          </Button>
         </Stack>
       </Paper>
 
@@ -1406,10 +1439,10 @@ export default function PromoPackages({
   const DEFAULT_PRIME_PKG = useMemo(() => ({
     id: 5,
     code: "PRIME1000",
-    name: "Agent Digital Prime Package (₹1,000)",
-    description: "Agent Digital Education Prime Package",
+    name: "Agent Educator Starter Package",
+    description: "Agent Educator Starter Package (₹2,000)",
     type: "PRIME",
-    price: 1000,
+    price: 2000,
     is_active: true,
     promo_products: [{ id: 1, name: "Exclusive Starter Product Pack" }]
   }), []);
@@ -1561,9 +1594,9 @@ export default function PromoPackages({
               status === "APPROVED" ? "success.main" : status === "PENDING" ? "warning.main" : "text.secondary";
             const badgeBorder =
               status === "APPROVED" ? "success.main" : status === "PENDING" ? "warning.main" : "divider";
-            const isJoinPrimeHist = isJoinPrimePackage(h?.package) || approx(h?.amount, 750) || approx(h?.package?.price, 750);
-            const displayName = isJoinPrimeHist ? "Agent Digital Education Prime Package" : (h?.package?.name || "-");
-            const displayAmount = isJoinPrimeHist ? 1000 : Number(h?.amount || h?.package?.price || 0);
+            const isJoinPrimeHist = isJoinPrimePackage(h?.package) || approx(h?.amount, 750) || approx(h?.package?.price, 750) || approx(h?.amount, 2000) || approx(h?.package?.price, 2000);
+            const displayName = isJoinPrimeHist ? "Agent Educator Starter Package" : (h?.package?.name || "-");
+            const displayAmount = isJoinPrimeHist ? 2000 : Number(h?.amount || h?.package?.price || 0);
 
             return (
               <Box
@@ -1757,31 +1790,23 @@ export default function PromoPackages({
           setWalletBusy(true);
           setWalletErr("");
           try {
-            const payload = {
-              wallet_source: walletSource,
-              ...(purchaseIntent.purchasePayload || {}),
-            };
-            if (purchaseIntent?.pkg?.id) payload.package_id = purchaseIntent.pkg.id;
-            // Internally ensure REDEEM is set for Prime 750 / Agent 1K combo if not already set
-            const isPrimeCombo =
-              purchaseIntent?.pkg?.code === "PRIME750" ||
-              purchaseIntent?.pkg?.code === "PRIME1000" ||
-              purchaseIntent?.amount === 1000 ||
-              purchaseIntent?.amount === 750 ||
-              approx(purchaseIntent?.pkg?.price, 750) ||
-              approx(purchaseIntent?.pkg?.price, 1000);
-            if (isPrimeCombo && !payload.prime750_choice) {
-              payload.prime750_choice = "REDEEM";
-            }
-            await createPromoPurchaseFromWallet(payload);
+            const isStarter =
+              purchaseIntent?.isStarterBundle ||
+              purchaseIntent?.purchasePayload?.is_starter_bundle ||
+              purchaseIntent?.amount === 2000 ||
+              approx(purchaseIntent?.amount, 2000) ||
+              isJoinPrimePackage(purchaseIntent?.pkg);
 
-            // Execute rank 1 upgrade (Digital Education 1st level - ₹250) in background if buying Agent Digital Prime
-            if (
-              purchaseIntent?.pkg?.code === "PRIME750" ||
-              purchaseIntent?.pkg?.code === "PRIME1000" ||
-              purchaseIntent?.amount === 1000 ||
-              purchaseIntent?.amount === 750
-            ) {
+            if (isStarter) {
+              // 1. Agent Subscription (Prime 750 - ₹750)
+              const primePayload = {
+                package_id: primePkg?.id || purchaseIntent?.pkg?.id,
+                prime750_choice: "REDEEM",
+                wallet_source: walletSource,
+              };
+              await createPromoPurchaseFromWallet(primePayload);
+
+              // 2. Rank 1 Upgrade (Level 1 Rank - ₹250)
               try {
                 const upgResp = await initiateUpgrade({ to_rank_id: 1 });
                 const upgId = upgResp?.id || upgResp?.upgrade?.id;
@@ -1792,24 +1817,54 @@ export default function PromoPackages({
                   });
                 }
               } catch (upgErr) {
-                console.warn("Background Rank 1 upgrade after Prime purchase:", upgErr);
+                console.warn("Rank 1 upgrade in starter bundle:", upgErr);
               }
-            }
 
-            setMethodOpen(false);
-            // Re-fetch history and wallet balance together.
-            // Use getWalletMeFresh() (no cache) so the deducted balance is shown
-            // immediately the next time the user opens the payment method dialog.
-            const [updatedHistory, freshWallet, freshHistory] = await Promise.allSettled([
-              listMyPromoPurchases(),
-              getWalletMeFresh(),
-              getWalletMeHistory().catch(() => null),
-            ]);
-            if (updatedHistory.status === "fulfilled") setHistory(updatedHistory.value);
-            if (freshWallet.status === "fulfilled") setWalletMe(freshWallet.value || null);
-            if (freshHistory.status === "fulfilled") setWalletHistory(freshHistory.value || null);
-            setPaymentSuccessMessage("Agent Digital Prime Package purchased successfully.");
-            setPaymentSuccessOpen(true);
+              // 3. SPP Month 1 Product Box (SPP 1000 Month 1 - ₹1,000)
+              if (seasonPkg?.id) {
+                try {
+                  await createPromoPurchaseFromWallet({
+                    package_id: seasonPkg.id,
+                    package_number: 1,
+                    boxes: [1],
+                    wallet_source: walletSource,
+                  });
+                } catch (sppErr) {
+                  console.warn("SPP Month 1 purchase in starter bundle:", sppErr);
+                }
+              }
+
+              setMethodOpen(false);
+              const [updatedHistory, freshWallet, freshHistory] = await Promise.allSettled([
+                listMyPromoPurchases(),
+                getWalletMeFresh(),
+                getWalletMeHistory().catch(() => null),
+              ]);
+              if (updatedHistory.status === "fulfilled") setHistory(updatedHistory.value);
+              if (freshWallet.status === "fulfilled") setWalletMe(freshWallet.value || null);
+              if (freshHistory.status === "fulfilled") setWalletHistory(freshHistory.value || null);
+              setPaymentSuccessMessage("Agent Educator Starter Package purchased successfully (₹2,000 deducted). Agent Subscription, Level 1 Rank Upgrade, and SPP Month 1 Box are activated.");
+              setPaymentSuccessOpen(true);
+            } else {
+              const payload = {
+                wallet_source: walletSource,
+                ...(purchaseIntent.purchasePayload || {}),
+              };
+              if (purchaseIntent?.pkg?.id) payload.package_id = purchaseIntent.pkg.id;
+              await createPromoPurchaseFromWallet(payload);
+
+              setMethodOpen(false);
+              const [updatedHistory, freshWallet, freshHistory] = await Promise.allSettled([
+                listMyPromoPurchases(),
+                getWalletMeFresh(),
+                getWalletMeHistory().catch(() => null),
+              ]);
+              if (updatedHistory.status === "fulfilled") setHistory(updatedHistory.value);
+              if (freshWallet.status === "fulfilled") setWalletMe(freshWallet.value || null);
+              if (freshHistory.status === "fulfilled") setWalletHistory(freshHistory.value || null);
+              setPaymentSuccessMessage("Package purchased successfully.");
+              setPaymentSuccessOpen(true);
+            }
           } catch (e) {
             let msg = e?.response?.data?.detail;
             if (!msg && e?.response?.data && typeof e.response.data === "object") {

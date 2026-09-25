@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Box, Typography } from "@mui/material";
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceWalletRounded";
-import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
+import Inventory2RoundedIcon from "@mui/icons-material/Inventory2Rounded";
 import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import { C, R, S } from "../../theme/tokens";
@@ -28,11 +28,11 @@ export default function BottomNav({ onToggleDrawer, isTeam = true }) {
       active: currentPath.includes("/wallet") || currentPath.includes("/withdrawal"),
     },
     {
-      key: "shop",
-      label: "Shop",
-      to: "/trikonekt-products",
-      icon: StorefrontRoundedIcon,
-      active: currentPath.includes("/trikonekt-products") || currentPath.includes("/ecommerce") || currentPath.includes("/promo-products"),
+      key: "packages",
+      label: "Packages",
+      to: "/user/packages/spp",
+      icon: Inventory2RoundedIcon,
+      active: currentPath.includes("/packages") || currentPath.includes("/spp"),
     },
     {
       key: "team",

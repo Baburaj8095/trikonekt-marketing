@@ -1231,15 +1231,21 @@ class PromoPurchasePayFromWalletView(APIView):
             return Response({"detail": "Invalid package_id."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            qty = int(ser.validated_data.get("quantity") or 1)
+            boxes_in = ser.validated_data.get("boxes") or ser.validated_data.get("boxes_json") or request.data.get("boxes") or []
+            if boxes_in and isinstance(boxes_in, list):
+                qty = len(set(int(b) for b in boxes_in))
+            else:
+                qty = int(ser.validated_data.get("quantity") or 1)
         except Exception:
             qty = 1
         qty = max(1, qty)
 
         try:
-            # MONTHLY/SPP price is admin-configured on the promo package.
+            # MONTHLY/SPP price is ₹1,000 per box
             if str(getattr(pkg, "type", "")) == "MONTHLY":
-                unit = D(str(getattr(pkg, "price", "0") or "0"))
+                unit = D(str(getattr(pkg, "price", "1000") or "1000"))
+                if unit == D("759") or unit <= 0:
+                    unit = D("1000.00")
             elif ser.validated_data.get("tri_app_slug") and ser.validated_data.get("tri_product_id"):
                 try:
                     trip = TriAppProduct.objects.filter(
@@ -1958,6 +1964,18 @@ class AdminPromoPurchaseApproveView(APIView):
                             )
                         except Exception:
                             continue
+
+                    # Generate redeemable SPP Gift Cards with QR code
+                    try:
+                        from business.services.spp_service import SPPService
+                        SPPService.generate_gift_cards_for_boxes(
+                            user=obj.user,
+                            purchase=obj,
+                            season_number=number,
+                            boxes=boxes,
+                        )
+                    except Exception as e:
+                        logger.warning("SPP Gift Card generation failed on approve: %s", e)
                     # Allocate E‑coupon(s) of ₹759 for each selected monthly box (best‑effort)
                     try:
                         if boxes:
@@ -3834,3 +3852,332 @@ class AdminMatrixEnforceSentinelView(APIView):
         pool_type = (request.data.get("pool_type") or request.query_params.get("pool_type") or "FIVE_150").strip().upper()
         sentinel = enforce_single_sentinel(pool_type)
         return Response({"sentinel_id": int(getattr(sentinel, "id", 0) or 0), "pool_type": pool_type}, status=status.HTTP_200_OK)
+
+
+# ==============================
+# SPP Gift Cards & Holiday Redemption Views
+# ==============================
+class SPPGiftCardListView(APIView):
+    """
+    GET /api/business/spp/gift-cards/
+    Returns list of SPP Gift Cards for the current authenticated user,
+    with dynamically updated lock/active statuses and maturity progress.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from business.models import SPPGiftCard
+        from business.serializers import SPPGiftCardSerializer
+        from business.services.spp_service import SPPService
+
+        # Evaluate live time-based statuses
+        SPPService.evaluate_gift_card_statuses(user=request.user)
+
+        qs = SPPGiftCard.objects.filter(user=request.user)
+        season = request.query_params.get("season")
+        if season:
+            try:
+                qs = qs.filter(season_number=int(season))
+            except Exception:
+                pass
+
+        status_filter = request.query_params.get("status")
+        if status_filter:
+            qs = qs.filter(status=status_filter.strip().upper())
+
+        cards = qs.order_by("season_number", "box_number", "-id")
+
+        # Compute summary metrics for active season or all
+        all_user_cards = list(SPPGiftCard.objects.filter(user=request.user))
+        total_purchased = len(all_user_cards)
+        locked_count = sum(1 for c in all_user_cards if c.status == "LOCKED")
+        active_count = sum(1 for c in all_user_cards if c.status == "ACTIVE")
+        redeemed_count = sum(1 for c in all_user_cards if c.status == "REDEEMED")
+        maturity_eligible_count = sum(1 for c in all_user_cards if c.status == "MATURITY_ELIGIBLE")
+        matured_paid_count = sum(1 for c in all_user_cards if c.status == "MATURED_PAID")
+
+        # Annual maturity check for season 1
+        season_cards = [c for c in all_user_cards if c.season_number == 1]
+        unique_boxes = {c.box_number for c in season_cards}
+        season_redeemed = sum(1 for c in season_cards if c.status == "REDEEMED")
+        season_matured_paid = any(c.status == "MATURED_PAID" for c in season_cards)
+
+        if season_matured_paid:
+            maturity_status = "PAID"
+        elif len(unique_boxes) >= 12 and season_redeemed == 0:
+            maturity_status = "READY_TO_CLAIM"
+        elif season_redeemed > 0:
+            maturity_status = "PARTIALLY_REDEEMED"
+        else:
+            maturity_status = "IN_PROGRESS"
+
+        renewal_cadence = SPPService.get_user_renewal_cadence(user=request.user, season_number=int(season or 1))
+
+        summary = {
+            "total_purchased": total_purchased,
+            "total_invested": total_purchased * 1000.00,
+            "locked_count": locked_count,
+            "active_count": active_count,
+            "redeemed_count": redeemed_count,
+            "maturity_eligible_count": maturity_eligible_count,
+            "matured_paid_count": matured_paid_count,
+            "renewal_cadence": renewal_cadence,
+            "annual_maturity": {
+                "season_number": 1,
+                "boxes_completed": len(unique_boxes),
+                "total_required_boxes": 12,
+                "is_eligible": len(unique_boxes) >= 12 and season_redeemed == 0 and not season_matured_paid,
+                "principal_amount": 12000.00,
+                "bonus_amount": 2000.00,
+                "total_payout_amount": 14000.00,
+                "status": maturity_status,
+            }
+        }
+
+        ser = SPPGiftCardSerializer(cards, many=True, context={"request": request})
+        return Response({
+            "results": ser.data,
+            "summary": summary,
+            "renewal_cadence": renewal_cadence,
+        }, status=status.HTTP_200_OK)
+
+
+class SPPCadenceMeView(APIView):
+    """
+    GET /api/business/spp/cadence/
+    Quick lightweight endpoint returning current user's SPP box streak, 30-day countdown, and next purchase date.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from business.services.spp_service import SPPService
+        season = request.query_params.get("season") or 1
+        try:
+            season_num = int(season)
+        except Exception:
+            season_num = 1
+
+        cadence = SPPService.get_user_renewal_cadence(user=request.user, season_number=season_num)
+        return Response(cadence, status=status.HTTP_200_OK)
+
+
+
+class SPPGiftCardRedeemHolidayView(APIView):
+    """
+    POST /api/business/spp/gift-cards/redeem-holiday/
+    Redeems an ACTIVE SPP Gift Card (₹1,000 face value) towards a Tri Holiday package purchase.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        from business.services.spp_service import SPPService
+
+        code = request.data.get("coupon_code") or request.data.get("code")
+        trip_id = request.data.get("trip_id") or "TRI_HOLIDAY"
+        trip_name = request.data.get("trip_name") or "Tri Holiday Package"
+
+        if not code:
+            return Response({"detail": "Coupon code is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        res = SPPService.redeem_gift_card_for_holiday(
+            user=request.user,
+            coupon_code=code,
+            trip_id=str(trip_id),
+            trip_name=str(trip_name),
+        )
+
+        if not res.get("success"):
+            return Response({"detail": res.get("detail", "Redemption failed.")}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(res, status=status.HTTP_200_OK)
+
+
+class SPPAnnualMaturityClaimView(APIView):
+    """
+    POST /api/business/spp/gift-cards/claim-maturity/
+    Claims the ₹14,000 (₹12k + ₹2k bonus) SPP Annual Maturity payout when all 12 boxes are unredeemed.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        from business.services.spp_service import SPPService
+
+        try:
+            season_number = int(request.data.get("season_number") or 1)
+        except Exception:
+            season_number = 1
+
+        res = SPPService.check_and_process_annual_maturity(
+            user=request.user,
+            season_number=season_number,
+        )
+
+        if not res.get("success"):
+            return Response({"detail": res.get("reason", "Not eligible for annual maturity bonus.")}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(res, status=status.HTTP_200_OK)
+
+
+class AdminSPPGiftCardsListView(APIView):
+    """
+    GET /api/business/admin/spp/gift-cards/
+    Admin monitoring and audit of all generated SPP Gift Cards across the platform.
+    """
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("promo")]
+
+    def get(self, request):
+        from business.models import SPPGiftCard
+        from business.serializers import SPPGiftCardSerializer
+        from business.services.spp_service import SPPService
+        from django.db.models import Q
+        from core.pagination import StandardResultsSetPagination
+
+        # Evaluate statuses
+        SPPService.evaluate_gift_card_statuses()
+
+        qs = SPPGiftCard.objects.select_related("user", "purchase").all()
+
+        search = (request.query_params.get("search") or "").strip()
+        if search:
+            qs = qs.filter(
+                Q(coupon_code__icontains=search)
+                | Q(user__username__icontains=search)
+                | Q(user__phone__icontains=search)
+                | Q(user__phone_number__icontains=search)
+                | Q(redeemed_trip_name__icontains=search)
+            )
+
+        status_filter = request.query_params.get("status")
+        if status_filter:
+            qs = qs.filter(status=status_filter.strip().upper())
+
+        season = request.query_params.get("season")
+        if season:
+            try:
+                qs = qs.filter(season_number=int(season))
+            except Exception:
+                pass
+
+        qs = qs.order_by("-id")
+
+        paginator = StandardResultsSetPagination()
+        page = paginator.paginate_queryset(qs, request)
+        ser = SPPGiftCardSerializer(page or qs, many=True, context={"request": request})
+
+        # Aggregations
+        total_count = SPPGiftCard.objects.count()
+        total_active = SPPGiftCard.objects.filter(status="ACTIVE").count()
+        total_locked = SPPGiftCard.objects.filter(status="LOCKED").count()
+        total_redeemed = SPPGiftCard.objects.filter(status="REDEEMED").count()
+        total_matured_paid = SPPGiftCard.objects.filter(status="MATURED_PAID").count()
+
+        data = ser.data if page is not None else ser.data
+        if page is not None:
+            resp = paginator.get_paginated_response(data)
+            resp.data["stats"] = {
+                "total_count": total_count,
+                "total_active": total_active,
+                "total_locked": total_locked,
+                "total_redeemed": total_redeemed,
+                "total_matured_paid": total_matured_paid,
+            }
+            return resp
+
+        return Response({
+            "results": data,
+            "stats": {
+                "total_count": total_count,
+                "total_active": total_active,
+                "total_locked": total_locked,
+                "total_redeemed": total_redeemed,
+                "total_matured_paid": total_matured_paid,
+            }
+        }, status=status.HTTP_200_OK)
+
+
+class AdminWalletTransactionsAllView(APIView):
+    """
+    GET /api/business/admin/wallet-transactions/
+    Full audit tracking of every user wallet transaction in the system.
+    """
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("finance")]
+
+    def get(self, request):
+        from accounts.models import WalletTransaction
+        from django.db.models import Q
+        from core.pagination import StandardResultsSetPagination
+
+        qs = WalletTransaction.objects.select_related("user").all()
+
+        search = (request.query_params.get("search") or "").strip()
+        if search:
+            qs = qs.filter(
+                Q(user__username__icontains=search)
+                | Q(user__phone__icontains=search)
+                | Q(user__phone_number__icontains=search)
+                | Q(type__icontains=search)
+                | Q(source_type__icontains=search)
+                | Q(source_id__icontains=search)
+            )
+
+        tx_type = request.query_params.get("type")
+        if tx_type:
+            qs = qs.filter(type=tx_type.strip())
+
+        source_type = request.query_params.get("source_type")
+        if source_type:
+            qs = qs.filter(source_type=source_type.strip())
+
+        user_id = request.query_params.get("user_id")
+        if user_id:
+            try:
+                qs = qs.filter(user_id=int(user_id))
+            except Exception:
+                pass
+
+        qs = qs.order_by("-created_at", "-id")
+
+        paginator = StandardResultsSetPagination()
+        page = paginator.paginate_queryset(qs, request)
+
+        results = []
+        for tx in (page or qs):
+            results.append({
+                "id": tx.id,
+                "user_id": getattr(tx.user, "id", None),
+                "username": getattr(tx.user, "username", ""),
+                "phone": str(getattr(tx.user, "phone", "") or getattr(tx.user, "phone_number", "") or ""),
+                "amount": str(tx.amount),
+                "balance_after": str(tx.balance_after) if tx.balance_after is not None else None,
+                "type": tx.type,
+                "source_type": tx.source_type,
+                "source_id": tx.source_id,
+                "meta": tx.meta,
+                "created_at": tx.created_at.isoformat() if tx.created_at else None,
+            })
+
+        if page is not None:
+            return paginator.get_paginated_response(results)
+
+        return Response({"results": results}, status=status.HTTP_200_OK)
+
+
+class AdminSPPCadenceReportView(APIView):
+    """
+    GET /api/business/admin/spp/cadence-report/
+    Admin monitoring of 30-day SPP purchase cadence, renewal countdowns, overdue consumers, and retention statistics.
+    """
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("promo")]
+
+    def get(self, request):
+        from business.services.spp_service import SPPService
+        season = request.query_params.get("season") or 1
+        try:
+            season_num = int(season)
+        except Exception:
+            season_num = 1
+
+        data = SPPService.get_admin_spp_cadence_report(season_number=season_num)
+        return Response(data, status=status.HTTP_200_OK)
+
+

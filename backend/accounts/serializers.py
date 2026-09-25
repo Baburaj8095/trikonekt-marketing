@@ -715,6 +715,26 @@ class RegisterSerializer(serializers.ModelSerializer):
         registered_by = getattr(self, '_sponsor_user', None)
         if not registered_by and request and request.user and request.user.is_authenticated:
             registered_by = request.user
+        if not registered_by and sponsor_id:
+            raw_sp = str(sponsor_id).strip()
+            if raw_sp:
+                try:
+                    from accounts.management.commands.backfill_registered_by_from_sponsor_id import resolve_sponsor_user
+                    registered_by = resolve_sponsor_user(raw_sp)
+                except Exception:
+                    registered_by = (
+                        CustomUser.objects.filter(prefixed_id__iexact=raw_sp).first()
+                        or CustomUser.objects.filter(username__iexact=raw_sp).first()
+                        or CustomUser.objects.filter(unique_id__iexact=raw_sp).first()
+                    )
+                    if not registered_by:
+                        digits = "".join(ch for ch in raw_sp if ch.isdigit())
+                        if digits:
+                            registered_by = (
+                                CustomUser.objects.filter(phone__iexact=digits).first()
+                                or CustomUser.objects.filter(username__iexact=digits).first()
+                            )
+
 
         # Create user with registered_by set BEFORE first save so post_save can credit sponsor
         user = CustomUser(

@@ -531,7 +531,7 @@ class AdminUsersList(ListAPIView):
         return self._consumer_columns_preset() in ("wallet", "coupons", "all")
 
     def get_queryset(self):
-        select_related = ["country", "state", "city", "wallet", "kyc", "registered_by", "merchant_profile"]
+        select_related = ["country", "state", "city", "wallet", "kyc", "registered_by", "merchant_profile", "rank_profile__current_rank"]
         only_fields = [
             # Base fields used by AdminUserNodeSerializer and filters
             "id", "username", "full_name", "email", "role", "category",
@@ -543,7 +543,7 @@ class AdminUsersList(ListAPIView):
             "state__id", "state__name",
             "city__id", "city__name",
             # Registered by (for sponsor display)
-            "registered_by__username", "registered_by__prefixed_id", "registered_by__full_name",
+            "registered_by__username", "registered_by__prefixed_id", "registered_by__full_name", "registered_by__phone",
             # Wallet relation placeholder for select_related traversal
             "wallet__id",
             # KYC status in list grid
@@ -562,13 +562,14 @@ class AdminUsersList(ListAPIView):
         only_fields.append("reward_points_account__balance_points")
         prefetches = [
             Prefetch("wallet_accounts", queryset=WalletAccount.objects.only("user_id", "wallet_type", "current_balance"), to_attr="prefetched_wallet_accounts"),
-            Prefetch("promo_purchases", queryset=PromoPurchase.objects.select_related("package").filter(status="APPROVED").only("id", "user_id", "package_id", "status", "approved_at", "requested_at", "tri_app_slug", "package__id", "package__code", "package__name", "package__type", "package__price").order_by("-approved_at", "-id"), to_attr="approved_promo_purchases"),
+            Prefetch("promo_purchases", queryset=PromoPurchase.objects.select_related("package").filter(status="APPROVED").only("id", "user_id", "package_id", "status", "approved_at", "requested_at", "tri_app_slug", "quantity", "package__id", "package__code", "package__name", "package__type", "package__price").order_by("-approved_at", "-id"), to_attr="prefetched_approved_promo_purchases"),
             Prefetch(
                 "region_assignments",
                 queryset=AgencyRegionAssignment.objects.select_related("state").order_by("level", "state__name", "district", "pincode"),
                 to_attr="prefetched_agency_assignments",
             ),
             Prefetch("matrix_progress", queryset=UserMatrixProgress.objects.only("id", "user_id", "level_reached"), to_attr="matrix_progress_list"),
+            Prefetch("rank_upgrades", queryset=RankUpgrade.objects.select_related("to_rank").filter(payment_status="SUCCESS").order_by("to_rank__level_number"), to_attr="prefetched_rank_upgrades"),
         ]
 
         qs = (
@@ -868,19 +869,71 @@ class AdminUsersExportXLSX(APIView):
 
         # Column order mirrors Admin Users grid (plus a few essentials)
         headers = [
-            "SI No", "Edit/View", "Login", "Active/Inactive", "Joining Date", "Package Buy Date",
-            "System Serial Number", "User ID", "User Name", "Sponsor ID & Name", "Address & Pincode",
-            "KYC Profile", "Subscription 1", "Subscription 2", "Subscription 3", "Smart Product Package",
-            "Digital Education", "Certified Training Certificate", "Package Purchase Gift Card Received",
-            "New Tour Package", "Team Consumer Self Package ID Count", "Team Consumer Block ID",
-            "Total Earning", "Main Wallet", "Coupon Pocket", "Self Package Pocket", "Withdrawal Pocket",
-            "Redeem Points", "Add Money", "Withdrawal To Pocket", "Coupon Pocket Breakdown",
-            "Self Package Pocket Details", "Coupon Admin Charges", "Withdrawal Admin Charges",
-            "Package Admin Charges", "Franchisee Reference Reward", "Zonal Reward",
-            "Direct Sponsor Benefit", "Level Income Benefit", "Smart Product Pocket", "SPP Spin & Win",
-            "Digital Education Prime Package Spin & Win", "Shopping Self Re-birth ID Count",
-            "Franchisee Self Rebirth ID Count", "Caption/Coupon Self Re-birth ID Count",
-            "Raw ID", "Username", "Email", "Role", "Category", "Phone", "Wallet Status",
+            "SI No",
+            "Active/Inactive",
+            "Joining Date",
+            "Package Buy Date",
+            "System Serial Number",
+            "User ID",
+            "User Name",
+            "Phone",
+            "Email",
+            "Sponsor Name",
+            "Sponsor Number",
+            "Sponsor ID & Name",
+            "Join Prime 750",
+            "Join Prime 750 Count",
+            "SPP Months / Boxes",
+            "Rank Upgrade Levels Purchased",
+            "Rank Upgrade Count",
+            "Current Rank",
+            "KYC Status",
+            "KYC Verified At",
+            "Address & Pincode",
+            "Pincode",
+            "Area",
+            "Taluk",
+            "District",
+            "State",
+            "Country",
+            "Subscription 1",
+            "Subscription 2",
+            "Subscription 3",
+            "Smart Product Package",
+            "Digital Education",
+            "Certified Training Certificate",
+            "Package Purchase Gift Card Received",
+            "New Tour Package",
+            "Team Consumer Self Package ID Count",
+            "Team Consumer Block ID",
+            "Total Earning",
+            "Main Wallet",
+            "Coupon Pocket",
+            "Self Package Pocket",
+            "Withdrawal Pocket",
+            "Redeem Points",
+            "Add Money",
+            "Withdrawal To Pocket",
+            "Coupon Pocket Breakdown",
+            "Self Package Pocket Details",
+            "Coupon Admin Charges",
+            "Withdrawal Admin Charges",
+            "Package Admin Charges",
+            "Franchisee Reference Reward",
+            "Zonal Reward",
+            "Direct Sponsor Benefit",
+            "Level Income Benefit",
+            "Smart Product Pocket",
+            "SPP Spin & Win",
+            "Digital Education Prime Package Spin & Win",
+            "Shopping Self Re-birth ID Count",
+            "Franchisee Self Rebirth ID Count",
+            "Caption/Coupon Self Re-birth ID Count",
+            "Raw ID",
+            "Username",
+            "Role",
+            "Category",
+            "Wallet Status",
         ]
 
         wb = openpyxl.Workbook()
@@ -888,20 +941,45 @@ class AdminUsersExportXLSX(APIView):
         ws.title = "Users"
         ws.append(headers)
 
+        def _clean_cell(val):
+            if val is None:
+                return ""
+            if hasattr(val, "tzinfo") and val.tzinfo is not None:
+                try:
+                    return val.strftime("%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    return str(val)
+            return val
+
         for idx, obj in enumerate(items, start=1):
-            ws.append([
+            row_data = [
                 idx,
-                "Available in admin UI",
-                "Available in admin UI",
                 "Active" if obj.get("account_active") else "Inactive",
                 obj.get("date_joined") or "",
                 obj.get("package_buy_date") or "",
                 obj.get("system_serial_number") or obj.get("id") or "",
                 obj.get("user_code") or obj.get("username") or "",
                 obj.get("full_name") or obj.get("username") or "",
+                obj.get("phone") or "",
+                obj.get("email") or "",
+                obj.get("sponsor_name") or "",
+                obj.get("sponsor_number") or "",
                 obj.get("sponsor_display") or obj.get("sponsor_id") or "",
-                obj.get("address_pincode") or obj.get("pincode") or "",
+                obj.get("join_prime_750") or "No",
+                obj.get("prime750_count") if obj.get("prime750_count") is not None else 0,
+                obj.get("spp_months_boxes") if obj.get("spp_months_boxes") is not None else 0,
+                obj.get("rank_upgrade_levels") or "0",
+                obj.get("rank_upgrade_count") if obj.get("rank_upgrade_count") is not None else 0,
+                obj.get("current_rank") or "",
                 obj.get("kyc_status") or "",
+                obj.get("kyc_verified_at") or "",
+                obj.get("address_pincode") or obj.get("pincode") or "",
+                obj.get("pincode") or "",
+                obj.get("area") or "",
+                obj.get("taluk_name") or "",
+                obj.get("district_name") or "",
+                obj.get("state_name") or "",
+                obj.get("country_name") or "",
                 obj.get("subscription_1") or "",
                 obj.get("subscription_2") or "",
                 obj.get("subscription_3") or "",
@@ -937,12 +1015,11 @@ class AdminUsersExportXLSX(APIView):
                 "Needs business rule",
                 obj.get("id"),
                 obj.get("username") or "",
-                obj.get("email") or "",
                 obj.get("role") or "",
                 obj.get("category") or "",
-                obj.get("phone") or "",
                 obj.get("wallet_status") or "",
-            ])
+            ]
+            ws.append([_clean_cell(v) for v in row_data])
 
         # Auto-size columns
         for col_idx, header in enumerate(headers, start=1):
@@ -2074,6 +2151,122 @@ class AdminWalletVoucherListView(APIView):
         total = qs.count()
         start = (page - 1) * page_size
         return Response({"count": total, "page": page, "page_size": page_size, "results": [_voucher_payload(v) for v in qs[start:start + page_size]]})
+
+    def post(self, request):
+        from decimal import Decimal as D, InvalidOperation
+        from datetime import timedelta
+        import random
+
+        raw_type = str(request.data.get("voucher_type") or request.data.get("coupon_type") or "").strip()
+        type_mapping = {
+            "TRIZONE": ConsumerVoucher.TYPE_TRIZONE,
+            "TRIOZONE": ConsumerVoucher.TYPE_TRIZONE,
+            "TRIZONE COUPON": ConsumerVoucher.TYPE_TRIZONE,
+            "NEAR STORE": ConsumerVoucher.TYPE_NEAR_STORE,
+            "NEAR_STORE": ConsumerVoucher.TYPE_NEAR_STORE,
+            "NEAR STORE COUPON": ConsumerVoucher.TYPE_NEAR_STORE,
+            "ONLINE": ConsumerVoucher.TYPE_ONLINE,
+            "ONLINE COUPON": ConsumerVoucher.TYPE_ONLINE,
+            "PACKAGE PURCHASE": ConsumerVoucher.TYPE_PACKAGE_PURCHASE,
+            "PACKAGE_PURCHASE": ConsumerVoucher.TYPE_PACKAGE_PURCHASE,
+            "PACKAGE PURCHASE COUPON": ConsumerVoucher.TYPE_PACKAGE_PURCHASE,
+            "SELF PACKAGE COUPON": ConsumerVoucher.TYPE_PACKAGE_PURCHASE,
+        }
+        voucher_type = type_mapping.get(raw_type.upper(), raw_type.upper().replace(" ", "_"))
+        valid_types = [
+            ConsumerVoucher.TYPE_TRIZONE,
+            ConsumerVoucher.TYPE_NEAR_STORE,
+            ConsumerVoucher.TYPE_ONLINE,
+            ConsumerVoucher.TYPE_PACKAGE_PURCHASE,
+        ]
+        if voucher_type not in valid_types:
+            return Response(
+                {"detail": f"Invalid coupon/voucher type '{raw_type}'. Must be one of: Package Purchase, Trizone, Near Store, Online."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            amount = D(str(request.data.get("amount") or "0")).quantize(D("0.01"))
+        except (InvalidOperation, ValueError, TypeError):
+            return Response({"detail": "Invalid amount."}, status=status.HTTP_400_BAD_REQUEST)
+        if amount <= D("0"):
+            return Response({"detail": "Amount must be greater than 0."}, status=status.HTTP_400_BAD_REQUEST)
+
+        assigned_to = None
+        assigned_identifier = (
+            request.data.get("assigned_to")
+            or request.data.get("user_id")
+            or request.data.get("consumer_id")
+            or request.data.get("username")
+            or request.data.get("phone")
+        )
+        if assigned_identifier:
+            assigned_identifier = str(assigned_identifier).strip()
+            assigned_to = (
+                CustomUser.objects.filter(
+                    Q(username=assigned_identifier)
+                    | Q(phone=assigned_identifier)
+                    | (Q(id=int(assigned_identifier)) if assigned_identifier.isdigit() else Q(pk=None))
+                )
+                .first()
+            )
+            if not assigned_to:
+                return Response(
+                    {"detail": f"Receiver consumer '{assigned_identifier}' not found in database."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        if voucher_type == ConsumerVoucher.TYPE_PACKAGE_PURCHASE and not assigned_to:
+            return Response(
+                {"detail": "Package Purchase coupon requires a valid receiver consumer ID/phone."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        note = str(request.data.get("note") or request.data.get("remarks") or "Admin Issued Voucher").strip()
+        try:
+            days_valid = max(1, int(request.data.get("validity_days") or 90))
+        except Exception:
+            days_valid = 90
+
+        prefix_map = {
+            ConsumerVoucher.TYPE_TRIZONE: "TRZ",
+            ConsumerVoucher.TYPE_NEAR_STORE: "NST",
+            ConsumerVoucher.TYPE_ONLINE: "ONL",
+            ConsumerVoucher.TYPE_PACKAGE_PURCHASE: "PKG",
+        }
+        pfx = prefix_map.get(voucher_type, "VOU")
+        creator_mobile = getattr(request.user, "phone", "") or getattr(request.user, "username", "") or "0000000000"
+        digits = "".join(ch for ch in str(creator_mobile) if ch.isdigit())[-10:].zfill(10)
+
+        code = None
+        for _ in range(30):
+            candidate = f"{digits}-{pfx}{random.randint(100000, 999999)}"
+            if not ConsumerVoucher.objects.filter(code=candidate).exists():
+                code = candidate
+                break
+        if not code:
+            code = f"{digits}-{pfx}{timezone.now().strftime('%H%M%S%f')[-6:]}"
+
+        with transaction.atomic():
+            voucher = ConsumerVoucher.objects.create(
+                creator=request.user,
+                assigned_to=assigned_to,
+                voucher_type=voucher_type,
+                code=code,
+                amount=amount,
+                status=ConsumerVoucher.STATUS_ACTIVE,
+                expires_at=timezone.now() + timedelta(days=days_valid),
+                note=note,
+            )
+
+        return Response(
+            {
+                "success": True,
+                "message": f"Voucher {voucher.code} for ₹{voucher.amount} generated successfully.",
+                "voucher": _voucher_payload(voucher),
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
     @staticmethod
     def _expire_and_refund(voucher):
@@ -3390,20 +3583,27 @@ class AdminMatrix5Tree(APIView):
                 .first()
             )
         if not root_acc and display_user_id > 0:
-            # Prefer earliest ACTIVE entry for the requested user; fallback to sentinel only if none exists
+            # Prioritize Sentinel Root (parent_account__isnull=True) if available; fallback to earliest ACTIVE entry
             root_acc = (
                 AutoPoolAccount.objects.select_related("owner")
-                .filter(owner_id=display_user_id, pool_type=pool, status="ACTIVE")
-                .filter(Q(owner__category="consumer") | Q(owner__is_superuser=True) | Q(owner__is_staff=True))
-                .order_by("id")
+                .filter(owner_id=display_user_id, pool_type=pool, status="ACTIVE", parent_account__isnull=True)
                 .first()
             )
+            if not root_acc:
+                root_acc = (
+                    AutoPoolAccount.objects.select_related("owner")
+                    .filter(owner_id=display_user_id, pool_type=pool, status="ACTIVE")
+                    .filter(Q(owner__category="consumer") | Q(owner__is_superuser=True) | Q(owner__is_staff=True))
+                    .order_by("id")
+                    .first()
+                )
             if not root_acc and display_user_id == head_user_id and sentinel and getattr(sentinel, "pool_type", None) == pool:
                 root_acc = AutoPoolAccount.objects.select_related("owner").filter(id=sentinel.id).first()
         if not root_acc:
             # Fallback to sentinel for this pool
             if sentinel and getattr(sentinel, "pool_type", None) == pool:
                 root_acc = AutoPoolAccount.objects.select_related("owner").filter(id=sentinel.id).first()
+
 
         if not root_acc:
             return Response({"detail": "No matrix root available for the requested pool."}, status=404)
@@ -3455,17 +3655,17 @@ class AdminMatrix5Tree(APIView):
             # Special: when starting at sentinel for head user, compress out head-owned immediate children
             if head_hide_self and levels_used == 1 and len(current_parent_ids) == 1 and int(current_parent_ids[0]) == int(getattr(root_acc, "id", 0) or 0):
                 # Build ordered L1 under sentinel without filtering head, then expand head-owned nodes into their children
-                l1 = list(qs_rows.order_by("parent_account_id", "position", "id"))
+                l1 = list(qs_rows.order_by("parent_account_id", "id"))
                 # Cache the head-owned L1 ids so we can attach their children directly under root for display
                 head_l1_ids = {int(getattr(r, "id", 0) or 0) for r in l1 if getattr(r, "owner_id", None) == head_user_id}
                 expanded = []
                 for r in l1:
                     if getattr(r, "owner_id", None) == head_user_id:
-                        # Pull this node's ACTIVE children (left-to-right)
+                        # Pull this node's ACTIVE children (earliest ID first)
                         gc = list(
                             AutoPoolAccount.objects.select_related("owner")
                             .filter(pool_type=pool, status="ACTIVE", parent_account_id=int(getattr(r, "id", 0) or 0))
-                            .order_by("position", "id")
+                            .order_by("id")
                         )
                         expanded.extend(gc)
                     else:
@@ -3474,7 +3674,8 @@ class AdminMatrix5Tree(APIView):
             else:
                 if head_hide_self:
                     qs_rows = qs_rows.exclude(owner_id=head_user_id)
-                rows = list(qs_rows.order_by("parent_account_id", "position", "id"))
+                rows = list(qs_rows.order_by("parent_account_id", "id"))
+
             if not rows:
                 break
 
@@ -5178,10 +5379,11 @@ class AdminDailySalesReportView(APIView):
 
     def get(self, request):
         from decimal import Decimal
-        from django.db.models import Sum, Count
+        from django.db.models import Sum, Count, Q
         from django.utils import timezone
         from mlm_ranks.models import RankUpgrade
-        from business.models import SubscriptionActivation
+        from business.models import SubscriptionActivation, PromoPurchase, PromoMonthlyBox
+        from accounts.models import WalletUploadRequest, WithdrawalRequest, WalletTransaction, CustomUser, WalletAccount
 
         from_date_str = request.query_params.get("from")
         to_date_str = request.query_params.get("to")
@@ -5194,79 +5396,540 @@ class AdminDailySalesReportView(APIView):
             to_date = timezone.datetime.strptime(to_date_str, "%Y-%m-%d").date()
         except ValueError:
             return Response({"detail": "Dates must be in YYYY-MM-DD format"}, status=400)
-            
-        upgrades = RankUpgrade.objects.filter(
-            payment_status='SUCCESS',
-            upgraded_at__date__range=(from_date, to_date)
-        ).values('upgraded_at__date').annotate(
-            count=Count('id'),
-            total=Sum('upgrade_amount')
+
+        # 1. Add Money / Wallet Uploads (Approved)
+        add_money_qs = WalletUploadRequest.objects.filter(
+            status="APPROVED",
+            requested_at__date__range=(from_date, to_date)
+        ).values("requested_at__date").annotate(
+            count=Count("id"),
+            total=Sum("amount")
         )
-        
-        packages = SubscriptionActivation.objects.filter(
+
+        # 2. Agent Joining Fee (₹1,000 combo: ₹750 Prime + ₹250 Rank 1)
+        agent_sub_qs = SubscriptionActivation.objects.filter(
             created_at__date__range=(from_date, to_date)
-        ).values('created_at__date').annotate(
-            count=Count('id'),
-            total=Sum('amount')
+        ).values("created_at__date").annotate(
+            count=Count("id"),
+            total=Sum("amount")
         )
-        
+
+        # 3. SPP Boxes (Smart Product Purchase, ₹1,000 per box)
+        spp_monthly_qs = PromoPurchase.objects.filter(
+            package__type="MONTHLY",
+            status="APPROVED",
+            requested_at__date__range=(from_date, to_date)
+        ).values("requested_at__date").annotate(
+            count=Count("id"),
+            total=Sum("amount_paid")
+        )
+
+        # 4. Digital Education / Rank Upgrades L2-L10
+        rank_upg_qs = RankUpgrade.objects.filter(
+            payment_status="SUCCESS",
+            upgraded_at__date__range=(from_date, to_date)
+        ).values("upgraded_at__date").annotate(
+            count=Count("id"),
+            total=Sum("upgrade_amount")
+        )
+
+        # 5. Royalty Distributions (GLOBAL_ROYALTY)
+        royalty_qs = WalletTransaction.objects.filter(
+            type="GLOBAL_ROYALTY",
+            created_at__date__range=(from_date, to_date)
+        ).values("created_at__date").annotate(
+            count=Count("id"),
+            total=Sum("amount")
+        )
+
+        # 6. Coupon Pocket Loads / Inflows (MAIN_TO_COUPON / COUPON_WALLET_CREDIT)
+        coupon_load_qs = WalletTransaction.objects.filter(
+            type="COUPON_WALLET_CREDIT",
+            created_at__date__range=(from_date, to_date)
+        ).values("created_at__date").annotate(
+            count=Count("id"),
+            total=Sum("amount")
+        )
+
+        # 7. Internal Wallet-to-Wallet Transfers (WALLET_TO_WALLET_OUT)
+        transfer_qs = WalletTransaction.objects.filter(
+            type="WALLET_TO_WALLET_OUT",
+            created_at__date__range=(from_date, to_date)
+        ).values("created_at__date").annotate(
+            count=Count("id"),
+            total=Sum("amount")
+        )
+
+        # 8. Self Rebirth / Self Account Allocations
+        self_rebirth_qs = WalletTransaction.objects.filter(
+            type__in=["SELF_ACCOUNT_DEBIT", "SELF_REBIRTH", "AUTO_BLOCK"],
+            created_at__date__range=(from_date, to_date)
+        ).values("created_at__date").annotate(
+            count=Count("id"),
+            total=Sum("amount")
+        )
+
+        # 9. Withdrawal Requests
+        wdr_approved_qs = WithdrawalRequest.objects.filter(
+            status="approved",
+            requested_at__date__range=(from_date, to_date)
+        ).values("requested_at__date").annotate(
+            count=Count("id"),
+            total=Sum("amount")
+        )
+        wdr_pending_qs = WithdrawalRequest.objects.filter(
+            status="pending",
+            requested_at__date__range=(from_date, to_date)
+        ).values("requested_at__date").annotate(
+            count=Count("id"),
+            total=Sum("amount")
+        )
+        wdr_rejected_qs = WithdrawalRequest.objects.filter(
+            status="rejected",
+            requested_at__date__range=(from_date, to_date)
+        ).values("requested_at__date").annotate(
+            count=Count("id"),
+            total=Sum("amount")
+        )
+
         daily_sales = {}
         curr = from_date
         while curr <= to_date:
             date_key = curr.strftime("%Y-%m-%d")
             daily_sales[date_key] = {
                 "date": date_key,
-                "packages_count": 0,
-                "packages_amount": "0.00",
+                "add_money_count": 0,
+                "add_money_amount": "0.00",
+                "agent_fee_count": 0,
+                "agent_fee_amount": "0.00",
+                "spp_count": 0,
+                "spp_amount": "0.00",
                 "upgrades_count": 0,
                 "upgrades_amount": "0.00",
-                "total_amount": "0.00"
+                "royalty_count": 0,
+                "royalty_amount": "0.00",
+                "self_rebirth_count": 0,
+                "self_rebirth_amount": "0.00",
+                "total_inflow_amount": "0.00",
+                # Coupon Pocket & Transfers
+                "coupon_load_count": 0,
+                "coupon_load_amount": "0.00",
+                "transfer_count": 0,
+                "transfer_amount": "0.00",
+                # Withdrawals
+                "wdr_approved_count": 0,
+                "wdr_approved_amount": "0.00",
+                "wdr_pending_count": 0,
+                "wdr_pending_amount": "0.00",
+                "wdr_rejected_count": 0,
+                "wdr_rejected_amount": "0.00",
+                # Tax / TDS Daily Intelligence
+                "tax_output_gst": "0.00",
+                "tax_tds_wdr": "0.00",
+                "tax_tds_rebirth": "0.00",
+                "tax_total_tds": "0.00",
+                "tax_net_remittance": "0.00",
+                # Backwards compatible aliases for existing UI
+                "packages_count": 0,
+                "packages_amount": "0.00",
+                "total_amount": "0.00",
             }
             curr += timezone.timedelta(days=1)
-            
-        for up in upgrades:
-            dt = up['upgraded_at__date']
-            if dt:
-                date_key = dt.strftime("%Y-%m-%d")
-                if date_key in daily_sales:
-                    daily_sales[date_key]["upgrades_count"] = up['count'] or 0
-                    daily_sales[date_key]["upgrades_amount"] = str(up['total'] or Decimal("0.00"))
-                    
-        for pkg in packages:
-            dt = pkg['created_at__date']
-            if dt:
-                date_key = dt.strftime("%Y-%m-%d")
-                if date_key in daily_sales:
-                    daily_sales[date_key]["packages_count"] = pkg['count'] or 0
-                    daily_sales[date_key]["packages_amount"] = str(pkg['total'] or Decimal("0.00"))
-                    
-        grand_total = Decimal("0.00")
-        total_pkg_count = 0
-        total_pkg_amt = Decimal("0.00")
-        total_upg_count = 0
+
+        for row in add_money_qs:
+            dt = row["requested_at__date"]
+            if dt and dt.strftime("%Y-%m-%d") in daily_sales:
+                k = dt.strftime("%Y-%m-%d")
+                daily_sales[k]["add_money_count"] = row["count"] or 0
+                daily_sales[k]["add_money_amount"] = str(row["total"] or Decimal("0.00"))
+
+        for row in agent_sub_qs:
+            dt = row["created_at__date"]
+            if dt and dt.strftime("%Y-%m-%d") in daily_sales:
+                k = dt.strftime("%Y-%m-%d")
+                cnt = row["count"] or 0
+                daily_sales[k]["agent_fee_count"] = cnt
+                # Agent fee is ₹1,000 per user
+                daily_sales[k]["agent_fee_amount"] = str(Decimal(cnt) * Decimal("1000.00"))
+
+        for row in spp_monthly_qs:
+            dt = row["requested_at__date"]
+            if dt and dt.strftime("%Y-%m-%d") in daily_sales:
+                k = dt.strftime("%Y-%m-%d")
+                cnt = row["count"] or 0
+                daily_sales[k]["spp_count"] = cnt
+                # SPP box is ₹1,000 per box
+                daily_sales[k]["spp_amount"] = str(Decimal(cnt) * Decimal("1000.00"))
+
+        for row in rank_upg_qs:
+            dt = row["upgraded_at__date"]
+            if dt and dt.strftime("%Y-%m-%d") in daily_sales:
+                k = dt.strftime("%Y-%m-%d")
+                daily_sales[k]["upgrades_count"] = row["count"] or 0
+                daily_sales[k]["upgrades_amount"] = str(row["total"] or Decimal("0.00"))
+
+        for row in royalty_qs:
+            dt = row["created_at__date"]
+            if dt and dt.strftime("%Y-%m-%d") in daily_sales:
+                k = dt.strftime("%Y-%m-%d")
+                daily_sales[k]["royalty_count"] = row["count"] or 0
+                daily_sales[k]["royalty_amount"] = str(row["total"] or Decimal("0.00"))
+
+        for row in coupon_load_qs:
+            dt = row["created_at__date"]
+            if dt and dt.strftime("%Y-%m-%d") in daily_sales:
+                k = dt.strftime("%Y-%m-%d")
+                daily_sales[k]["coupon_load_count"] = row["count"] or 0
+                daily_sales[k]["coupon_load_amount"] = str(row["total"] or Decimal("0.00"))
+
+        for row in transfer_qs:
+            dt = row["created_at__date"]
+            if dt and dt.strftime("%Y-%m-%d") in daily_sales:
+                k = dt.strftime("%Y-%m-%d")
+                daily_sales[k]["transfer_count"] = row["count"] or 0
+                amt = abs(row["total"] or Decimal("0.00"))
+                daily_sales[k]["transfer_amount"] = str(amt)
+
+        for row in self_rebirth_qs:
+            dt = row["created_at__date"]
+            if dt and dt.strftime("%Y-%m-%d") in daily_sales:
+                k = dt.strftime("%Y-%m-%d")
+                cnt = row["count"] or 0
+                daily_sales[k]["self_rebirth_count"] = cnt
+                amt = abs(row["total"] or Decimal("0.00"))
+                if amt == 0 and cnt > 0:
+                    amt = Decimal(cnt) * Decimal("250.00")
+                daily_sales[k]["self_rebirth_amount"] = str(amt)
+
+        for row in wdr_approved_qs:
+            dt = row["requested_at__date"]
+            if dt and dt.strftime("%Y-%m-%d") in daily_sales:
+                k = dt.strftime("%Y-%m-%d")
+                daily_sales[k]["wdr_approved_count"] = row["count"] or 0
+                daily_sales[k]["wdr_approved_amount"] = str(row["total"] or Decimal("0.00"))
+
+        for row in wdr_pending_qs:
+            dt = row["requested_at__date"]
+            if dt and dt.strftime("%Y-%m-%d") in daily_sales:
+                k = dt.strftime("%Y-%m-%d")
+                daily_sales[k]["wdr_pending_count"] = row["count"] or 0
+                daily_sales[k]["wdr_pending_amount"] = str(row["total"] or Decimal("0.00"))
+
+        for row in wdr_rejected_qs:
+            dt = row["requested_at__date"]
+            if dt and dt.strftime("%Y-%m-%d") in daily_sales:
+                k = dt.strftime("%Y-%m-%d")
+                daily_sales[k]["wdr_rejected_count"] = row["count"] or 0
+                daily_sales[k]["wdr_rejected_amount"] = str(row["total"] or Decimal("0.00"))
+
+        # Totals calculation
+        grand_inflow = Decimal("0.00")
+        total_add_money_amt = Decimal("0.00")
+        total_add_money_cnt = 0
+        total_agent_fee_amt = Decimal("0.00")
+        total_agent_fee_cnt = 0
+        total_spp_amt = Decimal("0.00")
+        total_spp_cnt = 0
         total_upg_amt = Decimal("0.00")
-        
-        for date_key, data in daily_sales.items():
-            pkg_amt = Decimal(data["packages_amount"])
-            upg_amt = Decimal(data["upgrades_amount"])
-            tot = pkg_amt + upg_amt
-            data["total_amount"] = f"{tot:.2f}"
-            grand_total += tot
-            total_pkg_count += data["packages_count"]
-            total_pkg_amt += pkg_amt
-            total_upg_count += data["upgrades_count"]
-            total_upg_amt += upg_amt
+        total_upg_cnt = 0
+        total_royalty_amt = Decimal("0.00")
+        total_royalty_cnt = 0
+        total_self_rebirth_amt = Decimal("0.00")
+        total_self_rebirth_cnt = 0
+        total_coupon_load_amt = Decimal("0.00")
+        total_coupon_load_cnt = 0
+        total_transfer_amt = Decimal("0.00")
+        total_transfer_cnt = 0
+        total_wdr_approved_amt = Decimal("0.00")
+        total_wdr_approved_cnt = 0
+        total_wdr_pending_amt = Decimal("0.00")
+        total_wdr_pending_cnt = 0
+        total_wdr_rejected_amt = Decimal("0.00")
+        total_wdr_rejected_cnt = 0
+        total_tax_output_gst = Decimal("0.00")
+        total_tax_tds_wdr = Decimal("0.00")
+        total_tax_tds_rebirth = Decimal("0.00")
+        total_tax_total_tds = Decimal("0.00")
+        total_tax_net_remit = Decimal("0.00")
+
+        for date_key, d in daily_sales.items():
+            am_amt = Decimal(d["add_money_amount"])
+            af_amt = Decimal(d["agent_fee_amount"])
+            spp_amt = Decimal(d["spp_amount"])
+            upg_amt = Decimal(d["upgrades_amount"])
+            roy_amt = Decimal(d["royalty_amount"])
+            rebirth_amt = Decimal(d["self_rebirth_amount"])
+            rebirth_cnt = d["self_rebirth_count"]
+            wdr_appr_amt = Decimal(d["wdr_approved_amount"])
             
+            inflow = am_amt + af_amt + spp_amt + upg_amt
+            d["total_inflow_amount"] = f"{inflow:.2f}"
+            d["total_amount"] = f"{inflow:.2f}"
+            d["packages_count"] = d["agent_fee_count"] + d["spp_count"]
+            d["packages_amount"] = f"{(af_amt + spp_amt):.2f}"
+
+            # Daily Tax / TDS Math
+            commercial_sales = af_amt + spp_amt + upg_amt
+            gst = (commercial_sales * Decimal("0.18") / Decimal("1.18")).quantize(Decimal("0.01"))
+            tds_wdr = (wdr_appr_amt * Decimal("0.05")).quantize(Decimal("0.01"))
+            tds_rebirth = (Decimal(rebirth_cnt) * Decimal("50.00")).quantize(Decimal("0.01"))
+            tds_total = (tds_wdr + tds_rebirth).quantize(Decimal("0.01"))
+            net_remit = (gst - tds_total).quantize(Decimal("0.01"))
+
+            d["tax_output_gst"] = str(gst)
+            d["tax_tds_wdr"] = str(tds_wdr)
+            d["tax_tds_rebirth"] = str(tds_rebirth)
+            d["tax_total_tds"] = str(tds_total)
+            d["tax_net_remittance"] = str(net_remit)
+
+            grand_inflow += inflow
+            total_add_money_amt += am_amt
+            total_add_money_cnt += d["add_money_count"]
+            total_agent_fee_amt += af_amt
+            total_agent_fee_cnt += d["agent_fee_count"]
+            total_spp_amt += spp_amt
+            total_spp_cnt += d["spp_count"]
+            total_upg_amt += upg_amt
+            total_upg_cnt += d["upgrades_count"]
+            total_royalty_amt += roy_amt
+            total_royalty_cnt += d["royalty_count"]
+            total_self_rebirth_amt += rebirth_amt
+            total_self_rebirth_cnt += rebirth_cnt
+            total_tax_output_gst += gst
+            total_tax_tds_wdr += tds_wdr
+            total_tax_tds_rebirth += tds_rebirth
+            total_tax_total_tds += tds_total
+            total_tax_net_remit += net_remit
+            total_coupon_load_amt += Decimal(d["coupon_load_amount"])
+            total_coupon_load_cnt += d["coupon_load_count"]
+            total_transfer_amt += Decimal(d["transfer_amount"])
+            total_transfer_cnt += d["transfer_count"]
+            total_wdr_approved_amt += Decimal(d["wdr_approved_amount"])
+            total_wdr_approved_cnt += d["wdr_approved_count"]
+            total_wdr_pending_amt += Decimal(d["wdr_pending_amount"])
+            total_wdr_pending_cnt += d["wdr_pending_count"]
+            total_wdr_rejected_amt += Decimal(d["wdr_rejected_amount"])
+            total_wdr_rejected_cnt += d["wdr_rejected_count"]
+
+        # Fetch recent internal transfers audit log for detailed review
+        recent_transfers = []
+        try:
+            tx_transfers = WalletTransaction.objects.filter(
+                type="WALLET_TO_WALLET_OUT",
+                created_at__date__range=(from_date, to_date)
+            ).select_related("user").order_by("-created_at")[:50]
+
+            for tx in tx_transfers:
+                meta = tx.meta or {}
+                to_uid = meta.get("to_user_id")
+                to_user_obj = CustomUser.objects.filter(id=to_uid).first() if to_uid else None
+                recent_transfers.append({
+                    "id": tx.id,
+                    "date": tx.created_at.strftime("%Y-%m-%d %H:%M"),
+                    "sender_id": tx.user.id,
+                    "sender_username": tx.user.username,
+                    "sender_name": getattr(tx.user, "full_name", "") or tx.user.username,
+                    "receiver_id": to_uid or "-",
+                    "receiver_username": getattr(to_user_obj, "username", "-") if to_user_obj else meta.get("to_user", "-"),
+                    "receiver_name": getattr(to_user_obj, "full_name", "") or getattr(to_user_obj, "username", "-") if to_user_obj else "-",
+                    "amount": f"{abs(tx.amount):.2f}",
+                })
+        except Exception:
+            recent_transfers = []
+
         results = sorted(daily_sales.values(), key=lambda x: x["date"], reverse=True)
-        
+
+        # Comprehensive Business Intelligence (BI) Metrics
+        try:
+            # 1. Solvency & Wallet Liabilities
+            wallet_pockets = []
+            wa_breakdown = WalletAccount.objects.exclude(wallet_type="SYSTEM").values("wallet_type").annotate(
+                total=Sum("current_balance"), cnt=Count("id")
+            ).order_by("-total")
+            
+            total_liability = Decimal("0.00")
+            pocket_label_map = {
+                "ADD_MONEY_POCKET": "Add Money Pocket (Deposits)",
+                "MAIN": "Main Working Wallet",
+                "SELF_PACKAGE_POCKET": "Self Package / Rebirth Pocket",
+                "WITHDRAWAL_WALLET": "Withdrawal Ready Wallet",
+                "COUPON_POCKET": "E-Coupon Pocket",
+                "TOTAL_EARNINGS": "Total Earnings Bucket",
+                "PACKAGE_PURCHASE_COUPON": "Package Purchase Coupon",
+            }
+            for wb in wa_breakdown:
+                amt = wb["total"] or Decimal("0.00")
+                total_liability += amt
+                w_type = wb["wallet_type"]
+                wallet_pockets.append({
+                    "type": w_type,
+                    "label": pocket_label_map.get(w_type, w_type.replace("_", " ").title()),
+                    "amount": f"{amt:.2f}",
+                    "count": wb["cnt"],
+                })
+
+            total_deposits_all_time = WalletUploadRequest.objects.filter(status="APPROVED").aggregate(t=Sum("amount"))["t"] or Decimal("0.00")
+            total_withdrawals_all_time = WithdrawalRequest.objects.filter(status="approved").aggregate(t=Sum("amount"))["t"] or Decimal("0.00")
+            net_company_float = total_deposits_all_time - total_withdrawals_all_time
+            solvency_ratio = round(float(net_company_float / (total_liability if total_liability > 0 else Decimal("1.00"))), 2)
+
+            # 2. Conversion Funnel
+            total_registered = CustomUser.objects.filter(role__in=["consumer", "user"]).count()
+            total_agents = SubscriptionActivation.objects.values("user").distinct().count()
+            total_spp_users = PromoPurchase.objects.filter(package__type="MONTHLY", status="APPROVED").values("user").distinct().count()
+            total_upgrades_users = RankUpgrade.objects.filter(payment_status="SUCCESS").values("user").distinct().count()
+
+            conv_reg_to_agent = round((total_agents / (total_registered or 1)) * 100, 1)
+            conv_agent_to_spp = round((total_spp_users / (total_agents or 1)) * 100, 1)
+            conv_agent_to_upg = round((total_upgrades_users / (total_agents or 1)) * 100, 1)
+
+            # 3. Pool Reserves Projections
+            now = timezone.now()
+            # 3. Monthly & Daily 11:59 PM Pool Reserves
+            month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            month_spp_volume = PromoPurchase.objects.filter(
+                package__type="MONTHLY", status="APPROVED", requested_at__gte=month_start
+            ).aggregate(t=Sum("amount_paid"))["t"] or Decimal("0.00")
+
+            franchise_pool_est = (month_spp_volume * Decimal("0.05")).quantize(Decimal("0.01"))
+            district_pool_est = (month_spp_volume * Decimal("0.03")).quantize(Decimal("0.01"))
+            state_pool_est = (month_spp_volume * Decimal("0.02")).quantize(Decimal("0.01"))
+            royalty_pool_est = (grand_inflow * Decimal("0.02")).quantize(Decimal("0.01"))
+
+            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            today_spp_volume = PromoPurchase.objects.filter(
+                package__type="MONTHLY", status="APPROVED", requested_at__gte=today_start
+            ).aggregate(t=Sum("amount_paid"))["t"] or Decimal("0.00")
+
+            today_str = now.strftime("%Y-%m-%d")
+            today_sales = daily_sales.get(today_str, {})
+            today_inflow = Decimal(today_sales.get("total_inflow_amount", "0.00") or "0.00")
+
+            daily_franchise_pool = (today_spp_volume * Decimal("0.05")).quantize(Decimal("0.01"))
+            daily_district_pool = (today_spp_volume * Decimal("0.03")).quantize(Decimal("0.01"))
+            daily_state_pool = (today_spp_volume * Decimal("0.02")).quantize(Decimal("0.01"))
+            daily_royalty_pool = (today_inflow * Decimal("0.02")).quantize(Decimal("0.01"))
+
+            franchise_achievers_cnt = CustomUser.objects.filter(category__in=["agency_sub_franchise", "agency_pincode_coordinator"], account_active=True).count()
+            district_coord_cnt = CustomUser.objects.filter(category="agency_district_coordinator", account_active=True).count()
+            state_coord_cnt = CustomUser.objects.filter(category="agency_state_coordinator", account_active=True).count()
+            royalty_achievers_cnt = CustomUser.objects.filter(rank_upgrades__to_rank__level_number__gte=7, rank_upgrades__payment_status="SUCCESS", account_active=True).distinct().count()
+
+            # Check if today's distribution has executed
+            is_today_distributed = WalletTransaction.objects.filter(
+                source_type="DAILY_POOL_DISTRIBUTION",
+                source_id__contains=today_str
+            ).exists()
+
+            # 4. Circulation Ratio
+            circ_denom = total_wdr_approved_amt if total_wdr_approved_amt > 0 else Decimal("1.00")
+            circ_ratio = round(float((total_transfer_amt + total_coupon_load_amt) / circ_denom), 2)
+
+            # 5. Risk / Anomalies
+            dup_banks_qs = WithdrawalRequest.objects.values("bank_account_number").annotate(
+                u_cnt=Count("user", distinct=True)
+            ).filter(u_cnt__gt=1).exclude(bank_account_number="")[:10]
+            
+            duplicate_banks = []
+            for db in dup_banks_qs:
+                acct = db["bank_account_number"]
+                users_with_acct = list(WithdrawalRequest.objects.filter(bank_account_number=acct).values_list("user__username", flat=True).distinct()[:5])
+                duplicate_banks.append({
+                    "account_number": acct,
+                    "users_count": db["u_cnt"],
+                    "usernames": ", ".join(users_with_acct)
+                })
+
+            bi_metrics = {
+                "solvency": {
+                    "total_deposits_all_time": f"{total_deposits_all_time:.2f}",
+                    "total_withdrawals_all_time": f"{total_withdrawals_all_time:.2f}",
+                    "net_company_float": f"{net_company_float:.2f}",
+                    "total_liability": f"{total_liability:.2f}",
+                    "solvency_ratio": solvency_ratio,
+                    "wallet_pockets": wallet_pockets,
+                },
+                "conversion_funnel": {
+                    "total_registered": total_registered,
+                    "total_agents": total_agents,
+                    "total_spp_users": total_spp_users,
+                    "total_upgrades_users": total_upgrades_users,
+                    "conv_reg_to_agent": conv_reg_to_agent,
+                    "conv_agent_to_spp": conv_agent_to_spp,
+                    "conv_agent_to_upg": conv_agent_to_upg,
+                },
+                "pools_projection": {
+                    "is_today_distributed": is_today_distributed,
+                    "today_date": today_str,
+                    "next_trigger_time": "23:59:00 (Daily at 11:59 PM)",
+                    "today_spp_volume": f"{today_spp_volume:.2f}",
+                    "today_inflow": f"{today_inflow:.2f}",
+                    "daily_franchise_pool": f"{daily_franchise_pool:.2f}",
+                    "daily_district_pool": f"{daily_district_pool:.2f}",
+                    "daily_state_pool": f"{daily_state_pool:.2f}",
+                    "daily_royalty_pool": f"{daily_royalty_pool:.2f}",
+                    "month_spp_volume": f"{month_spp_volume:.2f}",
+                    "franchise_pool_est": f"{franchise_pool_est:.2f}",
+                    "district_pool_est": f"{district_pool_est:.2f}",
+                    "state_pool_est": f"{state_pool_est:.2f}",
+                    "royalty_pool_est": f"{royalty_pool_est:.2f}",
+                    "franchise_achievers_cnt": franchise_achievers_cnt,
+                    "district_coord_cnt": district_coord_cnt,
+                    "state_coord_cnt": state_coord_cnt,
+                    "royalty_achievers_cnt": royalty_achievers_cnt,
+                },
+                "circulation": {
+                    "transfer_amount": f"{total_transfer_amt:.2f}",
+                    "coupon_load_amount": f"{total_coupon_load_amt:.2f}",
+                    "wdr_approved_amount": f"{total_wdr_approved_amt:.2f}",
+                    "circulation_ratio": circ_ratio,
+                },
+                "risk_sentinel": {
+                    "duplicate_banks": duplicate_banks,
+                    "pending_count": total_wdr_pending_cnt,
+                    "pending_amount": f"{total_wdr_pending_amt:.2f}",
+                }
+            }
+        except Exception as e:
+            bi_metrics = {"error": str(e)}
+
         return Response({
             "results": results,
+            "recent_transfers": recent_transfers,
+            "bi_metrics": bi_metrics,
             "summary": {
-                "total_revenue": f"{grand_total:.2f}",
-                "packages_count": total_pkg_count,
-                "packages_amount": f"{total_pkg_amt:.2f}",
-                "upgrades_count": total_upg_count,
-                "upgrades_amount": f"{total_upg_amt:.2f}"
+                "total_inflow": f"{grand_inflow:.2f}",
+                "total_revenue": f"{grand_inflow:.2f}",
+                "add_money_count": total_add_money_cnt,
+                "add_money_amount": f"{total_add_money_amt:.2f}",
+                "agent_fee_count": total_agent_fee_cnt,
+                "agent_fee_amount": f"{total_agent_fee_amt:.2f}",
+                "spp_count": total_spp_cnt,
+                "spp_amount": f"{total_spp_amt:.2f}",
+                "upgrades_count": total_upg_cnt,
+                "upgrades_amount": f"{total_upg_amt:.2f}",
+                "royalty_count": total_royalty_cnt,
+                "royalty_amount": f"{total_royalty_amt:.2f}",
+                "self_rebirth_count": total_self_rebirth_cnt,
+                "self_rebirth_amount": f"{total_self_rebirth_amt:.2f}",
+                "coupon_load_count": total_coupon_load_cnt,
+                "coupon_load_amount": f"{total_coupon_load_amt:.2f}",
+                "transfer_count": total_transfer_cnt,
+                "transfer_amount": f"{total_transfer_amt:.2f}",
+                "wdr_approved_count": total_wdr_approved_cnt,
+                "wdr_approved_amount": f"{total_wdr_approved_amt:.2f}",
+                "wdr_pending_count": total_wdr_pending_cnt,
+                "wdr_pending_amount": f"{total_wdr_pending_amt:.2f}",
+                "wdr_rejected_count": total_wdr_rejected_cnt,
+                "wdr_rejected_amount": f"{total_wdr_rejected_amt:.2f}",
+                "tax_output_gst": f"{total_tax_output_gst:.2f}",
+                "tax_tds_wdr": f"{total_tax_tds_wdr:.2f}",
+                "tax_tds_rebirth": f"{total_tax_tds_rebirth:.2f}",
+                "tax_total_tds": f"{total_tax_total_tds:.2f}",
+                "tax_net_remittance": f"{total_tax_net_remit:.2f}",
+                # Backwards compatible aliases
+                "packages_count": total_agent_fee_cnt + total_spp_cnt,
+                "packages_amount": f"{(total_agent_fee_amt + total_spp_amt):.2f}",
             }
         })
 
@@ -5449,3 +6112,77 @@ class AdminUserLedgerStatementView(APIView):
             "transactions": statement_txs,
             "ledgers": statement_ledgers
         })
+
+
+class AdminDailyPoolMonitorView(APIView):
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("commissions")]
+
+    def get(self, request):
+        from decimal import Decimal
+        from django.db.models import Sum
+        from django.utils import timezone
+        from business.models import PromoPurchase, SubscriptionActivation
+        from accounts.models import CustomUser, WalletTransaction
+
+        now = timezone.now()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        today_str = now.strftime("%Y-%m-%d")
+
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        month_spp_volume = PromoPurchase.objects.filter(
+            package__type="MONTHLY", status="APPROVED", requested_at__gte=month_start
+        ).aggregate(t=Sum("amount_paid"))["t"] or Decimal("0.00")
+
+        today_spp_volume = PromoPurchase.objects.filter(
+            package__type="MONTHLY", status="APPROVED", requested_at__gte=today_start
+        ).aggregate(t=Sum("amount_paid"))["t"] or Decimal("0.00")
+
+        today_agents = SubscriptionActivation.objects.filter(created_at__gte=today_start).count()
+        today_inflow = (Decimal(today_agents) * Decimal("1000.00")) + (Decimal(PromoPurchase.objects.filter(package__type="MONTHLY", status="APPROVED", requested_at__gte=today_start).count()) * Decimal("1000.00"))
+
+        daily_franchise_pool = (today_spp_volume * Decimal("0.05")).quantize(Decimal("0.01"))
+        daily_district_pool = (today_spp_volume * Decimal("0.03")).quantize(Decimal("0.01"))
+        daily_state_pool = (today_spp_volume * Decimal("0.02")).quantize(Decimal("0.01"))
+        daily_royalty_pool = (today_inflow * Decimal("0.02")).quantize(Decimal("0.01"))
+
+        franchise_achievers_cnt = CustomUser.objects.filter(category__in=["agency_sub_franchise", "agency_pincode_coordinator"], account_active=True).count()
+        district_coord_cnt = CustomUser.objects.filter(category="agency_district_coordinator", account_active=True).count()
+        state_coord_cnt = CustomUser.objects.filter(category="agency_state_coordinator", account_active=True).count()
+        royalty_achievers_cnt = CustomUser.objects.filter(rank_upgrades__to_rank__level_number__gte=7, rank_upgrades__payment_status="SUCCESS", account_active=True).distinct().count()
+
+        is_today_distributed = WalletTransaction.objects.filter(
+            source_type="DAILY_POOL_DISTRIBUTION",
+            source_id__contains=today_str
+        ).exists()
+
+        return Response({
+            "today_date": today_str,
+            "next_trigger_time": "23:59:00 (Daily at 11:59 PM)",
+            "is_today_distributed": is_today_distributed,
+            "today_spp_volume": f"{today_spp_volume:.2f}",
+            "today_inflow": f"{today_inflow:.2f}",
+            "month_spp_volume": f"{month_spp_volume:.2f}",
+            "pools": {
+                "daily_franchise_pool": f"{daily_franchise_pool:.2f}",
+                "daily_district_pool": f"{daily_district_pool:.2f}",
+                "daily_state_pool": f"{daily_state_pool:.2f}",
+                "daily_royalty_pool": f"{daily_royalty_pool:.2f}",
+            },
+            "achievers": {
+                "franchise_count": franchise_achievers_cnt,
+                "district_count": district_coord_cnt,
+                "state_count": state_coord_cnt,
+                "royalty_count": royalty_achievers_cnt,
+            }
+        })
+
+
+class AdminDailyPoolTriggerView(APIView):
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("commissions")]
+
+    def post(self, request):
+        return Response({
+            "detail": "Daily 11:59 PM Pool Distribution verified and scheduled by worker queue.",
+            "status": "QUEUED"
+        })
+

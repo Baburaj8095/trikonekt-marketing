@@ -31,10 +31,15 @@ function money(v) {
 
 export default function AdminUserTree() {
   const [tab, setTab] = useState(0);
-  const [viewMode, setViewMode] = useState("cards"); // "cards" or "visual"
-  const [category, setCategory] = useState("sub_750"); // "sub_750" | "smart_spp" | "p150" | "all"
   const [levels, setLevels] = useState({ five: 10, three: 15 });
   
+  // Drilldown & Search States
+  const [treeSearchInput, setTreeSearchInput] = useState("");
+  const [treeSearchIdent, setTreeSearchIdent] = useState("");
+  const [treeStartEntryId, setTreeStartEntryId] = useState(null);
+  const [trail, setTrail] = useState([]); // [{ identifier, startEntryId, label }]
+  const [selectedNodeData, setSelectedNodeData] = useState(null);
+
   // Auditor States
   const [auditQuery, setAuditQuery] = useState("");
   const [auditLoading, setAuditLoading] = useState(false);
@@ -42,12 +47,8 @@ export default function AdminUserTree() {
   const [auditResults, setAuditResults] = useState(null);
 
   const activePool = useMemo(() => {
-    const isFive = tab === 0;
-    if (category === "sub_750") return isFive ? "FIVE_750" : "THREE_750";
-    if (category === "smart_spp") return isFive ? "FIVE_759" : "THREE_759";
-    if (category === "p150") return isFive ? "FIVE_150" : "THREE_150";
-    return isFive ? "FIVE_ALL" : "THREE_ALL";
-  }, [tab, category]);
+    return tab === 0 ? "FIVE_750" : "THREE_750";
+  }, [tab]);
 
   useEffect(() => {
     let mounted = true;
@@ -66,6 +67,65 @@ export default function AdminUserTree() {
       mounted = false;
     };
   }, []);
+
+  const onTreeSearch = () => {
+    const q = treeSearchInput.trim();
+    setTreeSearchIdent(q);
+    setTreeStartEntryId(null);
+    setTrail(q ? [{ identifier: q, startEntryId: null, label: q }] : []);
+    setSelectedNodeData(null);
+  };
+
+  const onTreeReset = () => {
+    setTreeSearchInput("");
+    setTreeSearchIdent("");
+    setTreeStartEntryId(null);
+    setTrail([]);
+    setSelectedNodeData(null);
+  };
+
+  const onDrillDown = (node) => {
+    if (!node || node.isEmpty) return;
+    const nextIdent = String(node.username || node.id || "");
+    const nextEntryId = node.entryId || node.account_id || null;
+    const label = `${nextIdent} ${nextEntryId ? `(#${nextEntryId})` : ""}`;
+    
+    setTreeSearchIdent(nextIdent);
+    setTreeStartEntryId(nextEntryId);
+    setTrail((prev) => {
+      // Check if already in trail
+      const existingIdx = prev.findIndex(
+        (t) => (nextEntryId && t.startEntryId === nextEntryId) || (nextIdent && t.identifier === nextIdent)
+      );
+      if (existingIdx >= 0) {
+        return prev.slice(0, existingIdx + 1);
+      }
+      return [...prev, { identifier: nextIdent, startEntryId: nextEntryId, label }];
+    });
+    setSelectedNodeData(node);
+  };
+
+  const onCrumbClick = (idx) => {
+    if (idx < 0 || idx >= trail.length) return;
+    const target = trail[idx];
+    setTreeSearchIdent(target.identifier);
+    setTreeStartEntryId(target.startEntryId);
+    setTrail(trail.slice(0, idx + 1));
+    setSelectedNodeData(null);
+  };
+
+  const onGoBack = () => {
+    if (trail.length <= 1) {
+      onTreeReset();
+      return;
+    }
+    const newTrail = trail.slice(0, -1);
+    const parent = newTrail[newTrail.length - 1];
+    setTrail(newTrail);
+    setTreeSearchIdent(parent?.identifier || "");
+    setTreeStartEntryId(parent?.startEntryId || null);
+    setSelectedNodeData(null);
+  };
 
   const runAudit = async () => {
     if (!auditQuery) return;
@@ -101,11 +161,9 @@ export default function AdminUserTree() {
 
       // 4. Reconcile commissions
       const audits = downline.map((member) => {
-        // Assume default commission rules: Direct Sponsor = ₹50, Level placement = ₹10
         const isSponsor = member.sponsor_id === user.username;
         const expected = isSponsor ? 50.00 : 10.00;
 
-        // Trace transactions remarks referencing this member's username
         const matches = transactions.filter(
           (tx) => 
             tx.amount > 0 && 
@@ -118,7 +176,7 @@ export default function AdminUserTree() {
           username: member.username,
           fullName: member.full_name,
           role: member.role || "user",
-          relation: isSponsor ? "Direct Sponsor" : "Placement",
+          relation: isSponsor ? "Direct Sponsor" : "Layer Placement",
           expected,
           actual,
           status: Math.abs(actual - expected) < 0.01 ? "MATCHED" : "MISMATCHED",
@@ -139,86 +197,191 @@ export default function AdminUserTree() {
   };
 
   return (
-    <Box sx={{ p: 1 }}>
-      <Typography variant="h5" sx={{ fontWeight: 900, color: "#0C2D48", mb: 2 }}>
-        Layer Blocks Trees & Payout Auditor
+    <Box sx={{ p: { xs: 1, sm: 2 } }}>
+      <Typography variant="h5" sx={{ fontWeight: 900, color: "#0C2D48", mb: 0.5 }}>
+        Layer Blocks & Branches
+      </Typography>
+      <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>
+        Interactive hierarchical view. Shows <b>Direct Sponsor Headcount</b> (who sponsored whom) across 5-Block & 3-Block layer branch placements. <b>Tap any child branch to drill down & reload.</b>
       </Typography>
 
-      {/* Main Tabs (Blocks placement choice) */}
+      {/* Main Tabs (5 Blocks & 3 Blocks Only) */}
       <Box
         sx={{
           border: "1px solid #e2e8f0",
-          borderRadius: 2,
+          borderRadius: 2.5,
           bgcolor: "#fff",
-          mb: 1.5,
+          mb: 2,
         }}
       >
         <Tabs
           value={tab}
-          onChange={(e, v) => setTab(v)}
+          onChange={(e, v) => {
+            setTab(v);
+            setSelectedNodeData(null);
+            setTrail([]);
+            setTreeStartEntryId(null);
+          }}
           variant="scrollable"
           allowScrollButtonsMobile
           textColor="primary"
           indicatorColor="primary"
         >
-          <Tab label="5 Blocks (Blocks Placement)" />
-          <Tab label="3 Blocks (Blocks Placement)" />
+          <Tab label="5 Blocks (Layer Placement • 10 Layers)" sx={{ fontWeight: 800, textTransform: "none" }} />
+          <Tab label="3 Blocks (Layer Placement • 15 Layers)" sx={{ fontWeight: 800, textTransform: "none" }} />
         </Tabs>
       </Box>
 
-      {/* Category & View Mode Selector */}
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-        <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 0.5 }}>
-          {[
-            { id: "sub_750", label: "Subscription Joining (750 / 1000)" },
-            { id: "smart_spp", label: "Smart SPP" },
-            { id: "p150", label: "Prime 150" },
-            { id: "all", label: "All Matrix Accounts" },
-          ].map((cat) => (
-            <Chip
-              key={cat.id}
-              label={cat.label}
-              onClick={() => setCategory(cat.id)}
-              color={category === cat.id ? "primary" : "default"}
-              variant={category === cat.id ? "filled" : "outlined"}
-              sx={{ fontWeight: 800, fontSize: 12, cursor: "pointer" }}
-            />
-          ))}
-        </Stack>
-
-        <Box sx={{ display: "flex", gap: 1 }}>
+      {/* Search Controls */}
+      <Stack
+        direction="row"
+        spacing={1}
+        alignItems="center"
+        sx={{ mb: 2 }}
+      >
+        <TextField
+          size="small"
+          placeholder="Search Username / Phone / Entry #"
+          value={treeSearchInput}
+          onChange={(e) => setTreeSearchInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && onTreeSearch()}
+          sx={{ minWidth: { xs: 200, sm: 280 }, bgcolor: "#fff", borderRadius: 1 }}
+        />
+        <Button
+          variant="contained"
+          onClick={onTreeSearch}
+          startIcon={<SearchIcon />}
+          sx={{ textTransform: "none", fontWeight: 800, px: 2, borderRadius: 2 }}
+        >
+          Search / Load
+        </Button>
+        {(treeSearchIdent || trail.length > 0) && (
           <Button
-            variant={viewMode === "cards" ? "contained" : "outlined"}
-            onClick={() => setViewMode("cards")}
-            size="small"
-            sx={{ borderRadius: 99, px: 2, textTransform: "none", fontWeight: 800 }}
+            variant="outlined"
+            color="secondary"
+            onClick={onTreeReset}
+            sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2 }}
           >
-            Card Explorer List
+            Reset Root
           </Button>
-          <Button
-            variant={viewMode === "visual" ? "contained" : "outlined"}
-            onClick={() => setViewMode("visual")}
-            size="small"
-            sx={{ borderRadius: 99, px: 2, textTransform: "none", fontWeight: 800 }}
-          >
-            Interactive Zoomable SVG Tree
-          </Button>
-        </Box>
+        )}
       </Stack>
 
-      {/* Tree Content Render */}
-      <Paper elevation={0} sx={{ p: 1.5, borderRadius: 3, border: "1px solid #e2e8f0", bgcolor: "#f8fafc", mb: 3 }}>
-        {viewMode === "cards" ? (
-          tab === 0 ? (
-            <TreeReferralGalaxy mode="admin" preferredSource="auto" maxDepth={levels.five} maxChildren={5} pool={activePool} />
-          ) : (
-            <TreeReferralGalaxy mode="admin" preferredSource="auto" maxDepth={levels.three} maxChildren={3} pool={activePool} />
-          )
-        ) : (
-          <Box sx={{ height: 530, borderRadius: 2.5, overflow: "hidden" }}>
-            <InteractiveTree pool={activePool} />
+      {/* Breadcrumb Navigation Trail */}
+      {trail.length > 0 && (
+        <Paper
+          elevation={0}
+          sx={{
+            p: 1.5,
+            mb: 2,
+            borderRadius: 2,
+            bgcolor: "#ffffff",
+            border: "1px solid #e2e8f0",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 1,
+          }}
+        >
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: "wrap" }}>
+            <Typography variant="caption" sx={{ fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>
+              Hierarchy Trail:
+            </Typography>
+            <Chip
+              label="Root"
+              size="small"
+              onClick={onTreeReset}
+              sx={{ fontWeight: 800, cursor: "pointer", bgcolor: "#f1f5f9" }}
+            />
+            {trail.map((crumb, idx) => (
+              <React.Fragment key={idx}>
+                <Typography sx={{ color: "#94a3b8", fontWeight: 800 }}>→</Typography>
+                <Chip
+                  label={crumb.label}
+                  size="small"
+                  onClick={() => onCrumbClick(idx)}
+                  color={idx === trail.length - 1 ? "primary" : "default"}
+                  variant={idx === trail.length - 1 ? "filled" : "outlined"}
+                  sx={{ fontWeight: 800, cursor: "pointer" }}
+                />
+              </React.Fragment>
+            ))}
+          </Stack>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={onGoBack}
+            sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2 }}
+          >
+            ← Back 1 Layer
+          </Button>
+        </Paper>
+      )}
+
+      {/* Selected Node Summary Card if tapped */}
+      {selectedNodeData && (
+        <Paper
+          elevation={0}
+          sx={{
+            p: 2,
+            mb: 2,
+            borderRadius: 2.5,
+            border: "1.5px solid #c7d2fe",
+            bgcolor: "#eef2ff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 1.5,
+          }}
+        >
+          <Box>
+            <Typography sx={{ fontWeight: 900, color: "#1e1b4b", fontSize: 14 }}>
+              Current Node: {selectedNodeData.username} {selectedNodeData.entryId ? `(Entry #${selectedNodeData.entryId})` : ""}
+            </Typography>
+            <Typography variant="caption" sx={{ color: "#4338ca", fontWeight: 700 }}>
+              {selectedNodeData.matrixPos > 0 ? `Layer Position #${selectedNodeData.matrixPos}` : "Active Layer Root"}
+            </Typography>
           </Box>
-        )}
+          <Stack direction="row" spacing={2} alignItems="center">
+            <Chip
+              label={`👤 Direct Sponsored: ${selectedNodeData.directCount || 0}`}
+              color="success"
+              sx={{ fontWeight: 800 }}
+            />
+            {!selectedNodeData.isRoot && (
+              <Button
+                size="small"
+                variant="contained"
+                onClick={() => onDrillDown(selectedNodeData)}
+                sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, bgcolor: "#4338ca" }}
+              >
+                Drill Down →
+              </Button>
+            )}
+          </Stack>
+        </Paper>
+      )}
+
+      {/* Visual Tree Branches Container */}
+      <Paper elevation={0} sx={{ p: 1, borderRadius: 3, border: "1px solid #e2e8f0", bgcolor: "#f8fafc", mb: 3 }}>
+        <Box sx={{ height: 580, borderRadius: 2.5, overflow: "hidden" }}>
+          <InteractiveTree
+            key={`${activePool}-${treeSearchIdent}-${treeStartEntryId || "root"}`}
+            isAdmin={true}
+            adminIdentifier={treeSearchIdent}
+            entryRootId={treeStartEntryId}
+            pool={activePool}
+            onNodeSelect={(_, node) => {
+              if (node && !node.isRoot) {
+                onDrillDown(node);
+              } else if (node) {
+                setSelectedNodeData(node);
+              }
+            }}
+          />
+        </Box>
       </Paper>
 
       {/* Structure Payout Auditor Section */}

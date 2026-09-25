@@ -15,7 +15,13 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
         "system_serial_number",
         "user_code",
         "sponsor_name",
+        "sponsor_number",
         "sponsor_display",
+        "join_prime_750",
+        "spp_months_boxes",
+        "rank_upgrade_levels",
+        "rank_upgrade_count",
+        "current_rank",
         "address_pincode",
         "package_buy_date",
         "main_wallet",
@@ -38,10 +44,11 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
     }
     CONSUMER_PRESET_FIELDS = {
         "basic": {
-            "system_serial_number", "user_code", "sponsor_name", "sponsor_display", "address_pincode",
+            "system_serial_number", "user_code", "sponsor_name", "sponsor_number", "sponsor_display", "address_pincode",
         },
         "package": {
-            "user_code", "package_buy_date", "subscription_1", "subscription_2", "subscription_3",
+            "user_code", "package_buy_date", "join_prime_750", "spp_months_boxes", "rank_upgrade_levels", "current_rank",
+            "subscription_1", "subscription_2", "subscription_3",
             "smart_product_package", "digital_education", "new_tour_package",
         },
         "wallet": {
@@ -67,7 +74,13 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
     system_serial_number = serializers.SerializerMethodField()
     user_code = serializers.SerializerMethodField()
     sponsor_name = serializers.SerializerMethodField()
+    sponsor_number = serializers.SerializerMethodField()
     sponsor_display = serializers.SerializerMethodField()
+    join_prime_750 = serializers.SerializerMethodField()
+    spp_months_boxes = serializers.SerializerMethodField()
+    rank_upgrade_levels = serializers.SerializerMethodField()
+    rank_upgrade_count = serializers.SerializerMethodField()
+    current_rank = serializers.SerializerMethodField()
     address_pincode = serializers.SerializerMethodField()
     package_buy_date = serializers.SerializerMethodField()
     main_wallet = serializers.SerializerMethodField()
@@ -157,7 +170,13 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
             "system_serial_number",
             "user_code",
             "sponsor_name",
+            "sponsor_number",
             "sponsor_display",
+            "join_prime_750",
+            "spp_months_boxes",
+            "rank_upgrade_levels",
+            "rank_upgrade_count",
+            "current_rank",
             "address_pincode",
             "package_buy_date",
             "main_wallet",
@@ -499,19 +518,37 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
         except Exception:
             return getattr(obj, "username", "") or ""
 
+    def get_sponsor_number(self, obj):
+        try:
+            rb = getattr(obj, "registered_by", None)
+            if rb:
+                phone = (getattr(rb, "phone", "") or "").strip()
+                if phone:
+                    return phone
+                return (getattr(rb, "username", "") or "").strip()
+            sid = (getattr(obj, "sponsor_id", "") or "").strip()
+            return sid
+        except Exception:
+            return ""
+
     def get_sponsor_name(self, obj):
         try:
             rb = getattr(obj, "registered_by", None)
             if rb:
-                return (getattr(rb, "full_name", "") or "").strip() or (getattr(rb, "username", "") or "").strip()
+                name = (getattr(rb, "full_name", "") or "").strip()
+                if name:
+                    return name
+                return (getattr(rb, "username", "") or "").strip()
+            sid = (getattr(obj, "sponsor_id", "") or "").strip()
+            return sid
         except Exception:
             pass
         return ""
 
     def get_sponsor_display(self, obj):
-        sid = self.get_sponsor_id(obj)
+        sid = self.get_sponsor_number(obj) or self.get_sponsor_id(obj)
         sname = self.get_sponsor_name(obj)
-        if sid and sname:
+        if sid and sname and sid != sname:
             return f"{sid} - {sname}"
         return sid or sname or ""
 
@@ -1002,6 +1039,12 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
     # -------- Prime/Monthly counters and monthly summary --------
     def _approved_promo_purchases(self, obj):
         try:
+            pre = getattr(obj, "prefetched_approved_promo_purchases", None)
+            if isinstance(pre, list):
+                return pre
+        except Exception:
+            pass
+        try:
             pre = getattr(obj, "approved_promo_purchases", None)
             if isinstance(pre, list):
                 return pre
@@ -1040,15 +1083,24 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
             cnt = 0
             for p in self._approved_promo_purchases(obj):
                 try:
-                    typ = str(getattr(getattr(p, "package", None), "type", "") or "")
-                    price = D(str(getattr(getattr(p, "package", None), "price", "0") or "0"))
-                    if typ == "PRIME" and (abs(price - D("750")) <= D("0.5")):
+                    pkg = getattr(p, "package", None)
+                    code = str(getattr(pkg, "code", "") or "").upper()
+                    typ = str(getattr(pkg, "type", "") or "").upper()
+                    price = D(str(getattr(pkg, "price", "0") or "0"))
+                    if typ == "PRIME" and ("750" in code or abs(price - D("750")) <= D("0.5")):
                         cnt += 1
                 except Exception:
                     continue
             return int(cnt)
         except Exception:
             return 0
+
+    def get_join_prime_750(self, obj) -> str:
+        try:
+            cnt = self.get_prime750_count(obj)
+            return f"Yes ({cnt})" if cnt > 0 else "No"
+        except Exception:
+            return "No"
 
     def get_monthly_759_count(self, obj) -> int:
         """
@@ -1058,7 +1110,10 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
             total = 0
             for p in self._approved_promo_purchases(obj):
                 try:
-                    if str(getattr(getattr(p, "package", None), "type", "") or "") != "MONTHLY":
+                    pkg = getattr(p, "package", None)
+                    typ = str(getattr(pkg, "type", "") or "").upper()
+                    code = str(getattr(pkg, "code", "") or "").upper()
+                    if typ != "MONTHLY" and "MONTHLY" not in code and "SPP" not in code:
                         continue
                     q = getattr(p, "quantity", None)
                     if q is None:
@@ -1067,12 +1122,66 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
                             q = len(boxes)
                         except Exception:
                             q = 0
-                    total += int(q or 0)
+                    total += int(q or 1)
                 except Exception:
                     continue
             return int(total)
         except Exception:
             return 0
+
+    def get_spp_months_boxes(self, obj) -> int:
+        try:
+            return self.get_monthly_759_count(obj)
+        except Exception:
+            return 0
+
+    def _approved_rank_upgrades_list(self, obj):
+        try:
+            pre = getattr(obj, "prefetched_rank_upgrades", None)
+            if isinstance(pre, list):
+                return pre
+        except Exception:
+            pass
+        try:
+            from mlm_ranks.models import RankUpgrade
+            return list(
+                RankUpgrade.objects.select_related("to_rank")
+                .filter(user_id=getattr(obj, "id", None), payment_status="SUCCESS")
+                .order_by("to_rank__level_number")
+            )
+        except Exception:
+            return []
+
+    def get_rank_upgrade_levels(self, obj) -> str:
+        try:
+            upgs = self._approved_rank_upgrades_list(obj)
+            if not upgs:
+                return "0"
+            lvl_names = [f"L{getattr(u.to_rank, 'level_number', '')}" for u in upgs if getattr(u, "to_rank", None)]
+            return f"{len(upgs)} Levels ({', '.join(lvl_names)})"
+        except Exception:
+            return "0"
+
+    def get_rank_upgrade_count(self, obj) -> int:
+        try:
+            return len(self._approved_rank_upgrades_list(obj))
+        except Exception:
+            return 0
+
+    def get_current_rank(self, obj) -> str:
+        try:
+            rp = getattr(obj, "rank_profile", None)
+            if rp:
+                cr = getattr(rp, "current_rank", None)
+                if cr:
+                    return getattr(cr, "rank_name", "") or ""
+            from mlm_ranks.models import UserRank
+            ur = UserRank.objects.select_related("current_rank").filter(user_id=getattr(obj, "id", None)).first()
+            if ur and ur.current_rank:
+                return ur.current_rank.rank_name or ""
+        except Exception:
+            pass
+        return ""
 
     def _monthly_summary(self, obj):
         """
@@ -1239,6 +1348,133 @@ class AdminWithdrawalSerializer(serializers.ModelSerializer):
     full_name = serializers.CharField(source="user.full_name", read_only=True)
     phone = serializers.CharField(source="user.phone", read_only=True)
     pincode = serializers.CharField(source="user.pincode", read_only=True)
+    rank_name = serializers.SerializerMethodField()
+    rank_level = serializers.SerializerMethodField()
+    rank_label = serializers.SerializerMethodField()
+    rank_upgrades_count = serializers.SerializerMethodField()
+    rank_upgrades_history = serializers.SerializerMethodField()
+    purchased_packages = serializers.SerializerMethodField()
+    package_badges = serializers.SerializerMethodField()
+    spp_boxes_count = serializers.SerializerMethodField()
+
+    def get_rank_name(self, obj):
+        try:
+            rp = getattr(obj.user, "rank_profile", None)
+            if rp and rp.current_rank:
+                return rp.current_rank.rank_name
+            return "Free Tier"
+        except Exception:
+            return "Free Tier"
+
+    def get_rank_level(self, obj):
+        try:
+            rp = getattr(obj.user, "rank_profile", None)
+            if rp and rp.current_rank:
+                return rp.current_rank.level_number
+            return 0
+        except Exception:
+            return 0
+
+    def get_rank_label(self, obj):
+        try:
+            rp = getattr(obj.user, "rank_profile", None)
+            if rp and rp.current_rank:
+                lvl = rp.current_rank.level_number
+                return f"{rp.current_rank.rank_name} (Level {lvl})"
+            return "Free Tier (L0)"
+        except Exception:
+            return "Free Tier (L0)"
+
+    def get_rank_upgrades_count(self, obj):
+        try:
+            return obj.user.rank_upgrades.filter(payment_status="SUCCESS").count()
+        except Exception:
+            return 0
+
+    def get_rank_upgrades_history(self, obj):
+        try:
+            upgrades = obj.user.rank_upgrades.filter(payment_status="SUCCESS").select_related("from_rank", "to_rank").order_by("-id")
+            return [
+                {
+                    "from_rank": u.from_rank.rank_name if u.from_rank else "",
+                    "to_rank": u.to_rank.rank_name if u.to_rank else "",
+                    "to_level": u.to_rank.level_number if u.to_rank else 0,
+                    "amount": str(u.upgrade_amount),
+                    "date": u.created_at.strftime("%Y-%m-%d") if u.created_at else "",
+                }
+                for u in upgrades
+            ]
+        except Exception:
+            return []
+
+    def get_purchased_packages(self, obj):
+        packages = []
+        user = obj.user
+        try:
+            # Promo purchases (APPROVED / SUCCESS)
+            promo_qs = user.promo_purchases.filter(status__in=["APPROVED", "SUCCESS", "COMPLETED"]).select_related("package").order_by("-created_at")
+            pkg_map = {}
+            for p in promo_qs:
+                pkg_name = p.package.name if p.package else "Promo Package"
+                pkg_code = p.package.code if p.package else ""
+                pkg_type = p.package.type if p.package else ""
+                key = f"{pkg_code}_{pkg_name}"
+                if key not in pkg_map:
+                    pkg_map[key] = {
+                        "name": pkg_name,
+                        "code": pkg_code,
+                        "type": pkg_type,
+                        "count": 0,
+                        "total_amount": 0,
+                        "latest_date": p.created_at.strftime("%Y-%m-%d") if p.created_at else "",
+                    }
+                pkg_map[key]["count"] += (p.quantity or 1)
+                pkg_map[key]["total_amount"] += float(p.amount_paid or 0)
+            for v in pkg_map.values():
+                packages.append(v)
+        except Exception:
+            pass
+
+        try:
+            # Subscription Activations
+            sub_qs = user.subscription_activations.all().order_by("-created_at")
+            sub_map = {}
+            for s in sub_qs:
+                pkg = s.package
+                if pkg not in sub_map:
+                    sub_map[pkg] = {
+                        "name": pkg.replace("_", " ").title(),
+                        "code": pkg,
+                        "type": "SUBSCRIPTION",
+                        "count": 0,
+                        "total_amount": 0,
+                        "latest_date": s.created_at.strftime("%Y-%m-%d") if s.created_at else "",
+                    }
+                sub_map[pkg]["count"] += 1
+                sub_map[pkg]["total_amount"] += float(s.amount or 0)
+            for v in sub_map.values():
+                packages.append(v)
+        except Exception:
+            pass
+
+        return packages
+
+    def get_package_badges(self, obj):
+        pkgs = self.get_purchased_packages(obj)
+        badges = []
+        for p in pkgs:
+            c = p.get("count", 1)
+            if c > 1:
+                badges.append(f"{p.get('name', 'Package')} ({c}x)")
+            else:
+                badges.append(p.get("name", "Package"))
+        return badges
+
+    def get_spp_boxes_count(self, obj):
+        try:
+            return obj.user.spp_gift_cards.count()
+        except Exception:
+            return 0
 
     class Meta:
         model = WithdrawalRequest
@@ -1249,6 +1485,14 @@ class AdminWithdrawalSerializer(serializers.ModelSerializer):
             "full_name",
             "phone",
             "pincode",
+            "rank_name",
+            "rank_level",
+            "rank_label",
+            "rank_upgrades_count",
+            "rank_upgrades_history",
+            "purchased_packages",
+            "package_badges",
+            "spp_boxes_count",
             "amount",
             "method",
             "upi_id",

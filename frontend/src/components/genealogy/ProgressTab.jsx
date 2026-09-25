@@ -405,7 +405,7 @@ export default function ProgressTab({
   const members = Array.isArray(directList) ? directList : [];
 
   const subTabs = [
-    { key: "levels", label: "Levels" },
+    { key: "levels", label: "Layers" },
     { key: "direct", label: `Direct (${directCount})` },
     {
       key: "positions",
@@ -430,7 +430,7 @@ export default function ProgressTab({
         />
         <StatTile label="Direct" value={String(directCount)} />
         <StatTile
-          label="Active Levels"
+          label="Active Layers"
           value={String(activeLevelsReached)}
           color={C.primary}
         />

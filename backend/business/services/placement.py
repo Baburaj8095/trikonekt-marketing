@@ -271,7 +271,7 @@ class GenericPlacement:
         width: Optional[int] = None,
         max_depth: Optional[int] = None,
         start_entry_id: Optional[int] = None,
-    ) -> AutoPoolAccount:
+    ) -> Optional[AutoPoolAccount]:
         """
         Place a new AutoPoolAccount deterministically under a subtree:
         - If start_entry_id is provided, BFS within that subtree
@@ -286,6 +286,21 @@ class GenericPlacement:
                 cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", [pool_type])
         except Exception:
             pass
+
+        # The callers perform a source check before reaching the placement
+        # engine, but that check is outside this lock. Two workers can both
+        # observe "not found", then create two 5×/3× entries for one purchase.
+        # Recheck after acquiring the placement lock and treat the second call
+        # as an idempotent no-op. Recovery jobs intentionally retain their
+        # existing ability to create multiple rows from the same source.
+        if source_type and source_id and str(source_type).upper() != "RECOVERY":
+            if AutoPoolAccount.objects.filter(
+                owner=owner,
+                pool_type=pool_type,
+                source_type=str(source_type),
+                source_id=str(source_id),
+            ).exists():
+                return None
 
         if width is None or max_depth is None:
             w, d = GenericPlacement.configured_width_and_depth(pool_type)

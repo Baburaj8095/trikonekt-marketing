@@ -371,7 +371,6 @@ export default function AdminShell({ children }) {
           { to: "/admin/analytics/sales", label: "Daily Sales & Cash Flow", icon: "chart" },
           { to: "/admin/reports/users-today", label: "Users Today Report", icon: "users" },
           { to: "/admin/reports/internal-wallet", label: "Internal Wallet Daily Report", icon: "wallet" },
-          { to: "/admin/reports", label: "General Business Reports", icon: "chart" },
           { to: "/admin/ledger-statement", label: "Ledger Statement", icon: "file" },
         ],
       },

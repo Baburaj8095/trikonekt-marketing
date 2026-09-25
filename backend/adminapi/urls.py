@@ -54,6 +54,8 @@ from .views import (
     AdminMatrixAccountsList,
     AdminMatrixAccountStats,
     AdminMasterCommissionConfig,
+    AdminDailyPoolMonitorView,
+    AdminDailyPoolTriggerView,
     AdminWithdrawalDistributionPreviewView,
     AdminWalletDebugView,
     AdminDailySalesReportView,
@@ -153,6 +155,8 @@ urlpatterns = [
     # Matrix commission configuration (5-matrix and 3-matrix)
     path("commission/matrix/", AdminMatrixCommissionConfig.as_view()),
     path("commission/master/", AdminMasterCommissionConfig.as_view()),
+    path("commission/pools/monitor/", AdminDailyPoolMonitorView.as_view()),
+    path("commission/pools/trigger/", AdminDailyPoolTriggerView.as_view()),
     # Rewards Points (admin configurable schedule)
     path("rewards/points-config/", AdminRewardPointsConfig.as_view()),
 

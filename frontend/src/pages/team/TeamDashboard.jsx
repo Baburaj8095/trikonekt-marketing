@@ -27,6 +27,8 @@ import FlightTakeoffRoundedIcon from "@mui/icons-material/FlightTakeoffRounded";
 import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
 import ArrowForwardIosRoundedIcon from "@mui/icons-material/ArrowForwardIosRounded";
 import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
+import CardGiftcardRoundedIcon from "@mui/icons-material/CardGiftcardRounded";
+import AccessTimeFilledRoundedIcon from "@mui/icons-material/AccessTimeFilledRounded";
 import { useNavigate, useLocation } from "react-router-dom";
 import API, { getWalletMe } from "../../api/api";
 import BalanceCard from "../../components/common/BalanceCard";
@@ -672,19 +674,18 @@ function VideoScroller({ videos = [], loading = false, onOpenFallback, onBuyPrim
   );
 }
 
-function TourScroller({ onTour, onShop, onCoupons }) {
+function TourScroller({ onTour, onCoupons }) {
   const items = [
     { name: "Goa", image: imgHolidays, onClick: onTour },
     { name: "Kerala", image: imgKerala, onClick: onTour },
     { name: "Thailand", image: imgThailand, onClick: onTour },
     { name: "Malaysia", image: imgHolidays, onClick: onTour },
-    { name: "E-Commerce", image: imgEcommerce, onClick: onShop },
     { name: "Coupons", image: imgGifts, onClick: onCoupons },
   ];
 
   return (
     <Box sx={{ mb: { xs: 4, sm: 2 } }}>
-      <SectionTitle title="E-Commerce and TRI Tour" />
+      <SectionTitle title="TRI Tours & Holiday Destinations" />
       <HorizontalScroller>
         {items.map((d) => (
           <Paper
@@ -709,7 +710,7 @@ function TourScroller({ onTour, onShop, onCoupons }) {
               <Typography sx={{ fontSize: 13, fontWeight: 800 }} noWrap>
                 {d.name}
               </Typography>
-              {d.name === "E-Commerce" ? <StorefrontRoundedIcon sx={{ fontSize: 17, color: C.primary }} /> : <FlightTakeoffRoundedIcon sx={{ fontSize: 17, color: C.primary }} />}
+              <FlightTakeoffRoundedIcon sx={{ fontSize: 17, color: C.primary }} />
             </Stack>
           </Paper>
         ))}
@@ -1072,6 +1073,230 @@ export default function TeamDashboard() {
     if (action === "certificate") openLatestDocument("CERTIFICATE");
   }, [location.search, openLatestDocument]);
 
+function SPPMonthlyCadenceWidget() {
+  const navigate = useNavigate();
+  const [cadence, setCadence] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await API.get("/business/spp/cadence/");
+        if (alive && res?.data?.cadence) {
+          setCadence(res.data.cadence);
+        }
+      } catch (_) {
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  if (loading || !cadence) return null;
+
+  const boxes = cadence?.boxes_completed || 0;
+  const isCompleted = cadence?.cadence_status === "COMPLETED" || boxes >= 12;
+  const isOverdue = cadence?.cadence_status === "OVERDUE";
+  const isDueToday = cadence?.cadence_status === "DUE_TODAY";
+  const isDueSoon = cadence?.cadence_status === "DUE_SOON";
+  const daysRem = cadence?.days_remaining;
+
+  let badgeBg = "#ecfdf5";
+  let badgeColor = "#065f46";
+  let badgeBorder = "#a7f3d0";
+  let badgeText = `${daysRem} days remaining until next renewal`;
+
+  if (isCompleted) {
+    badgeBg = "#f5f3ff";
+    badgeColor = "#6d28d9";
+    badgeBorder = "#ddd6fe";
+    badgeText = "12/12 Months Completed • ₹14,000 Maturity Unlocked!";
+  } else if (isOverdue) {
+    badgeBg = "#fef2f2";
+    badgeColor = "#991b1b";
+    badgeBorder = "#fecaca";
+    badgeText = `Overdue by ${Math.abs(daysRem)} days • Purchase monthly box to stay on track`;
+  } else if (isDueToday) {
+    badgeBg = "#fff7ed";
+    badgeColor = "#9a3412";
+    badgeBorder = "#fed7aa";
+    badgeText = "Renewal Due Today! Purchase Monthly Box (₹1,000)";
+  } else if (isDueSoon) {
+    badgeBg = "#fefce8";
+    badgeColor = "#854d0e";
+    badgeBorder = "#fef08a";
+    badgeText = `Renewal Due Soon • ${daysRem} days remaining`;
+  } else if (cadence?.cadence_status === "NOT_STARTED") {
+    badgeBg = "#eff6ff";
+    badgeColor = "#1e40af";
+    badgeBorder = "#bfdbfe";
+    badgeText = "Start Season 1 • ₹1,000 / month";
+  }
+
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        p: { xs: 2, sm: 2.25 },
+        borderRadius: "16px",
+        background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+        color: "#ffffff",
+        border: "1px solid rgba(255,255,255,0.08)",
+        boxShadow: "0 10px 25px rgba(15,23,42,0.15)",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      <Box
+        sx={{
+          position: "absolute",
+          top: -20,
+          right: -20,
+          width: 120,
+          height: 120,
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(56,189,248,0.15) 0%, rgba(0,0,0,0) 70%)",
+          pointerEvents: "none",
+        }}
+      />
+      
+      <Stack spacing={1.5}>
+        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={1}>
+          <Box>
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <Box sx={{ p: 0.75, borderRadius: 1.5, bgcolor: "rgba(56, 189, 248, 0.15)", display: "flex" }}>
+                <CardGiftcardRoundedIcon sx={{ fontSize: 20, color: "#38bdf8" }} />
+              </Box>
+              <Typography sx={{ fontSize: { xs: 15, sm: 16 }, fontWeight: 800, color: "#ffffff" }}>
+                SPP Monthly Savings & Gift Card Cadence
+              </Typography>
+            </Stack>
+            <Typography sx={{ fontSize: 12, color: "#94a3b8", mt: 0.5, lineHeight: 1.4 }}>
+              Universal ₹1,000 Monthly Vouchers for <b>Products, Coupons, Holidays</b> or ₹14,000 Year-End Maturity.
+            </Typography>
+          </Box>
+
+          <Chip
+            size="small"
+            label={`Season ${cadence?.season_number || 1}: ${boxes}/12 Boxes`}
+            sx={{
+              bgcolor: "rgba(255,255,255,0.1)",
+              color: "#38bdf8",
+              fontWeight: 800,
+              fontSize: 12,
+              border: "1px solid rgba(56,189,248,0.3)",
+            }}
+          />
+        </Stack>
+
+        {/* Progress bar */}
+        <Box sx={{ width: "100%" }}>
+          <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+            <Typography sx={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>
+              {boxes} of 12 Months Completed
+            </Typography>
+            <Typography sx={{ fontSize: 11, color: "#38bdf8", fontWeight: 700 }}>
+              {Math.min(100, Math.round((boxes / 12) * 100))}%
+            </Typography>
+          </Stack>
+          <Box
+            sx={{
+              width: "100%",
+              height: 6,
+              borderRadius: 3,
+              bgcolor: "rgba(255,255,255,0.1)",
+              overflow: "hidden",
+            }}
+          >
+            <Box
+              sx={{
+                width: `${Math.min(100, Math.round((boxes / 12) * 100))}%`,
+                height: "100%",
+                background: "linear-gradient(90deg, #38bdf8 0%, #818cf8 100%)",
+                borderRadius: 3,
+                transition: "width 0.4s ease",
+              }}
+            />
+          </Box>
+        </Box>
+
+        {/* Cadence Status Strip */}
+        <Paper
+          elevation={0}
+          sx={{
+            p: 1.25,
+            borderRadius: 2,
+            bgcolor: badgeBg,
+            border: `1px solid ${badgeBorder}`,
+            display: "flex",
+            flexDirection: { xs: "column", sm: "row" },
+            justifyContent: "space-between",
+            alignItems: { xs: "flex-start", sm: "center" },
+            gap: 1,
+          }}
+        >
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <AccessTimeFilledRoundedIcon sx={{ fontSize: 18, color: badgeColor }} />
+            <Box>
+              <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: badgeColor }}>
+                {badgeText}
+              </Typography>
+              {cadence?.next_purchase_date && !isCompleted && (
+                <Typography sx={{ fontSize: 11, color: badgeColor, opacity: 0.9 }}>
+                  Next Due: <b>{cadence.next_purchase_date}</b> (Last: {cadence.last_purchase_date || "N/A"})
+                </Typography>
+              )}
+            </Box>
+          </Stack>
+
+          <Stack direction="row" spacing={1} sx={{ width: { xs: "100%", sm: "auto" } }}>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => navigate("/user/spp-gift-cards")}
+              sx={{
+                fontSize: 12,
+                fontWeight: 700,
+                textTransform: "none",
+                borderRadius: 2,
+                color: "#334155",
+                borderColor: "#cbd5e1",
+                bgcolor: "#ffffff",
+                "&:hover": { bgcolor: "#f8fafc" },
+                flex: { xs: 1, sm: "none" },
+              }}
+            >
+              View Gift Cards
+            </Button>
+            {!isCompleted && (
+              <Button
+                variant="contained"
+                size="small"
+                onClick={() => navigate("/user/packages/spp")}
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 800,
+                  textTransform: "none",
+                  borderRadius: 2,
+                  bgcolor: isDueToday || isOverdue ? "#ea580c" : "#2563eb",
+                  "&:hover": { bgcolor: isDueToday || isOverdue ? "#c2410c" : "#1d4ed8" },
+                  color: "#ffffff",
+                  flex: { xs: 1, sm: "none" },
+                  boxShadow: "0 2px 8px rgba(37,99,235,0.25)",
+                }}
+              >
+                {boxes === 0 ? "Start SPP (₹1,000)" : "Buy Next Box (₹1,000)"}
+              </Button>
+            )}
+          </Stack>
+        </Paper>
+      </Stack>
+    </Paper>
+  );
+}
+
   const [walletData, setWalletData] = useState(null);
 
   useEffect(() => {
@@ -1096,6 +1321,9 @@ export default function TeamDashboard() {
             subtitle="View wallet details"
             onClick={() => navigate("/user/team-wallet")}
           />
+
+          {/* SPP MONTHLY CADENCE & RENEWAL WIDGET */}
+          <SPPMonthlyCadenceWidget />
 
           {docErr ? (
             <Paper elevation={0} sx={{ p: 1.25, borderRadius: 2, border: "1px solid #fecaca", bgcolor: "#fef2f2" }}>
@@ -1123,16 +1351,16 @@ export default function TeamDashboard() {
           >
             <Box>
               <Typography sx={{ fontSize: { xs: 17, sm: 19 }, fontWeight: 700, color: "#ffffff", lineHeight: 1.2 }}>
-                Explore Opportunities
+                Explore Growth Opportunities
               </Typography>
               <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.9)", mt: 0.25 }}>
-                Shop • Learn • Travel • Earn
+                SPP Monthly Savings • Education • Travel • Team Commissions
               </Typography>
             </Box>
             <Button
               variant="contained"
               size="small"
-              onClick={() => navigate("/trikonekt-products")}
+              onClick={() => navigate("/user/packages/spp")}
               sx={{
                 bgcolor: "#ffffff",
                 color: "#0369a1",
@@ -1144,7 +1372,7 @@ export default function TeamDashboard() {
                 "&:hover": { bgcolor: "#f0f9ff" },
               }}
             >
-              Explore Now →
+              Explore SPP & Packages →
             </Button>
           </Paper>
 
@@ -1173,7 +1401,6 @@ export default function TeamDashboard() {
           />
           <TourScroller
             onTour={() => navigate("/user/tri/tri-holidays")}
-            onShop={() => navigate("/trikonekt-products")}
             onCoupons={() => navigate("/user/coupon-pocket")}
           />
         </Stack>

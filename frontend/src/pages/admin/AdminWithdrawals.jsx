@@ -350,6 +350,8 @@ export default function AdminWithdrawals() {
       "IFSC Code",
       "Net Amount (INR)",
       "Remarks / User ID",
+      "Digital Rank",
+      "Purchased Packages",
       "Debit Account No",
     ];
 
@@ -357,6 +359,8 @@ export default function AdminWithdrawals() {
       const gross = Number(r.amount || 0);
       const taxAmt = gross * Number(taxLabel || 0) / 100;
       const net = (gross - taxAmt).toFixed(2);
+      const rankStr = r.rank_label || r.rank_name || (r.rank_level ? `Level ${r.rank_level}` : "Free Tier (L0)");
+      const pkgsStr = Array.isArray(r.package_badges) && r.package_badges.length > 0 ? r.package_badges.join(" | ") : "None";
       return [
         "NEFT",
         `"${(r.full_name || r.username || "User").replace(/"/g, '""')}"`,
@@ -364,6 +368,8 @@ export default function AdminWithdrawals() {
         r.ifsc_code || r.ifsc || "",
         net,
         `"TR-${r.username || r.id}"`,
+        `"${rankStr.replace(/"/g, '""')}"`,
+        `"${pkgsStr.replace(/"/g, '""')}"`,
         "COMPANY_MAIN_ACCOUNT",
       ];
     });
@@ -735,22 +741,56 @@ export default function AdminWithdrawals() {
                       <span
                         style={{
                           fontSize: 11,
-                          fontWeight: 700,
+                          fontWeight: 800,
                           padding: "2px 8px",
                           borderRadius: 999,
-                          background: "#e0e7ff",
-                          color: "#3730a3",
-                          border: "1px solid #c7d2fe",
+                          background: (r.rank_level > 0) ? "#e0e7ff" : "#f1f5f9",
+                          color: (r.rank_level > 0) ? "#3730a3" : "#475569",
+                          border: `1px solid ${(r.rank_level > 0) ? "#c7d2fe" : "#e2e8f0"}`,
                         }}
                       >
-                        {r.rank_name || (r.rank_level ? `Level ${r.rank_level}` : "Free Tier")}
+                        {r.rank_label || r.rank_name || (r.rank_level ? `Level ${r.rank_level}` : "Free Tier (L0)")}
                       </span>
+                      {r.rank_upgrades_count > 0 && (
+                        <span style={{ fontSize: 11, color: "#6366f1", fontWeight: 700 }}>
+                          ⚡ {r.rank_upgrades_count} upgrade{r.rank_upgrades_count > 1 ? "s" : ""}
+                        </span>
+                      )}
                     </div>
                     <div style={{ fontSize: 12, color: "#64748b", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {r.username ? `@${r.username}` : ""}
                     </div>
                   </div>
                   <div style={{ flexShrink: 0 }}>{statusBadge}</div>
+                </div>
+
+                {/* Purchased Packages (Mobile) */}
+                <div style={{ background: "#f8fafc", padding: "8px 10px", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", marginBottom: 4 }}>
+                    Purchased Packages
+                  </div>
+                  {Array.isArray(r.package_badges) && r.package_badges.length > 0 ? (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {r.package_badges.map((b, idx) => (
+                        <span
+                          key={idx}
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            padding: "2px 6px",
+                            borderRadius: 4,
+                            background: b.toLowerCase().includes("spp") ? "#ecfdf5" : "#eff6ff",
+                            color: b.toLowerCase().includes("spp") ? "#065f46" : "#1e40af",
+                            border: `1px solid ${b.toLowerCase().includes("spp") ? "#a7f3d0" : "#bfdbfe"}`,
+                          }}
+                        >
+                          📦 {b}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span style={{ fontSize: 11, color: "#94a3b8", fontStyle: "italic" }}>No packages purchased</span>
+                  )}
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
@@ -845,13 +885,13 @@ export default function AdminWithdrawals() {
           >
             <div
               style={{
-                minWidth: 980,
+                minWidth: 1580,
               }}
             >
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "40px 60px 130px 1.1fr 120px 120px 110px 110px 150px 90px 80px 100px 100px 140px 170px",
+                  gridTemplateColumns: "40px 55px 120px 130px 145px 180px 95px 110px 95px 85px 145px 80px 95px 95px 130px 160px",
                   gap: 8,
                   padding: 12,
                   background: "#f8fafc",
@@ -876,13 +916,13 @@ export default function AdminWithdrawals() {
                 <div>ID</div>
                 <div>User</div>
                 <div>Name</div>
-                <div>Digital Rank</div>
+                <div>Rank & Level</div>
+                <div>Purchased Packages</div>
                 <div>Solvency</div>
                 <div>Phone</div>
                 <div>Amount</div>
                 <div>Method</div>
                 <div>Bank / IFSC</div>
-                <div>Pincode</div>
                 <div>Tax %</div>
                 <div>Final</div>
                 <div>Status</div>
@@ -903,7 +943,7 @@ export default function AdminWithdrawals() {
                       key={r.id}
                       style={{
                         display: "grid",
-                        gridTemplateColumns: "40px 60px 130px 1.1fr 120px 120px 110px 110px 150px 90px 80px 100px 100px 140px 170px",
+                        gridTemplateColumns: "40px 55px 120px 130px 145px 180px 95px 110px 95px 85px 145px 80px 95px 95px 130px 160px",
                         gap: 8,
                         padding: 12,
                         borderBottom: "1px solid #e2e8f0",
@@ -926,22 +966,76 @@ export default function AdminWithdrawals() {
                       <div style={{ color: "#0f172a", fontWeight: 700 }}>{r.id}</div>
                       <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.username}</div>
                       <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.full_name || ""}</div>
+                      
+                      {/* Rank & Upgrade Level */}
                       <div>
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 700,
-                            padding: "2px 8px",
-                            borderRadius: 999,
-                            background: "#e0e7ff",
-                            color: "#3730a3",
-                            border: "1px solid #c7d2fe",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {r.rank_name || (r.rank_level ? `Level ${r.rank_level}` : "Free Tier")}
-                        </span>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                          <span
+                            style={{
+                              fontSize: 11.5,
+                              fontWeight: 800,
+                              padding: "2px 8px",
+                              borderRadius: 999,
+                              background: (r.rank_level > 0) ? "#e0e7ff" : "#f1f5f9",
+                              color: (r.rank_level > 0) ? "#3730a3" : "#475569",
+                              border: `1px solid ${(r.rank_level > 0) ? "#c7d2fe" : "#e2e8f0"}`,
+                              whiteSpace: "nowrap",
+                              display: "inline-block",
+                              width: "fit-content",
+                            }}
+                          >
+                            {r.rank_label || r.rank_name || (r.rank_level ? `Level ${r.rank_level}` : "Free Tier (L0)")}
+                          </span>
+                          {r.rank_upgrades_count > 0 && (
+                            <span style={{ fontSize: 10.5, color: "#6366f1", fontWeight: 700 }}>
+                              ⚡ {r.rank_upgrades_count} upgrade{r.rank_upgrades_count > 1 ? "s" : ""}
+                            </span>
+                          )}
+                        </div>
                       </div>
+
+                      {/* Purchased Packages */}
+                      <div>
+                        {Array.isArray(r.package_badges) && r.package_badges.length > 0 ? (
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
+                            {r.package_badges.map((b, idx) => (
+                              <span
+                                key={idx}
+                                title={b}
+                                style={{
+                                  fontSize: 10.5,
+                                  fontWeight: 700,
+                                  padding: "2px 6px",
+                                  borderRadius: 4,
+                                  background: b.toLowerCase().includes("spp")
+                                    ? "#ecfdf5"
+                                    : b.toLowerCase().includes("tour")
+                                    ? "#fffbeb"
+                                    : "#f8fafc",
+                                  color: b.toLowerCase().includes("spp")
+                                    ? "#065f46"
+                                    : b.toLowerCase().includes("tour")
+                                    ? "#92400e"
+                                    : "#334155",
+                                  border: `1px solid ${
+                                    b.toLowerCase().includes("spp")
+                                      ? "#a7f3d0"
+                                      : b.toLowerCase().includes("tour")
+                                      ? "#fde68a"
+                                      : "#e2e8f0"
+                                  }`,
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                📦 {b}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: 11, color: "#94a3b8", fontStyle: "italic" }}>No packages</span>
+                        )}
+                      </div>
+
                       <div>
                         <span
                           title={isSolvent ? "Verified against wallet balance" : "Risk: check wallet audit"}
@@ -971,11 +1065,10 @@ export default function AdminWithdrawals() {
                           <span style={{ color: "#94a3b8" }}>—</span>
                         )}
                       </div>
-                      <div>{r.pincode || ""}</div>
                       <div>{Number(taxLabel).toFixed(2)}%</div>
                       <div style={{ fontWeight: 800 }}>₹{Number(net || 0).toFixed(2)}</div>
                       <div>{statusBadge}</div>
-                      <div style={{ color: "#334155" }}>{formatDateTime(r.requested_at)}</div>
+                      <div style={{ color: "#334155", fontSize: 12 }}>{formatDateTime(r.requested_at)}</div>
                       <div
                         style={{
                           display: "flex",

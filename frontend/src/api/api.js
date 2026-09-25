@@ -201,10 +201,19 @@ function parseJwt(token) {
 function getAccessToken() {
   const t = readNamespaced("token");
   if (t) return t;
-  // Fallback: if we're on an admin route but tokens exist under user namespace (e.g. logged in from non-admin URL)
   try {
-    if (currentNamespace() !== "user") {
-      const k = "token_user";
+    const keys = [
+      "token_admin",
+      "token_user",
+      "token",
+      "access_token",
+      "access",
+      "admin_token",
+      "token_agency",
+      "token_employee",
+      "token_business",
+    ];
+    for (const k of keys) {
       const v =
         (typeof localStorage !== "undefined" && localStorage.getItem(k)) ||
         (typeof sessionStorage !== "undefined" && sessionStorage.getItem(k)) ||
@@ -218,10 +227,17 @@ function getAccessToken() {
 function getRefreshToken() {
   const r = readNamespaced("refresh");
   if (r) return r;
-  // Fallback for cross-namespace login (e.g., admin using token from user namespace)
   try {
-    if (currentNamespace() !== "user") {
-      const k = "refresh_user";
+    const keys = [
+      "refresh_admin",
+      "refresh_user",
+      "refresh",
+      "refresh_token",
+      "refresh_agency",
+      "refresh_employee",
+      "refresh_business",
+    ];
+    for (const k of keys) {
       const v =
         (typeof localStorage !== "undefined" && localStorage.getItem(k)) ||
         (typeof sessionStorage !== "undefined" && sessionStorage.getItem(k)) ||

@@ -510,6 +510,7 @@ class Wallet(models.Model):
             # Monthly 759 payouts follow 75/25 streaming
             "MONTHLY_759_DIRECT",
             "MONTHLY_759_SELF",
+            "MONTHLY_759_LEVEL",
         }
         # Normalize tx type for classification to make PRIME streaming robust
         is_commission = (tx_upper in COMMISSION_WITHHOLD_TYPES)
