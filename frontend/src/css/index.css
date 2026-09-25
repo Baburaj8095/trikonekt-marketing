@@ -43,7 +43,8 @@ html, body {
   background-color: var(--color-bg-app);
   color: var(--color-text-primary);
   min-height: 100%;
-  overscroll-behavior-y: none;
+  overscroll-behavior-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 body {
@@ -51,7 +52,6 @@ body {
   color: var(--color-text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  touch-action: manipulation;
 }
 
 /* Base Surfaces */

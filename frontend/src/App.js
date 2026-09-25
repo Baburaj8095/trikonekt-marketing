@@ -25,6 +25,7 @@ import EnhancedLogin from "./pages/Auth/EnhancedLogin";
 import Wallet from "./pages/Wallet";
 import History from "./pages/History";
 import LoadingOverlay from "./components/LoadingOverlay";
+import AppLifecycleSync from "./components/common/AppLifecycleSync";
 import MyTeam from "./pages/team/MyTeam";
 import Genealogy5 from "./pages/team/Genealogy5";
 import TeamDocumentDownload from "./pages/team/TeamDocumentDownload";
@@ -283,6 +284,7 @@ function App() {
     <BrowserRouter>
       <LoadingOverlay />
       <DomainRedirects />
+      <AppLifecycleSync />
       <Routes>
         {/* Public Routes */}
 

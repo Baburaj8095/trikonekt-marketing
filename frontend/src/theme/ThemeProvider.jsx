@@ -81,7 +81,7 @@ const theme = createTheme({
           background: C.bg,
           WebkitFontSmoothing: "antialiased",
           MozOsxFontSmoothing: "grayscale",
-          overscrollBehaviorY: "none",
+          overscrollBehaviorY: "auto",
         },
         "*": {
           scrollbarWidth: "thin",
