@@ -20,6 +20,8 @@ export default function BottomNav({ onToggleDrawer, isTeam = true }) {
       icon: HomeRoundedIcon,
       active: currentPath === "/user/team-dashboard" || currentPath === "/user/dashboard" || currentPath === "/v4/home",
     },
+    // Wallet screen commented out as requested
+    /*
     {
       key: "wallet",
       label: "Wallet",
@@ -27,6 +29,7 @@ export default function BottomNav({ onToggleDrawer, isTeam = true }) {
       icon: AccountBalanceWalletRoundedIcon,
       active: currentPath.includes("/wallet") || currentPath.includes("/withdrawal"),
     },
+    */
     {
       key: "packages",
       label: "Packages",
@@ -66,7 +69,7 @@ export default function BottomNav({ onToggleDrawer, isTeam = true }) {
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: "repeat(5, 1fr)",
+          gridTemplateColumns: `repeat(${navItems.length + 1}, 1fr)`,
           alignItems: "center",
           maxWidth: 540,
           mx: "auto",

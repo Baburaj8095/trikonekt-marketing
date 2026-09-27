@@ -693,7 +693,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
         if (number > 0) {
           map.set(number, {
             number,
-            totalBoxes: Math.max(1, Number(row?.total_boxes || 12)),
+            totalBoxes: Math.max(13, Number(row?.total_boxes || 13)),
             active: row?.is_active !== false,
           });
         }
@@ -736,7 +736,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
   const seasonsToShow = enabledNumbers;
   const [selectedSeason, setSelectedSeason] = useState(defaultSeason);
   const totalBoxes = Math.max(
-    1,
+    13,
     Number(seasonDetails.get(Number(selectedSeason))?.totalBoxes || meta?.total_boxes || 13)
   );
   const unitPrice = Number(seasonPkg?.price) > 0 && Math.abs(Number(seasonPkg?.price) - 759) > 1 ? Number(seasonPkg?.price) : 1000;
@@ -836,7 +836,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
               {seasonActive ? <Chip size="small" color="success" sx={{ ml: 1, fontWeight: 800 }} label="Active" /> : null}
             </Typography>
             <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.8)", fontWeight: 500 }}>
-              ₹1,000 per box. Generates QR Gift Cards + 12-Month ₹14,000 Maturity Vault.
+              ₹1,000 per box. Generates QR Gift Cards + 13-Month Maturity Vault.
             </Typography>
           </Box>
 
@@ -1040,7 +1040,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
  */
 function PromoSection({ seasonPkg, history, onBuy, seasonActive }) {
   const meta = seasonPkg?.monthly_meta || {};
-  const totalBoxes = Math.max(1, Number(meta?.total_boxes || 13));
+  const totalBoxes = Math.max(13, Number(meta?.total_boxes || 13));
   const packageNumber = Number(meta?.current_package_number || 1);
   const unitPrice = Math.max(0, Number(seasonPkg?.price || 0));
 
