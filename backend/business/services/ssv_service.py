@@ -4,7 +4,6 @@ from django.utils import timezone
 from django.db import transaction
 from django.conf import settings
 from accounts.models import CustomUser, Wallet, WalletTransaction
-from accounts.wallet_engine import get_or_create_wallet_for_update, post_system_credit, post_system_debit
 import logging
 
 logger = logging.getLogger(__name__)
@@ -121,17 +120,20 @@ class SSVService:
         net_amount = amount - fee_amount
 
         # Check sender wallet balance
-        sender_wallet = get_or_create_wallet_for_update(sender)
+        sender_wallet = Wallet.get_or_create_for_user(sender)
         current_bal = sender_wallet.withdrawable_balance
         if current_bal < amount:
             raise ValueError(f"Insufficient withdrawable balance (₹{current_bal}) to transfer ₹{amount}.")
 
-        # Post debit on sender
-        post_system_debit(
+        # Deduct from sender withdrawable balance
+        sender_wallet.withdrawable_balance -= amount
+        sender_wallet.save(update_fields=["withdrawable_balance", "updated_at"])
+
+        WalletTransaction.objects.create(
             user=sender,
-            amount=amount,
-            tx_type="P2P_PACKAGE_COUPON_SEND",
-            balance_field="withdrawable_balance",
+            amount=-amount,
+            balance_after=sender_wallet.withdrawable_balance,
+            type="P2P_PACKAGE_COUPON_SEND",
             meta={
                 "recipient_id": recipient.id,
                 "recipient_phone": recipient.phone or recipient.username,
@@ -143,12 +145,16 @@ class SSVService:
             }
         )
 
-        # Post credit on recipient (net amount)
-        post_system_credit(
+        # Credit recipient withdrawable balance (net amount)
+        recipient_wallet = Wallet.get_or_create_for_user(recipient)
+        recipient_wallet.withdrawable_balance += net_amount
+        recipient_wallet.save(update_fields=["withdrawable_balance", "updated_at"])
+
+        WalletTransaction.objects.create(
             user=recipient,
             amount=net_amount,
-            tx_type="P2P_PACKAGE_COUPON_RECEIVE",
-            balance_field="withdrawable_balance",
+            balance_after=recipient_wallet.withdrawable_balance,
+            type="P2P_PACKAGE_COUPON_RECEIVE",
             meta={
                 "sender_id": sender.id,
                 "sender_phone": sender.phone or sender.username,
@@ -161,11 +167,12 @@ class SSVService:
         )
 
         # Record admin charges ledger entry for company fee
-        post_system_credit(
-            user=CustomUser.objects.filter(is_superuser=True).first() or sender,
+        admin_user = CustomUser.objects.filter(is_superuser=True).first() or sender
+        WalletTransaction.objects.create(
+            user=admin_user,
             amount=fee_amount,
-            tx_type="ADMIN_CHARGE_P2P_FEE",
-            balance_field="withdrawable_balance",
+            balance_after=Decimal("0.00"),
+            type="ADMIN_CHARGE_P2P_FEE",
             meta={
                 "source_user_id": sender.id,
                 "source_user_phone": sender.phone or sender.username,
