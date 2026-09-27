@@ -607,13 +607,7 @@ function AgentSubscriptionSection({
               variant="contained"
               disabled={!!prime750Active}
               onClick={() => {
-                onBuy({
-                  pkg: pkg || { id: 2, code: "PRIME750", name: "Agent Educator Starter Package", price: 2000 },
-                  amount: 2000,
-                  isStarterBundle: true,
-                  uiMeta: { bonus150: true, packageName: "Agent Educator Starter Package", isStarterBundle: true },
-                  purchasePayload: { prime750_choice: "REDEEM", is_starter_bundle: true },
-                });
+                window.open("https://triacademy.trikonekt.com/", "_blank", "noopener,noreferrer");
               }}
               sx={{
                 height: 48,
@@ -627,7 +621,7 @@ function AgentSubscriptionSection({
                 boxShadow: prime750Active ? "none" : "0 8px 20px rgba(67,56,202,0.3)",
               }}
             >
-              {prime750Active ? "ENROLLED • ACTIVE" : "BECOME AGENT EDUCATOR • ₹2,000"}
+              {prime750Active ? "ENROLLED • ACTIVE" : "PURCHASE PACKAGE ON TRIACADEMY • ₹2,000"}
             </Button>
           </Paper>
         </Grid>
