@@ -169,7 +169,7 @@ export default function SPPGiftCards() {
 
   const annualMaturity = summary?.annual_maturity;
   const boxesCompleted = annualMaturity?.boxes_completed || 0;
-  const progressPercent = Math.min(100, Math.round((boxesCompleted / 12) * 100));
+  const progressPercent = Math.min(100, Math.round((boxesCompleted / 13) * 100));
 
   const filterTabs = [
     { label: "All Vouchers", value: "ALL", count: cards.length },
@@ -274,7 +274,7 @@ export default function SPPGiftCards() {
               <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.25rem", sm: "1.6rem" }, color: "#ffffff", lineHeight: 1.2 }}>
                 {summary?.total_purchased || 0}{" "}
                 <Typography component="span" sx={{ fontSize: { xs: 11, sm: 13 }, color: "#94a3b8", fontWeight: 600 }}>
-                  / 12
+                  / 13
                 </Typography>
               </Typography>
               <Typography sx={{ fontSize: { xs: 10.5, sm: 11.5 }, color: "#38bdf8", fontWeight: 600, mt: 0.25 }}>
@@ -530,11 +530,11 @@ export default function SPPGiftCards() {
             <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
               <MoneyIcon sx={{ color: "#8b5cf6", fontSize: 22 }} />
               <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "#0f172a" }}>
-                12-Month SPP Maturity Vault Progress (Season {selectedSeason})
+                13-Month SPP Maturity Vault Progress (Season {selectedSeason})
               </Typography>
             </Stack>
             <Typography variant="body2" sx={{ color: "#64748b", fontSize: "13px" }}>
-              Complete 12 monthly boxes timely to get <b>2 Company Bonus Vouchers of ₹2,000 each (Total ₹4,000 Bonus)</b> at the end of the year for Trikonekt Shopping & Merchant stores!
+              Complete 12 monthly subscription boxes timely (total 13 boxes) to receive <b>2 Company Bonus Vouchers of ₹2,000 each (Total 15 Vouchers)</b> at the end of the year for Trikonekt Shopping & Merchant stores!
             </Typography>
           </Box>
 
@@ -569,7 +569,7 @@ export default function SPPGiftCards() {
             />
           ) : (
             <Chip
-              label={`${boxesCompleted}/12 Boxes Completed`}
+              label={`${boxesCompleted}/13 Boxes Completed`}
               sx={{
                 bgcolor: "#f1f5f9",
                 color: "#475569",
@@ -586,7 +586,7 @@ export default function SPPGiftCards() {
         <Box sx={{ mt: 1.5 }}>
           <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.75 }}>
             <Typography sx={{ fontSize: "12.5px", fontWeight: 700, color: "#475569" }}>
-              Annual Savings Progress: {boxesCompleted} of 12 Months
+              Annual Savings Progress: {boxesCompleted} of 13 Months
             </Typography>
             <Typography sx={{ fontSize: "12.5px", fontWeight: 800, color: "#8b5cf6" }}>
               {progressPercent}%

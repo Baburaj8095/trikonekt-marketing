@@ -53,16 +53,13 @@ export default function AppDrawer({
 
   const menuSections = [
     {
-      title: "TEAM CONSUMER",
+      title: "OVERVIEW",
       items: [
         { label: "Dashboard", to: isTeam ? "/user/team-dashboard" : "/user/dashboard", icon: SpaceDashboardOutlinedIcon },
-        { label: "Layers Blocks", to: "/user/team/layers-blocks", icon: AccountTreeRoundedIcon },
-        { label: "History / Wallet", to: "/user/history", icon: AccountBalanceWalletOutlinedIcon },
-        { label: "Transaction History", to: "/user/team-history", icon: HistoryOutlinedIcon },
       ],
     },
     {
-      title: "PACKAGES & ENROLLMENTS",
+      title: "PACKAGES",
       items: [
         { label: "E-edu Agent (₹2,000)", to: "https://triacademy.trikonekt.com/", external: true, icon: SchoolOutlinedIcon },
         { label: "Agent Subscription", to: "https://triacademy.trikonekt.com/", external: true, icon: StarOutlineRoundedIcon },
@@ -70,6 +67,14 @@ export default function AppDrawer({
         { label: "Tri Holiday Packages", to: "/user/tri/tri-holidays", icon: FlightTakeoffOutlinedIcon },
         { label: "P2P Package Coupon Pocket", to: "/user/package-coupon-pocket", icon: ConfirmationNumberOutlinedIcon },
         { label: "P2P Internal Coupons", to: "/user/coupon-pocket", icon: ConfirmationNumberOutlinedIcon },
+      ],
+    },
+    {
+      title: "NETWORK & WALLET",
+      items: [
+        { label: "Layers Blocks", to: "/user/genealogy-5", icon: AccountTreeRoundedIcon },
+        { label: "History & Wallet", to: "/user/history", icon: AccountBalanceWalletOutlinedIcon },
+        { label: "Transaction History", to: "/user/team-history", icon: HistoryOutlinedIcon },
       ],
     },
     {

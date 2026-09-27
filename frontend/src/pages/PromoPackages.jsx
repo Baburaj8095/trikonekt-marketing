@@ -737,7 +737,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
   const [selectedSeason, setSelectedSeason] = useState(defaultSeason);
   const totalBoxes = Math.max(
     1,
-    Number(seasonDetails.get(Number(selectedSeason))?.totalBoxes || meta?.total_boxes || 12)
+    Number(seasonDetails.get(Number(selectedSeason))?.totalBoxes || meta?.total_boxes || 13)
   );
   const unitPrice = Number(seasonPkg?.price) > 0 && Math.abs(Number(seasonPkg?.price) - 759) > 1 ? Number(seasonPkg?.price) : 1000;
   const unitPriceLabel = `Rs. ${unitPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
@@ -1040,7 +1040,7 @@ function SeasonSection({ seasonPkg, reg150Pkg, prime150Active, history, onBuy, s
  */
 function PromoSection({ seasonPkg, history, onBuy, seasonActive }) {
   const meta = seasonPkg?.monthly_meta || {};
-  const totalBoxes = Math.max(1, Number(meta?.total_boxes || 12));
+  const totalBoxes = Math.max(1, Number(meta?.total_boxes || 13));
   const packageNumber = Number(meta?.current_package_number || 1);
   const unitPrice = Math.max(0, Number(seasonPkg?.price || 0));
 
