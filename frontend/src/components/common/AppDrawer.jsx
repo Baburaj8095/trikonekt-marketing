@@ -28,6 +28,7 @@ import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import ConfirmationNumberOutlinedIcon from "@mui/icons-material/ConfirmationNumberOutlined";
 import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
+import AccountTreeRoundedIcon from "@mui/icons-material/AccountTreeRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import { C, R, S } from "../../theme/tokens";
 
@@ -52,44 +53,36 @@ export default function AppDrawer({
 
   const menuSections = [
     {
-      title: "CORE",
+      title: "TEAM CONSUMER",
       items: [
         { label: "Dashboard", to: isTeam ? "/user/team-dashboard" : "/user/dashboard", icon: SpaceDashboardOutlinedIcon },
-        { label: "Team Wallet", to: "/user/team-wallet", icon: AccountBalanceWalletOutlinedIcon },
-        { label: "Wallet History", to: "/user/team-history", icon: HistoryOutlinedIcon },
-        { label: "Add Money", to: "/user/upload-wallet", icon: AddCardOutlinedIcon },
+        { label: "Layers Blocks", to: "/user/team/layers-blocks", icon: AccountTreeRoundedIcon },
+        { label: "History / Wallet", to: "/user/history", icon: AccountBalanceWalletOutlinedIcon },
+        { label: "Transaction History", to: "/user/team-history", icon: HistoryOutlinedIcon },
       ],
     },
     {
-      title: "COUPONS & VOUCHERS",
+      title: "PACKAGES & COUPONS",
       items: [
-        { label: "Coupon Pocket", to: "/user/coupon-pocket", icon: ConfirmationNumberOutlinedIcon },
-        { label: "Package Coupon Pocket", to: "/user/package-coupon-pocket", icon: ConfirmationNumberOutlinedIcon },
+        { label: "E-edu Agent (₹2,000)", to: "/user/packages/digital-education-prime", icon: SchoolOutlinedIcon },
+        { label: "Agent Subscription", to: "/user/packages/join-subscription", icon: StarOutlineRoundedIcon },
+        { label: "SPP (15 Vouchers)", to: "/user/spp-gift-cards", icon: CardGiftcardOutlinedIcon },
+        { label: "Tri Holiday Packages", to: "/user/tri/tri-holidays", icon: FlightTakeoffOutlinedIcon },
+        { label: "P2P Package Coupon Pocket", to: "/user/package-coupon-pocket", icon: ConfirmationNumberOutlinedIcon },
+        { label: "P2P Internal Coupons", to: "/user/coupon-pocket", icon: ConfirmationNumberOutlinedIcon },
       ],
     },
     {
-      title: "AGENT SUBSCRIPTION",
+      title: "MEDIA & RESOURCES",
       items: [
-        { label: "Become Agent Educator", to: "/user/packages/join-subscription", icon: StarOutlineRoundedIcon },
-        { label: "Digital Education", to: "/user/packages/digital-education-prime", icon: SchoolOutlinedIcon },
-        { label: "SPP (Monthly Boxes)", to: "/user/packages/spp", icon: Inventory2OutlinedIcon },
-        { label: "SPP Gift Cards & Maturity", to: "/user/spp-gift-cards", icon: CardGiftcardOutlinedIcon },
-        { label: "Holidays", to: "/user/tri/tri-holidays", icon: FlightTakeoffOutlinedIcon },
+        { label: "Growth / Trikonekt PDF", to: "/user/trikonekt-pdf", icon: ReceiptLongOutlinedIcon },
+        { label: "Educational Videos", to: "/user/educational-videos", icon: OndemandVideoOutlinedIcon },
       ],
     },
     {
-      title: "COMMERCE & MEDIA",
+      title: "ACCOUNT & SECURITY",
       items: [
-        { label: "Gift Card Summary", to: "/user/gift-card-summary", icon: CardGiftcardOutlinedIcon },
-        { label: "Package Summary", to: "/user/promo-packages", icon: ReceiptLongOutlinedIcon },
-        { label: "Educational Video Summary", to: "/user/educational-videos", icon: OndemandVideoOutlinedIcon },
-      ],
-    },
-    {
-      title: "ACCOUNT & SUPPORT",
-      items: [
-        { label: "Generate ID Card", to: "/user/team-dashboard?action=id-card", icon: BadgeOutlinedIcon },
-        { label: "Profile", to: "/user/profile", icon: PersonOutlineRoundedIcon },
+        { label: "Profile (ID Card inside)", to: "/user/profile", icon: PersonOutlineRoundedIcon },
         { label: "KYC Verification", to: "/user/kyc", icon: ShieldOutlinedIcon },
         { label: "Help & Support", to: "/user/support", icon: HelpOutlineOutlinedIcon },
       ],

@@ -1,4 +1,10 @@
 from django.urls import path
+from .views_ssv import (
+    SSVSummaryView,
+    P2PCouponTransferView,
+    P2PCouponHistoryView,
+    TotalAdminChargesListView,
+)
 from .views import (
     BusinessRegistrationCreateView,
     BusinessRegistrationListAdminView,
@@ -182,16 +188,18 @@ urlpatterns = [
     path('admin/team-consumer/documents/<int:pk>/', AdminTeamConsumerDocumentDetailView.as_view(), name='admin_team_consumer_document_detail'),
 
     # ==========================
-    # Hubble (Gift Cards)
-    # ==========================
-    path('hubble/iframe-url/', HubbleIframeUrlView.as_view(), name='hubble_iframe_url'),
-    path('hubble/transactions/me/', HubbleTransactionsMeView.as_view(), name='hubble_transactions_me'),
-    path('hubble/webhook/', HubbleWebhookReceiverView.as_view(), name='hubble_webhook'),
-
     # Hubble SDK Webhook callbacks (per docs). We expose dedicated URLs for each event type,
     # but route them all to the same receiver since the payload contains the event discriminator.
     path('hubble/webhook/brand-updated/', HubbleWebhookReceiverView.as_view(), name='hubble_webhook_brand_updated'),
     path('hubble/webhook/partner-discount/', HubbleWebhookReceiverView.as_view(), name='hubble_webhook_partner_discount'),
     path('hubble/webhook/transaction-status/', HubbleWebhookReceiverView.as_view(), name='hubble_webhook_transaction_status'),
+
+    # ==========================
+    # SSV (Smart Shopping Vouchers) & P2P Coupons
+    # ==========================
+    path('ssv/summary/', SSVSummaryView.as_view(), name='ssv_summary'),
+    path('coupons/p2p-transfer/', P2PCouponTransferView.as_view(), name='p2p_coupon_transfer'),
+    path('coupons/p2p-history/', P2PCouponHistoryView.as_view(), name='p2p_coupon_history'),
+    path('admin/total-admin-charges/', TotalAdminChargesListView.as_view(), name='total_admin_charges_list'),
 ]
 

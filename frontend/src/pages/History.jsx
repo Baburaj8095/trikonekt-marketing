@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Paper,
@@ -9,6 +10,7 @@ import {
   Avatar,
   Tabs,
   Tab,
+  Button,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
@@ -20,6 +22,9 @@ import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import SavingsIcon from "@mui/icons-material/Savings";
 import RedeemIcon from "@mui/icons-material/Redeem";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import SendRoundedIcon from "@mui/icons-material/SendRounded";
+import SchoolRoundedIcon from "@mui/icons-material/SchoolRounded";
+import AccountBalanceRoundedIcon from "@mui/icons-material/AccountBalanceRounded";
 
 /** ---------- helpers ---------- */
 function fmtAmount(value) {
@@ -500,6 +505,7 @@ function SectionList({ sections, fallbackRows = [] }) {
 
 /** ---------- main page ---------- */
 export default function History() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [top, setTop] = useState({
@@ -724,6 +730,30 @@ export default function History() {
     return 0;
   }, [tab, top, filteredMainWallet, incomingGross, selfAccount]);
 
+  const earningsBreakdown = useMemo(() => {
+    let direct_referral = 0;
+    let matrix_autopool = 0;
+    let franchise_captain = 0;
+
+    (incoming || []).forEach((tx) => {
+      const type = String(tx?.type || "").toUpperCase();
+      const meta = tx?.meta || {};
+      const src = String(meta.source || "").toUpperCase();
+      const st = String(tx?.source_type || "").toUpperCase();
+      const amt = Number(tx?.amount || meta.gross || 0);
+
+      if (type === "DIRECT_REF_BONUS" || src.includes("REFERRAL") || st.includes("REFERRAL")) {
+        direct_referral += amt;
+      } else if (src.includes("MATRIX") || type.includes("AUTOPOOL") || src.includes("AUTOPOOL")) {
+        matrix_autopool += amt;
+      } else if (src.includes("FRANCHISE") || src.includes("CAPTAIN") || src.includes("ZONAL") || st.includes("FRANCHISE")) {
+        franchise_captain += amt;
+      }
+    });
+
+    return { direct_referral, matrix_autopool, franchise_captain };
+  }, [incoming]);
+
   const tabs = [
     { label: `Bonus History (${filteredIncoming.length})`, key: "incoming" },
     { label: `Main Wallet (${filteredMainWallet.length})`, key: "main" },
@@ -733,9 +763,9 @@ export default function History() {
   return (
     <Box
       sx={{
-        maxWidth: 520,
+        maxWidth: 560,
         mx: "auto",
-        px: 1,
+        px: { xs: 1, sm: 1.5 },
         py: 1,
         bgcolor: "#F7FAFC",
         minHeight: "100vh",
@@ -749,68 +779,125 @@ export default function History() {
           color: "#0C2D48",
         }}
       >
-        History
+        History & Wallet
       </Typography>
 
-      {/* Main Wallet Summary Card (Clickable to switch tab) */}
+      {/* Main Wallet Summary Card with Top Actions */}
       <Paper
         elevation={0}
         onClick={() => setTab(1)}
         sx={{
-          p: 1.6,
+          p: 1.8,
           borderRadius: 2.5,
-          mb: 1.2,
+          mb: 1.5,
           border: "1px solid",
           borderColor: tab === 1 ? "primary.main" : "#EEF2F6",
           borderWidth: tab === 1 ? 2 : 1,
           bgcolor: "#fff",
           cursor: "pointer",
           transition: "all 0.2s ease",
-          boxShadow: tab === 1 ? "0 4px 12px rgba(12, 45, 72, 0.12)" : "none",
-          "&:hover": {
-            borderColor: "primary.main",
-            boxShadow: "0 4px 12px rgba(12, 45, 72, 0.08)",
-            transform: "translateY(-1px)",
-          },
-          "&:active": {
-            transform: "scale(0.99)",
-          },
+          boxShadow: tab === 1 ? "0 4px 12px rgba(12, 45, 72, 0.12)" : "0 2px 6px rgba(0,0,0,0.03)",
         }}
       >
-        <Stack direction="row" spacing={1.2} alignItems="center">
+        <Stack direction="row" spacing={1.5} alignItems="center">
           <Avatar
             sx={{
               bgcolor: "primary.light",
               color: "primary.dark",
-              width: 38,
-              height: 38,
+              width: 44,
+              height: 44,
             }}
           >
-            <AccountBalanceWalletIcon fontSize="small" />
+            <AccountBalanceWalletIcon fontSize="medium" />
           </Avatar>
 
-          <Box>
+          <Box sx={{ flex: 1 }}>
             <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 800 }}>
-              Main Wallet (Tap for History)
+              Main Wallet (75% Withdrawable)
             </Typography>
 
             <Typography
               sx={{
-                fontSize: isMobile ? 22 : 26,
+                fontSize: isMobile ? 24 : 28,
                 fontWeight: 900,
                 lineHeight: 1.1,
                 mt: 0.2,
+                color: "#0F172A",
               }}
             >
               ₹ {fmtAmount(top.main_income_balance)}
             </Typography>
-           
           </Box>
+        </Stack>
+
+        {/* Top 3 Quick Actions inside Wallet Card */}
+        <Stack direction="row" spacing={1} sx={{ mt: 1.5, pt: 1.5, borderTop: "1px solid #EEF2F6" }}>
+          <Button
+            size="small"
+            variant="contained"
+            startIcon={<SendRoundedIcon sx={{ fontSize: 16 }} />}
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate("/user/coupon-pocket");
+            }}
+            sx={{
+              flex: 1,
+              fontSize: 11.5,
+              fontWeight: 700,
+              textTransform: "none",
+              borderRadius: 2,
+              bgcolor: "#2563EB",
+              boxShadow: "none",
+              "&:hover": { bgcolor: "#1D4ED8" },
+            }}
+          >
+            P2P Send
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<SchoolRoundedIcon sx={{ fontSize: 16 }} />}
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate("/user/packages/digital-education-prime");
+            }}
+            sx={{
+              flex: 1,
+              fontSize: 11.5,
+              fontWeight: 700,
+              textTransform: "none",
+              borderRadius: 2,
+              borderColor: "#2563EB",
+              color: "#2563EB",
+            }}
+          >
+            Self E-edu
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<AccountBalanceRoundedIcon sx={{ fontSize: 16 }} />}
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate("/user/withdrawal");
+            }}
+            sx={{
+              flex: 1,
+              fontSize: 11.5,
+              fontWeight: 700,
+              textTransform: "none",
+              borderRadius: 2,
+              borderColor: "#059669",
+              color: "#059669",
+            }}
+          >
+            Withdraw
+          </Button>
         </Stack>
       </Paper>
 
       {/* Today & Yesterday Earnings Stats */}
-      <Box sx={{ display: "flex", gap: 1.2, mb: 1.2 }}>
+      <Box sx={{ display: "flex", gap: 1.2, mb: 1.5 }}>
         <Paper
           elevation={0}
           sx={{
@@ -819,7 +906,7 @@ export default function History() {
             borderRadius: 2.2,
             border: "1px solid",
             borderColor: "#EEF2F6",
-            bgcolor: "#EDFDF5", // Light green tint
+            bgcolor: "#EDFDF5",
             display: "flex",
             flexDirection: "column",
             justifyContent: "center",
@@ -828,7 +915,7 @@ export default function History() {
           }}
         >
           <Typography variant="caption" sx={{ color: "success.dark", fontWeight: 800 }}>
-            {tab === 0 ? "Today's Bonus (100%)" : tab === 1 ? "Today's Main Inflow (75%)" : "Today's Reserve (25%)"}
+            {tab === 0 ? "Today's Bonus (100%)" : tab === 1 ? "Today's Main (75%)" : "Today's Reserve (25%)"}
           </Typography>
           <Typography sx={{ fontSize: 16, fontWeight: 900, color: "success.main", mt: 0.2 }}>
             +₹ {fmtAmount(todaysEarnings)}
@@ -842,7 +929,7 @@ export default function History() {
             borderRadius: 2.2,
             border: "1px solid",
             borderColor: "#EEF2F6",
-            bgcolor: "#F8FAFC", // Light gray tint
+            bgcolor: "#F8FAFC",
             display: "flex",
             flexDirection: "column",
             justifyContent: "center",
@@ -859,21 +946,21 @@ export default function History() {
         </Paper>
       </Box>
 
-      {/* Mini Cards (Horizontal scroll) */}
+      {/* Mini Cards (Bonus Wallet & Self Account) */}
       <Box
         sx={{
           display: "flex",
           gap: 1.2,
           overflowX: "auto",
           pb: 1,
-          mb: 1.2,
-          px: 0.5, // ✅ prevents cut off on left/right
+          mb: 1.5,
+          px: 0.5,
           scrollSnapType: "x mandatory",
           "&::-webkit-scrollbar": { display: "none" },
         }}
       >
         <MiniCard
-          title="Bonus Wallet"
+          title="Bonus Wallet (100% Inflow)"
           value={`₹ ${fmtAmount(top.all_earnings_total)}`}
           icon={<SavingsIcon fontSize="small" />}
           color="success"
@@ -881,13 +968,156 @@ export default function History() {
           selected={tab === 0}
         />
         <MiniCard
-          title="Self Account"
+          title="Self Account (25% Saved)"
           value={`₹ ${fmtAmount(top.self_account_balance)}`}
           icon={<AccountBalanceWalletIcon fontSize="small" />}
           color="warning"
           onClick={() => setTab(2)}
           selected={tab === 2}
         />
+      </Box>
+
+      {/* Horizontal Sliding "My Earnings" breakdown */}
+      <Box sx={{ mb: 1.5 }}>
+        <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#0C2D48", mb: 0.8, px: 0.5 }}>
+          My Earnings Breakdown
+        </Typography>
+        <Box
+          sx={{
+            display: "flex",
+            gap: 1.2,
+            overflowX: "auto",
+            pb: 1,
+            px: 0.5,
+            scrollSnapType: "x mandatory",
+            "&::-webkit-scrollbar": { display: "none" },
+          }}
+        >
+          {/* Card 1: Direct Referral / Package Direct */}
+          <Paper
+            elevation={0}
+            sx={{
+              minWidth: 165,
+              p: 1.3,
+              borderRadius: 2.2,
+              border: "1px solid #EEF2F6",
+              bgcolor: "#FFFFFF",
+              scrollSnapAlign: "start",
+            }}
+          >
+            <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
+              Package Direct
+            </Typography>
+            <Typography sx={{ fontSize: 16, fontWeight: 900, color: "#2563EB", mt: 0.3 }}>
+              ₹ {fmtAmount(earningsBreakdown.direct_referral || 0)}
+            </Typography>
+            <Chip size="small" label="E-edu & Prime Direct" sx={{ mt: 0.5, height: 18, fontSize: 10, bgcolor: "#EFF6FF", color: "#2563EB" }} />
+          </Paper>
+
+          {/* Card 2: Layer Matrix (5 & 3) */}
+          <Paper
+            elevation={0}
+            sx={{
+              minWidth: 165,
+              p: 1.3,
+              borderRadius: 2.2,
+              border: "1px solid #EEF2F6",
+              bgcolor: "#FFFFFF",
+              scrollSnapAlign: "start",
+            }}
+          >
+            <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
+              Layer 5 & 3 Matrix
+            </Typography>
+            <Typography sx={{ fontSize: 16, fontWeight: 900, color: "#7C3AED", mt: 0.3 }}>
+              ₹ {fmtAmount(earningsBreakdown.matrix_autopool || 0)}
+            </Typography>
+            <Chip size="small" label="5-Matrix & 3-Matrix" sx={{ mt: 0.5, height: 18, fontSize: 10, bgcolor: "#F5F3FF", color: "#7C3AED" }} />
+          </Paper>
+
+          {/* Card 3: Direct Self Block Breakdown */}
+          <Paper
+            elevation={0}
+            sx={{
+              minWidth: 220,
+              p: 1.3,
+              borderRadius: 2.2,
+              border: "1px solid #EEF2F6",
+              bgcolor: "#FFFFFF",
+              scrollSnapAlign: "start",
+            }}
+          >
+            <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
+              Direct Self Block Breakdown
+            </Typography>
+            <Stack spacing={0.3} sx={{ mt: 0.5 }}>
+              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                <Typography sx={{ fontSize: 11, color: "text.secondary" }}>E-edu Agent:</Typography>
+                <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#059669" }}>₹10 / ₹400</Typography>
+              </Box>
+              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                <Typography sx={{ fontSize: 11, color: "text.secondary" }}>Shopping:</Typography>
+                <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#059669" }}>₹2 / ₹50</Typography>
+              </Box>
+              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                <Typography sx={{ fontSize: 11, color: "text.secondary" }}>Franchise:</Typography>
+                <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#059669" }}>₹4 / ₹100</Typography>
+              </Box>
+              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                <Typography sx={{ fontSize: 11, color: "text.secondary" }}>Captain:</Typography>
+                <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#059669" }}>₹5 / ₹125</Typography>
+              </Box>
+            </Stack>
+          </Paper>
+
+          {/* Card 4: Royalty */}
+          <Paper
+            elevation={0}
+            sx={{
+              minWidth: 175,
+              p: 1.3,
+              borderRadius: 2.2,
+              border: "1px solid #EEF2F6",
+              bgcolor: "#FFFFFF",
+              scrollSnapAlign: "start",
+            }}
+          >
+            <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
+              Royalty Bonus
+            </Typography>
+            <Stack spacing={0.3} sx={{ mt: 0.5 }}>
+              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                <Typography sx={{ fontSize: 11, color: "text.secondary" }}>Club 1:</Typography>
+                <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#D97706" }}>₹10k / ₹2.5k</Typography>
+              </Box>
+              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                <Typography sx={{ fontSize: 11, color: "text.secondary" }}>Club 2:</Typography>
+                <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#D97706" }}>₹40k / ₹25k</Typography>
+              </Box>
+            </Stack>
+          </Paper>
+
+          {/* Card 5: Franchise / Captain */}
+          <Paper
+            elevation={0}
+            sx={{
+              minWidth: 165,
+              p: 1.3,
+              borderRadius: 2.2,
+              border: "1px solid #EEF2F6",
+              bgcolor: "#FFFFFF",
+              scrollSnapAlign: "start",
+            }}
+          >
+            <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
+              Franchise / Captain
+            </Typography>
+            <Typography sx={{ fontSize: 16, fontWeight: 900, color: "#059669", mt: 0.3 }}>
+              ₹ {fmtAmount(earningsBreakdown.franchise_captain || 0)}
+            </Typography>
+            <Chip size="small" label="Geo & Zonal Share" sx={{ mt: 0.5, height: 18, fontSize: 10, bgcolor: "#ECFDF5", color: "#059669" }} />
+          </Paper>
+        </Box>
       </Box>
 
       {/* Date Filter Pills Row */}

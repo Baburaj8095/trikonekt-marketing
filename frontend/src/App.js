@@ -198,6 +198,8 @@ import FranchiseAgreementCopy from "./components/franchise/pages/FranchiseAgreem
 import HubbleGiftCards from "./pages/HubbleGiftCards";
 import GiftCardSummary from "./pages/GiftCardSummary";
 import AdminFranchiseDocuments from "./pages/admin/AdminFranchiseDocuments";
+import LayersBlocks from "./pages/team/LayersBlocks";
+import AdminTotalAdminCharges from "./pages/admin/AdminTotalAdminCharges";
 
 function LegacyAuthEntry() {
   const location = useLocation();
@@ -690,6 +692,16 @@ function App() {
             </AdminProtectedRoute>
           }
         />
+        <Route
+          path="/admin/total-admin-charges"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminTotalAdminCharges />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
 
         <Route
           path="/user/profile"
@@ -707,6 +719,26 @@ function App() {
             <ProtectedRoute allowedRoles={["user"]}>
               <ConsumerShell>
                 <MyTeam />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/team/layers-blocks"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <LayersBlocks />
+              </ConsumerShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/layers-blocks"
+          element={
+            <ProtectedRoute allowedRoles={["user"]}>
+              <ConsumerShell>
+                <LayersBlocks />
               </ConsumerShell>
             </ProtectedRoute>
           }

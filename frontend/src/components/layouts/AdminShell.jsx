@@ -258,7 +258,8 @@ export default function AdminShell({ children }) {
       to.startsWith("/admin/workflows/franchise-reference-reward") ||
       to.startsWith("/admin/workflows/zonal-reward") ||
       to.startsWith("/admin/workflows/redeem-point-coupon-summary") ||
-      to.startsWith("/admin/workflows/generate-coupon")
+      to.startsWith("/admin/workflows/generate-coupon") ||
+      to.startsWith("/admin/total-admin-charges")
     )
       return "reports_finance";
     if (to.startsWith("/admin/workflows/")) return "promo";
@@ -346,6 +347,7 @@ export default function AdminShell({ children }) {
         key: "finance_wallet_ops",
         label: "Finance & Approvals",
         items: [
+          { to: "/admin/total-admin-charges", label: "Total Admin Charges", icon: "wallet" },
           { to: "/admin/wallet-upload-approvals", label: "Add Money Requests", icon: "upload" },
           { to: "/admin/withdrawals", label: "Withdrawal Requests", icon: "wallet" },
           { to: "/admin/packages/join-subscription", label: "Package Approvals", icon: "ticket" },
