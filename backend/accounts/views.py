@@ -3155,10 +3155,12 @@ def _move_main_to_derived_wallet(user, amount, target_type, extra_meta=None):
     if amount <= D("0"):
         raise serializers.ValidationError({"amount": "Amount must be greater than 0."})
 
+    from business.models import CommissionConfig
+    cfg = CommissionConfig.get_solo()
     charge_percent_map = {
-        "coupon": D("7.00"),
-        "internal": D("7.00"),
-        "withdrawal": D("10.00"),
+        "coupon": cfg.get_p2p_coupon_tax_percent(),
+        "internal": cfg.get_p2p_coupon_tax_percent(),
+        "withdrawal": cfg.get_withdrawal_tax_percent(),
     }
     charge_percent = charge_percent_map.get(target_type, D("0.00"))
     charge_amount = ((amount * charge_percent) / D("100")).quantize(D("0.01"))

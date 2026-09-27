@@ -585,6 +585,20 @@ export default function History() {
       setSelfAccount(Array.isArray(data?.self_account) ? data.self_account : []);
       setCashback(Array.isArray(data?.cashback) ? data.cashback : []);
       setRedeem(Array.isArray(data?.redeem) ? data.redeem : []);
+
+      // Load dynamic admin-configured platform taxes
+      try {
+        const taxRes = await API.get("/business/platform-taxes/");
+        if (taxRes?.data) {
+          setTaxConfig({
+            p2p_package_tax_percent: Number(taxRes.data.p2p_package_tax_percent ?? 7),
+            p2p_coupon_tax_percent: Number(taxRes.data.p2p_coupon_tax_percent ?? 7),
+            withdrawal_tax_percent: Number(taxRes.data.withdrawal_tax_percent ?? 10),
+          });
+        }
+      } catch (err) {
+        console.error("Failed to load platform taxes:", err);
+      }
     } catch (e) {
       setErr("Failed to load history.");
     } finally {
@@ -596,8 +610,62 @@ export default function History() {
     fetchHistory();
   }, []);
 
+  // Platform Tax Configuration
+  const [taxConfig, setTaxConfig] = useState({
+    p2p_package_tax_percent: 7,
+    p2p_coupon_tax_percent: 7,
+    withdrawal_tax_percent: 10,
+  });
+
+  // Pockets Transfer State (Main Wallet -> P2P Coupon Pocket / Withdrawal Pocket)
+  const [pocketType, setPocketType] = useState("coupon"); // "coupon" or "withdrawal"
+  const [pocketAmount, setPocketAmount] = useState("");
+  const [pocketBusy, setPocketBusy] = useState(false);
+  const [pocketError, setPocketError] = useState("");
+  const [pocketSuccess, setPocketSuccess] = useState("");
+
+  const pocketTaxPercent = pocketType === "withdrawal"
+    ? Number(taxConfig.withdrawal_tax_percent || 10)
+    : Number(taxConfig.p2p_coupon_tax_percent || 7);
+  const pocketGross = Number(pocketAmount || 0);
+  const pocketTax = pocketGross > 0 ? Number(((pocketGross * pocketTaxPercent) / 100).toFixed(2)) : 0;
+  const pocketNet = pocketGross > 0 ? Number((pocketGross - pocketTax).toFixed(2)) : 0;
+
+  const handlePocketTransfer = async () => {
+    if (pocketGross <= 0) {
+      setPocketError("Please enter a valid transfer amount.");
+      return;
+    }
+    const avail = Number(top.main_income_balance || top.withdrawable_balance || 0);
+    if (pocketGross > avail) {
+      setPocketError(`Insufficient balance. Available withdrawable balance is ₹${fmtAmount(avail)}.`);
+      return;
+    }
+    try {
+      setPocketBusy(true);
+      setPocketError("");
+      setPocketSuccess("");
+
+      const res = await API.post("/accounts/wallet/transfer/request-otp/", {
+        transfer_type: pocketType,
+        amount: pocketGross,
+      });
+
+      setPocketSuccess(
+        `Transfer initiated for ₹${fmtAmount(pocketGross)} to ${pocketType === "withdrawal" ? "Withdrawal Pocket" : "P2P Coupon Pocket"} (${pocketTaxPercent}% Tax: ₹${fmtAmount(pocketTax)}, Net Credit: ₹${fmtAmount(pocketNet)}). OTP sent to registered email.`
+      );
+      setPocketAmount("");
+      fetchHistory();
+    } catch (err) {
+      setPocketError(err?.response?.data?.detail || "Failed to process pocket transfer.");
+    } finally {
+      setPocketBusy(false);
+    }
+  };
+
   const p2pGross = Number(p2pForm.amount || 0);
-  const p2pFee = p2pGross > 0 ? Number((p2pGross * 0.07).toFixed(2)) : 0;
+  const p2pTaxPercent = Number(taxConfig.p2p_package_tax_percent || 7);
+  const p2pFee = p2pGross > 0 ? Number(((p2pGross * p2pTaxPercent) / 100).toFixed(2)) : 0;
   const p2pNet = p2pGross > 0 ? Number((p2pGross - p2pFee).toFixed(2)) : 0;
 
   const handleP2pTransfer = async () => {
@@ -619,13 +687,14 @@ export default function History() {
       setP2pError("");
       setP2pSuccess("");
 
-      await API.post("/business/coupons/p2p-transfer/", {
+      const res = await API.post("/business/coupons/p2p-transfer/", {
         recipient_phone: p2pForm.recipient_phone.trim(),
         amount: p2pGross,
         coupon_type: p2pForm.coupon_type,
       });
 
-      setP2pSuccess(`Successfully sent ₹${fmtAmount(p2pNet)} to ${p2pForm.recipient_phone}! (7% Fee: ₹${fmtAmount(p2pFee)})`);
+      const vCode = res.data?.voucher_code;
+      setP2pSuccess(`Successfully sent ₹${fmtAmount(p2pNet)} to ${p2pForm.recipient_phone}! (${p2pTaxPercent}% Tax: ₹${fmtAmount(p2pFee)})${vCode ? ` • Voucher Code: ${vCode}` : ""}`);
       setP2pForm({ recipient_phone: "", amount: "", coupon_type: "PACKAGE_COUPON" });
       fetchHistory();
     } catch (err) {
@@ -1022,7 +1091,7 @@ export default function History() {
         </Box>
 
         {/* Action Mode Toggle Pills */}
-        <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+        <Stack direction="row" spacing={0.8} sx={{ mb: 2 }}>
           <Button
             size="small"
             variant={drawerMode === "p2p" ? "contained" : "outlined"}
@@ -1032,13 +1101,30 @@ export default function History() {
               borderRadius: 999,
               textTransform: "none",
               fontWeight: 800,
-              fontSize: 12.5,
+              fontSize: 11.5,
               bgcolor: drawerMode === "p2p" ? "#2563EB" : "transparent",
               borderColor: "#2563EB",
               color: drawerMode === "p2p" ? "#fff" : "#2563EB",
             }}
           >
-            P2P Transfer (7% Fee)
+            P2P Send ({p2pTaxPercent}%)
+          </Button>
+          <Button
+            size="small"
+            variant={drawerMode === "pockets" ? "contained" : "outlined"}
+            onClick={() => setDrawerMode("pockets")}
+            sx={{
+              flex: 1,
+              borderRadius: 999,
+              textTransform: "none",
+              fontWeight: 800,
+              fontSize: 11.5,
+              bgcolor: drawerMode === "pockets" ? "#0D9488" : "transparent",
+              borderColor: "#0D9488",
+              color: drawerMode === "pockets" ? "#fff" : "#0D9488",
+            }}
+          >
+            Pockets (Taxable)
           </Button>
           <Button
             size="small"
@@ -1049,38 +1135,41 @@ export default function History() {
               borderRadius: 999,
               textTransform: "none",
               fontWeight: 800,
-              fontSize: 12.5,
+              fontSize: 11.5,
               bgcolor: drawerMode === "redeem" ? "#7C3AED" : "transparent",
               borderColor: "#7C3AED",
               color: drawerMode === "redeem" ? "#fff" : "#7C3AED",
             }}
           >
-            Redeem Coupon
+            Redeem
           </Button>
           <Button
             size="small"
             variant={drawerMode === "menu" ? "contained" : "outlined"}
             onClick={() => setDrawerMode("menu")}
             sx={{
-              flex: 1,
+              flex: 0.8,
               borderRadius: 999,
               textTransform: "none",
               fontWeight: 800,
-              fontSize: 12.5,
+              fontSize: 11.5,
               bgcolor: drawerMode === "menu" ? "#0F172A" : "transparent",
               borderColor: "#CBD5E1",
               color: drawerMode === "menu" ? "#fff" : "#475569",
             }}
           >
-            More Options
+            More
           </Button>
         </Stack>
 
         {/* Drawer Mode 1: P2P Transfer */}
         {drawerMode === "p2p" && (
           <Box sx={{ bgcolor: "#F8FAFC", p: 2, borderRadius: 3, border: "1px solid #E2E8F0", mb: 2 }}>
-            <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: "#0F172A", mb: 1.5 }}>
+            <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: "#0F172A", mb: 0.5 }}>
               Instant Peer-to-Peer Transfer
+            </Typography>
+            <Typography sx={{ fontSize: 12, color: "#64748B", mb: 1.5 }}>
+              Transfers package coupon directly to another member with {p2pTaxPercent}% GST/Tax deducted.
             </Typography>
 
             {p2pError && <Alert severity="error" sx={{ mb: 1.5, borderRadius: 2, fontSize: 12.5 }}>{p2pError}</Alert>}
@@ -1090,7 +1179,7 @@ export default function History() {
               <TextField
                 fullWidth
                 size="small"
-                label="Recipient Phone Number"
+                label="Recipient Phone Number or ID"
                 placeholder="Enter 10-digit mobile number"
                 value={p2pForm.recipient_phone}
                 onChange={(e) => setP2pForm({ ...p2pForm, recipient_phone: e.target.value })}
@@ -1117,7 +1206,7 @@ export default function History() {
                       <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#1E3A8A" }}>₹ {p2pGross.toFixed(2)}</Typography>
                     </Box>
                     <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                      <Typography sx={{ fontSize: 12, color: "#DC2626" }}>Transfer Fee (7%):</Typography>
+                      <Typography sx={{ fontSize: 12, color: "#DC2626" }}>Transfer GST/Tax ({p2pTaxPercent}%):</Typography>
                       <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#DC2626" }}>- ₹ {p2pFee.toFixed(2)}</Typography>
                     </Box>
                     <Divider sx={{ my: 0.5, borderColor: "#BFDBFE" }} />
@@ -1151,7 +1240,89 @@ export default function History() {
           </Box>
         )}
 
-        {/* Drawer Mode 2: Redeem Coupon */}
+        {/* Drawer Mode 2: Transfer to Pockets (P2P Coupon Pocket / Withdrawal Pocket) */}
+        {drawerMode === "pockets" && (
+          <Box sx={{ bgcolor: "#F0FDFA", p: 2, borderRadius: 3, border: "1px solid #99F6E4", mb: 2 }}>
+            <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: "#0F766E", mb: 0.5 }}>
+              Transfer to Dedicated Pockets (Taxable)
+            </Typography>
+            <Typography sx={{ fontSize: 12, color: "#64748B", mb: 1.5 }}>
+              Transfer from Main Wallet to P2P Coupon Pocket or Withdrawal Pocket with configured tax.
+            </Typography>
+
+            {pocketError && <Alert severity="error" sx={{ mb: 1.5, borderRadius: 2, fontSize: 12.5 }}>{pocketError}</Alert>}
+            {pocketSuccess && <Alert severity="success" sx={{ mb: 1.5, borderRadius: 2, fontSize: 12.5 }}>{pocketSuccess}</Alert>}
+
+            <Stack spacing={1.5}>
+              <TextField
+                fullWidth
+                select
+                size="small"
+                label="Destination Pocket"
+                value={pocketType}
+                onChange={(e) => setPocketType(e.target.value)}
+                sx={{ bgcolor: "#fff", borderRadius: 2 }}
+              >
+                <MenuItem value="coupon">P2P Coupon Pocket ({taxConfig.p2p_coupon_tax_percent}% Tax)</MenuItem>
+                <MenuItem value="withdrawal">Withdrawal Pocket ({taxConfig.withdrawal_tax_percent}% TDS/Tax)</MenuItem>
+              </TextField>
+
+              <TextField
+                fullWidth
+                size="small"
+                label="Transfer Amount (₹)"
+                placeholder="e.g. 1000"
+                type="number"
+                value={pocketAmount}
+                onChange={(e) => setPocketAmount(e.target.value)}
+                sx={{ bgcolor: "#fff", borderRadius: 2 }}
+              />
+
+              {pocketGross > 0 && (
+                <Paper elevation={0} sx={{ p: 1.5, bgcolor: "#CCFBF1", border: "1px solid #5EEAD4", borderRadius: 2 }}>
+                  <Stack spacing={0.5}>
+                    <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                      <Typography sx={{ fontSize: 12, color: "#115E59" }}>Transfer Amount:</Typography>
+                      <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#115E59" }}>₹ {pocketGross.toFixed(2)}</Typography>
+                    </Box>
+                    <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                      <Typography sx={{ fontSize: 12, color: "#DC2626" }}>
+                        {pocketType === "withdrawal" ? `TDS / Admin Charge (${pocketTaxPercent}%):` : `P2P Coupon Transfer Tax (${pocketTaxPercent}%):`}
+                      </Typography>
+                      <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#DC2626" }}>- ₹ {pocketTax.toFixed(2)}</Typography>
+                    </Box>
+                    <Divider sx={{ my: 0.5, borderColor: "#5EEAD4" }} />
+                    <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                      <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#0F766E" }}>Net Credited to Pocket:</Typography>
+                      <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0F766E" }}>₹ {pocketNet.toFixed(2)}</Typography>
+                    </Box>
+                  </Stack>
+                </Paper>
+              )}
+
+              <Button
+                fullWidth
+                variant="contained"
+                disabled={pocketBusy || pocketGross <= 0}
+                onClick={handlePocketTransfer}
+                startIcon={pocketBusy ? <CircularProgress size={16} color="inherit" /> : <AccountBalanceWalletRoundedIcon />}
+                sx={{
+                  py: 1.25,
+                  borderRadius: 2.5,
+                  fontWeight: 800,
+                  fontSize: 14,
+                  textTransform: "none",
+                  bgcolor: "#0D9488",
+                  "&:hover": { bgcolor: "#0F766E" },
+                }}
+              >
+                {pocketBusy ? "Processing..." : `Transfer ₹${pocketGross > 0 ? fmtAmount(pocketGross) : "0.00"} to Pocket (Net: ₹${fmtAmount(pocketNet)})`}
+              </Button>
+            </Stack>
+          </Box>
+        )}
+
+        {/* Drawer Mode 3: Redeem Coupon */}
         {drawerMode === "redeem" && (
           <Box sx={{ bgcolor: "#FDF4FF", p: 2, borderRadius: 3, border: "1px solid #F0ABFC", mb: 2 }}>
             <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: "#701A75", mb: 1.5 }}>

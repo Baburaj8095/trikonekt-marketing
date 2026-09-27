@@ -26,7 +26,10 @@ import {
   AccountBalanceWalletRounded as WalletIcon,
   PaidRounded as PaidIcon,
   PriceCheckRounded as FeeIcon,
+  TuneRounded as SettingsIcon,
+  CheckCircleRounded as CheckIcon,
 } from "@mui/icons-material";
+import { Alert } from "@mui/material";
 import API from "../../api/api";
 import { C, R, S } from "../../theme/tokens";
 import StatusBadge from "../../components/common/StatusBadge";
@@ -40,6 +43,43 @@ export default function AdminTotalAdminCharges() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState({ summary: {}, results: [] });
   const [search, setSearch] = useState("");
+
+  // Platform Tax & Deductions Configuration
+  const [taxConfig, setTaxConfig] = useState({
+    p2p_package_tax_percent: 7,
+    p2p_coupon_tax_percent: 7,
+    withdrawal_tax_percent: 10,
+  });
+  const [taxSaving, setTaxSaving] = useState(false);
+  const [taxMsg, setTaxMsg] = useState({ type: "", text: "" });
+
+  const fetchTaxConfig = async () => {
+    try {
+      const res = await API.get("/business/platform-taxes/");
+      if (res.data) {
+        setTaxConfig({
+          p2p_package_tax_percent: res.data.p2p_package_tax_percent ?? 7,
+          p2p_coupon_tax_percent: res.data.p2p_coupon_tax_percent ?? 7,
+          withdrawal_tax_percent: res.data.withdrawal_tax_percent ?? 10,
+        });
+      }
+    } catch (e) {
+      console.error("Failed to load platform taxes:", e);
+    }
+  };
+
+  const saveTaxConfig = async () => {
+    try {
+      setTaxSaving(true);
+      setTaxMsg({ type: "", text: "" });
+      const res = await API.post("/business/platform-taxes/", taxConfig);
+      setTaxMsg({ type: "success", text: "Platform tax rates saved successfully!" });
+    } catch (err) {
+      setTaxMsg({ type: "error", text: err?.response?.data?.detail || "Failed to update tax rates." });
+    } finally {
+      setTaxSaving(false);
+    }
+  };
 
   const fetchCharges = async () => {
     try {
@@ -55,6 +95,7 @@ export default function AdminTotalAdminCharges() {
 
   useEffect(() => {
     fetchCharges();
+    fetchTaxConfig();
   }, []);
 
   const summary = data.summary || {};
@@ -135,6 +176,115 @@ export default function AdminTotalAdminCharges() {
             <Box sx={{ p: 2, borderRadius: 2.5, bgcolor: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
               <Typography sx={{ fontSize: "11px", fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" }}>Admin Withholdings</Typography>
               <Typography sx={{ fontSize: "20px", fontWeight: 900, color: "#C084FC" }}>₹{fmtAmount(summary.total_withdrawal_admin_fees)}</Typography>
+            </Box>
+          </Grid>
+        </Grid>
+      </Paper>
+
+      {/* Platform Tax & Charges Configuration Card */}
+      <Paper
+        elevation={0}
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          borderRadius: 3,
+          border: "1.5px solid #E2E8F0",
+          bgcolor: "#FFFFFF",
+          boxShadow: S.card,
+          mb: 3,
+        }}
+      >
+        <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={1.5} sx={{ mb: 2 }}>
+          <Box>
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <SettingsIcon sx={{ color: "#2563EB", fontSize: 24 }} />
+              <Typography variant="h6" sx={{ fontWeight: 800, color: "#0F172A", fontSize: "17px" }}>
+                Platform Taxes & Charges Configuration
+              </Typography>
+            </Stack>
+            <Typography variant="body2" sx={{ color: "#64748B", fontSize: "13px" }}>
+              Configure GST/Tax rates for P2P Package transfers, Coupon pocket transfers, and Withdrawal TDS.
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
+            disabled={taxSaving}
+            onClick={saveTaxConfig}
+            startIcon={taxSaving ? <CircularProgress size={16} color="inherit" /> : <CheckIcon />}
+            sx={{
+              bgcolor: "#2563EB",
+              color: "#fff",
+              fontWeight: 700,
+              borderRadius: 2,
+              px: 2.5,
+              textTransform: "none",
+              "&:hover": { bgcolor: "#1D4ED8" },
+            }}
+          >
+            {taxSaving ? "Saving..." : "Save Tax Configuration"}
+          </Button>
+        </Stack>
+
+        {taxMsg.text && (
+          <Alert severity={taxMsg.type} sx={{ mb: 2, borderRadius: 2 }} onClose={() => setTaxMsg({ type: "", text: "" })}>
+            {taxMsg.text}
+          </Alert>
+        )}
+
+        <Grid container spacing={2.5}>
+          <Grid item xs={12} sm={4}>
+            <Box sx={{ p: 2, borderRadius: 2, bgcolor: "#F8FAFC", border: "1px solid #E2E8F0" }}>
+              <Typography sx={{ fontSize: "13px", fontWeight: 700, color: "#1E293B", mb: 0.5 }}>
+                P2P Package Coupon Transfer Tax (%)
+              </Typography>
+              <Typography sx={{ fontSize: "11.5px", color: "#64748B", mb: 1.5, minHeight: 34 }}>
+                GST / Tax deducted when a consumer sends a package coupon to another member.
+              </Typography>
+              <TextField
+                size="small"
+                type="number"
+                fullWidth
+                value={taxConfig.p2p_package_tax_percent}
+                onChange={(e) => setTaxConfig({ ...taxConfig, p2p_package_tax_percent: e.target.value })}
+                InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+              />
+            </Box>
+          </Grid>
+
+          <Grid item xs={12} sm={4}>
+            <Box sx={{ p: 2, borderRadius: 2, bgcolor: "#F8FAFC", border: "1px solid #E2E8F0" }}>
+              <Typography sx={{ fontSize: "13px", fontWeight: 700, color: "#1E293B", mb: 0.5 }}>
+                History → P2P Coupon Pocket Tax (%)
+              </Typography>
+              <Typography sx={{ fontSize: "11.5px", color: "#64748B", mb: 1.5, minHeight: 34 }}>
+                Tax / Fee deducted when transferring from Main Wallet to P2P Coupon Pocket.
+              </Typography>
+              <TextField
+                size="small"
+                type="number"
+                fullWidth
+                value={taxConfig.p2p_coupon_tax_percent}
+                onChange={(e) => setTaxConfig({ ...taxConfig, p2p_coupon_tax_percent: e.target.value })}
+                InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+              />
+            </Box>
+          </Grid>
+
+          <Grid item xs={12} sm={4}>
+            <Box sx={{ p: 2, borderRadius: 2, bgcolor: "#F8FAFC", border: "1px solid #E2E8F0" }}>
+              <Typography sx={{ fontSize: "13px", fontWeight: 700, color: "#1E293B", mb: 0.5 }}>
+                History → Withdrawal Pocket Tax / TDS (%)
+              </Typography>
+              <Typography sx={{ fontSize: "11.5px", color: "#64748B", mb: 1.5, minHeight: 34 }}>
+                Tax / TDS deducted when transferring from Main Wallet to Withdrawal Pocket.
+              </Typography>
+              <TextField
+                size="small"
+                type="number"
+                fullWidth
+                value={taxConfig.withdrawal_tax_percent}
+                onChange={(e) => setTaxConfig({ ...taxConfig, withdrawal_tax_percent: e.target.value })}
+                InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+              />
             </Box>
           </Grid>
         </Grid>

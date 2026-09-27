@@ -156,3 +156,49 @@ class TotalAdminChargesListView(APIView):
             },
             "results": items,
         }, status=status.HTTP_200_OK)
+
+
+class PlatformTaxConfigView(APIView):
+    """
+    Exposes and allows configuration of platform taxes:
+    - P2P Package Coupon Transfer Tax %
+    - P2P Coupon Pocket Transfer Tax %
+    - Withdrawal Pocket Tax / TDS %
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from business.models import CommissionConfig
+        cfg = CommissionConfig.get_solo()
+        return Response({
+            "p2p_package_tax_percent": float(cfg.get_p2p_package_tax_percent()),
+            "p2p_coupon_tax_percent": float(cfg.get_p2p_coupon_tax_percent()),
+            "withdrawal_tax_percent": float(cfg.get_withdrawal_tax_percent()),
+        }, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        if not (request.user.is_staff or request.user.is_superuser or getattr(request.user, 'admin_role', None)):
+            return Response({"detail": "Admin authorization required."}, status=status.HTTP_403_FORBIDDEN)
+        from business.models import CommissionConfig
+        from decimal import Decimal as D
+        cfg = CommissionConfig.get_solo()
+        master = dict(cfg.master_commission_json or {})
+        tc = dict(master.get("taxes_and_charges") or {})
+
+        if "p2p_package_tax_percent" in request.data:
+            tc["p2p_package_tax_percent"] = float(D(str(request.data["p2p_package_tax_percent"])))
+        if "p2p_coupon_tax_percent" in request.data:
+            tc["p2p_coupon_tax_percent"] = float(D(str(request.data["p2p_coupon_tax_percent"])))
+        if "withdrawal_tax_percent" in request.data:
+            tc["withdrawal_tax_percent"] = float(D(str(request.data["withdrawal_tax_percent"])))
+
+        master["taxes_and_charges"] = tc
+        cfg.master_commission_json = master
+        cfg.save(update_fields=["master_commission_json", "updated_at"])
+
+        return Response({
+            "status": "ok",
+            "message": "Platform tax configuration updated successfully.",
+            "taxes_and_charges": tc
+        }, status=status.HTTP_200_OK)
+

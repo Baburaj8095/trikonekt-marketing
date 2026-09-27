@@ -358,6 +358,36 @@ class CommissionConfig(models.Model):
         except Exception:
             return self._D("10.00")
 
+    def get_p2p_package_tax_percent(self) -> _D:
+        m = self._m()
+        try:
+            v = m.get("taxes_and_charges", {}).get("p2p_package_tax_percent", None)
+            if v is None:
+                return self._D("7.00")
+            return self._D(str(v))
+        except Exception:
+            return self._D("7.00")
+
+    def get_p2p_coupon_tax_percent(self) -> _D:
+        m = self._m()
+        try:
+            v = m.get("taxes_and_charges", {}).get("p2p_coupon_tax_percent", None)
+            if v is None:
+                return self._D("7.00")
+            return self._D(str(v))
+        except Exception:
+            return self._D("7.00")
+
+    def get_withdrawal_tax_percent(self) -> _D:
+        m = self._m()
+        try:
+            v = m.get("taxes_and_charges", {}).get("withdrawal_tax_percent", None)
+            if v is None:
+                return self.get_tax_percent()
+            return self._D(str(v))
+        except Exception:
+            return self._D("10.00")
+
     def get_company_user(self):
         # Prefer explicit config; else fallback to stored relation; else best-effort resolve
         u = getattr(self, "tax_company_user", None)

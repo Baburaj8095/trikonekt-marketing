@@ -94,13 +94,17 @@ class SSVService:
 
     @classmethod
     @transaction.atomic
-    def process_p2p_coupon_transfer(cls, sender: CustomUser, recipient_phone: str, amount: Decimal, coupon_type: str = "PACKAGE_COUPON"):
+    def process_p2p_coupon_transfer(cls, sender: CustomUser, recipient_phone: str, amount: Decimal, coupon_type: str = "PACKAGE_COUPON", fund_source: str = "MAIN"):
         """
         Transfers coupon/wallet balance P2P with exact fee deduction:
-        - PACKAGE_COUPON: 7% deduction fee
+        - PACKAGE_COUPON: Admin-configured deduction fee (defaults to 7%) and generates assigned ConsumerVoucher
         - E_EDU_COUPON Cycle 1: 15% deduction fee
         - E_EDU_COUPON Cycle 2+: 25% deduction fee
         """
+        from datetime import timedelta
+        from business.models import CommissionConfig
+        from accounts.models import ConsumerVoucher
+
         recipient = CustomUser.objects.filter(phone=recipient_phone.strip()).first()
         if not recipient:
             recipient = CustomUser.objects.filter(username=recipient_phone.strip()).first()
@@ -110,9 +114,10 @@ class SSVService:
         if sender.id == recipient.id:
             raise ValueError("Cannot transfer coupons to yourself.")
 
+        cfg = CommissionConfig.get_solo()
         # Determine fee percentage
         if coupon_type == "PACKAGE_COUPON":
-            fee_percent = cls.TRANSFER_FEE_PERCENT_PACKAGE # 7%
+            fee_percent = cfg.get_p2p_package_tax_percent()
         elif coupon_type == "E_EDU_COUPON_CYCLE_2":
             fee_percent = cls.CYCLE_2_E_EDU_FEE_PERCENT # 25%
         else:
@@ -136,7 +141,21 @@ class SSVService:
         sender_wallet.withdrawable_balance -= amount
         sender_wallet.save(update_fields=["withdrawable_balance", "updated_at"])
 
-        WalletTransaction.objects.create(
+        voucher_code = None
+        if coupon_type == "PACKAGE_COUPON":
+            voucher_code = f"PKG-{uuid.uuid4().hex[:8].upper()}"
+            voucher = ConsumerVoucher.objects.create(
+                creator=sender,
+                assigned_to=recipient,
+                voucher_type=ConsumerVoucher.TYPE_PACKAGE_PURCHASE,
+                code=voucher_code,
+                amount=net_amount,
+                status=ConsumerVoucher.STATUS_ACTIVE,
+                expires_at=timezone.now() + timedelta(days=90),
+                note=f"P2P package coupon from {sender.phone or sender.username}",
+            )
+
+        send_tx = WalletTransaction.objects.create(
             user=sender,
             amount=-amount,
             balance_after=sender_wallet.withdrawable_balance,
@@ -149,29 +168,54 @@ class SSVService:
                 "fee_amount": str(fee_amount),
                 "net_amount": str(net_amount),
                 "coupon_type": coupon_type,
+                "voucher_code": voucher_code or "",
             }
         )
 
-        # Credit recipient withdrawable balance (net amount)
-        recipient_wallet = Wallet.get_or_create_for_user(recipient)
-        recipient_wallet.withdrawable_balance += net_amount
-        recipient_wallet.save(update_fields=["withdrawable_balance", "updated_at"])
+        if voucher_code and 'voucher' in locals():
+            voucher.debit_transaction = send_tx
+            voucher.save(update_fields=["debit_transaction"])
 
-        WalletTransaction.objects.create(
-            user=recipient,
-            amount=net_amount,
-            balance_after=recipient_wallet.withdrawable_balance,
-            type="P2P_PACKAGE_COUPON_RECEIVE",
-            meta={
-                "sender_id": sender.id,
-                "sender_phone": sender.phone or sender.username,
-                "gross_amount": str(amount),
-                "fee_percent": str(fee_percent),
-                "fee_amount": str(fee_amount),
-                "net_amount": str(net_amount),
-                "coupon_type": coupon_type,
-            }
-        )
+        # If not package coupon (direct internal balance send), credit recipient withdrawable balance
+        if coupon_type != "PACKAGE_COUPON":
+            recipient_wallet = Wallet.get_or_create_for_user(recipient)
+            recipient_wallet.withdrawable_balance += net_amount
+            recipient_wallet.save(update_fields=["withdrawable_balance", "updated_at"])
+
+            WalletTransaction.objects.create(
+                user=recipient,
+                amount=net_amount,
+                balance_after=recipient_wallet.withdrawable_balance,
+                type="P2P_PACKAGE_COUPON_RECEIVE",
+                meta={
+                    "sender_id": sender.id,
+                    "sender_phone": sender.phone or sender.username,
+                    "gross_amount": str(amount),
+                    "fee_percent": str(fee_percent),
+                    "fee_amount": str(fee_amount),
+                    "net_amount": str(net_amount),
+                    "coupon_type": coupon_type,
+                }
+            )
+        else:
+            # Create notification transaction for recipient indicating voucher received
+            WalletTransaction.objects.create(
+                user=recipient,
+                amount=Decimal("0.00"),
+                balance_after=Wallet.get_or_create_for_user(recipient).withdrawable_balance,
+                type="P2P_PACKAGE_COUPON_RECEIVE",
+                meta={
+                    "sender_id": sender.id,
+                    "sender_phone": sender.phone or sender.username,
+                    "gross_amount": str(amount),
+                    "fee_percent": str(fee_percent),
+                    "fee_amount": str(fee_amount),
+                    "net_amount": str(net_amount),
+                    "coupon_type": coupon_type,
+                    "voucher_code": voucher_code,
+                    "status": "VOUCHER_ASSIGNED",
+                }
+            )
 
         # Record admin charges ledger entry for company fee
         admin_user = CustomUser.objects.filter(is_superuser=True).first() or sender
@@ -186,6 +230,7 @@ class SSVService:
                 "fee_percent": str(fee_percent),
                 "charge_category": "P2P_TRANSACTION_FEE",
                 "gross_amount": str(amount),
+                "voucher_code": voucher_code or "",
             }
         )
 
@@ -197,5 +242,6 @@ class SSVService:
             "fee_percent": float(fee_percent),
             "fee_amount": float(fee_amount),
             "net_amount": float(net_amount),
+            "voucher_code": voucher_code,
             "transferred_at": timezone.now().strftime("%d %b %Y, %I:%M %p"),
         }

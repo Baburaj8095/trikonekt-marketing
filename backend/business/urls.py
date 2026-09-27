@@ -4,6 +4,7 @@ from .views_ssv import (
     P2PCouponTransferView,
     P2PCouponHistoryView,
     TotalAdminChargesListView,
+    PlatformTaxConfigView,
 )
 from .views import (
     BusinessRegistrationCreateView,
@@ -201,5 +202,6 @@ urlpatterns = [
     path('coupons/p2p-transfer/', P2PCouponTransferView.as_view(), name='p2p_coupon_transfer'),
     path('coupons/p2p-history/', P2PCouponHistoryView.as_view(), name='p2p_coupon_history'),
     path('admin/total-admin-charges/', TotalAdminChargesListView.as_view(), name='total_admin_charges_list'),
+    path('platform-taxes/', PlatformTaxConfigView.as_view(), name='platform_taxes'),
 ]
 
