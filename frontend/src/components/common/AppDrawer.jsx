@@ -64,7 +64,7 @@ export default function AppDrawer({
     {
       title: "PACKAGES & COUPONS",
       items: [
-        { label: "E-edu Agent (₹2,000)", to: "/user/packages/digital-education-prime", icon: SchoolOutlinedIcon },
+        { label: "E-edu Agent (₹2,000)", to: "https://triacademy.trikonekt.com", external: true, icon: SchoolOutlinedIcon },
         { label: "Agent Subscription", to: "/user/packages/join-subscription", icon: StarOutlineRoundedIcon },
         { label: "SPP (15 Vouchers)", to: "/user/spp-gift-cards", icon: CardGiftcardOutlinedIcon },
         { label: "Tri Holiday Packages", to: "/user/tri/tri-holidays", icon: FlightTakeoffOutlinedIcon },
@@ -204,12 +204,16 @@ export default function AppDrawer({
               {section.items.map((item) => {
                 const IconComp = item.icon;
                 const isActive = currentPath === item.to || location.pathname === item.to;
+                const isExt = !!item.external;
 
                 return (
                   <Box
                     key={item.label}
-                    component={Link}
-                    to={item.to}
+                    component={isExt ? "a" : Link}
+                    href={isExt ? item.to : undefined}
+                    target={isExt ? "_blank" : undefined}
+                    rel={isExt ? "noopener noreferrer" : undefined}
+                    to={isExt ? undefined : item.to}
                     onClick={onClose}
                     sx={{
                       display: "flex",

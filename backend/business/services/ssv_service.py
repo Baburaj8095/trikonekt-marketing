@@ -42,19 +42,24 @@ class SSVService:
 
         vouchers_data = []
         for i in range(1, 16):
-            card = cards.filter(box_number=i).first() if i <= 12 else None
+            card = cards.filter(box_number=i).first() if i <= 13 else None
             
             if i == 1:
                 v_type = "INITIAL_PAID"
-                v_label = "Voucher 1 (Included in ₹2,000 Package)"
+                v_label = "Box 1 (Auto-purchased with ₹2,000 Package)"
+                v_amount = "1000.00"
                 is_available = has_initial_package
-            elif 2 <= i <= 12:
+            elif 2 <= i <= 13:
+                month_num = i
                 v_type = "MONTHLY_PAID"
-                v_label = f"Month {i} Smart Shopping Voucher"
-                is_available = total_boxes >= i
-            else: # 13, 14, 15 (Bonus vouchers)
+                v_label = f"Month {month_num} Subscription Box"
+                v_amount = "1000.00"
+                is_available = total_boxes >= (i - 1)
+            else: # 14, 15 (Bonus vouchers of ₹2,000 each)
+                bonus_idx = i - 13
                 v_type = "BONUS_COMPANY"
-                v_label = f"Company Bonus Voucher {i - 13 + 1}"
+                v_label = f"Company Shopping/Merchant Bonus Voucher {bonus_idx} (₹2,000)"
+                v_amount = "2000.00"
                 is_available = total_boxes >= 12
 
             status = "AVAILABLE" if is_available else "LOCKED"
@@ -65,13 +70,14 @@ class SSVService:
                 "voucher_number": i,
                 "label": v_label,
                 "type": v_type,
-                "amount": "1000.00",
-                "code": card.coupon_code if card else f"SSV-M{i:02d}-{user.phone or user.id}-{str(uuid.uuid4())[:4].upper()}",
+                "amount": v_amount,
+                "code": card.coupon_code if card else f"SPP-M{i:02d}-{user.phone or user.id}-{str(uuid.uuid4())[:4].upper()}",
                 "status": status,
                 "is_used": status == "USED",
                 "used_at": card.redeemed_at.strftime("%d %b %Y, %I:%M %p") if card and card.redeemed_at else None,
-                "invoice_number": f"INV-SSV-2026-{user.id:04d}-{i:02d}",
+                "invoice_number": f"INV-SPP-2026-{user.id:04d}-{i:02d}",
                 "invoice_date": card.purchased_at.strftime("%d %b %Y") if card else timezone.now().strftime("%d %b %Y"),
+                "redeemable_for": "Trikonekt Shopping & Near Store Merchant",
             })
 
         return {
@@ -79,6 +85,7 @@ class SSVService:
             "total_completed": total_boxes + (2 if has_bonus else 0),
             "months_paid": min(12, total_boxes),
             "bonus_awarded": 2 if has_bonus else 0,
+            "bonus_amount": "4000.00" if has_bonus else "0.00",
             "has_initial_package": has_initial_package,
             "active_count": active_count + (1 if has_initial_package and total_boxes == 0 else 0),
             "used_count": used_count,

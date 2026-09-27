@@ -534,7 +534,7 @@ export default function SPPGiftCards() {
               </Typography>
             </Stack>
             <Typography variant="body2" sx={{ color: "#64748b", fontSize: "13px" }}>
-              Complete 12 monthly boxes without holiday redemption to claim <b>₹14,000</b> (₹12,000 invested + ₹2,000 bonus) directly to your Main Wallet!
+              Complete 12 monthly boxes timely to get <b>2 Company Bonus Vouchers of ₹2,000 each (Total ₹4,000 Bonus)</b> at the end of the year for Trikonekt Shopping & Merchant stores!
             </Typography>
           </Box>
 

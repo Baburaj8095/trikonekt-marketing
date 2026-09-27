@@ -11,6 +11,8 @@ import {
   Tabs,
   Tab,
   Button,
+  Drawer,
+  IconButton,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
@@ -25,6 +27,7 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import SchoolRoundedIcon from "@mui/icons-material/SchoolRounded";
 import AccountBalanceRoundedIcon from "@mui/icons-material/AccountBalanceRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 
 /** ---------- helpers ---------- */
 function fmtAmount(value) {
@@ -508,6 +511,7 @@ export default function History() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [actionDrawerOpen, setActionDrawerOpen] = useState(false);
   const [top, setTop] = useState({
     main_income_balance: "0.00",
     self_account_balance: "0.00",
@@ -785,7 +789,10 @@ export default function History() {
       {/* Main Wallet Summary Card with Top Actions */}
       <Paper
         elevation={0}
-        onClick={() => setTab(1)}
+        onClick={() => {
+          setTab(1);
+          setActionDrawerOpen(true);
+        }}
         sx={{
           p: 1.8,
           borderRadius: 2.5,
@@ -813,7 +820,7 @@ export default function History() {
 
           <Box sx={{ flex: 1 }}>
             <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 800 }}>
-              Main Wallet (75% Withdrawable)
+              Main Wallet (75% Withdrawable • Tap for Actions)
             </Typography>
 
             <Typography
@@ -859,7 +866,7 @@ export default function History() {
             startIcon={<SchoolRoundedIcon sx={{ fontSize: 16 }} />}
             onClick={(e) => {
               e.stopPropagation();
-              navigate("/user/packages/digital-education-prime");
+              window.open("https://triacademy.trikonekt.com", "_blank", "noopener,noreferrer");
             }}
             sx={{
               flex: 1,
@@ -871,7 +878,7 @@ export default function History() {
               color: "#2563EB",
             }}
           >
-            Self E-edu
+            E-Edu Academy
           </Button>
           <Button
             size="small"
@@ -895,6 +902,152 @@ export default function History() {
           </Button>
         </Stack>
       </Paper>
+
+      {/* Bottom Sheet Drawer for Main Wallet Actions */}
+      <Drawer
+        anchor="bottom"
+        open={actionDrawerOpen}
+        onClose={() => setActionDrawerOpen(false)}
+        PaperProps={{
+          sx: {
+            borderTopLeftRadius: 24,
+            borderTopRightRadius: 24,
+            p: 2.5,
+            pb: { xs: 4, sm: 3 },
+            maxWidth: 560,
+            mx: "auto",
+            bgcolor: "#FFFFFF",
+            boxShadow: "0 -8px 30px rgba(0,0,0,0.15)",
+          },
+        }}
+      >
+        {/* Drag pill indicator */}
+        <Box sx={{ width: 40, height: 4, bgcolor: "#CBD5E1", borderRadius: 2, mx: "auto", mb: 2 }} />
+
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+          <Box>
+            <Typography sx={{ fontSize: 17, fontWeight: 800, color: "#0F172A" }}>
+              Main Wallet Actions
+            </Typography>
+            <Typography sx={{ fontSize: 13, color: "#64748B", fontWeight: 600 }}>
+              Available Balance: ₹ {fmtAmount(top.main_income_balance)}
+            </Typography>
+          </Box>
+          <IconButton size="small" onClick={() => setActionDrawerOpen(false)}>
+            <CloseRoundedIcon />
+          </IconButton>
+        </Box>
+
+        <Stack spacing={1.5}>
+          {/* 1. P2P Internal Transfer */}
+          <Paper
+            elevation={0}
+            onClick={() => {
+              setActionDrawerOpen(false);
+              navigate("/user/coupon-pocket");
+            }}
+            sx={{
+              p: 1.8,
+              borderRadius: 3,
+              border: "1px solid #E2E8F0",
+              bgcolor: "#F8FAFC",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              transition: "all 0.15s ease",
+              "&:hover": { bgcolor: "#EFF6FF", borderColor: "#2563EB" },
+            }}
+          >
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Avatar sx={{ bgcolor: "#EFF6FF", color: "#2563EB", width: 44, height: 44 }}>
+                <SendRoundedIcon />
+              </Avatar>
+              <Box>
+                <Typography sx={{ fontSize: 14.5, fontWeight: 800, color: "#0F172A" }}>
+                  P2P Internal Transaction
+                </Typography>
+                <Typography sx={{ fontSize: 12, color: "#64748B" }}>
+                  Send balance/coupon with 7% transaction fee
+                </Typography>
+              </Box>
+            </Stack>
+            <ChevronRightIcon sx={{ color: "#94A3B8" }} />
+          </Paper>
+
+          {/* 2. Self E-edu Buy / Academy */}
+          <Paper
+            elevation={0}
+            onClick={() => {
+              setActionDrawerOpen(false);
+              window.open("https://triacademy.trikonekt.com", "_blank", "noopener,noreferrer");
+            }}
+            sx={{
+              p: 1.8,
+              borderRadius: 3,
+              border: "1px solid #E2E8F0",
+              bgcolor: "#F8FAFC",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              transition: "all 0.15s ease",
+              "&:hover": { bgcolor: "#F5F3FF", borderColor: "#7C3AED" },
+            }}
+          >
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Avatar sx={{ bgcolor: "#F5F3FF", color: "#7C3AED", width: 44, height: 44 }}>
+                <SchoolRoundedIcon />
+              </Avatar>
+              <Box>
+                <Typography sx={{ fontSize: 14.5, fontWeight: 800, color: "#0F172A" }}>
+                  E-edu Agent Academy (₹2,000)
+                </Typography>
+                <Typography sx={{ fontSize: 12, color: "#64748B" }}>
+                  Access Academy portal at triacademy.trikonekt.com
+                </Typography>
+              </Box>
+            </Stack>
+            <ChevronRightIcon sx={{ color: "#94A3B8" }} />
+          </Paper>
+
+          {/* 3. Self Withdrawal */}
+          <Paper
+            elevation={0}
+            onClick={() => {
+              setActionDrawerOpen(false);
+              navigate("/user/withdrawal");
+            }}
+            sx={{
+              p: 1.8,
+              borderRadius: 3,
+              border: "1px solid #E2E8F0",
+              bgcolor: "#F8FAFC",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              transition: "all 0.15s ease",
+              "&:hover": { bgcolor: "#ECFDF5", borderColor: "#059669" },
+            }}
+          >
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Avatar sx={{ bgcolor: "#ECFDF5", color: "#059669", width: 44, height: 44 }}>
+                <AccountBalanceRoundedIcon />
+              </Avatar>
+              <Box>
+                <Typography sx={{ fontSize: 14.5, fontWeight: 800, color: "#0F172A" }}>
+                  Self Withdrawal
+                </Typography>
+                <Typography sx={{ fontSize: 12, color: "#64748B" }}>
+                  Instant payout to your verified bank account
+                </Typography>
+              </Box>
+            </Stack>
+            <ChevronRightIcon sx={{ color: "#94A3B8" }} />
+          </Paper>
+        </Stack>
+      </Drawer>
 
       {/* Today & Yesterday Earnings Stats */}
       <Box sx={{ display: "flex", gap: 1.2, mb: 1.5 }}>

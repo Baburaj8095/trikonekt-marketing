@@ -122,6 +122,13 @@ export default function CouponPocket() {
     note: "",
   });
 
+  const [redeemModalOpen, setRedeemModalOpen] = useState(false);
+  const [redeemForm, setRedeemForm] = useState({
+    coupon_code: "",
+    category: "ECOMMERCE_SHOPPING",
+    pin: "",
+  });
+
   const load = async () => {
     try {
       setLoading(true);
@@ -194,6 +201,32 @@ export default function CouponPocket() {
     }
   };
 
+  const handleRedeemCoupon = async () => {
+    if (!redeemForm.coupon_code.trim()) {
+      setError("Please enter the coupon code to redeem.");
+      return;
+    }
+    try {
+      setActionLoading(true);
+      setError("");
+      setSuccess("");
+
+      await API.post("/accounts/wallet/vouchers/redeem/", {
+        code: redeemForm.coupon_code.trim(),
+        category: redeemForm.category,
+      });
+
+      setSuccess(`Coupon ${redeemForm.coupon_code} redeemed successfully for ${redeemForm.category.replace(/_/g, " ")}!`);
+      setRedeemModalOpen(false);
+      setRedeemForm({ coupon_code: "", category: "ECOMMERCE_SHOPPING", pin: "" });
+      load();
+    } catch (err) {
+      setError(err?.response?.data?.detail || err?.response?.data?.message || "Failed to redeem coupon.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", p: { xs: 1.5, sm: 2.5, md: 3 } }}>
       {/* Header Banner */}
@@ -221,7 +254,7 @@ export default function CouponPocket() {
             </Typography>
           </Box>
 
-          <Stack direction="row" spacing={1.5} sx={{ width: { xs: "100%", sm: "auto" } }}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ width: { xs: "100%", sm: "auto" } }}>
             <IconButton
               onClick={load}
               disabled={loading}
@@ -239,7 +272,7 @@ export default function CouponPocket() {
                 background: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
                 color: "#fff",
                 fontWeight: 800,
-                px: 3,
+                px: 2.5,
                 py: 1,
                 borderRadius: 2.5,
                 textTransform: "none",
@@ -247,7 +280,27 @@ export default function CouponPocket() {
                 boxShadow: "0 4px 14px rgba(37,99,235,0.4)",
               }}
             >
-              P2P Internal Send (7% Fee)
+              P2P Send (7% Fee)
+            </Button>
+
+            <Button
+              variant="contained"
+              fullWidth
+              startIcon={<ShoppingBagRoundedIcon />}
+              onClick={() => setRedeemModalOpen(true)}
+              sx={{
+                background: "linear-gradient(135deg, #059669 0%, #047857 100%)",
+                color: "#fff",
+                fontWeight: 800,
+                px: 2.5,
+                py: 1,
+                borderRadius: 2.5,
+                textTransform: "none",
+                whiteSpace: "nowrap",
+                boxShadow: "0 4px 14px rgba(5,150,105,0.4)",
+              }}
+            >
+              Redeem Coupon
             </Button>
           </Stack>
         </Stack>
@@ -453,9 +506,32 @@ export default function CouponPocket() {
                     </Box>
                   </Box>
 
-                  <Typography sx={{ fontSize: "11px", color: "#64748B", mt: 1 }}>
-                    Created: {fmtDate(voucher.created_at)}
-                  </Typography>
+                  <Box sx={{ mt: 1.5, pt: 1, borderTop: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <Typography sx={{ fontSize: "11px", color: "#64748B" }}>
+                      Created: {fmtDate(voucher.created_at)}
+                    </Typography>
+
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<ShoppingBagRoundedIcon sx={{ fontSize: 15 }} />}
+                      onClick={() => {
+                        setRedeemForm({ coupon_code: voucher.code, category: "ECOMMERCE_SHOPPING", pin: "" });
+                        setRedeemModalOpen(true);
+                      }}
+                      sx={{
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        textTransform: "none",
+                        borderRadius: 1.5,
+                        borderColor: "#059669",
+                        color: "#059669",
+                        "&:hover": { bgcolor: "#ECFDF5", borderColor: "#047857" },
+                      }}
+                    >
+                      Redeem
+                    </Button>
+                  </Box>
                 </Paper>
               </Grid>
             ))}
@@ -532,6 +608,65 @@ export default function CouponPocket() {
             }}
           >
             {actionLoading ? "Processing..." : `Send ₹${fmtAmount(p2pNet)}`}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Redeem Coupon Modal */}
+      <Dialog
+        open={redeemModalOpen}
+        onClose={() => setRedeemModalOpen(false)}
+        PaperProps={{ sx: { borderRadius: 3.5, maxWidth: 460, width: "100%", p: 1 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 900, pb: 0.5, fontSize: "18px" }}>
+          Redeem Coupon / Voucher
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Alert severity="success" sx={{ borderRadius: 2.5, fontSize: "12.5px" }}>
+              Redeem 100% face value towards Trikonekt shopping or near store merchant discounts.
+            </Alert>
+
+            <TextField
+              label="Coupon / Voucher Code"
+              fullWidth
+              size="small"
+              placeholder="e.g. SPP-M01-9876-XXXX"
+              value={redeemForm.coupon_code}
+              onChange={(e) => setRedeemForm({ ...redeemForm, coupon_code: e.target.value })}
+            />
+
+            <TextField
+              select
+              label="Redemption Channel"
+              fullWidth
+              size="small"
+              value={redeemForm.category}
+              onChange={(e) => setRedeemForm({ ...redeemForm, category: e.target.value })}
+            >
+              <MenuItem value="ECOMMERCE_SHOPPING">Trikonekt E-Commerce Shopping (Instant Balance)</MenuItem>
+              <MenuItem value="NEAR_STORE_MERCHANT">Near Store / Offline Merchant Store</MenuItem>
+              <MenuItem value="TRI_HOLIDAY">Tri Holiday Travel Package</MenuItem>
+            </TextField>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setRedeemModalOpen(false)} sx={{ fontWeight: 600, color: "#64748B" }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleRedeemCoupon}
+            disabled={actionLoading || !redeemForm.coupon_code}
+            sx={{
+              bgcolor: "#059669",
+              "&:hover": { bgcolor: "#047857" },
+              fontWeight: 800,
+              borderRadius: 2,
+              px: 3,
+            }}
+          >
+            {actionLoading ? "Processing..." : "Confirm Redemption"}
           </Button>
         </DialogActions>
       </Dialog>
