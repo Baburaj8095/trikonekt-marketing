@@ -564,77 +564,71 @@ export default function History() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
-  // Debounced Recipient Verification
-  useEffect(() => {
+  // Explicit Recipient Verification
+  const handleVerifyRecipient = async () => {
     const val = String(p2pForm.recipient_phone || "").trim();
-    if (!val || val.length < 3) {
-      setRecipientValid(null);
+    if (!val) {
+      setRecipientValid(false);
       setRecipientInfo(null);
-      setRecipientChecking(false);
       return;
     }
     setRecipientChecking(true);
-    const timer = setTimeout(async () => {
-      try {
-        let found = false;
-        let info = null;
+    setRecipientValid(null);
+    setRecipientInfo(null);
+    try {
+      let found = false;
+      let info = null;
 
-        // Check 1: Sponsor / Region lookup
+      // Check 1: Sponsor / Region lookup
+      try {
+        const res = await API.get("/accounts/regions/by-sponsor/", {
+          params: { sponsor: val, level: "state" },
+        });
+        const sp = res?.data?.sponsor;
+        if (sp && sp.username) {
+          found = true;
+          info = {
+            name: sp.full_name || sp.username,
+            username: sp.username,
+            phone: sp.phone || sp.username,
+            pincode: sp.pincode,
+          };
+        }
+      } catch {}
+
+      // Check 2: User hierarchy lookup fallback
+      if (!found) {
         try {
-          const res = await API.get("/accounts/regions/by-sponsor/", {
-            params: { sponsor: val, level: "state" },
+          const res2 = await API.get("/accounts/hierarchy/", {
+            params: { username: val },
           });
-          const sp = res?.data?.sponsor;
-          if (sp && sp.username) {
+          const u = res2?.data?.user || res2?.data;
+          if (u && (u.username || u.full_name)) {
             found = true;
             info = {
-              name: sp.full_name || sp.username,
-              username: sp.username,
-              phone: sp.phone || sp.username,
-              pincode: sp.pincode,
+              name: u.full_name || u.username,
+              username: u.username,
+              phone: u.phone || u.username,
+              pincode: u.pincode,
             };
           }
         } catch {}
+      }
 
-        // Check 2: User hierarchy lookup fallback
-        if (!found) {
-          try {
-            const res2 = await API.get("/accounts/hierarchy/", {
-              params: { username: val },
-            });
-            const u = res2?.data?.user || res2?.data;
-            if (u && (u.username || u.full_name)) {
-              found = true;
-              info = {
-                name: u.full_name || u.username,
-                username: u.username,
-                phone: u.phone || u.username,
-                pincode: u.pincode,
-              };
-            }
-          } catch {}
-        }
-
-        if (found && info) {
-          setRecipientValid(true);
-          setRecipientInfo(info);
-        } else {
-          setRecipientValid(false);
-          setRecipientInfo(null);
-        }
-      } catch {
+      if (found && info) {
+        setRecipientValid(true);
+        setRecipientInfo(info);
+      } else {
         setRecipientValid(false);
         setRecipientInfo(null);
-      } finally {
-        setRecipientChecking(false);
       }
-    }, 450);
-
-    return () => {
-      clearTimeout(timer);
+    } catch {
+      setRecipientValid(false);
+      setRecipientInfo(null);
+    } finally {
       setRecipientChecking(false);
-    };
-  }, [p2pForm.recipient_phone]);
+    }
+  };
 
   const fetchHistory = async () => {
     try {
@@ -1237,34 +1231,54 @@ export default function History() {
 
             <Stack spacing={1.5}>
               <Box>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Recipient Phone Number or User ID"
-                  placeholder="Enter 10-digit mobile number"
-                  value={p2pForm.recipient_phone}
-                  onChange={(e) => {
-                    setP2pForm({ ...p2pForm, recipient_phone: e.target.value });
-                    setP2pError("");
-                  }}
-                  inputProps={{ maxLength: 15 }}
-                  sx={{ bgcolor: "#fff", borderRadius: 2 }}
-                />
-
-                {recipientChecking && (
-                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.8, px: 0.5 }}>
-                    <CircularProgress size={14} sx={{ color: "#2563EB" }} />
-                    <Typography sx={{ fontSize: 11.5, color: "#64748B", fontWeight: 600 }}>
-                      Verifying recipient account...
-                    </Typography>
-                  </Stack>
-                )}
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Recipient Phone Number or User ID"
+                    placeholder="Enter 10-digit mobile number"
+                    value={p2pForm.recipient_phone}
+                    onChange={(e) => {
+                      setP2pForm({ ...p2pForm, recipient_phone: e.target.value });
+                      setP2pError("");
+                      setRecipientValid(null);
+                      setRecipientInfo(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleVerifyRecipient();
+                      }
+                    }}
+                    inputProps={{ maxLength: 15 }}
+                    sx={{ bgcolor: "#fff", borderRadius: 2 }}
+                  />
+                  <Button
+                    variant="contained"
+                    disabled={recipientChecking || !p2pForm.recipient_phone.trim()}
+                    onClick={handleVerifyRecipient}
+                    sx={{
+                      py: 1,
+                      px: 2,
+                      borderRadius: 2,
+                      textTransform: "none",
+                      fontWeight: 800,
+                      fontSize: "12.5px",
+                      bgcolor: "#0F172A",
+                      "&:hover": { bgcolor: "#1E293B" },
+                      whiteSpace: "nowrap",
+                      minWidth: 80,
+                    }}
+                  >
+                    {recipientChecking ? <CircularProgress size={14} color="inherit" /> : "Verify"}
+                  </Button>
+                </Stack>
 
                 {!recipientChecking && recipientValid === true && recipientInfo && (
                   <Paper
                     elevation={0}
                     sx={{
-                      mt: 0.8,
+                      mt: 1,
                       p: 1,
                       px: 1.2,
                       borderRadius: 2,
