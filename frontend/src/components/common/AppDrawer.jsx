@@ -53,7 +53,7 @@ export default function AppDrawer({
 
   const menuSections = [
     {
-      title: "OVERVIEW",
+      title: "NAVIGATION",
       items: [
         { label: "Dashboard", to: isTeam ? "/user/team-dashboard" : "/user/dashboard", icon: SpaceDashboardOutlinedIcon },
       ],
@@ -61,35 +61,25 @@ export default function AppDrawer({
     {
       title: "PACKAGES",
       items: [
-        { label: "E-edu Agent", to: "https://triacademy.trikonekt.com/", external: true, icon: SchoolOutlinedIcon },
-        { label: "Agent Subscription", to: "https://triacademy.trikonekt.com/", external: true, icon: StarOutlineRoundedIcon },
+        { label: "E-edu Agent Academy", to: "https://triacademy.trikonekt.com/", external: true, icon: SchoolOutlinedIcon },
         { label: "E-edu Purchase History", to: "/user/prime-invoices", icon: ReceiptLongOutlinedIcon },
-        { label: "SPP (15 Vouchers & History)", to: "/user/spp-gift-cards", icon: CardGiftcardOutlinedIcon },
+        { label: "SPP (13 Boxes & History)", to: "/user/spp-gift-cards", icon: CardGiftcardOutlinedIcon },
         { label: "Tri Holiday Packages", to: "/user/tri/tri-holidays", icon: FlightTakeoffOutlinedIcon },
-        { label: "P2P Package Coupon Pocket", to: "/user/package-coupon-pocket", icon: ConfirmationNumberOutlinedIcon },
-        { label: "P2P Internal Coupons", to: "/user/coupon-pocket", icon: ConfirmationNumberOutlinedIcon },
+        { label: "P2P Coupon Pocket", to: "/user/coupon-pocket", icon: ConfirmationNumberOutlinedIcon },
       ],
     },
     {
-      title: "NETWORK & WALLET",
+      title: "NETWORK & FINANCE",
       items: [
         { label: "Layers Blocks", to: "/user/genealogy-5", icon: AccountTreeRoundedIcon },
         { label: "History & Wallet", to: "/user/history", icon: AccountBalanceWalletOutlinedIcon },
-        { label: "Transaction History", to: "/user/team-history", icon: HistoryOutlinedIcon },
       ],
     },
     {
-      title: "MEDIA & RESOURCES",
+      title: "ACCOUNT & SUPPORT",
       items: [
         { label: "Growth / Trikonekt PDF", to: "/user/trikonekt-pdf", icon: ReceiptLongOutlinedIcon },
-        { label: "Educational Videos", to: "/user/educational-videos", icon: OndemandVideoOutlinedIcon },
-      ],
-    },
-    {
-      title: "ACCOUNT & SECURITY",
-      items: [
-        { label: "Profile (ID Card inside)", to: "/user/profile", icon: PersonOutlineRoundedIcon },
-        { label: "KYC Verification", to: "/user/kyc", icon: ShieldOutlinedIcon },
+        { label: "Profile & KYC", to: "/user/profile", icon: PersonOutlineRoundedIcon },
         { label: "Help & Support", to: "/user/support", icon: HelpOutlineOutlinedIcon },
       ],
     },
