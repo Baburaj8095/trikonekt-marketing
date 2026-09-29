@@ -6,6 +6,7 @@ import ProgressTab from "../../components/genealogy/ProgressTab";
 import DirectSponsorTab from "../../components/genealogy/DirectSponsorTab";
 import FiveMatrixTab from "../../components/genealogy/FiveMatrixTab";
 import ThreeMatrixTab from "../../components/genealogy/ThreeMatrixTab";
+import RankUpgrade from "../RankUpgrade";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -146,7 +147,7 @@ const TABS = [
   { id: "directs",      label: "Direct",     Icon: DirectsIcon },
   { id: "five_matrix",  label: "5 Blocks",   Icon: FiveMatrixIcon },
   { id: "three_matrix", label: "3 Blocks",   Icon: ThreeMatrixIcon },
-  { id: "earnings",     label: "Rank Up",    Icon: EarningsIcon },
+  { id: "earnings",     label: "e - Edu",    Icon: EarningsIcon },
   // { id: "progress",     label: "Account",    Icon: ProgressIcon },
 ];
 
@@ -918,7 +919,7 @@ export default function Genealogy5() {
           >
             <div
               style={{
-                maxWidth: 480,
+                maxWidth: tab === "earnings" ? 840 : 480,
                 margin: "0 auto",
                 padding: "16px 16px 64px",
               }}
@@ -932,7 +933,7 @@ export default function Genealogy5() {
                 />
               )}
 
-              {/* ── 5 Matrix & Chart Tab ── */}
+              {/* ── 5 Blocks Tab ── */}
               {tab === "five_matrix" && (
                 <FiveMatrixTab
                   fiveRootsList={fiveRootsList}
@@ -949,7 +950,7 @@ export default function Genealogy5() {
                 />
               )}
 
-              {/* ── 3 Matrix Tree Tab ── */}
+              {/* ── 3 Blocks Tab ── */}
               {tab === "three_matrix" && (
                 <ThreeMatrixTab
                   threeRootsList={threeRootsList}
@@ -966,15 +967,9 @@ export default function Genealogy5() {
                 />
               )}
 
-              {/* ── Earnings Tab ── */}
+              {/* ── e - Edu Tab (Digital Education / Rank Upgrade) ── */}
               {tab === "earnings" && (
-                <EarningsTab
-                  rankMx={rankMx}
-                  rankMxLoading={rankMxLoading}
-                  rankMxErr={rankMxErr}
-                  onRefresh={refetchRankMx}
-                  directList={resolvedDirectList}
-                />
+                <RankUpgrade embedded />
               )}
 
               {/* ── Progress Tab ── */}

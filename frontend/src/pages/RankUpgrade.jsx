@@ -71,16 +71,16 @@ function fmt(val) {
 }
 
 const RANK_TIERS = [
-  { level: 1, name: "Level 1", upgradeAmt: 250, limit: 1750, teamCount: 5 },
-  { level: 2, name: "Level 2", upgradeAmt: 500, limit: 2000, teamCount: 25 },
-  { level: 3, name: "Level 3", upgradeAmt: 1000, limit: 4000, teamCount: 50 },
-  { level: 4, name: "Level 4", upgradeAmt: 1250, limit: 6000, teamCount: 100 },
-  { level: 5, name: "Level 5", upgradeAmt: 1500, limit: 7500, teamCount: 150 },
-  { level: 6, name: "Level 6", upgradeAmt: 1750, limit: 8750, teamCount: 175 },
-  { level: 7, name: "Level 7", upgradeAmt: 2000, limit: 10000, teamCount: 200 },
-  { level: 8, name: "Level 8", upgradeAmt: 5000, limit: 15000, teamCount: "-" },
-  { level: 9, name: "Level 9", upgradeAmt: 10000, limit: 20000, teamCount: "-" },
-  { level: 10, name: "Level 10", upgradeAmt: 25000, limit: 100000, teamCount: "-" },
+  { level: 1, name: "Layer 1", upgradeAmt: 250, limit: 1750, teamCount: 5 },
+  { level: 2, name: "Layer 2", upgradeAmt: 500, limit: 2000, teamCount: 25 },
+  { level: 3, name: "Layer 3", upgradeAmt: 1000, limit: 4000, teamCount: 50 },
+  { level: 4, name: "Layer 4", upgradeAmt: 1250, limit: 6000, teamCount: 100 },
+  { level: 5, name: "Layer 5", upgradeAmt: 1500, limit: 7500, teamCount: 150 },
+  { level: 6, name: "Layer 6", upgradeAmt: 1750, limit: 8750, teamCount: 175 },
+  { level: 7, name: "Layer 7", upgradeAmt: 2000, limit: 10000, teamCount: 200 },
+  { level: 8, name: "Layer 8", upgradeAmt: 5000, limit: 15000, teamCount: "-" },
+  { level: 9, name: "Layer 9", upgradeAmt: 10000, limit: 20000, teamCount: "-" },
+  { level: 10, name: "Layer 10", upgradeAmt: 25000, limit: 100000, teamCount: "-" },
 ];
 
 function RankPaymentMethodDialog({ open, onClose, data, walletMe, walletHistory, busy, onPickManual, onPickWallet }) {
@@ -580,13 +580,13 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
       started: true,
       daysLeft: Number(daysRemaining),
       totalDays: adminConfiguredDays,
-      levelRange: isL8Plus ? "L8 to L10" : "L1 to L7",
+      levelRange: isL8Plus ? "Layer 8 to Layer 10" : "Layer 1 to Layer 7",
     };
   }, [currentLevel, elig, walletHistory, savedRankConfig, hasApprovedBase]);
 
   const handleUpgradeClick = (rankTarget) => {
     const targetId = rankTarget?.id || (ranks.find((r) => Number(r.level_number || 0) === nextLevel)?.id);
-    const targetName = rankTarget?.rank_name || `Level ${nextLevel}`;
+    const targetName = rankTarget?.rank_name ? rankTarget.rank_name.replace(/Level/gi, "Layer") : `Layer ${nextLevel}`;
     setSelectedToRankId(targetId);
     setSelectedToRankName(targetName);
     setInitDialog(true);
@@ -610,7 +610,7 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
     return (
       <Box sx={{ p: 2, maxWidth: 840, mx: "auto" }}>
         <Typography fontSize={18} fontWeight={900} sx={{ mb: 1 }}>
-          Rank Upgrade
+          Digital Education (e - Edu)
         </Typography>
         <LinearProgress />
       </Box>
@@ -622,7 +622,7 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
       {/* ── Title ── */}
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
         <Typography fontSize={22} fontWeight={950} color="#0f172a">
-          My Wallet / Rank Upgrade
+          Digital Education (e - Edu)
         </Typography>
       </Stack>
 
@@ -637,9 +637,9 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
                 <ShieldRoundedIcon sx={{ fontSize: 22 }} />
               </Box>
               <Box>
-                <Typography sx={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>Current Level</Typography>
+                <Typography sx={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>Current Layer</Typography>
                 <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#1e1b4b" }}>
-                  Level {currentLevel} <Chip label="Eligible" size="small" color="primary" sx={{ height: 18, fontSize: 10, fontWeight: 800 }} />
+                  Layer {currentLevel} <Chip label="Eligible" size="small" color="primary" sx={{ height: 18, fontSize: 10, fontWeight: 800 }} />
                 </Typography>
               </Box>
             </Stack>
@@ -679,9 +679,9 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
                 <TrendingUpRoundedIcon sx={{ fontSize: 22 }} />
               </Box>
               <Box>
-                <Typography sx={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>Next Level</Typography>
+                <Typography sx={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>Next Layer</Typography>
                 <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#15803d" }}>
-                  Level {nextLevel} <Typography component="span" sx={{ fontSize: 10, color: "#166534" }}>(Upgrade to Continue)</Typography>
+                  Layer {nextLevel} <Typography component="span" sx={{ fontSize: 10, color: "#166534" }}>(Upgrade to Continue)</Typography>
                 </Typography>
               </Box>
             </Stack>
@@ -711,7 +711,7 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
                 }}
               />
               <Typography sx={{ fontSize: 12, mt: 0.8, opacity: 0.85 }}>
-                {isLimitReached ? `Earning Limit Reached for Level ${currentLevel} ⓘ` : `Earning Limit Progress (${percentUsed.toFixed(0)}%) ⓘ`}
+                {isLimitReached ? `Earning Limit Reached for Layer ${currentLevel} ⓘ` : `Earning Limit Progress (${percentUsed.toFixed(0)}%) ⓘ`}
               </Typography>
             </Grid>
 
@@ -728,8 +728,8 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
                 </Stack>
                 <Typography sx={{ fontSize: 11, opacity: 0.9, mb: 1.5 }}>
                   {isLimitReached
-                    ? `Limit reached for Level ${currentLevel}. Upgrade to next level to continue income.`
-                    : `Level ${currentLevel} earning limit is ₹${fmt(currentLimit)}.`}
+                    ? `Limit reached for Layer ${currentLevel}. Upgrade to next layer to continue income.`
+                    : `Layer ${currentLevel} earning limit is ₹${fmt(currentLimit)}.`}
                 </Typography>
                 <Button
                   fullWidth
@@ -745,11 +745,11 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
         </CardContent>
       </Card>
 
-      {/* ── Earning Limit Level Cards ── */}
+      {/* ── Earning Limit Layer Cards ── */}
       <Grid container spacing={1.5} sx={{ mb: 2 }}>
         <Grid item xs={12} sm={4}>
           <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#fff" }}>
-            <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>EARNING LIMIT (LEVEL {currentLevel})</Typography>
+            <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>EARNING LIMIT (LAYER {currentLevel})</Typography>
             <Typography sx={{ fontSize: 20, fontWeight: 900, color: "#0f172a", my: 0.5 }}>₹{fmt(currentLimit)}</Typography>
             {isLimitReached ? (
               <Chip icon={<CheckCircleRoundedIcon />} label="Completed" color="success" size="small" sx={{ fontWeight: 800 }} />
@@ -761,7 +761,7 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
 
         <Grid item xs={12} sm={4}>
           <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#fff" }}>
-            <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>EARNING LIMIT (LEVEL 10)</Typography>
+            <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>EARNING LIMIT (LAYER 10)</Typography>
             <Typography sx={{ fontSize: 20, fontWeight: 900, color: "#0f172a", my: 0.5 }}>₹1,50,000</Typography>
             {currentLevel >= 10 && isLimitReached ? (
               <Chip icon={<CheckCircleRoundedIcon />} label="Completed" color="success" size="small" sx={{ fontWeight: 800 }} />
@@ -782,7 +782,7 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
         </Grid>
       </Grid>
 
-      {/* ── Royalty Income, Layer Matrix & Missing Income Grid ── */}
+      {/* ── Royalty Income, Layer Blocks & Missing Income Grid ── */}
       <Grid container spacing={2} sx={{ mb: 2 }}>
         <Grid item xs={12} sm={4}>
           <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5, borderColor: "#bbf7d0", bgcolor: "#fff" }}>
@@ -798,7 +798,7 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
               <Stack direction="row" justifyContent="space-between" alignItems="center">
                 <Box>
                   <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700 }}>
-                    {savedRoyaltyConfig?.tier1_levels || "LEVEL 1 TO LEVEL 7"}
+                    {savedRoyaltyConfig?.tier1_levels ? String(savedRoyaltyConfig.tier1_levels).replace(/Level/gi, "LAYER") : "LAYER 1 TO LAYER 7"}
                   </Typography>
                   <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#15803d" }}>
                     {savedRoyaltyConfig?.tier1_percent ?? 3}% ₹{fmt(savedRoyaltyConfig?.tier1_cap ?? 10000)}
@@ -813,7 +813,7 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
               <Stack direction="row" justifyContent="space-between" alignItems="center">
                 <Box>
                   <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700 }}>
-                    {savedRoyaltyConfig?.tier2_levels || "LEVEL 10 TO LEVEL 10"}
+                    {savedRoyaltyConfig?.tier2_levels ? String(savedRoyaltyConfig.tier2_levels).replace(/Level/gi, "LAYER") : "LAYER 10 TO LAYER 10"}
                   </Typography>
                   <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#15803d" }}>
                     {savedRoyaltyConfig?.tier2_percent ?? 7}% ₹{fmt(savedRoyaltyConfig?.tier2_cap ?? 40000)}
@@ -838,12 +838,12 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
               <Stack direction="row" spacing={0.8} alignItems="center">
                 <LayersRoundedIcon color="primary" sx={{ fontSize: 18 }} />
-                <Typography sx={{ fontWeight: 900, fontSize: 12, color: "#0369a1" }}>LAYER MATRIX EARNINGS ⓘ</Typography>
+                <Typography sx={{ fontWeight: 900, fontSize: 12, color: "#0369a1" }}>LAYER BLOCKS EARNINGS ⓘ</Typography>
               </Stack>
               <Chip label={`Eligible ₹${fmt(layerMatrixEligible)}`} color="primary" size="small" sx={{ fontWeight: 900, fontSize: 11 }} />
             </Stack>
             <Divider sx={{ my: 1 }} />
-            <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700, mb: 0.5 }}>FROM LAYER MATRIX (All Slabs)</Typography>
+            <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700, mb: 0.5 }}>FROM LAYER BLOCKS (All Slabs)</Typography>
             <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#0f172a", mb: 0.5 }}>₹{fmt(layerMatrixEarned)}</Typography>
             <LinearProgress variant="determinate" value={layerMatrixPercent} sx={{ height: 6, borderRadius: 3, mb: 1 }} />
             <Divider sx={{ my: 1 }} />
@@ -858,7 +858,7 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
               <Stack direction="row" spacing={0.8} alignItems="center">
                 <HourglassEmptyRoundedIcon color="warning" sx={{ fontSize: 18 }} />
-                <Typography sx={{ fontWeight: 900, fontSize: 12, color: "#c2410c" }}>MISSING INCOME ⓘ</Typography>
+                <Typography sx={{ fontWeight: 900, fontSize: 12, color: "#c2410c" }}>MISSING BLOCKS INCOME ⓘ</Typography>
               </Stack>
             </Stack>
             <Divider sx={{ my: 1 }} />
@@ -873,13 +873,13 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
         </Grid>
       </Grid>
 
-      {/* ── Rank Upgrade Level Table (Dark Blue Header) ── */}
+      {/* ── Rank Upgrade Layer Table (Dark Blue Header) ── */}
       <Paper variant="outlined" sx={{ p: 0, mb: 2, borderRadius: 3, overflow: "hidden" }}>
         <TableContainer>
           <Table size="small">
             <TableHead sx={{ bgcolor: "#1e1b4b" }}>
               <TableRow sx={{ bgcolor: "#1e1b4b" }}>
-                <TableCell sx={{ color: "#ffffff", bgcolor: "#1e1b4b", fontWeight: 800, py: 1.5 }}>Level</TableCell>
+                <TableCell sx={{ color: "#ffffff", bgcolor: "#1e1b4b", fontWeight: 800, py: 1.5 }}>Layer</TableCell>
                 <TableCell sx={{ color: "#ffffff", bgcolor: "#1e1b4b", fontWeight: 800, py: 1.5 }}>Upgrade Amount (₹)</TableCell>
                 <TableCell sx={{ color: "#ffffff", bgcolor: "#1e1b4b", fontWeight: 800, py: 1.5 }}>Earning Limit (₹)</TableCell>
                 <TableCell sx={{ color: "#ffffff", bgcolor: "#1e1b4b", fontWeight: 800, py: 1.5 }}>Team Count ⓘ</TableCell>
@@ -910,7 +910,7 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
 
                   const teamVal = cfgLvl?.team_count != null ? String(cfgLvl.team_count) : (DEFAULT_TEAM_COUNTS[idx] || (r.team_size_required ? String(r.team_size_required) : "-"));
                   const amtVal = cfgLvl?.upgrade_amount ? Number(cfgLvl.upgrade_amount) : Number(r.upgrade_amount || 0);
-                  const rankTitle = cfgLvl?.name || `Level ${level}`;
+                  const rankTitle = cfgLvl?.name ? String(cfgLvl.name).replace(/Level/gi, "Layer") : (r.rank_name ? String(r.rank_name).replace(/Level/gi, "Layer") : `Layer ${level}`);
 
                   let teamDisplay = "-";
                   if (teamVal !== "-") {

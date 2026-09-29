@@ -572,7 +572,7 @@ export default function FiveMatrixTab({
           marginBottom: 8,
         }}
       >
-        5‑Blocks Tree
+        5‑Blocks View
       </div>
       <div
         style={{
@@ -585,7 +585,7 @@ export default function FiveMatrixTab({
           marginBottom: 10,
         }}
       >
-        💡 <strong>Tap</strong> a member to view their subtree · tap root to expand/collapse
+        💡 <strong>Tap</strong> a member to view their downline · tap root to expand/collapse
       </div>
 
       {hasPools ? (

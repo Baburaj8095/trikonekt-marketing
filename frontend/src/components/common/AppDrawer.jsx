@@ -61,9 +61,10 @@ export default function AppDrawer({
     {
       title: "PACKAGES",
       items: [
-        { label: "E-edu Agent (₹2,000)", to: "https://triacademy.trikonekt.com/", external: true, icon: SchoolOutlinedIcon },
+        { label: "E-edu Agent", to: "https://triacademy.trikonekt.com/", external: true, icon: SchoolOutlinedIcon },
         { label: "Agent Subscription", to: "https://triacademy.trikonekt.com/", external: true, icon: StarOutlineRoundedIcon },
-        { label: "SPP (15 Vouchers)", to: "/user/spp-gift-cards", icon: CardGiftcardOutlinedIcon },
+        { label: "E-edu Purchase History", to: "/user/prime-invoices", icon: ReceiptLongOutlinedIcon },
+        { label: "SPP (15 Vouchers & History)", to: "/user/spp-gift-cards", icon: CardGiftcardOutlinedIcon },
         { label: "Tri Holiday Packages", to: "/user/tri/tri-holidays", icon: FlightTakeoffOutlinedIcon },
         { label: "P2P Package Coupon Pocket", to: "/user/package-coupon-pocket", icon: ConfirmationNumberOutlinedIcon },
         { label: "P2P Internal Coupons", to: "/user/coupon-pocket", icon: ConfirmationNumberOutlinedIcon },

@@ -47,7 +47,7 @@ export default function ConsumerShell({ children }) {
     if (path.includes("/upload-wallet")) return "Add Money";
     if (path.includes("/digital-education")) return "Digital Education";
     if (path.includes("/educational-videos")) return "Educational Videos";
-    if (path.includes("/genealogy")) return "Layer Blocks Tree";
+    if (path.includes("/genealogy")) return "Layer Blocks";
     if (path.includes("/profile")) return "Profile";
     if (path.includes("/kyc")) return "KYC Verification";
     if (path.includes("/history")) return "Transaction History";

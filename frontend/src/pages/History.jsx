@@ -135,7 +135,7 @@ function describeSource(tx = {}) {
     }
     if (orig === "LEVEL_BONUS" || type === "LEVEL_BONUS") {
       const lvl = Number(meta.level ?? meta.level_index);
-      return Number.isFinite(lvl) && lvl > 0 ? `Rank Level ${lvl} Bonus` : "Rank Level Bonus";
+      return Number.isFinite(lvl) && lvl > 0 ? `Rank Layer ${lvl} Bonus` : "Rank Layer Bonus";
     }
   }
 
@@ -152,18 +152,18 @@ function describeSource(tx = {}) {
 
   // Monthly 759 flows
   if (st === "MONTHLY_759" || src === "MONTHLY_759" || src.includes("759")) {
-    if (src.startsWith("FIVE_MATRIX")) return "5 Matrix 1000 Prime";
+    if (src.startsWith("FIVE_MATRIX")) return "5 Blocks 1000 Prime";
     return "SPP 1000";
   }
 
-  // Matrix autopool bonuses
+  // Blocks autopool bonuses
   if (src.startsWith("THREE_MATRIX")) {
     const t = tier || (src.includes("150") ? 150 : src.includes("750") ? 750 : undefined);
-    return `3 Matrix ${t || ""} Prime`.trim();
+    return `3 Blocks ${t || ""} Prime`.trim();
   }
   if (src.startsWith("FIVE_MATRIX")) {
     const t = tier || (src.includes("150") ? 150 : src.includes("750") ? 750 : src.includes("759") ? 759 : undefined);
-    return `5 Matrix ${t || ""} Prime`.trim();
+    return `5 Blocks ${t || ""} Prime`.trim();
   }
 
   // Main Wallet Specific Transactions
@@ -414,7 +414,7 @@ function HistoryRow({ tx, onClick }) {
     String(tx?.meta?.kind || "").toUpperCase().startsWith("RANK_UPGRADE_");
   const typeName = isRankUpgradeRow
     ? describeSource(tx)
-    : `${describeSource(tx)}${Number.isFinite(levelVal) ? ` - Level ${levelVal}` : ""}`;
+    : `${describeSource(tx)}${Number.isFinite(levelVal) ? ` - Layer ${levelVal}` : ""}`;
 
   return (
     <Paper
@@ -1587,12 +1587,12 @@ export default function History() {
             }}
           >
             <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
-              Layer 5 & 3 Matrix
+              Layer 5 & 3 Blocks
             </Typography>
             <Typography sx={{ fontSize: 16, fontWeight: 900, color: "#7C3AED", mt: 0.3 }}>
               ₹ {fmtAmount(earningsBreakdown.matrix_autopool || 0)}
             </Typography>
-            <Chip size="small" label="5-Matrix & 3-Matrix" sx={{ mt: 0.5, height: 18, fontSize: 10, bgcolor: "#F5F3FF", color: "#7C3AED" }} />
+            <Chip size="small" label="5-Blocks & 3-Blocks" sx={{ mt: 0.5, height: 18, fontSize: 10, bgcolor: "#F5F3FF", color: "#7C3AED" }} />
           </Paper>
 
           {/* Card 3: Direct Self Block Breakdown */}
