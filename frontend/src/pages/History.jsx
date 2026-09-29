@@ -192,9 +192,9 @@ function describeSource(tx = {}) {
   if (type === "INCOME_CREDIT_75") {
     if (ot) {
       const parentLabel = describeSource({ ...tx, type: ot });
-      return `${parentLabel} (75%)`;
+      return `${parentLabel}`;
     }
-    return "Income Credited (75%)";
+    return "Income Credited";
   }
 
   // Prime direct/self
@@ -881,16 +881,6 @@ export default function History() {
 
   const todaysEarnings = useMemo(() => {
     if (tab === 0) {
-      if (top.today_bonus_100 !== undefined && top.today_bonus_100 !== null) {
-        return Number(top.today_bonus_100);
-      }
-      const startOfToday = new Date();
-      startOfToday.setHours(0, 0, 0, 0);
-      return incomingGross
-        .filter(tx => new Date(tx.created_at) >= startOfToday && Number(tx.amount) > 0)
-        .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
-    }
-    if (tab === 1) {
       if (top.today_main_75 !== undefined && top.today_main_75 !== null) {
         return Number(top.today_main_75);
       }
@@ -900,7 +890,7 @@ export default function History() {
         .filter(tx => new Date(tx.created_at) >= startOfToday && Number(tx.amount) > 0)
         .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
     }
-    if (tab === 2) {
+    if (tab === 1) {
       if (top.today_self_25 !== undefined && top.today_self_25 !== null) {
         return Number(top.today_self_25);
       }
@@ -911,27 +901,10 @@ export default function History() {
         .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
     }
     return 0;
-  }, [tab, top, filteredMainWallet, incomingGross, selfAccount]);
+  }, [tab, top, filteredMainWallet, selfAccount]);
 
   const yesterdaysEarnings = useMemo(() => {
     if (tab === 0) {
-      if (top.yesterday_bonus_100 !== undefined && top.yesterday_bonus_100 !== null) {
-        return Number(top.yesterday_bonus_100);
-      }
-      const startOfToday = new Date();
-      startOfToday.setHours(0, 0, 0, 0);
-      const startOfYesterday = new Date(startOfToday);
-      startOfYesterday.setDate(startOfYesterday.getDate() - 1);
-      const endOfYesterday = new Date(startOfToday);
-      endOfYesterday.setMilliseconds(-1);
-      return incomingGross
-        .filter(tx => {
-          const txDate = new Date(tx.created_at);
-          return txDate >= startOfYesterday && txDate <= endOfYesterday && Number(tx.amount) > 0;
-        })
-        .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
-    }
-    if (tab === 1) {
       if (top.yesterday_main_75 !== undefined && top.yesterday_main_75 !== null) {
         return Number(top.yesterday_main_75);
       }
@@ -948,7 +921,7 @@ export default function History() {
         })
         .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
     }
-    if (tab === 2) {
+    if (tab === 1) {
       if (top.yesterday_self_25 !== undefined && top.yesterday_self_25 !== null) {
         return Number(top.yesterday_self_25);
       }
@@ -966,7 +939,7 @@ export default function History() {
         .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
     }
     return 0;
-  }, [tab, top, filteredMainWallet, incomingGross, selfAccount]);
+  }, [tab, top, filteredMainWallet, selfAccount]);
 
   const earningsBreakdown = useMemo(() => {
     let direct_referral = 0;
@@ -993,7 +966,6 @@ export default function History() {
   }, [incoming]);
 
   const tabs = [
-    { label: `Bonus History (${filteredIncoming.length})`, key: "incoming" },
     { label: `Main Wallet (${filteredMainWallet.length})`, key: "main" },
     { label: `Self Account (${filteredSelf.length})`, key: "self" },
   ];
@@ -1024,7 +996,7 @@ export default function History() {
       <Paper
         elevation={0}
         onClick={() => {
-          setTab(1);
+          setTab(0);
           setActionDrawerOpen(true);
         }}
         sx={{
@@ -1032,12 +1004,12 @@ export default function History() {
           borderRadius: 2.5,
           mb: 1.5,
           border: "1px solid",
-          borderColor: tab === 1 ? "primary.main" : "#EEF2F6",
-          borderWidth: tab === 1 ? 2 : 1,
+          borderColor: tab === 0 ? "primary.main" : "#EEF2F6",
+          borderWidth: tab === 0 ? 2 : 1,
           bgcolor: "#fff",
           cursor: "pointer",
           transition: "all 0.2s ease",
-          boxShadow: tab === 1 ? "0 4px 12px rgba(12, 45, 72, 0.12)" : "0 2px 6px rgba(0,0,0,0.03)",
+          boxShadow: tab === 0 ? "0 4px 12px rgba(12, 45, 72, 0.12)" : "0 2px 6px rgba(0,0,0,0.03)",
         }}
       >
         <Stack direction="row" spacing={1.5} alignItems="center">
@@ -1054,7 +1026,7 @@ export default function History() {
 
           <Box sx={{ flex: 1 }}>
             <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 800 }}>
-              Main Wallet (75% Withdrawable • Tap for Actions)
+              Main Wallet Balance (Tap for Actions)
             </Typography>
 
             <Typography
@@ -1528,7 +1500,7 @@ export default function History() {
           }}
         >
           <Typography variant="caption" sx={{ color: "success.dark", fontWeight: 800 }}>
-            {tab === 0 ? "Today's Bonus (100%)" : tab === 1 ? "Today's Main (75%)" : "Today's Reserve (25%)"}
+            {tab === 0 ? "Today's Earnings" : "Today's Self Reserve"}
           </Typography>
           <Typography sx={{ fontSize: 16, fontWeight: 900, color: "success.main", mt: 0.2 }}>
             +₹ {fmtAmount(todaysEarnings)}
@@ -1551,7 +1523,7 @@ export default function History() {
           }}
         >
           <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 800 }}>
-            {tab === 0 ? "Yesterday's Bonus (100%)" : tab === 1 ? "Yesterday's Main (75%)" : "Yesterday's Reserve (25%)"}
+            {tab === 0 ? "Yesterday's Earnings" : "Yesterday's Self Reserve"}
           </Typography>
           <Typography sx={{ fontSize: 16, fontWeight: 900, color: "text.primary", mt: 0.2 }}>
             +₹ {fmtAmount(yesterdaysEarnings)}
@@ -1559,7 +1531,7 @@ export default function History() {
         </Paper>
       </Box>
 
-      {/* Mini Cards (Bonus Wallet & Self Account) */}
+      {/* Mini Cards (Withdrawable Pocket & Self Account) */}
       <Box
         sx={{
           display: "flex",
@@ -1573,20 +1545,20 @@ export default function History() {
         }}
       >
         <MiniCard
-          title="Bonus Wallet (100% Inflow)"
-          value={`₹ ${fmtAmount(top.all_earnings_total)}`}
+          title="Withdrawable Pocket"
+          value={`₹ ${fmtAmount(top.withdrawable_balance)}`}
           icon={<SavingsIcon fontSize="small" />}
           color="success"
-          onClick={() => setTab(0)}
-          selected={tab === 0}
+          onClick={() => navigate("/user/withdrawal")}
+          selected={false}
         />
         <MiniCard
-          title="Self Account (25% Saved)"
+          title="Self Account Balance"
           value={`₹ ${fmtAmount(top.self_account_balance)}`}
           icon={<AccountBalanceWalletIcon fontSize="small" />}
           color="warning"
-          onClick={() => setTab(2)}
-          selected={tab === 2}
+          onClick={() => setTab(1)}
+          selected={tab === 1}
         />
       </Box>
 
@@ -1826,11 +1798,8 @@ export default function History() {
             </Typography>
           ) : (
             <>
-              {tab === 0 && <SectionList sections={sectionsIncoming} fallbackRows={filteredIncoming} />}
-              {tab === 1 && <SectionList sections={sectionsMainWallet} fallbackRows={filteredMainWallet} />}
-              {tab === 2 && <SectionList sections={sectionsSelf} fallbackRows={filteredSelf} />}
-              {tab === 3 && <SectionList sections={sectionsRewards} fallbackRows={filteredRewards} />}
-              {tab === 4 && <SectionList sections={sectionsRedeem} fallbackRows={filteredRedeem} />}
+              {tab === 0 && <SectionList sections={sectionsMainWallet} fallbackRows={filteredMainWallet} />}
+              {tab === 1 && <SectionList sections={sectionsSelf} fallbackRows={filteredSelf} />}
             </>
           )}
         </Box>
