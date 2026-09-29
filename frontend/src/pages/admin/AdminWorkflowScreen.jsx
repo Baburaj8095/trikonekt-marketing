@@ -441,9 +441,9 @@ export default function AdminWorkflowScreen() {
                   onChange={(e) => setCouponForm((prev) => ({ ...prev, voucher_type: e.target.value }))}
                 >
                   <MenuItem value="PACKAGE_PURCHASE">Package Purchase (Self Package)</MenuItem>
-                  <MenuItem value="TRIZONE">Triozone Coupon</MenuItem>
-                  <MenuItem value="NEAR_STORE">Near Store Coupon</MenuItem>
-                  <MenuItem value="ONLINE">Online Coupon</MenuItem>
+                  <MenuItem value="TRIZONE" disabled>Triozone Coupon (Disabled)</MenuItem>
+                  <MenuItem value="NEAR_STORE" disabled>Near Store Coupon (Disabled)</MenuItem>
+                  <MenuItem value="ONLINE" disabled>Online Coupon (Disabled)</MenuItem>
                 </TextField>
 
                 <Box sx={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 1, alignItems: "center" }}>

@@ -3,6 +3,7 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -22,23 +23,22 @@ import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import LockRoundedIcon from "@mui/icons-material/LockRounded";
-import LockOpenRoundedIcon from "@mui/icons-material/LockOpenRounded";
 import FlightTakeoffRoundedIcon from "@mui/icons-material/FlightTakeoffRounded";
 import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
 import LanguageRoundedIcon from "@mui/icons-material/LanguageRounded";
 import ShoppingBagRoundedIcon from "@mui/icons-material/ShoppingBagRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import API from "../api/api";
-import { C, R, S } from "../theme/tokens";
+import { S } from "../theme/tokens";
 import StatusBadge from "../components/common/StatusBadge";
 
 const COUPON_BUCKETS = [
   {
     id: "P2P_INTERNAL",
-    name: "P2P Internal Coupon",
-    description: "Instant peer-to-peer coupon transfer to any Trikonekt user",
+    name: "P2P Package Coupon",
+    description: "Instant peer-to-peer package coupon transfer to any Trikonekt user",
     isOpen: true,
-    badgeText: "OPEN NOW",
+    badgeText: "ACTIVE",
     badgeColor: "success",
     icon: SendRoundedIcon,
     accent: "#2563EB",
@@ -48,45 +48,45 @@ const COUPON_BUCKETS = [
     id: "TRI_HOLIDAY",
     name: "Tri Holiday Coupon",
     description: "Redeemable towards premium domestic & international travel packages",
-    isOpen: true,
-    badgeText: "OPEN NOW",
-    badgeColor: "success",
+    isOpen: false,
+    badgeText: "DISABLED",
+    badgeColor: "default",
     icon: FlightTakeoffRoundedIcon,
-    accent: "#0D9488",
-    feeNote: "100% face value redemption on travel tours",
+    accent: "#64748B",
+    feeNote: "Disabled by Admin",
   },
   {
     id: "TRIZONE",
     name: "Trizone Coupon",
     description: "Exclusive discounts across Trizone verified merchant hubs",
     isOpen: false,
-    badgeText: "LOCKED",
-    badgeColor: "warning",
+    badgeText: "DISABLED",
+    badgeColor: "default",
     icon: ShoppingBagRoundedIcon,
-    accent: "#EA580C",
-    feeNote: "Controlled by Admin (Opens during promotional seasons)",
+    accent: "#64748B",
+    feeNote: "Disabled by Admin",
   },
   {
     id: "ONLINE",
     name: "Online Coupon",
     description: "Digital e-commerce shopping vouchers for partnered brands",
     isOpen: false,
-    badgeText: "LOCKED",
-    badgeColor: "warning",
+    badgeText: "DISABLED",
+    badgeColor: "default",
     icon: LanguageRoundedIcon,
-    accent: "#7C3AED",
-    feeNote: "Controlled by Admin (Unlocks on milestone ranks)",
+    accent: "#64748B",
+    feeNote: "Disabled by Admin",
   },
   {
     id: "NEAR_STORE",
     name: "Near Store Coupon",
     description: "Hyperlocal retail store discounts across verified offline shops",
     isOpen: false,
-    badgeText: "LOCKED",
-    badgeColor: "warning",
+    badgeText: "DISABLED",
+    badgeColor: "default",
     icon: StorefrontRoundedIcon,
-    accent: "#D97706",
-    feeNote: "Controlled by Admin (Offline merchant network)",
+    accent: "#64748B",
+    feeNote: "Disabled by Admin",
   },
 ];
 
@@ -121,6 +121,8 @@ export default function CouponPocket() {
     coupon_type: "PACKAGE_COUPON",
     note: "",
   });
+  const [p2pModalError, setP2pModalError] = useState("");
+  const [p2pModalSuccess, setP2pModalSuccess] = useState("");
 
   // Recipient Verification State
   const [recipientValid, setRecipientValid] = useState(null); // null | true | false
@@ -133,6 +135,22 @@ export default function CouponPocket() {
     category: "ECOMMERCE_SHOPPING",
     pin: "",
   });
+  const [redeemModalError, setRedeemModalError] = useState("");
+  const [redeemModalSuccess, setRedeemModalSuccess] = useState("");
+
+  const currentUsername = useMemo(() => {
+    try {
+      const ls =
+        localStorage.getItem("user_user") ||
+        sessionStorage.getItem("user_user") ||
+        localStorage.getItem("user") ||
+        sessionStorage.getItem("user");
+      const u = ls ? JSON.parse(ls) : null;
+      return String(u?.username || "").trim();
+    } catch {
+      return "";
+    }
+  }, []);
 
   // Explicit Recipient Verification
   const handleVerifyRecipient = async () => {
@@ -145,6 +163,7 @@ export default function CouponPocket() {
     setRecipientChecking(true);
     setRecipientValid(null);
     setRecipientInfo(null);
+    setP2pModalError("");
     try {
       let found = false;
       let info = null;
@@ -239,24 +258,23 @@ export default function CouponPocket() {
   };
 
   const handleP2pTransfer = async () => {
+    setP2pModalError("");
+    setP2pModalSuccess("");
     if (!p2pForm.recipient_phone.trim()) {
-      setError("Please enter the recipient phone number.");
+      setP2pModalError("Please enter the recipient phone number.");
       return;
     }
     if (p2pGross <= 0) {
-      setError("Please enter a valid transfer amount.");
+      setP2pModalError("Please enter a valid transfer amount.");
       return;
     }
     if (p2pGross > availableBalance && p2pGross > couponBalance) {
-      setError(`Insufficient balance. Your available balance is ₹${fmtAmount(availableBalance)}.`);
+      setP2pModalError(`Insufficient balance. Your available balance is ₹${fmtAmount(availableBalance)}.`);
       return;
     }
 
     try {
       setActionLoading(true);
-      setError("");
-      setSuccess("");
-
       const res = await API.post("/business/coupons/p2p-transfer/", {
         recipient_phone: p2pForm.recipient_phone.trim(),
         amount: p2pGross,
@@ -264,43 +282,54 @@ export default function CouponPocket() {
       });
 
       const vCode = res?.data?.voucher_code;
-      setSuccess(`Successfully sent ₹${fmtAmount(p2pNet)} to ${p2pForm.recipient_phone}! (7% Fee: ₹${fmtAmount(p2pFee)})${vCode ? ` • Voucher: ${vCode}` : ""}`);
+      const successMsg = `Successfully sent ₹${fmtAmount(p2pNet)} to ${p2pForm.recipient_phone}! (7% Fee: ₹${fmtAmount(p2pFee)})${vCode ? ` • Voucher: ${vCode}` : ""}`;
+      setP2pModalSuccess(successMsg);
+      setSuccess(successMsg);
       setP2pForm({ recipient_phone: "", amount: "", coupon_type: "PACKAGE_COUPON", note: "" });
       setRecipientValid(null);
       setRecipientInfo(null);
       setTimeout(() => {
         setP2pModalOpen(false);
-        setSuccess("");
+        setP2pModalSuccess("");
       }, 2500);
       load();
     } catch (err) {
-      setError(err?.response?.data?.detail || err?.response?.data?.message || "Failed to process P2P transfer.");
+      const errMsg = err?.response?.data?.detail || err?.response?.data?.message || "Failed to process P2P transfer.";
+      setP2pModalError(errMsg);
+      setError(errMsg);
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleRedeemCoupon = async () => {
-    if (!redeemForm.coupon_code.trim()) {
-      setError("Please enter the coupon code to redeem.");
+    setRedeemModalError("");
+    setRedeemModalSuccess("");
+    const codeToRedeem = redeemForm.coupon_code.trim();
+    if (!codeToRedeem) {
+      setRedeemModalError("Please enter the coupon code to redeem.");
       return;
     }
     try {
       setActionLoading(true);
-      setError("");
-      setSuccess("");
-
       await API.post("/accounts/wallet/vouchers/redeem/", {
-        code: redeemForm.coupon_code.trim(),
+        code: codeToRedeem,
         category: redeemForm.category,
       });
 
-      setSuccess(`Coupon ${redeemForm.coupon_code} redeemed successfully for ${redeemForm.category.replace(/_/g, " ")}!`);
-      setRedeemModalOpen(false);
-      setRedeemForm({ coupon_code: "", category: "ECOMMERCE_SHOPPING", pin: "" });
+      const msg = `Coupon ${codeToRedeem} redeemed successfully for ${redeemForm.category.replace(/_/g, " ")}!`;
+      setRedeemModalSuccess(msg);
+      setSuccess(msg);
+      setTimeout(() => {
+        setRedeemModalOpen(false);
+        setRedeemModalSuccess("");
+        setRedeemForm({ coupon_code: "", category: "ECOMMERCE_SHOPPING", pin: "" });
+      }, 2000);
       load();
     } catch (err) {
-      setError(err?.response?.data?.detail || err?.response?.data?.message || "Failed to redeem coupon.");
+      const errMsg = err?.response?.data?.detail || err?.response?.data?.message || "Failed to redeem coupon.";
+      setRedeemModalError(errMsg);
+      setError(errMsg);
     } finally {
       setActionLoading(false);
     }
@@ -329,7 +358,7 @@ export default function CouponPocket() {
               </Typography>
             </Stack>
             <Typography variant="body2" sx={{ color: "#94A3B8", fontWeight: 500, fontSize: "13.5px" }}>
-              Peer-to-Peer coupon routing, universal holiday vouchers, and multi-tier store discounts
+              Peer-to-Peer coupon routing, package vouchers, and ledger history
             </Typography>
           </Box>
 
@@ -346,7 +375,11 @@ export default function CouponPocket() {
               variant="contained"
               fullWidth
               startIcon={<SendRoundedIcon />}
-              onClick={() => setP2pModalOpen(true)}
+              onClick={() => {
+                setP2pModalError("");
+                setP2pModalSuccess("");
+                setP2pModalOpen(true);
+              }}
               sx={{
                 background: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
                 color: "#fff",
@@ -366,7 +399,11 @@ export default function CouponPocket() {
               variant="contained"
               fullWidth
               startIcon={<ShoppingBagRoundedIcon />}
-              onClick={() => setRedeemModalOpen(true)}
+              onClick={() => {
+                setRedeemModalError("");
+                setRedeemModalSuccess("");
+                setRedeemModalOpen(true);
+              }}
               sx={{
                 background: "linear-gradient(135deg, #059669 0%, #047857 100%)",
                 color: "#fff",
@@ -406,8 +443,8 @@ export default function CouponPocket() {
           </Grid>
           <Grid item xs={6} sm={3}>
             <Box sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
-              <Typography sx={{ fontSize: "11px", fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" }}>Available Buckets</Typography>
-              <Typography sx={{ fontSize: "18px", fontWeight: 900, color: "#C084FC" }}>5 Categories</Typography>
+              <Typography sx={{ fontSize: "11px", fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" }}>Active Category</Typography>
+              <Typography sx={{ fontSize: "18px", fontWeight: 900, color: "#C084FC" }}>Package Coupon</Typography>
             </Box>
           </Grid>
         </Grid>
@@ -416,7 +453,7 @@ export default function CouponPocket() {
       {error && <Alert severity="error" sx={{ mb: 2.5, borderRadius: 2.5, fontWeight: 600 }}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2.5, borderRadius: 2.5, fontWeight: 600 }}>{success}</Alert>}
 
-      {/* 5-Bucket Selector Grid */}
+      {/* Bucket Selector Grid */}
       <Typography variant="h6" sx={{ fontWeight: 800, color: "#0F172A", mb: 1.5, fontSize: "16px" }}>
         Coupon Buckets & Access Controls
       </Typography>
@@ -442,6 +479,7 @@ export default function CouponPocket() {
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "space-between",
+                  opacity: bucket.isOpen ? 1 : 0.7,
                   "&:hover": {
                     borderColor: bucket.accent,
                     transform: "translateY(-2px)",
@@ -450,8 +488,8 @@ export default function CouponPocket() {
               >
                 <Box>
                   <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.25 }}>
-                    <Box sx={{ p: 1, borderRadius: 2, bgcolor: `${bucket.accent}15` }}>
-                      <Icon sx={{ color: bucket.accent, fontSize: 22 }} />
+                    <Box sx={{ p: 1, borderRadius: 2, bgcolor: bucket.isOpen ? `${bucket.accent}15` : "#F1F5F9" }}>
+                      <Icon sx={{ color: bucket.isOpen ? bucket.accent : "#94A3B8", fontSize: 22 }} />
                     </Box>
                     <StatusBadge
                       label={bucket.badgeText}
@@ -468,7 +506,7 @@ export default function CouponPocket() {
                 </Box>
 
                 <Box sx={{ mt: 1.5, pt: 1, borderTop: "1px dashed #E2E8F0" }}>
-                  <Typography sx={{ fontSize: "10.5px", fontWeight: 700, color: bucket.isOpen ? "#059669" : "#D97706" }}>
+                  <Typography sx={{ fontSize: "10.5px", fontWeight: 700, color: bucket.isOpen ? "#059669" : "#64748B" }}>
                     {bucket.feeNote}
                   </Typography>
                 </Box>
@@ -507,7 +545,11 @@ export default function CouponPocket() {
             <Button
               variant="contained"
               startIcon={<SendRoundedIcon />}
-              onClick={() => setP2pModalOpen(true)}
+              onClick={() => {
+                setP2pModalError("");
+                setP2pModalSuccess("");
+                setP2pModalOpen(true);
+              }}
               sx={{
                 bgcolor: selectedBucket.accent,
                 "&:hover": { bgcolor: selectedBucket.accent, opacity: 0.9 },
@@ -541,79 +583,162 @@ export default function CouponPocket() {
         {voucherData?.results?.length === 0 ? (
           <Box sx={{ p: 4, textAlign: "center", bgcolor: "#F8FAFC", borderRadius: 3, border: "1.5px dashed #CBD5E1" }}>
             <ConfirmationNumberRoundedIcon sx={{ fontSize: 40, color: "#94A3B8", mb: 1 }} />
-            <Typography sx={{ fontWeight: 800, color: "#334155" }}>No active vouchers in this bucket</Typography>
+            <Typography sx={{ fontWeight: 800, color: "#334155" }}>No vouchers found in your ledger</Typography>
             <Typography sx={{ fontSize: "12.5px", color: "#64748B", mt: 0.5 }}>
               Use P2P Internal Send or purchase package coupons to populate your pocket.
             </Typography>
           </Box>
         ) : (
           <Grid container spacing={2}>
-            {(voucherData?.results || []).map((voucher) => (
-              <Grid item xs={12} sm={6} md={4} key={voucher.id || voucher.code}>
-                <Paper
-                  elevation={0}
-                  sx={{
-                    p: 2,
-                    borderRadius: 3,
-                    border: "1.5px solid #E2E8F0",
-                    bgcolor: "#F8FAFC",
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <Box>
-                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-                      <Typography sx={{ fontSize: "11px", fontWeight: 800, color: "#2563EB", textTransform: "uppercase" }}>
-                        {voucher.voucher_type || "COUPON"}
-                      </Typography>
-                      <StatusBadge label={voucher.status || "ACTIVE"} color={voucher.status === "ACTIVE" ? "success" : "default"} />
-                    </Stack>
-                    <Typography sx={{ fontSize: "18px", fontWeight: 900, color: "#0F172A", mb: 1 }}>
-                      ₹{fmtAmount(voucher.amount || voucher.value)}
-                    </Typography>
+            {(voucherData?.results || []).map((voucher) => {
+              const creator = String(voucher.creator_username || "").trim();
+              const assigned = String(voucher.assigned_to_username || "").trim();
+              const isSender = Boolean(currentUsername && creator === currentUsername && assigned && assigned !== currentUsername);
+              const isRedeemed = voucher.status === "REDEEMED";
+              const isActive = voucher.status === "ACTIVE";
 
-                    <Box sx={{ p: 1, bgcolor: "#FFFFFF", borderRadius: 2, border: "1px dashed #CBD5E1", display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-                      <Typography sx={{ fontFamily: "monospace", fontWeight: 800, fontSize: "13px", color: "#0F172A" }}>
-                        {voucher.code}
+              return (
+                <Grid item xs={12} sm={6} md={4} key={voucher.id || voucher.code}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 2,
+                      borderRadius: 3,
+                      border: isSender ? "1.5px solid #BFDBFE" : "1.5px solid #E2E8F0",
+                      bgcolor: isSender ? "#F8FAFC" : "#FFFFFF",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                      position: "relative",
+                    }}
+                  >
+                    <Box>
+                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                        <Stack direction="row" spacing={0.75} alignItems="center">
+                          <Typography sx={{ fontSize: "11px", fontWeight: 800, color: isSender ? "#2563EB" : "#059669", textTransform: "uppercase" }}>
+                            {voucher.voucher_type || "PACKAGE_COUPON"}
+                          </Typography>
+                          {isSender && (
+                            <Chip
+                              label="SENT P2P"
+                              size="small"
+                              sx={{
+                                height: 18,
+                                fontSize: "10px",
+                                fontWeight: 800,
+                                bgcolor: "#DBEAFE",
+                                color: "#1E40AF",
+                              }}
+                            />
+                          )}
+                        </Stack>
+
+                        <StatusBadge
+                          label={isSender ? (isRedeemed ? "REDEEMED" : "SENT (ACTIVE)") : (voucher.status || "ACTIVE")}
+                          color={isRedeemed ? "default" : isActive ? "success" : "warning"}
+                        />
+                      </Stack>
+
+                      <Typography sx={{ fontSize: "18px", fontWeight: 900, color: "#0F172A", mb: 1 }}>
+                        ₹{fmtAmount(voucher.amount || voucher.value)}
                       </Typography>
-                      <Tooltip title="Copy Code">
-                        <IconButton size="small" onClick={() => handleCopy(voucher.code, voucher.id)}>
-                          {copiedId === voucher.id ? <CheckRoundedIcon fontSize="small" sx={{ color: "#16A34A" }} /> : <ContentCopyRoundedIcon fontSize="small" />}
-                        </IconButton>
-                      </Tooltip>
+
+                      <Box sx={{ p: 1, bgcolor: "#F8FAFC", borderRadius: 2, border: "1px dashed #CBD5E1", display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+                        <Typography sx={{ fontFamily: "monospace", fontWeight: 800, fontSize: "13px", color: "#0F172A" }}>
+                          {voucher.code}
+                        </Typography>
+                        <Tooltip title="Copy Code">
+                          <IconButton size="small" onClick={() => handleCopy(voucher.code, voucher.id)}>
+                            {copiedId === voucher.id ? <CheckRoundedIcon fontSize="small" sx={{ color: "#16A34A" }} /> : <ContentCopyRoundedIcon fontSize="small" />}
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+
+                      {/* Recipient / Creator metadata tag */}
+                      <Box sx={{ mb: 1 }}>
+                        {isSender ? (
+                          <Typography sx={{ fontSize: "11.5px", color: "#2563EB", fontWeight: 700 }}>
+                            Sent to: {assigned || "Assigned User"}
+                          </Typography>
+                        ) : assigned ? (
+                          <Typography sx={{ fontSize: "11.5px", color: "#64748B", fontWeight: 600 }}>
+                            From: {creator || "Admin"}
+                          </Typography>
+                        ) : null}
+                      </Box>
                     </Box>
-                  </Box>
 
-                  <Box sx={{ mt: 1.5, pt: 1, borderTop: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <Typography sx={{ fontSize: "11px", color: "#64748B" }}>
-                      Created: {fmtDate(voucher.created_at)}
-                    </Typography>
+                    <Box sx={{ mt: 1.5, pt: 1, borderTop: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <Typography sx={{ fontSize: "11px", color: "#64748B" }}>
+                        {isRedeemed && voucher.redeemed_at
+                          ? `Redeemed: ${fmtDate(voucher.redeemed_at)}`
+                          : `Created: ${fmtDate(voucher.created_at)}`}
+                      </Typography>
 
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={<ShoppingBagRoundedIcon sx={{ fontSize: 15 }} />}
-                      onClick={() => {
-                        setRedeemForm({ coupon_code: voucher.code, category: "ECOMMERCE_SHOPPING", pin: "" });
-                        setRedeemModalOpen(true);
-                      }}
-                      sx={{
-                        fontSize: "11px",
-                        fontWeight: 700,
-                        textTransform: "none",
-                        borderRadius: 1.5,
-                        borderColor: "#059669",
-                        color: "#059669",
-                        "&:hover": { bgcolor: "#ECFDF5", borderColor: "#047857" },
-                      }}
-                    >
-                      Redeem
-                    </Button>
-                  </Box>
-                </Paper>
-              </Grid>
-            ))}
+                      {/* Action Button: Senders only view history; only Recipients can Redeem active vouchers */}
+                      {isSender ? (
+                        <Chip
+                          label={isRedeemed ? "Redeemed by Recipient" : "P2P Sent"}
+                          size="small"
+                          sx={{
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            bgcolor: isRedeemed ? "#F1F5F9" : "#EFF6FF",
+                            color: isRedeemed ? "#64748B" : "#1D4ED8",
+                            border: isRedeemed ? "1px solid #E2E8F0" : "1px solid #BFDBFE",
+                          }}
+                        />
+                      ) : isActive ? (
+                        <Button
+                          size="small"
+                          variant="contained"
+                          startIcon={<ShoppingBagRoundedIcon sx={{ fontSize: 14 }} />}
+                          onClick={() => {
+                            setRedeemModalError("");
+                            setRedeemModalSuccess("");
+                            setRedeemForm({ coupon_code: voucher.code, category: "ECOMMERCE_SHOPPING", pin: "" });
+                            setRedeemModalOpen(true);
+                          }}
+                          sx={{
+                            fontSize: "11px",
+                            fontWeight: 800,
+                            textTransform: "none",
+                            borderRadius: 1.5,
+                            bgcolor: "#059669",
+                            color: "#fff",
+                            "&:hover": { bgcolor: "#047857" },
+                          }}
+                        >
+                          Redeem
+                        </Button>
+                      ) : isRedeemed ? (
+                        <Chip
+                          label="Redeemed"
+                          size="small"
+                          sx={{
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            bgcolor: "#F1F5F9",
+                            color: "#64748B",
+                          }}
+                        />
+                      ) : (
+                        <Chip
+                          label="Expired"
+                          size="small"
+                          sx={{
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            bgcolor: "#FEF2F2",
+                            color: "#DC2626",
+                          }}
+                        />
+                      )}
+                    </Box>
+                  </Paper>
+                </Grid>
+              );
+            })}
           </Grid>
         )}
       </Paper>
@@ -633,8 +758,8 @@ export default function CouponPocket() {
               Standard <b>7.00% P2P transfer fee</b> is automatically deducted upon sending.
             </Alert>
 
-            {error && <Alert severity="error" sx={{ borderRadius: 2.5, fontSize: "12.5px" }}>{error}</Alert>}
-            {success && <Alert severity="success" sx={{ borderRadius: 2.5, fontSize: "12.5px" }}>{success}</Alert>}
+            {p2pModalError && <Alert severity="error" sx={{ borderRadius: 2.5, fontSize: "12.5px" }}>{p2pModalError}</Alert>}
+            {p2pModalSuccess && <Alert severity="success" sx={{ borderRadius: 2.5, fontSize: "12.5px" }}>{p2pModalSuccess}</Alert>}
 
             <Box>
               <Stack direction="row" spacing={1} alignItems="center">
@@ -648,6 +773,7 @@ export default function CouponPocket() {
                     setP2pForm({ ...p2pForm, recipient_phone: e.target.value });
                     setRecipientValid(null);
                     setRecipientInfo(null);
+                    setP2pModalError("");
                   }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
@@ -718,7 +844,10 @@ export default function CouponPocket() {
               size="small"
               placeholder="e.g. 1000"
               value={p2pForm.amount}
-              onChange={(e) => setP2pForm({ ...p2pForm, amount: e.target.value })}
+              onChange={(e) => {
+                setP2pForm({ ...p2pForm, amount: e.target.value });
+                setP2pModalError("");
+              }}
             />
 
             {p2pGross > 0 && (
@@ -772,19 +901,22 @@ export default function CouponPocket() {
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <Alert severity="success" sx={{ borderRadius: 2.5, fontSize: "12.5px" }}>
-              Redeem 100% face value towards Trikonekt shopping or near store merchant discounts.
+              Redeem 100% face value towards package purchases or shopping.
             </Alert>
 
-            {error && <Alert severity="error" sx={{ borderRadius: 2.5, fontSize: "12.5px" }}>{error}</Alert>}
-            {success && <Alert severity="success" sx={{ borderRadius: 2.5, fontSize: "12.5px" }}>{success}</Alert>}
+            {redeemModalError && <Alert severity="error" sx={{ borderRadius: 2.5, fontSize: "12.5px" }}>{redeemModalError}</Alert>}
+            {redeemModalSuccess && <Alert severity="success" sx={{ borderRadius: 2.5, fontSize: "12.5px" }}>{redeemModalSuccess}</Alert>}
 
             <TextField
               label="Coupon / Voucher Code"
               fullWidth
               size="small"
-              placeholder="e.g. SPP-M01-9876-XXXX"
+              placeholder="e.g. PKG-53BF758F"
               value={redeemForm.coupon_code}
-              onChange={(e) => setRedeemForm({ ...redeemForm, coupon_code: e.target.value })}
+              onChange={(e) => {
+                setRedeemForm({ ...redeemForm, coupon_code: e.target.value });
+                setRedeemModalError("");
+              }}
             />
 
             <TextField
@@ -795,9 +927,9 @@ export default function CouponPocket() {
               value={redeemForm.category}
               onChange={(e) => setRedeemForm({ ...redeemForm, category: e.target.value })}
             >
-              <MenuItem value="ECOMMERCE_SHOPPING">Trikonekt E-Commerce Shopping (Instant Balance)</MenuItem>
-              <MenuItem value="NEAR_STORE_MERCHANT">Near Store / Offline Merchant Store</MenuItem>
-              <MenuItem value="TRI_HOLIDAY">Tri Holiday Travel Package</MenuItem>
+              <MenuItem value="ECOMMERCE_SHOPPING">Package Purchase / E-Commerce (Instant Balance)</MenuItem>
+              <MenuItem value="NEAR_STORE_MERCHANT" disabled>Near Store / Offline Merchant Store (Disabled)</MenuItem>
+              <MenuItem value="TRI_HOLIDAY" disabled>Tri Holiday Travel Package (Disabled)</MenuItem>
             </TextField>
           </Stack>
         </DialogContent>
@@ -808,7 +940,7 @@ export default function CouponPocket() {
           <Button
             variant="contained"
             onClick={handleRedeemCoupon}
-            disabled={actionLoading || !redeemForm.coupon_code}
+            disabled={actionLoading || !redeemForm.coupon_code.trim()}
             sx={{
               bgcolor: "#059669",
               "&:hover": { bgcolor: "#047857" },
