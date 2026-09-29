@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import API, { ensureFreshAccess } from "../api/api";
 
@@ -33,6 +33,51 @@ function currentNamespaceFromPath() {
 
 function getStoredAccess() {
   const ns = currentNamespaceFromPath();
+  if (typeof window !== "undefined") {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const incomingToken = urlParams.get("token") || urlParams.get("access_token") || urlParams.get("sso_token");
+      const incomingRefresh = urlParams.get("refresh") || urlParams.get("refresh_token");
+      if (incomingToken) {
+        localStorage.setItem(`token_${ns}`, incomingToken);
+        sessionStorage.setItem(`token_${ns}`, incomingToken);
+        if (incomingRefresh) {
+          localStorage.setItem(`refresh_${ns}`, incomingRefresh);
+          sessionStorage.setItem(`refresh_${ns}`, incomingRefresh);
+        }
+        localStorage.setItem(`role_${ns}`, "user");
+        localStorage.setItem("login_context_user", "team");
+        try {
+          const parsed = parseJwt(incomingToken);
+          if (parsed && typeof parsed === "object") {
+            const userObj = {
+              id: parsed.user_id || parsed.id,
+              username: parsed.username || parsed.phone,
+              phone: parsed.phone || parsed.username,
+              role: parsed.role || "user",
+              name: parsed.name || parsed.full_name || parsed.username,
+            };
+            localStorage.setItem(`user_${ns}`, JSON.stringify(userObj));
+            sessionStorage.setItem(`user_${ns}`, JSON.stringify(userObj));
+          }
+        } catch (_) {}
+
+        // Clean parameters from browser URL
+        urlParams.delete("token");
+        urlParams.delete("access_token");
+        urlParams.delete("sso_token");
+        urlParams.delete("refresh");
+        urlParams.delete("refresh_token");
+        const remainingQuery = urlParams.toString();
+        const newUrl = window.location.pathname + (remainingQuery ? `?${remainingQuery}` : "") + window.location.hash;
+        window.history.replaceState({}, document.title, newUrl);
+        return incomingToken;
+      }
+    } catch (e) {
+      console.warn("SSO parameter ingest error:", e);
+    }
+  }
+
   return (
     (typeof localStorage !== "undefined" && localStorage.getItem(`token_${ns}`)) ||
     (typeof sessionStorage !== "undefined" && sessionStorage.getItem(`token_${ns}`)) ||

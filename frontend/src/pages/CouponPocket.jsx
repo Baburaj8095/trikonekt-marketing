@@ -122,12 +122,89 @@ export default function CouponPocket() {
     note: "",
   });
 
+  // Recipient Verification State
+  const [recipientValid, setRecipientValid] = useState(null); // null | true | false
+  const [recipientChecking, setRecipientChecking] = useState(false);
+  const [recipientInfo, setRecipientInfo] = useState(null);
+
   const [redeemModalOpen, setRedeemModalOpen] = useState(false);
   const [redeemForm, setRedeemForm] = useState({
     coupon_code: "",
     category: "ECOMMERCE_SHOPPING",
     pin: "",
   });
+
+  // Debounced Recipient Verification
+  useEffect(() => {
+    const val = String(p2pForm.recipient_phone || "").trim();
+    if (!val || val.length < 3) {
+      setRecipientValid(null);
+      setRecipientInfo(null);
+      setRecipientChecking(false);
+      return;
+    }
+    setRecipientChecking(true);
+    const timer = setTimeout(async () => {
+      try {
+        let found = false;
+        let info = null;
+
+        // Check 1: Sponsor / Region lookup
+        try {
+          const res = await API.get("/accounts/regions/by-sponsor/", {
+            params: { sponsor: val, level: "state" },
+          });
+          const sp = res?.data?.sponsor;
+          if (sp && sp.username) {
+            found = true;
+            info = {
+              name: sp.full_name || sp.username,
+              username: sp.username,
+              phone: sp.phone || sp.username,
+              pincode: sp.pincode,
+            };
+          }
+        } catch {}
+
+        // Check 2: User hierarchy lookup fallback
+        if (!found) {
+          try {
+            const res2 = await API.get("/accounts/hierarchy/", {
+              params: { username: val },
+            });
+            const u = res2?.data?.user || res2?.data;
+            if (u && (u.username || u.full_name)) {
+              found = true;
+              info = {
+                name: u.full_name || u.username,
+                username: u.username,
+                phone: u.phone || u.username,
+                pincode: u.pincode,
+              };
+            }
+          } catch {}
+        }
+
+        if (found && info) {
+          setRecipientValid(true);
+          setRecipientInfo(info);
+        } else {
+          setRecipientValid(false);
+          setRecipientInfo(null);
+        }
+      } catch {
+        setRecipientValid(false);
+        setRecipientInfo(null);
+      } finally {
+        setRecipientChecking(false);
+      }
+    }, 450);
+
+    return () => {
+      clearTimeout(timer);
+      setRecipientChecking(false);
+    };
+  }, [p2pForm.recipient_phone]);
 
   const load = async () => {
     try {
@@ -554,14 +631,58 @@ export default function CouponPocket() {
               Standard <b>7.00% P2P transfer fee</b> is automatically deducted upon sending.
             </Alert>
 
-            <TextField
-              label="Recipient Phone / ID"
-              fullWidth
-              size="small"
-              placeholder="e.g. 9876543210"
-              value={p2pForm.recipient_phone}
-              onChange={(e) => setP2pForm({ ...p2pForm, recipient_phone: e.target.value })}
-            />
+            <Box>
+              <TextField
+                label="Recipient Phone / User ID"
+                fullWidth
+                size="small"
+                placeholder="e.g. 9876543210"
+                value={p2pForm.recipient_phone}
+                onChange={(e) => setP2pForm({ ...p2pForm, recipient_phone: e.target.value })}
+              />
+
+              {recipientChecking && (
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.8, px: 0.5 }}>
+                  <CircularProgress size={14} sx={{ color: "#2563EB" }} />
+                  <Typography sx={{ fontSize: "11.5px", color: "#64748B", fontWeight: 600 }}>
+                    Verifying recipient account...
+                  </Typography>
+                </Stack>
+              )}
+
+              {!recipientChecking && recipientValid === true && recipientInfo && (
+                <Paper
+                  elevation={0}
+                  sx={{
+                    mt: 0.8,
+                    p: 1,
+                    px: 1.2,
+                    borderRadius: 2,
+                    bgcolor: "#ECFDF5",
+                    border: "1px solid #A7F3D0",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                  }}
+                >
+                  <CheckRoundedIcon sx={{ color: "#059669", fontSize: 18 }} />
+                  <Box>
+                    <Typography sx={{ fontSize: "12px", fontWeight: 800, color: "#065F46" }}>
+                      Verified: {recipientInfo.name}
+                    </Typography>
+                    <Typography sx={{ fontSize: "11px", color: "#047857" }}>
+                      ID/Phone: {recipientInfo.username} {recipientInfo.pincode ? `• PIN: ${recipientInfo.pincode}` : ""}
+                    </Typography>
+                  </Box>
+                </Paper>
+              )}
+
+              {!recipientChecking && recipientValid === false && (
+                <Typography sx={{ fontSize: "11.5px", color: "#DC2626", fontWeight: 600, mt: 0.8, px: 0.5 }}>
+                  ⚠ Recipient not found. Please verify the mobile number or user ID.
+                </Typography>
+              )}
+            </Box>
 
             <TextField
               label="Transfer Amount (₹)"
@@ -598,7 +719,7 @@ export default function CouponPocket() {
           <Button
             variant="contained"
             onClick={handleP2pTransfer}
-            disabled={actionLoading || p2pGross <= 0 || !p2pForm.recipient_phone}
+            disabled={actionLoading || p2pGross <= 0 || !p2pForm.recipient_phone || recipientValid !== true}
             sx={{
               bgcolor: "#2563EB",
               "&:hover": { bgcolor: "#1D4ED8" },
@@ -607,7 +728,7 @@ export default function CouponPocket() {
               px: 3,
             }}
           >
-            {actionLoading ? "Processing..." : `Send ₹${fmtAmount(p2pNet)}`}
+            {actionLoading ? "Processing..." : recipientValid === true ? `Send ₹${fmtAmount(p2pNet)}` : "Verify Recipient to Send"}
           </Button>
         </DialogActions>
       </Dialog>
