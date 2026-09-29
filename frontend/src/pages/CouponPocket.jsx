@@ -228,6 +228,8 @@ export default function CouponPocket() {
   }, []);
 
   const couponBalance = Number(wallet?.transfer_wallets?.coupon || voucherData?.coupon_wallet_balance || 0);
+  const withdrawableBalance = Number(wallet?.withdrawable_balance || 0);
+  const mainBalance = Number(wallet?.main_balance || wallet?.balance || 0);
   const availableBalance = Number(wallet?.main_balance || wallet?.balance || wallet?.withdrawable_balance || 0);
 
   const p2pGross = Number(p2pForm.amount || 0);
