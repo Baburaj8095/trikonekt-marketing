@@ -3793,8 +3793,13 @@ class ConsumerVoucherRedeem(APIView):
 
                 receiver_wallet = Wallet.get_or_create_for_user(request.user)
                 receiver_wallet = Wallet.objects.select_for_update().get(pk=receiver_wallet.pk)
-                # Remove direct legacy balance credit to prevent double-crediting to MAIN pocket.
-                # Double-entry posting is handled below via post_system_credit to the PACKAGE_PURCHASE_COUPON pocket.
+                
+                # Direct credit to Main Wallet balance
+                receiver_wallet.balance = (receiver_wallet.balance + amount).quantize(D("0.01"))
+                if hasattr(receiver_wallet, "main_balance"):
+                    receiver_wallet.main_balance = (receiver_wallet.main_balance + amount).quantize(D("0.01"))
+                receiver_wallet.save()
+
                 tx = WalletTransaction.objects.create(
                     user=request.user,
                     amount=amount,
@@ -3806,13 +3811,14 @@ class ConsumerVoucherRedeem(APIView):
                         "voucher_code": voucher.code,
                         "voucher_type": voucher.voucher_type,
                         "creator_user_id": voucher.creator_id,
-                        "destination_wallet": "PACKAGE_PURCHASE_COUPON",
+                        "creator_username": getattr(voucher.creator, "username", "Admin"),
+                        "destination_wallet": "MAIN",
                     },
                 )
                 try:
                     WalletEngine.post_system_credit(
                         user=request.user,
-                        wallet_type=WalletTypes.PACKAGE_PURCHASE_COUPON,
+                        wallet_type=WalletTypes.MAIN,
                         amount=amount,
                         category=FinanceCategories.VOUCHER_REDEEM,
                         source_module="CONSUMER_VOUCHER",
@@ -3820,11 +3826,12 @@ class ConsumerVoucherRedeem(APIView):
                         idempotency_key=f"voucher_redeem:{voucher.id}",
                         legacy_wallet_transaction=tx,
                         actor=request.user,
-                        remarks="Voucher redeemed to package purchase coupon wallet",
+                        remarks=f"Voucher {voucher.code} redeemed to main wallet",
                         metadata={
                             "voucher_code": voucher.code,
                             "voucher_type": voucher.voucher_type,
                             "creator_user_id": voucher.creator_id,
+                            "creator_username": getattr(voucher.creator, "username", "Admin"),
                         },
                     )
                 except Exception:

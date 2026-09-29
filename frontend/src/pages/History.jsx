@@ -167,6 +167,20 @@ function describeSource(tx = {}) {
   }
 
   // Main Wallet Specific Transactions
+  if (type === "P2P_PACKAGE_COUPON_SEND") {
+    const rec = meta.recipient_phone || meta.recipient_id || "User";
+    const fee = meta.fee_amount ? ` (7% Fee: -₹${Number(meta.fee_amount).toFixed(2)})` : "";
+    return `P2P Coupon Sent to ${rec}${fee}`;
+  }
+  if (type === "P2P_PACKAGE_COUPON_RECEIVE") {
+    const sender = meta.sender_phone || meta.sender_id || "Member";
+    return `P2P Coupon Received from ${sender}`;
+  }
+  if (type === "VOUCHER_REDEEM_CREDIT") {
+    const code = meta.voucher_code ? ` [${meta.voucher_code}]` : "";
+    const from = meta.creator_username ? ` from ${meta.creator_username}` : "";
+    return `Coupon Redeemed to Main Wallet${code}${from}`;
+  }
   if (type === "MAIN_TO_COUPON" || type === "COUPON_WALLET_TRANSFER_OUT") return "Transfer to Coupon Wallet";
   if (type === "VOUCHER_CREATE_DEBIT") return "Package Voucher Created";
   if (type === "WITHDRAWAL_DEBIT") return "Withdrawal Payout";
