@@ -133,13 +133,19 @@ class SSVService:
 
         # Check sender wallet balance
         sender_wallet = Wallet.get_or_create_for_user(sender)
-        current_bal = sender_wallet.withdrawable_balance
-        if current_bal < amount:
-            raise ValueError(f"Insufficient withdrawable balance (₹{current_bal}) to transfer ₹{amount}.")
-
-        # Deduct from sender withdrawable balance
-        sender_wallet.withdrawable_balance -= amount
-        sender_wallet.save(update_fields=["withdrawable_balance", "updated_at"])
+        main_bal = sender_wallet.main_balance
+        withdraw_bal = sender_wallet.withdrawable_balance
+        
+        if main_bal >= amount:
+            sender_wallet.main_balance -= amount
+            sender_wallet.save(update_fields=["main_balance", "updated_at"])
+            balance_after = sender_wallet.main_balance
+        elif withdraw_bal >= amount:
+            sender_wallet.withdrawable_balance -= amount
+            sender_wallet.save(update_fields=["withdrawable_balance", "updated_at"])
+            balance_after = sender_wallet.withdrawable_balance
+        else:
+            raise ValueError(f"Insufficient available balance (₹{max(main_bal, withdraw_bal)}) to transfer ₹{amount}.")
 
         voucher_code = None
         if coupon_type == "PACKAGE_COUPON":
@@ -158,7 +164,7 @@ class SSVService:
         send_tx = WalletTransaction.objects.create(
             user=sender,
             amount=-amount,
-            balance_after=sender_wallet.withdrawable_balance,
+            balance_after=balance_after,
             type="P2P_PACKAGE_COUPON_SEND",
             meta={
                 "recipient_id": recipient.id,

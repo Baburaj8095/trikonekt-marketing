@@ -228,7 +228,7 @@ export default function CouponPocket() {
   }, []);
 
   const couponBalance = Number(wallet?.transfer_wallets?.coupon || voucherData?.coupon_wallet_balance || 0);
-  const withdrawableBalance = Number(wallet?.withdrawable_balance || 0);
+  const availableBalance = Number(wallet?.main_balance || wallet?.balance || wallet?.withdrawable_balance || 0);
 
   const p2pGross = Number(p2pForm.amount || 0);
   const p2pFee = p2pGross > 0 ? Number((p2pGross * 0.07).toFixed(2)) : 0;
@@ -251,8 +251,8 @@ export default function CouponPocket() {
       setError("Please enter a valid transfer amount.");
       return;
     }
-    if (p2pGross > withdrawableBalance && p2pGross > couponBalance) {
-      setError(`Insufficient balance. Your balance is ₹${fmtAmount(withdrawableBalance)}.`);
+    if (p2pGross > availableBalance && p2pGross > couponBalance) {
+      setError(`Insufficient balance. Your available balance is ₹${fmtAmount(availableBalance)}.`);
       return;
     }
 
@@ -267,12 +267,18 @@ export default function CouponPocket() {
         coupon_type: p2pForm.coupon_type,
       });
 
-      setSuccess(`Successfully sent ₹${fmtAmount(p2pNet)} to ${p2pForm.recipient_phone}! (Fee: ₹${fmtAmount(p2pFee)})`);
-      setP2pModalOpen(false);
+      const vCode = res?.data?.voucher_code;
+      setSuccess(`Successfully sent ₹${fmtAmount(p2pNet)} to ${p2pForm.recipient_phone}! (7% Fee: ₹${fmtAmount(p2pFee)})${vCode ? ` • Voucher: ${vCode}` : ""}`);
       setP2pForm({ recipient_phone: "", amount: "", coupon_type: "PACKAGE_COUPON", note: "" });
+      setRecipientValid(null);
+      setRecipientInfo(null);
+      setTimeout(() => {
+        setP2pModalOpen(false);
+        setSuccess("");
+      }, 2500);
       load();
     } catch (err) {
-      setError(err?.response?.data?.detail || "Failed to process P2P transfer.");
+      setError(err?.response?.data?.detail || err?.response?.data?.message || "Failed to process P2P transfer.");
     } finally {
       setActionLoading(false);
     }
@@ -631,6 +637,9 @@ export default function CouponPocket() {
               Standard <b>7.00% P2P transfer fee</b> is automatically deducted upon sending.
             </Alert>
 
+            {error && <Alert severity="error" sx={{ borderRadius: 2.5, fontSize: "12.5px" }}>{error}</Alert>}
+            {success && <Alert severity="success" sx={{ borderRadius: 2.5, fontSize: "12.5px" }}>{success}</Alert>}
+
             <Box>
               <TextField
                 label="Recipient Phone / User ID"
@@ -747,6 +756,9 @@ export default function CouponPocket() {
             <Alert severity="success" sx={{ borderRadius: 2.5, fontSize: "12.5px" }}>
               Redeem 100% face value towards Trikonekt shopping or near store merchant discounts.
             </Alert>
+
+            {error && <Alert severity="error" sx={{ borderRadius: 2.5, fontSize: "12.5px" }}>{error}</Alert>}
+            {success && <Alert severity="success" sx={{ borderRadius: 2.5, fontSize: "12.5px" }}>{success}</Alert>}
 
             <TextField
               label="Coupon / Voucher Code"
