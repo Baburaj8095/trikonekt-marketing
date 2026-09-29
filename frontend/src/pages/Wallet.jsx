@@ -182,6 +182,72 @@ export default function Wallet() {
   });
   const onWdrChange = (e) => setWdrForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
+  // Move from Main Wallet to Withdrawable Pocket
+  const [moveAmount, setMoveAmount] = useState("");
+  const [moveBusy, setMoveBusy] = useState(false);
+  const [moveErr, setMoveErr] = useState("");
+  const [moveSuccess, setMoveSuccess] = useState("");
+  const [moveOtpSent, setMoveOtpSent] = useState(false);
+  const [moveOtp, setMoveOtp] = useState("");
+
+  const moveGross = Number(moveAmount || 0);
+  const moveTax = moveGross > 0 ? Number(((moveGross * 10) / 100).toFixed(2)) : 0;
+  const moveNet = moveGross > 0 ? Number((moveGross - moveTax).toFixed(2)) : 0;
+
+  const handleRequestMoveOtp = async () => {
+    if (moveGross < 100) {
+      setMoveErr("Minimum transfer amount is ₹100.");
+      return;
+    }
+    if (moveGross > Number(mainBalance || 0)) {
+      setMoveErr(`Insufficient main wallet balance. Available: ₹${fmtAmount(mainBalance)}.`);
+      return;
+    }
+    try {
+      setMoveBusy(true);
+      setMoveErr("");
+      setMoveSuccess("");
+      await API.post("/accounts/wallet/transfer/request-otp/", {
+        transfer_type: "withdrawal",
+        amount: moveGross,
+      });
+      setMoveOtpSent(true);
+      setMoveSuccess("OTP sent to your registered email. Enter OTP to confirm.");
+    } catch (e) {
+      setMoveErr(e?.response?.data?.detail || "Failed to request transfer OTP.");
+    } finally {
+      setMoveBusy(false);
+    }
+  };
+
+  const handleConfirmMoveOtp = async () => {
+    if (!moveOtp.trim()) {
+      setMoveErr("Please enter the 6-digit OTP.");
+      return;
+    }
+    try {
+      setMoveBusy(true);
+      setMoveErr("");
+      setMoveSuccess("");
+      await API.post("/accounts/wallet/transfer/confirm-otp/", {
+        transfer_type: "withdrawal",
+        otp: moveOtp.trim(),
+      });
+      setMoveSuccess(`Successfully moved ₹${fmtAmount(moveNet)} into Withdrawable Pocket (10% Tax: ₹${fmtAmount(moveTax)})!`);
+      setMoveAmount("");
+      setMoveOtp("");
+      setMoveOtpSent(false);
+      // Reload wallet balances
+      const w = await API.get("/accounts/wallet/me/");
+      setMainBalance(String(w?.data?.main_balance ?? "0.00"));
+      setWithdrawableBalance(String(w?.data?.withdrawable_balance ?? "0.00"));
+    } catch (e) {
+      setMoveErr(e?.response?.data?.detail || "Failed to confirm transfer.");
+    } finally {
+      setMoveBusy(false);
+    }
+  };
+
   const recentWithdrawals = useMemo(() => {
     const list = Array.isArray(myWithdrawals) ? myWithdrawals : [];
     const sorted = [...list].sort((a, b) => {
@@ -601,6 +667,114 @@ export default function Wallet() {
                 />
               </Stack>
             </Paper>
+
+            {/* Move from Main Wallet into Withdrawable Pocket */}
+            {Number(mainBalance) > 0 && (
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 1.6,
+                  borderRadius: 2.5,
+                  border: "1.5px dashed #93C5FD",
+                  bgcolor: "#EFF6FF",
+                }}
+              >
+                <Typography sx={{ fontWeight: 800, fontSize: 13.5, color: "#1E40AF", mb: 0.5 }}>
+                  Move Funds from Main Wallet
+                </Typography>
+                <Typography sx={{ fontSize: 12, color: "#3B82F6", mb: 1.5 }}>
+                  Available in Main Wallet: <b>₹ {fmtAmount(mainBalance)}</b> (10% TDS/Tax applied on allocation)
+                </Typography>
+
+                {moveErr && <Alert severity="error" sx={{ mb: 1.2, borderRadius: 2, fontSize: 12 }}>{moveErr}</Alert>}
+                {moveSuccess && <Alert severity="success" sx={{ mb: 1.2, borderRadius: 2, fontSize: 12 }}>{moveSuccess}</Alert>}
+
+                {!moveOtpSent ? (
+                  <Stack spacing={1.2}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="number"
+                      label="Transfer Amount (₹)"
+                      placeholder="e.g. 2500"
+                      value={moveAmount}
+                      onChange={(e) => setMoveAmount(e.target.value)}
+                      sx={{ bgcolor: "#fff", borderRadius: 2 }}
+                    />
+
+                    {moveGross > 0 && (
+                      <Box sx={{ p: 1.2, bgcolor: "#DBEAFE", borderRadius: 2 }}>
+                        <Stack spacing={0.4}>
+                          <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                            <Typography sx={{ fontSize: 11.5, color: "#1E3A8A" }}>Amount:</Typography>
+                            <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#1E3A8A" }}>₹ {moveGross.toFixed(2)}</Typography>
+                          </Box>
+                          <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                            <Typography sx={{ fontSize: 11.5, color: "#DC2626" }}>10% TDS / Platform Tax:</Typography>
+                            <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#DC2626" }}>- ₹ {moveTax.toFixed(2)}</Typography>
+                          </Box>
+                          <Box sx={{ display: "flex", justifyContent: "space-between", pt: 0.4, borderTop: "1px dashed #93C5FD" }}>
+                            <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#1D4ED8" }}>Credited to Withdrawable:</Typography>
+                            <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#1D4ED8" }}>₹ {moveNet.toFixed(2)}</Typography>
+                          </Box>
+                        </Stack>
+                      </Box>
+                    )}
+
+                    <Button
+                      variant="contained"
+                      disabled={moveBusy || moveGross < 100 || moveGross > Number(mainBalance)}
+                      onClick={handleRequestMoveOtp}
+                      sx={{
+                        borderRadius: 2,
+                        fontWeight: 800,
+                        textTransform: "none",
+                        bgcolor: "#2563EB",
+                        "&:hover": { bgcolor: "#1D4ED8" },
+                      }}
+                    >
+                      {moveBusy ? "Sending OTP..." : `Move ₹${moveGross > 0 ? fmtAmount(moveGross) : "0.00"} to Withdrawable Pocket`}
+                    </Button>
+                  </Stack>
+                ) : (
+                  <Stack spacing={1.2}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Enter 6-Digit Email OTP"
+                      placeholder="e.g. 123456"
+                      value={moveOtp}
+                      onChange={(e) => setMoveOtp(e.target.value)}
+                      sx={{ bgcolor: "#fff", borderRadius: 2 }}
+                    />
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        variant="outlined"
+                        onClick={() => setMoveOtpSent(false)}
+                        sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700 }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        fullWidth
+                        variant="contained"
+                        disabled={moveBusy || !moveOtp.trim()}
+                        onClick={handleConfirmMoveOtp}
+                        sx={{
+                          borderRadius: 2,
+                          fontWeight: 800,
+                          textTransform: "none",
+                          bgcolor: "#059669",
+                          "&:hover": { bgcolor: "#047857" },
+                        }}
+                      >
+                        {moveBusy ? "Verifying..." : "Confirm & Credit Pocket"}
+                      </Button>
+                    </Stack>
+                  </Stack>
+                )}
+              </Paper>
+            )}
 
             <Paper
               elevation={0}
