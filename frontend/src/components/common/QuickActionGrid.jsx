@@ -20,9 +20,7 @@ export default function QuickActionGrid({ variant = "dashboard" }) {
           { label: "History", icon: HistoryRoundedIcon, color: C.history, bg: "#F0FDFA", route: "/user/history" },
         ]
       : [
-          { label: "Add Money", icon: AddRoundedIcon, color: C.addMoney, bg: C.primaryLight, route: "/user/upload-wallet" },
-          { label: "Packages", icon: ShoppingBagRoundedIcon, color: C.buyPackage, bg: "#F5F3FF", route: "/user/packages/join-subscription" },
-          { label: "Withdraw", icon: ArrowUpwardRoundedIcon, color: C.withdraw, bg: "#FFF7ED", route: "/user/wallet" },
+          { label: "Withdraw", icon: ArrowUpwardRoundedIcon, color: C.withdraw, bg: "#FFF7ED", route: "/user/withdrawal" },
           { label: "History", icon: HistoryRoundedIcon, color: C.history, bg: "#F0FDFA", route: "/user/history" },
         ];
 

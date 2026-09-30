@@ -38,12 +38,13 @@ import imgGifts from "../../assets/gifts.jpg";
 import imgHolidays from "../../assets/holidays.jpg";
 import imgKerala from "../../assets/kerala.jpg";
 import imgThailand from "../../assets/thailand.jpg";
+import imgHomepageBanner from "../../assets/homepage_banner.png";
 
 function resolveApiMediaUrl(item, MEDIA_BASE) {
   const raw = item?.image_url || item?.image || "";
   if (!raw) return "";
   const s = String(raw);
-  if (s.startsWith("data:")) return s;
+  if (s.startsWith("data:") || s.startsWith("blob:") || s.startsWith("/static/") || s.includes("static/media/")) return s;
   if (/^https?:\/\//i.test(s)) {
     if (/^https?:\/\/localhost(?::\d+)?\//i.test(s) && MEDIA_BASE) {
       const path = s.replace(/^https?:\/\/localhost(?::\d+)?/i, "");
@@ -98,175 +99,88 @@ function DynamicHeroWishingBanner({
   banners = [],
   loading = false,
   error = "",
-  user = {},
-  directTeamCount = 0,
-  totalTeamCount = 0,
-  currentRank = "Prime 1",
 }) {
-  const bannerList = Array.isArray(banners) ? banners : [];
+  const defaultBanners = useMemo(
+    () => [
+      {
+        id: "default-wishing-1",
+        title: "Daily Wishing Banner",
+        image: imgHomepageBanner,
+      },
+      {
+        id: "default-wishing-2",
+        title: "Connect, Earn, Grow",
+        image: imgHomepageBanner,
+      },
+    ],
+    []
+  );
+
+  const bannerList = useMemo(() => {
+    const valid = Array.isArray(banners) ? banners.filter((b) => b && (b.image || b.image_url)) : [];
+    return valid.length > 0 ? valid : defaultBanners;
+  }, [banners, defaultBanners]);
+
   const [idx, setIdx] = useState(0);
   const MEDIA_BASE = useMemo(() => String(API?.defaults?.baseURL || "").replace(/\/api\/?$/, ""), []);
-  const active = bannerList[idx] || null;
+  const active = bannerList[idx] || bannerList[0] || null;
   const activeSrc = useMemo(() => resolveApiMediaUrl(active, MEDIA_BASE), [active, MEDIA_BASE]);
 
-  const fullName = user?.full_name || user?.name || user?.username || "Team User";
-
   useEffect(() => {
-    if (!bannerList.length) return undefined;
+    if (bannerList.length <= 1) return undefined;
     const t = window.setInterval(() => setIdx((i) => (i + 1) % bannerList.length), 4000);
     return () => window.clearInterval(t);
   }, [bannerList.length]);
-
-  if (activeSrc) {
-    return (
-      <Paper
-        elevation={0}
-        sx={{
-          borderRadius: "18px",
-          border: `1px solid ${C.border}`,
-          bgcolor: C.surface,
-          boxShadow: "0 8px 24px rgba(15, 23, 42, 0.06)",
-          overflow: "hidden",
-        }}
-      >
-        <Box sx={{ position: "relative", width: "100%", height: { xs: 170, sm: 210 } }}>
-          <Box
-            component="img"
-            src={activeSrc}
-            alt={active.title || "Wishing Banner"}
-            sx={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
-          <Box
-            sx={{
-              position: "absolute",
-              inset: 0,
-              background: "linear-gradient(to top, rgba(15,23,42,0.7) 0%, transparent 60%)",
-              display: "flex",
-              alignItems: "flex-end",
-              p: 2,
-            }}
-          >
-            <Typography sx={{ color: "#ffffff", fontWeight: 700, fontSize: 14 }}>
-              {active.title || "Special Announcement"}
-            </Typography>
-          </Box>
-        </Box>
-        {bannerList.length > 1 && (
-          <Stack direction="row" spacing={0.75} justifyContent="center" sx={{ py: 1 }}>
-            {bannerList.map((_, i) => (
-              <Box
-                key={i}
-                onClick={() => setIdx(i)}
-                sx={{
-                  width: i === idx ? 18 : 6,
-                  height: 6,
-                  borderRadius: 4,
-                  bgcolor: i === idx ? C.primary : "#cbd5e1",
-                  cursor: "pointer",
-                  transition: "all 140ms ease",
-                }}
-              />
-            ))}
-          </Stack>
-        )}
-      </Paper>
-    );
-  }
 
   return (
     <Paper
       elevation={0}
       sx={{
-        p: { xs: 2.25, sm: 2.75 },
+        p: { xs: 2, sm: 2.25 },
         borderRadius: "18px",
-        background: "linear-gradient(135deg, #0F172A 0%, #1E293B 100%)",
-        color: "#ffffff",
-        border: "1px solid rgba(255, 255, 255, 0.1)",
-        boxShadow: "0 10px 28px rgba(15, 23, 42, 0.22)",
-        position: "relative",
-        overflow: "hidden",
+        bgcolor: C.surface,
+        border: `1px solid ${C.border}`,
+        boxShadow: "0 8px 24px rgba(15, 23, 42, 0.05)",
       }}
     >
+      <Typography sx={{ fontSize: 16, fontWeight: 700, color: "#1e293b", mb: 1.5 }}>
+        Daily Wishing Banner
+      </Typography>
       <Box
         sx={{
-          position: "absolute",
-          top: -24,
-          right: -24,
-          width: 130,
-          height: 130,
-          borderRadius: "50%",
-          bgcolor: "rgba(37, 99, 235, 0.14)",
-          filter: "blur(20px)",
+          position: "relative",
+          width: "100%",
+          height: { xs: 160, sm: 220, md: 260 },
+          borderRadius: "14px",
+          overflow: "hidden",
+          bgcolor: "#f8fafc",
         }}
-      />
-
-      <Stack spacing={1.75}>
-        <Box>
-          <Typography
-            sx={{
-              fontSize: 10.5,
-              fontWeight: 800,
-              color: "#38BDF8",
-              letterSpacing: "1px",
-              textTransform: "uppercase",
-            }}
-          >
-            GOOD MORNING, TEAM CONSUMER
-          </Typography>
-          <Typography sx={{ fontSize: { xs: 18, sm: 20 }, fontWeight: 800, color: "#ffffff", mt: 0.5 }}>
-            Welcome back, {fullName} 👋
-          </Typography>
-          <Typography sx={{ fontSize: 12.5, color: "#94A3B8", mt: 0.25 }}>
-            Here's what's happening today
-          </Typography>
-        </Box>
-
-        {/* 2 Quick Dynamic Team & Rank Metrics (No duplicate wallet balance) */}
-        <Stack direction="row" spacing={1.5}>
-          <Box
-            sx={{
-              flex: 1,
-              p: 1.5,
-              borderRadius: "12px",
-              bgcolor: "rgba(255, 255, 255, 0.06)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
-            }}
-          >
-            <Typography sx={{ fontSize: 17, fontWeight: 800, color: "#ffffff" }}>
-              {directTeamCount}
-            </Typography>
-            <Typography sx={{ fontSize: 11, color: "#94A3B8", fontWeight: 500, mt: 0.2 }}>
-              Direct Referrals
-            </Typography>
-          </Box>
-
-          <Box
-            sx={{
-              flex: 1,
-              p: 1.5,
-              borderRadius: "12px",
-              bgcolor: "rgba(255, 255, 255, 0.06)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
-            }}
-          >
-            <Typography sx={{ fontSize: 17, fontWeight: 800, color: "#ffffff" }} noWrap>
-              {totalTeamCount > 0 ? totalTeamCount : currentRank}
-            </Typography>
-            <Typography sx={{ fontSize: 11, color: "#94A3B8", fontWeight: 500, mt: 0.2 }}>
-              {totalTeamCount > 0 ? "Total Team" : "Current Rank"}
-            </Typography>
-          </Box>
+      >
+        <Box
+          component="img"
+          src={activeSrc || imgHomepageBanner}
+          alt={active?.title || "Daily Wishing Banner"}
+          sx={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      </Box>
+      {bannerList.length > 1 && (
+        <Stack direction="row" spacing={0.75} justifyContent="center" sx={{ mt: 1.5 }}>
+          {bannerList.map((_, i) => (
+            <Box
+              key={i}
+              onClick={() => setIdx(i)}
+              sx={{
+                width: i === idx ? 18 : 6,
+                height: 6,
+                borderRadius: 4,
+                bgcolor: i === idx ? C.primary : "#cbd5e1",
+                cursor: "pointer",
+                transition: "all 140ms ease",
+              }}
+            />
+          ))}
         </Stack>
-
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ pt: 0.5, borderTop: "1px solid rgba(255, 255, 255, 0.08)" }}>
-          <Typography sx={{ fontSize: 12, fontStyle: "italic", color: "#CBD5E1" }}>
-            "Build today. Grow tomorrow."
-          </Typography>
-          <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#38BDF8" }}>
-            →
-          </Typography>
-        </Stack>
-      </Stack>
+      )}
     </Paper>
   );
 }
@@ -1334,57 +1248,11 @@ function SPPMonthlyCadenceWidget() {
           {/* 2) 4 QUICK ACTION BUTTONS */}
           <QuickActionGrid variant="dashboard" />
 
-          {/* 3) EXPLORE OPPORTUNITIES BANNER (Screen 1 Target) */}
-          <Paper
-            elevation={0}
-            sx={{
-              p: { xs: 2, sm: 2.5 },
-              borderRadius: "16px",
-              background: "linear-gradient(135deg, #0284c7 0%, #0369a1 50%, #075985 100%)",
-              color: "#ffffff",
-              boxShadow: "0 8px 24px rgba(2, 132, 199, 0.25)",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-start",
-              gap: 1,
-            }}
-          >
-            <Box>
-              <Typography sx={{ fontSize: { xs: 17, sm: 19 }, fontWeight: 700, color: "#ffffff", lineHeight: 1.2 }}>
-                Explore Growth Opportunities
-              </Typography>
-              <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.9)", mt: 0.25 }}>
-                SPP Monthly Savings • Education • Travel • Team Commissions
-              </Typography>
-            </Box>
-            <Button
-              variant="contained"
-              size="small"
-              onClick={() => navigate("/user/packages/spp")}
-              sx={{
-                bgcolor: "#ffffff",
-                color: "#0369a1",
-                fontWeight: 700,
-                fontSize: 12.5,
-                borderRadius: "999px",
-                px: 2,
-                mt: 0.5,
-                "&:hover": { bgcolor: "#f0f9ff" },
-              }}
-            >
-              Explore SPP & Packages →
-            </Button>
-          </Paper>
-
-          {/* 4) DAILY WISHING BANNER, TOP ACHIEVERS, VIDEOS & TOUR */}
+          {/* 3) DAILY WISHING BANNER */}
           <DynamicHeroWishingBanner
             banners={banners}
             loading={bannersLoading}
             error={bannersErr}
-            user={profileUser}
-            directTeamCount={teamStats.direct_count || profileUser?.direct_count || profileUser?.total_directs || 0}
-            totalTeamCount={teamStats.current_team_size || 0}
-            currentRank={teamStats.current_rank || (achievedPrimeLevel ? `Prime ${achievedPrimeLevel}` : "Prime 1")}
           />
           <TopAchieversRow items={achievers} loading={achieversLoading} error={achieversErr} />
           <VideoScroller
