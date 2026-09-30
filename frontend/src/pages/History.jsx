@@ -404,6 +404,118 @@ function SectionHeader({ title }) {
   );
 }
 
+function classifyTransaction(tx) {
+  const type = String(tx?.type || "").toUpperCase();
+  const meta = tx?.meta || {};
+  const src = String(meta.source || "").toUpperCase();
+  const st = String(tx?.source_type || "").toUpperCase();
+  const ot = String(meta.orig_type || "").toUpperCase();
+  const trig = String(meta.trigger || "").toUpperCase();
+
+  // 1. LAYER & AUTOPOOL
+  if (
+    type === "LEVEL_BONUS" ||
+    type === "AUTOPOOL_BONUS_FIVE" ||
+    type === "AUTOPOOL_BONUS_THREE" ||
+    (st === "RANK_UPGRADE" && (ot.includes("LEVEL") || type.includes("LEVEL") || String(meta.kind || "").toUpperCase().includes("LEVEL"))) ||
+    type === "PRIME_150_SELF" ||
+    type === "PRIME_750_SELF" ||
+    type === "PRIME_759_SELF" ||
+    src.startsWith("THREE_MATRIX") ||
+    src.startsWith("FIVE_MATRIX") ||
+    (type === "INCOME_CREDIT_75" && (
+      ot.includes("LEVEL") ||
+      ot.includes("AUTOPOOL") ||
+      src.includes("MATRIX") ||
+      trig === "PRIME_150" ||
+      trig === "PRIME_750" ||
+      trig === "PRIME_759"
+    ))
+  ) {
+    return "LAYER";
+  }
+
+  // 2. DIRECT BONUS
+  if (
+    type === "DIRECT_REF_BONUS" ||
+    type === "MONTHLY_759_DIRECT" ||
+    src.includes("REFERRAL") ||
+    st.includes("REFERRAL") ||
+    (st === "RANK_UPGRADE" && (ot.includes("DIRECT") || type.includes("DIRECT"))) ||
+    (type === "INCOME_CREDIT_75" && (
+      ot.includes("DIRECT") ||
+      src.includes("DIRECT") ||
+      trig === "PACKAGE_DIRECT" ||
+      trig === "JOIN_REFERRAL"
+    ))
+  ) {
+    return "DIRECT";
+  }
+
+  // 3. P2P TRANSFERS
+  if (
+    type === "P2P_PACKAGE_COUPON_SEND" ||
+    type === "P2P_PACKAGE_COUPON_RECEIVE" ||
+    type === "MAIN_TO_COUPON" ||
+    type === "COUPON_WALLET_TRANSFER_OUT" ||
+    type === "COUPON_PURCHASE_CREDIT" ||
+    type === "VOUCHER_CREATE_DEBIT" ||
+    type.includes("P2P")
+  ) {
+    return "P2P";
+  }
+
+  // 4. ROYALTY BONUS
+  if (
+    type === "GLOBAL_ROYALTY" ||
+    type === "ROYALTY_BONUS" ||
+    type === "GLOBAL_ACTIVATION_CREDIT" ||
+    src.includes("ROYALTY") ||
+    meta.club
+  ) {
+    return "ROYALTY";
+  }
+
+  // 5. MERCHANT, CAPTAIN & FRANCHISE
+  if (
+    type === "FRANCHISE_INCOME" ||
+    type === "CAPTAIN_INCOME" ||
+    type === "COMMISSION_CREDIT" ||
+    src.includes("FRANCHISE") ||
+    src.includes("CAPTAIN") ||
+    src.includes("MERCHANT") ||
+    src.includes("ZONAL") ||
+    st.includes("FRANCHISE")
+  ) {
+    return "MERCHANT_CAPTAIN";
+  }
+
+  // 6. WITHDRAWALS
+  if (
+    type === "WITHDRAWAL_DEBIT" ||
+    type === "WITHDRAWABLE_CREDIT" ||
+    type === "INTERNAL_WALLET_DEBIT" ||
+    src.includes("WITHDRAW")
+  ) {
+    return "WITHDRAWAL";
+  }
+
+  // 7. REDEEM & POCKET / SELF ACCOUNT
+  if (
+    type.startsWith("SELF_ACCOUNT") ||
+    type.includes("ECOUPON") ||
+    type.includes("VOUCHER") ||
+    type === "REDEEM_ECOUPON_CREDIT" ||
+    type === "AUTO_ECOUPON_ISSUED" ||
+    type === "AUTO_PURCHASE_DEBIT" ||
+    type.startsWith("RP_")
+  ) {
+    return "REDEEM";
+  }
+
+  return "OTHER";
+}
+
 function HistoryRow({ tx, onClick }) {
   const amount = Number(tx?.amount || 0);
 
@@ -430,65 +542,258 @@ function HistoryRow({ tx, onClick }) {
     ? describeSource(tx)
     : `${describeSource(tx)}${Number.isFinite(levelVal) ? ` - Layer ${levelVal}` : ""}`;
 
+  const cat = classifyTransaction(tx);
+  const catChipLabels = {
+    LAYER: "Layer & Blocks",
+    DIRECT: "Direct Bonus",
+    P2P: "P2P Transfer",
+    ROYALTY: "Royalty Bonus",
+    MERCHANT_CAPTAIN: "Merchant & Captain",
+    WITHDRAWAL: "Withdrawal",
+    REDEEM: "Redeemed / Pocket",
+    OTHER: "Wallet Flow",
+  };
+
+  const isCredit = amount >= 0;
+
   return (
     <Paper
       elevation={0}
       onClick={onClick}
       sx={{
-        p: 1.15, // âœ… slightly more breathing space
-        borderRadius: 2,
+        p: 1.25,
+        borderRadius: 2.2,
         border: "1px solid",
         borderColor: "#EEF2F6",
         bgcolor: "#fff",
         cursor: onClick ? "pointer" : "default",
-        transition: "transform 120ms ease, box-shadow 120ms ease",
+        transition: "all 150ms ease",
+        "&:hover": onClick
+          ? {
+              borderColor: "#CBD5E1",
+              boxShadow: "0 4px 12px rgba(12, 45, 72, 0.05)",
+            }
+          : {},
         "&:active": { transform: "scale(0.99)" },
       }}
     >
-      <Stack direction="row" spacing={1.1} alignItems="center">
+      <Stack direction="row" spacing={1.2} alignItems="center">
         <RowIcon value={amount} />
 
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography
-            sx={{
-              fontWeight: 900,
-              fontSize: 14,
-              lineHeight: 1.25,
-              whiteSpace: "normal",
-              wordBreak: "break-word",
-              overflowWrap: "anywhere",
-            }}
-          >
-            {typeName}
-          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.8, flexWrap: "wrap" }}>
+            <Typography
+              sx={{
+                fontWeight: 900,
+                fontSize: 13.5,
+                lineHeight: 1.25,
+                color: "#0F172A",
+                whiteSpace: "normal",
+                wordBreak: "break-word",
+              }}
+            >
+              {typeName}
+            </Typography>
+            {cat && cat !== "OTHER" && (
+              <Chip
+                size="small"
+                label={catChipLabels[cat] || cat}
+                sx={{
+                  height: 18,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  borderRadius: 1,
+                  bgcolor: isCredit ? "#F0FDF4" : "#FEF2F2",
+                  color: isCredit ? "#166534" : "#991B1B",
+                }}
+              />
+            )}
+          </Box>
 
           {counterpartyLabel(tx) ? (
-            <Typography sx={{ fontSize: 12, color: "text.secondary", mt: 0.15 }}>
+            <Typography sx={{ fontSize: 12, color: "text.secondary", mt: 0.2 }}>
               {counterpartyLabel(tx)}
             </Typography>
           ) : null}
 
-          <Typography sx={{ fontSize: 12, color: "text.secondary", mt: 0.25 }}>
+          <Typography sx={{ fontSize: 11.5, color: "#94A3B8", mt: 0.25 }}>
             {dateStr} {timeStr ? `• ${timeStr}` : ""}
           </Typography>
         </Box>
 
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction="row" spacing={0.8} alignItems="center">
           <Box sx={{ textAlign: "right" }}>
             <AmountBadge value={amount} />
-            {/* <Box sx={{ mt: 0.35, display: "flex", justifyContent: "flex-end" }}>
-              <StatusChip tx={tx} />
-            </Box> */}
           </Box>
-
-          <ChevronRightIcon sx={{ color: "#A0AEC0", fontSize: 20 }} />
+          <ChevronRightIcon sx={{ color: "#CBD5E1", fontSize: 18 }} />
         </Stack>
       </Stack>
     </Paper>
   );
 }
 
-function SectionList({ sections, fallbackRows = [] }) {
+function TxDetailDrawer({ open, onClose, tx }) {
+  if (!tx) return null;
+  const amount = Number(tx?.amount || 0);
+  const isCredit = amount >= 0;
+  const meta = tx?.meta || {};
+  const cat = classifyTransaction(tx);
+
+  const dateStr = tx?.created_at
+    ? new Intl.DateTimeFormat(undefined, {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(new Date(tx.created_at))
+    : "-";
+
+  const grossVal = meta.gross_amount ?? meta.gross;
+  const feeVal = meta.fee_amount ?? meta.admin_fee ?? meta.tax_amount;
+  const netVal = meta.net_amount;
+
+  return (
+    <Drawer
+      anchor="bottom"
+      open={open}
+      onClose={onClose}
+      PaperProps={{
+        sx: {
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+          p: { xs: 2, sm: 2.5 },
+          pb: { xs: 4, sm: 3.5 },
+          maxWidth: 560,
+          mx: "auto",
+          bgcolor: "#FFFFFF",
+          boxShadow: "0 -12px 40px rgba(15,23,42,0.18)",
+        },
+      }}
+    >
+      <Box sx={{ width: 40, height: 4, bgcolor: "#CBD5E1", borderRadius: 2, mx: "auto", mb: 2 }} />
+
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+        <Typography sx={{ fontSize: 16.5, fontWeight: 900, color: "#0F172A" }}>
+          Transaction Details
+        </Typography>
+        <IconButton size="small" onClick={onClose}>
+          <CloseRoundedIcon />
+        </IconButton>
+      </Box>
+
+      <Paper
+        elevation={0}
+        sx={{
+          p: 2,
+          borderRadius: 2.5,
+          bgcolor: isCredit ? "#F0FDF4" : "#FEF2F2",
+          border: "1px solid",
+          borderColor: isCredit ? "#BBF7D0" : "#FECACA",
+          textAlign: "center",
+          mb: 2,
+        }}
+      >
+        <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: isCredit ? "#166534" : "#991B1B", mb: 0.3 }}>
+          {describeSource(tx)}
+        </Typography>
+        <Typography sx={{ fontSize: 26, fontWeight: 900, color: isCredit ? "#15803D" : "#B91C1C" }}>
+          {isCredit ? "+" : "-"}₹ {fmtAmount(Math.abs(amount))}
+        </Typography>
+        <Chip
+          size="small"
+          label={cat.replace(/_/g, " ")}
+          sx={{
+            mt: 0.8,
+            height: 20,
+            fontSize: 10.5,
+            fontWeight: 800,
+            bgcolor: isCredit ? "#DCFCE7" : "#FEE2E2",
+            color: isCredit ? "#166534" : "#991B1B",
+          }}
+        />
+      </Paper>
+
+      <Stack spacing={1.2} sx={{ bgcolor: "#F8FAFC", p: 1.8, borderRadius: 2, border: "1px solid #E2E8F0" }}>
+        <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+          <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>Transaction ID</Typography>
+          <Typography sx={{ fontSize: 12, color: "#0F172A", fontWeight: 800 }}>#{tx.id || "N/A"}</Typography>
+        </Box>
+        <Divider />
+
+        <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+          <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>Timestamp</Typography>
+          <Typography sx={{ fontSize: 12, color: "#0F172A", fontWeight: 700 }}>{dateStr}</Typography>
+        </Box>
+        <Divider />
+
+        {counterpartyLabel(tx) && (
+          <>
+            <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+              <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>Counterparty</Typography>
+              <Typography sx={{ fontSize: 12, color: "#2563EB", fontWeight: 800 }}>{counterpartyLabel(tx)}</Typography>
+            </Box>
+            <Divider />
+          </>
+        )}
+
+        {grossVal !== undefined && grossVal !== null && (
+          <>
+            <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+              <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>Gross Amount</Typography>
+              <Typography sx={{ fontSize: 12, color: "#0F172A", fontWeight: 800 }}>₹ {fmtAmount(grossVal)}</Typography>
+            </Box>
+            <Divider />
+          </>
+        )}
+
+        {feeVal !== undefined && feeVal !== null && Number(feeVal) > 0 && (
+          <>
+            <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+              <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>Platform Tax / Fee</Typography>
+              <Typography sx={{ fontSize: 12, color: "#DC2626", fontWeight: 800 }}>-₹ {fmtAmount(feeVal)}</Typography>
+            </Box>
+            <Divider />
+          </>
+        )}
+
+        {netVal !== undefined && netVal !== null && (
+          <>
+            <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+              <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>Net Value</Typography>
+              <Typography sx={{ fontSize: 12, color: "#059669", fontWeight: 900 }}>₹ {fmtAmount(netVal)}</Typography>
+            </Box>
+            <Divider />
+          </>
+        )}
+
+        <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+          <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>Status</Typography>
+          <Typography sx={{ fontSize: 12, color: "#166534", fontWeight: 800 }}>Completed</Typography>
+        </Box>
+      </Stack>
+
+      <Button
+        fullWidth
+        variant="contained"
+        onClick={onClose}
+        sx={{
+          mt: 2,
+          py: 1.1,
+          borderRadius: 2,
+          fontWeight: 800,
+          textTransform: "none",
+          bgcolor: "#0F172A",
+          "&:hover": { bgcolor: "#1E293B" },
+        }}
+      >
+        Done
+      </Button>
+    </Drawer>
+  );
+}
+
+function SectionList({ sections, fallbackRows = [], onRowClick }) {
   const empty =
     !sections ||
     sections.length === 0 ||
@@ -499,26 +804,36 @@ function SectionList({ sections, fallbackRows = [] }) {
       return (
         <Stack spacing={1}>
           {fallbackRows.map((tx, i) => (
-            <HistoryRow key={`${tx.id || i}-${tx.created_at || i}`} tx={tx} />
+            <HistoryRow
+              key={`${tx.id || i}-${tx.created_at || i}`}
+              tx={tx}
+              onClick={() => onRowClick && onRowClick(tx)}
+            />
           ))}
         </Stack>
       );
     }
     return (
-      <Typography variant="body2" sx={{ color: "text.secondary", p: 2 }}>
-        No transactions yet.
-      </Typography>
+      <Box sx={{ py: 4, textAlign: "center" }}>
+        <Typography variant="body2" sx={{ color: "text.secondary", fontWeight: 700 }}>
+          No transactions found for this source or filter.
+        </Typography>
+      </Box>
     );
   }
 
   return (
-    <Stack spacing={1.2}>
+    <Stack spacing={1.5}>
       {sections.map((sec, idx) => (
         <Box key={`${sec.title}-${idx}`}>
           <SectionHeader title={sec.title} />
           <Stack spacing={1}>
             {sec.rows.map((tx, i) => (
-              <HistoryRow key={`${tx.id || i}-${tx.created_at || i}`} tx={tx} />
+              <HistoryRow
+                key={`${tx.id || i}-${tx.created_at || i}`}
+                tx={tx}
+                onClick={() => onRowClick && onRowClick(tx)}
+              />
             ))}
           </Stack>
         </Box>
@@ -549,6 +864,10 @@ export default function History() {
   const [selfAccount, setSelfAccount] = useState([]);
   const [cashback, setCashback] = useState([]);
   const [redeem, setRedeem] = useState([]);
+  const [allTransactions, setAllTransactions] = useState([]);
+  const [sourceFilter, setSourceFilter] = useState("ALL");
+  const [selectedTx, setSelectedTx] = useState(null);
+  const [txDetailOpen, setTxDetailOpen] = useState(false);
   const [tab, setTab] = useState(0);
 
   // In-Drawer P2P Transfer State
@@ -665,6 +984,7 @@ export default function History() {
         yesterday_self_25: data?.top?.yesterday_self_25,
       });
 
+      setAllTransactions(Array.isArray(data?.all_transactions) ? data.all_transactions : []);
       setMainWallet(Array.isArray(data?.main_wallet) ? data.main_wallet : (Array.isArray(data?.recent) ? data.recent : []));
       setIncoming(Array.isArray(data?.incoming) ? data.incoming : []);
       setSelfAccount(Array.isArray(data?.self_account) ? data.self_account : []);
@@ -824,151 +1144,128 @@ export default function History() {
     return date;
   }, [filterDays]);
 
-  const filteredMainWallet = useMemo(() => {
-    if (!cutoffDate) return mainWallet;
-    return mainWallet.filter(tx => new Date(tx.created_at) >= cutoffDate);
-  }, [mainWallet, cutoffDate]);
+  const rawTransactions = useMemo(() => {
+    const list = Array.isArray(allTransactions) && allTransactions.length > 0
+      ? allTransactions
+      : [...mainWallet, ...incoming, ...selfAccount, ...redeem];
 
-  const incomingGross = useMemo(
-    () =>
-      (incoming || []).map((tx) => {
-        const grossVal = (tx?.meta?.gross !== undefined && tx?.meta?.gross !== null && tx?.meta?.gross !== "") 
-          ? tx.meta.gross 
-          : (tx?.amount ?? 0);
-        const g = Number(grossVal);
-        return isNaN(g) ? tx : { ...tx, amount: g };
-      }),
-    [incoming]
-  );
-
-  const filteredIncoming = useMemo(() => {
-    if (!cutoffDate) return incomingGross;
-    return incomingGross.filter(tx => new Date(tx.created_at) >= cutoffDate);
-  }, [incomingGross, cutoffDate]);
-
-  const filteredSelf = useMemo(() => {
-    if (!cutoffDate) return selfAccount;
-    return selfAccount.filter(tx => new Date(tx.created_at) >= cutoffDate);
-  }, [selfAccount, cutoffDate]);
-
-  const filteredRewards = useMemo(() => {
-    if (!cutoffDate) return cashback;
-    return cashback.filter(tx => new Date(tx.created_at) >= cutoffDate);
-  }, [cashback, cutoffDate]);
-
-  const filteredRedeem = useMemo(() => {
-    if (!cutoffDate) return redeem;
-    return redeem.filter(tx => new Date(tx.created_at) >= cutoffDate);
-  }, [redeem, cutoffDate]);
-
-  const sectionsMainWallet = useMemo(() => groupByDay(filteredMainWallet), [filteredMainWallet]);
-  const sectionsIncoming = useMemo(() => groupByDay(filteredIncoming), [filteredIncoming]);
-  const sectionsSelf = useMemo(() => groupByDay(filteredSelf), [filteredSelf]);
-  const sectionsRewards = useMemo(() => groupByDay(filteredRewards), [filteredRewards]);
-  const sectionsRedeem = useMemo(() => groupByDay(filteredRedeem), [filteredRedeem]);
-
-  const totalGross = useMemo(
-    () =>
-      (incoming || []).reduce((sum, tx) => {
-        const grossVal = (tx?.meta?.gross !== undefined && tx?.meta?.gross !== null && tx?.meta?.gross !== "") 
-          ? tx.meta.gross 
-          : (tx?.amount ?? 0);
-        const g = Number(grossVal);
-        return sum + (isNaN(g) ? 0 : g);
-      }, 0),
-    [incoming]
-  );
-
-  const todaysEarnings = useMemo(() => {
-    if (tab === 0) {
-      if (top.today_main_75 !== undefined && top.today_main_75 !== null) {
-        return Number(top.today_main_75);
+    const map = new Map();
+    list.forEach((tx) => {
+      if (!tx) return;
+      const key = `${tx.id || ""}_${tx.type || ""}_${tx.created_at || ""}`;
+      if (!map.has(key)) {
+        map.set(key, tx);
       }
-      const startOfToday = new Date();
-      startOfToday.setHours(0, 0, 0, 0);
-      return filteredMainWallet
-        .filter(tx => new Date(tx.created_at) >= startOfToday && Number(tx.amount) > 0)
-        .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
-    }
-    if (tab === 1) {
-      if (top.today_self_25 !== undefined && top.today_self_25 !== null) {
-        return Number(top.today_self_25);
-      }
-      const startOfToday = new Date();
-      startOfToday.setHours(0, 0, 0, 0);
-      return selfAccount
-        .filter(tx => new Date(tx.created_at) >= startOfToday && Number(tx.amount) > 0)
-        .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
-    }
-    return 0;
-  }, [tab, top, filteredMainWallet, selfAccount]);
+    });
 
-  const yesterdaysEarnings = useMemo(() => {
-    if (tab === 0) {
-      if (top.yesterday_main_75 !== undefined && top.yesterday_main_75 !== null) {
-        return Number(top.yesterday_main_75);
+    return Array.from(map.values()).sort((a, b) => {
+      const da = a?.created_at ? new Date(a.created_at).getTime() : 0;
+      const db = b?.created_at ? new Date(b.created_at).getTime() : 0;
+      return db - da;
+    });
+  }, [allTransactions, mainWallet, incoming, selfAccount, redeem]);
+
+  const dateFilteredTransactions = useMemo(() => {
+    if (!cutoffDate) return rawTransactions;
+    return rawTransactions.filter((tx) => tx?.created_at && new Date(tx.created_at) >= cutoffDate);
+  }, [rawTransactions, cutoffDate]);
+
+  const categoryCounts = useMemo(() => {
+    const counts = {
+      ALL: dateFilteredTransactions.length,
+      LAYER: 0,
+      DIRECT: 0,
+      P2P: 0,
+      ROYALTY: 0,
+      MERCHANT_CAPTAIN: 0,
+      WITHDRAWAL: 0,
+      REDEEM: 0,
+    };
+    dateFilteredTransactions.forEach((tx) => {
+      const cat = classifyTransaction(tx);
+      if (counts[cat] !== undefined) {
+        counts[cat] += 1;
       }
-      const startOfToday = new Date();
-      startOfToday.setHours(0, 0, 0, 0);
-      const startOfYesterday = new Date(startOfToday);
-      startOfYesterday.setDate(startOfYesterday.getDate() - 1);
-      const endOfYesterday = new Date(startOfToday);
-      endOfYesterday.setMilliseconds(-1);
-      return filteredMainWallet
-        .filter(tx => {
-          const txDate = new Date(tx.created_at);
-          return txDate >= startOfYesterday && txDate <= endOfYesterday && Number(tx.amount) > 0;
-        })
-        .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
-    }
-    if (tab === 1) {
-      if (top.yesterday_self_25 !== undefined && top.yesterday_self_25 !== null) {
-        return Number(top.yesterday_self_25);
-      }
-      const startOfToday = new Date();
-      startOfToday.setHours(0, 0, 0, 0);
-      const startOfYesterday = new Date(startOfToday);
-      startOfYesterday.setDate(startOfYesterday.getDate() - 1);
-      const endOfYesterday = new Date(startOfToday);
-      endOfYesterday.setMilliseconds(-1);
-      return selfAccount
-        .filter(tx => {
-          const txDate = new Date(tx.created_at);
-          return txDate >= startOfYesterday && txDate <= endOfYesterday && Number(tx.amount) > 0;
-        })
-        .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
-    }
-    return 0;
-  }, [tab, top, filteredMainWallet, selfAccount]);
+    });
+    return counts;
+  }, [dateFilteredTransactions]);
+
+  const filteredTransactions = useMemo(() => {
+    if (sourceFilter === "ALL") return dateFilteredTransactions;
+    return dateFilteredTransactions.filter((tx) => classifyTransaction(tx) === sourceFilter);
+  }, [dateFilteredTransactions, sourceFilter]);
+
+  const sections = useMemo(() => groupByDay(filteredTransactions), [filteredTransactions]);
 
   const earningsBreakdown = useMemo(() => {
     let direct_referral = 0;
     let matrix_autopool = 0;
     let franchise_captain = 0;
+    let royalty_total = 0;
 
-    (incoming || []).forEach((tx) => {
-      const type = String(tx?.type || "").toUpperCase();
-      const meta = tx?.meta || {};
-      const src = String(meta.source || "").toUpperCase();
-      const st = String(tx?.source_type || "").toUpperCase();
-      const amt = Number(tx?.amount || meta.gross || 0);
+    rawTransactions.forEach((tx) => {
+      const cat = classifyTransaction(tx);
+      const amt = Number(tx?.amount || tx?.meta?.gross || 0);
+      if (amt <= 0) return;
 
-      if (type === "DIRECT_REF_BONUS" || src.includes("REFERRAL") || st.includes("REFERRAL")) {
+      if (cat === "DIRECT") {
         direct_referral += amt;
-      } else if (src.includes("MATRIX") || type.includes("AUTOPOOL") || src.includes("AUTOPOOL")) {
+      } else if (cat === "LAYER") {
         matrix_autopool += amt;
-      } else if (src.includes("FRANCHISE") || src.includes("CAPTAIN") || src.includes("ZONAL") || st.includes("FRANCHISE")) {
+      } else if (cat === "ROYALTY") {
+        royalty_total += amt;
+      } else if (cat === "MERCHANT_CAPTAIN") {
         franchise_captain += amt;
       }
     });
 
-    return { direct_referral, matrix_autopool, franchise_captain };
-  }, [incoming]);
+    const topLevel = Number(top.level_earnings_total || 0);
+    if (topLevel > matrix_autopool) {
+      matrix_autopool = topLevel;
+    }
 
-  const tabs = [
-    { label: `Main Wallet (${filteredMainWallet.length})`, key: "main" },
-    { label: `Self Account (${filteredSelf.length})`, key: "self" },
-  ];
+    return {
+      direct_referral,
+      matrix_autopool,
+      franchise_captain,
+      royalty_total,
+    };
+  }, [rawTransactions, top.level_earnings_total]);
+
+  const todaysEarnings = useMemo(() => {
+    if (top.today_bonus_100 !== undefined && top.today_bonus_100 !== null) {
+      return Number(top.today_bonus_100);
+    }
+    if (top.today_main_75 !== undefined && top.today_main_75 !== null) {
+      return Number(top.today_main_75);
+    }
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    return rawTransactions
+      .filter((tx) => new Date(tx.created_at) >= startOfToday && Number(tx.amount) > 0)
+      .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+  }, [top, rawTransactions]);
+
+  const yesterdaysEarnings = useMemo(() => {
+    if (top.yesterday_bonus_100 !== undefined && top.yesterday_bonus_100 !== null) {
+      return Number(top.yesterday_bonus_100);
+    }
+    if (top.yesterday_main_75 !== undefined && top.yesterday_main_75 !== null) {
+      return Number(top.yesterday_main_75);
+    }
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const startOfYesterday = new Date(startOfToday);
+    startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+    const endOfYesterday = new Date(startOfToday);
+    endOfYesterday.setMilliseconds(-1);
+    return rawTransactions
+      .filter((tx) => {
+        const txDate = new Date(tx.created_at);
+        return txDate >= startOfYesterday && txDate <= endOfYesterday && Number(tx.amount) > 0;
+      })
+      .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+  }, [top, rawTransactions]);
 
   return (
     <Box
@@ -1581,13 +1878,19 @@ export default function History() {
           {/* Card 1: Direct Referral / Package Direct */}
           <Paper
             elevation={0}
+            onClick={() => setSourceFilter(sourceFilter === "DIRECT" ? "ALL" : "DIRECT")}
             sx={{
               minWidth: 165,
               p: 1.3,
               borderRadius: 2.2,
-              border: "1px solid #EEF2F6",
-              bgcolor: "#FFFFFF",
+              border: "2px solid",
+              borderColor: sourceFilter === "DIRECT" ? "#2563EB" : "#EEF2F6",
+              bgcolor: sourceFilter === "DIRECT" ? "#EFF6FF" : "#FFFFFF",
+              cursor: "pointer",
               scrollSnapAlign: "start",
+              transition: "all 0.15s ease",
+              boxShadow: sourceFilter === "DIRECT" ? "0 4px 12px rgba(37, 99, 235, 0.15)" : "none",
+              "&:hover": { borderColor: "#2563EB" },
             }}
           >
             <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
@@ -1596,19 +1899,25 @@ export default function History() {
             <Typography sx={{ fontSize: 16, fontWeight: 900, color: "#2563EB", mt: 0.3 }}>
               ₹ {fmtAmount(earningsBreakdown.direct_referral || 0)}
             </Typography>
-            <Chip size="small" label="E-edu & Prime Direct" sx={{ mt: 0.5, height: 18, fontSize: 10, bgcolor: "#EFF6FF", color: "#2563EB" }} />
+            <Chip size="small" label="E-edu & Prime Direct" sx={{ mt: 0.5, height: 18, fontSize: 10, bgcolor: sourceFilter === "DIRECT" ? "#DBEAFE" : "#EFF6FF", color: "#2563EB" }} />
           </Paper>
 
           {/* Card 2: Layer Matrix (5 & 3) */}
           <Paper
             elevation={0}
+            onClick={() => setSourceFilter(sourceFilter === "LAYER" ? "ALL" : "LAYER")}
             sx={{
               minWidth: 165,
               p: 1.3,
               borderRadius: 2.2,
-              border: "1px solid #EEF2F6",
-              bgcolor: "#FFFFFF",
+              border: "2px solid",
+              borderColor: sourceFilter === "LAYER" ? "#7C3AED" : "#EEF2F6",
+              bgcolor: sourceFilter === "LAYER" ? "#F5F3FF" : "#FFFFFF",
+              cursor: "pointer",
               scrollSnapAlign: "start",
+              transition: "all 0.15s ease",
+              boxShadow: sourceFilter === "LAYER" ? "0 4px 12px rgba(124, 58, 237, 0.15)" : "none",
+              "&:hover": { borderColor: "#7C3AED" },
             }}
           >
             <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
@@ -1617,19 +1926,25 @@ export default function History() {
             <Typography sx={{ fontSize: 16, fontWeight: 900, color: "#7C3AED", mt: 0.3 }}>
               ₹ {fmtAmount(earningsBreakdown.matrix_autopool || 0)}
             </Typography>
-            <Chip size="small" label="5-Blocks & 3-Blocks" sx={{ mt: 0.5, height: 18, fontSize: 10, bgcolor: "#F5F3FF", color: "#7C3AED" }} />
+            <Chip size="small" label="5-Blocks & 3-Blocks" sx={{ mt: 0.5, height: 18, fontSize: 10, bgcolor: sourceFilter === "LAYER" ? "#EDE9FE" : "#F5F3FF", color: "#7C3AED" }} />
           </Paper>
 
           {/* Card 3: Direct Self Block Breakdown */}
           <Paper
             elevation={0}
+            onClick={() => setSourceFilter(sourceFilter === "REDEEM" ? "ALL" : "REDEEM")}
             sx={{
               minWidth: 220,
               p: 1.3,
               borderRadius: 2.2,
-              border: "1px solid #EEF2F6",
-              bgcolor: "#FFFFFF",
+              border: "2px solid",
+              borderColor: sourceFilter === "REDEEM" ? "#059669" : "#EEF2F6",
+              bgcolor: sourceFilter === "REDEEM" ? "#ECFDF5" : "#FFFFFF",
+              cursor: "pointer",
               scrollSnapAlign: "start",
+              transition: "all 0.15s ease",
+              boxShadow: sourceFilter === "REDEEM" ? "0 4px 12px rgba(5, 150, 105, 0.15)" : "none",
+              "&:hover": { borderColor: "#059669" },
             }}
           >
             <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
@@ -1658,13 +1973,19 @@ export default function History() {
           {/* Card 4: Royalty */}
           <Paper
             elevation={0}
+            onClick={() => setSourceFilter(sourceFilter === "ROYALTY" ? "ALL" : "ROYALTY")}
             sx={{
               minWidth: 175,
               p: 1.3,
               borderRadius: 2.2,
-              border: "1px solid #EEF2F6",
-              bgcolor: "#FFFFFF",
+              border: "2px solid",
+              borderColor: sourceFilter === "ROYALTY" ? "#D97706" : "#EEF2F6",
+              bgcolor: sourceFilter === "ROYALTY" ? "#FFFBEB" : "#FFFFFF",
+              cursor: "pointer",
               scrollSnapAlign: "start",
+              transition: "all 0.15s ease",
+              boxShadow: sourceFilter === "ROYALTY" ? "0 4px 12px rgba(217, 119, 6, 0.15)" : "none",
+              "&:hover": { borderColor: "#D97706" },
             }}
           >
             <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
@@ -1685,13 +2006,19 @@ export default function History() {
           {/* Card 5: Franchise / Captain */}
           <Paper
             elevation={0}
+            onClick={() => setSourceFilter(sourceFilter === "MERCHANT_CAPTAIN" ? "ALL" : "MERCHANT_CAPTAIN")}
             sx={{
               minWidth: 165,
               p: 1.3,
               borderRadius: 2.2,
-              border: "1px solid #EEF2F6",
-              bgcolor: "#FFFFFF",
+              border: "2px solid",
+              borderColor: sourceFilter === "MERCHANT_CAPTAIN" ? "#059669" : "#EEF2F6",
+              bgcolor: sourceFilter === "MERCHANT_CAPTAIN" ? "#ECFDF5" : "#FFFFFF",
+              cursor: "pointer",
               scrollSnapAlign: "start",
+              transition: "all 0.15s ease",
+              boxShadow: sourceFilter === "MERCHANT_CAPTAIN" ? "0 4px 12px rgba(5, 150, 105, 0.15)" : "none",
+              "&:hover": { borderColor: "#059669" },
             }}
           >
             <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
@@ -1700,7 +2027,7 @@ export default function History() {
             <Typography sx={{ fontSize: 16, fontWeight: 900, color: "#059669", mt: 0.3 }}>
               ₹ {fmtAmount(earningsBreakdown.franchise_captain || 0)}
             </Typography>
-            <Chip size="small" label="Geo & Zonal Share" sx={{ mt: 0.5, height: 18, fontSize: 10, bgcolor: "#ECFDF5", color: "#059669" }} />
+            <Chip size="small" label="Geo & Zonal Share" sx={{ mt: 0.5, height: 18, fontSize: 10, bgcolor: sourceFilter === "MERCHANT_CAPTAIN" ? "#D1FAE5" : "#ECFDF5", color: "#059669" }} />
           </Paper>
         </Box>
       </Box>
@@ -1746,7 +2073,57 @@ export default function History() {
         })}
       </Box>
 
-      {/* Tabs */}
+      {/* Source Category Filter Chips Bar */}
+      <Box sx={{ mb: 1.5 }}>
+        <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#64748B", mb: 0.8, px: 0.5 }}>
+          Filter By Source
+        </Typography>
+        <Box
+          sx={{
+            display: "flex",
+            gap: 0.8,
+            overflowX: "auto",
+            pb: 0.5,
+            "&::-webkit-scrollbar": { display: "none" },
+          }}
+        >
+          {[
+            { key: "ALL", label: `All (${categoryCounts.ALL})` },
+            { key: "LAYER", label: `Layer & Blocks (${categoryCounts.LAYER})` },
+            { key: "DIRECT", label: `Direct Bonus (${categoryCounts.DIRECT})` },
+            { key: "P2P", label: `P2P Transfer (${categoryCounts.P2P})` },
+            { key: "ROYALTY", label: `Royalty (${categoryCounts.ROYALTY})` },
+            { key: "MERCHANT_CAPTAIN", label: `Merchant / Captain (${categoryCounts.MERCHANT_CAPTAIN})` },
+            { key: "WITHDRAWAL", label: `Withdrawals (${categoryCounts.WITHDRAWAL})` },
+            { key: "REDEEM", label: `Redeemed / Pocket (${categoryCounts.REDEEM})` },
+          ].map((item) => {
+            const isSelected = sourceFilter === item.key;
+            return (
+              <Chip
+                key={item.key}
+                label={item.label}
+                onClick={() => setSourceFilter(item.key)}
+                sx={{
+                  fontWeight: 800,
+                  fontSize: 11.5,
+                  borderRadius: 999,
+                  bgcolor: isSelected ? "#0F172A" : "#F1F5F9",
+                  color: isSelected ? "#FFFFFF" : "#475569",
+                  border: "1px solid",
+                  borderColor: isSelected ? "#0F172A" : "#E2E8F0",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                  "&:hover": {
+                    bgcolor: isSelected ? "#1E293B" : "#E2E8F0",
+                  },
+                }}
+              />
+            );
+          })}
+        </Box>
+      </Box>
+
+      {/* Unified Transaction Stream List */}
       <Paper
         elevation={0}
         sx={{
@@ -1754,56 +2131,48 @@ export default function History() {
           border: "1px solid",
           borderColor: "#EEF2F6",
           bgcolor: "#fff",
+          p: 1.2,
           overflow: "hidden",
         }}
       >
-        <Box sx={{ px: 1, pt: 1 }}>
-          <Tabs
-            value={tab}
-            onChange={(_, v) => setTab(v)}
-            variant="scrollable"
-            scrollButtons={false}
-            sx={{
-              minHeight: 34,
-              "& .MuiTabs-indicator": { display: "none" },
-              "& .MuiTab-root": {
-                textTransform: "none",
-                minHeight: 30,
-                px: 1.2,
-                borderRadius: 999,
-                mr: 1,
-                fontWeight: 900,
-                fontSize: 12,
-                color: "text.secondary",
-                bgcolor: "#F1F5F9",
-              },
-              "& .Mui-selected": {
-                bgcolor: "primary.main",
-                color: "#fff !important",
-              },
-            }}
-          >
-            {tabs.map((t, i) => (
-              <Tab key={t.key} label={t.label} value={i} />
-            ))}
-          </Tabs>
-        </Box>
-
-        <Box sx={{ p: 1.2 }}>
-          {loading ? (
-            <LinearProgress />
-          ) : err ? (
-            <Typography variant="body2" color="error">
-              {err}
-            </Typography>
-          ) : (
-            <>
-              {tab === 0 && <SectionList sections={sectionsMainWallet} fallbackRows={filteredMainWallet} />}
-              {tab === 1 && <SectionList sections={sectionsSelf} fallbackRows={filteredSelf} />}
-            </>
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.2, px: 0.5 }}>
+          <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0F172A" }}>
+            Transactions ({filteredTransactions.length})
+          </Typography>
+          {sourceFilter !== "ALL" && (
+            <Chip
+              size="small"
+              label="Reset Filter"
+              onClick={() => setSourceFilter("ALL")}
+              sx={{ height: 20, fontSize: 10.5, fontWeight: 700, cursor: "pointer", bgcolor: "#F1F5F9" }}
+            />
           )}
         </Box>
+
+        {loading ? (
+          <LinearProgress />
+        ) : err ? (
+          <Typography variant="body2" color="error">
+            {err}
+          </Typography>
+        ) : (
+          <SectionList
+            sections={sections}
+            fallbackRows={filteredTransactions}
+            onRowClick={(tx) => {
+              setSelectedTx(tx);
+              setTxDetailOpen(true);
+            }}
+          />
+        )}
       </Paper>
+
+      {/* Transaction Details Bottom Sheet */}
+      <TxDetailDrawer
+        open={txDetailOpen}
+        onClose={() => setTxDetailOpen(false)}
+        tx={selectedTx}
+      />
 
       <Box sx={{ height: 16 }} />
     </Box>

@@ -4237,6 +4237,16 @@ def wallet_me_history(request):
         "ADJUSTMENT_CREDIT",
         "COMMISSION_CREDIT",
         "DIRECT_REF_BONUS",
+        "LEVEL_BONUS",
+        "AUTOPOOL_BONUS_FIVE",
+        "AUTOPOOL_BONUS_THREE",
+        "GLOBAL_ROYALTY",
+        "FRANCHISE_INCOME",
+        "CAPTAIN_INCOME",
+        "P2P_PACKAGE_COUPON_SEND",
+        "P2P_PACKAGE_COUPON_RECEIVE",
+        "COUPON_PURCHASE_CREDIT",
+        "REDEEM_ECOUPON_CREDIT",
     ]
     main_qs = WalletTransaction.objects.filter(
         user=user,
@@ -4246,6 +4256,13 @@ def wallet_me_history(request):
     ).order_by("-created_at")[:500]
     main_list = [txmap(x) for x in main_qs]
 
+    all_qs = WalletTransaction.objects.filter(
+        user=user
+    ).exclude(
+        source_type="ADMIN_SERVICE_CHARGE"
+    ).order_by("-created_at")[:500]
+    all_list = [txmap(x) for x in all_qs]
+
     data = {
         "top": top,
         "main_wallet": main_list,
@@ -4253,6 +4270,7 @@ def wallet_me_history(request):
         "self_account": self_list,
         "cashback": cashback,
         "redeem": redeem_list,
+        "all_transactions": all_list,
         "recent": [txmap(x) for x in WalletTransaction.objects.filter(user=user).order_by("-created_at")[:50]],
         "level_earnings": level_earnings_total,
         "layer_matrix_earned": level_earnings_total,
