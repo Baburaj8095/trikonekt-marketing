@@ -18,6 +18,8 @@ import {
   Alert,
   CircularProgress,
   Divider,
+  Badge,
+  InputAdornment,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
@@ -35,6 +37,9 @@ import AccountBalanceRoundedIcon from "@mui/icons-material/AccountBalanceRounded
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import ConfirmationNumberRoundedIcon from "@mui/icons-material/ConfirmationNumberRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
+import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
+import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 
 /** ---------- helpers ---------- */
 function fmtAmount(value) {
@@ -842,6 +847,231 @@ function SectionList({ sections, fallbackRows = [], onRowClick }) {
   );
 }
 
+function PhonePeFilterDrawer({
+  open,
+  onClose,
+  datePreset,
+  setDatePreset,
+  customStartDate,
+  setCustomStartDate,
+  customEndDate,
+  setCustomEndDate,
+  flowFilter,
+  setFlowFilter,
+  sourceFilter,
+  setSourceFilter,
+  onReset,
+}) {
+  const datePresets = [
+    { label: "All Time", value: "all" },
+    { label: "Today", value: "today" },
+    { label: "This Month", value: "this_month" },
+    { label: "Last Month", value: "last_month" },
+    { label: "Last 30 Days", value: "30_days" },
+    { label: "Custom Range", value: "custom" },
+  ];
+
+  const flowOptions = [
+    { label: "All", value: "ALL" },
+    { label: "Money Received (+ Credits)", value: "CREDIT" },
+    { label: "Money Sent (- Debits)", value: "DEBIT" },
+  ];
+
+  const sourceOptions = [
+    { label: "All Sources", value: "ALL" },
+    { label: "Layer & Blocks", value: "LAYER" },
+    { label: "Direct Bonus", value: "DIRECT" },
+    { label: "P2P Transfer", value: "P2P" },
+    { label: "Royalty Bonus", value: "ROYALTY" },
+    { label: "Merchant & Captain", value: "MERCHANT_CAPTAIN" },
+    { label: "Withdrawals", value: "WITHDRAWAL" },
+  ];
+
+  return (
+    <Drawer
+      anchor="bottom"
+      open={open}
+      onClose={onClose}
+      PaperProps={{
+        sx: {
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+          p: { xs: 2, sm: 2.5 },
+          pb: { xs: 4, sm: 3.5 },
+          maxWidth: 560,
+          mx: "auto",
+          bgcolor: "#FFFFFF",
+          boxShadow: "0 -12px 40px rgba(15,23,42,0.18)",
+          maxHeight: "85vh",
+          overflowY: "auto",
+        },
+      }}
+    >
+      <Box sx={{ width: 40, height: 4, bgcolor: "#CBD5E1", borderRadius: 2, mx: "auto", mb: 2 }} />
+
+      {/* Header */}
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+        <Box>
+          <Typography sx={{ fontSize: 17, fontWeight: 900, color: "#0F172A" }}>
+            Filter Transactions
+          </Typography>
+          <Typography sx={{ fontSize: 12, color: "#64748B" }}>
+            PhonePe-style date range & source filters
+          </Typography>
+        </Box>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Button
+            size="small"
+            onClick={onReset}
+            sx={{ textTransform: "none", fontSize: 12, fontWeight: 700, color: "#DC2626" }}
+          >
+            Reset All
+          </Button>
+          <IconButton size="small" onClick={onClose}>
+            <CloseRoundedIcon />
+          </IconButton>
+        </Stack>
+      </Box>
+
+      {/* Section 1: Date Range */}
+      <Box sx={{ mb: 2.5 }}>
+        <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#1E293B", mb: 1 }}>
+          📅 Date Range
+        </Typography>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.8, mb: 1.2 }}>
+          {datePresets.map((p) => {
+            const isSelected = datePreset === p.value;
+            return (
+              <Chip
+                key={p.value}
+                label={p.label}
+                onClick={() => setDatePreset(p.value)}
+                sx={{
+                  fontWeight: 800,
+                  fontSize: 12,
+                  borderRadius: 999,
+                  bgcolor: isSelected ? "#2563EB" : "#F1F5F9",
+                  color: isSelected ? "#FFFFFF" : "#475569",
+                  border: "1px solid",
+                  borderColor: isSelected ? "#2563EB" : "#E2E8F0",
+                  cursor: "pointer",
+                }}
+              />
+            );
+          })}
+        </Box>
+
+        {/* Custom Date Pickers */}
+        {datePreset === "custom" && (
+          <Paper elevation={0} sx={{ p: 1.5, bgcolor: "#F8FAFC", borderRadius: 2, border: "1px solid #E2E8F0", mt: 1 }}>
+            <Typography sx={{ fontSize: 11.5, color: "#64748B", fontWeight: 700, mb: 1 }}>
+              Pick Start Date and End Date
+            </Typography>
+            <Stack direction="row" spacing={1.2}>
+              <TextField
+                fullWidth
+                size="small"
+                type="date"
+                label="From Date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                sx={{ bgcolor: "#fff" }}
+              />
+              <TextField
+                fullWidth
+                size="small"
+                type="date"
+                label="To Date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                sx={{ bgcolor: "#fff" }}
+              />
+            </Stack>
+          </Paper>
+        )}
+      </Box>
+
+      {/* Section 2: Transaction Flow */}
+      <Box sx={{ mb: 2.5 }}>
+        <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#1E293B", mb: 1 }}>
+          ↕️ Transaction Flow
+        </Typography>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.8 }}>
+          {flowOptions.map((f) => {
+            const isSelected = flowFilter === f.value;
+            return (
+              <Chip
+                key={f.value}
+                label={f.label}
+                onClick={() => setFlowFilter(f.value)}
+                sx={{
+                  fontWeight: 800,
+                  fontSize: 12,
+                  borderRadius: 999,
+                  bgcolor: isSelected ? "#0F172A" : "#F1F5F9",
+                  color: isSelected ? "#FFFFFF" : "#475569",
+                  border: "1px solid",
+                  borderColor: isSelected ? "#0F172A" : "#E2E8F0",
+                  cursor: "pointer",
+                }}
+              />
+            );
+          })}
+        </Box>
+      </Box>
+
+      {/* Section 3: Income Source / Category */}
+      <Box sx={{ mb: 3 }}>
+        <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#1E293B", mb: 1 }}>
+          🏷️ Source Category
+        </Typography>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.8 }}>
+          {sourceOptions.map((s) => {
+            const isSelected = sourceFilter === s.value;
+            return (
+              <Chip
+                key={s.value}
+                label={s.label}
+                onClick={() => setSourceFilter(s.value)}
+                sx={{
+                  fontWeight: 800,
+                  fontSize: 12,
+                  borderRadius: 999,
+                  bgcolor: isSelected ? "#2563EB" : "#F1F5F9",
+                  color: isSelected ? "#FFFFFF" : "#475569",
+                  border: "1px solid",
+                  borderColor: isSelected ? "#2563EB" : "#E2E8F0",
+                  cursor: "pointer",
+                }}
+              />
+            );
+          })}
+        </Box>
+      </Box>
+
+      {/* Apply Button */}
+      <Button
+        fullWidth
+        variant="contained"
+        onClick={onClose}
+        sx={{
+          py: 1.3,
+          borderRadius: 2.5,
+          fontWeight: 800,
+          fontSize: 14,
+          textTransform: "none",
+          bgcolor: "#2563EB",
+          "&:hover": { bgcolor: "#1D4ED8" },
+        }}
+      >
+        Apply Filters
+      </Button>
+    </Drawer>
+  );
+}
+
 /** ---------- main page ---------- */
 export default function History() {
   const navigate = useNavigate();
@@ -885,14 +1115,13 @@ export default function History() {
   const [recipientChecking, setRecipientChecking] = useState(false);
   const [recipientInfo, setRecipientInfo] = useState(null);
 
-  // In-Drawer Redeem Coupon State
-  const [redeemForm, setRedeemForm] = useState({
-    coupon_code: "",
-    category: "ECOMMERCE_SHOPPING",
-  });
-  const [redeemBusy, setRedeemBusy] = useState(false);
-  const [redeemError, setRedeemError] = useState("");
-  const [redeemSuccess, setRedeemSuccess] = useState("");
+  // PhonePe-Style Filter State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [datePreset, setDatePreset] = useState("all");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
+  const [flowFilter, setFlowFilter] = useState("ALL"); // "ALL" | "CREDIT" | "DEBIT"
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -1109,40 +1338,63 @@ export default function History() {
     }
   };
 
-  const handleRedeemCoupon = async () => {
-    if (!redeemForm.coupon_code.trim()) {
-      setRedeemError("Please enter a coupon code to redeem.");
-      return;
-    }
-    try {
-      setRedeemBusy(true);
-      setRedeemError("");
-      setRedeemSuccess("");
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (datePreset !== "all" || customStartDate || customEndDate) count++;
+    if (flowFilter !== "ALL") count++;
+    if (sourceFilter !== "ALL") count++;
+    if (searchQuery.trim()) count++;
+    return count;
+  }, [datePreset, customStartDate, customEndDate, flowFilter, sourceFilter, searchQuery]);
 
-      await API.post("/accounts/wallet/vouchers/redeem/", {
-        code: redeemForm.coupon_code.trim(),
-        category: redeemForm.category,
-      });
-
-      setRedeemSuccess(`Coupon ${redeemForm.coupon_code} redeemed successfully for ${redeemForm.category.replace(/_/g, " ")}!`);
-      setRedeemForm({ coupon_code: "", category: "ECOMMERCE_SHOPPING" });
-      fetchHistory();
-    } catch (err) {
-      setRedeemError(err?.response?.data?.detail || err?.response?.data?.message || "Failed to redeem coupon.");
-    } finally {
-      setRedeemBusy(false);
-    }
+  const handleResetFilters = () => {
+    setDatePreset("all");
+    setCustomStartDate("");
+    setCustomEndDate("");
+    setFlowFilter("ALL");
+    setSourceFilter("ALL");
+    setSearchQuery("");
   };
 
-  const [filterDays, setFilterDays] = useState("all");
+  const isTxInDateRange = (txDateStr) => {
+    if (!txDateStr) return false;
+    const txDate = new Date(txDateStr);
 
-  const cutoffDate = useMemo(() => {
-    if (filterDays === "all") return null;
-    const date = new Date();
-    date.setDate(date.getDate() - Number(filterDays));
-    date.setHours(0, 0, 0, 0);
-    return date;
-  }, [filterDays]);
+    if (datePreset === "today") {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return txDate >= today;
+    }
+    if (datePreset === "this_month") {
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      return txDate >= startOfMonth;
+    }
+    if (datePreset === "last_month") {
+      const now = new Date();
+      const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+      return txDate >= startOfLastMonth && txDate <= endOfLastMonth;
+    }
+    if (datePreset === "30_days") {
+      const d = new Date();
+      d.setDate(d.getDate() - 30);
+      d.setHours(0, 0, 0, 0);
+      return txDate >= d;
+    }
+    if (datePreset === "custom" || customStartDate || customEndDate) {
+      if (customStartDate) {
+        const start = new Date(customStartDate + "T00:00:00");
+        if (txDate < start) return false;
+      }
+      if (customEndDate) {
+        const end = new Date(customEndDate + "T23:59:59");
+        if (txDate > end) return false;
+      }
+      return true;
+    }
+    return true; // "all"
+  };
 
   const rawTransactions = useMemo(() => {
     const list = Array.isArray(allTransactions) && allTransactions.length > 0
@@ -1166,9 +1418,8 @@ export default function History() {
   }, [allTransactions, mainWallet, incoming, selfAccount, redeem]);
 
   const dateFilteredTransactions = useMemo(() => {
-    if (!cutoffDate) return rawTransactions;
-    return rawTransactions.filter((tx) => tx?.created_at && new Date(tx.created_at) >= cutoffDate);
-  }, [rawTransactions, cutoffDate]);
+    return rawTransactions.filter((tx) => isTxInDateRange(tx?.created_at));
+  }, [rawTransactions, datePreset, customStartDate, customEndDate]);
 
   const categoryCounts = useMemo(() => {
     const counts = {
@@ -1179,7 +1430,6 @@ export default function History() {
       ROYALTY: 0,
       MERCHANT_CAPTAIN: 0,
       WITHDRAWAL: 0,
-      REDEEM: 0,
     };
     dateFilteredTransactions.forEach((tx) => {
       const cat = classifyTransaction(tx);
@@ -1191,11 +1441,74 @@ export default function History() {
   }, [dateFilteredTransactions]);
 
   const filteredTransactions = useMemo(() => {
-    if (sourceFilter === "ALL") return dateFilteredTransactions;
-    return dateFilteredTransactions.filter((tx) => classifyTransaction(tx) === sourceFilter);
-  }, [dateFilteredTransactions, sourceFilter]);
+    return dateFilteredTransactions.filter((tx) => {
+      const amt = Number(tx?.amount || 0);
+
+      // Flow filter
+      if (flowFilter === "CREDIT" && amt < 0) return false;
+      if (flowFilter === "DEBIT" && amt >= 0) return false;
+
+      // Source filter
+      if (sourceFilter !== "ALL" && classifyTransaction(tx) !== sourceFilter) return false;
+
+      // Search Query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const title = describeSource(tx).toLowerCase();
+        const counterparty = counterpartyLabel(tx).toLowerCase();
+        const idStr = String(tx?.id || "").toLowerCase();
+        const amtStr = String(Math.abs(amt));
+        const phoneMeta = String(tx?.meta?.recipient_phone || tx?.meta?.sender_phone || tx?.meta?.username || "").toLowerCase();
+        if (
+          !title.includes(q) &&
+          !counterparty.includes(q) &&
+          !idStr.includes(q) &&
+          !amtStr.includes(q) &&
+          !phoneMeta.includes(q)
+        ) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [dateFilteredTransactions, flowFilter, sourceFilter, searchQuery]);
 
   const sections = useMemo(() => groupByDay(filteredTransactions), [filteredTransactions]);
+
+  const dateLabel = useMemo(() => {
+    if (datePreset === "all") return "All Time";
+    if (datePreset === "today") return "Today";
+    if (datePreset === "this_month") return "This Month";
+    if (datePreset === "last_month") return "Last Month";
+    if (datePreset === "30_days") return "Last 30 Days";
+    if (datePreset === "custom") {
+      if (customStartDate && customEndDate) return `${customStartDate} to ${customEndDate}`;
+      if (customStartDate) return `From ${customStartDate}`;
+      if (customEndDate) return `Up to ${customEndDate}`;
+      return "Custom Range";
+    }
+    return "All Time";
+  }, [datePreset, customStartDate, customEndDate]);
+
+  const flowLabel = useMemo(() => {
+    if (flowFilter === "CREDIT") return "Money Received (+)";
+    if (flowFilter === "DEBIT") return "Money Sent (-)";
+    return "All Flows";
+  }, [flowFilter]);
+
+  const sourceLabel = useMemo(() => {
+    const map = {
+      ALL: "All Sources",
+      LAYER: "Layer & Blocks",
+      DIRECT: "Direct Bonus",
+      P2P: "P2P Transfer",
+      ROYALTY: "Royalty Bonus",
+      MERCHANT_CAPTAIN: "Merchant & Captain",
+      WITHDRAWAL: "Withdrawals",
+    };
+    return map[sourceFilter] || "All Sources";
+  }, [sourceFilter]);
 
   const earningsBreakdown = useMemo(() => {
     let direct_referral = 0;
@@ -1465,23 +1778,6 @@ export default function History() {
           </Button>
           <Button
             size="small"
-            variant={drawerMode === "redeem" ? "contained" : "outlined"}
-            onClick={() => setDrawerMode("redeem")}
-            sx={{
-              flex: 1,
-              borderRadius: 999,
-              textTransform: "none",
-              fontWeight: 800,
-              fontSize: 12,
-              bgcolor: drawerMode === "redeem" ? "#7C3AED" : "transparent",
-              borderColor: "#7C3AED",
-              color: drawerMode === "redeem" ? "#fff" : "#7C3AED",
-            }}
-          >
-            Redeem Coupon
-          </Button>
-          <Button
-            size="small"
             variant={drawerMode === "menu" ? "contained" : "outlined"}
             onClick={() => setDrawerMode("menu")}
             sx={{
@@ -1495,7 +1791,7 @@ export default function History() {
               color: drawerMode === "menu" ? "#fff" : "#475569",
             }}
           >
-            More
+            Quick Links
           </Button>
         </Stack>
 
@@ -1639,64 +1935,6 @@ export default function History() {
                 }}
               >
                 {p2pBusy ? "Processing Transfer..." : recipientValid === true ? `Transfer ₹${p2pGross > 0 ? fmtAmount(p2pGross) : "0.00"} (Net: ₹${fmtAmount(p2pNet)})` : "Verify Recipient to Transfer"}
-              </Button>
-            </Stack>
-          </Box>
-        )}
-
-        {/* Drawer Mode 2: Redeem Coupon */}
-        {drawerMode === "redeem" && (
-          <Box sx={{ bgcolor: "#FDF4FF", p: 2, borderRadius: 3, border: "1px solid #F0ABFC", mb: 2 }}>
-            <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: "#701A75", mb: 1.5 }}>
-              Redeem Universal Vouchers & Coupons
-            </Typography>
-
-            {redeemError && <Alert severity="error" sx={{ mb: 1.5, borderRadius: 2, fontSize: 12.5 }}>{redeemError}</Alert>}
-            {redeemSuccess && <Alert severity="success" sx={{ mb: 1.5, borderRadius: 2, fontSize: 12.5 }}>{redeemSuccess}</Alert>}
-
-            <Stack spacing={1.5}>
-              <TextField
-                fullWidth
-                size="small"
-                label="Coupon / Voucher Code"
-                placeholder="e.g. SPP-A89F-XXXX"
-                value={redeemForm.coupon_code}
-                onChange={(e) => setRedeemForm({ ...redeemForm, coupon_code: e.target.value })}
-                sx={{ bgcolor: "#fff", borderRadius: 2 }}
-              />
-
-              <TextField
-                fullWidth
-                select
-                size="small"
-                label="Redeem Category"
-                value={redeemForm.category}
-                onChange={(e) => setRedeemForm({ ...redeemForm, category: e.target.value })}
-                sx={{ bgcolor: "#fff", borderRadius: 2 }}
-              >
-                <MenuItem value="ECOMMERCE_SHOPPING">E-Commerce Shopping Products</MenuItem>
-                <MenuItem value="TRIZONE_STORE">Trizone Verified Stores</MenuItem>
-                <MenuItem value="NEAR_STORE">Near Store Merchant Discount</MenuItem>
-                <MenuItem value="TRI_HOLIDAY">Tri Holiday Travel Voucher</MenuItem>
-              </TextField>
-
-              <Button
-                fullWidth
-                variant="contained"
-                disabled={redeemBusy || !redeemForm.coupon_code.trim()}
-                onClick={handleRedeemCoupon}
-                startIcon={redeemBusy ? <CircularProgress size={16} color="inherit" /> : <ConfirmationNumberRoundedIcon />}
-                sx={{
-                  py: 1.25,
-                  borderRadius: 2.5,
-                  fontWeight: 800,
-                  fontSize: 14,
-                  textTransform: "none",
-                  bgcolor: "#7C3AED",
-                  "&:hover": { bgcolor: "#6D28D9" },
-                }}
-              >
-                {redeemBusy ? "Processing Redemption..." : "Redeem Coupon"}
               </Button>
             </Stack>
           </Box>
@@ -2032,52 +2270,169 @@ export default function History() {
         </Box>
       </Box>
 
-      {/* Date Filter Pills Row */}
-      <Box
-        sx={{
-          display: "flex",
-          gap: 1,
-          overflowX: "auto",
-          pb: 1,
-          mb: 1.2,
-          "&::-webkit-scrollbar": { display: "none" },
-        }}
-      >
-        {[
-          { label: "All Time", value: "all" },
-          { label: "7 Days", value: "7" },
-          { label: "10 Days", value: "10" },
-          { label: "15 Days", value: "15" },
-          { label: "30 Days", value: "30" },
-        ].map((p) => {
-          const selected = filterDays === p.value;
-          return (
+      {/* PhonePe Search & Filter Bar */}
+      <Box sx={{ mb: 1.2 }}>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="Search by name, phone, amount..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchRoundedIcon sx={{ color: "#94A3B8", fontSize: 20 }} />
+                </InputAdornment>
+              ),
+              endAdornment: searchQuery ? (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={() => setSearchQuery("")} sx={{ p: 0.5 }}>
+                    <CloseRoundedIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </InputAdornment>
+              ) : null,
+              sx: {
+                borderRadius: 2.5,
+                bgcolor: "#FFFFFF",
+                fontSize: 13,
+                "& fieldset": { borderColor: "#E2E8F0" },
+                "&:hover fieldset": { borderColor: "#CBD5E1" },
+                "&.Mui-focused fieldset": { borderColor: "primary.main" },
+              },
+            }}
+          />
+
+          <Button
+            variant="outlined"
+            onClick={() => setFilterDrawerOpen(true)}
+            startIcon={
+              <Badge
+                badgeContent={activeFilterCount}
+                color="error"
+                sx={{
+                  "& .MuiBadge-badge": {
+                    fontSize: 10,
+                    height: 16,
+                    minWidth: 16,
+                    top: -2,
+                    right: -2,
+                  },
+                }}
+              >
+                <TuneRoundedIcon sx={{ fontSize: 18, color: activeFilterCount > 0 ? "primary.main" : "#475569" }} />
+              </Badge>
+            }
+            sx={{
+              height: 40,
+              minWidth: 92,
+              borderRadius: 2.5,
+              textTransform: "none",
+              fontWeight: 800,
+              fontSize: 12.5,
+              bgcolor: activeFilterCount > 0 ? "#EFF6FF" : "#FFFFFF",
+              borderColor: activeFilterCount > 0 ? "primary.main" : "#E2E8F0",
+              color: activeFilterCount > 0 ? "primary.main" : "#334155",
+              boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
+              "&:hover": {
+                borderColor: "primary.main",
+                bgcolor: activeFilterCount > 0 ? "#DBEAFE" : "#F8FAFC",
+              },
+            }}
+          >
+            Filters
+          </Button>
+        </Stack>
+
+        {/* Quick Filter Pills (PhonePe Horizontal Pill Carousel) */}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 0.8,
+            overflowX: "auto",
+            pt: 1,
+            pb: 0.4,
+            "&::-webkit-scrollbar": { display: "none" },
+          }}
+        >
+          {/* Date Range Quick Pill */}
+          <Chip
+            icon={<CalendarMonthRoundedIcon sx={{ fontSize: "15px !important" }} />}
+            label={`Date: ${dateLabel} ▾`}
+            onClick={() => setFilterDrawerOpen(true)}
+            sx={{
+              fontWeight: 800,
+              fontSize: 11.5,
+              borderRadius: 999,
+              bgcolor: datePreset !== "all" ? "#EFF6FF" : "#FFFFFF",
+              color: datePreset !== "all" ? "#1D4ED8" : "#475569",
+              border: "1px solid",
+              borderColor: datePreset !== "all" ? "#3B82F6" : "#E2E8F0",
+              cursor: "pointer",
+              "& .MuiChip-icon": {
+                color: datePreset !== "all" ? "#1D4ED8" : "#64748B",
+              },
+              "&:hover": { bgcolor: "#EFF6FF" },
+            }}
+          />
+
+          {/* Flow Quick Pill */}
+          <Chip
+            label={flowFilter === "ALL" ? "Flow: All ▾" : `Flow: ${flowLabel} ▾`}
+            onClick={() => setFilterDrawerOpen(true)}
+            sx={{
+              fontWeight: 800,
+              fontSize: 11.5,
+              borderRadius: 999,
+              bgcolor: flowFilter !== "ALL" ? "#F5F3FF" : "#FFFFFF",
+              color: flowFilter !== "ALL" ? "#7C3AED" : "#475569",
+              border: "1px solid",
+              borderColor: flowFilter !== "ALL" ? "#8B5CF6" : "#E2E8F0",
+              cursor: "pointer",
+              "&:hover": { bgcolor: "#F5F3FF" },
+            }}
+          />
+
+          {/* Source Quick Pill */}
+          <Chip
+            label={sourceFilter === "ALL" ? "Source: All ▾" : `Source: ${sourceLabel} ▾`}
+            onClick={() => setFilterDrawerOpen(true)}
+            sx={{
+              fontWeight: 800,
+              fontSize: 11.5,
+              borderRadius: 999,
+              bgcolor: sourceFilter !== "ALL" ? "#F0FDF4" : "#FFFFFF",
+              color: sourceFilter !== "ALL" ? "#15803D" : "#475569",
+              border: "1px solid",
+              borderColor: sourceFilter !== "ALL" ? "#22C55E" : "#E2E8F0",
+              cursor: "pointer",
+              "&:hover": { bgcolor: "#F0FDF4" },
+            }}
+          />
+
+          {/* Clear / Reset All Pill if filters active */}
+          {activeFilterCount > 0 && (
             <Chip
-              key={p.value}
-              label={p.label}
-              onClick={() => setFilterDays(p.value)}
+              label={`✕ Reset (${activeFilterCount})`}
+              onClick={handleResetFilters}
               sx={{
                 fontWeight: 800,
-                fontSize: 12,
+                fontSize: 11.5,
                 borderRadius: 999,
-                bgcolor: selected ? "primary.main" : "#fff",
-                color: selected ? "#fff" : "text.secondary",
-                border: "1px solid",
-                borderColor: selected ? "primary.main" : "#E2E8F0",
-                "&:hover": {
-                  bgcolor: selected ? "primary.dark" : "#F1F5F9",
-                },
+                bgcolor: "#FEF2F2",
+                color: "#DC2626",
+                border: "1px solid #FCA5A5",
+                cursor: "pointer",
+                "&:hover": { bgcolor: "#FEE2E2" },
               }}
             />
-          );
-        })}
+          )}
+        </Box>
       </Box>
 
       {/* Source Category Filter Chips Bar */}
       <Box sx={{ mb: 1.5 }}>
-        <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#64748B", mb: 0.8, px: 0.5 }}>
-          Filter By Source
-        </Typography>
         <Box
           sx={{
             display: "flex",
@@ -2095,7 +2450,6 @@ export default function History() {
             { key: "ROYALTY", label: `Royalty (${categoryCounts.ROYALTY})` },
             { key: "MERCHANT_CAPTAIN", label: `Merchant / Captain (${categoryCounts.MERCHANT_CAPTAIN})` },
             { key: "WITHDRAWAL", label: `Withdrawals (${categoryCounts.WITHDRAWAL})` },
-            { key: "REDEEM", label: `Redeemed / Pocket (${categoryCounts.REDEEM})` },
           ].map((item) => {
             const isSelected = sourceFilter === item.key;
             return (
@@ -2107,14 +2461,14 @@ export default function History() {
                   fontWeight: 800,
                   fontSize: 11.5,
                   borderRadius: 999,
-                  bgcolor: isSelected ? "#0F172A" : "#F1F5F9",
+                  bgcolor: isSelected ? "#0F172A" : "#FFFFFF",
                   color: isSelected ? "#FFFFFF" : "#475569",
                   border: "1px solid",
                   borderColor: isSelected ? "#0F172A" : "#E2E8F0",
                   cursor: "pointer",
                   transition: "all 0.15s ease",
                   "&:hover": {
-                    bgcolor: isSelected ? "#1E293B" : "#E2E8F0",
+                    bgcolor: isSelected ? "#1E293B" : "#F1F5F9",
                   },
                 }}
               />
@@ -2139,11 +2493,11 @@ export default function History() {
           <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0F172A" }}>
             Transactions ({filteredTransactions.length})
           </Typography>
-          {sourceFilter !== "ALL" && (
+          {activeFilterCount > 0 && (
             <Chip
               size="small"
-              label="Reset Filter"
-              onClick={() => setSourceFilter("ALL")}
+              label="Reset Filters"
+              onClick={handleResetFilters}
               sx={{ height: 20, fontSize: 10.5, fontWeight: 700, cursor: "pointer", bgcolor: "#F1F5F9" }}
             />
           )}
@@ -2166,6 +2520,23 @@ export default function History() {
           />
         )}
       </Paper>
+
+      {/* PhonePe Filter Bottom Sheet */}
+      <PhonePeFilterDrawer
+        open={filterDrawerOpen}
+        onClose={() => setFilterDrawerOpen(false)}
+        datePreset={datePreset}
+        setDatePreset={setDatePreset}
+        customStartDate={customStartDate}
+        setCustomStartDate={setCustomStartDate}
+        customEndDate={customEndDate}
+        setCustomEndDate={setCustomEndDate}
+        flowFilter={flowFilter}
+        setFlowFilter={setFlowFilter}
+        sourceFilter={sourceFilter}
+        setSourceFilter={setSourceFilter}
+        onReset={handleResetFilters}
+      />
 
       {/* Transaction Details Bottom Sheet */}
       <TxDetailDrawer
