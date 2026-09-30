@@ -14,25 +14,41 @@ export default function QuickActionGrid({ variant = "dashboard" }) {
   const actions =
     variant === "wallet"
       ? [
-          { label: "Add Money", icon: AddRoundedIcon, color: C.addMoney, bg: C.primaryLight, route: "/user/upload-wallet" },
-          { label: "Withdraw", icon: ArrowUpwardRoundedIcon, color: C.withdraw, bg: "#FFF7ED", route: "/user/withdrawal" },
-          { label: "Transfer", icon: SwapHorizRoundedIcon, color: C.blocks, bg: "#ECFDF5", route: "/user/team-wallet" },
-          { label: "History", icon: HistoryRoundedIcon, color: C.history, bg: "#F0FDFA", route: "/user/history" },
+          { label: "Add Money", icon: AddRoundedIcon, color: "#2563eb", bg: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)", shadow: "rgba(37, 99, 235, 0.35)", route: "/user/upload-wallet" },
+          { label: "Withdraw", icon: ArrowUpwardRoundedIcon, color: "#f97316", bg: "linear-gradient(135deg, #f97316 0%, #ef4444 100%)", shadow: "rgba(249, 115, 22, 0.35)", route: "/user/withdrawal" },
+          { label: "Transfer", icon: SwapHorizRoundedIcon, color: "#10b981", bg: "linear-gradient(135deg, #10b981 0%, #059669 100%)", shadow: "rgba(16, 185, 129, 0.35)", route: "/user/team-wallet" },
+          { label: "History", icon: HistoryRoundedIcon, color: "#06b6d4", bg: "linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)", shadow: "rgba(6, 182, 212, 0.35)", route: "/user/history" },
         ]
       : [
-          { label: "Withdraw", icon: ArrowUpwardRoundedIcon, color: C.withdraw, bg: "#FFF7ED", route: "/user/withdrawal" },
-          { label: "History", icon: HistoryRoundedIcon, color: C.history, bg: "#F0FDFA", route: "/user/history" },
+          {
+            label: "Withdraw",
+            subtitle: "Instant Payout",
+            icon: ArrowUpwardRoundedIcon,
+            color: "#ffffff",
+            bg: "linear-gradient(135deg, #f97316 0%, #ef4444 100%)",
+            shadow: "0 8px 20px rgba(239, 68, 68, 0.38)",
+            route: "/user/withdrawal",
+          },
+          {
+            label: "History",
+            subtitle: "Transactions",
+            icon: HistoryRoundedIcon,
+            color: "#ffffff",
+            bg: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+            shadow: "0 8px 20px rgba(16, 185, 129, 0.38)",
+            route: "/user/history",
+          },
         ];
 
   return (
     <Paper
       elevation={0}
       sx={{
-        p: { xs: 1.75, sm: 2 },
-        borderRadius: `${R.card}px`,
-        bgcolor: C.surface,
-        border: `1px solid ${C.border}`,
-        boxShadow: S.cardShadow,
+        p: { xs: 2, sm: 2.25 },
+        borderRadius: "18px",
+        bgcolor: "#ffffff",
+        border: "1px solid #e2e8f0",
+        boxShadow: "0 8px 24px rgba(37, 99, 235, 0.05)",
       }}
     >
       <Stack direction="row" justifyContent="space-around" alignItems="center">
@@ -50,40 +66,50 @@ export default function QuickActionGrid({ variant = "dashboard" }) {
                 alignItems: "center",
                 gap: 0.75,
                 cursor: "pointer",
-                transition: "transform 140ms ease",
-                "&:active": { transform: "scale(0.92)" },
+                transition: "all 160ms ease",
+                "&:hover": { transform: "translateY(-2px)" },
+                "&:active": { transform: "scale(0.94)" },
               }}
             >
               <Box
                 sx={{
-                  width: { xs: 48, sm: 54 },
-                  height: { xs: 48, sm: 54 },
-                  borderRadius: "50%",
-                  bgcolor: act.bg,
-                  color: act.color,
+                  width: { xs: 52, sm: 58 },
+                  height: { xs: 52, sm: 58 },
+                  borderRadius: "16px",
+                  background: act.bg,
+                  color: act.color || "#ffffff",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  border: `1px solid ${act.color}22`,
-                  boxShadow: `0 4px 12px ${act.color}18`,
+                  boxShadow: act.shadow || "0 6px 16px rgba(0,0,0,0.1)",
                   transition: "box-shadow 160ms ease",
-                  "&:hover": {
-                    boxShadow: `0 6px 16px ${act.color}28`,
-                  },
                 }}
               >
-                <IconComp sx={{ fontSize: { xs: 22, sm: 26 } }} />
+                <IconComp sx={{ fontSize: { xs: 26, sm: 30 } }} />
               </Box>
               <Typography
                 sx={{
-                  fontSize: { xs: 11.5, sm: 12.5 },
-                  fontWeight: 600,
-                  color: C.text,
+                  fontSize: { xs: 13, sm: 14 },
+                  fontWeight: 700,
+                  color: "#0f172a",
                   textAlign: "center",
                 }}
               >
                 {act.label}
               </Typography>
+              {act.subtitle ? (
+                <Typography
+                  sx={{
+                    fontSize: 11,
+                    fontWeight: 500,
+                    color: "#64748b",
+                    textAlign: "center",
+                    mt: -0.5,
+                  }}
+                >
+                  {act.subtitle}
+                </Typography>
+              ) : null}
             </Box>
           );
         })}

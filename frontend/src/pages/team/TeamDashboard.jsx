@@ -45,7 +45,17 @@ import imgWishingGrow from "../../assets/wishing_connect_grow.png";
 function resolveApiMediaUrl(item, MEDIA_BASE) {
   const raw = item?.image_url || item?.image || "";
   if (!raw) return "";
-  const s = String(raw);
+  let s = String(raw).trim();
+
+  // If URL has duplicated protocols (e.g. Cloudinary duplicated prefix), take the last valid http(s)
+  const lastHttps = s.lastIndexOf("https://");
+  if (lastHttps > 0) {
+    s = s.substring(lastHttps);
+  } else {
+    const lastHttp = s.lastIndexOf("http://");
+    if (lastHttp > 0) s = s.substring(lastHttp);
+  }
+
   if (s.startsWith("data:") || s.startsWith("blob:") || s.startsWith("/static/") || s.includes("static/media/")) return s;
   if (/^https?:\/\//i.test(s)) {
     if (/^https?:\/\/localhost(?::\d+)?\//i.test(s) && MEDIA_BASE) {
@@ -75,19 +85,31 @@ const MotionPaper = motion.create(Paper);
 
 function SectionTitle({ title, action, onAction }) {
   return (
-    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.25 }}>
-      <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#64748b", letterSpacing: "0.5px", textTransform: "uppercase" }}>
-        {title}
-      </Typography>
+    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.25, px: 0.5 }}>
+      <Stack direction="row" alignItems="center" spacing={1}>
+        <Box
+          sx={{
+            width: 4,
+            height: 16,
+            borderRadius: 2,
+            background: "linear-gradient(to bottom, #2563eb, #06b6d4)",
+          }}
+        />
+        <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#1e293b", letterSpacing: "0.4px", textTransform: "uppercase" }}>
+          {title}
+        </Typography>
+      </Stack>
       {action ? (
         <Typography
           onClick={onAction}
           sx={{
-            fontSize: 12,
-            fontWeight: 700,
-            color: "#2563eb",
+            fontSize: 12.5,
+            fontWeight: 800,
+            background: "linear-gradient(90deg, #2563eb, #7c3aed)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
             cursor: "pointer",
-            "&:hover": { textDecoration: "underline" },
+            "&:hover": { opacity: 0.8 },
           }}
         >
           {action}
@@ -124,37 +146,70 @@ function DynamicHeroWishingBanner({
   }, [banners, defaultBanners]);
 
   const [idx, setIdx] = useState(0);
+  const [loadError, setLoadError] = useState(false);
   const MEDIA_BASE = useMemo(() => String(API?.defaults?.baseURL || "").replace(/\/api\/?$/, ""), []);
   const active = bannerList[idx] || bannerList[0] || null;
   const activeSrc = useMemo(() => resolveApiMediaUrl(active, MEDIA_BASE), [active, MEDIA_BASE]);
 
   useEffect(() => {
+    setLoadError(false);
+  }, [idx, activeSrc]);
+
+  useEffect(() => {
     if (bannerList.length <= 1) return undefined;
-    const t = window.setInterval(() => setIdx((i) => (i + 1) % bannerList.length), 4000);
+    const t = window.setInterval(() => setIdx((i) => (i + 1) % bannerList.length), 4500);
     return () => window.clearInterval(t);
   }, [bannerList.length]);
+
+  const fallbackAsset = idx % 2 === 0 ? imgWishingGanesha : imgWishingGrow;
+  const currentDisplaySrc = loadError || !activeSrc ? fallbackAsset : activeSrc;
 
   return (
     <Paper
       elevation={0}
       sx={{
-        p: { xs: 1.5, sm: 2 },
+        p: { xs: 2, sm: 2.25 },
         borderRadius: "18px",
-        bgcolor: C.surface,
-        border: `1px solid ${C.border}`,
-        boxShadow: "0 8px 24px rgba(15, 23, 42, 0.05)",
+        bgcolor: "#ffffff",
+        border: "1px solid #e2e8f0",
+        boxShadow: "0 8px 24px rgba(37, 99, 235, 0.05)",
       }}
     >
-      <Typography sx={{ fontSize: 16, fontWeight: 700, color: "#1e293b", mb: 1.25 }}>
-        Daily Wishing Banner
-      </Typography>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5, px: 0.25 }}>
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <Box
+            sx={{
+              width: 4,
+              height: 18,
+              borderRadius: 2,
+              background: "linear-gradient(to bottom, #f59e0b, #ec4899)",
+            }}
+          />
+          <Typography sx={{ fontSize: 16, fontWeight: 800, color: "#0f172a" }}>
+            Daily Wishing Banner
+          </Typography>
+        </Stack>
+        <Chip
+          label="✨ Dynamic Wishes"
+          size="small"
+          sx={{
+            height: 22,
+            fontSize: 11,
+            fontWeight: 800,
+            background: "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)",
+            color: "#92400e",
+            border: "1px solid #fcd34d",
+          }}
+        />
+      </Stack>
+
       <Box
         sx={{
           position: "relative",
           width: "100%",
           borderRadius: "14px",
           overflow: "hidden",
-          bgcolor: "#0f172a",
+          background: "linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%)",
           aspectRatio: { xs: "16 / 9", sm: "2.2 / 1", md: "2.6 / 1" },
           maxHeight: { xs: 260, sm: 360, md: 420 },
           display: "flex",
@@ -165,7 +220,7 @@ function DynamicHeroWishingBanner({
         {/* Ambient Blur Backdrop to eliminate awkward gaps across varying screen aspect ratios */}
         <Box
           component="img"
-          src={activeSrc || imgWishingGanesha}
+          src={currentDisplaySrc}
           alt=""
           aria-hidden="true"
           sx={{
@@ -179,11 +234,12 @@ function DynamicHeroWishingBanner({
             pointerEvents: "none",
           }}
         />
-        {/* Sharp, uncropped foreground wishing banner */}
+        {/* Sharp, uncropped foreground wishing banner with automatic error fallback */}
         <Box
           component="img"
-          src={activeSrc || imgWishingGanesha}
+          src={currentDisplaySrc}
           alt={active?.title || "Daily Wishing Banner"}
+          onError={() => setLoadError(true)}
           sx={{
             position: "relative",
             width: "100%",
@@ -195,18 +251,19 @@ function DynamicHeroWishingBanner({
         />
       </Box>
       {bannerList.length > 1 && (
-        <Stack direction="row" spacing={0.75} justifyContent="center" sx={{ mt: 1.25 }}>
+        <Stack direction="row" spacing={0.75} justifyContent="center" sx={{ mt: 1.5 }}>
           {bannerList.map((_, i) => (
             <Box
               key={i}
               onClick={() => setIdx(i)}
               sx={{
-                width: i === idx ? 18 : 6,
-                height: 6,
+                width: i === idx ? 22 : 7,
+                height: 7,
                 borderRadius: 4,
-                bgcolor: i === idx ? C.primary : "#cbd5e1",
+                background: i === idx ? "linear-gradient(90deg, #2563eb, #8b5cf6)" : "#cbd5e1",
+                boxShadow: i === idx ? "0 2px 8px rgba(37, 99, 235, 0.4)" : "none",
                 cursor: "pointer",
-                transition: "all 140ms ease",
+                transition: "all 200ms ease",
               }}
             />
           ))}
@@ -1259,13 +1316,61 @@ function SPPMonthlyCadenceWidget() {
     <Box sx={{ minHeight: "100dvh", bgcolor: C.appBg, pb: 4 }}>
       <Box className="consumer-fintech-page" sx={{ width: "100%", maxWidth: 1180, mx: "auto", px: { xs: 1, sm: 2 }, py: { xs: 1, sm: 2 } }}>
         <Stack spacing={2}>
-          {/* 1) MAIN WALLET HERO CARD */}
-          <BalanceCard
-            title="Main Wallet Balance"
-            amount={walletData?.main_wallet ?? walletData?.main_balance ?? 0}
-            subtitle="View wallet details"
-            onClick={() => navigate("/user/team-wallet")}
-          />
+          {/* 1) USER PROFILE GREETING CARD (Replaces Main Wallet Banner) */}
+          <Paper
+            elevation={0}
+            sx={{
+              p: { xs: 2, sm: 2.25 },
+              borderRadius: "18px",
+              background: "linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%)",
+              border: "1px solid #dbeafe",
+              boxShadow: "0 8px 24px rgba(37, 99, 235, 0.08)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Avatar
+                sx={{
+                  width: { xs: 50, sm: 56 },
+                  height: { xs: 50, sm: 56 },
+                  fontWeight: 800,
+                  fontSize: { xs: 19, sm: 22 },
+                  background: "linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)",
+                  boxShadow: "0 6px 18px rgba(37, 99, 235, 0.35)",
+                  color: "#ffffff",
+                }}
+              >
+                {initials}
+              </Avatar>
+              <Box>
+                <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#3b82f6", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Team Consumer
+                </Typography>
+                <Typography sx={{ fontSize: { xs: 18, sm: 20 }, fontWeight: 800, color: "#0f172a", lineHeight: 1.2 }}>
+                  {fullName}
+                </Typography>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5, flexWrap: "wrap", gap: 0.5 }}>
+                  <Typography sx={{ fontSize: 12, color: "#64748b" }}>
+                    User Id: <b style={{ color: "#2563eb" }}>{consumerPhone || username}</b>
+                  </Typography>
+                  <Chip
+                    label={`Status: ${status}`}
+                    size="small"
+                    sx={{
+                      height: 22,
+                      fontSize: 11,
+                      fontWeight: 800,
+                      background: "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)",
+                      color: "#059669",
+                      border: "1px solid #a7f3d0",
+                    }}
+                  />
+                </Stack>
+              </Box>
+            </Stack>
+          </Paper>
 
           {/* SPP MONTHLY CADENCE & RENEWAL WIDGET */}
           <SPPMonthlyCadenceWidget />
