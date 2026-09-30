@@ -37,8 +37,9 @@ import imgEcommerce from "../../assets/ecommerce.jpg";
 import imgGifts from "../../assets/gifts.jpg";
 import imgHolidays from "../../assets/holidays.jpg";
 import imgKerala from "../../assets/kerala.jpg";
-import imgThailand from "../../assets/thailand.jpg";
 import imgHomepageBanner from "../../assets/homepage_banner.png";
+import imgWishingGanesha from "../../assets/wishing_gowri_ganesha.png";
+import imgWishingGrow from "../../assets/wishing_connect_grow.png";
 
 function resolveApiMediaUrl(item, MEDIA_BASE) {
   const raw = item?.image_url || item?.image || "";
@@ -104,13 +105,13 @@ function DynamicHeroWishingBanner({
     () => [
       {
         id: "default-wishing-1",
-        title: "Daily Wishing Banner",
-        image: imgHomepageBanner,
+        title: "Happy Gowri Ganesha",
+        image: imgWishingGanesha,
       },
       {
         id: "default-wishing-2",
         title: "Connect, Earn, Grow",
-        image: imgHomepageBanner,
+        image: imgWishingGrow,
       },
     ],
     []
@@ -136,35 +137,64 @@ function DynamicHeroWishingBanner({
     <Paper
       elevation={0}
       sx={{
-        p: { xs: 2, sm: 2.25 },
+        p: { xs: 1.5, sm: 2 },
         borderRadius: "18px",
         bgcolor: C.surface,
         border: `1px solid ${C.border}`,
         boxShadow: "0 8px 24px rgba(15, 23, 42, 0.05)",
       }}
     >
-      <Typography sx={{ fontSize: 16, fontWeight: 700, color: "#1e293b", mb: 1.5 }}>
+      <Typography sx={{ fontSize: 16, fontWeight: 700, color: "#1e293b", mb: 1.25 }}>
         Daily Wishing Banner
       </Typography>
       <Box
         sx={{
           position: "relative",
           width: "100%",
-          height: { xs: 160, sm: 220, md: 260 },
           borderRadius: "14px",
           overflow: "hidden",
-          bgcolor: "#f8fafc",
+          bgcolor: "#0f172a",
+          aspectRatio: { xs: "16 / 9", sm: "2.2 / 1", md: "2.6 / 1" },
+          maxHeight: { xs: 260, sm: 360, md: 420 },
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}
       >
+        {/* Ambient Blur Backdrop to eliminate awkward gaps across varying screen aspect ratios */}
         <Box
           component="img"
-          src={activeSrc || imgHomepageBanner}
+          src={activeSrc || imgWishingGanesha}
+          alt=""
+          aria-hidden="true"
+          sx={{
+            position: "absolute",
+            inset: -16,
+            width: "calc(100% + 32px)",
+            height: "calc(100% + 32px)",
+            objectFit: "cover",
+            filter: "blur(22px) brightness(0.65)",
+            transform: "scale(1.1)",
+            pointerEvents: "none",
+          }}
+        />
+        {/* Sharp, uncropped foreground wishing banner */}
+        <Box
+          component="img"
+          src={activeSrc || imgWishingGanesha}
           alt={active?.title || "Daily Wishing Banner"}
-          sx={{ width: "100%", height: "100%", objectFit: "cover" }}
+          sx={{
+            position: "relative",
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+            zIndex: 1,
+            transition: "opacity 300ms ease",
+          }}
         />
       </Box>
       {bannerList.length > 1 && (
-        <Stack direction="row" spacing={0.75} justifyContent="center" sx={{ mt: 1.5 }}>
+        <Stack direction="row" spacing={0.75} justifyContent="center" sx={{ mt: 1.25 }}>
           {bannerList.map((_, i) => (
             <Box
               key={i}
