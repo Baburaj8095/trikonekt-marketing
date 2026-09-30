@@ -37,6 +37,7 @@ import imgEcommerce from "../../assets/ecommerce.jpg";
 import imgGifts from "../../assets/gifts.jpg";
 import imgHolidays from "../../assets/holidays.jpg";
 import imgKerala from "../../assets/kerala.jpg";
+import imgThailand from "../../assets/thailand.jpg";
 import imgHomepageBanner from "../../assets/homepage_banner.png";
 import imgWishingGanesha from "../../assets/wishing_gowri_ganesha.png";
 import imgWishingGrow from "../../assets/wishing_connect_grow.png";
